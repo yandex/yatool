@@ -389,7 +389,7 @@ def find_jdk_pattern(resources):
 
 
 def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, resolve_type):
-    temp_project = os.path.join('junk', core.config.get_user(), 'maven_import_tmp')
+    temp_project = os.path.join(core.config.user_junk_dir(), 'maven_import_tmp')
     temp_project_path = os.path.join(opts.arc_root, temp_project)
     session_id = str(uuid.uuid4())
 

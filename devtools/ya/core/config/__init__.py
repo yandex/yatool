@@ -92,8 +92,18 @@ def tmp_path():
     return os.path.join(misc_root(), 'tmp')
 
 
+def user_junk_dir(username=None):
+    username = username or get_user()
+    try:
+        import app_config
+
+        return app_config.junk_root.format(username=username)
+    except Exception:
+        return 'junk/' + username
+
+
 def junk_path(arc_root, *path):
-    return ya_path(arc_root, 'junk', get_user(), *path)
+    return ya_path(arc_root, user_junk_dir(username=get_user()), *path)
 
 
 def entry_point_path():
