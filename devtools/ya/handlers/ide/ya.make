@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE handlers.ide
     __init__.py
@@ -15,7 +17,7 @@ PEERDIR(
     devtools/ya/yalibrary/platform_matcher
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/ide/fsnotifier
     )

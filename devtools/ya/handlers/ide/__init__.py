@@ -142,13 +142,13 @@ class CLionOptions(core.yarg.Options):
                 ['--full-targets'],
                 hook=core.yarg.SetConstValueHook('full_targets', True),
                 help='Old Mode: Enable full targets graph generation for project.',
-                group=CLionOptions.CLION_OPT_GROUP
+                group=CLionOptions.CLION_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
                 ['--add-py3-targets'],
                 hook=core.yarg.SetConstValueHook('add_py_targets', True),
                 help='Add Python 3 targets to project',
-                group=CLionOptions.CLION_OPT_GROUP
+                group=CLionOptions.CLION_OPT_GROUP,
             ),
             core.yarg.ConfigConsumer('filters'),
             core.yarg.ConfigConsumer('lite_mode'),
@@ -237,10 +237,7 @@ class IdeaOptions(core.yarg.Options):
                 group=IdeaOptions.IDEA_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--ymake-bin'],
-                help='Path to ymake binary',
-                hook=core.yarg.SetValueHook('ymake_bin'),
-                visible=False
+                ['--ymake-bin'], help='Path to ymake binary', hook=core.yarg.SetValueHook('ymake_bin'), visible=False
             ),
             core.yarg.ArgConsumer(
                 ['--iml-in-project-root'],
@@ -291,42 +288,42 @@ class IdeaOptions(core.yarg.Options):
             core.yarg.ArgConsumer(
                 ['--generate-junit-run-configurations'],
                 help='Generate run configuration for junit tests',
-                hook=core.yarg.SetConstValueHook('generate_tests_run', True)
+                hook=core.yarg.SetConstValueHook('generate_tests_run', True),
             ),
             core.yarg.ArgConsumer(
                 ['--generate-tests-for-dependencies'],
                 help='Generate tests for PEERDIR dependencies',
-                hook=core.yarg.SetConstValueHook('generate_tests_for_deps', True)
+                hook=core.yarg.SetConstValueHook('generate_tests_for_deps', True),
             ),
             core.yarg.ArgConsumer(
                 ['--separate-tests-modules'],
                 help='Do not merge tests modules with their own libraries',
-                hook=core.yarg.SetConstValueHook('separate_tests_modules', True)
+                hook=core.yarg.SetConstValueHook('separate_tests_modules', True),
             ),
             core.yarg.ArgConsumer(
                 ['--auto-exclude-symlinks'],
                 help='Add all symlink-dirs in modules to exclude dirs',
-                hook=core.yarg.SetConstValueHook('auto_exclude_symlinks', True)
+                hook=core.yarg.SetConstValueHook('auto_exclude_symlinks', True),
             ),
             core.yarg.ArgConsumer(
                 ['--exclude-dirs'],
                 help='Exclude dirs with specific names from all modules',
-                hook=core.yarg.SetAppendHook('exclude_dirs')
+                hook=core.yarg.SetAppendHook('exclude_dirs'),
             ),
             core.yarg.ArgConsumer(
                 ['--with-common-jvm-args-in-junit-template'],
                 help='Add common JVM_ARGS flags to default junit template',
-                hook=core.yarg.SetConstValueHook('with_common_jvm_args_in_junit_template', True)
+                hook=core.yarg.SetConstValueHook('with_common_jvm_args_in_junit_template', True),
             ),
             core.yarg.ArgConsumer(
                 ['--with-long-library-names'],
                 help='Generate long library names',
-                hook=core.yarg.SetConstValueHook('with_long_library_names', True)
+                hook=core.yarg.SetConstValueHook('with_long_library_names', True),
             ),
             core.yarg.ArgConsumer(
                 ['--copy-shared-index-config'],
                 help='Copy project config for Shared Indexes if exist',
-                hook=core.yarg.SetConstValueHook('copy_shared_index_config', True)
+                hook=core.yarg.SetConstValueHook('copy_shared_index_config', True),
             ),
             core.yarg.ArgConsumer(
                 ['--idea-jdk-version'],
@@ -337,21 +334,21 @@ class IdeaOptions(core.yarg.Options):
                 ['-U', '--regenerate-with-project-update'],
                 help='Run `ya project update` upon regeneration from Idea',
                 group=IdeaOptions.IDE_PLUGIN_INTEGRATION_GROUP,
-                hook=core.yarg.SetConstValueHook('regenerate_with_project_update', True)
+                hook=core.yarg.SetConstValueHook('regenerate_with_project_update', True),
             ),
             core.yarg.ArgConsumer(
                 ['--project-update-targets'],
                 help='Run `ya project update` for this dirs upon regeneration from Idea',
                 hook=core.yarg.SetAppendHook('project_update_targets'),
                 group=IdeaOptions.IDE_PLUGIN_INTEGRATION_GROUP,
-                visible=HelpLevel.ADVANCED
+                visible=HelpLevel.ADVANCED,
             ),
             core.yarg.ArgConsumer(
                 ['--project-update-kind'],
                 help='Type of a project to use in `ya project update` upon regernation from Idea',
                 hook=core.yarg.SetValueHook('project_update_kind'),
                 group=IdeaOptions.IDE_PLUGIN_INTEGRATION_GROUP,
-                visible=HelpLevel.ADVANCED
+                visible=HelpLevel.ADVANCED,
             ),
             core.yarg.ConfigConsumer('idea_project_root'),
             core.yarg.ConfigConsumer('local'),
@@ -387,10 +384,14 @@ class IdeaOptions(core.yarg.Options):
         self.idea_project_root = os.path.abspath(self.idea_project_root)
 
         if self.iml_keep_relative_paths and not self.iml_in_project_root:
-            raise core.yarg.ArgsValidatingException('--iml-keep-relative-paths can be used only with --iml-in-project-root')
+            raise core.yarg.ArgsValidatingException(
+                '--iml-keep-relative-paths can be used only with --iml-in-project-root'
+            )
 
         if self.generate_tests_run and not self.directory_based:
-            raise core.yarg.ArgsValidatingException('run configurations may be generated only for directory-based project')
+            raise core.yarg.ArgsValidatingException(
+                'run configurations may be generated only for directory-based project'
+            )
 
         for p in self.exclude_dirs:
             if os.path.isabs(p):
@@ -410,7 +411,7 @@ class GradleOptions(core.yarg.Options):
                 ['--gradle-name'],
                 help='Set project name manually',
                 hook=core.yarg.SetValueHook('gradle_name'),
-                group=GradleOptions.GRADLE_OPT_GROUP
+                group=GradleOptions.GRADLE_OPT_GROUP,
             )
         ]
 
@@ -444,19 +445,23 @@ class PycharmOptions(core.yarg.Options):
                 ['--list-ide'],
                 help='List available JB IDE for patching SDK list.',
                 hook=core.yarg.SetConstValueHook('list_ide', True),
-                group=PycharmOptions.PYCHARM_OPT_GROUP
+                group=PycharmOptions.PYCHARM_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
                 ['--ide-version'],
-                help='Change IDE version for patching SDK list. Available IDE: {}'.format(", ".join(ide.pycharm.find_available_ide())),
+                help='Change IDE version for patching SDK list. Available IDE: {}'.format(
+                    ", ".join(ide.pycharm.find_available_ide())
+                ),
                 hook=core.yarg.SetValueHook('ide_version'),
-                group=PycharmOptions.PYCHARM_OPT_GROUP
-            )
+                group=PycharmOptions.PYCHARM_OPT_GROUP,
+            ),
         ]
 
     def postprocess(self):
         if PycharmOptions.PYTHON_WRAPPER_NAME != self.wrapper_name and not self.only_generate_wrapper:
-            raise core.yarg.ArgsValidatingException("Custom wrapper name can be used with option --only-generate-wrapper")
+            raise core.yarg.ArgsValidatingException(
+                "Custom wrapper name can be used with option --only-generate-wrapper"
+            )
 
 
 MSVS_OPTS = ide.msvs.MSVS_OPTS + [ide.ide_common.YaExtraArgsOptions(), core.common_opts.YaBin3Options()]
@@ -479,23 +484,18 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             examples=[
                 core.yarg.UsageExample(
                     '{prefix} util/generic util/datetime',
-                    'Generate solution for util/generic, util/datetime and all their dependencies'
+                    'Generate solution for util/generic, util/datetime and all their dependencies',
                 ),
-                core.yarg.UsageExample(
-                    '{prefix} -P Output',
-                    'Generate solution in Output directory'
-                ),
-                core.yarg.UsageExample(
-                    '{prefix} -T my_solution',
-                    'Generate solution titled my_solution.sln'
-                )
+                core.yarg.UsageExample('{prefix} -P Output', 'Generate solution in Output directory'),
+                core.yarg.UsageExample('{prefix} -T my_solution', 'Generate solution titled my_solution.sln'),
             ],
             visible=(pm.my_platform() == 'win32'),
         )
         self['clion'] = core.yarg.OptsHandler(
             action=app.execute(ide.clion2016.do_clion),
             description='[[imp]]ya ide clion[[rst]] is deprecated, please use clangd-based tooling instead',
-            opts=ide.ide_common.ide_via_ya_make_opts() + [
+            opts=ide.ide_common.ide_via_ya_make_opts()
+            + [
                 CLionOptions(),
                 TidyOptions(),
                 core.common_opts.YaBin3Options(),
@@ -505,7 +505,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['idea'] = core.yarg.OptsHandler(
             action=app.execute(ide.idea.do_idea),
             description='Generate stub for IntelliJ IDEA',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.ide_common.IdeYaMakeOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 IdeaOptions(),
@@ -543,7 +544,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 action=app.execute(
                     lambda *a, **k: None,
                     handler_python_major_version=3,
-                    ),
+                ),
                 description='Generate gradle for project',
                 opts=ide_gradle_opts,
                 visible=False,
@@ -553,7 +554,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 action=app.execute(
                     ide.gradle.do_gradle,
                     handler_python_major_version=3,
-                    ),
+                ),
                 description='Generate gradle for project',
                 opts=ide_gradle_opts,
                 visible=False,
@@ -566,7 +567,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['goland'] = core.yarg.OptsHandler(
             action=app.execute(ide.goland.do_goland),
             description='Generate stub for Goland',
-            opts=ide.ide_common.ide_via_ya_make_opts() + [
+            opts=ide.ide_common.ide_via_ya_make_opts()
+            + [
                 ide.goland.GolandOptions(),
                 core.common_opts.YaBin3Options(),
             ],
@@ -574,7 +576,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['pycharm'] = core.yarg.OptsHandler(
             action=app.execute(ide.pycharm.do_pycharm),
             description='Generate PyCharm project.',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 PycharmOptions(),
                 ide.ide_common.IdeYaMakeOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
@@ -586,7 +589,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode-clangd'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_clangd.gen_vscode_workspace),
             description='Generate VSCode clangd C++ project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#c',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode_clangd.VSCodeClangdOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 bcd.CompilationDatabaseOptions(),
@@ -603,7 +607,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode-go'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_go.gen_vscode_workspace),
             description='Generate VSCode Go project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#golang',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode_go.VSCodeGoOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
@@ -617,7 +622,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode-py'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_py.gen_vscode_workspace),
             description='Generate VSCode Python project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#python',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode_py.VSCodePyOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
@@ -632,7 +638,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode-ts'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_py.gen_vscode_workspace),
             description='Generate VSCode TypeScript project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode_py.VSCodePyOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
@@ -647,7 +654,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_all.gen_vscode_workspace),
             description='Generate VSCode multi-language project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#multi',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode.opts.VSCodeAllOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 bcd.CompilationDatabaseOptions(),
@@ -663,7 +671,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode-ts'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_ts.gen_vscode_workspace),
             description='Generate VSCode TypeScript project\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 ide.vscode_ts.VSCodeTypeScriptOptions(),
                 core.common_opts.YaBin3Options(),
             ],
@@ -672,7 +681,8 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['venv'] = core.yarg.OptsHandler(
             action=app.execute(ide.venv.do_venv),
             description='Create or update python venv',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True) + [
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
                 build.build_opts.BuildTypeOptions('release'),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ExecutorOptions(),

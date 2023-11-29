@@ -5,8 +5,21 @@ import sys
 import logging
 
 from core.common_opts import CrossCompilationOptions
-from core.yarg import (ArgConsumer, CompositeHandler, EnvConsumer, SetConstValueHook, SetValueHook, Options,
-                       OptsHandler, FreeArgConsumer, ConfigConsumer, ExtendHook, ShowHelpException, SetAppendHook, BaseHook)
+from core.yarg import (
+    ArgConsumer,
+    CompositeHandler,
+    EnvConsumer,
+    SetConstValueHook,
+    SetValueHook,
+    Options,
+    OptsHandler,
+    FreeArgConsumer,
+    ConfigConsumer,
+    ExtendHook,
+    ShowHelpException,
+    SetAppendHook,
+    BaseHook,
+)
 
 import app
 
@@ -36,22 +49,14 @@ class ToolYaHandler(CompositeHandler):
             self,
             description=self.description,
             examples=[
-                core.yarg.UsageExample(
-                    '{prefix} --ya-help',
-                    'Print yatool specific options',
-                    good_looking=20
-                ),
-                core.yarg.UsageExample(
-                    '{prefix} --print-path',
-                    'Print path to tool executable file',
-                    good_looking=10
-                ),
+                core.yarg.UsageExample('{prefix} --ya-help', 'Print yatool specific options', good_looking=20),
+                core.yarg.UsageExample('{prefix} --print-path', 'Print path to tool executable file', good_looking=10),
                 core.yarg.UsageExample(
                     '{prefix} --force-update',
                     'Check tool for updates before the update interval elapses',
-                    good_looking=10
+                    good_looking=10,
                 ),
-            ]
+            ],
         )
         for x in tools():
             self[x.name] = OptsHandler(
@@ -59,7 +64,7 @@ class ToolYaHandler(CompositeHandler):
                 description=x.description,
                 visible=x.visible,
                 opts=[ToolOptions(x.name)] + self.common_download_options(),
-                unknown_args_as_free=True
+                unknown_args_as_free=True,
             )
 
 
@@ -96,42 +101,54 @@ class ToolOptions(Options):
     @staticmethod
     def consumer():
         return [
-            ArgConsumer(['--print-path'], help='Only print path to tool, do not execute',
-                        hook=SetConstValueHook('print_path', True)),
-            ArgConsumer(['--print-toolchain-path'], help='Print path to toolchain root',
-                        hook=SetConstValueHook('print_toolchain_path', True)),
-            ArgConsumer(['--print-toolchain-sys-libs'], help='Print pathes to toolchsin system libraries',
-                        hook=SetConstValueHook('print_toolchain_sys_libs', True)),
-            ArgConsumer(['--platform'], help="Set specific platform",
-                        hook=SetValueHook('platform')),
-            ArgConsumer(['--host-platform'], help="Set host platform",
-                        hook=SetValueHook('host_platform')),
+            ArgConsumer(
+                ['--print-path'],
+                help='Only print path to tool, do not execute',
+                hook=SetConstValueHook('print_path', True),
+            ),
+            ArgConsumer(
+                ['--print-toolchain-path'],
+                help='Print path to toolchain root',
+                hook=SetConstValueHook('print_toolchain_path', True),
+            ),
+            ArgConsumer(
+                ['--print-toolchain-sys-libs'],
+                help='Print pathes to toolchsin system libraries',
+                hook=SetConstValueHook('print_toolchain_sys_libs', True),
+            ),
+            ArgConsumer(['--platform'], help="Set specific platform", hook=SetValueHook('platform')),
+            ArgConsumer(['--host-platform'], help="Set host platform", hook=SetValueHook('host_platform')),
             EnvConsumer('YA_TOOL_HOST_PLATFORM', hook=SetValueHook('host_platform')),
-            ArgConsumer(['--toolchain'], help="Specify toolchain",
-                        hook=SetValueHook('toolchain')),
-            ArgConsumer(['--get-param'], help="Get specified param",
-                        hook=SetValueHook('param')),
-            ArgConsumer(['--get-resource-id'],
-                        help="Get resource id for specific platform (the platform should be specified)",
-                        hook=SetConstValueHook('need_resource_id', True)),
-            ArgConsumer(['--get-task-id'], help="Get task id",
-                        hook=SetConstValueHook('need_task_id', True)),
-            ArgConsumer(['--ya-help'], help="Show help",
-                        hook=SetConstValueHook('show_help', True)),
-            ArgConsumer(['--target-platform'], help='Target platform',
-                        hook=SetAppendHook('target_platforms', values=CrossCompilationOptions.generate_target_platforms_cxx())),
-            ArgConsumer(['--hide-arm64-host-warning'], help='Hide MacOS arm64 host warning',
-                        hook=SetConstValueHook('hide_arm64_host_warning', True),
-                        group=PRINT_CONTROL_GROUP,
-                        visible=HelpLevel.EXPERT if is_darwin_arm64() else False),
+            ArgConsumer(['--toolchain'], help="Specify toolchain", hook=SetValueHook('toolchain')),
+            ArgConsumer(['--get-param'], help="Get specified param", hook=SetValueHook('param')),
+            ArgConsumer(
+                ['--get-resource-id'],
+                help="Get resource id for specific platform (the platform should be specified)",
+                hook=SetConstValueHook('need_resource_id', True),
+            ),
+            ArgConsumer(['--get-task-id'], help="Get task id", hook=SetConstValueHook('need_task_id', True)),
+            ArgConsumer(['--ya-help'], help="Show help", hook=SetConstValueHook('show_help', True)),
+            ArgConsumer(
+                ['--target-platform'],
+                help='Target platform',
+                hook=SetAppendHook('target_platforms', values=CrossCompilationOptions.generate_target_platforms_cxx()),
+            ),
+            ArgConsumer(
+                ['--hide-arm64-host-warning'],
+                help='Hide MacOS arm64 host warning',
+                hook=SetConstValueHook('hide_arm64_host_warning', True),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT if is_darwin_arm64() else False,
+            ),
             EnvConsumer('YA_TOOL_HIDE_ARM64_HOST_WARNING', hook=SetConstValueHook('hide_arm64_host_warning', True)),
             ConfigConsumer('hide_arm64_host_warning'),
-            ArgConsumer(['--force-update'], help='Check tool for updates before the update interval elapses',
-                        hook=SetConstValueHook('force_update', True)),
-            ArgConsumer(['--force-refetch'], help='Refetch toolchain',
-                        hook=SetConstValueHook('force_refetch', True)),
-            ArgConsumer(['--print-fastpath-error'], help='Print fast path failure error',
-                        hook=DummyHook()),
+            ArgConsumer(
+                ['--force-update'],
+                help='Check tool for updates before the update interval elapses',
+                hook=SetConstValueHook('force_update', True),
+            ),
+            ArgConsumer(['--force-refetch'], help='Refetch toolchain', hook=SetConstValueHook('force_refetch', True)),
+            ArgConsumer(['--print-fastpath-error'], help='Print fast path failure error', hook=DummyHook()),
             FreeArgConsumer(help='arg', hook=ExtendHook(name='tail_args')),
         ]
 
@@ -151,9 +168,7 @@ def _replace(s, transformations):
 
 
 def _useful_env_vars():
-    return {
-        'YA_TOOL': sys.argv[0]
-    }
+    return {'YA_TOOL': sys.argv[0]}
 
 
 def do_tool(params):
@@ -173,11 +188,18 @@ def do_tool(params):
         if not params.hide_arm64_host_warning:
             try:
                 import app_ctx
+
                 app_ctx.display.emit_message("You use x86_64 version of selected tool.")
             except Exception as e:
                 logger.error("Can't print arm64 warning message: {}".format(e))
 
-    tool_path = tool(tool_name, params.toolchain, target_platform=target_platform, for_platform=host_platform, force_refetch=params.force_refetch)
+    tool_path = tool(
+        tool_name,
+        params.toolchain,
+        target_platform=target_platform,
+        for_platform=host_platform,
+        force_refetch=params.force_refetch,
+    )
     if exts.windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'
@@ -216,10 +238,7 @@ def do_tool(params):
         env.update(_useful_env_vars())
         for key, value in environ(tool_name, params.toolchain).items():
             env[key] = _replace(
-                os.pathsep.join(value),
-                {
-                    'ROOT': toolchain_root(tool_name, params.toolchain, for_platform)
-                }
+                os.pathsep.join(value), {'ROOT': toolchain_root(tool_name, params.toolchain, for_platform)}
             )
         if tool_name == 'gdb':
             # gdb does not fit in 8 MB stack with large cores (DEVTOOLS-5040).
@@ -246,11 +265,15 @@ def do_tool(params):
                 logger.debug('Arcadia root found: %s', arc_root)
                 extra_args = ['-ex', 'set substitute-path /-S/ {}/'.format(arc_root)] + extra_args
                 extra_args = ['-ex', 'set filename-display absolute'] + extra_args
-        if tool_name == 'arc' \
-                and params.username not in {'sandbox', 'root'} \
-                and os.getenv('YA_ALLOW_TOOL_ARC', 'no') != 'yes':
-            message = 'Please, use natively installed arc, install guide:' \
-                      ' https://docs.yandex-team.ru/devtools/intro/quick-start-guide#arc-setup'
+        if (
+            tool_name == 'arc'
+            and params.username not in {'sandbox', 'root'}
+            and os.getenv('YA_ALLOW_TOOL_ARC', 'no') != 'yes'
+        ):
+            message = (
+                'Please, use natively installed arc, install guide:'
+                ' https://docs.yandex-team.ru/devtools/intro/quick-start-guide#arc-setup'
+            )
             raise core.yarg.ArgsValidatingException(message)
         exts.process.execve(tool_path, extra_args, env=env)
 

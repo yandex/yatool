@@ -9,19 +9,62 @@ import sys
 import enum
 import six
 
-from build.build_facade import (gen_all_loops, gen_dir_loops, gen_graph, gen_licenses_list, gen_forced_deps_list, gen_modules, gen_module_info, gen_plan,
-                                gen_json_graph, gen_uids, gen_srcdeps, gen_dependencies, gen_test_dart, gen_conf, gen_filelist, gen_relation)
+from build.build_facade import (
+    gen_all_loops,
+    gen_dir_loops,
+    gen_graph,
+    gen_licenses_list,
+    gen_forced_deps_list,
+    gen_modules,
+    gen_module_info,
+    gen_plan,
+    gen_json_graph,
+    gen_uids,
+    gen_srcdeps,
+    gen_dependencies,
+    gen_test_dart,
+    gen_conf,
+    gen_filelist,
+    gen_relation,
+)
 from handlers.dump.gen_conf_docs import dump_mmm_docs
 from build.dir_graph import reachable, gen_dir_graph
 from build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
 from exts.strtobool import strtobool
 from exts.tmp import temp_dir
-from core.yarg import (CompositeHandler, OptsHandler, ArgConsumer, FreeArgConsumer, SetValueHook, Options,
-                       SetConstValueHook, SetConstAppendHook, UpdateValueHook, SetAppendHook, ExtendHook, ArgsValidatingException, Group)
+from core.yarg import (
+    CompositeHandler,
+    OptsHandler,
+    ArgConsumer,
+    FreeArgConsumer,
+    SetValueHook,
+    Options,
+    SetConstValueHook,
+    SetConstAppendHook,
+    UpdateValueHook,
+    SetAppendHook,
+    ExtendHook,
+    ArgsValidatingException,
+    Group,
+)
 from yalibrary.vcs import vcsversion
 from core.imprint import imprint
-from build.build_opts import YMakeDebugOptions, YMakeBinOptions, FlagsOptions, CustomFetcherOptions, ToolsOptions, SandboxAuthOptions, JavaSpecificOptions
-from build.build_opts import BuildTypeOptions, BuildTargetsOptions, ShowHelpOptions, CustomBuildRootOptions, ContinueOnFailOptions
+from build.build_opts import (
+    YMakeDebugOptions,
+    YMakeBinOptions,
+    FlagsOptions,
+    CustomFetcherOptions,
+    ToolsOptions,
+    SandboxAuthOptions,
+    JavaSpecificOptions,
+)
+from build.build_opts import (
+    BuildTypeOptions,
+    BuildTargetsOptions,
+    ShowHelpOptions,
+    CustomBuildRootOptions,
+    ContinueOnFailOptions,
+)
 from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions
 from core.common_opts import CrossCompilationOptions, YaBin3Options
 from test.explore import generate_tests_by_dart
@@ -58,18 +101,22 @@ class DumpYaHandler(CompositeHandler):
         self['modules'] = OptsHandler(
             action=app.execute(action=do_modules),
             description='All modules',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 PeerDirectoriesOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['module-info'] = OptsHandler(
             action=app.execute(action=do_module_info),
             description='Modules info',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 PeerDirectoriesOptions(),
@@ -77,21 +124,25 @@ class DumpYaHandler(CompositeHandler):
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
                 DumpModuleInfoOptions(),
-            ]
+            ],
         )
         self['src-deps'] = OptsHandler(
             action=app.execute(action=do_dump_srcdeps),
             description='Dump of all source dependencies',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DumpSrcDepsOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['dir-graph'] = OptsHandler(
             action=app.execute(action=do_dir_graph),
             description='Dependencies between directories',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DumpDirOptions(),
                 SplitByTypeOptions(),
                 DumpTestListOptions(),
@@ -100,49 +151,57 @@ class DumpYaHandler(CompositeHandler):
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
                 LegacyDepsOptions(),
-            ]
+            ],
         )
         self['dep-graph'] = OptsHandler(
             action=app.execute(action=do_dep_graph),
             description='Dependency internal graph',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepGraphOutputOptions(),
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
                 LegacyDepsOptions(),
-            ]
+            ],
         )
         self['dot-graph'] = OptsHandler(
             action=app.execute(action=do_dot_graph),
             description='Dependency between directories in dot format',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 PeerDirectoriesOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['json-dep-graph'] = OptsHandler(
             action=app.execute(action=do_json_dep_graph),
             description='Dependency graph as json',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
                 LegacyDepsOptions(),
-            ]
+            ],
         )
         self['build-plan'] = OptsHandler(
             action=app.execute(action=do_build_plan),
             description='Build plan',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 CustomBuildRootOptions(),
                 YMakeDebugOptions(),
-            ]
+            ],
         )
         self['compile-commands'] = OptsHandler(
             action=app.execute(action=dump_compilation_database),
@@ -157,19 +216,23 @@ class DumpYaHandler(CompositeHandler):
         self['relation'] = OptsHandler(
             action=app.execute(action=do_relation),
             description='PEERDIR relations.  Please don\'t run from the arcadia root.',
-            opts=self.common_opts + self.common_build_facade_opts(False) + [
+            opts=self.common_opts
+            + self.common_build_facade_opts(False)
+            + [
                 RelationSrcDstOptions(free_dst=True),
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 PeerDirectoriesOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['all-relations'] = OptsHandler(
             action=app.execute(action=do_all_relations),
             description='All relations between internal graph nodes in dot format. Please don\'t run from the arcadia root.',
-            opts=self.common_opts + self.common_build_facade_opts(False) + [
+            opts=self.common_opts
+            + self.common_build_facade_opts(False)
+            + [
                 RelationSrcDstOptions(free_dst=True),
                 DumpAllRelationsOptions(),
                 DepTraverseOptions(),
@@ -177,48 +240,54 @@ class DumpYaHandler(CompositeHandler):
                 PeerDirectoriesOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['files'] = OptsHandler(
             action=app.execute(action=do_files),
             description='File list',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 FilesFilterOptions(),
                 DepTraverseOptions(),
                 DepFilterOptions(),
                 DataOptions(),
                 YMakeDebugOptions(),
-                CustomBuildRootOptions()
-            ]
+                CustomBuildRootOptions(),
+            ],
         )
         self['loops'] = OptsHandler(
             action=app.execute(action=do_loops),
             description='All loops in arcadia',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['peerdir-loops'] = OptsHandler(
             action=app.execute(action=do_peerdir_loops),
             description='Loops by peerdirs',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 DepTraverseOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ]
+            ],
         )
         self['imprint'] = OptsHandler(
             action=app.execute(action=do_imprint),
             description='Directory imprint',
-            opts=self.common_opts + [CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()]
+            opts=self.common_opts + [CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],
         )
         self['uids'] = OptsHandler(
             action=app.execute(action=do_uids),
             description='All targets uids',
             opts=self.common_opts + self.common_build_facade_opts(),
-            visible=False
+            visible=False,
         )
         self['test-list'] = OptsHandler(
             action=app.execute(action=do_test_list),
@@ -233,7 +302,8 @@ class DumpYaHandler(CompositeHandler):
         self['conf'] = OptsHandler(
             action=app.execute(action=do_conf),
             description='Print build conf',
-            opts=self.common_opts + [
+            opts=self.common_opts
+            + [
                 FlagsOptions(),
                 CustomFetcherOptions(),
                 SandboxAuthOptions(),
@@ -242,28 +312,30 @@ class DumpYaHandler(CompositeHandler):
                 BuildTypeOptions('release'),
                 JavaSpecificOptions(),
             ],
-            visible=False
+            visible=False,
         )
         self['licenses'] = OptsHandler(
             action=app.execute(action=do_licenses),
             description='Print known licenses grouped by their properties',
-            opts=self.common_opts + self.common_build_facade_opts() + [
+            opts=self.common_opts
+            + self.common_build_facade_opts()
+            + [
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
                 DumpLicenseOptions(),
             ],
-            visible=False
+            visible=False,
         )
         self['forced-deps'] = OptsHandler(
             action=app.execute(action=do_forced_deps),
             description='Print known forced dependency management',
             opts=FullForcedDepsOptions(),
-            visible=False
+            visible=False,
         )
         self['conf-docs'] = OptsHandler(
             action=app.execute(action=do_conf_docs),
             description='Print descriptions of entities (modules, macros, multimodules, etc.)',
-            opts=self.common_opts + self.common_build_facade_opts() + [DumpDescriptionOptions()]
+            opts=self.common_opts + self.common_build_facade_opts() + [DumpDescriptionOptions()],
         )
         self['root'] = OptsHandler(
             action=app.execute(lambda params: sys.stdout.write(params.arc_root) and 0),
@@ -274,19 +346,19 @@ class DumpYaHandler(CompositeHandler):
             action=app.execute(action=do_dump_vcs_info),
             description='Print VCS revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
-            visible=False
+            visible=False,
         )
         self['raw-vcs-info'] = OptsHandler(
             action=app.execute(action=do_dump_raw_vcs_info),
             description='Print VCS revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
-            visible=False
+            visible=False,
         )
         self['svn-revision'] = OptsHandler(
             action=app.execute(action=do_dump_svn_revision),
             description='Print SVN revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
-            visible=False
+            visible=False,
         )
         self['recipes'] = OptsHandler(
             action=app.execute(action=do_recipes),
@@ -296,11 +368,13 @@ class DumpYaHandler(CompositeHandler):
         if app_config.in_house:
             import devtools.ya.handlers.dump.arcadia_specific as arcadia_specific
             from handlers.dump.debug import debug_handler
+
             self['groups'] = arcadia_specific.GroupsHandler()
             self['atd-revisions'] = OptsHandler(
                 action=app.execute(action=arcadia_specific.do_atd_revisions),
                 description='Dump revisions of trunk/arcadia_tests_data',
-                opts=self.common_opts + [DumpAtdRevisionOptions(), CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()]
+                opts=self.common_opts
+                + [DumpAtdRevisionOptions(), CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],
             )
             self['debug'] = debug_handler
 
@@ -344,7 +418,6 @@ def do_module_info(params, write_stdout=True):
 
 
 def do_dir_graph(params):
-
     def merge_lists(one, two):
         return sorted(set(one + two))
 
@@ -361,7 +434,9 @@ def do_dir_graph(params):
         _do_dump(gen_graph, params, params.legacy_deps_opts + ['x', 'M'])
         return
 
-    dg = _do_dump(gen_dir_graph, params, params.legacy_deps_opts, write_stdout=False, split_by_types=params.split_by_type)
+    dg = _do_dump(
+        gen_dir_graph, params, params.legacy_deps_opts, write_stdout=False, split_by_types=params.split_by_type
+    )
 
     tests = get_tests(params)
     for test in tests:
@@ -371,15 +446,20 @@ def do_dir_graph(params):
         if params.split_by_type:
             if test.project_path not in dg:
                 dg[test.project_path] = {}
-            dg[test.project_path]["INCLUDE"] = get_test_dependencies(dg[test.project_path].get("INCLUDE", []), params.arc_root, test)
+            dg[test.project_path]["INCLUDE"] = get_test_dependencies(
+                dg[test.project_path].get("INCLUDE", []), params.arc_root, test
+            )
             dg[test.project_path]["DATA"] = merge_lists(dg[test.project_path].get("DATA", []), test_data)
         else:
-            dg[test.project_path] = get_test_dependencies(dg.get(test.project_path, []), params.arc_root, test, test_data)
+            dg[test.project_path] = get_test_dependencies(
+                dg.get(test.project_path, []), params.arc_root, test, test_data
+            )
 
     if params.trace_from is not None:
         print('\n'.join(reachable(dg, params.trace_from, params.split_by_type)))
 
     elif params.plain_dump:
+
         def get_plain_deps():
             plain_deps = set()
             for k, v in six.iteritems(dg):
@@ -461,13 +541,15 @@ class PeerDirectoriesOptions(Options):
 
     @staticmethod
     def consumer():
-        return [ArgConsumer(
-            ['--old-peerdirs'],
-            help='Include indirect (module->dir->module) PEERDIRs',
-            hook=SetConstAppendHook('peerdir_opts', 'I'),
-            group=DUMP_OPTS_GROUP,
-            visible=False,
-        )]
+        return [
+            ArgConsumer(
+                ['--old-peerdirs'],
+                help='Include indirect (module->dir->module) PEERDIRs',
+                hook=SetConstAppendHook('peerdir_opts', 'I'),
+                group=DUMP_OPTS_GROUP,
+                visible=False,
+            )
+        ]
 
 
 class LegacyDepsOptions(Options):
@@ -476,12 +558,14 @@ class LegacyDepsOptions(Options):
 
     @staticmethod
     def consumer():
-        return [ArgConsumer(
-            ['--no-legacy-deps'],
-            help='Exclude legacy dependencies (inderect PEERDIR relations)',
-            hook=SetConstValueHook('legacy_deps_opts', []),
-            group=DUMP_OPTS_GROUP,
-        )]
+        return [
+            ArgConsumer(
+                ['--no-legacy-deps'],
+                help='Exclude legacy dependencies (inderect PEERDIR relations)',
+                hook=SetConstValueHook('legacy_deps_opts', []),
+                group=DUMP_OPTS_GROUP,
+            )
+        ]
 
 
 class DumpSrcDepsOptions(Options):
@@ -666,11 +750,15 @@ class DumpForcedDepsOptions(Options):
 
 
 def FullForcedDepsOptions():
-    return DumpYaHandler.common_opts + DumpYaHandler.common_build_facade_opts() + [
-        YMakeDebugOptions(),
-        CustomBuildRootOptions(),
-        DumpForcedDepsOptions(),
-    ]
+    return (
+        DumpYaHandler.common_opts
+        + DumpYaHandler.common_build_facade_opts()
+        + [
+            YMakeDebugOptions(),
+            CustomBuildRootOptions(),
+            DumpForcedDepsOptions(),
+        ]
+    )
 
 
 class RelationSrcDstOptions(Options):
@@ -699,13 +787,15 @@ class RelationSrcDstOptions(Options):
                 help='Show relations between RELATION_SRC and all modules from RELATION_DST directories',
                 hook=SetConstValueHook('recursive', True),
                 group=DUMP_OPTS_GROUP,
-            )
+            ),
         ]
         if self._free_dst:
-            res.append(FreeArgConsumer(
-                help='relation destination target',
-                hook=ExtendHook('relation_dst'),
-            ))
+            res.append(
+                FreeArgConsumer(
+                    help='relation destination target',
+                    hook=ExtendHook('relation_dst'),
+                )
+            )
         return res
 
     def postprocess(self):
@@ -731,7 +821,7 @@ class FilesFilterOptions(Options):
                 help='Mark all make files as Makefile',
                 hook=SetConstValueHook('mark_make_files', True),
                 group=DUMP_OPTS_GROUP,
-            )
+            ),
         ]
         return res
 
@@ -754,7 +844,7 @@ class DumpAllRelationsOptions(Options):
                 help='Show dependencies between RELATION_DST targets',
                 hook=SetConstValueHook('show_targets_deps', True),
                 group=DUMP_OPTS_GROUP,
-            )
+            ),
         ]
         return res
 
@@ -778,7 +868,7 @@ class DumpDescriptionOptions(Options):
                 help='Dump information for all entities including internal in json format, uses are included',
                 hook=SetConstValueHook('conf_docs_json', True),
                 group=DUMP_OPTS_GROUP,
-            )
+            ),
         ]
 
 
@@ -916,7 +1006,7 @@ def do_build_plan(params):
             flags=params.flags,
             ymake_bin=params.ymake_bin,
             no_ymake_resource=params.no_ymake_resource,
-            vcs_file=params.vcs_file
+            vcs_file=params.vcs_file,
         )
         json.dump(graph, sys.stdout, indent=4, sort_keys=True)
 
@@ -1000,16 +1090,19 @@ def get_tests(params):
         'debug_options': [],
         'flags': params.flags,
         'ymake_bin': params.ymake_bin,
-        'arcadia_tests_data_path': 'arcadia_tests_data'
+        'arcadia_tests_data_path': 'arcadia_tests_data',
     }
-    _, test_dart, = gen_test_dart(**kwargs)
+    (
+        _,
+        test_dart,
+    ) = gen_test_dart(**kwargs)
 
     return sorted(
         generate_tests_by_dart(
             test_dart,
             opts=params,
         ),
-        key=lambda test: os.path.join(test.project_path, test.name)
+        key=lambda test: os.path.join(test.project_path, test.name),
     )
 
 

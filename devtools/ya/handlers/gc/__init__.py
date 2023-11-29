@@ -61,18 +61,25 @@ class CollectCacheOptions(LocalCacheOptions):
     def consumer(self):
         return super(CollectCacheOptions, self).consumer() + [
             core.yarg.ArgConsumer(
-                ['--size-limit'], help='Strip build cache to size (in GiB if not set explicitly)',
-                hook=core.yarg.SetValueHook('cache_size', transform=_to_size_in_gb, default_value=lambda x: str(_to_size_in_gb(x) * 1.0 / 1024 / 1024 / 1024)),
+                ['--size-limit'],
+                help='Strip build cache to size (in GiB if not set explicitly)',
+                hook=core.yarg.SetValueHook(
+                    'cache_size',
+                    transform=_to_size_in_gb,
+                    default_value=lambda x: str(_to_size_in_gb(x) * 1.0 / 1024 / 1024 / 1024),
+                ),
                 group=core.yarg.BULLET_PROOF_OPT_GROUP,
                 visible=False,
             ),
             core.yarg.ArgConsumer(
-                ['--object-size-limit'], help='Strip build cache from large objects (in MiB if not set explicitly)',
+                ['--object-size-limit'],
+                help='Strip build cache from large objects (in MiB if not set explicitly)',
                 hook=core.yarg.SetValueHook('object_size_limit', transform=_to_size_in_mb),
                 group=core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--age-limit'], help='Strip build cache from old objects (in hours if not set explicitly)',
+                ['--age-limit'],
+                help='Strip build cache from old objects (in hours if not set explicitly)',
                 hook=core.yarg.SetValueHook('age_limit', transform=_to_timespan_in_hours),
                 group=core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
@@ -148,6 +155,7 @@ def _clean_logs():
 
     try:
         import app_ctx
+
         file_dir, file_name = os.path.split(app_ctx.file_log)
     except Exception as e:
         file_dir, file_name = ('', '')
@@ -162,6 +170,7 @@ def _clean_evlogs():
 
     try:
         import app_ctx
+
         file_dir, file_name = os.path.split(app_ctx.evlog._fileobj.name)
     except Exception as e:
         file_dir, file_name = ('', '')
@@ -212,6 +221,7 @@ def do_cache(opts):
     with lock:
         if opts.cache_stat:
             import app_ctx
+
             if not cache:
                 app_ctx.display.emit_message("Cache not initialized, can't show stats")
             else:
@@ -223,13 +233,16 @@ def do_cache(opts):
         if cache:
             cache.flush()
 
-        logger.debug("ya gc stats %s", {
-            'cache_size': opts.cache_size,
-            'object_size_limit': opts.object_size_limit,
-            'age_limit': opts.age_limit,
-            'symlinks_ttl': opts.symlinks_ttl,
-            'errors': errors
-        })
+        logger.debug(
+            "ya gc stats %s",
+            {
+                'cache_size': opts.cache_size,
+                'object_size_limit': opts.object_size_limit,
+                'age_limit': opts.age_limit,
+                'symlinks_ttl': opts.symlinks_ttl,
+                'errors': errors,
+            },
+        )
 
 
 def _do_collect_cache(cache, build_root, opts):
@@ -259,7 +272,9 @@ def _do_collect_cache(cache, build_root, opts):
         src_dir = cc.find_root(fail_on_error=False) or ""
         if os.path.isdir(symres_dir):
             logger.debug('Cleaning symres %s for %s, ttl=%s', symres_dir, src_dir, opts.symlinks_ttl)
-            result_store.SymlinkResultStore(symres_dir, src_dir).sieve(state=None, ttl=opts.symlinks_ttl, cleanup=opts.symlinks_ttl == 0)
+            result_store.SymlinkResultStore(symres_dir, src_dir).sieve(
+                state=None, ttl=opts.symlinks_ttl, cleanup=opts.symlinks_ttl == 0
+            )
 
     if hasattr(cache, '_store_path'):
         for dir in os.listdir(os.path.join(build_root, 'cache')):
@@ -280,6 +295,7 @@ def _do_collect_cache(cache, build_root, opts):
             cache.strip_total_size(opts.cache_size)
 
         from yalibrary.toolscache import tc_force_gc
+
         tc_force_gc(opts.cache_size)
 
     if opts.object_size_limit is not None:
@@ -318,5 +334,9 @@ def do_strip_yt_cache(opts):
 
     counters = cache.strip()
     if counters:
-        logger.info('Deleted: meta rows:%d, data rows:%d, net data size:%d',
-                    counters['meta_rows'], counters['data_rows'], counters['data_size'])
+        logger.info(
+            'Deleted: meta rows:%d, data rows:%d, net data size:%d',
+            counters['meta_rows'],
+            counters['data_rows'],
+            counters['data_size'],
+        )

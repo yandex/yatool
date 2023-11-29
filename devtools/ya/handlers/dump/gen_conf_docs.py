@@ -30,7 +30,8 @@ class _Markdown:
     # Checks header
     h_patterns = {
         'internal': re.compile('.*#.*internal.*', flags=re.IGNORECASE),
-        'deprecated': re.compile('.*#.*deprecated.*', flags=re.IGNORECASE)}
+        'deprecated': re.compile('.*#.*deprecated.*', flags=re.IGNORECASE),
+    }
 
     def __init__(self, arc_root, dump_all_descs, use_svn):
         self.descs = {'macros': {}, 'modules': {}, 'multimodules': {}, 'unknowns': {}}
@@ -80,9 +81,11 @@ class _Markdown:
 
         descs, link = self._format_entry(doc)
 
-        dictionary = self.descs[doc['type'] + 's']                  \
-            if doc['type'] in ['macro', 'module', 'multimodule']    \
+        dictionary = (
+            self.descs[doc['type'] + 's']
+            if doc['type'] in ['macro', 'module', 'multimodule']
             else self.descs['unknowns']
+        )
 
         if not self.dump_all_descs and _Markdown._is_internal(descs[0]):
             return
@@ -94,9 +97,15 @@ class _Markdown:
         return cls.h_patterns['internal'].match(header)
 
     def _dump_toc(self):
-        res = '*Do not edit, this file is generated from comments to macros definitions using `ya dump conf-docs{all}`.*\n\n'.format(all=' --dump-all' if self.dump_all_descs else '')
-        res += '{markup} ya.make {all}commands\n\n'.format(markup=_Markdown.header, all='and core.conf ' if self.dump_all_descs else '')
-        res += 'General info: [How to write ya.make files](https://wiki.yandex-team.ru/yatool/HowToWriteYaMakeFiles)\n\n'
+        res = '*Do not edit, this file is generated from comments to macros definitions using `ya dump conf-docs{all}`.*\n\n'.format(
+            all=' --dump-all' if self.dump_all_descs else ''
+        )
+        res += '{markup} ya.make {all}commands\n\n'.format(
+            markup=_Markdown.header, all='and core.conf ' if self.dump_all_descs else ''
+        )
+        res += (
+            'General info: [How to write ya.make files](https://wiki.yandex-team.ru/yatool/HowToWriteYaMakeFiles)\n\n'
+        )
         res += '{markup} Table of contents\n\n'.format(markup=_Markdown.header * 2)
 
         for type in ['multimodules', 'modules', 'macros', 'unknowns']:
@@ -104,8 +113,7 @@ class _Markdown:
                 res += _Markdown._format_toc_section(type)
                 if type != 'macros':
                     for name in sorted(self.descs[type]):
-                        res += _Markdown._format_toc_header(
-                            self.descs[type][name]['src_data'])
+                        res += _Markdown._format_toc_header(self.descs[type][name]['src_data'])
                 else:
                     chunk_cnt = 0
                     first_macro = {}
@@ -118,12 +126,10 @@ class _Markdown:
 
                         if chunk_cnt == _Markdown.chunks_in_toc:
                             chunk_cnt = 0
-                            res += _Markdown._format_toc_macro_header(
-                                first_macro, last_macro)
+                            res += _Markdown._format_toc_macro_header(first_macro, last_macro)
 
                     if chunk_cnt != 0:
-                        res += _Markdown._format_toc_macro_header(
-                            first_macro, last_macro)
+                        res += _Markdown._format_toc_macro_header(first_macro, last_macro)
         return res
 
     @classmethod
@@ -138,42 +144,31 @@ class _Markdown:
     @classmethod
     def _format_toc_section(cls, type):
         return '{indent} * [{section}](#{anchor})\n'.format(
-            indent=' ' * cls.scount,
-            section=type.capitalize(),
-            anchor=type)
+            indent=' ' * cls.scount, section=type.capitalize(), anchor=type
+        )
 
     @classmethod
     def _format_section(cls, type):
         return '{markup} {text} <a name="{anchor}"></a>\n\n'.format(
-            markup=cls.header * cls.scount,
-            text=type.capitalize(),
-            anchor=type)
+            markup=cls.header * cls.scount, text=type.capitalize(), anchor=type
+        )
 
     @staticmethod
     def _format_header_anchor(doc):
-        return '<a name="{atype}_{aname}"></a>'.format(
-            atype=doc['type'],
-            aname=doc['name'])
+        return '<a name="{atype}_{aname}"></a>'.format(atype=doc['type'], aname=doc['name'])
 
     @classmethod
     def _format_toc_header(cls, doc):
-        qual = doc['type'].capitalize()                             \
-            if doc['type'] in ['macro', 'module', 'multimodule']    \
-            else "Unknown"
+        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule'] else "Unknown"
         return '{indent} - {qual} [{name}](#{type}_{name})\n'.format(
-            indent=' ' * cls.dcount,
-            qual=qual,
-            name=doc['name'],
-            type=doc['type'])
+            indent=' ' * cls.dcount, qual=qual, name=doc['name'], type=doc['type']
+        )
 
     @classmethod
     def _format_toc_macro_header(cls, fdoc, ldoc):
         return '{indent} - Macros [{fname}](#{ftype}_{fname}) .. [{lname}](#{ltype}_{lname})\n'.format(
-            indent=' ' * cls.dcount,
-            fname=fdoc['name'],
-            ftype=fdoc['type'],
-            lname=ldoc['name'],
-            ltype=ldoc['type'])
+            indent=' ' * cls.dcount, fname=fdoc['name'], ftype=fdoc['type'], lname=ldoc['name'], ltype=ldoc['type']
+        )
 
     # Also adds special tags 'internal' and 'deprecated'
     @classmethod
@@ -182,9 +177,7 @@ class _Markdown:
         usage = doc['usage'] if 'usage' in doc else ""
         usage = name if not usage else usage
 
-        qual = doc['type'].capitalize()                             \
-            if doc['type'] in ['macro', 'module', 'multimodule']    \
-            else "Unknown"
+        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule'] else "Unknown"
 
         usage = _Markdown._remove_formatting(usage.rstrip().lstrip())
         name = _Markdown._remove_formatting(name)
@@ -208,10 +201,8 @@ class _Markdown:
             usage += "_"
 
         return '{markup} {type} {usage} {anchor}\n'.format(
-            markup=cls.header * cls.dcount,
-            type=qual,
-            usage=usage,
-            anchor=_Markdown._format_header_anchor(doc))
+            markup=cls.header * cls.dcount, type=qual, usage=usage, anchor=_Markdown._format_header_anchor(doc)
+        )
 
     # Prints verbatim. Strips unnecessary indent and escapes '_'/'*'.
     @classmethod
@@ -244,7 +235,8 @@ class _Markdown:
             baselink=_Markdown.alink,
             file=doc['file'],
             rev='?rev=' + str(doc['revision']) if doc['revision'] > 0 else '',
-            line=doc['line'])
+            line=doc['line'],
+        )
 
     @staticmethod
     def _strip_blanks(lines):
@@ -260,7 +252,7 @@ class _Markdown:
                 last += 1
             else:
                 break
-        lines = lines[first: (len(lines) - last)]
+        lines = lines[first : (len(lines) - last)]
         lines = [x.rstrip().expandtabs(4) for x in lines]
         indent = 10000
         for line in lines:
@@ -294,8 +286,7 @@ class _Markdown:
             if line.lstrip() == '```':
                 backtick_block = not backtick_block
 
-            res.append(line if code or backtick_block
-                       else _Markdown._remove_formatting(line))
+            res.append(line if code or backtick_block else _Markdown._remove_formatting(line))
         return res
 
     # Unconditionally removes formatting due to '_'/'*'
@@ -352,9 +343,8 @@ def dump_mmm_docs(
     ymake_bin=None,
     platform=None,
     host_platform=None,
-    target_platforms=None
+    target_platforms=None,
 ):
-
     json_dump_name = os.path.join(build_root, 'ymake.dump.ydx.json')
     arc_root = core.config.find_root_from(build_targets)
     null_ya_make = os.path.join(arc_root, 'build', 'docs', 'empty')
@@ -374,7 +364,7 @@ def dump_mmm_docs(
         platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
-        yndex_file=json_dump_name
+        yndex_file=json_dump_name,
     )
 
     if conf_docs_json:

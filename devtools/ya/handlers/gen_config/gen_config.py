@@ -192,7 +192,9 @@ def dump_config(options, handler_map, user_config):
     def get_group_title(name):
         return "{} {} {}".format("=" * 10, name, "=" * (65 - len(name)))
 
-    blocks = ["# Save config to the junk/{USER}/ya.conf or to the ~/.ya/ya.conf\n# For more info see https://docs.yandex-team.ru/yatool/commands/gen_config"]
+    blocks = [
+        "# Save config to the junk/{USER}/ya.conf or to the ~/.ya/ya.conf\n# For more info see https://docs.yandex-team.ru/yatool/commands/gen_config"
+    ]
 
     # dump all options
     subgroups = []
@@ -269,9 +271,7 @@ def generate_config(root_handler, output=None, dump_defaults=None):
         handler_map[target].append(name)
 
     if dump_defaults:
-        json.dump(
-            {k: v['default'] for k, v in options.items()}, sys.stdout, indent=2
-        )
+        json.dump({k: v['default'] for k, v in options.items()}, sys.stdout, indent=2)
         return
 
     data = dump_config(options, handler_map, user_config)

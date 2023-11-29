@@ -25,6 +25,7 @@ class MavenImportYaHandler(core.yarg.OptsHandler):
                 build_opts.YMakeBinOptions(),
                 build_opts.CustomFetcherOptions(),
                 build_opts.ToolsOptions(),
-            ] + build_opts.checkout_options(),
+            ]
+            + build_opts.checkout_options(),
             description=self.description,
         )

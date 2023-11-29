@@ -20,24 +20,19 @@ def default_options():
 
 
 class JavaYaHandler(core.yarg.CompositeHandler):
-
     def __init__(self):
         super(JavaYaHandler, self).__init__(description='Java build helpers')
 
         self['dependency-tree'] = core.yarg.OptsHandler(
             action=app.execute(action=helpers.print_ymake_dep_tree),
             description='Print dependency tree',
-            opts=default_options() + [
-                build_opts.BuildTypeOptions('release')
-            ],
+            opts=default_options() + [build_opts.BuildTypeOptions('release')],
             visible=True,
         )
         self['classpath'] = core.yarg.OptsHandler(
             action=app.execute(action=helpers.print_classpath),
             description='Print classpath',
-            opts=default_options() + [
-                build_opts.BuildTypeOptions('release')
-            ],
+            opts=default_options() + [build_opts.BuildTypeOptions('release')],
             visible=True,
         )
         self['test-classpath'] = core.yarg.OptsHandler(

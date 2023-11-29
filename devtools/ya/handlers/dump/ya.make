@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE handlers.dump
     __init__.py
@@ -35,7 +37,7 @@ PEERDIR(
     library/python/tmp
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/handlers/dump/arcadia_specific
         devtools/ya/handlers/dump/debug

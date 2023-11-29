@@ -28,7 +28,7 @@ class YaTestYaHandler(core.yarg.OptsHandler):
                     '{prefix} -tt',
                     'Build and run small and medium tests',
                     good_looking=103,
-                )
+                ),
             ],
             description=self.description,
             opts=ya_make_options(

@@ -6,7 +6,6 @@ from . import gen_config
 
 
 class GenConfigOptions(core.yarg.Options):
-
     def __init__(self):
         self.output = None
         self.dump_defaults = False
@@ -23,7 +22,7 @@ class GenConfigOptions(core.yarg.Options):
                 ['--dump-defaults'],
                 help='Dump default values as JSON',
                 hook=core.yarg.SetConstValueHook('dump_defaults', True),
-            )
+            ),
         ]
 
 
@@ -38,7 +37,7 @@ class GenConfigYaHandler(core.yarg.OptsHandler):
             opts=[
                 core.common_opts.ShowHelpOptions(),
                 GenConfigOptions(),
-            ]
+            ],
         )
 
     def handle(self, root_handler, args, prefix):
