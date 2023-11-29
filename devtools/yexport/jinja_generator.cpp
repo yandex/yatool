@@ -416,14 +416,14 @@ void TJinjaGenerator::AddStrToParams(const std::string& attrMacro, const TVector
 }
 
 void TJinjaGenerator::AddBoolToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params, const std::string& renderPath) {
-    if (values.size() != 1) {
+    if (values.size() > 1) {
         spdlog::error("trying to add to target map {} elements, type bool should have only 1 element. Attribute macro: {}. Problem in {}", values.size(), attrMacro, renderPath);
     }
 
     if (values.empty()) {
         params.emplace(attrMacro, false);
     } else {
-        params.emplace(attrMacro, values[0] == "true" || values[0] == "1");
+        params.emplace(attrMacro, IsTrue(values[0]));
     }
 }
 
