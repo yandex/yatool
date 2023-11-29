@@ -1,0 +1,140 @@
+#include <devtools/ymake/include_parsers/cython_parser.h>
+
+#include <util/generic/strbuf.h>
+#include <util/string/subst.h>
+
+%%{
+
+machine CythonIncludes;
+
+action StartCapture {
+    captureStart = p;
+}
+
+action EndCapture {
+    Y_ASSERT(p >= captureStart);
+    capture = TStringBuf(captureStart, p);
+}
+
+action SkipLine {
+    p = static_cast<const char*>(memchr(p, '\n', pe - p));
+    if (!p) return;
+    fgoto main;
+}
+
+action SetInclude { kind = TCythonDep::EKind::Include; }
+action SetCdef { kind = TCythonDep::EKind::Cdef; }
+action SetCimportSimple { kind = TCythonDep::EKind::CimportSimple; }
+action SetCimportFrom {
+    kind = TCythonDep::EKind::CimportFrom;
+    cimportFrom = capture;
+}
+
+action CleanCimportList { cimportList.clear(); }
+action AddCimportItem {
+    if (!capture.empty()) {
+        cimportList.emplace_back(capture);
+    }
+    capture = "";
+}
+
+action ProcessImport {
+    switch(kind) {
+    case TCythonDep::EKind::Include:
+    case TCythonDep::EKind::Cdef:
+        includes.emplace_back(capture, kind);
+        break;
+    case TCythonDep::EKind::CimportSimple:
+        if (!capture.empty()) {
+            cimportList.emplace_back(capture);
+        }
+        for (const auto& item : cimportList) {
+            TString path(item);
+            SubstGlobal(path, ".", "/");
+            includes.emplace_back(path, TCythonDep::EKind::CimportSimple);
+        }
+        break;
+    case TCythonDep::EKind::CimportFrom:
+        TCythonDep dep(cimportFrom, TCythonDep::EKind::CimportFrom);
+        if (!capture.empty()) {
+            cimportList.emplace_back(capture);
+        }
+        for (const auto& item : cimportList) {
+            TString path(item);
+            SubstGlobal(path, ".", "/");
+            dep.List.emplace_back(path);
+        }
+        includes.emplace_back(dep);
+        break;
+    }
+    cimportList.clear();
+}
+
+ws = [\t\v\f\r ];
+wsb = (ws | "\\\n")*;
+wsn = (ws | '\n')*;
+comment = '#' ^'\n'*;
+
+include_capture = ([^\n]*) >StartCapture %EndCapture;
+include_stmt = ("include" ws+ (('"' include_capture :> '"') |
+                              ("'" include_capture :> "'"))) %SetInclude;
+
+cdef_capture = ([^\n<>]*) >StartCapture %EndCapture;
+cdef_source = (('<' cdef_capture '>') | cdef_capture);
+cdef = ("cdef" ws+ "extern" ws+ "from" ws+ (('"' cdef_source :> '"') |
+                                            ("'" cdef_source :> "'")) [^\n]*) %SetCdef;
+
+cimport_ident = [^\t\v\f\r\n #,()\\]+;
+cimport_capture = cimport_ident >StartCapture %EndCapture;
+cimport_item = (cimport_capture (ws+ "as" ws+ cimport_ident)?);
+cimport_list = ("cimport" ws+ (
+                (cimport_item (wsb "," $AddCimportItem wsb cimport_item)*) |
+        ("(" wsn cimport_item (wsn "," $AddCimportItem wsn cimport_item)* wsn ","? wsn ")"))
+    ) >CleanCimportList;
+cimport_simple = (cimport_list) %SetCimportSimple;
+cimport_from = ("from" ws+ cimport_capture %SetCimportFrom ws+ cimport_list);
+
+statement = ( include_stmt | cdef | cimport_simple | cimport_from );
+main := ( (ws* statement ws* comment?) '\n' @ProcessImport)* $err(SkipLine);
+
+}%%
+
+%% write data;
+
+//TODO(kikht): maybe include <> into cdef includes for better resolving
+void TCythonIncludesParser::Parse(IContentHolder& file, TVector<TCythonDep>& includes) {
+    int cs;
+    const char* start = static_cast<const char*>(file.GetContent().Data());
+    const char* p = start;
+    const char* pe = start + file.GetContent().Size();
+    const char* eof = pe;
+    %% write init;
+
+    const char* captureStart;
+    TStringBuf capture;
+    TStringBuf cimportFrom;
+    TVector<TStringBuf> cimportList;
+    TCythonDep::EKind kind;
+
+    %% write exec;
+
+    if (cs == CythonIncludes_error) {
+        Cerr << "TCythonIncludesParser failed at "
+             << p - start << " bytes from the start, "
+             << pe - p << " bytes from the end "
+             << Endl;
+        Y_ASSERT(false);
+    };
+}
+
+void ParseCythonIncludes(const TString& data, TVector<TString>& includes) {
+    TStringContentHolder incFile(data, TString());
+    TCythonIncludesParser parser;
+    TVector<TCythonDep> typedIncludes;
+    parser.Parse(incFile, typedIncludes);
+    for (auto& incl : typedIncludes) {
+        if (incl.Kind == TCythonDep::EKind::Include && !incl.Path.Empty()) {
+            includes.push_back(incl.Path);
+        }
+    }
+}

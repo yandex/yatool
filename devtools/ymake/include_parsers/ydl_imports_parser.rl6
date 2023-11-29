@@ -1,0 +1,171 @@
+#include <devtools/ymake/include_parsers/ydl_imports_parser.h>
+
+#include <util/generic/string.h>
+#include <util/generic/strbuf.h>
+#include <util/generic/vector.h>
+#include <util/stream/output.h>
+#include <util/string/join.h>
+
+%%{
+    machine YDLImports;
+
+    action OnNewline {
+        if (inLineComment) {
+            inLineComment = false;
+            inComment = false;
+        }
+    }
+
+    action OnBlockCommentStart {
+        if (!inLineComment && !inString) {
+            ++blockCommentLevel;
+            inComment = true;
+        }
+    }
+
+    action OnBlockCommentEnd {
+        if (blockCommentLevel > 0) {
+            --blockCommentLevel;
+
+            if (!blockCommentLevel) {
+                inComment = false;
+            }
+        }
+    }
+
+    action OnLineCommentStart {
+        if (!inComment && !inString) {
+            inLineComment = true;
+            inComment = true;
+        }
+    }
+
+    action OnSQuote {
+        if (!inComment && !inDQuoteString) {
+            inSQuoteString = !inSQuoteString;
+            inString = !inString;
+        }
+    }
+
+    action OnDQuote {
+        if (!inComment && !inSQuoteString) {
+            inDQuoteString = !inDQuoteString;
+            inString = !inString;
+        }
+    }
+
+    action OnFromKeyword {
+        if (!inComment && !inString) {
+            inSymbolImport = true;
+            inImport = true;
+            appendId = true;
+        }
+    }
+
+    action OnImportKeyword {
+        if (!inComment && !inString && !inSymbolImport) {
+            inImport = true;
+            appendId = true;
+        }
+    }
+
+    action OnIdStart {
+        if (!inComment && !inString) {
+            if (appendId) {
+                idStart = p;
+            }
+        }
+    }
+
+    action OnIdEnd {
+        if (!inComment && !inString) {
+            if (appendId) {
+                importParts.push_back(TStringBuf(idStart, p));
+                appendId = false;
+            }
+        }
+    }
+
+    action OnDot {
+        if (!inComment && !inString) {
+            if (inImport) {
+                // only dot may prolong useful import parts
+                appendId = true;
+            }
+        }
+    }
+
+    action OnSemicolon {
+        if (!inComment && !inString) {
+            if (inImport) {
+                imports.push_back(JoinSeq(".", importParts));
+                inSymbolImport = false;
+                inImport = false;
+            }
+
+            importParts.clear();
+        }
+    }
+
+    newline = '\n' @OnNewline;
+    ws = ([ \t\v\f\r] | newline);
+
+    block_comment_start = "/*" @OnBlockCommentStart;
+    block_comment_end = "*/" @OnBlockCommentEnd;
+    line_comment_start = "//" @OnLineCommentStart;
+
+    squote = "'" @OnSQuote;
+    dquote = '"' @OnDQuote;
+
+    from_keyword = "from" ws @OnFromKeyword;
+    import_keyword = "import" ws @OnImportKeyword;
+
+    id = ((alpha | '_') (alnum | '_')*) >OnIdStart %OnIdEnd;
+    dot = '.' @OnDot;
+    semicolon = ';' @OnSemicolon;
+
+    main := (
+        block_comment_start | block_comment_end | line_comment_start
+            | squote | dquote | from_keyword | import_keyword
+            | id | dot | semicolon | ws | any
+    )**;
+}%%
+
+%% write data;
+
+void ScanYDLImports(const TStringBuf input, TVector<TString>& imports) {
+    int cs;
+    const char* start = input.begin();
+    const char* p = start;
+    const char* pe = input.end();
+    const char* eof = pe;
+    %% write init;
+
+    bool inLineComment = false;
+    size_t blockCommentLevel = 0;
+    bool inComment = false;
+
+    bool inSQuoteString = false;
+    bool inDQuoteString = false;
+    bool inString = false;
+
+    bool inSymbolImport = false;
+    bool inImport = false;
+
+    const char* idStart = nullptr;
+    bool appendId = false;
+
+    TVector<TStringBuf> importParts;
+    %% write exec;
+
+    if (cs == YDLImports_error) {
+        Cerr << "ScanYDLImports failed at "
+            << p - start << " bytes from the start, "
+            << pe - p << " bytes from the end"
+            << Endl
+            << "First chars of non-matching part: "
+            << TString(p, p + 10).Quote()
+            << Endl;
+        assert(false);
+    }
+}

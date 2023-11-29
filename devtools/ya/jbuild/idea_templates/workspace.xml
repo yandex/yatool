@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RunManager">
+    <configuration default="true" type="Application" factoryName="Application">
+    </configuration>
+    <configuration default="true" type="JUnit" factoryName="JUnit">
+    </configuration>
+  </component>
+</project>

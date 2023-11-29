@@ -1,0 +1,92 @@
+#include <devtools/ymake/include_parsers/nlg_includes_parser.h>
+
+#include <util/generic/string.h>
+#include <util/stream/output.h>
+
+%%{
+
+machine NlgIncludes;
+
+action AddChar { capture.append(*p); }
+action AddPathToImportList {
+    if (capture != "") {
+        importList.emplace_back(capture);
+        capture = "";
+    }
+}
+
+action SetExternal {
+    isExternal = true;
+}
+
+action SetInternal {
+    isExternal = false;
+}
+
+action AddInclude {
+    for (auto importPath : importList) {
+        includes.emplace_back(TInclDep(importPath, isExternal));
+    }
+    importList.clear();
+}
+
+action Skip {
+    capture = "";
+    importList.clear();
+    for (; p != pe && *p != '{' && *p != '#'; ++p);
+    if (p == pe) {
+        return;
+    }
+    fhold;
+    fgoto main;
+}
+
+ws = [ \t\v\f\r\n];
+
+path = ([a-zA-Z0-9_/]+ ".nlg") $AddChar;
+quotedPath = ("'" path "'" | '"' path '"') @AddPathToImportList;
+
+targetName = [a-zA-Z0-9_]+;
+targetList = targetName (ws* "," ws* targetName)*;
+
+importModule = quotedPath (ws* "as" ws+ targetName)? (ws+ "with" ws+ "context")?;
+pathsList = importModule (ws* "," ws* importModule)*;
+
+fromImport = ws* "from" @SetInternal ws* quotedPath ws* "import" ws+ targetList (ws+ "with" ws+ "context")? ws*;
+extFromImport = ws* "ext_from" @SetExternal ws* quotedPath ws* "import" ws+ targetList (ws+ "with" ws+ "context")? ws*;
+
+simpleImport = ws* "import" @SetInternal ws* pathsList ws*;
+extSimpleImport = ws* "ext_import" @SetExternal ws* pathsList ws*;
+
+nlgimport = ws* "nlgimport" @SetInternal ws* pathsList ws*;
+extNlgimport = ws* "ext_nlgimport" @SetExternal ws* pathsList ws*;
+
+importCommand = "{%" (fromImport | extFromImport | simpleImport | extSimpleImport | nlgimport | extNlgimport) "%}" @AddInclude;
+comment = "#" [^\n]* "\n";
+main := (comment | importCommand) $err(Skip);
+ 
+}%%
+
+%% write data;
+
+void ScanNlgIncludes(const TStringBuf input, TVector<TInclDep>& includes) {
+    int cs;
+    const char* start = input.begin();
+    const char* p = start;
+    const char* pe = input.end();
+    const char* eof = pe;
+    %% write init;
+
+    TString capture;
+    TVector<TString> importList;
+    bool isExternal;
+    %% write exec;
+
+    if (cs == NlgIncludes_error) {
+        Cerr << "ScanNlgIncludes failed at "
+             << p - start << " bytes from the start, "
+             << pe - p << " bytes from the end," << " in symbol " << *p
+             << Endl;
+        Y_ASSERT(false);
+    };
+}

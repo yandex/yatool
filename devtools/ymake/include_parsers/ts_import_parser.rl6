@@ -1,0 +1,129 @@
+#include <devtools/ymake/include_parsers/ts_import_parser.h>
+
+#include <util/generic/string.h>
+#include <util/generic/strbuf.h>
+#include <util/generic/vector.h>
+#include <util/stream/output.h>
+
+%%{
+
+    machine TsImports;
+
+    action BeginImport {
+        importPos = p;
+    }
+
+    action EndImport {
+        Y_ASSERT(p >= importPos);
+        import = TStringBuf(importPos, p);
+    }
+
+    action AddImport {
+        imports.emplace_back(import);
+    }
+
+    action AddIgnoreImport {
+        imports.emplace_back(TTsImportParser::IGNORE_IMPORT);
+    }
+
+    action AddModuleSpecifierError {
+        TString specifier = TString(p, std::min<ptrdiff_t>(pe - p, 100));
+        const auto lfPos = specifier.find('\n');
+ 
+        if (lfPos != TString::npos) {
+            specifier.resize(lfPos);
+        }
+ 
+        imports.push_back(TString::Join(TTsImportParser::PARSE_ERROR_PREFIX, "Invalid module specifier: ...", specifier, "..."));
+    }
+
+    sp = space | ( "/*" any* :> "*/" );
+
+    string_literal = ( "'" any* >BeginImport %EndImport :> "'" ) | ( "\"" any* >BeginImport %EndImport :> "\"" );
+
+    identifier = ( alpha | "$" | "_" ) ( alnum | "$" | "_" )*;
+
+    module_specifier = string_literal @AddImport >err(AddModuleSpecifierError);
+
+    module_specifier_in_call_args = sp* "(" sp* module_specifier sp* ")";
+
+    identifier_alias = sp+ "as" sp+ identifier;
+
+    import_sep = sp* "," sp*;
+
+    import_specifier = identifier | ( identifier identifier_alias );
+
+    import_specifier_list = import_specifier ( import_sep import_specifier )* import_sep?;
+
+    named_imports = "{" sp* "}" | "{" sp* import_specifier_list sp* "}";
+
+    namespace_import = "*" identifier_alias?;
+
+    import_clause =
+        identifier |
+        namespace_import |
+        named_imports |
+        ( identifier import_sep namespace_import ) |
+        ( identifier import_sep named_imports );
+
+    import_decl_partial = sp+ ( ( ( "type" sp+ )? import_clause sp+ "from" sp+ module_specifier ) | module_specifier );
+
+    keyword_ctx = ^(identifier | ".");
+
+    ParseImport := (
+        # Import declaration without "import"
+        import_decl_partial |
+        # Dynamic import
+        module_specifier_in_call_args
+    ) $err{ fgoto main; };
+
+    ParseExport := ( (sp* "=") | import_decl_partial ) $err{ fgoto main; };
+
+    ParseRequire := module_specifier_in_call_args $err{ fgoto main; };
+
+    SkipSquoteString := ( any* -- ( ^"\\" "'" ) ) %lerr{ fgoto main; };
+    SkipDquoteString := ( any* -- ( ^"\\" "\"" ) ) %lerr{ fgoto main; };
+    SkipBquoteString := ( any* -- ( ^"\\" "`" ) ) %lerr{ fgoto main; };
+    SkipLineComment := ( ( sp* "nots-ignore-import" @AddIgnoreImport )? any* -- "\n" ) %lerr{ fgoto main; };
+    SkipBlockComment := ( any* -- "*/" ) %lerr{ fgoto main; };
+
+    main :=
+        (
+            "import" @{ fgoto ParseImport; } |
+            "export" @{ fgoto ParseExport; } |
+            "require" @{ fgoto ParseRequire; }
+        )?
+        (
+            ( keyword_ctx "import" @{ fgoto ParseImport; } ) |
+            ( keyword_ctx "export" @{ fgoto ParseExport; } ) |
+            ( keyword_ctx "require" @{ fgoto ParseRequire; } ) |
+            ( "'" @{ fgoto SkipSquoteString; } ) |
+            ( "\"" @{ fgoto SkipDquoteString; } ) |
+            ( "`" @{ fgoto SkipBquoteString; } ) |
+            ( "//" @{ fgoto SkipLineComment; } ) |
+            ( "/*" @{ fgoto SkipBlockComment; } ) |
+            any+
+        )+;
+
+}%%
+
+%% write data;
+
+void ScanTsImports(const TStringBuf input, TVector<TString>& imports) {
+    int cs;
+    const char* start = input.begin();
+    const char* p = start;
+    const char* pe = input.end();
+    const char* eof = pe;
+    %% write init;
+
+    const char* importPos;
+    TStringBuf import;
+    %% write exec;
+
+    if (cs == TsImports_error) {
+        Cerr << "ScanTsImports failed at " << (p - start) << ": ..." << TString(p, std::min<ptrdiff_t>(pe - p, 100)) << "..." << Endl;
+
+        assert(false);
+    }
+}

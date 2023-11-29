@@ -1,0 +1,1616 @@
+import collections
+import copy
+import functools
+import itertools
+import logging
+import os
+import random
+import re
+import six
+import sys
+import time
+import traceback
+from jsonschema import Draft4Validator, ValidationError
+
+import library.python.resource as rs
+
+import exts.archive
+import exts.fs
+import exts.func
+import exts.hashing
+import exts.os2
+import exts.path2
+import exts.timer
+import exts.tmp
+import exts.yjson as json
+
+import core.config
+import core.error
+import core.yarg
+import core.profiler
+import build.ya_make
+import build.targets_deref
+import build.build_opts
+import build.build_handler
+
+import core.common_opts
+
+import devtools.ya.test.opts as test_opts
+
+from yalibrary import find_root
+
+from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
+
+import package
+import package.aar
+import package.artifactory
+import package.debian
+import package.docker
+import package.fs_util
+import package.npm
+import package.postprocessor
+import package.process
+import package.rpm
+import package.source
+import package.tarball
+import package.vcs
+import package.wheel
+import devtools.ya.handlers.package.opts as package_opts
+from devtools.ya.package import const
+import app_config
+
+if app_config.in_house or app_config.have_sandbox_fetcher:
+    import package.sandbox_source
+    import package.sandbox_postprocessor
+if app_config.in_house:
+    from yalibrary.upload import uploader, mds_uploader
+    from yalibrary.yandex.sandbox import fix_logging
+
+logger = logging.getLogger(__name__)
+
+SOURCE_ELEMENTS = {
+    'BUILD_OUTPUT': package.source.BuildOutputSource,
+    'RELATIVE': package.source.RelativeSource,
+    'DIRECTORY': package.source.DirectorySource,
+    'ARCADIA': package.source.ArcadiaSource,
+    'TEST_DATA': package.source.TestDataSource,
+    'TEMP': package.source.TempSource,
+    'SYMLINK': package.source.SymlinkSource,
+    'INLINE': package.source.InlineFileSource,
+}
+
+POSTPROCESS_ELEMENTS = {
+    'BUILD_OUTPUT': package.postprocessor.BuildOutputPostprocessor,
+    'ARCADIA': package.postprocessor.ArcadiaPostprocessor,
+    'TEMP': package.postprocessor.TempPostprocessor,
+}
+
+REQUIRED_META_FIELDS = [
+    "name",
+    "maintainer",
+    "version",
+]
+
+if app_config.in_house or app_config.have_sandbox_fetcher:
+    SOURCE_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_source.SandboxSource
+    POSTPROCESS_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_postprocessor.SandboxPostprocessor
+
+
+class YaPackageException(Exception):
+    mute = True
+
+
+class PackageFileNotFoundException(YaPackageException):
+    def __init__(self, *args, **kwargs):
+        super(PackageFileNotFoundException, self).__init__(*args)
+        self.missing_file_path = kwargs["path"]
+
+
+def _get_package_file(arcadia_root, package_file):
+    def norm_path(p):
+        return os.path.realpath(p)
+
+    if os.path.exists(exts.path2.abspath(package_file)):
+        return exts.path2.abspath(norm_path(package_file))
+
+    abs_path = os.path.join(arcadia_root, package_file)
+    if os.path.exists(abs_path):
+        return norm_path(abs_path)
+
+    raise PackageFileNotFoundException('Package path {} cannot be found'.format(package_file), path=package_file)
+
+
+TYPES_FOR_BUILDING = ["program", "package"]
+DEFAULT_BUILD_KEY = None
+
+
+def timeit(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        timer = exts.timer.Timer(__name__)
+        res = func(*args, **kwargs)
+        timer.show_step(func.__name__)
+        return res
+
+    return wrapper
+
+
+def stage_started(stage_name):
+    core.profiler.profile_step_started(stage_name)
+
+
+def stage_finished(stage_name):
+    core.profiler.profile_step_finished(stage_name)
+
+
+@timeit
+def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters):
+    targets = [t.format(**formatters) for t in build_info['targets']]
+    build_key = build_info.get("build_key", "")
+    build_key_str = "[[alt1]][{}][[rst]] ".format(build_key) if build_key else ""
+    package.display.emit_message('{}Building targets: [[imp]]{}'.format(build_key_str, ' '.join(targets)))
+
+    merged_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
+    merged_opts.export_to_maven = build_info.get("maven-export", False)
+    merged_opts.dump_sources = build_info.get("sources", False)
+    build_options = merged_opts.initialize([])
+    build_options.build_targets = [os.path.join(arcadia_root, t) for t in targets]
+
+    build_options.build_type = build_info.get("build_type", params.build_type)
+    build_options.sanitize = build_info.get("sanitize", params.sanitize)
+    build_options.sanitizer_flags = build_info.get("sanitizer_flags", params.sanitizer_flags)
+    build_options.lto = build_info.get("lto", params.lto)
+    build_options.thinlto = build_info.get("thinlto", params.thinlto)
+    build_options.force_build_depends = build_info.get("force_build_depends", params.force_build_depends)
+    build_options.ignore_recurses = build_info.get("ignore_recurses", params.ignore_recurses)
+    build_options.musl = build_info.get("musl", params.musl)
+    build_options.sanitize_coverage = build_info.get("sanitize_coverage", params.sanitize_coverage)
+    build_options.use_afl = build_info.get("use_afl", params.use_afl)
+    build_options.sanitize = build_info.get("sanitize", params.sanitize)
+    build_options.race = build_info.get("race", params.race)
+
+    build_options.pgo_user_path = build_info.get("pgo_use", params.pgo_user_path)
+
+    build_options.build_threads = params.build_threads
+    build_options.output_root = build_info["output_root"]
+    build_options.create_symlinks = False
+    build_options.keep_temps = params.keep_temps
+    build_options.clear_build = params.clear_build
+    build_options.clear_ymake_cache = True
+    build_options.vcs_file = params.vcs_file
+    build_options.debug_options += ["x", "x"]
+    build_options.be_verbose = params.be_verbose
+    build_options.custom_build_directory = params.custom_build_directory
+    if app_config.in_house:
+        build_options.use_distbuild = params.use_distbuild
+        build_options.dist_priority = params.dist_priority
+        build_options.cluster_type = params.cluster_type
+        build_options.download_artifacts = True
+        build_options.distbuild_pool = params.distbuild_pool
+    else:
+        # no distbuild no cry for opensource
+        build_options.use_distbuild = False
+
+    build_options.ymake_bin = params.ymake_bin
+
+    build_options.host_platform = params.host_platform
+    build_options.host_flags = copy.deepcopy(params.host_flags)
+    build_options.host_platform_flags = copy.deepcopy(params.host_platform_flags)
+    for k, v in six.iteritems(params.flags):
+        build_options.flags[k] = v
+
+    if build_info.get("target-platforms"):
+        target_platforms = [
+            core.common_opts.CrossCompilationOptions.make_platform(p) for p in build_info["target-platforms"]
+        ]
+        if params.target_platforms and params.target_platforms != target_platforms:
+            raise YaPackageException(
+                "Cannot choose target platforms between passed via ya package --target-platform and specified in json"
+            )
+    else:
+        target_platforms = params.target_platforms
+
+    if 'flags' in build_info:
+        flags_list = []
+        if target_platforms:
+            for tp in target_platforms:
+                flags_list.append(tp["flags"])
+        else:
+            flags_list.append(build_options.flags)
+
+        for flag in build_info['flags']:
+            for flags in flags_list:
+                flag_name = flag['name'].format(**formatters)
+                flag_value = flag['value'].format(**formatters)
+                flags[flag_name] = flag_value
+
+    build_options.target_platforms = target_platforms
+
+    build_options.build_results_report_file = params.build_results_report_file
+    build_options.build_report_type = params.build_report_type
+    build_options.build_results_resource_id = params.build_results_resource_id
+    build_options.build_results_report_tests_only = params.build_results_report_tests_only
+    build_options.report_skipped_suites = params.report_skipped_suites
+    build_options.report_skipped_suites_only = params.report_skipped_suites_only
+    build_options.use_links_in_report = params.use_links_in_report
+
+    build_options.dump_graph = params.dump_graph
+
+    build_options.run_tests = params.run_tests
+    build_options.cache_tests = params.cache_tests
+    if params.run_tests:
+        build_options.print_test_console_report = True
+        filename = 'junit_{}'.format(parsed_package["meta"]["name"])
+        if build_key:
+            filename += '_{}'.format(exts.hashing.md5_value(build_key))
+        build_options.junit_path = os.path.join(os.getcwd(), '{}.xml'.format(filename))
+        # There might be a test which depends on program A which could be a required output for the package
+        # and if this test is skipped, ya will strip out program A from a build graph.
+        # There is not way to mark required binaries for package in the current version of graph,
+        # so just don't strip them out
+        build_options.strip_skipped_test_deps = False
+        build_options.strip_idle_build_results = False
+    build_options.test_tool_bin = params.test_tool_bin
+    build_options.profile_test_tool = params.profile_test_tool
+
+    if 'add-result' in build_info:
+        build_options.add_result.extend(build_info['add-result'])
+
+    build_options.dump_sources = True
+    build_options.javac_flags = {f["name"]: f["value"] for f in build_info.get("javac_flags", [])}
+
+    build_options.checkout = getattr(params, "checkout", False)
+
+    build_options.print_statistics = True
+
+    for i in [
+        "auto_clean_results_cache",
+        "build_cache",
+        "build_cache_conf",
+        "build_cache_master",
+        "cache_codec",
+        "cache_size",
+        "cache_stat",
+        "custom_fetcher",
+        "custom_version",
+        "executor_address",
+        "fetcher_params",
+        "incremental_build_dirs_cleanup",
+        "junit_args",
+        "link_threads",
+        "local_executor",
+        "new_store",
+        "new_store_ttl",
+        "pytest_args",
+        "strip_cache",
+        "strip_symlinks",
+        "symlinks_ttl",
+        "test_log_level",
+        "test_params",
+        "test_size_filters",
+        "test_tags_filter",
+        "test_threads",
+        "test_type_filters",
+        "tests_filters",
+        "tests_retries",
+        "tools_cache",
+        "tools_cache_bin",
+        "tools_cache_conf",
+        "tools_cache_gl_conf",
+        "tools_cache_ini",
+        "tools_cache_master",
+    ]:
+        setattr(build_options, i, getattr(params, i))
+
+    build_options.yt_store = params.yt_store
+    build_options.yt_proxy = params.yt_proxy
+    build_options.yt_dir = params.yt_dir
+    build_options.yt_token = params.yt_token
+    build_options.yt_readonly = params.yt_readonly
+    build_options.yt_max_cache_size = params.yt_max_cache_size
+    build_options.yt_cache_filter = params.yt_cache_filter
+    build_options.yt_store_ttl = params.yt_store_ttl
+    build_options.yt_store_codec = params.yt_store_codec
+    build_options.yt_store_threads = params.yt_store_threads
+    build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
+
+    build_options.oauth_token = params.oauth_token
+    if app_config.in_house:
+        build_options.use_new_distbuild_client = params.use_new_distbuild_client
+    build_options.username = params.username
+
+    logger.debug("Build options %s", json.dumps(build_options.__dict__, sort_keys=True, indent=2))
+
+    builder = build.targets_deref.intercept(lambda x: build.ya_make.YaMake(x, app_ctx), build_options)
+    builder.go()
+
+    if builder.exit_code:
+        if builder.exit_code != core.error.ExitCodes.TEST_FAILED or not params.ignore_fail_tests:
+            sys.exit(builder.exit_code)
+
+    package.display.emit_message('{}Building targets: [[good]]done'.format(build_key_str))
+
+
+@timeit
+def prepare_package(
+    format,
+    result_dir,
+    parsed_package,
+    arcadia_root,
+    tests_data_root,
+    data_root,
+    builds,
+    package_root,
+    formaters,
+    files_comparator,
+    params,
+):
+    source_elements = []
+
+    title = '=' * 20 + ' Package files ' + '=' * 20
+    package.display.emit_message('[[imp]]{}'.format(title))
+
+    temp = exts.fs.create_dirs(os.path.join(result_dir, 'temp-' + str(random.random())))
+
+    if 'data' in parsed_package:
+        for element in parsed_package['data']:
+            element_type_name = element['source']['type']
+            if element_type_name in SOURCE_ELEMENTS:
+                element_type = SOURCE_ELEMENTS[element_type_name]
+            else:
+                raise YaPackageException('Unknown source element type {}'.format(element_type_name))
+
+            package.display.emit_message('[[good]]{}[[rst]]: [[imp]]{}[[rst]]'.format('SOURCE', element_type_name))
+
+            element = element_type(
+                arcadia_root,
+                tests_data_root,
+                data_root,
+                builds,
+                element,
+                result_dir,
+                package_root,
+                os.path.basename(temp),
+                formaters,
+                files_comparator,
+                params,
+            )
+            element.prepare(apply_attributes=format != const.PackageFormat.DEBIAN)
+
+            source_elements.append(element)
+    if 'postprocess' in parsed_package:
+        with exts.tmp.temp_dir('ya-package-postprocess') as workspace:
+            for element in parsed_package['postprocess']:
+                element_type_name = element['source']['type']
+                if element_type_name in POSTPROCESS_ELEMENTS:
+                    element_type = POSTPROCESS_ELEMENTS[element_type_name]
+                else:
+                    raise YaPackageException('Unknown postprocess element type {}'.format(element_type_name))
+
+                package.display.emit_message(
+                    '[[good]]{}[[rst]]: [[imp]]{}[[rst]]'.format('POSTPROCESS', element_type_name)
+                )
+
+                element = element_type(
+                    arcadia_root,
+                    builds,
+                    element,
+                    result_dir,
+                    temp,
+                    workspace,
+                    params,
+                    formaters,
+                )
+                element.run()
+
+    package.fs_util.cleanup(temp)
+
+    package.display.emit_message('[[imp]]{}'.format('=' * len(title)))
+    return source_elements
+
+
+def is_application(path):
+    assert os.path.isfile(path)
+    try:
+        import magic
+
+        return 'application' in magic.from_file(path, mime=True)
+    except ImportError:
+        # use heuristics like here: https://stackoverflow.com/questions/898669/how-can-i-detect-if-a-file-is-binary-non-text-in-python
+        textchars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
+
+        def is_binary_string(bytes):
+            return bool(bytes.translate(None, textchars))
+
+        return is_binary_string(open(path, 'rb').read(1024))
+
+
+def get_tool_path(name, tool_platform=None):
+    # fallback to system tool on every unknown situation
+    if not tool_platform:
+        return name
+
+    try:
+        tool_path = tool(name, None, target_platform=tool_platform.upper())
+    except (UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException) as e:
+        package.display.emit_message(
+            'Not found toolchain for tool {} on platform {}: {}. Use the system one.'.format(
+                name, tool_platform, e.message
+            )
+        )
+        return name
+
+    if exts.windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
+        logger.debug('Rename tool for win: %s', tool_path)
+        tool_path += '.exe'
+    return tool_path
+
+
+def strip_binary(executable_name, debug_file_name=None, tool_platform=None, full_strip=False):
+    # Separate debug symbols
+    if debug_file_name:
+        args = ['--only-keep-debug', executable_name, debug_file_name]
+
+    package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+
+    # Strip the executable
+    strip_args = [executable_name] if full_strip else ['-g', executable_name]
+    package.process.run_process(get_tool_path('strip', tool_platform), strip_args)
+
+    # Add link to the debug symbols
+    if debug_file_name:
+        args = ['--remove-section=.gnu_debuglink', '--add-gnu-debuglink', debug_file_name, executable_name]
+
+        package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+
+
+def get_platform_from_build_info(tool_platform):
+    if isinstance(tool_platform, dict):
+        return tool_platform.get('platform_name', '')
+    if isinstance(tool_platform, six.string_types):
+        return tool_platform
+    return ''
+
+
+def guess_tool_platform(filename, tool_platforms):
+    if not tool_platforms:
+        return None
+    if len(tool_platforms) == 1:
+        return get_platform_from_build_info(tool_platforms[0])
+    try:
+        extension = os.path.splitext(filename)[1].upper()
+        for platform in tool_platforms:
+            platform_str = get_platform_from_build_info(platform).upper()
+            if platform_str in extension:
+                return platform_str
+        return get_platform_from_build_info(tool_platforms[0])
+    except IndexError:
+        return get_platform_from_build_info(tool_platforms[0])
+
+
+@timeit
+def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
+    for element in source_elements:
+        if element.data['source']['type'] != 'BUILD_OUTPUT':
+            logger.debug('Strip binaries only from BUILD_OUTPUT section. Skip %s', element.data)
+            continue
+
+        if element.opts.target_platforms:
+            tool_platforms = [tp['platform_name'] for tp in element.opts.target_platforms]
+        else:
+            build_info = element.builds[element.data['source'].get('build_key', None)]
+            tool_platforms = build_info.get('target-platforms', [])
+
+        logger.debug(
+            'Strip binaries from paths [%s] with toolchains %s', ', '.join(element.destination_paths), tool_platforms
+        )
+        tool_platform = guess_tool_platform(element.data['source']['path'], tool_platforms)
+        for destination_path in element.destination_paths:
+            if os.path.isdir(destination_path):
+                for root, _, files in os.walk(destination_path):
+                    for f in files:
+                        try_strip_file(
+                            result_dir,
+                            debug_dir,
+                            os.path.join(root, f),
+                            tool_platform=tool_platform,
+                            full_strip=full_strip,
+                        )
+            else:
+                try_strip_file(
+                    result_dir, debug_dir, destination_path, tool_platform=tool_platform, full_strip=full_strip
+                )
+
+
+def try_strip_file(result_dir, debug_dir, destination_path, tool_platform=None, full_strip=False):
+    if os.path.isfile(destination_path) and os.access(destination_path, os.X_OK) and is_application(destination_path):
+        executable_name = os.path.basename(destination_path)
+        executable_relative_dir = os.path.dirname(os.path.relpath(destination_path, result_dir))
+
+        with exts.os2.change_dir(os.path.dirname(destination_path)):
+            debug_file_name = os.path.join(debug_dir, executable_relative_dir, executable_name + ".debug")
+
+            exts.fs.create_dirs(os.path.dirname(debug_file_name))
+            try:
+                strip_binary(
+                    executable_name, debug_file_name=debug_file_name, tool_platform=tool_platform, full_strip=full_strip
+                )
+            except package.packager.YaPackageException as e:
+                package.display.emit_message('[[bad]]Strip failed: {}[[rst]]'.format(e))
+
+
+def is_old_format(package_data):
+    for data_el in package_data.get("data", []):
+        if 'src' in data_el:
+            return True
+        if 'source' in data_el:
+            return False
+    return False
+
+
+def verify_rpm_package_meta(package_meta):
+    if 'name' not in package_meta:
+        raise KeyError("'name' is mandatory field in meta section for building rpm package")
+    if 'version' not in package_meta:
+        raise KeyError("'version' is mandatory field in meta section for building rpm package")
+    if 'homepage' not in package_meta:
+        raise KeyError("'homepage' is mandatory field in meta section for building rpm package")
+    if 'rpm_license' not in package_meta:
+        raise KeyError("'rpm_license' is mandatory field in meta section for building rpm package")
+    if 'rpm_release' not in package_meta:
+        raise KeyError("'rpm_release' is mandatory field in meta section for building rpm package")
+
+
+def format_package_meta(meta_value, formatters):
+    try:
+        meta_value = meta_value.format(**formatters)
+    except KeyError as e:
+        raise Exception("Can not substitute {%s}" % e.message)
+    return meta_value
+
+
+@timeit
+def create_package(arcadia_root, output_root, package_root, parsed_package, builds, params, formatters):
+    package_meta = parsed_package['meta']
+    package_version = package_meta['version']
+    package_name = package_meta['name']
+    package_data = parsed_package['data']
+
+    for field in REQUIRED_META_FIELDS:
+        if field not in package_meta:
+            raise YaPackageException('Meta field {} is required'.format(field))
+
+    for key, value in six.iteritems(package_meta):
+        if isinstance(value, six.string_types):
+            package_meta[key] = format_package_meta(value, formatters)
+
+    if params.package_output:
+        result_dir = params.package_output
+        exts.fs.ensure_dir(result_dir)
+    else:
+        result_dir = os.getcwd()
+
+    package_path = debug_package_path = None
+    package_rel_root = os.path.relpath(package_root, os.path.realpath(arcadia_root))
+    meta = {}
+
+    # package format: command line -> default format fixed in json -> general default format is tar
+    def get_format_from_meta():
+        str_format = parsed_package['meta'].get('default-format', None)
+        if str_format == 'raw-package':
+            return const.PackageFormat.TAR, True
+        return str_format, False
+
+    def get_format_from_cmd():
+        if params.format:
+            return params.format, params.raw_package
+        if params.raw_package:
+            return const.PackageFormat.TAR, True
+        return None, False
+
+    format_from_meta, build_raw_from_meta = get_format_from_meta()
+    format_from_cmd, build_raw_from_cmd = get_format_from_cmd()
+
+    package_format = format_from_cmd or format_from_meta or const.PackageFormat.TAR
+    build_raw_package = build_raw_from_cmd if format_from_cmd else build_raw_from_meta
+
+    files_comparator = package.source.FilesComparator()
+
+    with exts.tmp.temp_dir() as temp_work_dir:
+        try:
+            content_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.content'))
+
+            source_elements = prepare_package(
+                package_format,
+                content_dir,
+                parsed_package,
+                arcadia_root,
+                params.custom_tests_data_root,
+                params.custom_data_root,
+                builds,
+                package_root,
+                formatters,
+                files_comparator,
+                params,
+            )
+
+            create_dbg = False
+
+            if params.strip or params.full_strip:
+                debug_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.debug'))
+                strip_binaries(temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
+                if params.create_dbg:
+                    debug_dir = os.path.join(debug_dir, '.content')
+                    if os.path.exists(debug_dir):
+                        create_dbg = True
+                    else:
+                        logger.debug("Debug content dir for %s does not exist", package_name)
+
+            package.display.emit_message(
+                'Creating [[imp]]{}[[rst]] package [[imp]]{}[[rst]] version [[imp]]{}'.format(
+                    package_format, package_name, package_version
+                )
+            )
+
+            timestamp_started = time.time()
+            if params.artifactory and params.publish_to:
+                artifactory_settings = params.publish_to
+                if len(artifactory_settings) > 1:
+                    raise ValueError("Use unique settings file for artifactory")
+                if len(artifactory_settings) == 0:
+                    raise ValueError("Settings file for artifactory not specified")
+                artifactory_settings = artifactory_settings[0]
+                if os.path.isabs(artifactory_settings):
+                    if not os.path.exists(artifactory_settings):
+                        raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
+                else:
+                    if os.path.exists(artifactory_settings):
+                        artifactory_settings = os.path.abspath(artifactory_settings)
+                    elif os.path.exists(os.path.join(arcadia_root, artifactory_settings)):
+                        artifactory_settings = os.path.join(arcadia_root, artifactory_settings)
+                    else:
+                        raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
+                package.artifactory.publish_to_artifactory(
+                    content_dir,
+                    package_version,
+                    artifactory_settings=artifactory_settings,
+                    password_path=params.artifactory_password_path,
+                )
+                params.publish_to = []
+            if package_format == const.PackageFormat.TAR:
+                package.display.emit_message('Package version: [[imp]]{}'.format(package_version))
+                if build_raw_package:
+                    if params.raw_package_path:
+                        package_path = params.raw_package_path
+                    else:
+                        package_path = '.'.join([package_name, package_version])
+                    exts.fs.ensure_removed(package_path)
+                    exts.fs.copytree3(content_dir, package_path, symlinks=True)
+                    package.display.emit_message(
+                        'Package content is stored in [[imp]]{}'.format(os.path.abspath(package_path))
+                    )
+                else:
+                    stage_started("create_tarball_package")
+                    package_path = package.tarball.create_tarball_package(
+                        result_dir,
+                        content_dir,
+                        package_name,
+                        package_version,
+                        compress=params.compress_archive,
+                        codec=params.codec,
+                        threads=params.build_threads,
+                        compression_filter=params.compression_filter,
+                        compression_level=params.compression_level,
+                    )
+                    stage_finished("create_tarball_package")
+
+                if create_dbg:
+                    debug_package_name = package_name + '-dbg' if create_dbg else None
+                    stage_started("create_tarball_package-dbg")
+                    debug_package_path = package.tarball.create_tarball_package(
+                        result_dir,
+                        debug_dir,
+                        debug_package_name,
+                        package_version,
+                        compress=params.compress_archive,
+                        codec=params.codec,
+                        threads=params.build_threads,
+                        compression_filter=params.compression_filter,
+                        compression_level=params.compression_level,
+                    )
+                    stage_finished("create_tarball_package-dbg")
+
+            elif package_format == const.PackageFormat.AAR:
+                package_path = package.aar.create_aar_package(
+                    result_dir,
+                    content_dir,
+                    package_name,
+                    package_version,
+                    compress=params.compress_archive,
+                    publish_to_list=params.publish_to,
+                )
+            elif package_format == const.PackageFormat.DEBIAN:
+                if params.build_debian_scripts:
+                    debian_dir = os.path.join(output_root, package_rel_root, 'debian')
+                else:
+                    debian_dir = os.path.join(package_root, 'debian')
+                debian_dir = package.debian.prepare_debian_folder(temp_work_dir, debian_dir)
+
+                changelog_message = 'Created by ya package'
+                change_log_path = os.path.join(debian_dir, "changelog")
+
+                # XXX debug logging, see DEVTOOLSSUPPORT-11944
+                change_log_is_file = False
+                if params.change_log:
+                    try:
+                        logger.debug("type(params.change_log) = %s", type(params.change_log))
+                        logger.debug("params.change_log = %s (%r)", params.change_log, params.change_log)
+                        change_log_is_file = os.path.isfile(params.change_log)
+                        logger.debug("isfile params.change_log = %s", change_log_is_file)
+                        logger.debug("exists params.change_log = %s", os.path.exists(params.change_log))
+                    except Exception:
+                        logger.exception("Check failed, see DEVTOOLSSUPPORT-11944")
+
+                if params.change_log and change_log_is_file:
+                    exts.fs.copy_file(params.change_log, change_log_path)
+                else:
+                    if params.change_log:
+                        changelog_message += "\n" + params.change_log
+
+                if not re.match(r"\d.*", package_version):
+                    raise YaPackageException(
+                        "Invalid version '{}', version has to start with a digit".format(package_version)
+                    )
+
+                package.display.emit_message('Package version: [[imp]]{}'.format(package_version))
+
+                if 'depends' in parsed_package['meta']:
+                    parsed_package['meta']['depends'] = [
+                        format_package_meta(dep, formatters) for dep in parsed_package['meta']['depends']
+                    ]
+
+                debug_package_name = package_name + '-dbg' if create_dbg else None
+
+                noconffiles_all = parsed_package['meta'].get('noconffiles_all', True)
+
+                package.debian.create_rules_file(debian_dir, source_elements, params, content_dir, noconffiles_all)
+                if source_elements:
+                    package.debian.create_install_file(debian_dir, source_elements, package_name)
+                package.debian.create_compat_file(debian_dir)
+                package.debian.create_control_file(
+                    debian_dir, package_name, package_meta, params.arch_all, debug_package_name
+                )
+
+                if not params.build_debian_scripts:
+                    package.debian.create_changelog_file(
+                        debian_dir,
+                        package_meta.get('source', package_name),
+                        package_version,
+                        params.debian_distribution,
+                        changelog_message,
+                    )
+
+                if create_dbg:
+                    debug_install_file_name = os.path.join(debian_dir, debug_package_name + '.install')
+                    with open(debug_install_file_name, 'w') as debug_install_file:
+                        debug_install_file.write('.debug/.content/* /\n')
+
+                package_path = package.debian.create_debian_package(
+                    temp_work_dir,
+                    package_name,
+                    package_version,
+                    params.arch_all,
+                    params.sign,
+                    params.key,
+                    params.sloppy_deb,
+                    params.publish_to,
+                    params.force_dupload,
+                    params.store_debian,
+                    params.dupload_max_attempts,
+                    params.dupload_no_mail,
+                    params.ensure_package_published,
+                    params.debian_arch,
+                    params.debian_distribution,
+                    params.debian_upload_token,
+                )
+
+            elif package_format == const.PackageFormat.RPM:
+                verify_rpm_package_meta(package_meta)
+                data_files = []
+                for elem in package_data:
+                    try:
+                        path = elem['destination']['path']
+                        if path.endswith('/'):
+                            path += '*'
+                        data_files.append(path)
+                    except KeyError:
+                        data_files.append(elem['destination']['archive'])
+                data_files = '\n'.join(data_files) or '/*'
+                logger.debug("files for 'files' section in spec file: %s", data_files)
+                spec_file = package.rpm.create_spec_file(
+                    temp_work_dir,
+                    package_name,
+                    package_version,
+                    package_meta["rpm_release"],
+                    package_meta.get("rpm_buildarch"),
+                    'package {} was built by ya package'.format(package_name),
+                    package_meta['homepage'],
+                    package_meta.get('depends'),
+                    package_meta.get("pre-depends"),
+                    package_meta.get("provides"),
+                    package_meta.get("conflicts"),
+                    package_meta.get("replaces"),
+                    ['.'.join((package_name, package_version, "tar.gz"))],
+                    package_meta['description'],
+                    package_meta["rpm_license"],
+                    data_files,
+                    package_root,
+                )
+                gz_file = package.rpm.create_gz_file(
+                    package_name, package_version, temp_work_dir, content_dir, threads=params.build_threads
+                )
+                rpmbuild_dir = package.rpm.prepare_rpm_folder_structure(temp_work_dir, spec_file, gz_file)
+                package_path = package.rpm.create_rpm_package(
+                    temp_work_dir, package_name, package_version, rpmbuild_dir, params.publish_to, params.key
+                )
+                package_version = "{0}-{1}".format(package_version, package_meta["rpm_release"])
+
+            elif package_format == const.PackageFormat.DOCKER:
+                package_path, info = package.docker.create_package(
+                    params.docker_registry,
+                    params.docker_repository,
+                    package_name,
+                    package_version,
+                    content_dir,
+                    result_dir,
+                    params.docker_save_image,
+                    params.docker_push_image,
+                    params.nanny_release,
+                    params.docker_build_network,
+                    params.docker_build_arg,
+                    params.docker_no_cache,
+                    params.docker_use_remote_cache,
+                    params.docker_remote_image_version,
+                    params.docker_platform,
+                    params.docker_add_host,
+                    params.docker_target,
+                    params.docker_secrets,
+                )
+                meta["docker_image"] = info.image_tag
+                if info.digest:
+                    meta["digest"] = info.digest
+
+            elif package_format == const.PackageFormat.NPM:
+                package_path = package.npm.create_npm_package(
+                    content_dir, result_dir, params.publish_to, package_version
+                )
+
+            elif package_format == const.PackageFormat.WHEEL:
+                package_path = package.wheel.setup(
+                    content_dir,
+                    result_dir,
+                    params.publish_to,
+                    params.wheel_access_key_path,
+                    params.wheel_secret_key_path,
+                    params.wheel_python3,
+                    params.wheel_platform,
+                    package_version,
+                )
+
+            else:
+                raise YaPackageException("Unknown packaging format '{}'".format(package_format))
+            package.display.emit_message(
+                'Duration of package creation: {:.2f}s'.format(time.time() - timestamp_started)
+            )
+        finally:
+            if not params.cleanup and os.path.exists(temp_work_dir):
+                result_temp = 'result.' + package_name + '.' + str(random.random())
+                exts.fs.copytree3(temp_work_dir, result_temp, symlinks=True)
+                package.display.emit_message('Result temp directory: [[imp]]{}'.format(result_temp))
+
+        return package_name, package_version, package_path, debug_package_path, meta
+
+
+@timeit
+def checkout_data(arcadia_root, params):
+    """
+    Checkout parts of source code required for packaging
+    (package descriptions, %branch%/arcadia_tests_data, %branch%/data, etc),
+    rest data will be obtained during the build.
+    """
+    from yalibrary import checkout
+
+    # obtain specified package json descriptions
+    fetcher = checkout.VcsFetcher(arcadia_root)
+    fetcher.fetch_base_dirs()
+
+    packages = []
+    for package_file in params.packages:
+        not_found_paths = []
+        while True:
+            try:
+                packages.append(load_package(arcadia_root, package_file))
+                break
+            except PackageFileNotFoundException as pfnfe:
+                if pfnfe.missing_file_path in not_found_paths:  # looping over not existing path
+                    raise
+                not_found_paths.append(pfnfe.missing_file_path)
+                fetcher.fetch_dirs([os.path.dirname(pfnfe.missing_file_path)])
+
+    data_roots = ['arcadia', 'arcadia_tests_data', 'data']
+    required_data = {root: set() for root in data_roots}
+
+    # get list of required test_data and source code paths
+    for parsed_package in packages:
+        for element in parsed_package['data']:
+            source = element.get('source', None) or element.get('src', None)
+            if not source:
+                continue
+            path = source.get('path')
+            if not path:
+                continue
+
+            # old and new types
+            data_types = ['data', 'ARCADIA', 'TEST_DATA']
+            if source.get('type') in data_types:
+                # path in new format (convert required) is relative to root/arcadia for ARCADIA type
+                if source.get('type') == 'ARCADIA':
+                    path = os.path.join("arcadia", path)
+
+                root, path = path.split("/", 1)
+                if root in data_roots:
+                    required_data[root].add(path)
+            # obtain part of source code which will allow to convert old package format to the new one.
+            # conversion required some information from CMakeLists.txt (see adapter.convert for more info)
+            elif source.get('type') == "program":
+                root, path = path.split("/", 1)
+                required_data[root].add(path)
+
+    # obtain required data for packages
+    dest_dirs = {
+        'arcadia': {"rel_path": None, "destination": arcadia_root},
+        'arcadia_tests_data': {"rel_path": "../arcadia_tests_data", "destination": params.custom_tests_data_root},
+        'data': {"rel_path": "../data", "destination": params.custom_data_root},
+    }
+    for data_root, paths in required_data.items():
+        if paths:
+            fetcher.fetch_dirs(paths, dest_dirs[data_root]["rel_path"], dest_dirs[data_root]["destination"])
+
+
+@timeit
+def merge_package_with_included(
+    this_package, this_package_path, include_package, include_package_path, include_root=None
+):
+    result_package = copy.deepcopy(include_package)
+
+    for key in ["meta", "userdata"]:  # keys that rewrite base package
+        if key not in result_package:
+            result_package[key] = {}
+        result_package[key].update(this_package.get(key, {}))
+
+    merged_builds = {}
+    # Clear data and postprocess sections as we merge them later
+    result_package["data"] = []
+    result_package["postprocess"] = []
+
+    default_build_key = "build"
+
+    # each layer has its own build_key prefix for build section to avoid conflicts by flags
+    for package_data, package_path, package_targets_root in [
+        (this_package, this_package_path, None),
+        (include_package, include_package_path, include_root),
+    ]:
+        build_key = package_path.lstrip(os.sep)
+        build_section = package_data.get("build", {})
+        builds = [(default_build_key, build_section)] if "targets" in build_section else build_section.items()
+        for key, value in builds:
+            merged_builds["{}::{}".format(build_key, key) if '::' not in key else key] = value
+        for data in package_data.get("data", []):
+            if data.get("source", {}).get("type") == "BUILD_OUTPUT":
+                current = data["source"].get("build_key", default_build_key)
+                if '::' not in current:
+                    data["source"]["build_key"] = "{}::{}".format(build_key, current)
+            if package_targets_root:
+                package_targets_root = "/" + package_targets_root.lstrip("/")
+                data["destination"]["path"] = os.path.join(
+                    package_targets_root, data["destination"]["path"].lstrip("/")
+                )
+            result_package["data"].append(data)
+        for pp in package_data.get("postprocess", []):
+            if pp.get("source", {}).get("type") == "BUILD_OUTPUT":
+                current = pp["source"].get("build_key", default_build_key)
+                if '::' not in current:
+                    pp["source"]["build_key"] = "{}::{}".format(build_key, current)
+            result_package["postprocess"].append(pp)
+
+    result_package["build"] = merged_builds
+
+    return result_package
+
+
+@exts.func.lazy
+def get_validator():
+    schema = json.loads(rs.resfs_read("package.schema.json"))
+    return Draft4Validator(schema)
+
+
+@timeit
+def load_package(arcadia_root, package_file, included=None):
+    included = included or []
+
+    if package_file in included:
+        raise YaPackageException('Include loop detected: {}'.format(' -> '.join(included)))
+    included.append(package_file)
+
+    try:
+        parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
+    except ValueError as e:
+        raise YaPackageException('JSON loading error: {} in {}'.format(e.message, package_file))
+
+    old = is_old_format(parsed_package)
+    logger.debug("Detected package file format: %s", "new" if not old else "old")
+    if old:
+        raise YaPackageException("The old package format is no longer supported.")
+
+    for include_package in parsed_package.get("include", []):
+        if type(include_package) == dict:
+            include_package_path = include_package["package"]
+            include_package_root = include_package.get("targets_root")
+        else:
+            include_package_path, include_package_root = include_package, None
+        parsed_package = merge_package_with_included(
+            parsed_package,
+            package_file,
+            load_package(arcadia_root, include_package_path, included=included),
+            include_package_path,
+            include_package_root,
+        )
+
+    try:
+        get_validator().validate(parsed_package)
+    except ValidationError as error:
+        logger.warning("Package %s has either invalid or old format: %s", package_file, error.message)
+
+    return parsed_package
+
+
+def update_params(parsed_package, package_params, filename):
+    if 'params' not in parsed_package:
+        return package_params
+
+    logger.debug("Updating params from %s", filename)
+    default_params = package_opts.PackageCustomizableOptions()
+    new_params = {}
+
+    for opt, value in parsed_package['params'].items():
+        # Allow to redefine options only from PackageCustomizableOptions
+        if hasattr(default_params, opt):
+            def_value = getattr(default_params, opt)
+            user_value = getattr(package_params, opt)
+            if def_value is None or isinstance(value, type(def_value)):
+                if isinstance(value, dict):
+                    new_params[opt] = copy.deepcopy(value)
+                    # User cli params always extends package.json's dict params
+                    new_params[opt].update(user_value)
+                    logger.debug(
+                        "Dict option '%s' updated: %s (%r) -> %s (%r)",
+                        opt,
+                        user_value,
+                        type(user_value),
+                        new_params[opt],
+                        type(value),
+                    )
+                elif def_value == user_value:
+                    new_params[opt] = value
+                    logger.debug(
+                        "Option '%s' updated: %s (%r) -> %s (%r)", opt, user_value, type(user_value), value, type(value)
+                    )
+                else:
+                    logger.info("Option '%s' from file is overwritten by command line argument: %s", opt, value)
+            else:
+                logger.warning("Option '%s' skipped due type mismatch: got %r expected %r", opt, value, def_value)
+        else:
+            logger.warning("Skipping unknown '%s' option from %s", opt, filename)
+
+    return core.yarg.merge_params(package_params, core.yarg.Params(**new_params))
+
+
+@timeit
+def do_package(params):
+    import app_ctx  # XXX: get via args
+
+    package.display = app_ctx.display
+
+    stage_started("do_package")
+
+    if params.list_codecs:
+        package.display.emit_message("\n".join(package.tarball.get_codecs_list()))
+        return
+
+    if not params.packages:
+        raise YaPackageException('No packages to create')
+
+    arcadia_root = params.custom_source_root
+    if arcadia_root and os.path.exists(os.path.join(arcadia_root, 'arcadia')):
+        # support old style root
+        arcadia_root = os.path.join(arcadia_root, 'arcadia')
+    if not arcadia_root and os.path.exists(params.packages[0]):
+        arcadia_root = find_root.detect_root(params.packages[0])
+    if not arcadia_root:
+        arcadia_root = exts.path2.abspath(core.config.find_root())
+    package.display.emit_message('Source root: [[imp]]{}'.format(arcadia_root))
+    if not os.path.exists(arcadia_root):
+        raise YaPackageException('Arcadia root {} does not exist'.format(arcadia_root))
+
+    if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
+        raise YaPackageException('Cannot use --run-all-tests with --dist')
+
+    if not params.custom_tests_data_root:
+        params.custom_tests_data_root = os.path.abspath(os.path.join(arcadia_root, "..", "arcadia_tests_data"))
+    if not params.custom_data_root:
+        params.custom_data_root = os.path.abspath(os.path.join(arcadia_root, "..", "data"))
+
+    if getattr(params, "checkout", False):
+        stage_started("checkout_data")
+        checkout_data(arcadia_root, params)
+        stage_started("checkout_data")
+
+    packages_meta_info = []
+
+    if params.publish_to:
+        if isinstance(params.publish_to, (six.string_types, six.text_type)):
+            # support for older YaPackage task that passes args via stdin
+            params.publish_to = {params.publish_to: ""}
+
+        publish_to_keys = copy.copy(set(params.publish_to.keys()))
+        for key in publish_to_keys:
+            if key.startswith('http://') or key.startswith('https://') and params.publish_to[key]:
+                # it's url, not splited publish instruction
+                params.publish_to[key + '=' + params.publish_to[key]] = None
+                params.publish_to.pop(key)
+
+        if len(params.publish_to.keys()) == 1 and not list(params.publish_to.values())[0]:  # --publish-to <repo string>
+            repos = list(params.publish_to.keys())[0].split(";")
+            repos_iterator = itertools.chain(iter(repos), itertools.repeat(repos[-1]))
+
+            def repos_getter(package_file_name):
+                return next(repos_iterator)
+
+        else:
+            for key, value in tuple(params.publish_to.items()):
+                params.publish_to[_get_package_file(arcadia_root, key)] = value
+
+            def repos_getter(package_file_name):
+                return params.publish_to.get(package_file_name, "")
+
+    else:
+
+        def repos_getter(package_file_name):
+            return ""
+
+    # make package files path absolute
+    params.packages = [_get_package_file(arcadia_root, p) for p in params.packages]
+
+    if params.dump_build_targets:
+        targets = []
+        for package_file in params.packages:
+            package_data = load_package(arcadia_root, package_file)
+            package_build = package_data.get("build", {})
+            if "targets" in package_build:
+                targets.extend(package_build["targets"])
+            else:
+                for build_key in package_build:
+                    if "targets" in package_build[build_key]:
+                        targets.extend(package_build[build_key]["targets"])
+        targets = list(set(targets))
+        logger.debug("Will dump build targets %s to %s", targets, params.dump_build_targets)
+        with open(params.dump_build_targets, "w") as f:
+            json.dump(targets, f)
+        return
+
+    if params.dump_inputs:
+        do_dump_input(params, arcadia_root, params.dump_inputs)
+        return
+
+    for package_file in params.packages:
+        logger.debug("Creating package: %s", package_file)
+        package_params = copy.copy(params)
+        package_params.publish_to = [_f for _f in repos_getter(package_file).split(";") if _f]
+        if package_params.publish_to:
+            logger.debug("Will publish %s to: %s", package_file, package_params.publish_to)
+
+        def build_package(params, output_root):
+            try:
+                logger.debug("Creating package: %s", locals())
+                package.display.emit_message('Creating package: [[imp]]{}'.format(package_file))
+
+                parsed_package = load_package(arcadia_root, package_file)
+                params = update_params(parsed_package, params, package_file)
+                package_root = os.path.dirname(package_file)
+
+                formatters = {
+                    "sandbox_task_id": params.sandbox_task_id,
+                    "package_name": parsed_package['meta']['name'],
+                    "package_root": os.path.relpath(package_root, os.path.realpath(arcadia_root)),
+                }
+
+                if "userdata" in parsed_package:
+                    formatters["userdata"] = parsed_package["userdata"]
+
+                def get_package_version():
+                    ver = parsed_package['meta']['version']
+                    change_log = params.change_log or os.path.join(package_root, 'debian', 'changelog')
+                    formatters["changelog_version"] = package.debian.ChangeLogVersion(change_log)
+                    return format_package_meta(ver, formatters)
+
+                package.display.emit_message('Package root: [[imp]]{}'.format(package_root))
+                package_name = parsed_package['meta']['name']
+                package.display.emit_message('Package name: [[imp]]{}'.format(package_name))
+                if params.change_log:
+                    params.change_log = six.ensure_str(params.change_log)
+
+                package_rel_root = os.path.relpath(package_root, os.path.realpath(arcadia_root))
+
+                branch = package.vcs.Branch(arcadia_root)
+                formatters.update(
+                    {
+                        "revision": package.vcs.Revision(arcadia_root),
+                        "svn_revision": package.vcs.SvnRevision(arcadia_root),
+                        "branch": branch,
+                        "package_root": package_rel_root,
+                    }
+                )
+                package.display.emit_message('Package branch: [[imp]]{}'.format(branch))
+
+                if params.custom_version:
+                    parsed_package['meta']['version'] = params.custom_version
+
+                package_version = get_package_version()
+                formatters.update(
+                    {
+                        "package_version": package_version,
+                        "package_full_name": ".".join([package_name, package_version]),
+                    }
+                )
+
+                parsed_package['meta']['version'] = package_version
+
+                builds = {}
+
+                if 'build' in parsed_package:
+                    if "targets" in parsed_package["build"]:
+                        build_info = parsed_package["build"]
+                        build_info["build_key"] = DEFAULT_BUILD_KEY
+                        build_info["output_root"] = output_root
+                        builds[DEFAULT_BUILD_KEY] = build_info
+                    else:
+                        for build_key in parsed_package["build"]:
+                            build_info = parsed_package["build"][build_key]
+                            build_info["build_key"] = build_key
+                            build_info["output_root"] = os.path.join(output_root, build_key)
+                            builds[build_key] = build_info
+
+                    for build_info in builds.values():
+                        if params.build_debian_scripts:
+                            if 'targets' not in build_info:
+                                build_info['targets'] = []
+                            # build_info['targets'].append(os.path.relpath(os.path.dirname(package_file), arcadia_root))
+                            # dirty hack, fix it
+                            build_info['targets'].append(
+                                os.path.relpath(os.path.dirname(package_file), os.path.realpath(arcadia_root))
+                            )
+                        if build_info.get("targets"):
+                            stage_started("build_targets")
+                            _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters)
+                            stage_finished("build_targets")
+
+                if not params.build_only:
+                    stage_started("create_package")
+                    name, version, path, debug_path, meta = create_package(
+                        arcadia_root, output_root, package_root, parsed_package, builds, params, formatters
+                    )
+                    stage_finished("create_package")
+
+                    if params.format == const.PackageFormat.DEBIAN and not params.store_debian:
+                        return True
+
+                    package_meta = meta
+                    package_meta.update(
+                        {
+                            'name': name,
+                            'version': version,
+                            'path': os.path.abspath(path),
+                            'debug_path': debug_path and os.path.abspath(debug_path),
+                        }
+                    )
+                    if params.upload:
+                        if params.mds:
+                            if not params.mds_token:
+                                params.mds_token = mds_uploader.get_mds_token(params)
+                            package_resource_url, platform_run_resource_url = upload_package_to_mds(
+                                path, package_file, params
+                            )
+                            package_meta["package_resource_url"] = package_resource_url
+                            if platform_run_resource_url:
+                                package_meta["platform_run_resource_url"] = platform_run_resource_url
+                        else:
+                            package_resource_id, platform_run_resource_id = upload_package(path, package_file, params)
+                            package_meta["package_resource_id"] = package_resource_id
+                            if platform_run_resource_id:
+                                package_meta["platform_run_resource_id"] = platform_run_resource_id
+                    if params.store_debian:
+                        packages_meta_info.append(package_meta)
+            except Exception as e:
+                logger.debug(traceback.format_exc())
+                package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
+                raise YaPackageException("Packaging {} failed".format(package_file))
+            finally:
+                if not params.cleanup and os.path.exists(output_root):
+                    build_temp = 'build.' + parsed_package['meta']['name'] + '.' + str(random.random())
+                    package.fs_util.copy_tree(output_root, build_temp)
+                    package.display.emit_message('Build temp directory: [[imp]]{}'.format(build_temp))
+
+        if params.output_root:
+            package_path = os.path.relpath(os.path.realpath(package_file), os.path.realpath(arcadia_root))
+            is_package_skipped = build_package(package_params, os.path.join(params.output_root, package_path))
+        else:
+            with exts.tmp.temp_dir() as output_root:
+                is_package_skipped = build_package(package_params, output_root)
+
+        if is_package_skipped:
+            continue
+
+    if packages_meta_info:
+        json.dump(packages_meta_info, open('packages.json', 'w'), indent=4)
+
+    stage_finished("do_package")
+
+
+def upload_package(built_package_file, package_json, opts):
+    built_package_file_name = os.path.basename(built_package_file)
+    fix_logging()
+    platform_run_resource_id = None
+
+    package_attrs = opts.resource_attrs
+    package_attrs.update(
+        {
+            'build_type': opts.build_type,
+        }
+    )
+
+    logging.info("Uploading %s", built_package_file_name)
+    logging.debug("Uploading file full path: %s", built_package_file)
+
+    package_resource_id = uploader.do(
+        [built_package_file],
+        resource_type=opts.resource_type,
+        resource_description=package_json,
+        resource_owner=opts.resource_owner,
+        resource_attrs=package_attrs,
+        ttl=opts.ttl,
+        sandbox_url=opts.sandbox_url,
+        sandbox_token=opts.oauth_token,
+        transport=opts.transport,
+        ssh_keys=opts.ssh_keys,
+        ssh_user=opts.username,
+    )
+    logger.info(
+        "Uploaded package %s: https://sandbox.yandex-team.ru/resource/%s/view",
+        built_package_file_name,
+        package_resource_id,
+    )
+
+    platform_run_path = os.path.join(os.path.dirname(package_json), "platform.run")
+    if os.path.exists(platform_run_path):
+        platform_run_resource_id = uploader.do(
+            [platform_run_path],
+            resource_type="PLATFORM_RUN",
+            resource_description="platform.run for {}({})".format(package_resource_id, package_json),
+            resource_owner=opts.resource_owner,
+            resource_attrs=package_attrs,
+            ttl=opts.ttl,
+            sandbox_url=opts.sandbox_url,
+            sandbox_token=opts.oauth_token,
+            transport=opts.transport,
+            ssh_keys=opts.ssh_keys,
+            ssh_user=opts.username,
+        )
+        logger.info(
+            "Uploaded platform.run for package %s with resource id %s: https://sandbox.yandex-team.ru/resource/%s/view",
+            built_package_file_name,
+            package_resource_id,
+            platform_run_resource_id,
+        )
+
+    return package_resource_id, platform_run_resource_id
+
+
+def upload_package_to_mds(built_package_file, package_json, opts):
+    platform_run_resource_url = None
+    built_package_file_name = os.path.basename(built_package_file)
+
+    logger.info("Uploading %s to MDS", built_package_file_name)
+    logging.debug("Uploading file full path: %s", built_package_file)
+
+    package_resource_key = mds_uploader.do(
+        [built_package_file],
+        ttl=opts.ttl,
+        mds_host=opts.mds_host,
+        mds_port=opts.mds_port,
+        mds_namespace=opts.mds_namespace,
+        mds_token=opts.mds_token,
+    )
+    package_resource_url = "https://{}/get-{}/{}".format(opts.mds_host, opts.mds_namespace, package_resource_key)
+    logger.info("Uploaded package %s: %s", built_package_file_name, package_resource_url)
+
+    platform_run_path = os.path.join(os.path.dirname(package_json), "platform.run")
+    if os.path.exists(platform_run_path):
+        platform_run_resource_key = mds_uploader.do(
+            [platform_run_path],
+            ttl=opts.ttl,
+            mds_host=opts.mds_host,
+            mds_port=opts.mds_port,
+            mds_namespace=opts.mds_namespace,
+            mds_token=opts.mds_token,
+        )
+        platform_run_resource_url = "https://{}/get-{}/{}".format(
+            opts.mds_host, opts.mds_namespace, platform_run_resource_key
+        )
+        logger.info("Uploaded platform.run for package %s: %s", built_package_file_name, platform_run_resource_url)
+
+    return package_resource_url, platform_run_resource_url
+
+
+def do_dump_input(params, arcadia_root, output):
+    def safe_format(string, formatter):
+        """
+        This formatter will format string using only fields given in formatter.
+        Fields not presented in formatter dict will be skipped.
+        """
+        for key, val in formatter.items():
+            string = string.replace(key, val)
+        return string
+
+    result = {}
+    for package_file in params.packages:
+
+        def get_package_version():
+            ver = package_data.get('meta', {}).get('version', "{package_version}")
+            if params.custom_version:
+                ver = params.custom_version
+            return safe_format(ver, formatters)
+
+        if not package_file.startswith(arcadia_root):
+            arcadia_root = find_root.detect_root(package_file)
+            if not arcadia_root:
+                arcadia_root = exts.path2.abspath(core.config.find_root())
+            logger.info("Find new arcadia root %s", arcadia_root)
+        package_relpath = (
+            package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file
+        )
+        package_root = os.path.dirname(package_relpath)
+
+        build_section = collections.defaultdict(set)
+        arcadia_section = set()
+        sandbox_section = set()
+        include_section = set()
+        outputs_section = []
+
+        package_data = load_package(arcadia_root, package_relpath)
+
+        formatters = {
+            "{package_name}": package_data.get("meta", {}).get("name", None)
+            or package_data.get("name", "{package_name}"),
+            "{package_root}": package_root,
+            "{revision}": package.vcs.Revision(arcadia_root)(),
+            "{svn_revision}": str(package.vcs.SvnRevision(arcadia_root)()),
+            "{branch}": package.vcs.Branch(arcadia_root)(),
+        }
+
+        package_version = get_package_version()
+        formatters.update(
+            {
+                "{package_version}": package_version,
+                "{package_full_name}": ".".join([formatters["{package_name}"], package_version]),
+            }
+        )
+        package_build = package_data.get("build", {})
+        if "targets" in package_build:
+            for build_info in _do_dump_input_build(package_build):
+                build_section[safe_format(build_info[0], formatters)].add(safe_format(build_info[1], formatters))
+        else:
+            for build_key in package_build:
+                if "targets" in package_build[build_key]:
+                    for build_info in _do_dump_input_build(package_build[build_key]):
+                        build_section[safe_format(build_info[0], formatters)].add(
+                            safe_format(build_info[1], formatters)
+                        )
+
+        for data in package_data.get("data", []):
+            if data.get("source", {}).get("type") == 'BUILD_OUTPUT':
+                item = data.get("source", {})
+                if "path" in item:
+                    item["path"] = safe_format(item["path"], formatters)
+                outputs_section.append(item)
+            if data.get("source", {}).get("type") == 'ARCADIA':
+                for path in _do_dump_input_arcadia(
+                    arcadia_root, None, data["source"].get("path"), data["source"].get("files")
+                ):
+                    arcadia_section.add(safe_format(path, formatters))
+            if data.get("source", {}).get("type") == 'RELATIVE':
+                for path in _do_dump_input_arcadia(
+                    arcadia_root, package_root, data["source"].get("path"), data["source"].get("files")
+                ):
+                    arcadia_section.add(safe_format(path, formatters))
+            if data.get("source", {}).get("type") == 'SANDBOX_RESOURCE':
+                sandbox_id = data["source"].get("id")
+                if id:
+                    sandbox_section.add(sandbox_id)
+
+        include_section = set(_get_all_includes(arcadia_root, package_relpath))
+
+        result[package_relpath] = {
+            'build': {k: list(sorted(v)) for k, v in build_section.items()},
+            'arcadia': list(sorted(arcadia_section)),
+            'sandbox': list(sorted(sandbox_section)),
+            'include': list(sorted(include_section)),
+            'build_outputs': outputs_section,
+        }
+
+    with open(output, 'w') as out:
+        out.write(json.dumps(result, sort_keys=True, indent=2))
+
+
+def _do_dump_input_build(build_info):
+    targets = build_info.get("targets")
+    if not targets:
+        return
+    flags = {item["name"]: item.get("value") for item in build_info.get("flags", [])}
+    for platform in build_info.get("target-platforms", []) or ["DEFAULT-LINUX-X86_64"]:
+        platform_key = json.dumps({platform: flags}, sort_keys=True)
+        for t in targets:
+            yield platform_key, t
+
+
+def _do_dump_input_arcadia(arcadia_root, root, path, files):
+    def list_dir(d):
+        for r, _, files_list in os.walk(d):
+            for f in files_list:
+                yield os.path.join(r, f)[len(d) + 1 :]
+
+    if not path:
+        return
+    if root:
+        path = os.path.join(root, path)
+    abs_path = os.path.abspath(os.path.join(arcadia_root, path))
+    if os.path.isfile(abs_path):
+        yield path
+    if os.path.isdir(abs_path):
+        if files:
+            for f, _ in package.source.filter_files(abs_path, files):
+                yield os.path.normpath(os.path.join(path, f))
+        else:
+            for f in list_dir(abs_path):
+                yield os.path.normpath(os.path.join(path, f))
+
+
+def _get_all_includes(arcadia_root, package_file, included=None):
+    included = included or []
+
+    if package_file in included:
+        raise YaPackageException('Include loop detected: {}'.format(' -> '.join(included)))
+
+    try:
+        parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
+    except ValueError as e:
+        raise YaPackageException('JSON loading error: {} in {}'.format(e.message, package_file))
+    included.append(package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file)
+
+    for include_package in parsed_package.get("include", []):
+        if type(include_package) == dict:
+            include_package_path = include_package["package"]
+        else:
+            include_package_path = include_package
+        included.extend(_get_all_includes(arcadia_root, include_package_path, included))
+
+    return included

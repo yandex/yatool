@@ -1,0 +1,27 @@
+option optimize_for = SPEED;
+
+import "library/cpp/eventlog/proto/events_extension.proto";
+
+package NEvent;
+
+message TStageStarted {
+    option (message_id) = 13;
+    optional string StageName = 1;
+};
+
+message TStageFinished {
+    option (message_id) = 14;
+    optional string StageName = 1;
+};
+
+message TDisplayMessage {
+    option (message_id) = 23;
+    required string Type = 1;
+    required string Message = 2;
+    optional string Mod = 3;
+    optional string Sub = 4;
+    optional string Where = 5;
+    optional uint32 Row = 6;
+    optional uint32 Column = 7;
+    optional uint32 PID = 8;
+};

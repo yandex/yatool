@@ -1,0 +1,204 @@
+{% set timeline_width = 1000 %}
+{% set timeline_items = 10 %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dump debug info</title>
+    <style>
+        .warning {
+            color: red;
+        }
+
+        body {
+            font-family: "Yandex Sans Display", serif;
+        }
+
+        div.row {
+
+        }
+        div.timeline {
+            width: {{ timeline_width }}px;
+            border: 1px solid black;
+            margin-right: 0;
+            height: 22px;
+        }
+        div.item {
+            border: 1px dotted gray;
+            height: 20px;
+            background-color: gray;
+            float: left;
+            position: absolute;
+            opacity: 50%;
+        }
+        div.timestamp {
+            border-left: 1px solid blue;
+            height: 20px;
+            float: left;
+            position: absolute;
+        }
+        code.traceback {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<h3>Common info</h3>
+
+{% if not is_last %}
+    <div class="warning">This debug bundle not from last ya run, some files (like caches log or caches databases) could be changed</div>
+{% endif %}
+
+{% if system_info %}
+    <div>System info: <code>{{ system_info }}</code></div>
+{% else %}
+    <div class=warning>System info not found!</div>
+{% endif %}
+
+{% if session_id %}
+    <div>Snowden session id: <code>{{ session_id }}</code></div>
+{% else %}
+    <div class=warning>Snowden session id not found!</div>
+{% endif %}
+
+{% if ya_version_info %}
+    <div>Ya version:</div>
+    <div><code class="traceback">{{ ya_version_info }}</code></div>
+{% else %}
+    <div class="warning">Ya version info not found</div>
+{% endif %}
+
+<div>Command: <code>{{ cmd }}</code></div>
+
+{% if exit_code %}
+    <div>Exit code: <code>{{ exit_code }}</code></div>
+{% else %}
+    <div class=warning>Exit code not found, but it can be zero</div>
+{% endif %}
+
+{% if cwd %}
+    <div>CWD: <code>{{ cwd }}</code></div>
+{% endif %}
+
+<div>Bundle file: <a href={{ debug_bundle_file }}?force_text_mode=1>{{ debug_bundle_file }}</a></div>
+
+<div>
+    Run time: <code>~{{ init_time|pretty_date }}</code> .. <code>~{{ finish_time|pretty_date }}</code>
+</div>
+
+{% if duration %}
+    <div>Work time: <code>~{{ duration|pretty_delta }}</code></div>
+{% endif %}
+
+{% if username %}
+    <div>Username: <a href="https://staff.yandex-team.ru/{{ username }}">{{username}}</a></div>
+{% else %}
+    <div class=warning>User not found</div>
+{% endif %}
+
+{% if log_file %}
+    <div>Log file: <a href={{ log_file }}?force_text_mode=1>{{log_file}}</a> </div>
+{% else %}
+    <div class=warning>Logfile not found!</div>
+{% endif %}
+
+{% if evlog_file %}
+    <div>Evlog file: <a href={{ evlog_file }}?force_text_mode=1>{{evlog_file}}</a></div>
+{% else %}
+    <div class=warning>Evlog file not found!</div>
+{% endif %}
+
+{% macro render_sub_platform(info) -%}
+    <code>{{ info.visible_name }}: {{ info.os }}{{ info.arch }} ({{ info.toolchain }})</code>
+{%- endmacro %}
+
+{% macro render_platform(info) -%}
+    <code>{{ render_sub_platform(info.platform.host) }} -> {{ render_sub_platform(info.platform.target) }}</code>
+{%- endmacro %}
+
+{% macro render_branch(branch) -%}
+    <a href="https://a.yandex-team.ru/arc_vcs/?rev={{ branch }}">{{ branch }}</a>
+{%- endmacro %}
+
+{% macro render_revision(rev) -%}
+    <a href="https://a.yandex-team.ru/arc_vcs/commit/r{{ rev }}">r{{ rev }}</a>
+{%- endmacro %}
+
+{% if vcs_info %}
+    <div>Source root: <code>{{ vcs_info.ARCADIA_SOURCE_PATH }}</code></div>
+    <div>Used vcs: <code>{{ vcs_info.VCS }}</code></div>
+    <div>Branch: {{ render_branch(vcs_info.BRANCH) }}</div>
+    <div>Revision: {{ render_revision(vcs_info.ARCADIA_SOURCE_REVISION) }}</div>
+    <div>Revision last change: {{ render_revision(vcs_info.ARCADIA_SOURCE_LAST_CHANGE) }}</div>
+    <div>Revision patch number: {{ render_revision(vcs_info.ARCADIA_PATCH_NUMBER) }}</div>
+{% else %}
+    <div class=warning>Platform info not found!</div>
+{% endif %}
+
+{% if platforms %}
+    <div>Host: {{ render_platform(platforms.host) }}</div>
+    <div>Targets:</div>
+    {% for pl in platforms.targets %}
+        <div style="padding-left: 1em">{{ render_platform(pl) }}</div>
+    {% endfor %}
+{% else %}
+    <div class=warning>Platform info not found!</div>
+{% endif %}
+
+<h3>Files</h3>
+
+{% for local_path, info in files | sort_files_info %}
+    <div>{{ info.orig_key }}: <a href="{{ local_path }}{{ '?force_text_mode=1' if info.type == 'file' else '' }}">{{ info.original_path }}</a>: {{ info.status }} ({{ info.type }})</div>
+{% endfor %}
+
+<h3>Resources</h3>
+{% for key, value in resources.items() %}
+    <div>{{ key }}: {{ value }}</div>
+{% endfor %}
+
+<h3>Tracebacks</h3>
+
+{% for tb_info in tracebacks %}
+    <div><code class="traceback">{{ tb_info }}</code></div>
+    <hr>
+{% endfor %}
+
+<h3>Ymake runs</h3>
+{% for proc_name, info in runs.items() %}
+    <div class=row>
+        {{ proc_name }} ({{ info.purpose }})
+        <div class=timeline>
+            {% for stage_name, stage_info in info.stages.items() | sort(attribute="1.width", reverse=True) %}
+                <div class="item" style="margin-left: {{ stage_info.left * timeline_width }}px; width: {{ stage_info.width * timeline_width }}px"
+                     title="{{ stage_name }}: {{ stage_info.start|pretty_time }} .. {{ stage_info.finish|pretty_time }}">
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endfor %}
+
+<div class=row>
+    <div class="timeline">
+        {% for x in range(timeline_items) %}
+            <div class="timestamp" style="margin-left: {{ x * timeline_width / timeline_items }}px; width: {{ timeline_width / timeline_items }}px">
+                {{ (x / timeline_items * run_infos.duration + run_infos.start) | pretty_time }}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if run_errors %}
+<div class="row">
+    <div>Ymake stages errors:</div>
+    {% for error in run_errors %}
+        <div><code class="traceback">
+            {{- error -}}
+        </code></div>
+    {% endfor %}
+</div>
+{% endif %}
+
+</body>
+</html>

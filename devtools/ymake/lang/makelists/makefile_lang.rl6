@@ -1,0 +1,137 @@
+#include <devtools/ymake/common/memory_pool.h>
+#include <devtools/ymake/common/npath.h>
+#include <devtools/ymake/lang/makelists/makefile_lang.h>
+#include <devtools/ymake/lang/makelists/statement_location.h>
+
+#include <library/cpp/string_utils/subst_buf/substbuf.h>
+
+#include <util/generic/vector.h>
+#include <util/generic/strbuf.h>
+#include <util/string/cast.h>
+
+%%{
+
+machine MakeLists;
+alphtype char;
+
+action start_str {
+    curstr_started = fpc;
+}
+
+action end_str {
+    curstr = TStringBuf(curstr_started, fpc - curstr_started);
+}
+
+action start_quoted_str {
+    curstr_started = fpc + 1;
+}
+
+action end_quoted_str {
+    curstr = TStringBuf(curstr_started, fpc - curstr_started - 1);
+    SubstGlobal(curstr, "\\", "", *pool);
+}
+
+action a_error {
+    visitor->Error("lexer error at ", TVisitorCtx(TStatementLocation(ToString(path), numline, numcol, pos), content));
+}
+
+action clear_list {
+    curlist.clear();
+}
+
+action push_list_elem {
+    curlist.push_back(curstr);
+}
+
+action start_cmd {
+    curProcRange.Line = numline;
+    curProcRange.Column = numcol;
+}
+
+action end_cmd {
+    curProcName = curstr;
+    curProcRange.EndLine = numline;
+    curProcRange.EndColumn = numcol - 1;
+}
+
+action end_statement {
+    visitor->Statement(curProcName, curlist, TVisitorCtx(TStatementLocation(ToString(path), numline, numcol, pos), content), curProcRange);
+}
+
+spaces = space**;
+
+comment = '#' (any - '\n')* '\n';
+
+posentry = ('\n' ${ numcol = 1; numline++; }) | ((any - '\n') ${ numcol++; }) | (any ${ pos++; });
+poscount = posentry*;
+
+# string starts with quote and can have escaped quotes and spaces inside
+str_dq_char = any - '"' - '\\';
+str_dq = '"' str_dq_char* ('\\' any str_dq_char*)* '"';
+str_sq_char = any - '\'' - '\\';
+str_sq = '\'' str_sq_char* ('\\' any str_sq_char*)* '\'';
+str = (str_dq | str_sq) >start_quoted_str %end_quoted_str;
+
+escaped = ('\\' any);
+allowed_sym = any - space - '(' - ')' - '#' - '\\';
+atom = ( ( escaped | (allowed_sym - '"' - '\'') | ('$(' allowed_sym+ ')') ) (allowed_sym | escaped)* ) >start_str %end_str;
+
+command = (/[a-z_]/i /[\-a-z0-9_]/i*) >start_str %end_str;
+
+list_elem = (str | atom) %push_list_elem;
+list = spaces ((list_elem | comment) spaces)** >clear_list;
+statement = (command >start_cmd %end_cmd) spaces '(' list ')' $end_statement;
+statements = spaces ((statement | comment) spaces)* $^a_error;
+
+main := statements | poscount;
+
+}%%
+
+%% write data;
+
+ISimpleMakeListVisitor::~ISimpleMakeListVisitor() {
+}
+
+TVisitorCtx::TVisitorCtx(const TStatementLocation& location, TStringBuf content)
+   : Location(location)
+   , Content(content)
+{
+}
+
+const TStatementLocation& TVisitorCtx::GetLocation() const {
+    return Location;
+}
+
+TString TVisitorCtx::Here(size_t context) const {
+    const int syms_to_trace = context;
+
+    int pos = Location.Pos;
+
+    TString where = TString::Join(NPath::CutType(Location.Path), ":", ToString(Location.Row), ":", ToString(Location.Column));
+    int start = std::max(pos - syms_to_trace, 0);
+    int end = std::min(pos + syms_to_trace, pos + static_cast<int>(Content.length()) - 1);
+    return TString::Join(
+        Content.SubStr(start, pos - start),
+        "[ <- HERE ]",
+        Content.SubStr(pos, end - pos)
+    );
+}
+
+void ReadMakeList(const TStringBuf& path, const TStringBuf& content, ISimpleMakeListVisitor* visitor, IMemoryPool* pool)
+{
+    int cs;
+    %% write init;
+
+    const char *p = content.data();
+    const char *pe = content.end();
+    const char* eof = pe;
+
+    TStringBuf curstr;
+    TVector<TStringBuf> curlist;
+    TStringBuf curProcName;
+    TSourceRange curProcRange;
+    size_t numcol = 1, numline = 1, pos = 0;
+    const char* curstr_started = nullptr;
+
+    %% write exec;
+}

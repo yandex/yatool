@@ -1,0 +1,11 @@
+PROTO_LIBRARY()
+
+GRPC()
+
+SRCS(
+    runner.proto
+)
+
+EXCLUDE_TAGS(GO_PROTO)
+
+END()

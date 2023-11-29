@@ -1,0 +1,1101 @@
+# coding: utf-8
+
+import os
+import copy
+import time
+import exts.yjson as json
+import logging
+import traceback
+import threading
+
+from collections import defaultdict
+from itertools import chain
+
+import six
+
+from six.moves import urllib
+import core.error
+import test.common as test_common
+import yalibrary.term.console as term_console
+from build.reports import configure_error as ce
+from exts.fs import create_dirs, ensure_removed
+import build.owners as ow
+from test import const as constants
+from test.const import Status, TestSize
+from test.reports import trace_comment
+import test.reports.report_prototype as rp
+import test.util.tools as tut
+from yalibrary import formatter
+from yalibrary import platform_matcher
+
+logger = logging.getLogger(__name__)
+
+
+TEST_SIZES = [TestSize.Small, TestSize.Medium, TestSize.Large]
+TIMEOUT_TARGETS_MARKER = "Process exceeds time limit"
+DEPENDS_ON_BROKEN_TARGETS_MARKER = "Depends on broken targets"
+IMPORTANT_FIELDS = {'path', 'toolchain', 'duration'}
+
+
+def truncate_snippet(record):
+    if record.get("rich-snippet"):
+        record["rich-snippet"] = trace_comment.truncate_comment(record["rich-snippet"], constants.REPORT_SNIPPET_LIMIT)
+    return record
+
+
+def remove_empty_field(entry):
+    for k, v in tuple(entry.items()):
+        if not v and k not in IMPORTANT_FIELDS:
+            del entry[k]
+    return entry
+
+
+def filter_nontest_node(entry):
+    if entry.get("type") in ["style", "test"]:
+        return True
+    return False
+
+
+def _fix_link_prefix_and_quote(link, fix_from, fix_to):
+    assert link, locals()
+    if link.startswith(fix_from):
+        tail = link[len(fix_from) :]
+        url = "/".join([_f for _f in [fix_to.rstrip("/"), formatter.html.quote_url(tail)] if _f])
+        if url.endswith((".tar", ".tar.gz", ".tar.zstd")):
+            return url + "/"
+        return url
+    else:
+        return formatter.html.quote_url(link)
+
+
+def _fix_links_entry(entry, name, fix_from, fix_to):
+    paths = entry["links"][name]
+    assert isinstance(paths, list), entry
+    for i in range(len(paths)):
+        if fix_to.startswith("http") and not paths[i].startswith("http"):
+            p = paths[i]
+            if os.sep == "\\":  # windows host
+                p = p.replace("\\", "/")
+            paths[i] = _fix_link_prefix_and_quote(p, fix_from, fix_to)
+        else:
+            paths[i] = paths[i].replace(fix_from, fix_to)
+    entry["links"][name] = paths
+
+    if "rich-snippet" in entry:
+        entry["rich-snippet"] = entry["rich-snippet"].replace(fix_from, fix_to)
+
+
+def _fix_links(entry, fix_from, fix_to):
+    for name, paths in six.iteritems(entry.get("links", {})):
+        _fix_links_entry(entry, name, fix_from, fix_to)
+    for key, obj in six.iteritems(entry.get("result", {})):
+        if fix_to.startswith("http"):
+            obj['url'] = _fix_link_prefix_and_quote(obj['url'], fix_from, fix_to)
+        else:
+            obj['url'] = obj['url'].replace(fix_from, fix_to)
+    if "rich-snippet" in entry:
+        entry["rich-snippet"] = entry["rich-snippet"].replace(fix_from, fix_to)
+    return entry
+
+
+def log_restrained_investigation(entry, logsdir, output_dir, work_dir, tar_dirs):
+    ncalls = getattr(log_restrained_investigation, 'ncalls', 0)
+    setattr(log_restrained_investigation, 'ncalls', ncalls + 1)
+
+    if ncalls > 20:
+        logger.debug('Unable to find link file for %s', logsdir)
+    else:
+
+        def format_path(path):
+            return "{}(exist:{})".format(path, os.path.exists(path))
+
+        logger.debug(
+            "Unable to find link file for %s. Test entry: %s", logsdir, json.dumps(entry, indent=4, sort_keys=True)
+        )
+        logger.debug(
+            "Extracted logsdir:%s output_dir:%s: work_dir:%s",
+            format_path(logsdir),
+            format_path(output_dir),
+            format_path(work_dir),
+        )
+        for path in tar_dirs:
+            logger.debug("Target dir %s content: %s", path, os.listdir(path) if os.path.exists(path) else 'None')
+
+
+# XXX FOR DEBUG PURPOSE ONLY - will be removed soon
+def log_restrained_investigation2(entry, path, filename, output_dir, work_dir):
+    ncalls = getattr(log_restrained_investigation2, 'ncalls', 0)
+
+    if ncalls > 5:
+        pass
+    else:
+        setattr(log_restrained_investigation2, 'ncalls', ncalls + 1)
+
+        def format_path(path):
+            return "{}(exist:{})".format(path, os.path.exists(path))
+
+        logger.debug(
+            "Unable to find link file for %s. Test entry: %s",
+            format_path(path),
+            json.dumps(entry, indent=4, sort_keys=True),
+        )
+        logger.debug(
+            "Extracted path:%s output_dir:%s: work_dir:%s",
+            format_path(filename),
+            format_path(output_dir),
+            format_path(work_dir),
+        )
+        for path in [output_dir, work_dir]:
+            logger.debug("Target dir %s content: %s", path, os.listdir(path) if os.path.exists(path) else 'None')
+
+
+def _replace_logs_with_links(entry, output_dir, work_dir):
+    def _any_path():
+        for log_type, paths in entry.get("links", {}).items():
+            for path in paths:
+                any_path = path.replace("build-release", "")
+                return any_path
+        return None
+
+    def _build_root():
+        path = _any_path()
+        if not path:
+            return output_dir
+
+        while not work_dir.endswith(path) and path != '/':
+            path, _ = os.path.split(path)
+
+        if path in ['', '/']:
+            return output_dir
+
+        return work_dir[: work_dir.find(path)]
+
+    search_dir = output_dir
+    if os.path.exists(work_dir) and os.path.isdir(work_dir):
+        search_dir = _build_root()
+
+    path_to_link = dict()
+    links = set()
+    for log_type, paths in entry.get("links", {}).items():
+        for path in paths:
+            link_path = path.replace("build-release", search_dir) + '.link'
+            link_tar_path = path.replace("build-release", search_dir) + '.tar.link'
+            link_tar_zstd_path = path.replace("build-release", search_dir) + '.tar.zstd.link'
+            if os.path.exists(link_path) and os.path.isfile(link_path):
+                with open(link_path) as fp:
+                    link = fp.read().strip()
+                    links.add(link)
+                    _fix_links_entry(entry, log_type, path, link)
+                break
+            else:
+                link_filename = None
+                if os.path.exists(link_tar_path) and os.path.isfile(link_tar_path):
+                    link_filename = link_tar_path
+                elif os.path.exists(link_tar_zstd_path) and os.path.isfile(link_tar_zstd_path):
+                    link_filename = link_tar_zstd_path
+                if link_filename:
+                    with open(link_filename) as fp:
+                        link = fp.read().strip()
+                        path_to_link[path] = link
+                    break
+
+    for log_type, paths in entry.get("links", {}).items():
+        for path in paths:
+            if path not in links:
+                for dirpath in path_to_link:
+                    if path.startswith(dirpath):
+                        _fix_links_entry(entry, log_type, dirpath, path_to_link[dirpath])
+                        break
+
+    return entry
+
+
+def fix_links(report, result_root, build_root='build-release'):
+    entries = []
+    for entry in report["results"]:
+        entries.append(_fix_links(entry, build_root, result_root))
+    report["results"] = entries
+    return report
+
+
+def transform_toolchain(report_config, toolchain):
+    return report_config.get('toolchain_transforms', {}).get(toolchain, toolchain)
+
+
+def is_toolchain_ignored(report_config, toolchain):
+    return toolchain in report_config.get('ignored_toolchains', [])
+
+
+def _read_report_config(path):
+    if path:
+        with open(path) as fp:
+            return json.load(fp)
+    else:
+        return {}
+
+
+def parse_error_message(error, target_name):
+    if not isinstance(error, ce.ConfigureError):
+        error = ce.ConfigureError(str(error), 0, 0)
+
+    detailed_message = {
+        "path": target_name,
+        "type": "ERROR",
+        "text": error.message,
+    }
+
+    if error.row != 0 and error.column != 0:
+        detailed_message['line'] = error.row
+        detailed_message['position'] = error.column
+
+    return detailed_message
+
+
+def make_target_entry(
+    target_name,
+    target_id,
+    target_hid,
+    uid,
+    status,
+    owners,
+    results_dir,
+    messages_dir,
+    errors,
+    message_type,
+    target_platform=None,
+    metrics=None,
+    report_config=None,
+    module_tag=None,
+    errors_links=None,
+    error_type=None,
+):
+    def get_error_message(error):
+        if isinstance(error, six.string_types):
+            return error
+        elif isinstance(error, ce.ConfigureError):
+            return error.message
+        else:
+            logger.debug('Suspicious configure error type: %s (error: %s)', str(type(error)), str(error))
+            return str(error)
+
+    errors = sorted(errors or [])
+
+    toolchain = transform_toolchain(report_config or {}, target_platform or platform_matcher.my_platform())
+    if is_toolchain_ignored(report_config, toolchain):
+        return None
+
+    entry = rp.get_blank_record()
+    entry.update(
+        {
+            "id": target_id,
+            # WIP: https://st.yandex-team.ru/DEVTOOLS-8716
+            "hid": target_hid,
+            "toolchain": toolchain,
+            "path": target_name,
+            "type": message_type,
+            "status": status,
+            "uid": uid,
+            "owners": owners,
+        }
+    )
+    if error_type:
+        entry["error_type"] = error_type
+    else:
+        if status == rp.TestStatus.Fail:
+            entry["error_type"] = rp.ErrorType.Regular
+    if metrics:
+        entry['metrics'].update(metrics)
+    if module_tag:
+        entry['name'] = module_tag
+
+    if errors:
+        messages_file = os.path.join(messages_dir, target_name, "{}-{}.txt".format(message_type, toolchain))
+        create_dirs(os.path.dirname(messages_file))
+
+        errors_text = test_common.to_utf8("\n\n".join(get_error_message(error) for error in errors))
+        plain_errors = term_console.ecma_48_sgr_regex().sub("", errors_text)
+
+        with open(messages_file, "w") as file:
+            file.write(plain_errors)
+
+        entry["rich-snippet"] = formatter.ansi_codes_to_markup(errors_text)
+        # entry["links"]["messages"] = [os.path.relpath(messages_file, results_dir)]
+
+        errors_links_flattened = list(chain(*[_f for _f in errors_links or [] if _f]))
+        for i, link in enumerate(errors_links_flattened):
+            suffix = '-{}'.format(i + 1)
+            entry["links"]["stderr%s" % suffix] = [link]
+
+        for error_item in errors:
+            if get_error_message(error_item).startswith(DEPENDS_ON_BROKEN_TARGETS_MARKER):
+                entry["error_type"] = rp.ErrorType.BrokenDeps
+                break
+            if get_error_message(error_item).startswith(TIMEOUT_TARGETS_MARKER):
+                entry["error_type"] = rp.ErrorType.Timeout
+                break
+
+        if message_type == 'configure' and errors:
+            entry['messages'] = [parse_error_message(error, target_name) for error in errors]
+
+    return entry
+
+
+class YaMakeProgress(object):
+    BUILD = 'build'
+    CONFIGURE = 'configure'
+    STYLE = 'style'
+    TEST = 'test'
+
+    def __init__(self, totals_build, totals_style, totals_test_by_size):
+        self._lock = threading.RLock()
+        self.progress_without_test = defaultdict(lambda: defaultdict(lambda: {'done': 0, 'total': 0}))
+        self.progress_only_test = defaultdict(lambda: defaultdict(lambda: {'done': 0, 'total': 0}))
+        for toolchain, total in six.iteritems(totals_build):
+            self._increment(toolchain, YaMakeProgress.BUILD, total, progress_key='total')
+        for toolchain, total in six.iteritems(totals_style):
+            self._increment(toolchain, YaMakeProgress.STYLE, total, progress_key='total')
+        for toolchain, totals_test in six.iteritems(totals_test_by_size):
+            for size, total in six.iteritems(totals_test):
+                self._increment(toolchain, YaMakeProgress.TEST, total, progress_key='total', test_size=size)
+        for toolchain in set(self.progress_without_test.keys()) | set(self.progress_only_test.keys()):
+            self._increment(toolchain, YaMakeProgress.CONFIGURE, 0, progress_key='total')
+
+    def _increment(self, toolchain, build_type, value, test_size=None, progress_key='done'):
+        with self._lock:
+            if test_size:
+                self.progress_only_test[toolchain][test_size][progress_key] += value
+            else:
+                self.progress_without_test[toolchain][build_type][progress_key] += value
+
+    def increment_configure_done(self, toolchain, value):
+        """all graph in autocheck2.0 is read at once when starting report thus here total is equal to done"""
+        self._increment(toolchain, YaMakeProgress.CONFIGURE, value)
+        self._increment(toolchain, YaMakeProgress.CONFIGURE, value, progress_key='total')
+
+    def increment_build_done(self, toolchain, value):
+        self._increment(toolchain, YaMakeProgress.BUILD, value)
+
+    def increment_style_done(self, toolchain, value):
+        self._increment(toolchain, YaMakeProgress.STYLE, value)
+
+    def increment_test_done(self, toolchain, test_size, value):
+        self._increment(toolchain, YaMakeProgress.TEST, value, test_size=test_size)
+
+    def get_progress_ci_format(self):
+        with self._lock:
+            progress_without_test = copy.deepcopy(self.progress_without_test)
+            progress_only_test = copy.deepcopy(self.progress_only_test)
+
+        ci_progress = defaultdict(list)
+        for toolchain, progress_by_type in six.iteritems(progress_without_test):
+            for _type, type_progress in six.iteritems(progress_by_type):
+                ci_type_progress = type_progress.copy()
+                ci_type_progress.update({'type': _type})
+                ci_progress[toolchain] += [ci_type_progress]
+
+        for toolchain, progress_by_size in six.iteritems(progress_only_test):
+            for size, size_progress in six.iteritems(progress_by_size):
+                ci_test_progress = size_progress.copy()
+                ci_test_progress.update({'type': YaMakeProgress.TEST, 'size': size})
+                ci_progress[toolchain] += [ci_test_progress]
+        return ci_progress
+
+
+class ReportGenerator(object):
+    _logger = logging.getLogger('ReportGenerator')
+
+    def __init__(
+        self, opts, distbuild_graph, targets, tests, owners_list, make_files, results_dir, build_root, reports
+    ):
+        self._opts = opts
+        self._distbuild_graph = distbuild_graph
+        self._report_config = _read_report_config(self._opts.report_config_path)
+        self._targets = targets
+        self._owners_list = owners_list
+        self._make_files = make_files
+        self._results_dir = results_dir
+        self._build_root = build_root
+        self._reports = reports
+        self._messages_dir = os.path.join(results_dir, "compiler-messages")
+        ensure_removed(self._messages_dir)
+        create_dirs(self._messages_dir)
+        self._processed_uids = set()
+        self._tests_by_size = defaultdict(set)
+        tests_count = defaultdict(lambda: defaultdict(int))
+        style_tests_count = defaultdict(int)
+        logger.debug("Got %d tests to report", len(tests))
+        for test in tests:
+            toolchain = test.target_platform_descriptor
+            transformed_toolchain = transform_toolchain(self._report_config, toolchain)
+            should_report = (
+                test.is_skipped() and (self._opts.report_skipped_suites_only or self._opts.report_skipped_suites)
+            ) or (not test.is_skipped() and not self._opts.report_skipped_suites_only)
+            if test.get_ci_type_name() == YaMakeProgress.TEST:
+                self._tests_by_size[test.test_size].add(test.uid)
+                tests_count[transformed_toolchain][test.test_size] += 1 * should_report
+            elif test.get_ci_type_name() == YaMakeProgress.STYLE:
+                style_tests_count[transformed_toolchain] += 1 * should_report
+
+        self._tests_by_type = defaultdict(set)
+        for test in tests:
+            self._tests_by_type[test.get_ci_type_name()].add(test.uid)
+        for size in TEST_SIZES:
+            if size not in self._tests_by_size:
+                self.finish_tests_report_by_size(size)
+                self._tests_by_size[size] = set()
+        self.setup_ya_make_progress(style_tests_count, tests_count)
+
+    def setup_ya_make_progress(self, style_tests_count, tests_count):
+        totals_build = defaultdict(int)
+        for uid, target in six.iteritems(self._targets):
+            _, target_platform, _, _, _ = target
+            transformed_toolchain = transform_toolchain(self._report_config, target_platform)
+            totals_build[transformed_toolchain] += 1 * (not self._opts.report_skipped_suites_only)
+
+        self.ya_make_progress = YaMakeProgress(totals_build, style_tests_count, tests_count)
+
+    def finish(self):
+        self._logger.debug('Finish report')
+        for report in self._reports:
+            report.finish()
+
+    def finish_style_report(self):
+        self._logger.debug('Finish style report')
+        for report in self._reports:
+            report.finish_style_report()
+
+    def finish_configure_report(self):
+        self._logger.debug('Finish configure report')
+        for report in self._reports:
+            report.finish_configure_report()
+
+    def finish_build_report(self):
+        self._logger.debug('Finish build report')
+        for report in self._reports:
+            report.finish_build_report()
+
+    def finish_tests_report(self):
+        self._logger.debug(
+            'Finish tests report, tests by size %s, tests by type %s ', self._tests_by_size, self._tests_by_type
+        )
+        for size in self._tests_by_size.keys():
+            self.finish_tests_report_by_size(size)
+        for report in self._reports:
+            report.finish_tests_report()
+
+    def finish_tests_report_by_size(self, size):
+        self._logger.debug('Finish tests report by size %s', size)
+        for report in self._reports:
+            report.finish_tests_report_by_size(size)
+
+    def _post_process(self, entry):
+        if not entry:
+            return None
+        if (
+            self._opts.build_results_report_tests_only or self._report_config.get('report_tests_only')
+        ) and not filter_nontest_node(entry):
+            return None
+        entry["rich-snippet"] = formatter.ansi_codes_to_markup(entry.get("rich-snippet", ""))
+        entry = remove_empty_field(entry)
+        entry = truncate_snippet(entry)
+        return entry
+
+    def _add_entries(self, entries):
+        filtered_entries = [_f for _f in map(self._post_process, entries) if _f]
+        for report in self._reports:
+            report(filtered_entries, self.ya_make_progress.get_progress_ci_format())
+
+    def add_configure_results(self, configure_errors):
+        entries = []
+        if getattr(self._opts, 'add_changed_ok_configures', False):
+            progress_by_toolchain = defaultdict(int)
+            for target_name in sorted(configure_errors.keys()):
+                errors = [
+                    configure_error
+                    for configure_error in configure_errors.get(target_name, [])
+                    if configure_error.message != 'OK'
+                ]
+                target_id = rp.get_id(target_name, 'configure-step')
+                target_hid = rp.get_hash_id(target_name, 'configure-step')
+                owners = ow.find_path_owners(self._owners_list, target_name)
+                status = rp.TestStatus.Fail if errors else rp.TestStatus.Good
+                configure_uid = rp.get_id(target_name, "configure" + str(errors))
+                entries.append(
+                    make_target_entry(
+                        target_name,
+                        target_id,
+                        target_hid,
+                        configure_uid,
+                        status,
+                        owners,
+                        self._results_dir,
+                        self._messages_dir,
+                        errors,
+                        'configure',
+                        report_config=self._report_config,
+                        module_tag=None,
+                    )
+                )
+                toolchain = entries[-1].get('toolchain', None) if entries[-1] else None
+                if toolchain:
+                    progress_by_toolchain[toolchain] += 1
+        else:
+            targets = set()
+
+            for uid, target in six.iteritems(self._targets):
+                targets.add(target[0])
+
+            for target_name in configure_errors.keys():
+                targets.add(target_name)
+
+            for target_name in self._make_files:
+                targets.add(target_name)
+
+            progress_by_toolchain = defaultdict(int)
+
+            for target_name in sorted(targets):
+                errors = configure_errors.get(target_name, [])
+                target_id = rp.get_id(target_name, 'configure-step')
+                target_hid = rp.get_hash_id(target_name, 'configure-step')
+                owners = ow.find_path_owners(self._owners_list, target_name)
+                status = rp.TestStatus.Fail if errors else rp.TestStatus.Good
+                configure_uid = rp.get_id(target_name, "configure" + str(errors))
+                entries.append(
+                    make_target_entry(
+                        target_name,
+                        target_id,
+                        target_hid,
+                        configure_uid,
+                        status,
+                        owners,
+                        self._results_dir,
+                        self._messages_dir,
+                        errors,
+                        'configure',
+                        report_config=self._report_config,
+                        module_tag=None,
+                    )
+                )
+                toolchain = entries[-1].get('toolchain', None) if entries[-1] else None
+                if toolchain:
+                    progress_by_toolchain[toolchain] += 1
+
+        if self.ya_make_progress:
+            list(
+                map(
+                    lambda toolchain_value: self.ya_make_progress.increment_configure_done(*toolchain_value),
+                    six.iteritems(progress_by_toolchain),
+                )
+            )
+        self._add_entries(entries)
+
+    def _make_build_result(
+        self, uid, target_name, target_platform, errors, metrics, module_tag, errors_links, exit_code=None
+    ):
+        if not self._distbuild_graph.add_to_report(uid) or uid in self._processed_uids:
+            return None
+        self._processed_uids.add(uid)
+
+        if errors:
+            status = rp.TestStatus.Fail
+            if exit_code == core.error.ExitCodes.INFRASTRUCTURE_ERROR:
+                error_type = rp.ErrorType.Internal
+            else:
+                error_type = rp.ErrorType.Regular
+        else:
+            status = rp.TestStatus.Good
+            error_type = None
+
+        owners = ow.find_path_owners(self._owners_list, target_name)
+        target_id = rp.get_id(target_name, subtest=(module_tag or ''))
+        target_hid = rp.get_hash_id(target_name, subtest=(module_tag or ''))
+        return make_target_entry(
+            target_name,
+            target_id,
+            target_hid,
+            uid,
+            status,
+            owners,
+            self._results_dir,
+            self._messages_dir,
+            errors,
+            'build',
+            target_platform=target_platform,
+            metrics=metrics,
+            report_config=self._report_config,
+            module_tag=module_tag,
+            errors_links=errors_links,
+            error_type=error_type,
+        )
+
+    def add_build_result(self, uid, target_name, target_platform, errors, metrics, module_tag, errors_links, exit_code):
+        entry = self._make_build_result(
+            uid, target_name, target_platform, errors, metrics, module_tag, errors_links, exit_code=exit_code
+        )
+        toolchain = entry.get('toolchain', None) if entry else None
+        if self.ya_make_progress and toolchain:
+            self.ya_make_progress.increment_build_done(toolchain, 1)
+        self._add_entries([entry])
+
+    def add_build_results(self, build_result):
+        entries = []
+        progress_by_toolchain = defaultdict(int)
+        for uid, target in six.iteritems(self._targets):
+            target_name, target_platform, _, module_tag, _ = target
+            key = (target_name, target_platform, uid)
+            errors = build_result.build_errors.get(key)
+            errors_links = build_result.build_errors_links.get(key, [])
+            exit_code = build_result.exit_code_map.get(uid, 0)
+            metrics = build_result.build_metrics.get(uid)
+            entry = self._make_build_result(
+                uid, target_name, target_platform, errors, metrics, module_tag, errors_links, exit_code=exit_code
+            )
+            if entry is not None:
+                entries.append(entry)
+                toolchain = entry.get('toolchain', None)
+                if toolchain:
+                    progress_by_toolchain[toolchain] += 1
+
+        self._logger.debug('Build result is processed, add %s entries', len(entries))
+        if self.ya_make_progress:
+            list(
+                map(
+                    lambda toolchain_value: self.ya_make_progress.increment_build_done(*toolchain_value),
+                    six.iteritems(progress_by_toolchain),
+                )
+            )
+        self._add_entries(entries)
+
+    def _finish_report_by_type(self, tp):
+        if tp == 'test':
+            self.finish_tests_report()
+        elif tp == 'style':
+            self.finish_style_report()
+        else:
+            logger.warn('Unable to close report by type %s', tp)
+
+    def _fix_roots(self, entry, resolver):
+        from yatest_lib import external
+
+        def resolve_external_path(value, _):
+            if external.is_external(value):
+                value["uri"] = resolver.substitute(value["uri"])
+            return value
+
+        entry["rich-snippet"] = resolver.substitute(entry["rich-snippet"])
+        entry["links"] = {k: [resolver.substitute(item) for item in v] for k, v in entry["links"].items()}
+        if "result" in entry:
+            external.apply(resolve_external_path, entry["result"])
+
+    def _add_test_result(self, suite, node_errors, links, report_prototype):
+        import test.const as test_const
+
+        if suite.uid in self._processed_uids:
+            return
+
+        if suite.uid in report_prototype:
+            entry_prototypes = report_prototype[suite.uid]
+        else:
+            entry_prototypes = rp.make_suites_results_prototype([suite])
+
+        suite_prototypes = [entry for entry in entry_prototypes if "suite_id" not in entry]
+        assert len(suite_prototypes) == 1
+        suite_prototype = suite_prototypes[0]
+
+        test_size = suite_prototype["test_size"]
+        ci_type_name = suite_prototype["type"]
+        logging.debug('Process test result for %s test %s', test_size, suite.uid)
+
+        if (
+            suite_prototype["status"] == Status.MISSING
+            and not suite_prototype["is_skipped"]
+            and not suite.get_comment()
+            and node_errors
+        ):
+            suite_prototype["rich-snippet"] += "\n{}".format("\n".join(node_errors))
+
+        results_root = "build-release"
+        replacements = [
+            (self._build_root, results_root),
+            ('$(BUILD_ROOT)', results_root),
+        ]
+        import test.reports as test_reports
+
+        resolver = test_reports.TextTransformer(replacements)
+
+        if not suite_prototype["is_skipped"]:
+            suite.set_work_dir(resolver.substitute(suite.work_dir()))
+
+        entries = []
+
+        for entry_prototype in entry_prototypes:
+            entry = {}
+            for field in rp.REPORT_ENTRY_COMPLETED_FIELDS:
+                if field in entry_prototype:
+                    entry[field] = entry_prototype[field]
+
+            entry.update(
+                {
+                    "owners": ow.find_path_owners(self._owners_list, entry["path"]),
+                    "toolchain": transform_toolchain(
+                        self._report_config,
+                        entry_prototype["target_platform_descriptor"] or platform_matcher.my_platform(),
+                    ),
+                }
+            )
+            # TODO: DEVTOOLS-5005 - stop sending skipped tests to distbs
+            requirements = suite._original_requirements
+            if requirements:
+                entry["requirements"] = requirements
+
+            # for now we change toolchain for all fat tests from default-linux-x86_64-relwithdebinfo to
+            # default-linux-x86_64-release except tests tagged with ya:relwithdebinfo
+            if (
+                test_const.YaTestTags.Fat in entry["tags"]
+                and entry["toolchain"] == "default-linux-x86_64-relwithdebinfo"
+                and test_const.YaTestTags.RunWithAsserts not in entry["tags"]
+            ):
+                entry["toolchain"] = "default-linux-x86_64-release"
+            # Add ya:not_autocheck tag to the tests if they are not explicitly marked as exotic
+            if (
+                entry["toolchain"] == "default-darwin-x86_64-release"
+                and entry["status"] == rp.TestStatus.Discovered
+                and test_const.YaTestTags.ExoticPlatform not in entry.get("tags", [])
+            ):
+                entry["tags"] = entry.get("tags", []) + [test_const.YaTestTags.NotAutocheck]
+
+            self._fix_roots(entry, resolver)
+
+            if self._opts.build_results_resource_id is not None:
+                _fix_links(entry, results_root, tut.get_log_results_link(self._opts))
+            elif (
+                self._opts.use_links_in_report
+                and (entry != suite_prototype or suite_prototype["links"])
+                and not entry_prototype["is_skipped"]
+            ):
+                _replace_logs_with_links(entry, self._build_root, suite.work_dir())
+            if links:
+                if "links" not in entry:
+                    entry["links"] = {}
+                entry["links"].update(links)
+
+            entries.append(entry)
+
+        toolchain = entries[-1].get("toolchain", None) if len(entries) and entries[-1] else None
+        if self.ya_make_progress and toolchain:
+            if ci_type_name == YaMakeProgress.STYLE:
+                self.ya_make_progress.increment_style_done(toolchain, 1)
+            else:
+                self.ya_make_progress.increment_test_done(toolchain, test_size, 1)
+
+        self._add_entries(entries)
+        self._processed_uids.add(suite.uid)
+
+        def _discard_last_item(m, key, u):
+            if key in m and len(m[key]) > 0:
+                m[key].discard(u)
+                return len(m[key]) == 0
+            return False
+
+        if _discard_last_item(self._tests_by_size, test_size, suite.uid):
+            self._logger.debug('Fetched all tests results by size %s, close stream', test_size)
+            self.finish_tests_report_by_size(test_size)
+
+        if _discard_last_item(self._tests_by_type, ci_type_name, suite.uid):
+            self._logger.debug('Fetched all tests results by type %s, close stream', ci_type_name)
+            self._finish_report_by_type(ci_type_name)
+
+    def add_tests_results(self, suites, build_errors, node_build_errors_links, report_prototype=None):
+        if report_prototype is None:
+            report_prototype = defaultdict(list)
+        for suite in suites:
+            if build_errors:
+                target_platform = suite.target_platform_descriptor or platform_matcher.my_platform()
+                key = (suite.project_path, target_platform, suite.uid)
+                errors = build_errors.get(key)
+            else:
+                errors = []
+
+            links = {}
+            if suite.uid in node_build_errors_links:
+                for dep_uid, logs in node_build_errors_links[suite.uid]:
+                    for url in logs:
+                        links["{}_{}".format(dep_uid, os.path.basename(url))] = [url]
+
+            self._add_test_result(suite, errors, links, report_prototype)
+
+    def add_stage(self, build_stage):
+        for report in self._reports:
+            report.trace_stage(build_stage)
+
+
+class AggregatingStreamingReport(object):
+    FLUSHING_DELAY = 20
+
+    _logger = logging.getLogger('AggregatingStreamingReport')
+
+    def __init__(self, targets, client, report_config_path, keep_alive_streams, report_only_stages):
+        self._report_config = _read_report_config(report_config_path)
+        self._target_results = defaultdict(dict)
+        self._targets = defaultdict(set)
+        self._targets_list = set()
+        self._keep_alive_streams = keep_alive_streams
+        self._report_only_stages = report_only_stages
+        for uid, target in six.iteritems(targets):
+            target_name, target_platform, _, target_tag, _ = target
+            target_platform = transform_toolchain(self._report_config, target_platform)
+            target_key = (target_name, target_platform, target_tag)
+            self._targets[target_platform].add(target_key)
+            self._targets_list.add(target_key)
+        self._client = client
+        self._lock = threading.RLock()
+        self._closed_tests_streams = set()
+        self._closed_streams = set()
+        self._last_flush_time = 0
+        self._items_queue = []
+        self._closed = False
+        self._ci_progress = None
+        self._run_flushing_loop()
+
+    def _run_flushing_loop(self):
+        thread = threading.Thread(target=self._flushing_loop)
+        thread.daemon = True
+        thread.start()
+
+    def _flushing_loop(self):
+        while not self._closed:
+            self._flush_items()
+            time.sleep(self.FLUSHING_DELAY)
+
+    def _add_entry_into_queue(self, entry):
+        with self._lock:
+            self._items_queue.append(entry)
+
+    def _flush_items(self, force_flush=False):
+        with self._lock:
+            now = time.time()
+            if self._items_queue and (force_flush or self._last_flush_time + self.FLUSHING_DELAY <= now):
+                if self._report_only_stages:
+                    self._logger.debug(
+                        'Skip sending chunk of %s entries due to report_only_stages option', len(self._items_queue)
+                    )
+                else:
+                    self._client.send_chunk(self._items_queue, self._ci_progress)
+                self._last_flush_time = now
+                self._items_queue = []
+
+    def _add_target_result(self, entry):
+        target_path, target_platform, target_name = entry['path'], entry['toolchain'], entry.get('name')
+        target_key = (target_path, target_platform, target_name)
+
+        if target_platform not in self._targets:
+            self._logger.warn('Target result %s has unknown platform %s', entry, target_platform)
+            return
+
+        if target_key not in self._targets[target_platform]:
+            self._logger.warn('Target result %s has unknown target key %s', entry, target_key)
+            return
+
+        if target_key in self._target_results[target_platform]:
+            self._logger.warn('Target result %s was already added', entry)
+            return
+
+        if len(self._targets_list) == 0:
+            self._logger.warn('Add targets have been already added, incoming target is %s', entry)
+            return
+
+        self._target_results[target_platform][target_key] = entry
+        self._targets_list.discard(target_key)
+        self._add_entry_into_queue(entry)
+        if len(self._targets_list) == 0:
+            self._logger.debug('All targets have been added')
+            self.finish_build_report()
+
+    def __call__(self, entries, ci_progress):
+        with self._lock:
+            self._ci_progress = ci_progress
+        types = defaultdict(int)
+        for entry in entries:
+            tp = entry['type']
+            types[tp] += 1
+            if tp in self._closed_streams:
+                self._logger.warn('Stream %s has been already closed, ignore entry %s', tp, entry)
+            elif tp in ('configure', 'test', 'style'):
+                self._add_entry_into_queue(entry)
+            elif tp == 'build':
+                self._add_target_result(entry)
+            else:
+                self._logger.warn('Result %s has unknown type %s', entry, tp)
+        self._flush_items()
+
+    def trace_stage(self, build_stage):
+        with self._lock:
+            self._client.trace_stage(build_stage)
+
+    def _finish_report(self, tp):
+        if self._report_only_stages:
+            self._logger.debug('Skip finishing %s report due to report_only_stages option', tp)
+            return
+        self._logger.debug('Try to finish %s report', tp)
+        if tp not in self._closed_streams:
+            self._flush_items(force_flush=True)
+            self._logger.debug('Finish %s report', tp)
+            if tp in self._keep_alive_streams:
+                self._logger.debug('Keeping stream %s alive', tp)
+            else:
+                self._client.close_stream(tp)
+            self._closed_streams.add(tp)
+
+    def finish_style_report(self):
+        self._finish_report('style')
+
+    def finish_configure_report(self):
+        self._finish_report('configure')
+
+    def finish_build_report(self):
+        self._finish_report('build')
+
+    def finish_tests_report(self):
+        self._finish_report('test')
+
+    def finish_tests_report_by_size(self, size):
+        if self._report_only_stages:
+            self._logger.debug('Skip finishing test report by size %s due to report_only_stages option', size)
+            return
+        self._logger.debug('Try to finish test report by size %s', size)
+        if size not in self._closed_tests_streams:
+            self._flush_items(force_flush=True)
+            self._logger.debug('Finish tests report by size %s', size)
+            if size in self._keep_alive_streams:
+                self._logger.debug('Keeping stream test for %s tests alive', size)
+            else:
+                self._client.close_stream_by_size('test', size)
+            self._closed_tests_streams.add(size)
+
+    def finish(self):
+        self.finish_style_report()
+        self.finish_configure_report()
+        self.finish_build_report()
+        self.finish_tests_report()
+        if self._keep_alive_streams:
+            self._logger.debug('Keeping stream alive')
+            self._client.release()
+        elif self._report_only_stages:
+            self._logger.debug('Skip finishing report due to report_only_stages option')
+        else:
+            self._client.close()
+        self._closed = True
+
+
+class StreamingReport(object):
+    def __init__(self, url):
+        self._url = url
+
+    def trace_stage(self, build_stage):
+        pass
+
+    def finish_style_report(self):
+        pass
+
+    def finish_configure_report(self):
+        pass
+
+    def finish_build_report(self):
+        pass
+
+    def finish_tests_report(self):
+        pass
+
+    def finish_tests_report_by_size(self, size):
+        pass
+
+    def finish(self):
+        pass
+
+    def __call__(self, entries, ci_progress):
+        try:
+            message = json.dumps({'results': entries, 'progress': ci_progress})
+            logger.debug('Start to send report to %s, length is %s', self._url, len(message))
+            response = json.load(urllib.request.urlopen(self._url, data=message))
+            logger.debug('Report is sent to %s, response is %s', self._url, response)
+        except Exception:
+            logger.warning('Unable to send report because of %s', traceback.format_exc())
+
+
+class StoredReport(object):
+    _logger = logging.getLogger('StoredReport')
+
+    def __init__(self):
+        self._results = []
+        self._ci_progress = {}
+
+    def log_progress(self, ya_make_progress):
+        self._logger.debug('Progress: {}'.format(ya_make_progress.progress))
+
+    def trace_stage(self, build_stage):
+        self._logger.debug('Trace build stage %s', build_stage)
+
+    def finish_style_report(self):
+        self._logger.debug('Finish style report')
+
+    def finish_configure_report(self):
+        self._logger.debug('Finish configure report')
+
+    def finish_build_report(self):
+        self._logger.debug('Finish build report')
+
+    def finish_tests_report(self):
+        self._logger.debug('Finish tests report')
+
+    def finish_tests_report_by_size(self, size):
+        self._logger.debug('Finish tests report by size %s', size)
+
+    def finish(self):
+        self._logger.debug('Finish report')
+
+    def __call__(self, entries, ci_progress):
+        self._ci_progress = ci_progress
+        self._results.extend(entries)
+
+    def make_report(self):
+        return {'results': self._results, 'static_values': {}, 'progress': self._ci_progress}
+
+
+def prepare_results(test_results, report_prototype, builder, owners_list, configure_errors, results_dir, build_root):
+    report = StoredReport()
+    generator = ReportGenerator(
+        builder.opts,
+        builder.distbuild_graph,
+        builder.targets,
+        builder.ctx.tests,
+        owners_list,
+        builder.get_make_files(),
+        results_dir,
+        build_root,
+        [report],
+    )
+    if not builder.opts.report_skipped_suites_only:
+        generator.add_configure_results(configure_errors)
+        generator.add_build_results(builder.build_result)
+
+    logger.debug(
+        "builder.opts.report_skipped_suites: %s, builder.opts.report_skipped_suites %s",
+        builder.opts.report_skipped_suites,
+        builder.opts.report_skipped_suites_only,
+    )
+    if builder.opts.report_skipped_suites or builder.opts.report_skipped_suites_only:
+        generator.add_tests_results(
+            test_results,
+            builder.build_result.build_errors,
+            builder.build_result.node_build_errors_links,
+            report_prototype,
+        )
+    else:
+        generator.add_tests_results(
+            [t for t in test_results if not t.is_skipped()],
+            builder.build_result.build_errors,
+            builder.build_result.node_build_errors_links,
+            report_prototype,
+        )
+
+    return report.make_report()

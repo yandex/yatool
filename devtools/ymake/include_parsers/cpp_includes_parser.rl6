@@ -1,0 +1,61 @@
+#include <util/generic/string.h>
+#include <util/generic/strbuf.h>
+#include <util/generic/vector.h>
+#include <util/stream/output.h>
+
+%%{
+
+machine CppIncludes;
+
+action ClearInclude { include.resize(0); }
+action AddChar { include.append(*p); }
+action AddInclude { includes.push_back(include); }
+action RemoveInclude { includes.pop_back(); }
+
+action Include { fgoto Include; }
+action Ignore { fgoto Ignore; }
+action Undo { fhold; }
+action Skip {
+    p = static_cast<const char*>(memchr(p, '\n', pe - p));
+    if (!p) return;
+    fgoto main;
+}
+
+wsc = ([ \t\v\f\r] | ("/*" (any* -- "*/") "*/"));
+ws = wsc*;
+
+incl = (
+    (ws ('"' ^'\n'* :> '"') $AddChar) |
+    (ws ('<' ^'\n'* :> '>') $AddChar) |
+    (wsc+ <: (^('"'|'<') any*) $AddChar $eof(AddInclude) :> space $Undo)
+) >ClearInclude @AddInclude;
+
+main := (ws '#' ws ("include"|"import")) @Include @err(Skip);
+
+Include := incl @Ignore $err(Skip);
+
+Ignore := (ws "//" ' '* "Y_IGNORE") @RemoveInclude $err(Skip);
+
+}%%
+
+%% write data;
+
+void ScanCppIncludes(const TStringBuf& input, TVector<TString>& includes) {
+    int cs;
+    const char* start = input.begin();
+    const char* p = start;
+    const char* pe = input.end();
+    const char* eof = pe;
+    %% write init;
+
+    TString include;
+    %% write exec;
+
+    if (cs == CppIncludes_error) {
+        Cerr << "ScanCppIncludes failed at "
+             << p - start << " bytes from the start, "
+             << pe - p << " bytes from the end"
+             << Endl;
+        assert(false);
+    };
+}

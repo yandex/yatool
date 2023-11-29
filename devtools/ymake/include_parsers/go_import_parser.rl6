@@ -1,0 +1,111 @@
+#include <devtools/ymake/include_parsers/go_import_parser.h>
+#include <devtools/ymake/include_parsers/cpp_includes_parser.h>
+
+#include <util/generic/string.h>
+#include <util/generic/strbuf.h>
+#include <util/generic/vector.h>
+#include <util/stream/output.h>
+
+%%{
+    machine GoImports;
+
+    action ClearImport {
+        import.resize(0);
+    }
+
+    action AddChar {
+        import.append(*p);
+    }
+
+    action AddImport {
+        parsedFiles.emplace_back(import, TParsedFile::EKind::Import);
+    }
+
+    action Import {
+        fgoto Import;
+    }
+
+    action ClearComment {
+        assert(startComment == nullptr);
+        startComment = p;
+    }
+
+    action ProcessComment {
+        assert(startComment != nullptr);
+        TStringBuf comment(startComment, p - startComment);
+        includes.clear();
+        ScanCppIncludes(comment, includes);
+        for (const auto& include : includes) {
+            parsedFiles.emplace_back(include, TParsedFile::EKind::Include);
+        }
+        startComment = nullptr;
+    }
+
+    action CppComment {
+        fgoto CppComment;
+    }
+
+    action Skip {
+        TStringBuf rem(p, pe - p);
+        // No need to parse futher if we encountered statements other than 'package' or 'import'
+        if (rem.StartsWith(TStringBuf("var")) ||
+            rem.StartsWith(TStringBuf("func")) ||
+            rem.StartsWith(TStringBuf("type")) ||
+            rem.StartsWith(TStringBuf("const")) ||
+            rem.StartsWith(TStringBuf("interface")))
+        {
+            return;
+        }
+        p = static_cast<const char*>(memchr(p, '\n', pe - p));
+        if (!p) return;
+        fgoto main;
+    }
+
+    wsc = ( [ \t\v\f\r] | ("/*" ( any* -- "*/" ) >ClearComment "*/") %^ProcessComment );
+    ws = wsc*;
+
+    import_simple = ( ws ( [a-zA-Z0-9_.]+ wsc+ )? ( '"' ^'\n'* $AddChar :> '"' ) ) >ClearImport @AddImport;
+
+    cpp_comment_content = ^'\n'*;
+
+    cpp_comment = "//" cpp_comment_content;
+
+    compound_item = import_simple ( ws ';' import_simple )*;
+
+    compound_space = ws ( cpp_comment? '\n' ws )*;
+
+    import_compound = compound_space '(' compound_space ( compound_item ( compound_space compound_item )* )* compound_space ')';
+
+    import_stmt = ( import_simple | import_compound );
+
+    main := ( ws ( "import" @Import | "//" @CppComment ) ) @err(Skip);
+
+    Import := import_stmt $err(Skip);
+
+    CppComment := cpp_comment_content >*ClearComment %^ProcessComment $err(Skip);
+}%%
+
+%% write data;
+
+void ScanGoImports(const TStringBuf input, TVector<TParsedFile>& parsedFiles) {
+    int cs;
+    const char* start = input.begin();
+    const char* p = start;
+    const char* pe = input.end();
+    const char* eof = pe;
+    const char* startComment = nullptr;
+    %% write init;
+
+    TString import;
+    TVector<TString> includes;
+    %% write exec;
+
+    if (cs == GoImports_error) {
+        Cerr << "ScanGoImports failed at "
+            << p - start << " bytes from the start, "
+            << pe - p << " bytes from the end"
+            << Endl;
+        assert(false);
+    }
+}
+

@@ -1,0 +1,259 @@
+#pragma once
+
+#include "macro.h"
+
+#include <devtools/ymake/command_store.h>
+#include <devtools/ymake/dirs.h>
+#include <devtools/ymake/macro_vars.h>
+
+#include <util/generic/maybe.h>
+#include <util/generic/hash.h>
+#include <util/generic/string.h>
+#include <util/generic/variant.h>
+#include <util/generic/vector.h>
+#include <util/system/types.h>
+#include <util/system/yassert.h>
+
+#include <utility>
+#include <span>
+
+class TMacroCmd;
+class TYMake;
+class TModule;
+class TModuleBuilder;
+class TBuildConfiguration;
+class TDepGraph;
+class TUpdIter;
+class TAddDepAdaptor;
+class TCommands;
+
+struct IMemoryPool;
+
+bool IsInternalReservedVar(const TStringBuf& cur);
+
+enum ESubstMode {
+    ESM_DoSubst = 0,
+    ESM_DoFillCoord = 1,
+    ESM_DoBoth = 2,
+    ESM_DoBothCm = 3,
+};
+
+struct TCommandInfo {
+    enum ECmdType : ui8 {
+        Macro = 0,
+        MacroImplInp = 1, // when EMT_Usual macro type is used instead of EMT_MacroCall
+    };
+
+    enum ECmdInfoState {
+        OK = 0,
+        FAILED = 1,
+        SKIPPED = 2,
+    };
+
+    using TSubstObserver = std::function<void(const TVarStr&)>;
+
+    explicit TCommandInfo(const TBuildConfiguration* conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
+    void SetCommandSink(TCommands* commands);
+    bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod);
+
+public:
+    TYVar Cmd; // dep for the main output
+    THolder<TVars> ExternalVars;
+    THolder<THashMap<TString, TString>> KV;
+    THolder<THashMap<TString, TString>> ToolPaths;
+    THolder<THashMap<TString, TString>> ResultPaths;
+    struct TMultiCmdDescr* MkCmdAcceptor = nullptr; // for command builder only
+    bool KeepTargetPlatform = false;
+
+private:
+    struct TSpecFileLists {
+        TSpecFileList Input;         // deps for the main output
+        TSpecFileList AutoInput;     // inputs added automatically by ymake
+        TSpecFileList Output;        // deps for the main output
+        TSpecFileList OutputInclude; // includes for the main output
+        TSpecFileList Tools;         // deps for Cmd
+        TSpecFileList Results;       // deps for Cmd
+        THashMap<TString, TSpecFileList> OutputIncludeForType;
+    };
+
+    struct TSpecFileArrs {
+        TSpecFileArr Input;
+        TSpecFileArr AutoInput;
+        TSpecFileArr Output;
+        TSpecFileArr OutputInclude;
+        TSpecFileArr Tools;
+        TSpecFileArr Results;
+        THashMap<TString, TSpecFileArr> OutputIncludeForType;
+    };
+
+    TFileView InputDir;
+    TString InputDirStr; // dir part for Input[0]
+    TFileView BuildDir;
+    TString BuildDirStr;
+
+    static TAutoPtr<IMemoryPool> StrPool;
+
+    const TBuildConfiguration* Conf;
+    TDepGraph* Graph;
+    TCommands* CommandSink = nullptr;
+    TUpdIter* UpdIter;
+
+    std::variant<TSpecFileLists, TSpecFileArrs> SpecFiles;
+    THolder<THashMap<TString, TString>> Requirements;
+
+    TModule* Module;
+    TVarStrEx* MainInput = nullptr;
+    TVarStrEx* MainOutput = nullptr;
+    ui32 MainInputCandidateIdx = Max<ui32>();
+
+    mutable ui8 MsgDepth = 0; // for debug messages
+    ECmdType CmdType = Macro;
+    bool AllVarsNeedSubst = false;
+    bool HasGlobalInput = false;
+
+    THolder<TVector<TStringBuf>> AddIncls;
+    THolder<TVector<TStringBuf>> AddPeers;
+
+    TSpecFileList& GetInputInternal() { return std::get<0>(SpecFiles).Input; }
+    TSpecFileList& GetAutoInputInternal() { return std::get<0>(SpecFiles).AutoInput; }
+    TSpecFileList& GetOutputInternal() { return std::get<0>(SpecFiles).Output; }
+    TSpecFileList& GetOutputIncludeInternal() { return std::get<0>(SpecFiles).OutputInclude; }
+    TSpecFileList& GetToolsInternal() { return std::get<0>(SpecFiles).Tools; }
+    TSpecFileList& GetResultsInternal() { return std::get<0>(SpecFiles).Results; }
+
+    TSpecFileList& GetOutputIncludeForTypeInternal(TStringBuf type) {
+        return std::get<0>(SpecFiles).OutputIncludeForType[type];
+    }
+    template<typename TAction>
+    void ApplyToOutputIncludesInternal(TAction&& action) {
+        action(TStringBuf{}, GetOutputIncludeInternal());
+        for (auto& [type, outputIncludes] : std::get<0>(SpecFiles).OutputIncludeForType) {
+            action(type, outputIncludes);
+        }
+    }
+
+public:
+    // The only public user of this one is mkcmd.cpp :(
+    void AddOutputInternal(const TVarStrEx& out) {
+        GetOutputInternal().Push(out);
+    }
+
+    std::span<const TVarStrEx> GetInput() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Input : std::get<0>(SpecFiles).Input.Data(); }
+    std::span<const TVarStrEx> GetAutoInput() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).AutoInput : std::get<0>(SpecFiles).AutoInput.Data(); }
+    std::span<const TVarStrEx> GetOutput() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Output : std::get<0>(SpecFiles).Output.Data(); }
+    std::span<const TVarStrEx> GetOutputInclude() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).OutputInclude : std::get<0>(SpecFiles).OutputInclude.Data(); }
+    std::span<const TVarStrEx> GetTools() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Tools : std::get<0>(SpecFiles).Tools.Data(); }
+    std::span<const TVarStrEx> GetResults() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Results : std::get<0>(SpecFiles).Results.Data(); }
+
+    std::span<TVarStrEx> GetInput() { return std::get<1>(SpecFiles).Input; }
+    std::span<TVarStrEx> GetOutput() { return std::get<1>(SpecFiles).Output; }
+
+    THashMap<TString, TString> TakeRequirements();
+
+    void InitFromModule(const TModule& mod);
+
+    ECmdInfoState CheckInputs(TModuleBuilder& mod, TAddDepAdaptor& node, bool lastTry);
+    const TVarStrEx* GetMainOutput() const {
+        return MainOutput;
+    }
+    bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd = false);
+    bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
+    void AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId);
+
+    bool GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod);
+
+    bool GetCommandInfoFromStructCmd(
+        const TCommands& commands,
+        ui32 cmdElemId,
+        const TVector<TCommands::TCompiledCommand::TInput>& cmdInputs,
+        const TVector<TCommands::TCompiledCommand::TOutput>& cmdOutputs,
+        const TVars& vars
+    );
+    bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
+    TString SubstMacro(const TYVar* origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor = ECF_Unset);
+
+    TString SubstMacroDeeply(const TYVar* origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix = false, ECmdFormat cmdFormat = ECF_ExpandVars);
+    TString SubstVarDeeply(const TStringBuf& varName, const TVars& vars, ECmdFormat cmdFormat = ECF_ExpandVars);
+
+    // Convenience overload performing vars.Lookop(macroData.Name) with necessary fallbacks and calls full SubstData implementation
+    bool SubstData(
+        const TYVar* origin,
+        TMacroData& macro,
+        const TVars& vars,
+        ECmdFormat cmdFormat,
+        ESubstMode substMode,
+        TString& result,
+        ECmdFormat formatFor = ECF_Unset,
+        const TSubstObserver& substObserver = {});
+
+    void SubstData(
+        const TYVar* origin,
+        TMacroData& macro,
+        const TYVar* var,
+        const TVars& vars,
+        ECmdFormat cmdFormat,
+        ESubstMode substMode,
+        TString& result,
+        ECmdFormat formatFor = ECF_Unset,
+        const TSubstObserver& substObserver = {});
+
+    ECmdType GetCmdType() const { return CmdType; }
+    void SetCmdType(ECmdType type) { CmdType = type; }
+    void SetAllVarsNeedSubst(bool need) { AllVarsNeedSubst = need; }
+
+private:
+    template<typename T>
+    void ApplyToOutputIncludes(T&& action) const {
+        action(TStringBuf{}, GetOutputInclude());
+
+        if (SpecFiles.index() == 1) {
+            for (auto& [type, outputIncludes] : std::get<1>(SpecFiles).OutputIncludeForType) {
+                action(type, outputIncludes);
+            }
+        } else {
+            for (auto& [type, outputIncludes] : std::get<0>(SpecFiles).OutputIncludeForType) {
+                action(type, outputIncludes.Data());
+            }
+        }
+    }
+
+    // Only input and output are changed outside of this class
+    TSpecFileArr& GetAutoInput() { return std::get<1>(SpecFiles).AutoInput; }
+    TSpecFileArr& GetOutputInclude() { return std::get<1>(SpecFiles).OutputInclude; }
+    TSpecFileArr& GetTools() { return std::get<1>(SpecFiles).Tools; }
+    TSpecFileArr& GetResults() { return std::get<1>(SpecFiles).Results; }
+
+    template<typename T>
+    void ApplyToOutputIncludes(T&& action) {
+        action(TStringBuf{}, GetOutputInclude());
+        for (auto& [type, outputIncludes] : std::get<1>(SpecFiles).OutputIncludeForType) {
+            action(type, outputIncludes);
+        }
+    }
+
+    bool InitDirs(TVarStrEx& curSrc, TModuleBuilder& mod, bool lastTry);
+    // Finalizes TCommandInfo internal state (TSpecFileLists forming).
+    // Switches TSpecFiles representation from TSpecFileList to TSpecFileArr.
+    void Finalize();
+
+    ui64 InitCmdNode(const TYVar& var);
+    void AddCmdNode(const TYVar& var, ui64 elemId);
+    // TODO: move MsgPad here, too?
+    TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
+    void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);
+    TString MacroCall(const TYVar* macroDefVar, const TStringBuf& macroDef, const TYVar* argsVar, const TStringBuf& args, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat, bool convertNamedArgs);
+    bool ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* modsVar, const TMacroData& macroData, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat);
+
+    void FillAddCtx(const TYVar& var, const TVars& parentVars);
+
+    static bool IsIncludeVar(const TStringBuf& cur);
+    bool IsReservedVar(const TStringBuf& cur) const;
+    bool IsGlobalReservedVar(const TStringBuf& cur) const;
+
+    const TYVar* GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroname, const TStringBuf& args, const TVars& vars);
+
+    THolder<TVector<TStringBuf>> GetDirsFromOpts(const TStringBuf opt, const TVars& vars);
+    void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
+};
+
+void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>& result);

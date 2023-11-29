@@ -1,0 +1,617 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Package",
+    "description": "Package properties and data files",
+    "type": "object",
+    "definitions": {
+        "build": {
+            "description": "Build properties",
+            "type": "object",
+            "properties": {
+                "targets": {
+                    "description": "Build targets",
+                    "type": "array",
+                    "items": {
+                        "description": "Build target",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "build_type": {
+                    "description": "Build type (debug, release, etc.)",
+                    "type": "string"
+                },
+                "sanitize": {
+                    "description": "Sanitizer (memory, address, etc.)",
+                    "type": "string"
+                },
+                "sanitizer_flags": {
+                    "description": "Sanitizer flags",
+                    "type": "string"
+                },
+                "race": {
+                    "description": "Golang race sanitizer",
+                    "type": "boolean"
+                },
+                "pgo_use": {
+                    "description": "Build with PGO profiles",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "lto": {
+                    "description": "Build with LTO",
+                    "type": "boolean"
+                },
+                "thinlto": {
+                    "description": "Build with ThinLTO (-flto=thin flag)",
+                    "type": "boolean"
+                },
+                "musl": {
+                    "description": "Build with MUSL",
+                    "type": "boolean"
+                },
+                "pch": {
+                    "description": "Build with PCH",
+                    "type": "boolean"
+                },
+                "maven-export": {
+                    "description": "Create pom.xml file (java build)",
+                    "type": "boolean"
+                },
+                "sources": {
+                    "description": "Create jar with sources (java build)",
+                    "type": "boolean"
+                },
+                "add-result": {
+                    "description": "Process selected build output as a result",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "target-platforms": {
+                    "description": "Target platforms",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "flags": {
+                    "description": "Build flags",
+                    "type": "array",
+                    "items": {
+                        "description": "Build flag",
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "description": "Flag name",
+                                "type": "string"
+                            },
+                            "value": {
+                                "description": "Flag value",
+                                "type": "string"
+                            }
+                        },
+                        "required": ["name", "value"],
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "required": ["targets"],
+            "additionalProperties": false
+        },
+        "buildOutput": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["BUILD_OUTPUT"] },
+                "build_key": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "untar": {
+                    "type": "boolean"
+                }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+        },
+        "arcadia": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["ARCADIA"] },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+        },
+        "testData": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["TEST_DATA"] },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+        },
+        "directory": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["DIRECTORY"] }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+        },
+        "relative": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["RELATIVE"] },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+        },
+        "symlink": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["SYMLINK"] }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+        },
+        "inline": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["INLINE"] },
+                "content": {
+                    "type": "string"
+                }
+            },
+            "required": ["type", "content"],
+            "additionalProperties": false
+        },
+        "sandboxResource": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["SANDBOX_RESOURCE"] },
+                "id": {
+                    "type": ["integer", "string"]
+                },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "symlinks": {
+                    "type": "boolean"
+                },
+                "untar": {
+                    "type": "boolean"
+                }
+            },
+            "required": ["type", "id"],
+            "additionalProperties": false
+        },
+        "temp": {
+            "type": "object",
+            "properties": {
+                "type": { "enum": ["TEMP"] },
+                "path": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+        },
+        "attributes": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "description": "Change owner",
+                    "type": "object",
+                    "properties": {
+                        "value": {
+                            "description": "File owner (name or ID)",
+                            "type": ["string", "integer"]
+                        },
+                        "recursive": {
+                            "description": "Operate recursively",
+                            "type": "boolean"
+                        }
+                    },
+                    "required": ["value"],
+                    "additionalProperties": false
+                },
+                "group": {
+                    "description": "Change group",
+                    "type": "object",
+                    "properties": {
+                        "value": {
+                            "description": "File group (name or ID)",
+                            "type": ["string", "integer"]
+                        },
+                        "recursive": {
+                            "description": "Operate recursively",
+                            "type": "boolean"
+                        }
+                    },
+                    "required": ["value"],
+                    "additionalProperties": false
+                },
+                "mode": {
+                    "description": "Change mode",
+                    "type": "object",
+                    "properties": {
+                        "value": {
+                            "description": "File mode bits, chmod(1) compatible",
+                            "type": "string"
+                        },
+                        "recursive": {
+                            "description": "Operate recursively",
+                            "type": "boolean"
+                        }
+                    },
+                    "required": ["value"],
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "properties": {
+        "meta": {
+            "description": "Package meta information",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "The unique name of a package",
+                    "type": "string"
+                },
+                "version": {
+                    "description": "Package version",
+                    "type": "string",
+                    "default": "{revision}"
+                },
+                "description": {
+                    "description": "Package description",
+                    "type": "string"
+                },
+                "default-format": {
+                    "description": "Package default format: aar, tar, docker, rpm, debian, wheel, npm.",
+                    "type": "string",
+                    "enum": ["aar", "tar", "docker", "rpm", "debian", "wheel", "npm", "raw-package"]
+                },
+                "maintainer": {
+                    "description": "Package maintainer",
+                    "type": "string"
+                },
+                "homepage": {
+                    "description": "Package homepage",
+                    "type": "string",
+                    "pattern": "^http.+"
+                },
+                "pre-depends": {
+                    "description": "Package pre-dependencies",
+                    "type": "array",
+                    "items": {
+                        "description": "Dependent package name (debian/control syntax for Pre-depends)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "depends": {
+                    "description": "Package dependencies",
+                    "type": "array",
+                    "items": {
+                        "description": "Dependent package name (debian/control syntax for Depends)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "provides": {
+                    "description": "Virtual package list",
+                    "type": "array",
+                    "items": {
+                        "description": "Package name (debian/control syntax for Provides)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "conflicts": {
+                    "description": "Conflict package list",
+                    "type": "array",
+                    "items": {
+                        "description": "Package name (debian/control syntax for Conflicts)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "replaces": {
+                    "description": "Replacement package list",
+                    "type": "array",
+                    "items": {
+                        "description": "Package name (debian/control syntax for Replaces)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "breaks": {
+                    "type": "array",
+                    "items": {
+                        "description": "Package name (debian/control syntax for Breaks)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "build-depends": {
+                    "description": "Package build-dependencies",
+                    "type": "array",
+                    "items": {
+                        "description": "Dependent package name (debian/control syntax for Build-Depends)",
+                        "type": "string",
+                        "uniqueItems": true
+                    }
+                },
+                "section": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "noconffiles_all": {
+                    "description": "Set dh_noconffiles --all (debian only, default: true)",
+                    "type": "boolean",
+                    "default": true
+                },
+                "rpm_license": {
+                    "description": "license name",
+                    "type": "string"
+                },
+                "rpm_release": {
+                    "description": "release",
+                    "type": ["string", "integer"]
+                },
+                "rpm_buildarch": {
+                    "description": "build architecture",
+                    "type": "string"
+                }
+            },
+            "required": ["name", "maintainer"],
+            "additionalProperties": false
+        },
+        "include": {
+            "description": "Included package files",
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    {
+                        "description": "Arcadia-relative path to the included package",
+                        "type": "string"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "package": {
+                                "description": "Arcadia-relative path to the included package",
+                                "type": "string"
+                            },
+                            "targets_root": {
+                                "type": "string"
+                            }
+                        },
+                        "required": ["package"],
+                        "additionalProperties": false
+                    }
+                ],
+                "uniqueItems": true
+            }
+        },
+        "build": {
+            "oneOf": [
+                { "$ref": "#/definitions/build" },
+                {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/build"
+                    }
+                }
+            ]
+        },
+        "data": {
+            "description": "Package data files",
+            "type": "array",
+            "items": {
+                "description": "Data item (file, directory, symlink, etc)",
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "description": "Where to get it",
+                        "type": "object",
+                        "oneOf": [
+                            {"$ref": "#/definitions/buildOutput"},
+                            {"$ref": "#/definitions/arcadia"},
+                            {"$ref": "#/definitions/testData"},
+                            {"$ref": "#/definitions/directory"},
+                            {"$ref": "#/definitions/relative"},
+                            {"$ref": "#/definitions/symlink"},
+                            {"$ref": "#/definitions/inline"},
+                            {"$ref": "#/definitions/sandboxResource"},
+                            {"$ref": "#/definitions/temp"}
+                        ]
+                    },
+                    "destination": {
+                        "description": "Where to install it on a target host",
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "description": "Installation path",
+                                "type": "string",
+                                "pattern": "^\/.*"
+                            },
+                            "archive": {
+                                "type": "string",
+                                "pattern": "^\/.*"
+                            },
+                            "target": {
+                                "description": "Symlink target",
+                                "type": "string"
+                            },
+                            "attributes": {
+                                "$ref": "#/definitions/attributes"
+                            },
+                            "temp": {
+                                "type": "boolean"
+                            }
+                        },
+                        "anyOf": [
+                            {
+                                "required": ["path"]
+                            },
+                            {
+                                "required": ["archive"]
+                            }
+                        ],
+                        "additionalProperties": false
+                    },
+                    "description": {
+                        "description": "Optional comment about data item purpose",
+                        "type": "string"
+                    }
+                },
+                "required": ["source", "destination"],
+                "additionalProperties": false
+            },
+            "uniqueItems": true
+        },
+        "params": {
+            "description": "Fixed 'ya package' parameters",
+            "type": "object",
+            "uniqueItems": true
+        },
+        "postprocess": {
+            "description": "Postprocess the package by executing some applications",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "description": "Binary source",
+                        "type": "object",
+                        "oneOf": [
+                            {"$ref": "#/definitions/buildOutput"},
+                            {"$ref": "#/definitions/arcadia"},
+                            {"$ref": "#/definitions/sandboxResource"},
+                            {"$ref": "#/definitions/temp"}
+                        ]
+                    },
+                    "arguments": {
+                        "description": "Command line arguments",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "userdata": {
+            "description": "Arbitrary user data",
+            "type": "object"
+        }
+    },
+    "required": ["meta", "data"],
+    "additionalProperties": false
+}

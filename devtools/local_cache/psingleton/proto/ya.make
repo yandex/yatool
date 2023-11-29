@@ -1,0 +1,11 @@
+PROTO_LIBRARY()
+
+GRPC()
+
+SRCS(
+    known_service.proto
+)
+
+EXCLUDE_TAGS(GO_PROTO JAVA_PROTO)
+
+END()

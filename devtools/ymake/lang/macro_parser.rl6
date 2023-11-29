@@ -1,0 +1,388 @@
+#include <devtools/ymake/lang/macro_parser.h>
+
+#include <devtools/ymake/diag/manager.h>
+
+#include <util/generic/iterator_range.h>
+#include <util/generic/noncopyable.h>
+#include <util/generic/vector.h>
+#include <util/stream/str.h>
+#include <util/system/yassert.h>
+
+class TMacroBuilder : public TNonCopyable {
+public:
+    void Clear() {
+        Modifiers.clear();
+        ClearName();
+        ClearArguments();
+        ClearModifierName();
+        ClearModifierValue();
+        ClearSuffix();
+        IsRawString = false;
+        IsCommandSeparator = false;
+    }
+
+    void SetIsRawString() {
+        IsRawString = true;
+    }
+
+    bool GetIsRawString() const {
+        return IsRawString;
+    }
+
+    void SetIsCommandSeparator() {
+        IsCommandSeparator = true;
+    }
+
+    bool GetIsCommandSeparator() const {
+        return IsCommandSeparator;
+    }
+
+    bool IsMacroCall() const {
+        return !Name.empty() && Arguments != TStringBuf();
+    }
+
+    void AddModifier(const TStringBuf& name, const TStringBuf& value) {
+        Modifiers.emplace_back(name, value);
+    }
+
+    void ClearName() {
+        NameStart = nullptr;
+        Name.Clear();
+    }
+
+    void SetNameStart(const char* p) {
+        Y_ASSERT(p != nullptr);
+        NameStart = p;
+    }
+
+    void SetNameEnd(const char* p) {
+        Y_ASSERT(NameStart != nullptr);
+        Y_ASSERT(p >= NameStart);
+        Name = TStringBuf(NameStart, p - NameStart);
+    }
+
+    const TStringBuf& GetName() const {
+        return Name;
+    }
+
+    void ClearArguments() {
+        ArgumentsStart = nullptr;
+        Arguments.Clear();
+    }
+
+    void SetArgumnetsStart(const char* p) {
+        Y_ASSERT(p != nullptr);
+        ArgumentsStart = p;
+    }
+
+    void SetArgumnetsEnd(const char* p) {
+        Y_ASSERT(ArgumentsStart != nullptr);
+        Y_ASSERT(p >= ArgumentsStart);
+        Arguments = TStringBuf(ArgumentsStart, p - ArgumentsStart);
+    }
+
+    const TStringBuf& GetArguments() const {
+        return Arguments;
+    }
+
+    void ClearModifierName() {
+        ModifierNameStart = nullptr;
+        ModifierName.Clear();
+    }
+    void SetModifierNameStart(const char* p) {
+        Y_ASSERT(p != nullptr);
+        ModifierNameStart = p;
+    }
+
+    void SetModifierNameEnd(const char* p) {
+        Y_ASSERT(ModifierNameStart != nullptr);
+        Y_ASSERT(p >= ModifierNameStart);
+        ModifierName = TStringBuf(ModifierNameStart, p - ModifierNameStart);
+    }
+
+    const TStringBuf& GetModifierName() const {
+        return ModifierName;
+    }
+
+    void ClearModifierValue() {
+        ModifierValueStart = nullptr;
+        ModifierValue.Clear();
+    }
+    void SetModifierValueStart(const char* p) {
+        Y_ASSERT(p != nullptr);
+        ModifierValueStart = p;
+    }
+
+    void SetModifierValueEnd(const char* p) {
+        Y_ASSERT(ModifierValueStart != nullptr);
+        Y_ASSERT(p >= ModifierValueStart);
+        ModifierValue = TStringBuf(ModifierValueStart, p - ModifierValueStart);
+    }
+
+    const TStringBuf& GetModifierValue() const {
+        return ModifierValue;
+    }
+
+    void ClearSuffix() {
+        SuffixStart = nullptr;
+        Suffix.Clear();
+    }
+    void SetSuffixStart(const char* p) {
+        Y_ASSERT(p != nullptr);
+        SuffixStart = p;
+    }
+
+    void SetSuffixEnd(const char* p) {
+        Y_ASSERT(SuffixStart != nullptr);
+        Y_ASSERT(p >= SuffixStart);
+        Suffix = TStringBuf(SuffixStart, p - SuffixStart);
+    }
+
+    const TStringBuf& GetSuffix() const {
+        return Suffix;
+    }
+
+    TString ToString() const {
+        TString result;
+        result += "$";
+        if (!Modifiers.empty()) {
+            result += '{';
+            for (const auto& modifier : Modifiers) {
+                result += modifier.first;
+                if (modifier.second != TStringBuf()) {
+                    result += '=';
+                    result += modifier.second;
+                }   
+                result += ';';
+            }
+            result.back() = ':';
+        }
+        result += Name;
+        if (!Modifiers.empty()) {
+            result += "}";
+        }
+        if (!Arguments.empty()) {
+            Y_ASSERT(Modifiers.empty());
+            result += Arguments;
+        }
+        return result;
+    }
+
+    TMacroData ToMacroData() const {
+        TMacroData macroData;
+        if (IsMacroCall()) {
+            macroData.Args() = Arguments;
+            macroData.HasArgs = true;
+        } else {
+            macroData.RawString = IsRawString;
+            if (IsCommandSeparator) {
+                macroData.Flags.Set(EMF_CommandSeparator);
+            }
+        }
+        macroData.Name = Name;
+        for (const auto& modifier : Modifiers) {
+            const auto& name = modifier.first;
+            const auto& value = modifier.second;
+            Y_ASSERT(name != TStringBuf());
+            macroData.SetMod(name, value);
+        }
+        return macroData;
+    }
+
+private:
+    TVector<std::pair<TStringBuf, TStringBuf>> Modifiers;
+    TStringBuf Name;
+    TStringBuf Arguments;
+    TStringBuf ModifierName;
+    TStringBuf ModifierValue;
+    TStringBuf Suffix;
+
+    const char* NameStart = nullptr;
+    const char* ArgumentsStart = nullptr;
+    const char* ModifierNameStart = nullptr;
+    const char* ModifierValueStart = nullptr;
+    const char* SuffixStart = nullptr;
+    bool IsRawString = false;
+    bool IsCommandSeparator = false;
+};
+
+int GetMacrosFromString(const TStringBuf& content, TVector<TMacroData>& macros, const THashSet<TStringBuf>& ownVars, const TStringBuf& cmdName)
+{
+    if (content == TStringBuf() || content.empty()) {
+        // nothing to do, the content is empty, just exit
+        return 0;
+    }
+
+    int cs = 0;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+    int act;
+#pragma clang diagnostic pop
+    const char* p = content.data();
+    const char* pe = p + content.size();
+    const char* eof = pe;
+    const char *ts, *te;
+
+    TMacroBuilder macroBuilder;
+    macroBuilder.Clear();
+    bool hasOwnVars = !ownVars.empty();
+
+    %%{
+        machine MacroProcessor;
+        alphtype char;
+
+        action enterIdentifier {
+            macroBuilder.SetNameStart(fpc);
+        }
+
+        action exitIdentifier {
+            macroBuilder.SetNameEnd(fpc);
+        }
+
+        action enterRawString {
+            macroBuilder.SetNameStart(fpc + 1);
+        }
+
+        action exitRawString {
+            macroBuilder.SetNameEnd(fpc - 1);
+            macroBuilder.SetIsRawString();
+        }
+
+        action enterArguments {
+            macroBuilder.SetArgumnetsStart(fpc);
+        }
+
+        action exitArguments {
+            macroBuilder.SetArgumnetsEnd(fpc);
+        }
+
+        action enterModifierValue {
+            macroBuilder.SetModifierValueStart(fpc);
+        }
+
+        action exitModifierValue {
+            macroBuilder.SetModifierValueEnd(fpc);
+        }
+
+        action enterModifierName {
+            macroBuilder.SetModifierNameStart(fpc);
+        }
+
+        action exitModifierName {
+            macroBuilder.SetModifierNameEnd(fpc);
+        }
+
+        action enterModifier {
+            macroBuilder.ClearModifierName();
+            macroBuilder.ClearModifierValue();
+        }
+
+        action exitModifier {
+            macroBuilder.AddModifier(macroBuilder.GetModifierName(), macroBuilder.GetModifierValue());
+        }
+
+        action enterSuffix {
+            macroBuilder.SetSuffixStart(fpc);
+        }
+
+        action exitSuffix {
+            macroBuilder.SetSuffixEnd(fpc);
+        }
+
+        action enterMacroDefinition {
+            macroBuilder.Clear();
+        }
+
+        action exitMacroDefinition {
+            Y_ASSERT(macroBuilder.GetName() != TStringBuf() || macroBuilder.GetIsRawString());
+            const TStringBuf& suffix = macroBuilder.GetSuffix();
+            if (suffix != TStringBuf()) {
+                macroBuilder.AddModifier(TStringBuf("suf"), suffix);
+            }
+        }
+
+        action enterCommandSeparator {
+            macroBuilder.Clear();
+            macroBuilder.SetNameStart(fpc);
+        }
+
+        action exitCommandSeparator {
+            macroBuilder.SetNameEnd(fpc);
+            macroBuilder.SetIsCommandSeparator();
+        }
+
+        action emitMacro {
+            auto macroData = macroBuilder.ToMacroData();
+            if (macroData.HasArgs) {
+                // If currently processed macro is a macro call then
+                // process its arguments and mark them as ComplexArg
+                auto markPoint = macros.size();
+                const auto& args = macroData.Args();
+                Y_ASSERT(args.size() > 1);
+                GetMacrosFromString(args.SubStr(1, args.size() - 2), macros, ownVars, cmdName);
+                Y_ASSERT(macros.size() >= markPoint);
+                for (auto& m : MakeIteratorRange(macros.begin() + markPoint, macros.end())) {
+                    m.ComplexArg = true;
+                }
+            }
+            macroData.OrigFragment = TStringBuf(ts, te - ts);
+            macroData.IsOwnArg = hasOwnVars && ownVars.contains(macroData.Name);
+            macroData.SameName = macroData.Name == cmdName;
+            if (macroData.Flags.Get(EMF_Namespace) && !macroData.Flags.Get(EMF_LateOut)) {
+                YConfErr(BadMacro) << "The to_namespace modifier should be used only for late outs" << Endl;
+            }
+            macros.push_back(macroData);
+        }
+
+        action emit {
+            // Do nothing, just a placeholder
+        }
+
+        identifier = ( ( alpha | '_' ) ( alnum | '_' )* ) >enterIdentifier %exitIdentifier ( ( '-'+ ( alnum | '_' )+ ) %exitIdentifier )*;
+
+        string = '"' ( [^"\\] | '\\' any )* '"';
+
+        reference = '$(' ( alpha | '_' ) ( alnum | '_' )* ')';
+
+        arguments = ( '(' ( reference | [^)\\] | '\\' any )* ')' ) >enterArguments %exitArguments;
+
+        rawString = string >enterRawString %exitRawString;
+
+        modifierValue = ( [^;:\\"] | '\\' any | string )* >enterModifierValue %exitModifierValue;
+
+        modifierName = ( lower | '_' )+ >enterModifierName %exitModifierName;
+
+        modifier = ( modifierName ( '=' modifierValue )? ) >enterModifier %exitModifier;
+
+        modifiers = modifier ( ';' modifier )*;
+
+        simpleMacro = ( identifier arguments? );
+
+        suffix = ( ( '.'+ alnum+ )+ ) >enterSuffix %exitSuffix;
+
+        extMacro = ( '{' ( modifiers ':' )? ( identifier | rawString ) ( suffix )?  '}' );
+
+        macroDefinition = '$' ( simpleMacro | extMacro ) >enterMacroDefinition %exitMacroDefinition;
+
+        commandSeparator = '&&' >enterCommandSeparator %exitCommandSeparator;
+
+        main := |*
+            '\\' any => emit;
+            macroDefinition => emitMacro;
+            commandSeparator => emitMacro;
+            any => emit;
+        *|;
+    }%%
+
+    %% write data;
+    %% write init;
+    %% write exec;
+
+    if (cs < %%{ write first_final; }%%) {
+        // TODO(snermolaev): we have to correctly process state of parser
+        // Cout << Endl << Endl << "error: have not finished in final state [" << cs << "]" << Endl;
+        return -1;
+    }
+
+    return 0;
+}

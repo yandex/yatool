@@ -1,0 +1,24 @@
+BEGIN EXCLUSIVE;
+DROP INDEX IF EXISTS acs_request;
+DROP INDEX IF EXISTS from_edge;
+DROP INDEX IF EXISTS to_edge;
+DROP INDEX IF EXISTS dead_tasks;
+DROP INDEX IF EXISTS acs_not_in_use;
+DROP INDEX IF EXISTS gc_last_access;
+DROP INDEX IF EXISTS gc_last_access_time;
+DROP VIEW IF EXISTS analyze_files;
+DROP VIEW IF EXISTS analyze_helper;
+DROP VIEW IF EXISTS safe_to_delete;
+DROP VIEW IF EXISTS view_safe_to_delete;
+DROP VIEW IF EXISTS task_disk_usage;
+DROP VIEW IF EXISTS acs_blob_plain;
+DROP TABLE IF EXISTS running;
+DROP TABLE IF EXISTS acs_results_gc;
+DROP TABLE IF EXISTS acs_gc;
+DROP TABLE IF EXISTS dependencies;
+DROP TABLE IF EXISTS acs_blob;
+DROP TABLE IF EXISTS acs;
+DROP TABLE IF EXISTS blobs;
+COMMIT;
+
+VACUUM;

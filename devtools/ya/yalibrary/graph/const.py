@@ -1,0 +1,4 @@
+DIR = True
+FILE = False
+SOURCE_ROOT = '$(SOURCE_ROOT)'
+BUILD_ROOT = '$(BUILD_ROOT)'

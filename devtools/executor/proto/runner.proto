@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option optimize_for = SPEED;
+
+package NExternalExecutor;
+
+service Runner {
+    rpc Ping(TEmpty) returns (TEmpty);
+
+    rpc Execute(TCommand) returns (stream TResponse);
+}
+
+message TResponse {
+    bytes Error = 1;
+    uint32 Pid = 2;
+    repeated bytes StderrLines = 3;
+    int32 ExitCode = 4;
+}
+
+message TEnvEntry {
+    bytes Name = 1;
+    bytes Value = 2;
+}
+
+message TCommand {
+    repeated bytes Args = 1;
+    repeated TEnvEntry Env = 2;
+    bytes Cwd = 3;
+    bytes StdoutFilename = 4;
+    bytes StderrFilename = 5;
+    int32 Nice = 6;
+    TRequirements Requirements = 7;
+}
+
+message TEmpty {
+
+}
+
+message TRequirements {
+    uint32 Cpu = 1;
+    uint32 DiskUsage = 2;
+    uint32 Ram = 3;
+    uint32 RamDisk = 4;
+    uint64 Container = 5;
+    enum NetworkDescriptor {
+        NONE = 0;
+        RESTRICTED = 1;
+        FULL = 2;
+    }
+    NetworkDescriptor Network = 6;
+}

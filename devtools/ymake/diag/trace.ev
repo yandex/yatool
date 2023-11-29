@@ -1,0 +1,132 @@
+option optimize_for = SPEED;
+
+import "devtools/ymake/diag/common_msg/msg.ev";
+import "library/cpp/eventlog/proto/events_extension.proto";
+
+package NEvent;
+
+message TNoMakefile {
+    option (message_id) = 3;
+    optional string Where = 1;
+};
+
+message TRebuildGraph {
+    option (message_id) = 5;
+    optional string Why = 1;
+};
+
+message TUntypedError {
+    option (message_id) = 10;
+    optional string What = 1;
+};
+
+message TLoopDetected {
+    option (message_id) = 11;
+    required uint32 LoopId = 1;
+    repeated TLoopItem LoopNodes = 2;
+};
+
+//syntax errors in ya.make-files, missing or bad src files
+message TMakeSyntaxError {
+    option (message_id) = 12;
+    optional string What = 1;
+    optional string Where = 2;
+};
+
+message TInvalidPeerdir {
+    option (message_id) = 16;
+    optional string Dir = 1;
+};
+
+message TInvalidFile {
+    option (message_id) = 17;
+    optional string File = 1;
+    repeated string Dirs = 2;
+    optional string Reason = 3;
+};
+
+message TBadIncl {
+    option (message_id) = 18;
+    required string FromHere = 1;
+    required string Include = 2;
+};
+
+message TInvalidRecurse {
+    option (message_id) = 19;
+    optional string Dir = 1;
+};
+
+message TInvalidSrcDir {
+    option (message_id) = 20;
+    optional string Dir = 1;
+};
+
+message TInvalidAddIncl {
+    option (message_id) = 21;
+    optional string Dir = 1;
+};
+
+message TFileOutsideRoots {
+    option (message_id) = 22;
+    optional string File = 1;
+};
+
+message TInvalidDataDir {
+    option (message_id) = 24;
+    optional string Dir = 1;
+};
+
+message TLoopItem {
+    option (message_id) = 25;
+    required string Type = 1;
+    required string Name = 2;
+};
+
+message TFilesStat {
+    option (message_id) = 26;
+    required uint32 Count = 1;
+    required uint32 Rate = 2;
+};
+
+message TConfModulesStat {
+    option (message_id) = 27;
+    required uint32 Done = 1;
+    required uint32 Total = 2;
+};
+
+message TNeedDirHint {
+    option (message_id) = 28;
+    required string Dir = 1;
+};
+
+message TFailOnRecurse {
+    option (message_id) = 29;
+    repeated string TakenDirs = 1;
+    repeated string IgnoredDirs = 2;
+};
+
+message TRenderModulesStat {
+    option (message_id) = 30;
+    required uint32 Done = 1;
+    required uint32 Total = 2;
+};
+
+message TForeignPlatformTarget {
+    option (message_id) = 31;
+    enum EPlatform {
+        TOOL=0;
+        PIC=1;
+    }
+    enum EKind {
+        POSSIBLE=0;
+        REQUIRED=1;
+    }
+    required EPlatform Platform = 1;
+    required string Dir = 2;
+    required EKind Reachable = 3;
+    optional string ModuleTag = 4;
+};
+
+message TAllForeignPlatformsReported {
+    option (message_id) = 32;
+};

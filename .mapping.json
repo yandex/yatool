@@ -1,0 +1,9 @@
+{
+  "CODE_OF_CONDUCT.md":"devtools/ya/opensource/github/CODE_OF_CONDUCT.md",
+  "CONTRIBUTING.md":"devtools/ya/opensource/github/CONTRIBUTING.md",
+  "LICENSE":"devtools/ya/opensource/github/LICENSE",
+  "build/mapping.conf.json":"devtools/ya/opensource/mapping.conf.json",
+  "build/ya.conf.json":"devtools/ya/opensource/ya.conf.json",
+  "ya":"devtools/ya/opensource/ya",
+  "ya.conf":"devtools/ya/opensource/ya.conf"
+}

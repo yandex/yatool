@@ -1,0 +1,65 @@
+#include <devtools/ymake/lang/expansion.h>
+
+#include <util/generic/vector.h>
+#include <util/generic/string.h>
+#include <util/string/cast.h>
+
+
+%%{
+
+machine Expansion;
+alphtype char;
+
+action macro_name_end {
+    macroNameEnd = fpc;
+}
+
+action macro {
+    TStringBuf insideMacro = TStringBuf(macroNameEnd + 1, te - macroNameEnd - 2);
+    TStringBuf macroName = TStringBuf(ts + 1, macroNameEnd - ts - 1);
+    TString value;
+    if (lookup.Get(macroName, insideMacro, value)) {
+        result += value;
+    } else {
+        result += TStringBuf(ts, te - ts);
+    }
+}
+
+action emit {
+    result += *(te - 1);
+}
+
+main := |*
+    '\\' any => emit;
+    '$' (alnum* %macro_name_end) '{' (any - '$' - '{' - '}')+ '}' => macro;
+    any => emit;
+*|;
+
+}%%
+
+%% write data;
+
+TString Expand(const IMacroValueLookup& lookup, const TStringBuf& expr) {
+    int cs;
+
+    const char* p = expr.begin();
+    const char* pe = expr.end();
+    const char* eof = pe;
+
+    const char* ts = nullptr;
+    const char* te = nullptr;
+    int act;
+
+    const char* macroNameEnd = nullptr;
+
+    TString result;
+
+    %%{
+        write init;
+        write exec;
+    }%%
+
+    Y_UNUSED(act); //  variable 'act' set but not used
+
+    return result;
+}
