@@ -95,7 +95,7 @@ class AndroidEmulator(object):
         if not port:
             raise Exception("Can't detect emulator port")
         port = port[0]
-        device_id = 'emulator-' + port
+        device_id = 'emulator-' + port.decode()
         self.running_devices[device_name]['device_id'] = device_id
         process.execute(
             self._get_adb_cmd(device_id) + [
