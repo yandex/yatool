@@ -472,6 +472,20 @@ def gen_msvs_solution(params):
     return impl.gen_msvs_solution(params)
 
 
+def get_description(text, ref_name):
+    if app_config.in_house:
+        ref = {
+            "c": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#c",
+            "golang": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#golang",
+            "multi": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#multi",
+            "python": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#python",
+            "typescript": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript",
+        }[ref_name]
+        return "{}\nDocs: [[c:dark-cyan]]{}[[rst]]".format(text, ref)
+    else:
+        return text
+
+
 class IdeYaHandler(core.yarg.CompositeHandler):
     description = 'Generate project for IDE'
 
@@ -588,7 +602,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-clangd'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_clangd.gen_vscode_workspace),
-            description='Generate VSCode clangd C++ project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#c',
+            description=get_description('Generate VSCode clangd C++ project.', ref_name='c'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_clangd.VSCodeClangdOptions(),
@@ -606,7 +620,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-go'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_go.gen_vscode_workspace),
-            description='Generate VSCode Go project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#golang',
+            description=get_description('Generate VSCode Go project.', ref_name='golang'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_go.VSCodeGoOptions(),
@@ -621,7 +635,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-py'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_py.gen_vscode_workspace),
-            description='Generate VSCode Python project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#python',
+            description=get_description('Generate VSCode Python project.', ref_name='python'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_py.VSCodePyOptions(),
@@ -637,7 +651,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-ts'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_py.gen_vscode_workspace),
-            description='Generate VSCode TypeScript project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript',
+            description=get_description('Generate VSCode TypeScript project.', ref_name='typescript'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_py.VSCodePyOptions(),
@@ -653,7 +667,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_all.gen_vscode_workspace),
-            description='Generate VSCode multi-language project.\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#multi',
+            description=get_description('Generate VSCode multi-language project.', ref_name='multi'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode.opts.VSCodeAllOptions(),
@@ -670,7 +684,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-ts'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_ts.gen_vscode_workspace),
-            description='Generate VSCode TypeScript project\nDocs: https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript',
+            description=get_description('Generate VSCode TypeScript project.', ref_name='typescript'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_ts.VSCodeTypeScriptOptions(),
