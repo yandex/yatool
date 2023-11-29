@@ -123,7 +123,7 @@ class TestUidGenerator(object):
                 logger.debug("!! Default test_path_hashes: %s", test_paths_hashes)
                 logger.debug("!! Clean   test_path_hashes: %s", test_paths_hashes_clean)
 
-        affecting_tags = sorted([t for t in test.tags if t.startswith("ya:")])
+        affecting_tags = sorted([t for t in test.tags if t.startswith(("ya:", "sb:"))])
 
         imprint_parts = [
             test.name,
