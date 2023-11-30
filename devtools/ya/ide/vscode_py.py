@@ -283,7 +283,6 @@ class PyProject(object):
                     ],
                 ),
                 ("black-formatter.path", black_binary_path),
-                ("python.formatting.provider", "none"),
             )
         )
 

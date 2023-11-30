@@ -49,6 +49,10 @@ def merge_workspace(new, workspace_path):
         if setting not in new["settings"]:
             new["settings"][setting] = old["settings"][setting]
 
+    # Drop deprecated settings
+    new["settings"].pop("python.formatting.provider", None)
+    new["settings"].get("gopls", {}).pop("build.expandWorkspaceToModule", None)
+
 
 def sort_tasks(workspace):
     def sorting_key(t):
@@ -149,7 +153,6 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
             "--config", os.path.join(arc_root, "build/config/tests/py_style/config.toml"),
         ]),
         ("black-formatter.path", [black_binary_path]),
-        ("python.formatting.provider", "none"),
     ))
 
 

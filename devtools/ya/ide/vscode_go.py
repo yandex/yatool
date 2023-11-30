@@ -303,7 +303,6 @@ def gen_vscode_workspace(params):
                     "GOFLAGS": "-mod=vendor",
                     "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
                 }),
-                ("build.expandWorkspaceToModule", False),
                 ("formatting.local", "a.yandex-team.ru"),
                 ("ui.codelenses", {
                     "regenerate_cgo": False,
