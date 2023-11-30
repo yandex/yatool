@@ -704,7 +704,7 @@ class ReportGenerator(object):
 
         test_size = suite_prototype["test_size"]
         ci_type_name = suite_prototype["type"]
-        logging.debug('Process test result for %s test %s', test_size, suite.uid)
+        self._logger.debug('Process test result for %s test %s', test_size, suite.uid)
 
         if (
             suite_prototype["status"] == Status.MISSING
