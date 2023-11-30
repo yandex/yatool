@@ -23,7 +23,7 @@ from devtools.executor.proto import runner_pb2, runner_pb2_grpc
 
 
 cdef extern from "devtools/executor/lib/server.h":
-    int RunServer(char* mount_point, bint cache_stderr) nogil
+    int RunServer(char* mount_point, bint cache_stderr, bint debug) nogil
 
 
 class ShutdownException(Exception):
@@ -152,15 +152,15 @@ def _run_server_entry_point():
 
     address = sys.argv[1]
     cache_stderr = bool(int(sys.argv[2]))
-
-    if os.environ.get('DEBUG_LOCAL_EXECUTOR') == '1':
+    debug = bool(int(os.environ.get('DEBUG_LOCAL_EXECUTOR')))
+    if debug:
         sys.stderr.write("Staring server at {}\n".format(address))
 
     cdef bytes rawstr = six.ensure_binary(address)
     cdef char* cstr = rawstr
 
     try:
-        RunServer(cstr, cache_stderr)
+        RunServer(cstr, cache_stderr, debug)
         exit(0)
     except Exception:
         exit(1)
