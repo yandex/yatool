@@ -3,7 +3,7 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PEERDIR(
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     devtools/common/libmagic
     devtools/ya/core
     devtools/ya/exts

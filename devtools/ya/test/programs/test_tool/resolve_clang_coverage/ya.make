@@ -5,7 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     contrib/python/six
     devtools/common/libmagic
     devtools/ya/exts

@@ -5,7 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     devtools/ya/exts
     devtools/ya/test/programs/test_tool/lib/coverage
     devtools/ya/test/util

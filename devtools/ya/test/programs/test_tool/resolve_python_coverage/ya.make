@@ -6,7 +6,7 @@ PY_SRCS(resolve_python_coverage.py)
 
 PEERDIR(
     contrib/python/coverage
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     devtools/ya/exts
     devtools/ya/test/programs/test_tool/lib/runtime
     devtools/ya/test/programs/test_tool/lib/coverage

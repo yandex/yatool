@@ -9,7 +9,7 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     devtools/ya/exts
     devtools/ya/test/programs/test_tool/lib/coverage/iter_cov_json/lib
     library/python/cityhash

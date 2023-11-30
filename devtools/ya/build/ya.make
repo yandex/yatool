@@ -19,7 +19,7 @@ PY_SRCS(
 PEERDIR(
     contrib/python/humanfriendly
     contrib/python/pyre2
-    contrib/python/ujson
+    contrib/deprecated/python/ujson
     devtools/libs/parse_number/python
     devtools/libs/yaplatform/python
     devtools/ya/build/build_facade
