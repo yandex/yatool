@@ -2,8 +2,10 @@
   "CODE_OF_CONDUCT.md":"devtools/ya/opensource/github/CODE_OF_CONDUCT.md",
   "CONTRIBUTING.md":"devtools/ya/opensource/github/CONTRIBUTING.md",
   "LICENSE":"devtools/ya/opensource/github/LICENSE",
+  "README.md":"devtools/ya/opensource/github/README.md",
   "build/mapping.conf.json":"devtools/ya/opensource/mapping.conf.json",
   "build/ya.conf.json":"devtools/ya/opensource/ya.conf.json",
   "ya":"devtools/ya/opensource/ya",
-  "ya.conf":"devtools/ya/opensource/ya.conf"
+  "ya.conf":"devtools/ya/opensource/ya.conf",
+  "ya.make":"devtools/ya/opensource/github/ya.make"
 }
