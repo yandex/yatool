@@ -62,6 +62,7 @@ def write_xml(root, outpath):
 
 def get_vcs(arc_root):
     from yalibrary.vcs import detect
+
     vcs_type, _, _ = detect([arc_root])
 
     if not vcs_type:
@@ -83,11 +84,26 @@ def create_plugin_config(project_info):
     write_xml(root, config_path)
 
 
-def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote_toolchain=None,
-                 remote_deploy_config=None, remote_repo_path=None, remote_build_path=None,
-                 remote_host=None, use_sync_server=False, content_root=None):
-    targets = dict({ide_common.JOINT_TARGET_NAME: {'runnable': False}, ide_common.CODEGEN_TARGET_NAME: {'runnable': False}}, **targets)
-    exclude_roots = find_excludes(project_info.params.arc_root, sorted([x.split('/') for x in fringe]), recursive_includes)
+def gen_idea_prj(
+    project_info,
+    fringe,
+    recursive_includes={},
+    targets={},
+    remote_toolchain=None,
+    remote_deploy_config=None,
+    remote_repo_path=None,
+    remote_build_path=None,
+    remote_host=None,
+    use_sync_server=False,
+    content_root=None,
+):
+    targets = dict(
+        {ide_common.JOINT_TARGET_NAME: {'runnable': False}, ide_common.CODEGEN_TARGET_NAME: {'runnable': False}},
+        **targets
+    )
+    exclude_roots = find_excludes(
+        project_info.params.arc_root, sorted([x.split('/') for x in fringe]), recursive_includes
+    )
     idea_dir = os.path.join(project_info.output_path, '.idea')
     if content_root is None:
         content_root = project_info.params.arc_root
@@ -98,12 +114,16 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
     # Write misc.xml
 
     with open(os.path.join(idea_dir, 'misc.xml'), 'w') as misc_out:
-        misc_out.write("""<?xml version="1.0" encoding="UTF-8"?>
+        misc_out.write(
+            """<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
 <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$">
 <contentRoot DIR="{}" />
 </component>
-  <component name="CidrRootsConfiguration">""".format(content_root))
+  <component name="CidrRootsConfiguration">""".format(
+                content_root
+            )
+        )
 
         misc_out.write("<sourceRoots>\n")
         misc_out.write('<file path="{}" />\n'.format(content_root))
@@ -121,24 +141,30 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         misc_out.write('<file path="{}" />'.format(os.path.join(project_info.params.arc_root, 'contrib')))
         misc_out.write('</libraryRoots>')
 
-        misc_out.write("""</component>
+        misc_out.write(
+            """</component>
 <component name="ProjectRootManager" version="2" />
 <component name="SvnBranchConfigurationManager">
 <option name="mySupportsUserInfoFilter" value="true" />
 </component>
-</project>""")
+</project>"""
+        )
 
     # Write vcs.xml
 
     vcs_file = os.path.join(idea_dir, 'vcs.xml')
     if not os.path.exists(vcs_file):
         with open(vcs_file, 'w') as vcs_out:
-            vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
+            vcs_out.write(
+                """<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="{root}" vcs="{vcs}" />
   </component>
-</project>""".format(root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)))
+</project>""".format(
+                    root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)
+                )
+            )
 
     # Write workspace.xml
 
@@ -156,27 +182,63 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         ("Remote Debug", "Debug", generation_options + " -DYA_REMOTE=ON", 'cmake-build-remote-debug', True),
         ("Remote Release", "Release", generation_options + " -DYA_REMOTE=ON", 'cmake-build-remote-release', True),
         ("Remote Profile", "Profile", generation_options + " -DYA_REMOTE=ON", 'cmake-build-remote-profile', True),
-        ("Remote Asan", "Debug", generation_options + " -DYA_SANITIZE=address -DYA_REMOTE=ON", 'cmake-build-remote-asan', True),
-        ("Remote Msan", "Debug", generation_options + " -DYA_SANITIZE=memory -DYA_REMOTE=ON", 'cmake-build-remote-msan', True),
-        ("Remote Tsan", "Debug", generation_options + " -DYA_SANITIZE=thread -DYA_REMOTE=ON", 'cmake-build-remote-tsan', True),
-        ("Remote UBsan", "Debug", generation_options + " -DYA_SANITIZE=undefined -DYA_REMOTE=ON", 'cmake-build-remote-ubsan', True),
-        ("Remote Lsan", "Debug", generation_options + " -DYA_SANITIZE=leak -DYA_REMOTE=ON", 'cmake-build-remote-lsan', True),
+        (
+            "Remote Asan",
+            "Debug",
+            generation_options + " -DYA_SANITIZE=address -DYA_REMOTE=ON",
+            'cmake-build-remote-asan',
+            True,
+        ),
+        (
+            "Remote Msan",
+            "Debug",
+            generation_options + " -DYA_SANITIZE=memory -DYA_REMOTE=ON",
+            'cmake-build-remote-msan',
+            True,
+        ),
+        (
+            "Remote Tsan",
+            "Debug",
+            generation_options + " -DYA_SANITIZE=thread -DYA_REMOTE=ON",
+            'cmake-build-remote-tsan',
+            True,
+        ),
+        (
+            "Remote UBsan",
+            "Debug",
+            generation_options + " -DYA_SANITIZE=undefined -DYA_REMOTE=ON",
+            'cmake-build-remote-ubsan',
+            True,
+        ),
+        (
+            "Remote Lsan",
+            "Debug",
+            generation_options + " -DYA_SANITIZE=leak -DYA_REMOTE=ON",
+            'cmake-build-remote-lsan',
+            True,
+        ),
     ]
 
     if os.path.exists(workspace_file):
         with open(workspace_file) as f:
             root = eTree.fromstring(f.read())
     else:
-        root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
+        root = eTree.fromstring(
+            '''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
     <component name="CMakeRunConfigurationManager" shouldGenerate="false">
         <generated />
     </component>
-</project>''')
+</project>'''
+        )
 
     def _warn_override(what, where_type, where, value, canon):
         if value != canon:
-            ide_common.emit_message('[[imp]]{}[[rst]] of your {} {!r} [[imp]]was overwritten[[rst]]: old value is {!r}, new value is {!r}'.format(what, where_type, where, value, canon))
+            ide_common.emit_message(
+                '[[imp]]{}[[rst]] of your {} {!r} [[imp]]was overwritten[[rst]]: old value is {!r}, new value is {!r}'.format(
+                    what, where_type, where, value, canon
+                )
+            )
 
     component = root.find('component[@name="CMakeSettings"]')
     if component is None:
@@ -186,7 +248,7 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
     configurations = component.find('configurations')
     if configurations is None:
         configurations = eTree.SubElement(component, 'configurations')
-    for (profile_name, config_name, generation_options, generation_dir, is_remote) in configs:
+    for profile_name, config_name, generation_options, generation_dir, is_remote in configs:
         configuration = configurations.find('configuration[@PROFILE_NAME="{}"]'.format(profile_name))
         if configuration is None:
             if is_remote and remote_toolchain is None:
@@ -198,10 +260,20 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
                 continue
             _warn_override('Name', 'CMake profile', profile_name, configuration.get('PROFILE_NAME'), profile_name)
             _warn_override('Build level', 'CMake profile', profile_name, configuration.get('CONFIG_NAME'), config_name)
-            _warn_override('CMake flags', 'CMake profile', profile_name, configuration.get('GENERATION_OPTIONS'), generation_options)
-            _warn_override('CMake output dir', 'CMake profile', profile_name, configuration.get('GENERATION_DIR'), generation_dir)
+            _warn_override(
+                'CMake flags',
+                'CMake profile',
+                profile_name,
+                configuration.get('GENERATION_OPTIONS'),
+                generation_options,
+            )
+            _warn_override(
+                'CMake output dir', 'CMake profile', profile_name, configuration.get('GENERATION_DIR'), generation_dir
+            )
             if is_remote and remote_toolchain is not None:
-                _warn_override('Toolchain', 'CMake profile', profile_name, configuration.get('TOOLCHAIN_NAME'), remote_toolchain)
+                _warn_override(
+                    'Toolchain', 'CMake profile', profile_name, configuration.get('TOOLCHAIN_NAME'), remote_toolchain
+                )
         configuration.set('PROFILE_NAME', profile_name)
         configuration.set('CONFIG_NAME', config_name)
         configuration.set('GENERATION_OPTIONS', generation_options)
@@ -213,7 +285,7 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
     if component is None:
         component = eTree.SubElement(root, 'component')
         component.set('name', 'RunManager')
-    for (name, params) in targets.items():
+    for name, params in targets.items():
         configuration = component.find('configuration[@name="{}"]'.format(name))
         if configuration is None:
             configuration = eTree.SubElement(component, 'configuration')
@@ -225,12 +297,22 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         else:
             _warn_override('Name', 'run/debug configuration', name, configuration.get('name'), name)
             _warn_override('Type', 'run/debug configuration', name, configuration.get('type'), 'CMakeRunConfiguration')
-            _warn_override('Factory name', 'run/debug configuration', name, configuration.get('factoryName'), 'Application')
-            _warn_override('Project name', 'run/debug configuration', name, configuration.get('PROJECT_NAME'), project_info.title)
+            _warn_override(
+                'Factory name', 'run/debug configuration', name, configuration.get('factoryName'), 'Application'
+            )
+            _warn_override(
+                'Project name', 'run/debug configuration', name, configuration.get('PROJECT_NAME'), project_info.title
+            )
             _warn_override('Target', 'run/debug configuration', name, configuration.get('TARGET_NAME'), name)
             _warn_override('Config', 'run/debug configuration', name, configuration.get('CONFIG_NAME'), 'Debug')
             if params['runnable']:
-                _warn_override('Executable', 'run/debug configuration', name, configuration.get('RUN_PATH'), '$PROJECT_DIR$/_current_build_target/{}'.format(params['path']))
+                _warn_override(
+                    'Executable',
+                    'run/debug configuration',
+                    name,
+                    configuration.get('RUN_PATH'),
+                    '$PROJECT_DIR$/_current_build_target/{}'.format(params['path']),
+                )
         configuration.set('name', name)
         configuration.set('type', 'CMakeRunConfiguration')
         configuration.set('factoryName', 'Application')
@@ -256,7 +338,7 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
                 ('INTERPRETER_PATH', '/usr/bin/env'),
                 ('INTERPRETER_OPTIONS', 'python3'),
             ]
-            for (name, value) in options:
+            for name, value in options:
                 option = eTree.SubElement(configuration, 'option')
                 option.set('name', name)
                 option.set('value', value)
@@ -264,7 +346,7 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
     configurations_list = component.find('list')
     if configurations_list is None:
         configurations_list = eTree.SubElement(component, 'list')
-    for (name, params) in targets.items():
+    for name, params in targets.items():
         list_item = configurations_list.find('item[@itemvalue="CMake Application.{}"]'.format(name))
         if list_item is None:
             list_item = eTree.SubElement(configurations_list, 'item')
@@ -285,13 +367,15 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
             with open(deployment_file) as f:
                 root = eTree.fromstring(f.read())
         else:
-            root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
+            root = eTree.fromstring(
+                '''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="PublishConfigData">
     <serverData>
     </serverData>
   </component>
-</project>''')
+</project>'''
+            )
 
         component = root.find('component[@name="PublishConfigData"]')
         if component is None:
@@ -312,8 +396,9 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         if mappings is None:
             mappings = eTree.SubElement(paths_server_data, 'mappings')
         local_repo_path = os.path.join(
-            '$PROJECT_DIR$', os.path.relpath(project_info.params.arc_root, project_info.output_path))
-        for (deploy, local) in [(remote_build_path, '$PROJECT_DIR$'), (remote_repo_path, local_repo_path)]:
+            '$PROJECT_DIR$', os.path.relpath(project_info.params.arc_root, project_info.output_path)
+        )
+        for deploy, local in [(remote_build_path, '$PROJECT_DIR$'), (remote_repo_path, local_repo_path)]:
             mapping = mappings.find('mapping[@local="{}"]'.format(local))
             if mapping is None:
                 mapping = eTree.SubElement(mappings, 'mapping')
@@ -324,10 +409,7 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         if excluded_paths is None:
             excluded_paths = eTree.SubElement(paths_server_data, 'excludedPaths')
         generation_dirs = ['$PROJECT_DIR$/{}'.format(generation_dir) for (_, _, _, generation_dir, _) in configs]
-        generation_dirs += [
-            '$PROJECT_DIR$/_current_build_target',
-            project_info.params.arc_root
-        ]
+        generation_dirs += ['$PROJECT_DIR$/_current_build_target', project_info.params.arc_root]
         for generation_dir in generation_dirs:
             excluded_path = excluded_paths.find('excludedPath[@path="{}"]'.format(generation_dir))
             if excluded_path is None:
@@ -342,12 +424,14 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         external_dependencies_file = os.path.join(idea_dir, 'externalDependencies.xml')
         if not os.path.exists(external_dependencies_file):
             with open(external_dependencies_file, 'w') as vcs_out:
-                vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
+                vcs_out.write(
+                    """<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ExternalDependencies">
     <plugin id="com.intellij.plugins.watcher" />
   </component>
-</project>""")
+</project>"""
+                )
 
         # write watcherTasks.xml
 
@@ -356,12 +440,14 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
             with open(watcher_tasks_file) as f:
                 root = eTree.fromstring(f.read())
         else:
-            root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
+            root = eTree.fromstring(
+                '''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ProjectTasksOptions">
   </component>
 </project>
-''')
+'''
+            )
 
         component = root.find('component[@name="ProjectTasksOptions"]')
         if component is None:
@@ -412,13 +498,15 @@ def gen_idea_prj(project_info, fringe, recursive_includes={}, targets={}, remote
         sync_file = os.path.join(project_info.output_path, 'sync.py')
         with open(sync_file, 'w') as sync_file_out:
             import __res
+
             script = (
                 __res.find('/clion/sync.py')
                 .replace('<<host>>', remote_host)
                 .replace('<<remote_repo>>', ide_common.fix_win_path(remote_repo_path))
                 .replace('<<remote_build>>', ide_common.fix_win_path(remote_build_path))
                 .replace('<<local_repo>>', ide_common.fix_win_path(project_info.params.arc_root))
-                .replace('<<local_build>>', ide_common.fix_win_path(project_info.output_path)))
+                .replace('<<local_build>>', ide_common.fix_win_path(project_info.output_path))
+            )
             sync_file_out.write(script)
         os.chmod(sync_file, 0o774)
 
@@ -429,7 +517,8 @@ def gen_lite_solution(info, filters, required_cmake_version):
     for proj_dir in [os.path.normpath(os.path.join(os.getcwd(), i)) for i in filters]:
         ide_common.emit_message("Generate lite project for [[imp]]{}[[rst]]".format(proj_dir))
         with open(os.path.join(proj_dir, MAKE_LIST), 'w') as solution:
-            solution.write('''cmake_minimum_required(VERSION {cmake_version})
+            solution.write(
+                '''cmake_minimum_required(VERSION {cmake_version})
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories({arc_root})
@@ -443,12 +532,18 @@ file(GLOB_RECURSE SOURCE_FILES
         ${{CMAKE_CURRENT_SOURCE_DIR}}/*.txt)
 add_executable({proj_name} ${{SOURCE_FILES}})
 set_target_properties({proj_name} PROPERTIES LINKER_LANGUAGE CXX)
-'''.format(cmake_version=required_cmake_version, arc_root=info.params.arc_root, proj_name=os.path.basename(proj_dir)))
+'''.format(
+                    cmake_version=required_cmake_version,
+                    arc_root=info.params.arc_root,
+                    proj_name=os.path.basename(proj_dir),
+                )
+            )
         ide_common.emit_message("File to open [[imp]]{}[[rst]]".format(os.path.join(proj_dir, MAKE_LIST)))
 
 
 def do_clion(params):
     import app_ctx
+
     ide_common.emit_message('[[bad]]ya ide clion is deprecated, please use clangd-based tooling instead')
 
     if not params.full_targets:
@@ -470,7 +565,13 @@ def do_clion(params):
         remote_build_path = params.remote_build_path
         remote_host = params.remote_deploy_host
 
-        if remote_toolchain is not None or remote_deploy_config is not None or remote_repo_path is not None or remote_build_path is not None or remote_host is not None:
+        if (
+            remote_toolchain is not None
+            or remote_deploy_config is not None
+            or remote_repo_path is not None
+            or remote_build_path is not None
+            or remote_host is not None
+        ):
             # YA_IDE_CLION_REMOTE_FORCE used in tests to force generation even if this is not an arc repo
             if get_vcs(cmake_stub_info.params.arc_root) != 'Arc' and 'YA_IDE_CLION_REMOTE_FORCE' not in os.environ:
                 ide_common.emit_message('remote build only works with arc repository')
@@ -492,18 +593,32 @@ def do_clion(params):
                 return
 
         cmake_stub = ide_common.CMakeStubProject(params, app_ctx, cmake_stub_info, required_cmake_version='3.20')
-        cmake_stub.generate(filters=params.filters, forbid_cmake_override=True, joint_target=True, codegen_target=True,
-                            out_dir='${CMAKE_CURRENT_SOURCE_DIR}/_current_build_target',
-                            remote_dir=params.remote_repo_path,
-                            use_sync_server=params.use_sync_server,
-                            strip_non_final=params.strip_non_final_targets
-                            )
+        cmake_stub.generate(
+            filters=params.filters,
+            forbid_cmake_override=True,
+            joint_target=True,
+            codegen_target=True,
+            out_dir='${CMAKE_CURRENT_SOURCE_DIR}/_current_build_target',
+            remote_dir=params.remote_repo_path,
+            use_sync_server=params.use_sync_server,
+            strip_non_final=params.strip_non_final_targets,
+        )
         source_roots = {build.graph_path.GraphPath(os.path.dirname(x)).strip() for x in cmake_stub.project_files}
         inc_dirs = {build.graph_path.GraphPath(x).strip() for x in cmake_stub.inc_dirs}
         source_roots.update(inc_dirs)
-        gen_idea_prj(cmake_stub_info, source_roots, inc_dirs, cmake_stub.targets, remote_toolchain,
-                     remote_deploy_config, remote_repo_path, remote_build_path, remote_host, params.use_sync_server,
-                     params.content_root)
+        gen_idea_prj(
+            cmake_stub_info,
+            source_roots,
+            inc_dirs,
+            cmake_stub.targets,
+            remote_toolchain,
+            remote_deploy_config,
+            remote_repo_path,
+            remote_build_path,
+            remote_host,
+            params.use_sync_server,
+            params.content_root,
+        )
     create_plugin_config(cmake_stub_info)
 
     if params.setup_tidy:

@@ -67,7 +67,11 @@ class VSCodeAllOptions(core.yarg.Options):
             core.yarg.ArgConsumer(
                 ["--files-visibility"],
                 help="Limit files visibility in VS Code Explorer/Search (\"targets\", \"targets-and-deps\", \"all\")",
-                hook=core.yarg.SetValueHook("files_visibility", values=("targets", "targets-and-deps", "all"), default_value=lambda _: "targets-and-deps"),
+                hook=core.yarg.SetValueHook(
+                    "files_visibility",
+                    values=("targets", "targets-and-deps", "all"),
+                    default_value=lambda _: "targets-and-deps",
+                ),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(

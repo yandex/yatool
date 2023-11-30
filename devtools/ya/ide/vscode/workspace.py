@@ -17,7 +17,10 @@ def merge_workspace(new, workspace_path):
         with open(workspace_path, "r") as f:
             old = json.load(f, object_pairs_hook=OrderedDict)
     except (ValueError, TypeError) as e:
-        ide_common.emit_message("[[warn]]Parsing old workspace file failed[[rst]]: %s\n[[warn]]Workspace will be created as new[[rst]]" % str(e))
+        ide_common.emit_message(
+            "[[warn]]Parsing old workspace file failed[[rst]]: %s\n[[warn]]Workspace will be created as new[[rst]]"
+            % str(e)
+        )
         return new
 
     new_folders = OrderedDict(((f["path"], f) for f in new["folders"]))
@@ -63,18 +66,20 @@ def sort_tasks(workspace):
             group = group.get("kind", "build")
 
         return group + ("A" if isDefault else "B") + t.get("label", "None")
+
     workspace["tasks"]["tasks"].sort(key=sorting_key)
 
 
 def sort_configurations(workspace):
     for type_ in ("Run", "Tests"):
-        configurations = [conf for conf in workspace.get("launch", {}).get("configurations", []) if conf.get("presentation", {}).get("group", "Run") == type_]
+        configurations = [
+            conf
+            for conf in workspace.get("launch", {}).get("configurations", [])
+            if conf.get("presentation", {}).get("group", "Run") == type_
+        ]
         configurations.sort(key=lambda conf: conf["name"])
         for index, conf in enumerate(configurations, 1):
-            conf["presentation"] = {
-                "group": type_,
-                "order": index
-            }
+            conf["presentation"] = {"group": type_, "order": index}
 
 
 def pick_workspace_path(project_root, workspace_name=None):
@@ -83,7 +88,9 @@ def pick_workspace_path(project_root, workspace_name=None):
             workspace_name = "%s.code-workspace" % workspace_name
     else:
         workspace_name = "%s.code-workspace" % os.path.basename(project_root)
-        if os.path.exists(os.path.join(project_root, "workspace.code-workspace")) and not os.path.exists(os.path.join(project_root, workspace_name)):
+        if os.path.exists(os.path.join(project_root, "workspace.code-workspace")) and not os.path.exists(
+            os.path.join(project_root, workspace_name)
+        ):
             workspace_name = "workspace.code-workspace"
     return os.path.join(project_root, workspace_name)
 
@@ -91,7 +98,9 @@ def pick_workspace_path(project_root, workspace_name=None):
 def gen_codenv_params(params, languages):
     args = ["--prefetch", "--tests", "-j%s" % params.build_threads]
     if getattr(params, "use_arcadia_root", False):
-        args.extend(["--use-arcadia-root", "--files-visibility=" + getattr(params, "files_visibility", "targets-and-deps")])
+        args.extend(
+            ["--use-arcadia-root", "--files-visibility=" + getattr(params, "files_visibility", "targets-and-deps")]
+        )
     return {
         "languages": languages,
         "targets": params.rel_targets,
@@ -144,16 +153,25 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
         ide_common.emit_message("[[warn]]Could not get \"ya tool black\"[[rst]]: %s" % repr(e))
         return {}
 
-    return OrderedDict((
-        ("[python]", {
-            "editor.defaultFormatter": "ms-python.black-formatter",
-            "editor.formatOnSaveMode": "file",
-        }),
-        ("black-formatter.args", [
-            "--config", os.path.join(arc_root, "build/config/tests/py_style/config.toml"),
-        ]),
-        ("black-formatter.path", [black_binary_path]),
-    ))
+    return OrderedDict(
+        (
+            (
+                "[python]",
+                {
+                    "editor.defaultFormatter": "ms-python.black-formatter",
+                    "editor.formatOnSaveMode": "file",
+                },
+            ),
+            (
+                "black-formatter.args",
+                [
+                    "--config",
+                    os.path.join(arc_root, "build/config/tests/py_style/config.toml"),
+                ],
+            ),
+            ("black-formatter.path", [black_binary_path]),
+        )
+    )
 
 
 def gen_clang_format_settings(arc_root, tool_fetcher):
@@ -166,7 +184,9 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
     config_path = os.path.join(arc_root, "build/config/tests/cpp_style/config.clang-format")
 
     if not os.path.exists(config_path):
-        ide_common.emit_message("[[warn]]Failed to find clang-format config[[rst]]: '{}' doesn't exist".format(config_path))
+        ide_common.emit_message(
+            "[[warn]]Failed to find clang-format config[[rst]]: '{}' doesn't exist".format(config_path)
+        )
         return {}
 
     target_name = ".clang-format"
@@ -188,18 +208,25 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
             os.unlink(target_path)
             create_symlink = True
     else:
-        ide_common.emit_message("[[warn]]Failed to create link to the clang-format config[[rst]]: '{}' is not a link".format(target_path))
+        ide_common.emit_message(
+            "[[warn]]Failed to create link to the clang-format config[[rst]]: '{}' is not a link".format(target_path)
+        )
 
     if create_symlink:
         os.symlink(config_path, target_path)
 
-    return OrderedDict((
-        ("[cpp]", {
-            "editor.defaultFormatter": "xaver.clang-format",
-            "editor.formatOnSaveMode": "modificationsIfAvailable",
-        }),
-        ("clang-format.executable", clang_format_binary_path),
-    ))
+    return OrderedDict(
+        (
+            (
+                "[cpp]",
+                {
+                    "editor.defaultFormatter": "xaver.clang-format",
+                    "editor.formatOnSaveMode": "modificationsIfAvailable",
+                },
+            ),
+            ("clang-format.executable", clang_format_binary_path),
+        )
+    )
 
 
 def gen_pyrights_excludes(arc_root, srcdirs):
@@ -244,10 +271,12 @@ def get_recommended_extensions(params):
         if params.clang_format_enabled:
             extensions.append("xaver.clang-format")
     if "PY3" in params.languages:
-        extensions.extend([
-            "ms-python.python",
-            "ms-python.vscode-pylance",
-        ])
+        extensions.extend(
+            [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+            ]
+        )
         if params.black_formatter_enabled:
             extensions.append("ms-python.black-formatter")
     if "GO" in params.languages:

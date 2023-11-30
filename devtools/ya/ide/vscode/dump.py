@@ -16,21 +16,26 @@ from ide import ide_common
 
 def module_info(params):
     import handlers.dump
-    dump_params = core.yarg.merge_params(copy.deepcopy(params), handlers.dump.DumpModuleInfoOptions(), handlers.dump.DataOptions())
+
+    dump_params = core.yarg.merge_params(
+        copy.deepcopy(params), handlers.dump.DumpModuleInfoOptions(), handlers.dump.DataOptions()
+    )
     if params.tests_enabled:
         dump_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
-    return app.execute(action=partial(handlers.dump.do_module_info, write_stdout=False), respawn=app.RespawnType.NONE)(dump_params).stdout
+    return app.execute(action=partial(handlers.dump.do_module_info, write_stdout=False), respawn=app.RespawnType.NONE)(
+        dump_params
+    ).stdout
 
 
 def removeprefix(s, prefix):
-    return s[len(prefix):] if s.startswith(prefix) else s
+    return s[len(prefix) :] if s.startswith(prefix) else s
 
 
 def shorten_module_name(module_name, rel_targets):
     if rel_targets and len(rel_targets) == 1:
         target = rel_targets[0]
         if module_name.startswith(target):
-            return module_name[len(target)+1:] or module_name
+            return module_name[len(target) + 1 :] or module_name
     return module_name
 
 
@@ -69,8 +74,10 @@ def get_modules(module_info_res, rel_targets=None):
 
 def filter_run_modules(modules, rel_targets):
     return {
-        shorten_module_name(name, rel_targets): module for name, module in modules.items()
-        if module.get("NodeType") == "Program" and any(module["module_path"].startswith(prefix) for prefix in rel_targets)
+        shorten_module_name(name, rel_targets): module
+        for name, module in modules.items()
+        if module.get("NodeType") == "Program"
+        and any(module["module_path"].startswith(prefix) for prefix in rel_targets)
     }
 
 
@@ -106,7 +113,9 @@ def mine_test_cwd(params, modules):
         try:
             makelist = yalibrary.makelists.ArcProject(params.arc_root, module["module_path"]).makelist()
         except Exception as e:
-            ide_common.emit_message(termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow"))
+            ide_common.emit_message(
+                termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow")
+            )
             continue
 
         test_cwd = find_test_cwd(makelist)
@@ -121,8 +130,13 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
         for child in node.children:
             if isinstance(child, yalibrary.makelists.macro_definitions.PyNamespaceValue) and child.value:
                 return child.value
-            if isinstance(child, yalibrary.makelists.macro_definitions.Macro) and child.name == "PY_NAMESPACE" and len(child.children) > 0 and \
-                    isinstance(child.children[0], yalibrary.makelists.macro_definitions.Value) and child.children[0].key():
+            if (
+                isinstance(child, yalibrary.makelists.macro_definitions.Macro)
+                and child.name == "PY_NAMESPACE"
+                and len(child.children) > 0
+                and isinstance(child.children[0], yalibrary.makelists.macro_definitions.Value)
+                and child.children[0].key()
+            ):
                 return child.children[0].key()
             namespace = find_py_namespace(child)
             if namespace:
@@ -242,7 +256,9 @@ def mine_py_main(arc_root, modules):
         try:
             makelist = yalibrary.makelists.ArcProject(arc_root, module["module_path"]).makelist()
         except Exception as e:
-            ide_common.emit_message(termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow"))
+            ide_common.emit_message(
+                termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow")
+            )
             continue
 
         if not makelist:

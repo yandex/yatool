@@ -6,6 +6,7 @@ import core.yarg
 
 def gen_graph(params):
     import app
+
     opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
     ya_make_extra = getattr(params, "ya_make_extra", [])
     build_params = opts.initialize(ya_make_extra)
@@ -37,7 +38,7 @@ def get_modules(graph, rel_targets=None, is_final=False, kv_p=None, target_prope
             if rel_targets and len(rel_targets) == 1:
                 target = rel_targets[0]
                 if module_name.startswith(target):
-                    module_name = module_name[len(target)+1:] or module_name
+                    module_name = module_name[len(target) + 1 :] or module_name
             modules[module_name] = {
                 "path": main_output,
                 "module_path": module_path,

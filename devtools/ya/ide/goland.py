@@ -20,12 +20,7 @@ from six.moves import filterfalse
 CODEGEN_EXTS = [".go", ".gosrc"]
 SUPPRESS_CODEGEN_EXTS = [".cgo1.go", "_cgo_gotypes.go", "_cgo_import.go"]
 
-EXLUDES = [
-    'contrib/',
-    'library/go/',
-    'vendor/',
-    'tools/go_test_miner/'
-]
+EXLUDES = ['contrib/', 'library/go/', 'vendor/', 'tools/go_test_miner/']
 
 
 TARGETS = [
@@ -228,17 +223,22 @@ def gen_idea_prj(project_info, app_ctx, targets, params):
 
     iml_name = project_info.title + '.iml'
     with open(os.path.join(idea_dir, 'modules.xml'), 'w') as modules_out:
-        modules_out.write("""<?xml version="1.0" encoding="UTF-8"?>
+        modules_out.write(
+            """<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/{iml}" filepath="$PROJECT_DIR$/.idea/{iml}" />
     </modules>
   </component>
-</project>""".format(iml=iml_name))
+</project>""".format(
+                iml=iml_name
+            )
+        )
 
     with open(os.path.join(idea_dir, iml_name), 'w') as go_iml:
-        go_iml.write("""<?xml version="1.0" encoding="UTF-8"?>
+        go_iml.write(
+            """<?xml version="1.0" encoding="UTF-8"?>
 <module type="WEB_MODULE" version="4">
   <component name="Go" enabled="true">
     <buildTags>
@@ -246,26 +246,35 @@ def gen_idea_prj(project_info, app_ctx, targets, params):
     </buildTags>
   </component>
   <component name="NewModuleRootManager">
-    <content url="file://{}">""".format(project_info.params.arc_root))
+    <content url="file://{}">""".format(
+                project_info.params.arc_root
+            )
+        )
 
         for x in excludes:
             go_iml.write('<excludeFolder url="file://{}" />\n'.format(x))
 
-        go_iml.write("""
+        go_iml.write(
+            """
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
-</module>""")
+</module>"""
+        )
 
     vcs_file = os.path.join(idea_dir, 'vcs.xml')
     if not os.path.exists(vcs_file):
         with open(vcs_file, 'w') as vcs_out:
-            vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
+            vcs_out.write(
+                """<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="{root}" vcs="{vcs}" />
   </component>
-</project>""".format(root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)))
+</project>""".format(
+                    root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)
+                )
+            )
 
     workspace_file = os.path.join(idea_dir, 'workspace.xml')
     if os.path.exists(workspace_file):
@@ -296,7 +305,7 @@ def is_excluded_source(file):
 def norm_graph_path(data):
     data = path2.normpath(data)
     pos = data.index('/')
-    return data[pos+1:]
+    return data[pos + 1 :]
 
 
 def do_codegen(params):
@@ -315,31 +324,38 @@ def do_goland(params):
     ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
     params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     import app_ctx  # XXX
+
     stub_info = ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)
 
     ide_graph = ide.ide_common.IdeGraph(params)
     src_dirs = sorted(
         set(
             itertools.chain(
-                list(map(
-                    os.path.dirname,
-                    itertools.chain(
-                        filterfalse(
-                            is_excluded_source,
-                            list(map(
-                                norm_graph_path,
-                                ide_graph.iter_source_files(),
-                            ))
+                list(
+                    map(
+                        os.path.dirname,
+                        itertools.chain(
+                            filterfalse(
+                                is_excluded_source,
+                                list(
+                                    map(
+                                        norm_graph_path,
+                                        ide_graph.iter_source_files(),
+                                    )
+                                ),
+                            ),
+                            filterfalse(
+                                is_excluded_source,
+                                list(
+                                    map(
+                                        norm_graph_path,
+                                        ide_graph.iter_build_files(),
+                                    )
+                                ),
+                            ),
                         ),
-                        filterfalse(
-                            is_excluded_source,
-                            list(map(
-                                norm_graph_path,
-                                ide_graph.iter_build_files(),
-                            ))
-                        ),
-                    ),
-                )),
+                    )
+                ),
                 params.rel_targets,
             ),
         )

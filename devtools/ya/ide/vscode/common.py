@@ -3,7 +3,7 @@ def pretty_name(name):
 
 
 def replace_prefix(s, pairs):
-    for (p, r) in pairs:
+    for p, r in pairs:
         if s.startswith(p):
-            return r + s[len(p):]
+            return r + s[len(p) :]
     return s

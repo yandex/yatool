@@ -17,8 +17,8 @@ EXTERNAL_DIR = 'External'
 
 class Project(object):
     """
-        MSBuild project
-        https://msdn.microsoft.com/en-us/library/bcxfsh87.aspx
+    MSBuild project
+    https://msdn.microsoft.com/en-us/library/bcxfsh87.aspx
     """
 
     def __init__(self, proj_descr, main_descr, ide_graph, info, tools_version=None, root_path=None):
@@ -157,10 +157,7 @@ class DebugInfoProject(Project):
         return '{project_path}.user'.format(project_path=output_path)
 
     def generate(self):
-        env = {
-            'ARCADIA_BUILD_ROOT': '$(BUILD_ROOT)',
-            'ARCADIA_SOURCE_ROOT': '$(SOURCE_ROOT)'
-        }
+        env = {'ARCADIA_BUILD_ROOT': '$(BUILD_ROOT)', 'ARCADIA_SOURCE_ROOT': '$(SOURCE_ROOT)'}
         add_debugger_env(self.xml_root, env)
 
 
@@ -184,6 +181,7 @@ def norm_paths(lst):
 
 def make_pretty(root):
     import xml.dom.minidom
+
     string = et.tostring(root, 'utf-8')
     parsed = xml.dom.minidom.parseString(string)
     return parsed.toprettyxml(indent='  ')
@@ -272,8 +270,10 @@ def add_custom_command(root, path, extra_args=None):
         '-j{}'.format(use_cpu),
         '-T',
         '--no-emit-status',
-        '--no-emit-nodes', 'CompactCache',
-        '--no-emit-nodes', 'ResultNode',
+        '--no-emit-nodes',
+        'CompactCache',
+        '--no-emit-nodes',
+        'ResultNode',
         '--force-build-depends',
         '--build=$(Configuration)',
         '--output=$(BUILD_ROOT)',
@@ -288,7 +288,9 @@ def add_custom_command(root, path, extra_args=None):
     ]
 
     add_node(cmd_node, 'Command', text=' '.join(args))
-    add_node(cmd_node, 'Outputs', text='fake.output')  # Add non-existing file to outputs -> always run custom build step
+    add_node(
+        cmd_node, 'Outputs', text='fake.output'
+    )  # Add non-existing file to outputs -> always run custom build step
 
 
 def add_dependencies_node(root, rel_path, deps):

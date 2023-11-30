@@ -27,6 +27,8 @@ IF (PYTHON3)
     )
 ENDIF()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE ide
     clion2016.py

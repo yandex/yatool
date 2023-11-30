@@ -28,9 +28,7 @@ def do_venv(params):
     if pm.my_platform() == 'win32':
         logger.error("Handler 'venv' doesn't work on Windows")
         return
-    ya_make_opts = core.yarg.merge_opts(
-        build.build_opts.ya_make_options(free_build_targets=True)
-    )
+    ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
     params.ya_make_extra.append('-DBUILD_LANGUAGES=PY3')
     params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     gen_venv(params)
@@ -64,8 +62,11 @@ def _run_cmd(cmd, env=None):
     with subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, env=env) as python:
         _, stderr = python.communicate()
         if python.returncode != 0:
-            raise CreateVenvError("Command '{}' failed with exit code={} and output:\n{}".format(
-                ' '.join(cmd), python.returncode, six.ensure_text(stderr)))
+            raise CreateVenvError(
+                "Command '{}' failed with exit code={} and output:\n{}".format(
+                    ' '.join(cmd), python.returncode, six.ensure_text(stderr)
+                )
+            )
 
 
 def _create_venv(params, exe_path):
@@ -83,7 +84,15 @@ def _update_config(params):
 
 
 def _install_pip(params):
-    install_pip_cmd = [os.path.join(params.venv_root, 'bin', 'python'), '-mpip', 'install', '--index-url=https://pypi.yandex-team.ru/simple/', '--force-reinstall', '--no-deps', 'pip']
+    install_pip_cmd = [
+        os.path.join(params.venv_root, 'bin', 'python'),
+        '-mpip',
+        'install',
+        '--index-url=https://pypi.yandex-team.ru/simple/',
+        '--force-reinstall',
+        '--no-deps',
+        'pip',
+    ]
     _run_cmd(install_pip_cmd)
 
 

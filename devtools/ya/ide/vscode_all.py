@@ -44,10 +44,13 @@ class VSCodeProject(object):
             self.project_root = os.path.abspath(os.path.expanduser(params.project_output))
         else:
             self.project_root = os.path.abspath(os.curdir)
-        if not params.allow_project_inside_arc and (self.project_root == params.arc_root or self.project_root.startswith(params.arc_root + os.path.sep)):
+        if not params.allow_project_inside_arc and (
+            self.project_root == params.arc_root or self.project_root.startswith(params.arc_root + os.path.sep)
+        ):
             raise vscode.YaIDEError(
                 "You should not create VS Code project inside Arc repository. "
-                "Use \"-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT\" to set the project directory outside of Arc root (%s)" % params.arc_root
+                "Use \"-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT\" to set the project directory outside of Arc root (%s)"
+                % params.arc_root
             )
 
         self.vscode_config_dir = os.path.join(self.project_root, ".vscode")
@@ -78,7 +81,9 @@ class VSCodeProject(object):
         elif params.darwin_arm64_platform:
             self.tool_platform = "darwin-arm64"
 
-        self.common_args = params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
+        self.common_args = (
+            params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
+        )
         self.params = params
 
     def ensure_dirs(self):
@@ -121,7 +126,12 @@ class VSCodeProject(object):
                 tools_list.append("dlv")
             if self.params.patch_gopls:
                 tools_list.append("gopls")
-        return {name: exts.asyncthread.future(functools.partial(yalibrary.tools.tool, name, with_params=True, for_platform=for_platform), False) for name in tools_list}
+        return {
+            name: exts.asyncthread.future(
+                functools.partial(yalibrary.tools.tool, name, with_params=True, for_platform=for_platform), False
+            )
+            for name in tools_list
+        }
 
     def gen_compile_commands(self, tool_fetcher):
         ide_common.emit_message("Generating compilation database")
@@ -133,6 +143,7 @@ class VSCodeProject(object):
 
         def gen(prms):
             return bc.gen_compilation_database(prms, self.app_ctx)
+
         compilation_database = app.execute(action=gen, respawn=app.RespawnType.NONE)(build_params)
 
         if self.params.compile_commands_fix:
@@ -164,8 +175,12 @@ class VSCodeProject(object):
 
         languages = [lang for lang in build_params.languages if lang != "CPP"]
         if languages:
-            build_params.add_result = [ext for lang in languages for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get(lang, [])]
-            build_params.suppress_outputs = [ext for lang in languages for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get(lang, [])]
+            build_params.add_result = [
+                ext for lang in languages for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get(lang, [])
+            ]
+            build_params.suppress_outputs = [
+                ext for lang in languages for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get(lang, [])
+            ]
             build_params.output_root = self.params.output_root
             build_params.create_symlinks = True
             if self.is_go:
@@ -175,37 +190,40 @@ class VSCodeProject(object):
             app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
 
     def get_default_settings(self):
-        settings = OrderedDict((
-            ("C_Cpp.intelliSenseEngine", "disabled"),
-            ("explorer.fileNesting.enabled", True),
-            ("explorer.fileNesting.expand", False),
-            ("explorer.fileNesting.patterns", {
-                "*.proto":
-                    "${capture}.pb.h, ${capture}.grpc.pb.h, ${capture}.pb.h_serialized.cpp, "
-                    "${capture}.pb.cc, ${capture}.grpc.pb.cc, ${capture}.pb.go, "
-                    "${capture}_pb2.py, ${capture}_pb2_grpc.py, ${capture}_pb2.pyi",
-                "*.fbs":
-                    "${capture}.fbs.h, ${capture}.iter.fbs.h, ${capture}.fbs.cpp, "
-                    "${capture}.py3.fbs.pysrc, ${capture}.fbs.gosrc",
-            }),
-            ("forbeslindesay-taskrunner.separator", ": "),
-            ("git.mergeEditor", False),
-            ("go.testExplorer.enable", False),
-            ("go.toolsManagement.autoUpdate", False),
-            ("go.toolsManagement.checkForUpdates", "off"),
-            ("npm.autoDetect", "off"),
-            ("python.analysis.autoSearchPaths", False),
-            ("python.analysis.diagnosticMode", "openFilesOnly"),
-            ("python.analysis.enablePytestSupport", False),
-            ("python.analysis.indexing", False),
-            ("python.languageServer", "Pylance"),
-            ("python.testing.autoTestDiscoverOnSaveEnabled", False),
-            ("search.followSymlinks", False),
-            ("task.autoDetect", "off"),
-            ("typescript.suggest.autoImports", False),
-            ("typescript.tsc.autoDetect", "off"),
-            ("vsicons.projectDetection.disableDetect", True),
-        ))
+        settings = OrderedDict(
+            (
+                ("C_Cpp.intelliSenseEngine", "disabled"),
+                ("explorer.fileNesting.enabled", True),
+                ("explorer.fileNesting.expand", False),
+                (
+                    "explorer.fileNesting.patterns",
+                    {
+                        "*.proto": "${capture}.pb.h, ${capture}.grpc.pb.h, ${capture}.pb.h_serialized.cpp, "
+                        "${capture}.pb.cc, ${capture}.grpc.pb.cc, ${capture}.pb.go, "
+                        "${capture}_pb2.py, ${capture}_pb2_grpc.py, ${capture}_pb2.pyi",
+                        "*.fbs": "${capture}.fbs.h, ${capture}.iter.fbs.h, ${capture}.fbs.cpp, "
+                        "${capture}.py3.fbs.pysrc, ${capture}.fbs.gosrc",
+                    },
+                ),
+                ("forbeslindesay-taskrunner.separator", ": "),
+                ("git.mergeEditor", False),
+                ("go.testExplorer.enable", False),
+                ("go.toolsManagement.autoUpdate", False),
+                ("go.toolsManagement.checkForUpdates", "off"),
+                ("npm.autoDetect", "off"),
+                ("python.analysis.autoSearchPaths", False),
+                ("python.analysis.diagnosticMode", "openFilesOnly"),
+                ("python.analysis.enablePytestSupport", False),
+                ("python.analysis.indexing", False),
+                ("python.languageServer", "Pylance"),
+                ("python.testing.autoTestDiscoverOnSaveEnabled", False),
+                ("search.followSymlinks", False),
+                ("task.autoDetect", "off"),
+                ("typescript.suggest.autoImports", False),
+                ("typescript.tsc.autoDetect", "off"),
+                ("vsicons.projectDetection.disableDetect", True),
+            )
+        )
         if self.is_cpp:
             settings["clangd.arguments"] = [
                 "--background-index",
@@ -222,29 +240,45 @@ class VSCodeProject(object):
             settings["python.analysis.persistAllIndices"] = True
 
         if self.is_go:
-            settings.update((
-                ("go.logging.level", "verbose"),
-                ("go.toolsEnvVars", {
-                    "CGO_ENABLED": "0",
-                    "GOFLAGS": "-mod=vendor",
-                    "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
-                }),
-                ("gopls", OrderedDict((
-                    ("build.env", {
-                        "CGO_ENABLED": "0",
-                        "GOFLAGS": "-mod=vendor",
-                        "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
-                    }),
-                    ("formatting.local", "a.yandex-team.ru"),
-                    ("ui.codelenses", {
-                        "regenerate_cgo": False,
-                        "generate": False,
-                    }),
-                    ("ui.navigation.importShortcut", "Definition"),
-                    ("ui.semanticTokens", True),
-                    ("verboseOutput", True),
-                ))),
-            ))
+            settings.update(
+                (
+                    ("go.logging.level", "verbose"),
+                    (
+                        "go.toolsEnvVars",
+                        {
+                            "CGO_ENABLED": "0",
+                            "GOFLAGS": "-mod=vendor",
+                            "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
+                        },
+                    ),
+                    (
+                        "gopls",
+                        OrderedDict(
+                            (
+                                (
+                                    "build.env",
+                                    {
+                                        "CGO_ENABLED": "0",
+                                        "GOFLAGS": "-mod=vendor",
+                                        "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
+                                    },
+                                ),
+                                ("formatting.local", "a.yandex-team.ru"),
+                                (
+                                    "ui.codelenses",
+                                    {
+                                        "regenerate_cgo": False,
+                                        "generate": False,
+                                    },
+                                ),
+                                ("ui.navigation.importShortcut", "Definition"),
+                                ("ui.semanticTokens", True),
+                                ("verboseOutput", True),
+                            )
+                        ),
+                    ),
+                )
+            )
         else:
             settings["go.useLanguageServer"] = False
 
@@ -252,21 +286,29 @@ class VSCodeProject(object):
 
     def gen_workspace(self):
         self.ensure_dirs()
-        workspace = OrderedDict((
-            ("extensions", OrderedDict((
-                ("recommendations", vscode.workspace.get_recommended_extensions(self.params)),
-            ))),
-        ))
+        workspace = OrderedDict(
+            (
+                (
+                    "extensions",
+                    OrderedDict((("recommendations", vscode.workspace.get_recommended_extensions(self.params)),)),
+                ),
+            )
+        )
         if self.params.use_arcadia_root:
             workspace["folders"] = [{"path": self.params.arc_root}]
         else:
-            workspace["folders"] = [{"path": os.path.join(self.params.arc_root, target), "name": target} for target in self.params.rel_targets]
+            workspace["folders"] = [
+                {"path": os.path.join(self.params.arc_root, target), "name": target}
+                for target in self.params.rel_targets
+            ]
 
         if self.is_cpp and self.params.add_codegen_folder:
-            workspace["folders"].append({
-                "path": self.codegen_cpp_dir,
-                "name": "[codegen]",
-            })
+            workspace["folders"].append(
+                {
+                    "path": self.codegen_cpp_dir,
+                    "name": "[codegen]",
+                }
+            )
 
         workspace["settings"] = self.get_default_settings()
         workspace["settings"]["yandex.arcRoot"] = self.params.arc_root
@@ -315,7 +357,9 @@ class VSCodeProject(object):
             python_srcdirs = vscode.dump.get_python_srcdirs(modules)
             extra_paths = vscode.dump.collect_python_path(self.params.arc_root, self.links_dir, modules, python_srcdirs)
             python_excludes = vscode.workspace.gen_pyrights_excludes(self.params.arc_root, python_srcdirs)
-            pyright_config = vscode.workspace.gen_pyrightconfig(self.params, python_srcdirs, extra_paths, python_excludes)
+            pyright_config = vscode.workspace.gen_pyrightconfig(
+                self.params, python_srcdirs, extra_paths, python_excludes
+            )
             for key, value in pyright_config.items():
                 workspace["settings"]["python.analysis.%s" % key] = value
         run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets)
@@ -328,17 +372,35 @@ class VSCodeProject(object):
         ide_common.emit_message("Generating tasks")
         ya_bin_path = os.path.join(self.params.arc_root, "ya")
         default_tasks = vscode.tasks.gen_default_tasks(self.params.abs_targets, ya_bin_path, self.common_args)
-        codegen_tasks = vscode.tasks.gen_codegen_tasks(self.params.abs_targets, ya_bin_path, self.common_args, self.params.languages, self.params.tests_enabled, self.codegen_cpp_dir)
-        tasks = vscode.tasks.gen_tasks(run_modules, self.common_args, self.params.arc_root, ya_bin_path, self.params.languages, with_prepare=self.params.debug_enabled)
-        workspace["tasks"] = OrderedDict((
-            ("version", "2.0.0"),
-            ("tasks", default_tasks + codegen_tasks + tasks),
-        ))
+        codegen_tasks = vscode.tasks.gen_codegen_tasks(
+            self.params.abs_targets,
+            ya_bin_path,
+            self.common_args,
+            self.params.languages,
+            self.params.tests_enabled,
+            self.codegen_cpp_dir,
+        )
+        tasks = vscode.tasks.gen_tasks(
+            run_modules,
+            self.common_args,
+            self.params.arc_root,
+            ya_bin_path,
+            self.params.languages,
+            with_prepare=self.params.debug_enabled,
+        )
+        workspace["tasks"] = OrderedDict(
+            (
+                ("version", "2.0.0"),
+                ("tasks", default_tasks + codegen_tasks + tasks),
+            )
+        )
 
-        workspace["launch"] = OrderedDict((
-            ("version", "0.2.0"),
-            ("configurations", []),
-        ))
+        workspace["launch"] = OrderedDict(
+            (
+                ("version", "0.2.0"),
+                ("configurations", []),
+            )
+        )
 
         if self.params.debug_enabled:
             ide_common.emit_message("Generating debug configurations")
@@ -357,9 +419,15 @@ class VSCodeProject(object):
                 ide_common.setup_tidy_config(self.params.arc_root)
                 workspace["settings"]["clangd.arguments"].append("--clang-tidy")
             if self.params.clang_format_enabled:
-                workspace["settings"].update(vscode.workspace.gen_clang_format_settings(self.params.arc_root, tool_fetcher))
+                workspace["settings"].update(
+                    vscode.workspace.gen_clang_format_settings(self.params.arc_root, tool_fetcher)
+                )
         if self.is_py3 and self.params.black_formatter_enabled:
-            workspace["settings"].update(vscode.workspace.gen_black_settings(self.params.arc_root, self.params.rel_targets, python_srcdirs, tool_fetcher))
+            workspace["settings"].update(
+                vscode.workspace.gen_black_settings(
+                    self.params.arc_root, self.params.rel_targets, python_srcdirs, tool_fetcher
+                )
+            )
         if self.is_go:
             alt_tools = {}
             if self.params.patch_gopls:
@@ -384,7 +452,9 @@ class VSCodeProject(object):
 
         if os.getenv("SSH_CONNECTION"):
             ide_common.emit_message(
-                "[[good]]vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank[[rst]]".format(hostname=platform.node(), workspace_path=workspace_path),
+                "[[good]]vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank[[rst]]".format(
+                    hostname=platform.node(), workspace_path=workspace_path
+                ),
             )
 
         # TODO: print finish help
@@ -392,7 +462,9 @@ class VSCodeProject(object):
 
 def gen_vscode_workspace(params):
     if pm.my_platform() == "win32" and "CPP" in params.languages:
-        ide_common.emit_message("[[bad]]C++ configuration for Windows is not supported.\nIssue: https://st.yandex-team.ru/YMAKE-342[[rst]]")
+        ide_common.emit_message(
+            "[[bad]]C++ configuration for Windows is not supported.\nIssue: https://st.yandex-team.ru/YMAKE-342[[rst]]"
+        )
 
     # noinspection PyUnresolvedReferences
     import app_ctx  # pyright: ignore[reportMissingImports]

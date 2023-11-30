@@ -76,8 +76,13 @@ def bootstrap(func):
         gradle_names = ('build.gradle.kts', 'settings.gradle.kts', 'build.gradle', 'settings.gradle')
 
         for gradle_name in gradle_names:
-            go_through_gradle(os.path.join(params.arc_root, params.rel_targets[0]), delete_all_gradle,
-                              params, gradle_name, 'bootstrap')
+            go_through_gradle(
+                os.path.join(params.arc_root, params.rel_targets[0]),
+                delete_all_gradle,
+                params,
+                gradle_name,
+                'bootstrap',
+            )
         func(*args, **kwargs)
 
     return inner
@@ -95,12 +100,12 @@ def resolve_transitives(line):
         lib_versions['com.squareup.okhttp3:okhttp'] = '3.14.9'
 
     if 'api("' in line:
-        found_lib = line[line.find('api("') + 5:len(line) - 3].split(':')
+        found_lib = line[line.find('api("') + 5 : len(line) - 3].split(':')
         lib_name = found_lib[0] + ':' + found_lib[1]
         check_dep(found_lib)
         return '    api("' + lib_name + ':' + lib_versions[lib_name] + '")\n'
     if 'testImplementation("' in line:
-        found_lib = line[line.find('testImplementation("') + 20:len(line) - 3].split(':')
+        found_lib = line[line.find('testImplementation("') + 20 : len(line) - 3].split(':')
         lib_name = found_lib[0] + ':' + found_lib[1]
         check_dep(found_lib)
         return '    testImplementation("' + lib_name + ':' + lib_versions[lib_name] + '")\n'
@@ -121,7 +126,7 @@ def resolve_non_contrib_peerdir(root, params, only_build):
             continue
         # переделать на регулярки
         if 'api(project(' in line:
-            found_lib = line[line.find('api(project(') + 14:len(line) - 4].replace(':', os.sep)
+            found_lib = line[line.find('api(project(') + 14 : len(line) - 4].replace(':', os.sep)
             logger.info(found_lib)
 
             if only_build:
@@ -142,10 +147,11 @@ def resolve_non_contrib_peerdir(root, params, only_build):
                 new_data.append('    api(files("' + os.path.join(CACHE_DIR, build_lib) + '"))\n')
             else:
                 new_data.append('    api(project(":' + found_lib.split(os.sep)[-1] + '"))\n')
-                new_data.append('    api(project(path=":' + found_lib.split(os.sep)[-1] + '", configuration'
-                                                                                          '="testOutput"))\n')
+                new_data.append(
+                    '    api(project(path=":' + found_lib.split(os.sep)[-1] + '", configuration' '="testOutput"))\n'
+                )
         elif 'testImplementation(project(' in line:
-            found_lib = line[line.find('testImplementation(project(') + 29:len(line) - 4].replace(':', os.sep)
+            found_lib = line[line.find('testImplementation(project(') + 29 : len(line) - 4].replace(':', os.sep)
             logger.info(found_lib)
 
             if only_build:
@@ -160,8 +166,9 @@ def resolve_non_contrib_peerdir(root, params, only_build):
             if found_lib in project_test_modules:
                 module_for_test = find_module_for_test(found_lib)
                 new_data.append('    testImplementation(project(":' + module_for_test + '"))\n')
-                new_data.append('    testImplementation(project(path=":' + module_for_test + '", configuration'
-                                                                                             '="testOutput"))\n')
+                new_data.append(
+                    '    testImplementation(project(path=":' + module_for_test + '", configuration' '="testOutput"))\n'
+                )
                 continue
 
             if found_lib not in project_modules:
@@ -178,10 +185,13 @@ def resolve_non_contrib_peerdir(root, params, only_build):
     file.close()
 
     module_for_root = root.replace(params.abs_targets[0] + os.sep, '')
-    if module_for_root in project_modules or root == os.path.join(params.arc_root, params.rel_targets[0],
-                                                                  params.rel_targets[0]):
-        shutil.move(bld_gradle,
-                    os.path.join(params.arc_root, bld_gradle[len(params.arc_root) + len(params.rel_targets[0]) + 2:]))
+    if module_for_root in project_modules or root == os.path.join(
+        params.arc_root, params.rel_targets[0], params.rel_targets[0]
+    ):
+        shutil.move(
+            bld_gradle,
+            os.path.join(params.arc_root, bld_gradle[len(params.arc_root) + len(params.rel_targets[0]) + 2 :]),
+        )
 
 
 def fix_settings_gradle(params):
@@ -193,7 +203,7 @@ def fix_settings_gradle(params):
 
     for line in data:
         if 'include(' in line:
-            found_module = line[len('include("'):len(line) - 3].replace(':', os.sep)
+            found_module = line[len('include("') : len(line) - 3].replace(':', os.sep)
             if found_module in project_modules:
                 module = found_module.split(os.sep)[-1]
                 new_data.append('include("' + module + '")\n')
@@ -273,15 +283,16 @@ def do_gradle(params):
     project_prefix = params.rel_targets[0]
     project_modules.add(project_prefix)
     target = params.abs_targets[0]
-    flags = {'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': target,
-             'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': GRADLE_DIR,
-             'EXPORT_GRADLE': 'yes',
-             'TRAVERSE_RECURSE': 'yes',
-             'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
-             'BUILD_LANGUAGES': 'JAVA',  # KOTLIN == JAVA
-             'USE_PREBUILT_TOOLS': 'no',
-             'OPENSOURCE': 'yes',
-             }
+    flags = {
+        'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': target,
+        'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': GRADLE_DIR,
+        'EXPORT_GRADLE': 'yes',
+        'TRAVERSE_RECURSE': 'yes',
+        'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
+        'BUILD_LANGUAGES': 'JAVA',  # KOTLIN == JAVA
+        'USE_PREBUILT_TOOLS': 'no',
+        'OPENSOURCE': 'yes',
+    }
 
     params.flags.update(flags)
     conf = build_facade.gen_conf(
@@ -291,8 +302,7 @@ def do_gradle(params):
         flags=params.flags,
         ymake_bin=getattr(params, 'ymake_bin', None),
         host_platform=params.host_platform,
-        target_platforms=params.target_platforms
-
+        target_platforms=params.target_platforms,
     )
 
     yexport = yalibrary.tools.tool('yexport')
@@ -303,12 +313,16 @@ def do_gradle(params):
 
     ymake_args = (
         '-k',
-        '--build-root', GRADLE_DIR,
-        '--config', conf,
-        '--plugins-root', os.path.join(params.arc_root, 'build/plugins'),
+        '--build-root',
+        GRADLE_DIR,
+        '--config',
+        conf,
+        '--plugins-root',
+        os.path.join(params.arc_root, 'build/plugins'),
         '--xs',
         '--sem-graph',
-        os.path.join(params.arc_root, params.rel_targets[0]))
+        os.path.join(params.arc_root, params.rel_targets[0]),
+    )
 
     def listener(event):
         logger.info(event)
@@ -319,34 +333,62 @@ def do_gradle(params):
     sem_graph.close()
 
     # debug info
-    logger.info('Doing gradle\n' + params.__str__() + '\n' + yexport
-                + '\n' + ymake + '\n' + conf + '\ngradle_dir ' + GRADLE_DIR + '\n' + sem_graph_path)
+    logger.info(
+        'Doing gradle\n'
+        + params.__str__()
+        + '\n'
+        + yexport
+        + '\n'
+        + ymake
+        + '\n'
+        + conf
+        + '\ngradle_dir '
+        + GRADLE_DIR
+        + '\n'
+        + sem_graph_path
+    )
 
     project_name = target.split(os.sep)[-1]
 
     if params.gradle_name:
         project_name = params.gradle_name
 
-    yexport_args = (yexport,
-                    '--arcadia-root', params.arc_root,
-                    '--export-root', os.path.join(params.arc_root, params.rel_targets[0]),
-                    '-s', sem_graph_path,
-                    '-G', 'ide-gradle',
-                    '-t', project_name
-                    )
+    yexport_args = (
+        yexport,
+        '--arcadia-root',
+        params.arc_root,
+        '--export-root',
+        os.path.join(params.arc_root, params.rel_targets[0]),
+        '-s',
+        sem_graph_path,
+        '-G',
+        'ide-gradle',
+        '-t',
+        project_name,
+    )
 
     subprocess.call(yexport_args)
 
     find_all_modules(sem_graph_path, project_prefix)
 
     # бежим по всем .gradle, компилим некотрибные зависимости и подставляем их в скомпиленном виде
-    go_through_gradle(os.path.join(params.arc_root, params.rel_targets[0]), resolve_non_contrib_peerdir, params,
-                      'build.gradle.kts', True)
+    go_through_gradle(
+        os.path.join(params.arc_root, params.rel_targets[0]),
+        resolve_non_contrib_peerdir,
+        params,
+        'build.gradle.kts',
+        True,
+    )
 
     build_target('foo', params)
 
-    go_through_gradle(os.path.join(params.arc_root, params.rel_targets[0]), resolve_non_contrib_peerdir, params,
-                      'build.gradle.kts', False)
+    go_through_gradle(
+        os.path.join(params.arc_root, params.rel_targets[0]),
+        resolve_non_contrib_peerdir,
+        params,
+        'build.gradle.kts',
+        False,
+    )
 
     fix_settings_gradle(params)
 

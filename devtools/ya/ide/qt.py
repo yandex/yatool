@@ -53,11 +53,12 @@ class QtConfigOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(['--kit'],
-                                  help='Specify QtCreator kit to use',
-                                  hook=core.yarg.SetValueHook('kit'),
-                                  group=core.yarg.DEVELOPERS_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['--kit'],
+                help='Specify QtCreator kit to use',
+                hook=core.yarg.SetValueHook('kit'),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            ),
         ]
 
 
@@ -69,16 +70,18 @@ class QtDevEnvOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(['--no-reset'],
-                                  help='Avoid removing .user project settings or build cache',
-                                  hook=core.yarg.SetConstValueHook('reset', False),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
-            core.yarg.ArgConsumer(['--no-verify'],
-                                  help='Skip QtCreator config verification',
-                                  hook=core.yarg.SetConstValueHook('verify', False),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['--no-reset'],
+                help='Avoid removing .user project settings or build cache',
+                hook=core.yarg.SetConstValueHook('reset', False),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--no-verify'],
+                help='Skip QtCreator config verification',
+                hook=core.yarg.SetConstValueHook('verify', False),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
         ]
 
 
@@ -91,21 +94,24 @@ class GenQtOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(['--install'],
-                                  help='Install required configs for QtCreator (modifies user configuration)',
-                                  hook=core.yarg.SetConstValueHook('install', True),
-                                  group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                                  ),
-            core.yarg.ArgConsumer(['--project-type'],
-                                  help='Project type: {}'.format(', '.join(str(x) for x in VALID_QT_PROJECT_TYPES)),
-                                  hook=core.yarg.SetValueHook('project_type'),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
-            core.yarg.ArgConsumer(['--no-symlink'],
-                                  help='Do not create symlink to Arcadia in project directory. Always set for Arc VCS.',
-                                  hook=core.yarg.SetConstValueHook('symlink', False),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['--install'],
+                help='Install required configs for QtCreator (modifies user configuration)',
+                hook=core.yarg.SetConstValueHook('install', True),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--project-type'],
+                help='Project type: {}'.format(', '.join(str(x) for x in VALID_QT_PROJECT_TYPES)),
+                hook=core.yarg.SetValueHook('project_type'),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--no-symlink'],
+                help='Do not create symlink to Arcadia in project directory. Always set for Arc VCS.',
+                hook=core.yarg.SetConstValueHook('symlink', False),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
         ]
 
 
@@ -117,28 +123,34 @@ class QtCreatorOptions(core.yarg.Options):
 
     @staticmethod
     def consumer():
-        return core.yarg.ArgConsumer(
-            ['-I', '--ide-path'],
-            help='Path to QtCreator binary (normally it will be autodetected)',
-            hook=core.yarg.SetValueHook('ide_path'),
-            group=core.yarg.BULLET_PROOF_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['-R', '--run'],
-            help='Run Qt Creator on the created project. '
-                 'If it\'s a remote project, it will be run with environment ready for remote debugging',
-            group=core.yarg.BULLET_PROOF_OPT_GROUP,
-            hook=core.yarg.SetConstValueHook('run', True)
-        ) + core.yarg.ArgConsumer(
-            ['--daemonize'],
-            help='Makes --run to start QtCreator like a daemon',
-            hook=core.yarg.SetConstValueHook('daemonize', True)
+        return (
+            core.yarg.ArgConsumer(
+                ['-I', '--ide-path'],
+                help='Path to QtCreator binary (normally it will be autodetected)',
+                hook=core.yarg.SetValueHook('ide_path'),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['-R', '--run'],
+                help='Run Qt Creator on the created project. '
+                'If it\'s a remote project, it will be run with environment ready for remote debugging',
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=core.yarg.SetConstValueHook('run', True),
+            )
+            + core.yarg.ArgConsumer(
+                ['--daemonize'],
+                help='Makes --run to start QtCreator like a daemon',
+                hook=core.yarg.SetConstValueHook('daemonize', True),
+            )
         )
 
     def postprocess(self):
         if self.ide_path:
             self.ide_path = exts.path2.abspath(self.ide_path, expand_user=True)
             if not os.path.isfile(self.ide_path) and not os.access(self.ide_path, os.X_OK):
-                raise core.yarg.ArgsValidatingException('{} doesn\'t look like an executable file'.format(self.ide_path))
+                raise core.yarg.ArgsValidatingException(
+                    '{} doesn\'t look like an executable file'.format(self.ide_path)
+                )
         if self.daemonize and not self.run:
             raise core.yarg.ArgsValidatingException('--daemon option requires --run one')
 
@@ -163,24 +175,30 @@ def find_qt_creator():
                     yield path
 
         if platform.system() == 'Linux':
-            for path in iter_patterns((
-                os.path.expanduser('~'),
-                '/opt',
-            ), (
-                'qtcreator*/bin/qtcreator',
-                'Qt*/Tools/QtCreator/bin/qtcreator',
-            )):
+            for path in iter_patterns(
+                (
+                    os.path.expanduser('~'),
+                    '/opt',
+                ),
+                (
+                    'qtcreator*/bin/qtcreator',
+                    'Qt*/Tools/QtCreator/bin/qtcreator',
+                ),
+            ):
                 yield path
             yield '/usr/bin/qtcreator'
         elif platform.system() == 'Darwin':
-            for path in iter_patterns((
-                os.path.expanduser('~/Applications'),
-                os.path.expanduser('~'),
-                '/Applications',
-            ), (
-                'Qt Creator.app/Contents/MacOS/Qt Creator',
-                'Qt*/Qt Creator.app/Contents/MacOS/Qt Creator',
-            )):
+            for path in iter_patterns(
+                (
+                    os.path.expanduser('~/Applications'),
+                    os.path.expanduser('~'),
+                    '/Applications',
+                ),
+                (
+                    'Qt Creator.app/Contents/MacOS/Qt Creator',
+                    'Qt*/Qt Creator.app/Contents/MacOS/Qt Creator',
+                ),
+            ):
                 yield path
 
     execs = [cand for cand in candidates() if os.path.isfile(cand) and os.access(cand, os.X_OK)]
@@ -252,7 +270,11 @@ class QtConfigFile(object):
         yalibrary.qxml.save(self.path, self.data, self.root_tag, doctype=self.DOCTYPE)
 
     def _elem_keys(self):
-        return {elem[self.ELEM_ID_KEY]: k for k, elem in six.iteritems(self.data) if k.startswith(self.ELEM + '.') and isinstance(elem, dict) and self.ELEM_ID_KEY in elem}
+        return {
+            elem[self.ELEM_ID_KEY]: k
+            for k, elem in six.iteritems(self.data)
+            if k.startswith(self.ELEM + '.') and isinstance(elem, dict) and self.ELEM_ID_KEY in elem
+        }
 
     def ids(self):
         return frozenset(six.iterkeys(self._elem_keys()))
@@ -285,29 +307,35 @@ class QtProfileConfig(QtConfigFile):
 
     def add_profile(self, profile_id, name, tools, cmake=True, gdb_inline=None):
         profile = self.add(profile_id)
-        profile.update({
-            'PE.Profile.Name': exts.strings.to_unicode(name),
-            'PE.Profile.Icon': u':///DESKTOP///',
-            'PE.Profile.SDK': False,
-            'PE.Profile.MutableInfo': [],
-            'PE.Profile.AutoDetected': False,
-        })
+        profile.update(
+            {
+                'PE.Profile.Name': exts.strings.to_unicode(name),
+                'PE.Profile.Icon': u':///DESKTOP///',
+                'PE.Profile.SDK': False,
+                'PE.Profile.MutableInfo': [],
+                'PE.Profile.AutoDetected': False,
+            }
+        )
         data = profile.setdefault('PE.Profile.Data', {})
-        data.update({
-            'PE.Profile.Device': u'Desktop Device',
-            'PE.Profile.DeviceType': 'Desktop',
-            'PE.Profile.SysRoot': u'',
-            'PE.Profile.ToolChain': exts.strings.to_unicode(tools['c++-clang']),
-            'QtSupport.QtInformation': -1,
-        })
+        data.update(
+            {
+                'PE.Profile.Device': u'Desktop Device',
+                'PE.Profile.DeviceType': 'Desktop',
+                'PE.Profile.SysRoot': u'',
+                'PE.Profile.ToolChain': exts.strings.to_unicode(tools['c++-clang']),
+                'QtSupport.QtInformation': -1,
+            }
+        )
         if cmake:
-            data.update({
-                'CMakeProjectManager.CMakeKitInformation': exts.strings.to_unicode(tools['cmake']),
-                'CMake.ConfigurationKitInformation': [
-                    u'CMAKE_CXX_COMPILER:STRING=%{Compiler:Executable}',
-                ],
-                'CMake.GeneratorKitInformation': u'CodeBlocks - Unix Makefiles',
-            })
+            data.update(
+                {
+                    'CMakeProjectManager.CMakeKitInformation': exts.strings.to_unicode(tools['cmake']),
+                    'CMake.ConfigurationKitInformation': [
+                        u'CMAKE_CXX_COMPILER:STRING=%{Compiler:Executable}',
+                    ],
+                    'CMake.GeneratorKitInformation': u'CodeBlocks - Unix Makefiles',
+                }
+            )
         if gdb_inline is None:
             data['Debugger.Information'] = exts.strings.to_unicode(tools['gdb'])
         else:
@@ -326,12 +354,14 @@ class QtToolChainConfig(QtConfigFile):
     DOCTYPE = 'QtCreatorToolChains'
 
     def add_toolchain(self, toolchain_id, name, path, abi):
-        self.add(toolchain_id).update({
-            'ProjectExplorer.ToolChain.DisplayName': exts.strings.to_unicode(name),
-            'ProjectExplorer.ToolChain.Autodetect': False,
-            'ProjectExplorer.GccToolChain.Path': exts.strings.to_unicode(path),
-            'ProjectExplorer.GccToolChain.TargetAbi': exts.strings.to_unicode(abi),
-        })
+        self.add(toolchain_id).update(
+            {
+                'ProjectExplorer.ToolChain.DisplayName': exts.strings.to_unicode(name),
+                'ProjectExplorer.ToolChain.Autodetect': False,
+                'ProjectExplorer.GccToolChain.Path': exts.strings.to_unicode(path),
+                'ProjectExplorer.GccToolChain.TargetAbi': exts.strings.to_unicode(abi),
+            }
+        )
         self.save()
 
 
@@ -341,15 +371,17 @@ class QtDebuggerConfig(QtConfigFile):
     DOCTYPE = 'QtCreatorDebugger'
 
     def add_debugger(self, debugger_id, name, path, abi, engine_type):
-        self.add(debugger_id).update({
-            'DisplayName': exts.strings.to_unicode(name),
-            'Binary': exts.strings.to_unicode(path),
-            'AutoDetected': False,
-            'EngineType': engine_type,
-            'Abis': [
-                exts.strings.to_unicode(abi),
-            ],
-        })
+        self.add(debugger_id).update(
+            {
+                'DisplayName': exts.strings.to_unicode(name),
+                'Binary': exts.strings.to_unicode(path),
+                'AutoDetected': False,
+                'EngineType': engine_type,
+                'Abis': [
+                    exts.strings.to_unicode(abi),
+                ],
+            }
+        )
         self.save()
 
 
@@ -359,11 +391,13 @@ class QtCMakeToolsConfig(QtConfigFile):
     DOCTYPE = 'QtCreatorCMakeTools'
 
     def add_cmaketools(self, cmaketools_id, name, path):
-        self.add(cmaketools_id).update({
-            'DisplayName': exts.strings.to_unicode(name),
-            'Binary': exts.strings.to_unicode(path),
-            'AutoDetected': False,
-        })
+        self.add(cmaketools_id).update(
+            {
+                'DisplayName': exts.strings.to_unicode(name),
+                'Binary': exts.strings.to_unicode(path),
+                'AutoDetected': False,
+            }
+        )
         self.save()
 
 
@@ -408,7 +442,9 @@ class QtConfig(object):
             try:
                 self.path = discover_qt_config()
             except IdeQtDiscoverConfError:
-                self.app_ctx.display.emit_message('[[warn]]Cannot find QtCreator config files, you should install and launch QtCreator to generate its configuration[[rst]]')
+                self.app_ctx.display.emit_message(
+                    '[[warn]]Cannot find QtCreator config files, you should install and launch QtCreator to generate its configuration[[rst]]'
+                )
                 raise
         if not os.path.isdir(self.path):
             raise IdeQtError('Cannot find QtCreator config directory: {}'.format(self.path))
@@ -442,24 +478,45 @@ class QtConfig(object):
         try:
             self._load()
             if self.profiles and not self.profiles.has_id(self.kit):
-                raise IdeQtInvalidConfError('Kit not found: {} (found: {})'.format(self.kit, ', '.join(sorted(self.profiles.ids()))))
+                raise IdeQtInvalidConfError(
+                    'Kit not found: {} (found: {})'.format(self.kit, ', '.join(sorted(self.profiles.ids())))
+                )
             if self.toolchains and not self.toolchains.has_id(self.KIT_TOOLS['c++-clang']):
-                raise IdeQtInvalidConfError('Toolchain not found: {} (found: {})'.format(self.KIT_TOOLS['c++-clang'], ', '.join(sorted(self.toolchains.ids()))))
+                raise IdeQtInvalidConfError(
+                    'Toolchain not found: {} (found: {})'.format(
+                        self.KIT_TOOLS['c++-clang'], ', '.join(sorted(self.toolchains.ids()))
+                    )
+                )
             if self.debuggers and not self.debuggers.has_id(self.KIT_TOOLS['gdb']):
-                raise IdeQtInvalidConfError('Debugger not found: {} (found: {})'.format(self.KIT_TOOLS['gdb'], ', '.join(sorted(self.debuggers.ids()))))
+                raise IdeQtInvalidConfError(
+                    'Debugger not found: {} (found: {})'.format(
+                        self.KIT_TOOLS['gdb'], ', '.join(sorted(self.debuggers.ids()))
+                    )
+                )
             if self.cmaketools and not self.cmaketools.has_id(self.KIT_TOOLS['cmake']):
-                raise IdeQtInvalidConfError('CMake tools not found: {} (found: {})'.format(self.KIT_TOOLS['cmake'], ', '.join(sorted(self.cmaketools.ids()))))
+                raise IdeQtInvalidConfError(
+                    'CMake tools not found: {} (found: {})'.format(
+                        self.KIT_TOOLS['cmake'], ', '.join(sorted(self.cmaketools.ids()))
+                    )
+                )
             not_installed_tools = set((tool for tool in self.TOOLS if tool not in self.tools))
             if not_installed_tools:
-                self.app_ctx.display.emit_message('[[warn]]QtCreator external tools are available: {}, run [[imp]]ya ide qt --install[[warn]] to install them[[rst]]'
-                                                  .format(', '.join('[[imp]]{}[[warn]]'.format(x) for x in sorted(not_installed_tools))))
+                self.app_ctx.display.emit_message(
+                    '[[warn]]QtCreator external tools are available: {}, run [[imp]]ya ide qt --install[[warn]] to install them[[rst]]'.format(
+                        ', '.join('[[imp]]{}[[warn]]'.format(x) for x in sorted(not_installed_tools))
+                    )
+                )
         except IdeQtDiscoverConfError:
-            self.app_ctx.display.emit_message('[[warn]]Also you should run [[imp]]ya ide qt --install[[warn]] before using generated project, '
-                                              'or use [[imp]]--no-verify[[warn]] at your own risk[[rst]]')
+            self.app_ctx.display.emit_message(
+                '[[warn]]Also you should run [[imp]]ya ide qt --install[[warn]] before using generated project, '
+                'or use [[imp]]--no-verify[[warn]] at your own risk[[rst]]'
+            )
             raise
         except IdeQtInvalidConfError:
-            self.app_ctx.display.emit_message('[[warn]]QtCreator config verification failed, install required configuration with [[imp]]ya ide qt --install[[warn]], '
-                                              'or use [[imp]]--no-verify[[warn]] at your own risk[[rst]]')
+            self.app_ctx.display.emit_message(
+                '[[warn]]QtCreator config verification failed, install required configuration with [[imp]]ya ide qt --install[[warn]], '
+                'or use [[imp]]--no-verify[[warn]] at your own risk[[rst]]'
+            )
             raise
 
     def install(self):
@@ -468,18 +525,24 @@ class QtConfig(object):
         if not os.path.isdir(self.kit_path):
             raise IdeQtError('Ya Ide QtCreator Kit is not found in Arcadia: %s', self.kit_path)
         self.app_ctx.display.emit_message('Installing toolchain')
-        self.toolchains.add_toolchain(self.KIT_TOOLS['c++-clang'], 'Ya Tool C++ (clang)', self.kitpath('c++'), self.abi())
+        self.toolchains.add_toolchain(
+            self.KIT_TOOLS['c++-clang'], 'Ya Tool C++ (clang)', self.kitpath('c++'), self.abi()
+        )
         gdb_inline = None
         if self.debuggers:
             self.app_ctx.display.emit_message('Installing debugger: [[path]]{}[[rst]]'.format(self.gdb_path))
-            self.debuggers.add_debugger(self.KIT_TOOLS['gdb'], 'Ya Tool Gdb', self.gdb_path, self.abi(), self.GDB_ENGINE_TYPE)
+            self.debuggers.add_debugger(
+                self.KIT_TOOLS['gdb'], 'Ya Tool Gdb', self.gdb_path, self.abi(), self.GDB_ENGINE_TYPE
+            )
         else:
             gdb_inline = (self.gdb_path, self.GDB_ENGINE_TYPE)
         if self.cmaketools:
             self.app_ctx.display.emit_message('Installing cmake')
             self.cmaketools.add_cmaketools(self.KIT_TOOLS['cmake'], 'Ya Tool CMake', self.kitpath('cmake'))
         self.app_ctx.display.emit_message('Installing profile')
-        self.profiles.add_profile(self.kit, 'Ya', self.KIT_TOOLS, cmake=self.cmaketools is not None, gdb_inline=gdb_inline)
+        self.profiles.add_profile(
+            self.kit, 'Ya', self.KIT_TOOLS, cmake=self.cmaketools is not None, gdb_inline=gdb_inline
+        )
         exts.fs.ensure_dir(self.qtcreator_subpath('externaltools'))
         for tool in self.TOOLS:
             tool_src_path = self.toolspath('{}.xml'.format(tool))
@@ -505,7 +568,9 @@ class QtCMakeProject(object):
         self.info = info
         self.version = version
         self.cmake_stub = ide.ide_common.CMakeStubProject(params, app_ctx, info, mask_output_roots=True)
-        self.selected_targets = frozenset((ide.ide_common.JOINT_TARGET_NAME,) if not selected_targets else selected_targets)
+        self.selected_targets = frozenset(
+            (ide.ide_common.JOINT_TARGET_NAME,) if not selected_targets else selected_targets
+        )
         logger.debug('Selected targets: %s', ', '.join(sorted(self.selected_targets)))
 
     def generate(self):
@@ -526,11 +591,26 @@ endif()
         else:
             src_dir = self.params.arc_root
         out_dir = self.output_conf_path('${CMAKE_YA_IDE_QT_CONF}')
-        wrapper = ' '.join((
-            '${PROJECT_SOURCE_DIR}/ya', 'tool', 'python', '--',
-            '${PROJECT_SOURCE_DIR}/devtools/qt/unmask_roots.py', '${PROJECT_SOURCE_DIR}', '${PROJECT_BINARY_DIR}'))
-        self.cmake_stub.generate(joint_target=True, src_dir=src_dir, out_dir=out_dir, custom_block_base_vars=custom_block_base_vars, wrapper=wrapper,
-                                 makelists=True, all_source_files=True)
+        wrapper = ' '.join(
+            (
+                '${PROJECT_SOURCE_DIR}/ya',
+                'tool',
+                'python',
+                '--',
+                '${PROJECT_SOURCE_DIR}/devtools/qt/unmask_roots.py',
+                '${PROJECT_SOURCE_DIR}',
+                '${PROJECT_BINARY_DIR}',
+            )
+        )
+        self.cmake_stub.generate(
+            joint_target=True,
+            src_dir=src_dir,
+            out_dir=out_dir,
+            custom_block_base_vars=custom_block_base_vars,
+            wrapper=wrapper,
+            makelists=True,
+            all_source_files=True,
+        )
 
     def build_conf_settings(self, conf):
         settings = {
@@ -543,7 +623,9 @@ endif()
                     'params': {
                         'CMakeProjectManager.MakeStep.Clean': False,
                         'CMakeProjectManager.MakeStep.UseNinja': False,
-                        'CMakeProjectManager.MakeStep.BuildTargets': list(exts.strings.to_unicode(x) for x in sorted(self.selected_targets)),
+                        'CMakeProjectManager.MakeStep.BuildTargets': list(
+                            exts.strings.to_unicode(x) for x in sorted(self.selected_targets)
+                        ),
                     },
                 },
             ],
@@ -563,7 +645,9 @@ endif()
             settings['env'].append(u'CMAKE_YA_IDE_QT_CONF={}'.format(self._cmake_build_type(conf)))
 
         if self.version >= (2, 8) and self.version < (3, 0):
-            settings['extra_conf']['CMakeProjectManager.CMakeBuildConfiguration.BuildDirectory'] = exts.strings.to_unicode(self.build_conf_path(conf))
+            settings['extra_conf'][
+                'CMakeProjectManager.CMakeBuildConfiguration.BuildDirectory'
+            ] = exts.strings.to_unicode(self.build_conf_path(conf))
 
         return settings
 
@@ -651,13 +735,16 @@ class QtDevEnv(object):
         app_ctx.display.emit_message('Project settings: [[path]]{}[[rst]]'.format(self.settings_path))
         if verify_config and params.verify:
             config.verify()
-        self.project_storage.data['ide_path'] = exts.path2.abspath(path_to_ide, expand_user=True) if path_to_ide else None
+        self.project_storage.data['ide_path'] = (
+            exts.path2.abspath(path_to_ide, expand_user=True) if path_to_ide else None
+        )
         self.project_storage.data['settings_path'] = None
         if path_to_ide:
             app_ctx.display.emit_message('Using QtCreator: {}'.format(path_to_ide))
         else:
             app_ctx.display.emit_message(
-                '[[warn]]QtCreator is not detected and -I option is not used, you\'ll have to use -I option with \'run\' command further[[rst]]')
+                '[[warn]]QtCreator is not detected and -I option is not used, you\'ll have to use -I option with \'run\' command further[[rst]]'
+            )
 
     def generate(self):
         self.project.generate()
@@ -700,36 +787,46 @@ class QtDevEnv(object):
             },
         }
         target = settings['ProjectExplorer.Project.Target.0']
-        target.update({
-            'ProjectExplorer.Target.BuildConfigurationCount': len(self.BUILD_CONFIGURATIONS),
-            'ProjectExplorer.Target.RunConfigurationCount': len(self.project.runnables),
-        })
+        target.update(
+            {
+                'ProjectExplorer.Target.BuildConfigurationCount': len(self.BUILD_CONFIGURATIONS),
+                'ProjectExplorer.Target.RunConfigurationCount': len(self.project.runnables),
+            }
+        )
 
         for num, conf in enumerate(self.BUILD_CONFIGURATIONS):
             build_configuration = target.setdefault('ProjectExplorer.Target.BuildConfiguration.{}'.format(num), {})
-            build_configuration.update({
-                'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(conf),
-                'ProjectExplorer.ProjectConfiguration.DisplayName': exts.strings.to_unicode(conf),
-                'ProjectExplorer.BuildConfiguration.ClearSystemEnvironment': False,
-                'ProjectExplorer.BuildConfiguration.UserEnvironmentChanges': [],
-                'ProjectExplorer.BuildConfiguration.BuildStepListCount': 2,
-                'ProjectExplorer.BuildConfiguration.BuildStepList.0': {
-                    'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Build',
-                },
-                'ProjectExplorer.BuildConfiguration.BuildStepList.1': {
-                    'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Clean',
-                },
-            })
+            build_configuration.update(
+                {
+                    'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(conf),
+                    'ProjectExplorer.ProjectConfiguration.DisplayName': exts.strings.to_unicode(conf),
+                    'ProjectExplorer.BuildConfiguration.ClearSystemEnvironment': False,
+                    'ProjectExplorer.BuildConfiguration.UserEnvironmentChanges': [],
+                    'ProjectExplorer.BuildConfiguration.BuildStepListCount': 2,
+                    'ProjectExplorer.BuildConfiguration.BuildStepList.0': {
+                        'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Build',
+                    },
+                    'ProjectExplorer.BuildConfiguration.BuildStepList.1': {
+                        'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Clean',
+                    },
+                }
+            )
 
             project_build_conf = self.project.build_conf_settings(conf)
-            logger.debug('Project build conf settings (%s): %s', conf, json.dumps(project_build_conf, sort_keys=True, indent=2))
+            logger.debug(
+                'Project build conf settings (%s): %s', conf, json.dumps(project_build_conf, sort_keys=True, indent=2)
+            )
             build_step_lists = ('build_steps', 'build_steps_clean')
             assert all(field in project_build_conf for field in ('id', 'build_dir') + build_step_lists)
 
             build_configuration['ProjectExplorer.ProjectConfiguration.Id'] = project_build_conf['id']
-            build_configuration['ProjectExplorer.BuildConfiguration.UserEnvironmentChanges'].extend(project_build_conf.get('env', []))
+            build_configuration['ProjectExplorer.BuildConfiguration.UserEnvironmentChanges'].extend(
+                project_build_conf.get('env', [])
+            )
             if self.version >= (3, 0):
-                build_configuration['ProjectExplorer.BuildConfiguration.BuildDirectory'] = project_build_conf.get('build_dir')
+                build_configuration['ProjectExplorer.BuildConfiguration.BuildDirectory'] = project_build_conf.get(
+                    'build_dir'
+                )
             for bsl_num, bsl in enumerate(build_step_lists):
                 bsl_key = 'ProjectExplorer.BuildConfiguration.BuildStepList.{}'.format(bsl_num)
                 assert bsl_key in build_configuration
@@ -738,10 +835,12 @@ class QtDevEnv(object):
                     assert 'id' in bs_conf
                     bs_key = 'ProjectExplorer.BuildStepList.Step.{}'.format(bs_num)
                     build_step = build_configuration[bsl_key].setdefault(bs_key, {})
-                    build_step.update({
-                        'ProjectExplorer.ProjectConfiguration.Id': bs_conf['id'],
-                        'ProjectExplorer.BuildStep.Enabled': True,
-                    })
+                    build_step.update(
+                        {
+                            'ProjectExplorer.ProjectConfiguration.Id': bs_conf['id'],
+                            'ProjectExplorer.BuildStep.Enabled': True,
+                        }
+                    )
                     build_step.update(bs_conf.get('params', {}))
             build_configuration.update(project_build_conf.get('extra_conf', {}))
 
@@ -751,21 +850,33 @@ class QtDevEnv(object):
 
         for num, runnable in enumerate(sorted(six.iterkeys(self.project.runnables))):
             run_configuration = target.setdefault('ProjectExplorer.Target.RunConfiguration.{}'.format(num), {})
-            run_configuration.update({
-                'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.CustomExecutableRunConfiguration',
-                'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(runnable),
-                'ProjectExplorer.ProjectConfiguration.DisplayName': exts.strings.to_unicode(runnable),
-                'ProjectExplorer.CustomExecutableRunConfiguration.Executable': exts.strings.to_unicode(self.project.runnables[runnable]),
-                'ProjectExplorer.CustomExecutableRunConfiguration.Arguments': u'',
-                'ProjectExplorer.CustomExecutableRunConfiguration.UseTerminal': False,
-                'ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory': project_run_conf.get('output_dir'),
-                'RunConfiguration.UseCppDebugger': True,
-                'RunConfiguration.UseCppDebuggerAuto': False,
-                'RunConfiguration.UseQmlDebugger': False,
-                'RunConfiguration.UseQmlDebuggerAuto': False,
-            })
+            run_configuration.update(
+                {
+                    'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.CustomExecutableRunConfiguration',
+                    'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(runnable),
+                    'ProjectExplorer.ProjectConfiguration.DisplayName': exts.strings.to_unicode(runnable),
+                    'ProjectExplorer.CustomExecutableRunConfiguration.Executable': exts.strings.to_unicode(
+                        self.project.runnables[runnable]
+                    ),
+                    'ProjectExplorer.CustomExecutableRunConfiguration.Arguments': u'',
+                    'ProjectExplorer.CustomExecutableRunConfiguration.UseTerminal': False,
+                    'ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory': project_run_conf.get(
+                        'output_dir'
+                    ),
+                    'RunConfiguration.UseCppDebugger': True,
+                    'RunConfiguration.UseCppDebuggerAuto': False,
+                    'RunConfiguration.UseQmlDebugger': False,
+                    'RunConfiguration.UseQmlDebuggerAuto': False,
+                }
+            )
 
-        yalibrary.qxml.save(self.settings_path, settings, 'qtcreator', doctype='QtCreatorProject', comment='Arcadia QtCreator settings file generated by ya ide qt')
+        yalibrary.qxml.save(
+            self.settings_path,
+            settings,
+            'qtcreator',
+            doctype='QtCreatorProject',
+            comment='Arcadia QtCreator settings file generated by ya ide qt',
+        )
 
     def _reset(self):
         project_directory = os.path.dirname(self.project.project_path)
@@ -781,38 +892,46 @@ class QtDevEnv(object):
 
 def gen_qt_project(params):
     import app_ctx  # XXX
+
     app_ctx.display.emit_message('[[bad]]ya ide qt is deprecated, please use clangd-based tooling instead')
     config = QtConfig(params, app_ctx)
     if params.install:
         app_ctx.display.emit_message('[[imp]]Installing required QtCreator configuration[[rst]]')
         config.install()
-        app_ctx.display.emit_message('[[good]]QtCreator configuration upgraded, now you may run project generation[[rst]]')
+        app_ctx.display.emit_message(
+            '[[good]]QtCreator configuration upgraded, now you may run project generation[[rst]]'
+        )
         return
     app_ctx.display.emit_message('[[imp]]Generating QtCreator project[[rst]]')
     if params.project_type == 'cmake':
         project_creator = QtCMakeProject
     else:
         raise IdeQtError('QtCreator generation mode not implemented: {}'.format(params.project_type))
-    project_info = ide.ide_common.IdeProjectInfo(params, app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR)
+    project_info = ide.ide_common.IdeProjectInfo(
+        params, app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR
+    )
     dev_env = QtDevEnv(params, app_ctx, config, project_info, project_creator)
     dev_env.generate()
     run_cmd = 'ya ide qt --run'
     if project_info.title != ide.ide_common.DEFAULT_PROJECT_TITLE:
         run_cmd += ' -T ' + project_info.title
-    if project_info.output_path != ide.ide_common.IdeProjectInfo.output_path_from_default(params, DEFAULT_QT_OUTPUT_DIR):
+    if project_info.output_path != ide.ide_common.IdeProjectInfo.output_path_from_default(
+        params, DEFAULT_QT_OUTPUT_DIR
+    ):
         run_cmd += ' -P ' + project_info.output_path
-    app_ctx.display.emit_message('[[good]]Ready. Project created: {}. To start IDE use: {}[[rst]]'.format(dev_env.project.project_path, run_cmd))
+    app_ctx.display.emit_message(
+        '[[good]]Ready. Project created: {}. To start IDE use: {}[[rst]]'.format(dev_env.project.project_path, run_cmd)
+    )
 
 
 def run_qtcreator(params):
     logger.warning("ya ide qt is deprecated")
     import app_ctx
+
     fake_app_ctx = ide.ide_common.FakeAppCtx()
 
     project_info = ide.ide_common.IdeProjectInfo(
-        params, fake_app_ctx,
-        instance_per_title=True,
-        default_output_name=DEFAULT_QT_OUTPUT_DIR
+        params, fake_app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR
     )
     project_storage = ide.ide_common.IdeProjectStorage(project_info)
     if len(project_storage.data) == 0:
@@ -822,7 +941,9 @@ def run_qtcreator(params):
         raise ide.ide_common.RemoteIdeError('Can\'t locate project: file {} doesn\'t exist'.format(target))
     path_to_ide = params.ide_path or project_storage.data['ide_path']
     if not path_to_ide:
-        raise ide.ide_common.RemoteIdeError('Couldn\'t find Qt Creator installed :-( Please, set the binary path manually with -I option')
+        raise ide.ide_common.RemoteIdeError(
+            'Couldn\'t find Qt Creator installed :-( Please, set the binary path manually with -I option'
+        )
     app_ctx.display.emit_message('Using IDE: ' + path_to_ide)
     command = [path_to_ide, target]
     if project_storage.data['settings_path']:

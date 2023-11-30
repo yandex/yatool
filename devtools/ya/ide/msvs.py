@@ -34,13 +34,13 @@ from six.moves import map
 logger = logging.getLogger(__name__)
 
 DEFAULT_MSVS_OUTPUT_DIR = 'msvs'
-VALID_MSVS_VERSIONS = ('2019', )
+VALID_MSVS_VERSIONS = ('2019',)
 DEFAULT_MSVS_VERSION = '2019'
 
 SUBST_VAR_MAP = {
     # name in subst  VAR for subst   tool for default resolution
-    'python2' : ('BUILD_PYTHON_BIN',  'ymake_python2'),
-    'python3' : ('BUILD_PYTHON3_BIN', 'ymake_python3')
+    'python2': ('BUILD_PYTHON_BIN', 'ymake_python2'),
+    'python3': ('BUILD_PYTHON3_BIN', 'ymake_python3'),
 }
 
 
@@ -52,23 +52,24 @@ class IdeMsvsImplSwitchOptions(core.yarg.Options):
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(['--lite'],
-                                  help='Lite generation mode',
-                                  hook=core.yarg.SetConstValueHook('lite', True),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
-
-            core.yarg.ArgConsumer(['--use-clang'],
-                                  help='Using local llvm-toolset',
-                                  hook=core.yarg.SetConstValueHook('use_clang', True),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
-
-            core.yarg.ArgConsumer(['-a', '--use-arcadia-toolchain'],
-                                  help='Using arcadia toolchain',
-                                  hook=core.yarg.SetConstValueHook('use_arcadia_toolchain', True),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  )
+            core.yarg.ArgConsumer(
+                ['--lite'],
+                help='Lite generation mode',
+                hook=core.yarg.SetConstValueHook('lite', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--use-clang'],
+                help='Using local llvm-toolset',
+                hook=core.yarg.SetConstValueHook('use_clang', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['-a', '--use-arcadia-toolchain'],
+                help='Using arcadia toolchain',
+                hook=core.yarg.SetConstValueHook('use_arcadia_toolchain', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
         ]
 
     def postprocess(self):
@@ -85,11 +86,12 @@ class IdeMsvsToolsSubst(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(['--tools-subst'],
-                                  help="Customize python2 and python3 paths (tool=path)",
-                                  hook=core.yarg.DictPutHook('tools_subst'),
-                                  group=core.yarg.DEVELOPERS_OPT_GROUP
-                                  )
+            core.yarg.ArgConsumer(
+                ['--tools-subst'],
+                help="Customize python2 and python3 paths (tool=path)",
+                hook=core.yarg.DictPutHook('tools_subst'),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
         ]
 
     def postprocess(self):
@@ -120,7 +122,9 @@ class MsvsSolution(object):
         self.params = params
         self.app_ctx = app_ctx
         self.info = info
-        self.toolchain_params = self._gen_toolchain_params(params.project_version, params.use_clang, params.use_arcadia_toolchain)
+        self.toolchain_params = self._gen_toolchain_params(
+            params.project_version, params.use_clang, params.use_arcadia_toolchain
+        )
         app_ctx.display.emit_message('Visual Studio version: [[imp]]{}[[rst]]'.format(params.project_version))
         logger.debug('Toolchain params: %s', json.dumps(self.toolchain_params, indent=2))
 
@@ -170,7 +174,7 @@ class MsvsSolution(object):
             ide_name='msvs{}'.format(self.params.project_version),
             ide_project_title=self.info.title,
             ide_project_dir=self.info.output_path,
-            ev_listener=build.ya_make.get_print_listener(self.params, self.app_ctx.display)
+            ev_listener=build.ya_make.get_print_listener(self.params, self.app_ctx.display),
         )
 
     @property
@@ -260,7 +264,6 @@ def fix_scarab(solution_dir, build_root, classpath, manifest_jar_filename):
 
 
 def fix_msvs_solution(solution_dir, opts, app_ctx):
-
     make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options()).params()
     make_opts.__dict__.update(opts.__dict__)
     make_opts.build_threads = 1
@@ -268,7 +271,9 @@ def fix_msvs_solution(solution_dir, opts, app_ctx):
     make_opts.continue_on_fail = True
 
     try:
-        graph, _, _, _, _ = build.graph.build_graph_and_tests(make_opts, check=True, ev_listener=lambda x: None, display=getattr(app_ctx, 'display', None))
+        graph, _, _, _, _ = build.graph.build_graph_and_tests(
+            make_opts, check=True, ev_listener=lambda x: None, display=getattr(app_ctx, 'display', None)
+        )
 
     except Exception:
         logger.debug('Exception while graph generation')
@@ -315,10 +320,7 @@ def fix_msvs_solution(solution_dir, opts, app_ctx):
 
         def f(rmap):
             mj = fix_scarab(
-                solution_dir,
-                rmap.fix('$(BUILD_ROOT)'),
-                list(map(rmap.fix, classpath)),
-                manifest_jar_filename
+                solution_dir, rmap.fix('$(BUILD_ROOT)'), list(map(rmap.fix, classpath)), manifest_jar_filename
             )
 
             if mj.startswith(solution_dir):
@@ -402,6 +404,7 @@ def gen_props_file(output_path):
 
 def gen_msvs_solution(params):
     import app_ctx  # XXX
+
     app_ctx.display.emit_message('[[imp]]Generating Visual Studio solution[[rst]]')
     solution_info = ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_name=DEFAULT_MSVS_OUTPUT_DIR)
     solution = MsvsSolution(params, app_ctx, solution_info)

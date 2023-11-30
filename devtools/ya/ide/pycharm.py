@@ -59,7 +59,7 @@ def generate_wrappers(params, arcadia_root):
     params.ya_make_extra.extend(['-DBUILD_LANGUAGES=PY3', '-r'])
     ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
     params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
-    old_add_result = (params.add_result or [])
+    old_add_result = params.add_result or []
     if '_pb2.pyi' not in old_add_result:
         params.add_result = old_add_result + ['_pb2.pyi']
     if '.fbs.pysrc' not in old_add_result:
@@ -83,12 +83,14 @@ def generate_wrappers(params, arcadia_root):
     results = task['result']
     targets = []
     for graph_node in task['graph']:
-        if graph_node['uid'] in results \
-            and graph_node.get('target_properties', {}).get('module_type') == 'bin' \
-                and graph_node.get('target_properties', {}).get('module_lang') == 'py3':
+        if (
+            graph_node['uid'] in results
+            and graph_node.get('target_properties', {}).get('module_type') == 'bin'
+            and graph_node.get('target_properties', {}).get('module_lang') == 'py3'
+        ):
             target = {
                 'binary': graph_node['outputs'][0],
-                'module_dir': graph_node.get('target_properties', {}).get('module_dir')
+                'module_dir': graph_node.get('target_properties', {}).get('module_dir'),
             }
             targets.append(target)
 
@@ -236,10 +238,12 @@ def backup_jdk_table_settings(jdk_table_path):
 
 
 def format_home_path(arcadia_root, binary_path, user_home, wrapper_name):
-    return os.path.join('$USER_HOME$',
-                        os.path.relpath(arcadia_root, user_home),
-                        os.path.dirname(binary_path).replace('$(BUILD_ROOT)' + os.path.sep, ''),
-                        wrapper_name)
+    return os.path.join(
+        '$USER_HOME$',
+        os.path.relpath(arcadia_root, user_home),
+        os.path.dirname(binary_path).replace('$(BUILD_ROOT)' + os.path.sep, ''),
+        wrapper_name,
+    )
 
 
 def compute_wrapper_classpath(home_path, target):
@@ -304,7 +308,7 @@ def indent(elem, level=0, more_sibs=False):
     """Indent xml elements properly for readable diffs in unit tests and ocular debugging"""
     i = "\n"
     if level:
-        i += (level-1) * '  '
+        i += (level - 1) * '  '
     num_kids = len(elem)
     if num_kids:
         if not elem.text or not elem.text.strip():
@@ -313,7 +317,7 @@ def indent(elem, level=0, more_sibs=False):
                 elem.text += '  '
         count = 0
         for kid in elem:
-            indent(kid, level+1, count < num_kids - 1)
+            indent(kid, level + 1, count < num_kids - 1)
             count += 1
         if not elem.tail or not elem.tail.strip():
             elem.tail = i

@@ -38,34 +38,38 @@ class GDBWrapperOpts(core.yarg.Options):
 
     @staticmethod
     def consumer():
-        return core.common_opts.ArgConsumer(
-            ['-P', '--port'],
-            help='Port to run gdbserver on. If 0 will be automatically chosen',
-            hook=core.yarg.SetValueHook('port'),
-            group=core.yarg.ADVANCED_OPT_GROUP
-        ) + core.common_opts.ArgConsumer(
-            ['--find-port'],
-            help='Find a free port, print it and terminate',
-            hook=core.yarg.SetConstValueHook('find_port', True),
-            group=core.yarg.DEVELOPERS_OPT_GROUP
-        ) + core.yarg.ArgConsumer(
-            ['--start-server'],
-            help='Start gdbserver, saving it\'s PID before',
-            hook=core.yarg.SetConstValueHook('start_server', True),
-            group=core.yarg.DEVELOPERS_OPT_GROUP
-        ) + core.yarg.ArgConsumer(
-            ['--stop-server'],
-            help='Stop gdbserver, killing it with pid saved before',
-            hook=core.yarg.SetConstValueHook('stop_server', True),
-            group=core.yarg.DEVELOPERS_OPT_GROUP
-        ) + core.yarg.ArgConsumer(
-            ['--patrol-server'],
-            help='Kill server if pid file has too late modification time',
-            hook=core.yarg.SetConstValueHook('patrol_server', True),
-            group=core.yarg.DEVELOPERS_OPT_GROUP
-        ) + core.yarg.FreeArgConsumer(
-            help='GDB args',
-            hook=core.yarg.ExtendHook('args')
+        return (
+            core.common_opts.ArgConsumer(
+                ['-P', '--port'],
+                help='Port to run gdbserver on. If 0 will be automatically chosen',
+                hook=core.yarg.SetValueHook('port'),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            )
+            + core.common_opts.ArgConsumer(
+                ['--find-port'],
+                help='Find a free port, print it and terminate',
+                hook=core.yarg.SetConstValueHook('find_port', True),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--start-server'],
+                help='Start gdbserver, saving it\'s PID before',
+                hook=core.yarg.SetConstValueHook('start_server', True),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--stop-server'],
+                help='Stop gdbserver, killing it with pid saved before',
+                hook=core.yarg.SetConstValueHook('stop_server', True),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--patrol-server'],
+                help='Kill server if pid file has too late modification time',
+                hook=core.yarg.SetConstValueHook('patrol_server', True),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.FreeArgConsumer(help='GDB args', hook=core.yarg.ExtendHook('args'))
         )
 
 
@@ -111,8 +115,12 @@ class GDBServer(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
-            logger.debug('Error during debugging:\n\texc_type: %s\n\texc_val: %s\n\texc_tb: %s', exc_type, exc_val, exc_tb)
-            sys.stderr.write('Error during debugging:\n\texc_type: {0}\n\texc_val: {1}\n\texc_tb: {2}\n', exc_type, exc_val, exc_tb)
+            logger.debug(
+                'Error during debugging:\n\texc_type: %s\n\texc_val: %s\n\texc_tb: %s', exc_type, exc_val, exc_tb
+            )
+            sys.stderr.write(
+                'Error during debugging:\n\texc_type: {0}\n\texc_val: {1}\n\texc_tb: {2}\n', exc_type, exc_val, exc_tb
+            )
         try:
             self.stop()
         except Exception as e:
@@ -171,6 +179,7 @@ def run_wrapper(params):
         run_proc_slave(gdb_run_cmd, always_by_line=False)
     else:
         with GDBServer(params.remote_host, params.remote_cache_path, params.port) as gdbserver:
+
             class _GDBStreamsModifier(object):
                 def __init__(self):
                     self.is_waiting = False
@@ -183,7 +192,7 @@ def run_wrapper(params):
                         return input_command
                     pre_server, server, target, stuff = input_command.split('!')
                     new_command = '{0}target extended-remote {1}:{2}\nset remote exec-file {3}\n'.format(
-                        input_command[:input_command.index('target remote')], server, gdbserver.port, target
+                        input_command[: input_command.index('target remote')], server, gdbserver.port, target
                     )
                     logger.debug('Changed gdb input: %s into %s', input_command, new_command)
                     self.is_waiting = True
@@ -194,7 +203,14 @@ def run_wrapper(params):
 
 
 def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, always_by_line=True):
-    proc = exts.process.popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, close_fds=exts.windows.on_win())
+    proc = exts.process.popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=0,
+        close_fds=exts.windows.on_win(),
+    )
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
@@ -208,13 +224,18 @@ def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, alwa
 
     def f_id(x):
         return x
+
     ids = ('sysin', 'procout', 'procerr')
     channels_read = {'sysin': sys.stdin, 'procout': proc.stdout, 'procerr': proc.stderr}
     channels_write = {'sysin': proc.stdin, 'procout': sys.stdout, 'procerr': sys.stderr}
     modifiers = {'sysin': sysin_mod, 'procout': procout_mod, 'procerr': procerr_mod}
     modifiers = {k: (v or f_id) for k, v in six.iteritems(modifiers)}
-    threads = [threading.Thread(target=process_pipe, args=(channels_read[_id], _id, msg_queue),
-                                kwargs={'read_by_line': (_id == 'sysin')}) for _id in ids]
+    threads = [
+        threading.Thread(
+            target=process_pipe, args=(channels_read[_id], _id, msg_queue), kwargs={'read_by_line': (_id == 'sysin')}
+        )
+        for _id in ids
+    ]
     for t in threads:
         t.daemon = True
         t.start()

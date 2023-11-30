@@ -64,6 +64,7 @@ class SSHProxy(object):
 
     def is_host_up(self):
         import socket
+
         try:
             socket.getaddrinfo(self.host, None)
             return True
@@ -80,8 +81,9 @@ class SSHProxy(object):
         exts.process.run_process(self.SSH, self.ssh_args + [self.host, 'mkdir', '-p', path], check=True)
 
     def ya_clone(self, ya_path, path):
-        exts.process.run_process(self.SSH, self.ssh_args + [self.host, ya_path, 'clone', path],
-                                 check=True, pipe_stdout=False)
+        exts.process.run_process(
+            self.SSH, self.ssh_args + [self.host, ya_path, 'clone', path], check=True, pipe_stdout=False
+        )
 
     @staticmethod
     def _remote_ya_path(arc_path):
@@ -89,42 +91,53 @@ class SSHProxy(object):
 
     def checkout(self, arc_path, rel_targets):
         ya_opts = ['make', '-j0', '--checkout']
-        exts.process.run_process(self.SSH,
-                                 self.ssh_args + [self.host, self._remote_ya_path(arc_path)] +
-                                 ya_opts + [os.path.join(arc_path, p) for p in rel_targets],
-                                 check=True, pipe_stdout=False)
+        exts.process.run_process(
+            self.SSH,
+            self.ssh_args
+            + [self.host, self._remote_ya_path(arc_path)]
+            + ya_opts
+            + [os.path.join(arc_path, p) for p in rel_targets],
+            check=True,
+            pipe_stdout=False,
+        )
 
     def get_real_path(self, path):
         return exts.process.run_process(self.SSH, self.ssh_args + [self.host, 'readlink', '-n', '-f', path], check=True)
 
     def get_free_port(self, remote_cache):
         arc_root = os.path.join(remote_cache, REMOTE_SOURCE_SUBDIR)
-        return exts.process.run_process(self.SSH,
-                                        self.ssh_args + [self.host, self._remote_ya_path(arc_root), 'remote_gdb', '--find-port'],
-                                        check=True).strip()
+        return exts.process.run_process(
+            self.SSH,
+            self.ssh_args + [self.host, self._remote_ya_path(arc_root), 'remote_gdb', '--find-port'],
+            check=True,
+        ).strip()
 
     def start_gdbserver(self, remote_cache, port):
         arc_root = os.path.join(remote_cache, REMOTE_SOURCE_SUBDIR)
         pidfile_path = get_pidfile_path(remote_cache, port)
         self.mkdir_p(os.path.dirname(pidfile_path))
         cmd = '{{ {0} remote_gdb --remote-cache {1} --port {2} --start-server </dev/null >/dev/null 2>/dev/null & }} ; echo $! > {3}'.format(
-            self._remote_ya_path(arc_root),
-            remote_cache,
-            port,
-            pidfile_path
+            self._remote_ya_path(arc_root), remote_cache, port, pidfile_path
         )
-        exts.process.run_process(self.SSH,
-                                 self.ssh_args + [self.host, cmd],
-                                 check=True
-                                 )
+        exts.process.run_process(self.SSH, self.ssh_args + [self.host, cmd], check=True)
 
     def stop_gdbserver(self, remote_cache, port):
         arc_root = os.path.join(remote_cache, REMOTE_SOURCE_SUBDIR)
-        exts.process.run_process(self.SSH,
-                                 self.ssh_args + [self.host, self._remote_ya_path(arc_root), 'remote_gdb', '--remote-cache',
-                                                  remote_cache, '--port', port, '--stop-server'],
-                                 check=True
-                                 )
+        exts.process.run_process(
+            self.SSH,
+            self.ssh_args
+            + [
+                self.host,
+                self._remote_ya_path(arc_root),
+                'remote_gdb',
+                '--remote-cache',
+                remote_cache,
+                '--port',
+                port,
+                '--stop-server',
+            ],
+            check=True,
+        )
 
     def touch(self, path, opts=None):
         exts.process.run_process(self.SSH, self.ssh_args + [self.host, 'touch'] + (opts or []) + [path], check=True)
@@ -149,7 +162,8 @@ def ide_opts(targets_free=True):
 
 def ide_via_ya_make_opts(targets_free=True):
     return ide_opts(targets_free=targets_free) + [
-        IdeYaMakeOptions(), YaExtraArgsOptions(),
+        IdeYaMakeOptions(),
+        YaExtraArgsOptions(),
         build.build_opts.CustomFetcherOptions(),
         build.build_opts.SandboxAuthOptions(),
         build.build_opts.ToolsOptions(),
@@ -178,18 +192,26 @@ class IdeProjectVersionOptions(core.yarg.Options):
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(['-V', '--project-version'],
-                                  help='IDE version' + (': {}'.format(
-                                      ', '.join(str(x) for x in self.valid_project_versions)
-                                  ) if self.valid_project_versions else ''),
-                                  hook=core.yarg.SetValueHook('project_version'),
-                                  group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['-V', '--project-version'],
+                help='IDE version'
+                + (
+                    ': {}'.format(', '.join(str(x) for x in self.valid_project_versions))
+                    if self.valid_project_versions
+                    else ''
+                ),
+                hook=core.yarg.SetValueHook('project_version'),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
         ]
 
     def postprocess(self):
         if self.valid_project_versions and self.project_version not in self.valid_project_versions:
-            raise core.yarg.ArgsValidatingException('Unsupported IDE version \'{}\', valid versions: {}'.format(self.project_version, ', '.join(self.valid_project_versions)))
+            raise core.yarg.ArgsValidatingException(
+                'Unsupported IDE version \'{}\', valid versions: {}'.format(
+                    self.project_version, ', '.join(self.valid_project_versions)
+                )
+            )
 
 
 class IdeProjectTitleOptions(core.yarg.Options):
@@ -200,19 +222,23 @@ class IdeProjectTitleOptions(core.yarg.Options):
 
     def consumer(self):
         consumers = [
-            core.yarg.ArgConsumer(['-T', '--project-title'],
-                                  help='Custom IDE project title',
-                                  hook=core.yarg.SetValueHook('project_title'),
-                                  group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                                  ),
-            core.yarg.ArgConsumer(['--dirname-as-project-title'],
-                                  help='Use cwd dirname as default IDE project title',
-                                  hook=core.yarg.SetConstValueHook('dirname_as_project_title', True),
-                                  group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['-T', '--project-title'],
+                help='Custom IDE project title',
+                hook=core.yarg.SetValueHook('project_title'),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--dirname-as-project-title'],
+                help='Use cwd dirname as default IDE project title',
+                hook=core.yarg.SetConstValueHook('dirname_as_project_title', True),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
         ]
         if self._consume_free_args:
-            consumers.append(core.yarg.FreeArgConsumer(help='project_title', hook=core.yarg.SetValueHook('project_title')))
+            consumers.append(
+                core.yarg.FreeArgConsumer(help='project_title', hook=core.yarg.SetValueHook('project_title'))
+            )
         return consumers
 
     def postprocess(self):
@@ -222,7 +248,10 @@ class IdeProjectTitleOptions(core.yarg.Options):
             if self.dirname_as_project_title:
                 raise core.yarg.ArgsValidatingException(
                     "You cwd directory name '{}' do not match pattern '{}'. "
-                    "Please specify project name using -T or --project-title option".format(self.project_title, RE_PROJECT_TITLE.pattern))
+                    "Please specify project name using -T or --project-title option".format(
+                        self.project_title, RE_PROJECT_TITLE.pattern
+                    )
+                )
             raise core.yarg.ArgsValidatingException('Invalid IDE project title \'{}\''.format(self.project_title))
 
 
@@ -236,7 +265,7 @@ class IdeProjectJavaFixOptions(core.yarg.Options):
             ['--disable-java'],
             hook=core.yarg.SetConstValueHook('java_fix', False),
             group=core.yarg.ADVANCED_OPT_GROUP,
-            visible=False
+            visible=False,
         )
 
 
@@ -246,11 +275,12 @@ class IdeProjectOutputOptions(core.yarg.Options):
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(['-P', '--project-output'],
-                                  help='Custom IDE project output directory',
-                                  hook=core.yarg.SetValueHook('project_output'),
-                                  group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['-P', '--project-output'],
+                help='Custom IDE project output directory',
+                hook=core.yarg.SetValueHook('project_output'),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
         ]
 
     def postprocess(self):
@@ -264,11 +294,12 @@ class YaExtraArgsOptions(core.yarg.Options):
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(['--make-args'],
-                                  help='Extra ya make arguments',
-                                  hook=core.yarg.SetAppendHook('ya_make_extra'),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['--make-args'],
+                help='Extra ya make arguments',
+                hook=core.yarg.SetAppendHook('ya_make_extra'),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
         ]
 
 
@@ -280,16 +311,18 @@ class IdeYaMakeOptions(core.yarg.Options):
 
     def consumer(self):
         consumers = [
-            core.yarg.ArgConsumer(['--make-src-links'],
-                                  help='Create ya make symlinks in source tree',
-                                  hook=core.yarg.SetConstValueHook('ya_make_symlinks', True),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
-            core.yarg.ArgConsumer(['--dist'],
-                                  help='Use distbuild',
-                                  hook=core.yarg.SetConstValueHook('use_distbuild', True),
-                                  group=core.yarg.ADVANCED_OPT_GROUP,
-                                  ),
+            core.yarg.ArgConsumer(
+                ['--make-src-links'],
+                help='Create ya make symlinks in source tree',
+                hook=core.yarg.SetConstValueHook('ya_make_symlinks', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--dist'],
+                help='Use distbuild',
+                hook=core.yarg.SetConstValueHook('use_distbuild', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            ),
         ]
         return consumers
 
@@ -307,11 +340,13 @@ class RemoteOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return core.yarg.ArgConsumer(
-            ['-H', '--host'], help='Host machine address',
+            ['-H', '--host'],
+            help='Host machine address',
             hook=core.yarg.SetValueHook('remote_host'),
             group=core.yarg.BULLET_PROOF_OPT_GROUP,
         ) + core.yarg.ArgConsumer(
-            ['--remote-cache'], help='Path to the service directory on the remote machine',
+            ['--remote-cache'],
+            help='Path to the service directory on the remote machine',
             hook=core.yarg.SetValueHook('remote_cache_path'),
             group=core.yarg.ADVANCED_OPT_GROUP,
         )
@@ -335,36 +370,49 @@ class IdeRemoteOptions(core.yarg.Options):
 
     @staticmethod
     def consumer():
-        return core.yarg.ArgConsumer(
-            ['--remote-keep-output'], help='Don\'t clean remote output dir after build',
-            hook=core.yarg.SetConstValueHook('remote_clean_output', False),
-            group=core.yarg.ADVANCED_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['--rsync_up_args'],
-            help='Rsync arguments for uploading sources',
-            hook=core.yarg.SetValueHook('rsync_upload_args'),
-            group=core.yarg.DEVELOPERS_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['--rsync_down_args'],
-            help='Rsync arguments for downloading build results',
-            hook=core.yarg.SetValueHook('rsync_down_args'),
-            group=core.yarg.DEVELOPERS_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['--remote-ya'], help='Path to \'ya\' on the remote machine',
-            hook=core.yarg.SetValueHook('remote_ya_path'),
-            group=core.yarg.BULLET_PROOF_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['--remote-env-ready'], help='Skip preparing remote environment',
-            hook=core.yarg.SetConstValueHook('remote_prepare_env', False),
-            group=core.yarg.DEVELOPERS_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
-            ['--forward-key'], help='Literally, run ssh with -A argument when initiate remote dirs',
-            hook=core.yarg.SetConstValueHook('forward_key', True),
-            group=core.yarg.ADVANCED_OPT_GROUP
-        ) + core.yarg.ArgConsumer(
-            ['--no-get-sources-build'], help='Don\'t download generated source files in build-only targets',
-            hook=core.yarg.SetConstValueHook('in_build_get_source', False),
-            group=core.yarg.ADVANCED_OPT_GROUP
+        return (
+            core.yarg.ArgConsumer(
+                ['--remote-keep-output'],
+                help='Don\'t clean remote output dir after build',
+                hook=core.yarg.SetConstValueHook('remote_clean_output', False),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--rsync_up_args'],
+                help='Rsync arguments for uploading sources',
+                hook=core.yarg.SetValueHook('rsync_upload_args'),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--rsync_down_args'],
+                help='Rsync arguments for downloading build results',
+                hook=core.yarg.SetValueHook('rsync_down_args'),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--remote-ya'],
+                help='Path to \'ya\' on the remote machine',
+                hook=core.yarg.SetValueHook('remote_ya_path'),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--remote-env-ready'],
+                help='Skip preparing remote environment',
+                hook=core.yarg.SetConstValueHook('remote_prepare_env', False),
+                group=core.yarg.DEVELOPERS_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--forward-key'],
+                help='Literally, run ssh with -A argument when initiate remote dirs',
+                hook=core.yarg.SetConstValueHook('forward_key', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            )
+            + core.yarg.ArgConsumer(
+                ['--no-get-sources-build'],
+                help='Don\'t download generated source files in build-only targets',
+                hook=core.yarg.SetConstValueHook('in_build_get_source', False),
+                group=core.yarg.ADVANCED_OPT_GROUP,
+            )
         )
 
     def postprocess(self):
@@ -396,12 +444,21 @@ def gen_ide_ymake_conf(params, toolchain_params, extra_flags, build_type=IDE_YMA
         extra_flags=flags,
         tool_chain=toolchain_params,
         conf_debug=params.conf_debug_options,
-        debug_id='ide'
+        debug_id='ide',
     )
 
 
 class IdeProjectInfo(object):
-    def __init__(self, params, app_ctx, title=None, output_path=None, instance_per_title=False, default_output_name='ide-project', default_output_here=False):
+    def __init__(
+        self,
+        params,
+        app_ctx,
+        title=None,
+        output_path=None,
+        instance_per_title=False,
+        default_output_name='ide-project',
+        default_output_here=False,
+    ):
         self.params = params
         self.app_ctx = app_ctx
         self._instance_per_title = instance_per_title
@@ -594,7 +651,9 @@ class IdeGraph(object):
 
     def sync_targets(self, source_root, add_extra=True, exclude_regexps=None):
         source_root = source_root.rstrip('/')
-        sync_files = {build.graph_path.GraphPath(fl).resolve(source_root=source_root) for fl in self.iter_source_files()}
+        sync_files = {
+            build.graph_path.GraphPath(fl).resolve(source_root=source_root) for fl in self.iter_source_files()
+        }
 
         def get_dir_content(path):
             return list(filter(os.path.isfile, [os.path.join(path, x) for x in os.listdir(path)]))
@@ -603,10 +662,13 @@ class IdeGraph(object):
             return list(filter(os.path.isdir, [os.path.join(path, x) for x in os.listdir(path)]))
 
         def get_whole_dir(path):
-            return (os.path.join(w_root, w_file)
-                    for w_root, _, w_files in exts.os2.fastwalk(path, followlinks=True)
-                    # filter broken symlinks
-                    for w_file in w_files if os.path.exists(os.path.join(w_root, w_file)))
+            return (
+                os.path.join(w_root, w_file)
+                for w_root, _, w_files in exts.os2.fastwalk(path, followlinks=True)
+                # filter broken symlinks
+                for w_file in w_files
+                if os.path.exists(os.path.join(w_root, w_file))
+            )
 
         def get_parent_cmakelists(path):
             path = os.path.dirname(path).rstrip(os.path.sep)
@@ -638,7 +700,9 @@ class IdeGraph(object):
                 sync_files.update(get_whole_dir(contrib_dir))
 
         extra_dev_dirs = (os.path.join('devtools', 'ya'), 'build')
-        sync_files.update(itertools.chain.from_iterable(get_whole_dir(os.path.join(source_root, path)) for path in extra_dev_dirs))
+        sync_files.update(
+            itertools.chain.from_iterable(get_whole_dir(os.path.join(source_root, path)) for path in extra_dev_dirs)
+        )
         sync_files.add(os.path.join(source_root, build.makelist.MAKELIST_FILENAME_PREFERRED))
 
         if exclude_regexps:
@@ -665,7 +729,15 @@ class CMakeStubProject(object):
     IDENTIFY_COMMENT = '# __YA_IDE_CMAKE_STUB_FILE__'
 
     def __init__(
-        self, params, app_ctx, info, filename='CMakeLists.txt', required_cmake_version=None, need_source_symlinks=False, mask_output_roots=False, header=None
+        self,
+        params,
+        app_ctx,
+        info,
+        filename='CMakeLists.txt',
+        required_cmake_version=None,
+        need_source_symlinks=False,
+        mask_output_roots=False,
+        header=None,
     ):
         self.params = params
         self.app_ctx = app_ctx
@@ -684,16 +756,33 @@ class CMakeStubProject(object):
         logger.debug('Extra make args: %s', self.params.ya_make_extra)
         logger.debug('Make symlinks: %s', self.source_symlinks)
 
-    def generate(self, joint_target=False, codegen_target=False, filters=None, custom_block_base_vars='', custom_block='', src_dir=None,
-                 out_dir=None, remote_dir=None, wrapper=None, makelists=False, generated=False, all_source_files=False, forbid_cmake_override=False,
-                 use_sync_server=False, strip_non_final=False):
+    def generate(
+        self,
+        joint_target=False,
+        codegen_target=False,
+        filters=None,
+        custom_block_base_vars='',
+        custom_block='',
+        src_dir=None,
+        out_dir=None,
+        remote_dir=None,
+        wrapper=None,
+        makelists=False,
+        generated=False,
+        all_source_files=False,
+        forbid_cmake_override=False,
+        use_sync_server=False,
+        strip_non_final=False,
+    ):
         if forbid_cmake_override and os.path.exists(self._stub_path):
             with open(self._stub_path) as fl:
                 first_line = fl.readline().strip()
             if first_line != self.header:
                 emit_message(
                     '[[bad]]File {} already exists. '
-                    'If it\'s automatically generated delete it and rerun generation (needed one time).[[rst]]'.format(exts.path2.abspath(self._stub_path))
+                    'If it\'s automatically generated delete it and rerun generation (needed one time).[[rst]]'.format(
+                        exts.path2.abspath(self._stub_path)
+                    )
                 )
                 raise CMakeStubGenerationException()
         self.ide_graph = IdeGraph(self.params)
@@ -717,14 +806,32 @@ endif()
 """
         files = self.ide_graph.iter_source_files()
         if generated:
-            files = itertools.chain(files, (f for f in self.ide_graph.iter_build_files() if any(f.endswith('.' + ext) for ext in self.SOURCE_EXTS)))
+            files = itertools.chain(
+                files,
+                (
+                    f
+                    for f in self.ide_graph.iter_build_files()
+                    if any(f.endswith('.' + ext) for ext in self.SOURCE_EXTS)
+                ),
+            )
         if not src_dir:
             src_dir = self.params.arc_root
         if not out_dir:
             out_dir = '${PROJECT_BINARY_DIR}'
-        self.project_files, self.targets = self._create_stub(src_dir, out_dir, remote_dir, files, joint_target,
-                                                             codegen_target, filters, custom_block_base_vars,
-                                                             custom_block, wrapper, use_sync_server, strip_non_final)
+        self.project_files, self.targets = self._create_stub(
+            src_dir,
+            out_dir,
+            remote_dir,
+            files,
+            joint_target,
+            codegen_target,
+            filters,
+            custom_block_base_vars,
+            custom_block,
+            wrapper,
+            use_sync_server,
+            strip_non_final,
+        )
         self.inc_dirs = self.ide_graph.inc_dirs
         logger.debug('Targets: %s', ', '.join(sorted(six.iterkeys(self.targets))))
         logger.debug('Project files: %s', len(self.project_files))
@@ -732,9 +839,25 @@ endif()
         self.binaries = {k: v.get('path') for k, v in six.iteritems(self.targets) if v.get('runnable')}
         logger.debug('Binaries: %s', ', '.join(six.iterkeys(self.binaries)))
 
-    def _create_stub(self, src_dir, out_dir, remote_dir, files, joint_target, codegen_target, filters, custom_block_base_vars, custom_block, wrapper, use_sync_server, strip_non_final):
+    def _create_stub(
+        self,
+        src_dir,
+        out_dir,
+        remote_dir,
+        files,
+        joint_target,
+        codegen_target,
+        filters,
+        custom_block_base_vars,
+        custom_block,
+        wrapper,
+        use_sync_server,
+        strip_non_final,
+    ):
         def subst(s):
-            res = build.graph_path.resolve_graph_value(s, source_root='${PROJECT_SOURCE_DIR}', build_root='${PROJECT_OUTPUT_DIR}')
+            res = build.graph_path.resolve_graph_value(
+                s, source_root='${PROJECT_SOURCE_DIR}', build_root='${PROJECT_OUTPUT_DIR}'
+            )
             return RE_ESCAPE_IN_UNQUOTED.sub(r'\\\g<0>', res)
 
         def gen_ya_make_cmd(name, paths, with_tests, replace_result=False, extra=None):
@@ -759,43 +882,55 @@ endif()
             make_opts.extend(['-T', '--no-emit-status'])
             make_opts_str = (' ' + ' '.join(opt.replace(' ', r'\ ') for opt in make_opts)) if make_opts else ''
             targets = ['${{PROJECT_SOURCE_DIR}}/{}'.format(fix_win_path(path)) for path in paths]
-            build_command = self.YA_MAKE_CMD.format(name=target_name, wrapper=(wrapper + ' ') if wrapper else '',
-                                                    opts=make_opts_str,
-                                                    targets=' '.join(targets))
+            build_command = self.YA_MAKE_CMD.format(
+                name=target_name,
+                wrapper=(wrapper + ' ') if wrapper else '',
+                opts=make_opts_str,
+                targets=' '.join(targets),
+            )
             if hasattr(self.params, 'remote_host') and self.params.remote_host:
                 module_name = target_name if target_name != JOINT_TARGET_NAME else JOINT_TARGET_REMOTE_NAME
                 # backslash is necessary as rsync treats 'source_path' and 'source_path/' in different ways
-                remote_output_subdir = \
+                remote_output_subdir = (
                     os.path.join(self.params.remote_cache_path, REMOTE_OUTPUT_SUBDIR).rstrip(os.path.sep) + os.path.sep
+                )
                 remote_source_subdir = os.path.join(self.params.remote_cache_path, REMOTE_SOURCE_SUBDIR)
                 remote_build_dir = os.path.join(self.params.remote_cache_path, REMOTE_BUILD_SUBDIR)
-                remote_build_command = 'add_custom_target(REMOTE_BUILD_{module_name}\n' \
-                                       'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool rsync {rsync_up_args} ' \
-                                       '--files-from={sync_file} ${{PROJECT_SOURCE_DIR}} ' \
-                                       '{host}:{remote_source_path}\n' + (
-                                           'COMMAND ssh {host} \'find {remote_output} -mindepth 1 -delete 2>/dev/null || echo\'\n'
-                                           if self.params.remote_clean_output else '') + \
-                                       'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool python -- ' \
-                                       '${{PROJECT_SOURCE_DIR}}/devtools/qt/unmask_roots.py ' \
-                                       '${{PROJECT_SOURCE_DIR}} ${{PROJECT_BINARY_DIR}} ' \
-                                       'ssh {host} {remote_source_path}/ya make {remote_target} ' \
-                                       '--build=${{CMAKE_BUILD_TYPE}} ' \
-                                       '--output={remote_output} --build-dir={remote_build_dir} {remote_build_options}' + (
-                                           '\nCOMMAND ssh {host} \'cd {remote_output} && find -type f -not -perm /111\' |'
-                                           ' ${{PROJECT_SOURCE_DIR}}/ya tool rsync --files-from=- {rsync_down_args} '
-                                           '{host}:{remote_output} ${{PROJECT_OUTPUT_DIR}}' if self.params.in_build_get_source else ''
-                                           ) + \
-                                       ')'
-                remote_download_command = 'add_custom_target(REMOTE_BUILD_AND_DOWNLOAD_{module_name}\n' \
-                                          'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool rsync {rsync_down_args} ' \
-                                          '{host}:{remote_output} ${{PROJECT_OUTPUT_DIR}}' \
-                                          ')'
+                remote_build_command = (
+                    'add_custom_target(REMOTE_BUILD_{module_name}\n'
+                    'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool rsync {rsync_up_args} '
+                    '--files-from={sync_file} ${{PROJECT_SOURCE_DIR}} '
+                    '{host}:{remote_source_path}\n'
+                    + (
+                        'COMMAND ssh {host} \'find {remote_output} -mindepth 1 -delete 2>/dev/null || echo\'\n'
+                        if self.params.remote_clean_output
+                        else ''
+                    )
+                    + 'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool python -- '
+                    '${{PROJECT_SOURCE_DIR}}/devtools/qt/unmask_roots.py '
+                    '${{PROJECT_SOURCE_DIR}} ${{PROJECT_BINARY_DIR}} '
+                    'ssh {host} {remote_source_path}/ya make {remote_target} '
+                    '--build=${{CMAKE_BUILD_TYPE}} '
+                    '--output={remote_output} --build-dir={remote_build_dir} {remote_build_options}'
+                    + (
+                        '\nCOMMAND ssh {host} \'cd {remote_output} && find -type f -not -perm /111\' |'
+                        ' ${{PROJECT_SOURCE_DIR}}/ya tool rsync --files-from=- {rsync_down_args} '
+                        '{host}:{remote_output} ${{PROJECT_OUTPUT_DIR}}'
+                        if self.params.in_build_get_source
+                        else ''
+                    )
+                    + ')'
+                )
+                remote_download_command = (
+                    'add_custom_target(REMOTE_BUILD_AND_DOWNLOAD_{module_name}\n'
+                    'COMMAND ${{PROJECT_SOURCE_DIR}}/ya tool rsync {rsync_down_args} '
+                    '{host}:{remote_output} ${{PROJECT_OUTPUT_DIR}}'
+                    ')'
+                )
                 dependency = 'add_dependencies(REMOTE_BUILD_AND_DOWNLOAD_{module_name} REMOTE_BUILD_{module_name})'
                 remote_args = dict(
                     module_name=module_name,
-                    remote_target=' '.join(
-                        os.path.join(remote_source_subdir, target_path) for target_path in paths
-                    ),
+                    remote_target=' '.join(os.path.join(remote_source_subdir, target_path) for target_path in paths),
                     remote_source_path=remote_source_subdir,
                     host=self.params.remote_host,
                     ya_dir_name='ya',
@@ -804,10 +939,12 @@ endif()
                     remote_build_options=make_opts_str,
                     rsync_up_args=self.params.rsync_upload_args,
                     rsync_down_args=self.params.rsync_down_args,
-                    remote_build_dir=remote_build_dir
+                    remote_build_dir=remote_build_dir,
                 )
-                build_command = '\n'.join([build_command] +
-                                          [x.format(**remote_args) for x in [remote_build_command, remote_download_command, dependency]])
+                build_command = '\n'.join(
+                    [build_command]
+                    + [x.format(**remote_args) for x in [remote_build_command, remote_download_command, dependency]]
+                )
 
             return build_command
 
@@ -817,6 +954,7 @@ endif()
         exts.fs.create_dirs(os.path.dirname(self._stub_path))
         stub_tmp_path = self._stub_path + '.tmp'
         with open(stub_tmp_path, 'w') as stub:
+
             def emit(s=''):
                 stub.write(s)
                 stub.write('\n')
@@ -846,7 +984,9 @@ endif()
             emit('set(CMAKE_CXX_STANDARD 20)')
             emit_block(custom_block)
 
-            filtered_files = set((f for f in files if any(build.graph_path.GraphPath(f).strip().startswith(x) for x in roots)))
+            filtered_files = set(
+                (f for f in files if any(build.graph_path.GraphPath(f).strip().startswith(x) for x in roots))
+            )
 
             indent = ''
             if remote_dir:
@@ -871,11 +1011,21 @@ endif()
 
             targets = self.ide_graph.get_modules(roots, strip_non_final)
             for module_name in sorted(six.iterkeys(targets)):
-                emit(gen_ya_make_cmd(module_name, [targets[module_name]['module_path']], False, False, self.params.ya_make_extra))
+                emit(
+                    gen_ya_make_cmd(
+                        module_name, [targets[module_name]['module_path']], False, False, self.params.ya_make_extra
+                    )
+                )
             if joint_target:
-                emit(gen_ya_make_cmd(JOINT_TARGET_NAME, self.params.rel_targets, False, False, self.params.ya_make_extra))
+                emit(
+                    gen_ya_make_cmd(JOINT_TARGET_NAME, self.params.rel_targets, False, False, self.params.ya_make_extra)
+                )
             if codegen_target:
-                emit(gen_ya_make_cmd(CODEGEN_TARGET_NAME, self.params.rel_targets, False, True, self.params.ya_make_extra))
+                emit(
+                    gen_ya_make_cmd(
+                        CODEGEN_TARGET_NAME, self.params.rel_targets, False, True, self.params.ya_make_extra
+                    )
+                )
 
             if use_sync_server and remote_dir:
                 emit()
@@ -883,11 +1033,17 @@ endif()
                 emit('    add_custom_target(')
                 emit('        _arcadia_remote_sync')
                 emit('        COMMAND echo "Sync local changes..."')
-                emit('        COMMAND curl --silent --show-error --fail --unix-socket ${CMAKE_CURRENT_SOURCE_DIR}/pull.socket http://socket/pull')
+                emit(
+                    '        COMMAND curl --silent --show-error --fail --unix-socket ${CMAKE_CURRENT_SOURCE_DIR}/pull.socket http://socket/pull'
+                )
                 emit('        COMMAND echo "Done")')
 
                 for module_name in sorted(six.iterkeys(targets)):
-                    emit('    add_dependencies({} _arcadia_remote_sync)'.format(module_name + '_' if module_name in self.FORBIDDEN_TARGET_NAMES else module_name))
+                    emit(
+                        '    add_dependencies({} _arcadia_remote_sync)'.format(
+                            module_name + '_' if module_name in self.FORBIDDEN_TARGET_NAMES else module_name
+                        )
+                    )
                 if joint_target:
                     emit('    add_dependencies({} _arcadia_remote_sync)'.format(JOINT_TARGET_NAME))
                 if codegen_target:
@@ -983,7 +1139,9 @@ def setup_tidy_config(source_root):
             os.unlink(target_path)
             create_symlink = True
     else:
-        emit_message("[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{}' is not a link".format(target_path))
+        emit_message(
+            "[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{}' is not a link".format(target_path)
+        )
 
     if create_symlink:
         os.symlink(config_path, target_path)

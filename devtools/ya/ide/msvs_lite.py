@@ -65,9 +65,36 @@ class Solution(object):
 class ProjectDescription(object):
     INCLUDE_SOURCE_EXTS = ('.h', '.hh', '.hpp', '.inc', '')
     BUILD_SOURCE_EXTS = (
-        '.cpp', '.cc', '.c', '.cxx', '.C', '.rl5', '.rl6', '.rl', '.gperf', '.y', '.ypp', '.l', '.lex', '.lpp',
-        '.proto', '.gztproto', '.ev', '.asp', '.fml', '.fml2', '.fml3', '.sfdl', '.S', '.asm', '.masm', '.cu', '.swg',
-        '.pyx', '.xsyn', '.py'
+        '.cpp',
+        '.cc',
+        '.c',
+        '.cxx',
+        '.C',
+        '.rl5',
+        '.rl6',
+        '.rl',
+        '.gperf',
+        '.y',
+        '.ypp',
+        '.l',
+        '.lex',
+        '.lpp',
+        '.proto',
+        '.gztproto',
+        '.ev',
+        '.asp',
+        '.fml',
+        '.fml2',
+        '.fml3',
+        '.sfdl',
+        '.S',
+        '.asm',
+        '.masm',
+        '.cu',
+        '.swg',
+        '.pyx',
+        '.xsyn',
+        '.py',
     )
     EXCLUDE_SOURCE_EXTS = ('.obj', '.exe', '.lib', '.dll', '.o', '.a', '.so')
     EXCLUDE_FILES = ('build/scripts/fix_msvc_output.py', 'build/scripts/_fake_src.cpp', 'build/scripts/link_lib.py')
@@ -187,7 +214,10 @@ class LookUpProjects(object):
         clean_sources = []
         for src in sources:
             src = self._remove_dollar(src)
-            if utils.get_ext(src) not in ProjectDescription.EXCLUDE_SOURCE_EXTS and src not in ProjectDescription.EXCLUDE_FILES:
+            if (
+                utils.get_ext(src) not in ProjectDescription.EXCLUDE_SOURCE_EXTS
+                and src not in ProjectDescription.EXCLUDE_FILES
+            ):
                 clean_sources.append(src)
         return sorted(set(clean_sources))
 
@@ -219,12 +249,34 @@ class SlnGenerator(object):
         projects = []
         for proj_descr in self.proj_descriptions + [self.top_description]:
             if proj_descr.type == 'top':
-                projects.append(msbuild.TopProject(proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root, self.extra_args))
+                projects.append(
+                    msbuild.TopProject(
+                        proj_descr,
+                        self.top_description,
+                        self.ide_graph,
+                        self.info,
+                        self.tools_version,
+                        self.proj_root,
+                        self.extra_args,
+                    )
+                )
             else:
                 projects += [
-                    msbuild.GeneralProject(proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root, self.extra_args),
-                    msbuild.FilterProject(proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root),
-                    msbuild.DebugInfoProject(proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root)
+                    msbuild.GeneralProject(
+                        proj_descr,
+                        self.top_description,
+                        self.ide_graph,
+                        self.info,
+                        self.tools_version,
+                        self.proj_root,
+                        self.extra_args,
+                    ),
+                    msbuild.FilterProject(
+                        proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root
+                    ),
+                    msbuild.DebugInfoProject(
+                        proj_descr, self.top_description, self.ide_graph, self.info, self.tools_version, self.proj_root
+                    ),
                 ]
 
         for project in projects:
@@ -308,12 +360,16 @@ class SlnProject(object):
         for node in self._iterate_tree():
             if node.path.endswith('.vcxproj'):
                 for mode, platform in itertools.product(msbuild.MODES, msbuild.PLATFORMS):
-                    template.append('\t\t{{{guid}}}.{mode}|{plat}.ActiveCfg = {mode}|{plat}'.format(
-                        guid=node.guid, mode=mode, plat=platform
-                    ))
-                    template.append('\t\t{{{guid}}}.{mode}|{plat}.Build.0 = {mode}|{plat}'.format(
-                        guid=node.guid, mode=mode, plat=platform
-                    ))
+                    template.append(
+                        '\t\t{{{guid}}}.{mode}|{plat}.ActiveCfg = {mode}|{plat}'.format(
+                            guid=node.guid, mode=mode, plat=platform
+                        )
+                    )
+                    template.append(
+                        '\t\t{{{guid}}}.{mode}|{plat}.Build.0 = {mode}|{plat}'.format(
+                            guid=node.guid, mode=mode, plat=platform
+                        )
+                    )
         template.append('\tEndGlobalSection')
 
         template.append('\tGlobalSection(NestedProjects) = preSolution')
@@ -361,7 +417,7 @@ def add_sln_project_node(path, guid):
     name = os.path.splitext(os.path.basename(path))[0]
     template = [
         'Project("{{{type}}}") = "{name}", "{path}", "{{{guid}}}"'.format(type=type, name=name, path=path, guid=guid),
-        'EndProject'
+        'EndProject',
     ]
 
     return template
@@ -375,7 +431,7 @@ def gen_tree(root_node, proj_descriptions):
 def add_node(root_node, path, guid):
     chunks = path.split('/')
     current_node = root_node
-    for chunk in chunks[: -1]:
+    for chunk in chunks[:-1]:
         current_path = msbuild.norm_path(os.path.join(current_node.path, chunk))
         if current_path not in current_node:
             current_node.children.append(Node(current_path, utils.to_guid(current_path)))
@@ -388,6 +444,7 @@ def add_node(root_node, path, guid):
 
 def get_res(res):
     import __res
+
     return __res.find(res)
 
 
@@ -413,6 +470,7 @@ def settings(template):
 
 def gen_msvs_solution(params):
     import app_ctx  # XXX
+
     app_ctx.display.emit_message('[[bad]]ya ide msvs is deprecated, please use clangd-based tooling instead')
     app_ctx.display.emit_message('[[imp]]Generating Visual Studio solution[[rst]]')
     solution_info = ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_name=msvs.DEFAULT_MSVS_OUTPUT_DIR)
@@ -426,5 +484,4 @@ def gen_msvs_solution(params):
         solution = Solution(params, app_ctx, solution_info)
         solution.generate()
         res.dump('arcadia.natvis', extra_path='Projects')
-        app_ctx.display.emit_message(
-            '[[good]]Ready. File to open: [[path]]{}[[rst]]'.format(solution.solution_path))
+        app_ctx.display.emit_message('[[good]]Ready. File to open: [[path]]{}[[rst]]'.format(solution.solution_path))

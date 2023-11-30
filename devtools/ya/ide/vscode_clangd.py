@@ -26,9 +26,17 @@ from ide import ide_common, vscode
 
 CODEGEN_EXTS = [".h", ".hh", ".hpp", ".inc", ".c", ".cc", ".cpp", ".C", ".cxx"]
 CODEGEN_TASK = "%s make --force-build-depends --replace-result --keep-going --no-src-links --output=%s %s %s"
-FINISH_HELP = 'Workspace file ' + termcolor.colored('%s', 'green', attrs=['bold']) + ' is ready\n' + \
-              'Code navigation and autocomplete configured for ' + termcolor.colored('Clangd', 'green') + ' plugin: ' + \
-              termcolor.colored('https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd', attrs=['bold'])
+FINISH_HELP = (
+    'Workspace file '
+    + termcolor.colored('%s', 'green', attrs=['bold'])
+    + ' is ready\n'
+    + 'Code navigation and autocomplete configured for '
+    + termcolor.colored('Clangd', 'green')
+    + ' plugin: '
+    + termcolor.colored(
+        'https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd', attrs=['bold']
+    )
+)
 
 
 class VSCodeClangdOptions(core.yarg.Options):
@@ -82,7 +90,11 @@ class VSCodeClangdOptions(core.yarg.Options):
             core.yarg.ArgConsumer(
                 ['--files-visibility'],
                 help='Limit files visibility in VS Code Explorer/Search ("targets", "targets-and-deps", "all")',
-                hook=core.yarg.SetValueHook('files_visibility', values=("targets", "targets-and-deps", "all"), default_value=lambda _: "targets-and-deps"),
+                hook=core.yarg.SetValueHook(
+                    'files_visibility',
+                    values=("targets", "targets-and-deps", "all"),
+                    default_value=lambda _: "targets-and-deps",
+                ),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
@@ -153,6 +165,7 @@ def gen_compile_commands(params, compile_commands_path):
             # Tests doesn't contain app_ctx
             app_ctx = ide_common.FakeAppCtx()
         return bc.gen_compilation_database(prms, app_ctx)
+
     return app.execute(action=gen, respawn=app.RespawnType.NONE)(build_params)
 
 
@@ -179,66 +192,90 @@ def gen_run_configurations(params, modules, args, YA_PATH):
             name = os.path.dirname(name) or name
         name = name.replace('/', u'\uff0f')
         if debug_enabled:
-            configuration = OrderedDict((
-                ("name", name),
-                ("program", os.path.join(params.arc_root, module['path'])),
-                ("args", []),
-                ("request", "launch"),
-            ))
+            configuration = OrderedDict(
+                (
+                    ("name", name),
+                    ("program", os.path.join(params.arc_root, module['path'])),
+                    ("args", []),
+                    ("request", "launch"),
+                )
+            )
 
             if is_mac:
-                configuration.update(OrderedDict((
-                    ("type", "lldb"),
-                    ("env", {}),
-                    ("sourceMap", {
-                        "/-S": params.arc_root,
-                        "/-B": params.output_root,
-                    }),
-                )))
+                configuration.update(
+                    OrderedDict(
+                        (
+                            ("type", "lldb"),
+                            ("env", {}),
+                            (
+                                "sourceMap",
+                                {
+                                    "/-S": params.arc_root,
+                                    "/-B": params.output_root,
+                                },
+                            ),
+                        )
+                    )
+                )
             elif gdb_path:
-                configuration.update(OrderedDict((
-                    ("type", "cppdbg"),
-                    ("MIMode", "gdb"),
-                    ("miDebuggerPath", gdb_path),
-                    ("environment", []),
-                    ("setupCommands", [
-                        {
-                            "description": "Enable pretty-printing for gdb",
-                            "text": "-enable-pretty-printing",
-                            "ignoreFailures": True
-                        },
-                        {
-                            "description": "GDB will show the full paths to all source files",
-                            "text": "set filename-display absolute",
-                            "ignoreFailures": True
-                        },
-                        {
-                            "description": "When displaying a pointer to an object, identify the actual (derived) type of the object rather than the declared type, using the virtual function table. ",
-                            "text": "set print object on",
-                            "ignoreFailures": True
-                        },
-                        {
-                            "text": "set substitute-path /-S/ " + params.arc_root,
-                            "description": "Map source files",
-                            "ignoreFailures": True
-                        },
-                        {
-                            "text": "set substitute-path /-B/ " + params.output_root,
-                            "description": "Map generated files",
-                            "ignoreFailures": True
-                        },
-                    ]),
-                )))
+                configuration.update(
+                    OrderedDict(
+                        (
+                            ("type", "cppdbg"),
+                            ("MIMode", "gdb"),
+                            ("miDebuggerPath", gdb_path),
+                            ("environment", []),
+                            (
+                                "setupCommands",
+                                [
+                                    {
+                                        "description": "Enable pretty-printing for gdb",
+                                        "text": "-enable-pretty-printing",
+                                        "ignoreFailures": True,
+                                    },
+                                    {
+                                        "description": "GDB will show the full paths to all source files",
+                                        "text": "set filename-display absolute",
+                                        "ignoreFailures": True,
+                                    },
+                                    {
+                                        "description": "When displaying a pointer to an object, identify the actual (derived) type of the object rather than the declared type, using the virtual function table. ",  # noqa
+                                        "text": "set print object on",
+                                        "ignoreFailures": True,
+                                    },
+                                    {
+                                        "text": "set substitute-path /-S/ " + params.arc_root,
+                                        "description": "Map source files",
+                                        "ignoreFailures": True,
+                                    },
+                                    {
+                                        "text": "set substitute-path /-B/ " + params.output_root,
+                                        "description": "Map generated files",
+                                        "ignoreFailures": True,
+                                    },
+                                ],
+                            ),
+                        )
+                    )
+                )
 
         if mangle_module_type == 'PROGRAM':
             task_name = "Build: %s (debug)" % name
-            tasks.append(OrderedDict((
-                ("label", task_name),
-                ("detail", module['path']),
-                ("type", "shell"),
-                ("command", "%s make -d %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                ("group", "build"),
-            )))
+            tasks.append(
+                OrderedDict(
+                    (
+                        ("label", task_name),
+                        ("detail", module['path']),
+                        ("type", "shell"),
+                        (
+                            "command",
+                            "%s make -d %s %s"
+                            % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path']))),
+                        ),
+                        ("group", "build"),
+                    )
+                )
+            )
             if debug_enabled:
                 configuration["cwd"] = os.path.join(params.arc_root, module['module_path'])
                 configuration["presentation"] = {
@@ -248,16 +285,29 @@ def gen_run_configurations(params, modules, args, YA_PATH):
                 configuration["preLaunchTask"] = task_name
                 program_index += 1
         elif params.tests_enabled:
-            tasks.append(OrderedDict((
-                ("label", "Test: %s (debug)" % name),
-                ("detail", module['path']),
-                ("type", "shell"),
-                ("command", "%s test -A --regular-tests %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                ("group", "test"),
-            )))
+            tasks.append(
+                OrderedDict(
+                    (
+                        ("label", "Test: %s (debug)" % name),
+                        ("detail", module['path']),
+                        ("type", "shell"),
+                        (
+                            "command",
+                            "%s test -A --regular-tests %s %s"
+                            % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path']))),
+                        ),
+                        ("group", "test"),
+                    )
+                )
+            )
             if debug_enabled:
                 test_results_path = None
-                if mangle_module_type in ('UNITTEST', 'UNITTEST_FOR', 'YT_UNITTEST', 'UNITTEST_WITH_CUSTOM_ENTRY_POINT'):
+                if mangle_module_type in (
+                    'UNITTEST',
+                    'UNITTEST_FOR',
+                    'YT_UNITTEST',
+                    'UNITTEST_WITH_CUSTOM_ENTRY_POINT',
+                ):
                     test_results_path = os.path.join(params.arc_root, module['module_path'], 'test-results', 'unittest')
                 elif mangle_module_type == 'GTEST':
                     test_results_path = os.path.join(params.arc_root, module['module_path'], 'test-results', 'gtest')
@@ -271,13 +321,25 @@ def gen_run_configurations(params, modules, args, YA_PATH):
                     "order": tests_index,
                 }
                 prepare_task_name = "Prepare test: %s (debug)" % name
-                tasks.append(OrderedDict((
-                    ("label", prepare_task_name),
-                    ("detail", module['path']),
-                    ("type", "shell"),
-                    ("command", "%s test -A --regular-tests --keep-going --test-prepare --keep-temps %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                    ("group", "build"),
-                )))
+                tasks.append(
+                    OrderedDict(
+                        (
+                            ("label", prepare_task_name),
+                            ("detail", module['path']),
+                            ("type", "shell"),
+                            (
+                                "command",
+                                "%s test -A --regular-tests --keep-going --test-prepare --keep-temps %s %s"
+                                % (
+                                    YA_PATH,
+                                    args,
+                                    exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])),
+                                ),
+                            ),
+                            ("group", "build"),
+                        )
+                    )
+                )
                 configuration["preLaunchTask"] = prepare_task_name
                 environment = {'YA_TEST_CONTEXT_FILE': os.path.join(test_results_path, 'test.context')}
                 if is_mac:
@@ -294,8 +356,7 @@ def gen_run_configurations(params, modules, args, YA_PATH):
 def gen_vscode_workspace(params):
     orig_flags = copy.copy(params.flags)
     ya_make_opts = core.yarg.merge_opts(
-        build_opts.ya_make_options(free_build_targets=True) +
-        [bc.CompilationDatabaseOptions()],
+        build_opts.ya_make_options(free_build_targets=True) + [bc.CompilationDatabaseOptions()],
     )
     params.ya_make_extra.append('-DBUILD_LANGUAGES=CPP')
     params.ya_make_extra.append("-DCONSISTENT_DEBUG=yes")
@@ -308,10 +369,13 @@ def gen_vscode_workspace(params):
     else:
         project_root = os.path.abspath(os.curdir)
 
-    if not params.allow_project_inside_arc and (project_root == params.arc_root or project_root.startswith(params.arc_root + os.path.sep)):
+    if not params.allow_project_inside_arc and (
+        project_root == params.arc_root or project_root.startswith(params.arc_root + os.path.sep)
+    ):
         raise vscode.YaIDEError(
             'You should not create VS Code project inside Arc repository. '
-            'Use "-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT" to set the project directory outside of Arc root (%s)' % params.arc_root
+            'Use "-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT" to set the project directory outside of Arc root (%s)'
+            % params.arc_root
         )
 
     if not os.path.exists(project_root):
@@ -335,7 +399,9 @@ def gen_vscode_workspace(params):
     compilation_database = gen_compile_commands(params, compile_commands_path)
 
     for item in compilation_database:
-        item['command'] = vscode.common.replace_prefix(item['command'], [('clang++', get_clang_cpp_tool()), ('clang', get_clang_cc_tool())])
+        item['command'] = vscode.common.replace_prefix(
+            item['command'], [('clang++', get_clang_cpp_tool()), ('clang', get_clang_cc_tool())]
+        )
     ide_common.emit_message('Writing {}'.format(compile_commands_path))
     with open(compile_commands_path, 'w') as f:
         json.dump(compilation_database, f, indent=4)
@@ -344,7 +410,9 @@ def gen_vscode_workspace(params):
         do_codegen(params)
 
     TARGETS = ' '.join(exts.shlex2.quote(arg) for arg in params.abs_targets)
-    common_args = params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in orig_flags.items()]
+    common_args = (
+        params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in orig_flags.items()]
+    )
     if params.prefetch:
         common_args.append('--prefetch')
     COMMON_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in common_args)
@@ -352,115 +420,187 @@ def gen_vscode_workspace(params):
     CODEGEN_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in codegen_args)
     YA_PATH = os.path.join(params.arc_root, "ya")
 
-    workspace = OrderedDict((
-        ("folders", []),
-        ("extensions", OrderedDict((
-            ("recommendations", [
-                "llvm-vs-code-extensions.vscode-clangd",
-                "forbeslindesay.forbeslindesay-taskrunner",
-            ]),
-        ))),
-        ("settings", OrderedDict((
-            ("clangd.arguments", [
-                "--background-index",
-                "--compile-commands-dir={}".format(vscode_path),
-                "--header-insertion=never",
-                "--log=info",
-                "--pretty",
-                "-j=%s" % params.build_threads,
-            ]),
-            ("clangd.checkUpdates", True),
-            ("C_Cpp.intelliSenseEngine", "disabled"),
-            ("go.useLanguageServer", False),
-            ("python.languageServer", "Pylance"),
-            ("python.analysis.indexing", False),
-            ("python.analysis.autoSearchPaths", False),
-            ("python.analysis.diagnosticMode", "openFilesOnly"),
-            ("search.followSymlinks", False),
-            ("git.mergeEditor", False),
-            ("npm.autoDetect", "off"),
-            ("task.autoDetect", "off"),
-            ("typescript.tsc.autoDetect", "off"),
-            ("forbeslindesay-taskrunner.separator", ": "),
-        ))),
-        ("tasks", OrderedDict((
-            ("version", "2.0.0"),
-            ("tasks", [
-                OrderedDict((
-                    ("label", "<Codegen>"),
-                    ("type", "shell"),
-                    ("command", CODEGEN_TASK % (YA_PATH, exts.shlex2.quote(params.output_root), CODEGEN_ARGS, TARGETS)),
-                    ("group", "build"),
-                )),
-                OrderedDict((
-                    ("label", "<Regenerate workspace>"),
-                    ("type", "shell"),
-                    ("command", YA_PATH + " " + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:])),
-                    ("options", OrderedDict((
-                        ("cwd", os.path.abspath(os.curdir)),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Build: ALL (debug)"),
-                    ("type", "shell"),
-                    ("command", "%s make -d %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", OrderedDict((
-                        ("kind", "build"),
-                        ("isDefault", True),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Build: ALL (release)"),
-                    ("type", "shell"),
-                    ("command", "%s make -r %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "build"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", OrderedDict((
-                        ("kind", "test"),
-                        ("isDefault", True),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (medium)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t --test-size=MEDIUM %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small + medium)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tt %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (large)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t --test-size=LARGE %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small + medium + large)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tA %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (restart failed)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tA -X %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-            ]),
-        ))),
-        ("launch", OrderedDict((
-            ("version", "0.2.0"),
-            ("configurations", []),
-        ))),
-    ))
+    workspace = OrderedDict(
+        (
+            ("folders", []),
+            (
+                "extensions",
+                OrderedDict(
+                    (
+                        (
+                            "recommendations",
+                            [
+                                "llvm-vs-code-extensions.vscode-clangd",
+                                "forbeslindesay.forbeslindesay-taskrunner",
+                            ],
+                        ),
+                    )
+                ),
+            ),
+            (
+                "settings",
+                OrderedDict(
+                    (
+                        (
+                            "clangd.arguments",
+                            [
+                                "--background-index",
+                                "--compile-commands-dir={}".format(vscode_path),
+                                "--header-insertion=never",
+                                "--log=info",
+                                "--pretty",
+                                "-j=%s" % params.build_threads,
+                            ],
+                        ),
+                        ("clangd.checkUpdates", True),
+                        ("C_Cpp.intelliSenseEngine", "disabled"),
+                        ("go.useLanguageServer", False),
+                        ("python.languageServer", "Pylance"),
+                        ("python.analysis.indexing", False),
+                        ("python.analysis.autoSearchPaths", False),
+                        ("python.analysis.diagnosticMode", "openFilesOnly"),
+                        ("search.followSymlinks", False),
+                        ("git.mergeEditor", False),
+                        ("npm.autoDetect", "off"),
+                        ("task.autoDetect", "off"),
+                        ("typescript.tsc.autoDetect", "off"),
+                        ("forbeslindesay-taskrunner.separator", ": "),
+                    )
+                ),
+            ),
+            (
+                "tasks",
+                OrderedDict(
+                    (
+                        ("version", "2.0.0"),
+                        (
+                            "tasks",
+                            [
+                                OrderedDict(
+                                    (
+                                        ("label", "<Codegen>"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            CODEGEN_TASK
+                                            % (YA_PATH, exts.shlex2.quote(params.output_root), CODEGEN_ARGS, TARGETS),
+                                        ),
+                                        ("group", "build"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "<Regenerate workspace>"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            YA_PATH + " " + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
+                                        ),
+                                        ("options", OrderedDict((("cwd", os.path.abspath(os.curdir)),))),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Build: ALL (debug)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -d %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        (
+                                            "group",
+                                            OrderedDict(
+                                                (
+                                                    ("kind", "build"),
+                                                    ("isDefault", True),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Build: ALL (release)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -r %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "build"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -t %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        (
+                                            "group",
+                                            OrderedDict(
+                                                (
+                                                    ("kind", "test"),
+                                                    ("isDefault", True),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (medium)"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            "%s make -t --test-size=MEDIUM %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                        ),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small + medium)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tt %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (large)"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            "%s make -t --test-size=LARGE %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                        ),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small + medium + large)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tA %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (restart failed)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tA -X %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                            ],
+                        ),
+                    )
+                ),
+            ),
+            (
+                "launch",
+                OrderedDict(
+                    (
+                        ("version", "0.2.0"),
+                        ("configurations", []),
+                    )
+                ),
+            ),
+        )
+    )
 
     if pm.my_platform().startswith('darwin'):
         workspace['extensions']['recommendations'].append('vadimcn.vscode-lldb')
@@ -470,13 +610,17 @@ def gen_vscode_workspace(params):
     if params.use_arcadia_root:
         workspace["folders"] = [{"path": params.arc_root}]
     else:
-        workspace["folders"] = [{"path": os.path.join(params.arc_root, target), "name": target} for target in params.rel_targets]
+        workspace["folders"] = [
+            {"path": os.path.join(params.arc_root, target), "name": target} for target in params.rel_targets
+        ]
 
     if params.add_codegen_folder:
-        workspace["folders"].append({
-            "path": params.output_root,
-            "name": "[codegen]",
-        })
+        workspace["folders"].append(
+            {
+                "path": params.output_root,
+                "name": "[codegen]",
+            }
+        )
 
     workspace["settings"]["yandex.arcRoot"] = params.arc_root
     workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
@@ -508,4 +652,8 @@ def gen_vscode_workspace(params):
 
     ide_common.emit_message(FINISH_HELP % workspace_path)
     if os.getenv('SSH_CONNECTION'):
-        ide_common.emit_message('vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'.format(hostname=platform.node(), workspace_path=workspace_path))
+        ide_common.emit_message(
+            'vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'.format(
+                hostname=platform.node(), workspace_path=workspace_path
+            )
+        )

@@ -39,7 +39,11 @@ class Project(object):
 
     def __enter__(self):
         if os.path.exists(self.source_path):
-            raise ProjectError('{} already exists. Use `--venv-tmp-project` option or `venv_tmp_project` ya.conf setting to set temporary project location'.format(self.source_path))
+            raise ProjectError(
+                '{} already exists. Use `--venv-tmp-project` option or `venv_tmp_project` ya.conf setting to set temporary project location'.format(
+                    self.source_path
+                )
+            )
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -110,5 +114,7 @@ class Project(object):
                 projects.append(path)
 
         arcadia = yalibrary.makelists.Arcadia(self.params.arc_root)
-        arcadia.walk_projects(walker, visit_peerdirs=False, visit_tests=self.params.venv_add_tests, paths=self.params.rel_targets)
+        arcadia.walk_projects(
+            walker, visit_peerdirs=False, visit_tests=self.params.venv_add_tests, paths=self.params.rel_targets
+        )
         return projects

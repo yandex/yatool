@@ -26,9 +26,15 @@ from ide import ide_common, vscode
 CODEGEN_EXTS = [".go", ".gosrc"]
 SUPPRESS_OUTPUTS = [".cgo1.go", ".res.go", "_cgo_gotypes.go", "_cgo_import.go"]
 CODEGEN_TASK = "%s make --force-build-depends --replace-result --keep-going -DCGO_ENABLED=0 %s %s"
-FINISH_HELP = 'Workspace file ' + termcolor.colored('%s', 'green', attrs=['bold']) + ' is ready\n' + \
-              'Code navigation and autocomplete configured for ' + termcolor.colored('Go', 'green') + ' plugin: ' + \
-              termcolor.colored('https://marketplace.visualstudio.com/items?itemName=golang.go', attrs=['bold'])
+FINISH_HELP = (
+    'Workspace file '
+    + termcolor.colored('%s', 'green', attrs=['bold'])
+    + ' is ready\n'
+    + 'Code navigation and autocomplete configured for '
+    + termcolor.colored('Go', 'green')
+    + ' plugin: '
+    + termcolor.colored('https://marketplace.visualstudio.com/items?itemName=golang.go', attrs=['bold'])
+)
 
 
 class VSCodeGoOptions(core.yarg.Options):
@@ -129,29 +135,36 @@ def gen_run_configurations(params, modules, args, YA_PATH):
             name = os.path.dirname(name) or name
         name = name.replace('/', u'\uff0f')
 
-        configuration = OrderedDict((
-            ("name", name),
-            ("type", "go"),
-            ("request", "launch"),
-            ("mode", "exec"),
-            ("program", os.path.join(params.arc_root, module['path'])),
-            ("args", []),
-            ("env", {}),
-            ("substitutePath", [{
-                'from': params.arc_root,
-                'to': '/-S'
-            }]),
-        ))
+        configuration = OrderedDict(
+            (
+                ("name", name),
+                ("type", "go"),
+                ("request", "launch"),
+                ("mode", "exec"),
+                ("program", os.path.join(params.arc_root, module['path'])),
+                ("args", []),
+                ("env", {}),
+                ("substitutePath", [{'from': params.arc_root, 'to': '/-S'}]),
+            )
+        )
 
         if mangle_module_type == 'GO_PROGRAM':
             task_name = "Build: %s (debug)" % name
-            tasks.append(OrderedDict((
-                ("label", task_name),
-                ("type", "shell"),
-                ("command", "%s make -d %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                ("group", "build"),
-                ("problemMatcher", []),
-            )))
+            tasks.append(
+                OrderedDict(
+                    (
+                        ("label", task_name),
+                        ("type", "shell"),
+                        (
+                            "command",
+                            "%s make -d %s %s"
+                            % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path']))),
+                        ),
+                        ("group", "build"),
+                        ("problemMatcher", []),
+                    )
+                )
+            )
             configuration["cwd"] = os.path.join(params.arc_root, module['module_path'])
             configuration["presentation"] = {
                 "group": "Run",
@@ -161,20 +174,36 @@ def gen_run_configurations(params, modules, args, YA_PATH):
             program_index += 1
         elif mangle_module_type == 'GO_TEST' and params.tests_enabled:
             prepare_task_name = "Prepare test: %s (debug)" % name
-            tasks.append(OrderedDict((
-                ("label", prepare_task_name),
-                ("detail", module['path']),
-                ("type", "shell"),
-                ("command", "%s test -A --regular-tests --keep-going --test-prepare --keep-temps %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                ("group", "build"),
-            )))
-            tasks.append(OrderedDict((
-                ("label", "Test: %s (debug)" % name),
-                ("detail", module['path']),
-                ("type", "shell"),
-                ("command", "%s test -A --regular-tests %s %s" % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path'])))),
-                ("group", "test"),
-            )))
+            tasks.append(
+                OrderedDict(
+                    (
+                        ("label", prepare_task_name),
+                        ("detail", module['path']),
+                        ("type", "shell"),
+                        (
+                            "command",
+                            "%s test -A --regular-tests --keep-going --test-prepare --keep-temps %s %s"
+                            % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path']))),
+                        ),
+                        ("group", "build"),
+                    )
+                )
+            )
+            tasks.append(
+                OrderedDict(
+                    (
+                        ("label", "Test: %s (debug)" % name),
+                        ("detail", module['path']),
+                        ("type", "shell"),
+                        (
+                            "command",
+                            "%s test -A --regular-tests %s %s"
+                            % (YA_PATH, args, exts.shlex2.quote(os.path.join(params.arc_root, module['module_path']))),
+                        ),
+                        ("group", "test"),
+                    )
+                )
+            )
             configuration["presentation"] = {
                 "group": "Tests",
                 "order": tests_index,
@@ -239,9 +268,13 @@ def gen_vscode_workspace(params):
         try:
             result = subprocess.check_output(['/usr/bin/file', gobin_path])
             if result.strip().rsplit(' ', 1)[1] != 'arm64':
-                ide_common.emit_message(termcolor.colored("Using X86-64 Go toolchain. Debug will not work under Rosetta.", 'yellow'))
+                ide_common.emit_message(
+                    termcolor.colored("Using X86-64 Go toolchain. Debug will not work under Rosetta.", 'yellow')
+                )
                 if not params.goroot:
-                    ide_common.emit_message(termcolor.colored("Restart with '--apple-arm-platform' flag to use native tools", 'yellow'))
+                    ide_common.emit_message(
+                        termcolor.colored("Restart with '--apple-arm-platform' flag to use native tools", 'yellow')
+                    )
         except Exception:
             pass
 
@@ -257,148 +290,243 @@ def gen_vscode_workspace(params):
         do_codegen(params)
 
     TARGETS = ' '.join(exts.shlex2.quote(arg) for arg in params.abs_targets)
-    common_args = params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in orig_flags.items()]
+    common_args = (
+        params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in orig_flags.items()]
+    )
     if params.prefetch:
         common_args.append('--prefetch')
     COMMON_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in common_args)
-    codegen_args = common_args + ['--add-result=%s' % ext for ext in CODEGEN_EXTS] + ['--no-output-for=%s' % ext for ext in SUPPRESS_OUTPUTS]
+    codegen_args = (
+        common_args
+        + ['--add-result=%s' % ext for ext in CODEGEN_EXTS]
+        + ['--no-output-for=%s' % ext for ext in SUPPRESS_OUTPUTS]
+    )
     CODEGEN_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in codegen_args)
     YA_PATH = os.path.join(params.arc_root, "ya")
 
-    workspace = OrderedDict((
-        ("folders", [
-            {"path": os.path.join(params.arc_root, target), "name": target} for target in params.rel_targets
-        ]),
-        ("extensions", OrderedDict((
-            ("recommendations", [
-                "golang.go",
-                "forbeslindesay.forbeslindesay-taskrunner",
-            ]),
-        ))),
-        ("settings", OrderedDict((
-            ("C_Cpp.intelliSenseEngine", "disabled"),
-            ("python.languageServer", "Pylance"),
-            ("python.analysis.indexing", False),
-            ("python.analysis.autoSearchPaths", False),
-            ("python.analysis.diagnosticMode", "openFilesOnly"),
-            ("search.followSymlinks", False),
-            ("git.mergeEditor", False),
-            ("npm.autoDetect", "off"),
-            ("task.autoDetect", "off"),
-            ("typescript.tsc.autoDetect", "off"),
-            ("forbeslindesay-taskrunner.separator", ": "),
-            ("go.goroot", goroot),
-            ("go.logging.level", "verbose"),
-            ("go.testExplorer.enable", False),
-            ("go.toolsManagement.autoUpdate", False),
-            ("go.toolsManagement.checkForUpdates", "off"),
-            ("go.toolsEnvVars", {
-                "CGO_ENABLED": "0",
-                "GOFLAGS": "-mod=vendor",
-                "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
-            }),
-            ("gopls", OrderedDict((
-                ("build.env", {
-                    "CGO_ENABLED": "0",
-                    "GOFLAGS": "-mod=vendor",
-                    "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
-                }),
-                ("formatting.local", "a.yandex-team.ru"),
-                ("ui.codelenses", {
-                    "regenerate_cgo": False,
-                    "generate": False,
-                }),
-                ("ui.navigation.importShortcut", "Definition"),
-                ("ui.semanticTokens", True),
-                ("verboseOutput", True),
-            ))),
-        ))),
-        ("tasks", OrderedDict((
-            ("version", "2.0.0"),
-            ("tasks", [
-                OrderedDict((
-                    ("label", "<Codegen>"),
-                    ("type", "shell"),
-                    ("command", CODEGEN_TASK % (YA_PATH, CODEGEN_ARGS, TARGETS)),
-                    ("group", "build"),
-                )),
-                OrderedDict((
-                    ("label", "<Regenerate workspace>"),
-                    ("type", "shell"),
-                    ("command", YA_PATH + " " + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:])),
-                    ("options", OrderedDict((
-                        ("cwd", os.path.abspath(os.curdir)),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Build: ALL (debug)"),
-                    ("type", "shell"),
-                    ("command", "%s make -d  -DGO_COMPILE_FLAGS='-N -l' %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", OrderedDict((
-                        ("kind", "build"),
-                        ("isDefault", True),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Build: ALL (release)"),
-                    ("type", "shell"),
-                    ("command", "%s make -r %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "build"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", OrderedDict((
-                        ("kind", "test"),
-                        ("isDefault", True),
-                    ))),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (medium)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t --test-size=MEDIUM %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small + medium)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tt %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (large)"),
-                    ("type", "shell"),
-                    ("command", "%s make -t --test-size=LARGE %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (small + medium + large)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tA %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-                OrderedDict((
-                    ("label", "Test: ALL (restart failed)"),
-                    ("type", "shell"),
-                    ("command", "%s make -tA -X %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
-                    ("group", "test"),
-                )),
-            ]),
-        ))),
-        ("launch", OrderedDict((
-            ("version", "0.2.0"),
-            ("configurations", [
-                OrderedDict((
-                    ("name", "Current Package (without CGO)"),
-                    ("type", "go"),
-                    ("request", "launch"),
-                    ("mode", "auto"),
-                    ("program", "${fileDirname}"),
-                )),
-            ]),
-        ))),
-    ))
+    workspace = OrderedDict(
+        (
+            (
+                "folders",
+                [{"path": os.path.join(params.arc_root, target), "name": target} for target in params.rel_targets],
+            ),
+            (
+                "extensions",
+                OrderedDict(
+                    (
+                        (
+                            "recommendations",
+                            [
+                                "golang.go",
+                                "forbeslindesay.forbeslindesay-taskrunner",
+                            ],
+                        ),
+                    )
+                ),
+            ),
+            (
+                "settings",
+                OrderedDict(
+                    (
+                        ("C_Cpp.intelliSenseEngine", "disabled"),
+                        ("python.languageServer", "Pylance"),
+                        ("python.analysis.indexing", False),
+                        ("python.analysis.autoSearchPaths", False),
+                        ("python.analysis.diagnosticMode", "openFilesOnly"),
+                        ("search.followSymlinks", False),
+                        ("git.mergeEditor", False),
+                        ("npm.autoDetect", "off"),
+                        ("task.autoDetect", "off"),
+                        ("typescript.tsc.autoDetect", "off"),
+                        ("forbeslindesay-taskrunner.separator", ": "),
+                        ("go.goroot", goroot),
+                        ("go.logging.level", "verbose"),
+                        ("go.testExplorer.enable", False),
+                        ("go.toolsManagement.autoUpdate", False),
+                        ("go.toolsManagement.checkForUpdates", "off"),
+                        (
+                            "go.toolsEnvVars",
+                            {
+                                "CGO_ENABLED": "0",
+                                "GOFLAGS": "-mod=vendor",
+                                "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
+                            },
+                        ),
+                        (
+                            "gopls",
+                            OrderedDict(
+                                (
+                                    (
+                                        "build.env",
+                                        {
+                                            "CGO_ENABLED": "0",
+                                            "GOFLAGS": "-mod=vendor",
+                                            "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
+                                        },
+                                    ),
+                                    ("formatting.local", "a.yandex-team.ru"),
+                                    (
+                                        "ui.codelenses",
+                                        {
+                                            "regenerate_cgo": False,
+                                            "generate": False,
+                                        },
+                                    ),
+                                    ("ui.navigation.importShortcut", "Definition"),
+                                    ("ui.semanticTokens", True),
+                                    ("verboseOutput", True),
+                                )
+                            ),
+                        ),
+                    )
+                ),
+            ),
+            (
+                "tasks",
+                OrderedDict(
+                    (
+                        ("version", "2.0.0"),
+                        (
+                            "tasks",
+                            [
+                                OrderedDict(
+                                    (
+                                        ("label", "<Codegen>"),
+                                        ("type", "shell"),
+                                        ("command", CODEGEN_TASK % (YA_PATH, CODEGEN_ARGS, TARGETS)),
+                                        ("group", "build"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "<Regenerate workspace>"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            YA_PATH + " " + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
+                                        ),
+                                        ("options", OrderedDict((("cwd", os.path.abspath(os.curdir)),))),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Build: ALL (debug)"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            "%s make -d  -DGO_COMPILE_FLAGS='-N -l' %s %s"
+                                            % (YA_PATH, COMMON_ARGS, TARGETS),
+                                        ),
+                                        (
+                                            "group",
+                                            OrderedDict(
+                                                (
+                                                    ("kind", "build"),
+                                                    ("isDefault", True),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Build: ALL (release)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -r %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "build"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -t %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        (
+                                            "group",
+                                            OrderedDict(
+                                                (
+                                                    ("kind", "test"),
+                                                    ("isDefault", True),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (medium)"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            "%s make -t --test-size=MEDIUM %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                        ),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small + medium)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tt %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (large)"),
+                                        ("type", "shell"),
+                                        (
+                                            "command",
+                                            "%s make -t --test-size=LARGE %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                        ),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (small + medium + large)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tA %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ("label", "Test: ALL (restart failed)"),
+                                        ("type", "shell"),
+                                        ("command", "%s make -tA -X %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("group", "test"),
+                                    )
+                                ),
+                            ],
+                        ),
+                    )
+                ),
+            ),
+            (
+                "launch",
+                OrderedDict(
+                    (
+                        ("version", "0.2.0"),
+                        (
+                            "configurations",
+                            [
+                                OrderedDict(
+                                    (
+                                        ("name", "Current Package (without CGO)"),
+                                        ("type", "go"),
+                                        ("request", "launch"),
+                                        ("mode", "auto"),
+                                        ("program", "${fileDirname}"),
+                                    )
+                                ),
+                            ],
+                        ),
+                    )
+                ),
+            ),
+        )
+    )
 
     workspace["settings"]["yandex.arcRoot"] = params.arc_root
     workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
@@ -432,4 +560,8 @@ def gen_vscode_workspace(params):
 
     ide_common.emit_message(FINISH_HELP % workspace_path)
     if os.getenv('SSH_CONNECTION'):
-        ide_common.emit_message('vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'.format(hostname=platform.node(), workspace_path=workspace_path))
+        ide_common.emit_message(
+            'vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'.format(
+                hostname=platform.node(), workspace_path=workspace_path
+            )
+        )
