@@ -1,6 +1,5 @@
 #pragma once
 
-
 enum class EAttrTypes {
     Str /* "str" */,
     Bool /* "bool" */,
@@ -8,5 +7,6 @@ enum class EAttrTypes {
     List /* "list" */,
     Set /* "set" */,
     SortedSet /* "sorted_set" */,
+    Dict /* "dict" */,
     Unknown /* "unknown" */,
 };

@@ -38,11 +38,16 @@ struct TAttrsSpecValue {
 };
 
 struct TAttrsSpec {
-
     THashMap<std::string, TAttrsSpecValue> Items;
 
     bool operator== (const TAttrsSpec&) const noexcept = default;
 };
+
+inline const std::string ATTRGROUP_ROOT = "root";       // Root of all targets attribute
+inline const std::string ATTRGROUP_TARGET = "target";   // Target for generator attribute
+inline const std::string ATTRGROUP_INDUCED = "induced"; // Target for generator induced attribute (add to list for parent node in graph)
+
+inline const std::string LIST_ITEM_TYPE = ".ITEM";      // Magic suffix for set list item type
 
 struct TGeneratorSpec {
     TTargetSpec Root;
@@ -55,12 +60,10 @@ struct TGeneratorSpec {
 struct TBadGeneratorSpec: public std::runtime_error {
     TBadGeneratorSpec(const std::string& msg)
         : std::runtime_error{msg}
-    {
-    }
+    {}
     TBadGeneratorSpec(std::string&& msg)
         : std::runtime_error{std::move(msg)}
-    {
-    }
+    {}
 };
 
 enum class ESpecFeatures {

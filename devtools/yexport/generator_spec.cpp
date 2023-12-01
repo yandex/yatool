@@ -109,15 +109,18 @@ namespace {
     TAttrsSpec ParseAttrsSpec(const toml::value& attrs) {
         TAttrsSpec attrsSpec;
         for (const auto& item : attrs.as_table()) {
-            EAttrTypes value;
+            EAttrTypes value = EAttrTypes::Unknown;
             if (item.second.is_table()) {
                 const auto& table = item.second.as_table();
-                if (table.contains(NKeys::Copy)) {
-                    if (TryFromString(table.find(NKeys::Type)->second.as_string(), value)) {
+                const auto typeIt = table.find(NKeys::Type);
+                if (typeIt != table.end()) {
+                    if (TryFromString(typeIt->second.as_string(), value)) {
                         attrsSpec.Items[item.first].Type = value;
                     }
-                    const auto& array = table.find(NKeys::Copy)->second.as_array();
-                    for (const auto& arrayItem : array) {
+                }
+                const auto copyIt = table.find(NKeys::Copy);
+                if (copyIt != table.end()) {
+                    for (const auto& arrayItem : copyIt->second.as_array()) {
                         if (arrayItem.is_string()) {
                             attrsSpec.Items[item.first].Copy.insert(fs::path{std::string(arrayItem.as_string())});
                         }
@@ -125,9 +128,10 @@ namespace {
                 }
             } else if (TryFromString(item.second.as_string(), value)) {
                 attrsSpec.Items[item.first].Type = value;
-            } else {
+            }
+            if (value == EAttrTypes::Unknown) {
                 throw TBadGeneratorSpec(toml::format_error("[error] invalid attrs value", toml::find(attrs, item.first),
-                                                           " value must be one of the following data types: " + GetEnumAllNames<EAttrTypes>()));
+            " value must be one of the following data types: " + GetEnumAllNames<EAttrTypes>()));
             }
         }
         return attrsSpec;
@@ -135,18 +139,16 @@ namespace {
 
     void ParseRules(const toml::value& value, THashMap<std::string, TAttrsSpec>& attrs) {
         const auto& table = value.as_table();
-        if (!table.contains(NKeys::Attrs)) {
-            return;
-        }
-        if (!table.contains(NKeys::Copy)) {
+        if (!table.contains(NKeys::Attrs) || !table.contains(NKeys::Copy)) {
             return;
         }
         THashSet<fs::path> filesToCopy;
         for (const auto& file : table.at(NKeys::Copy).as_array()) {
             filesToCopy.insert(fs::path(file.as_string().str));
         }
+        auto& targetAttrs = attrs[ATTRGROUP_TARGET];
         for (const auto& attr : table.at(NKeys::Attrs).as_array()) {
-            attrs["target"].Items[attr.as_string().str].Copy.insert(filesToCopy.begin(), filesToCopy.end());
+            targetAttrs.Items[attr.as_string().str].Copy.insert(filesToCopy.begin(), filesToCopy.end());
         }
     }
 
@@ -178,8 +180,19 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
             genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
         }
 
+        auto& attrs = genspec.Attrs;
         for (const auto& [name, attspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
-            genspec.Attrs[name] = ParseAttrsSpec(attspec);
+            attrs[name] = ParseAttrsSpec(attspec);
+        }
+
+        const auto inducedIt = attrs.find(ATTRGROUP_INDUCED);
+        if (inducedIt != attrs.end()) {
+            auto [targetIt, targetInserted] = attrs.emplace(ATTRGROUP_TARGET, TAttrsSpec{});
+            auto& targetItems = targetIt->second.Items;
+            for (const auto& [attrMacro, attrSpec]: inducedIt->second.Items) {
+                targetItems[attrMacro] = TAttrsSpecValue{ .Type = EAttrTypes::List }; // induced attributes are always list in target attributes
+                targetItems[attrMacro + LIST_ITEM_TYPE] = attrSpec; // type of list item is taken from induced definition
+            }
         }
 
         for (const auto& [name, mergespec] : find_or<toml::table>(doc, NKeys::Merge, toml::table{})) {

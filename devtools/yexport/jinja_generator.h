@@ -25,7 +25,7 @@ struct TJinjaTarget {
     std::string Name;
     bool isTest;
     TVector<std::string> MacroArgs;
-    TMap<std::string, TVector<std::string>> Attributes;
+    jinja2::ValuesMap JinjaAttrs;
     TMap<std::string, TVector<TNodeId>> LibExcludes;
 };
 
@@ -52,17 +52,10 @@ public:
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
         return TargetReplacements_.ApplyReplacement(path, inputSem);
     }
+
+    EAttrTypes GetAttrType(const std::string& attrGroup, const std::string& attrMacro) const;
+
 private:
-
-    void AddStrToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params, const std::string& renderPath);
-    void AddBoolToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params, const std::string& renderPath);
-    void AddFlagToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params, const std::string& renderPath);
-    void AddListToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params);
-    void AddSortedSetToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params);
-    void AddSetToParams(const std::string& attrMacro, const TVector<std::string>& values, jinja2::ValuesMap& params);
-    void AddValuesToParams(const std::string& attrMacro, const EAttrTypes attrType, const TVector<std::string>& values, jinja2::ValuesMap& params, const std::string& renderPath);
-
-    EAttrTypes GetAttrTypeFromSpec(const std::string& attrName, const std::string& attrMacro);
 
     bool IsExcludeInLibraryClasspath(const std::string& library, const std::string& exclude);
     void AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath);
@@ -80,7 +73,7 @@ private:
     TSubdirsTable Subdirs;
     TVector<TSubdirsTableElem*> SubdirsOrder;
     TDeque<TJinjaTarget> Targets;
-    THashMap<std::string, TVector<std::string>> RootAttrs;
+    jinja2::ValuesMap JinjaAttrs;
 
     THashMap<std::string, THashSet<std::string>> ClasspathByNodePath;
     THashMap<std::string, std::string> NodePathByLibrary;
