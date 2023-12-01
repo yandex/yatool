@@ -28,14 +28,14 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem) {
         }
         TStringBuf depName = TDepGraph::GetCmdName(dep.To()).GetStr();
         TStringBuf varName = GetCmdName(depName);
-        if (varName == "EXTRALIBS" || RestoreContext.Conf.CommandConf.IsReservedName(varName) || varName.EndsWith("_RESOURCE_GLOBAL")) {
+        if (RestoreContext.Conf.CommandConf.IsReservedName(varName) || varName.EndsWith("_RESOURCE_GLOBAL")) {
             auto& vars = parentVars.GetVars();
             TVars commandInfoVars(&vars);
             TCommandInfo commandInfo(&RestoreContext.Conf, &RestoreContext.Graph, nullptr);
             TUniqVector<TNodeId> lateOuts;
             MineVariables(RestoreContext.Conf, dep.To(), commandInfo.ToolPaths, commandInfo.ResultPaths, commandInfoVars, lateOuts, RestoreContext.Modules);
             TString objd = commandInfo.SubstMacro(nullptr, depName, ESM_DoSubst, commandInfoVars, ECF_Unset, true);
-            vars[varName == "EXTRALIBS" ? "OBJADDE_LIB" : varName].push_back(TVarStr(objd));
+            vars[varName].push_back(TVarStr(objd));
         }
     }
     parentVars.SetVarsComplete();

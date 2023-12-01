@@ -89,9 +89,6 @@ namespace NYndex {
             "@usage: SRCDIR(dirlist)  # builtin\n\n"
                 "Add the specified directories to the list of those in which the source files will be searched\n"
                 "Available only for arcadia/contrib"},
-        { "EXTRALIBS",
-            "@usage: EXTRALIBS(liblist)  # builtin\n\n"
-                "Add external dynamic libraries during program linkage stage" },
         { "ONLY_TAGS",
             "@usage: ONLY_TAGS(tags...)  # builtin\n\n"
                 "Instantiate from multimodule only variants with tags listed" },

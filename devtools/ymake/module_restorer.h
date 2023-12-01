@@ -38,9 +38,9 @@ public:
     /// Append module variables (INCLUDE, PEERS, GLOBAL_SRCS) to vars
     void UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers);
 
-    /// Call mining module global variables ("EXTRALIBS", ends with "_RESOURCE_GLOBAL" and reserved names)
+    /// Call mining module global variables (ends with "_RESOURCE_GLOBAL" and reserved names)
     /// and append them to vars
-    void UpdateGlobalVarsFromModule(TVars& vars, bool moduleUsesPeers);
+    void UpdateGlobalVarsFromModule(TVars& vars);
 
     /// Return set of NodeIds for dependencies (peer modules and global srcs commands)
     void GetModuleDepIds(THashSet<TNodeId>& ids);
@@ -74,7 +74,7 @@ private:
     /// be called only when TBuildConfiguration::RealPath is prepared to generate executor or IDE file paths.
     void MineGlobVars();
 
-    /// This mines module global vars ("EXTRALIBS", ends with "_RESOURCE_GLOBAL" and reserved names)
+    /// This mines module global vars (ends with "_RESOURCE_GLOBAL" and reserved names)
     /// as well as MineIncludesRecursive
     void MineGlobalVars();
 

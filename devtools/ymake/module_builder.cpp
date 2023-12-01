@@ -372,9 +372,6 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
 }
 
 void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, TCommandInfo* cmdInfo) {
-    if (GetModuleConf().Allowed.contains("EXTRALIBS")) {
-        AddGlobalVarDep("EXTRALIBS", node, cmdInfo);
-    }
     for (const auto& var : GetModuleConf().Globals) {
         const TString depName = TString::Join(var, "_GLOBAL");
         AddGlobalVarDep(depName, node, cmdInfo);
@@ -549,7 +546,7 @@ void TModuleBuilder::ApplyVarAsMacro(const TStringBuf& name, bool force) {
         if (args.size()) {
             //YConfWarn(Dev) << "ApplyVarAsMacro: " << name << ": " << value << Endl;
             if (name == "OBJADDE") {
-                RememberStatement("EXTRALIBS", args);
+                YConfErr(Misconfiguration) << "Using OBJADDE var" << Endl;
             } else {
                 DirStatement(name, args);
             }
@@ -588,7 +585,6 @@ bool TModuleBuilder::ProcessMakeFile() {
     ApplyVarAsMacro("PEERDIR", true);
     ApplyVarAsMacro("SRCDIR", true);
     ApplyVarAsMacro("ADDINCL", true);
-    ApplyVarAsMacro("OBJADDE", true);
 
 //  FIXME(spreis) Some Dirs are added with inputs, so call to AddDirsToProps() here
 //                loses some dirs in props. On the other hand late call leaves GlIncDirs
@@ -834,15 +830,7 @@ static void ProcessExternalHostResources(const TVector<TStringBuf>& args, TModul
 }
 
 bool TModuleBuilder::RememberStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (name == "EXTRALIBS") {
-        TVector<TStringBuf> margs = args;
-        for (size_t n = 0; n < margs.size(); n++) {
-            if (!margs[n].StartsWith('-')) {
-                margs[n] = ModuleDef->GetMakeFileMap().Pool->Append(TString::Join("-l", margs[n]));
-            }
-        }
-        Vars.SetAppendStoreOriginals("EXTRALIBS", EvalExpr(Vars, margs), OrigVars());
-    } else if (name == "INDUCED_DEPS") {
+    if (name == "INDUCED_DEPS") {
         CheckMinArgs(name, args, 2, ": src_type files...");
         TVector<TResolveFile> files;
         files.reserve(args.size() - 1);

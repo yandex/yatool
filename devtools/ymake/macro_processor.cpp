@@ -191,7 +191,7 @@ void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>
 
 bool IsInternalReservedVar(const TStringBuf& cur) {
     return EqualToOneOf(cur, "INPUT", "OUTPUT", "AUTO_INPUT", "PEERS", "SRC", "BINDIR", "CURDIR",
-                        "ARCADIA_BUILD_ROOT", "ARCADIA_ROOT", "OBJADDE_LIB", "SRCS_GLOBAL", "YMAKE_BIN",
+                        "ARCADIA_BUILD_ROOT", "ARCADIA_ROOT", "SRCS_GLOBAL", "YMAKE_BIN",
                         "TARGET", "MANAGED_PEERS", "MANAGED_PEERS_CLOSURE", "GLOBAL_TARGET", "PEERS_LATE_OUTS",
                         "ALL_SRCS");
 }

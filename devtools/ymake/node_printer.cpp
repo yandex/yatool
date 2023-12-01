@@ -2094,7 +2094,7 @@ bool TDumpDartProc::Enter(TState& state) {
             const auto module = restorer.RestoreModule();
             TScopedContext context(module->GetMakefile());
             restorer.UpdateLocalVarsFromModule(vars, RestoreContext.Conf, false);
-            restorer.UpdateGlobalVarsFromModule(vars, false);
+            restorer.UpdateGlobalVarsFromModule(vars);
             for (const auto& gvar: vars) {
                 if (NYMake::IsGlobalResource(gvar.first)) {
                     auto [it, added] = globalResources.try_emplace(gvar.first);

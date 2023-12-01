@@ -513,14 +513,11 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
     }
 }
 
-void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars, bool moduleUsesPeers) {
+void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars) {
     MineGlobalVars();
     auto appendModVars = [&] (ui32 modId, bool uniq) {
         const TVars& globalVars = Context.Modules.GetGlobalVars(modId).GetVars();
         for (auto& [name, val] : globalVars) {
-            if (!moduleUsesPeers && name == "OBJADDE_LIB") {
-                continue;
-            }
             if (uniq) {
                 vars[name].AppendUnique(val);
             } else {

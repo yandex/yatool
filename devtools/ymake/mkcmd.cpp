@@ -47,7 +47,6 @@ public:
         Vars.SetValue("ARCADIA_BUILD_ROOT", conf.BuildRoot.c_str());
         Vars.SetValue("ARCADIA_ROOT", conf.SourceRoot.c_str());
 
-        Vars["OBJADDE_LIB"];
         Vars["SRCS_GLOBAL"];
         Vars["AUTO_INPUT"];
         Vars["PEERS"];
@@ -63,7 +62,7 @@ public:
         TModuleRestorer restorer({conf, graph, modules}, modNode);
         restorer.RestoreModule();
         restorer.UpdateLocalVarsFromModule(Vars, conf, moduleUsesPeers);
-        restorer.UpdateGlobalVarsFromModule(Vars, moduleUsesPeers);
+        restorer.UpdateGlobalVarsFromModule(Vars);
         restorer.GetModuleDepIds(PeerIds);
         GlobalSrcs = &restorer.GetGlobalSrcsIds();
     }
