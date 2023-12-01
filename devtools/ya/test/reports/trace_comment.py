@@ -75,7 +75,7 @@ def _is_valid_comment(comment):
     tags = []
     for tag_type, pattern in [
         ("opening", re.escape(OPENING_BRACER).replace(r"\{\}", r"(\w+)(.*?)")),
-        ("closing", re.escape(CLOSING_BRACER).replace(r"\{\}", r"(\w+)"))
+        ("closing", re.escape(CLOSING_BRACER).replace(r"\{\}", r"(\w+)")),
     ]:
         for match in re.finditer(pattern, comment):
             # add only known tags

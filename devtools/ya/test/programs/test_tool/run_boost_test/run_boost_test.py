@@ -40,7 +40,9 @@ def parse_args():
     parser.add_argument("-b", "--binary", required=True, help="Path to the unittest binary")
     parser.add_argument("-t", "--trace-path", help="Path to the output trace log")
     parser.add_argument("-o", "--output-dir", help="Path to the output dir")
-    parser.add_argument("-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)")
+    parser.add_argument(
+        "-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)"
+    )
     parser.add_argument("-p", "--project-path", help="Project path relative to arcadia")
     parser.add_argument("--tracefile", help="Path to the output trace log")
     parser.add_argument("--test-list", action="store_true", help="List of tests")
@@ -55,7 +57,9 @@ def parse_args():
     parser.add_argument("--ios-runtime", default=None, help="iPhone simulator runtime (need for iOS app)")
     parser.add_argument("--android-app", action="store_true", help="Test binary is android app")
     parser.add_argument("--android-sdk", default=None, help="Path to android sdk root (need for android apk)")
-    parser.add_argument("--android-avd", default=None, help="Path to directory with template avd's (need for android apk)")
+    parser.add_argument(
+        "--android-avd", default=None, help="Path to directory with template avd's (need for android apk)"
+    )
     parser.add_argument("--android-arch", default=None, help="Android apk architecture")
     parser.add_argument("--android-activity", default=None, help="Android activity name")
 
@@ -76,7 +80,15 @@ def setup_logging(verbose):
 def get_tests(args):
     if args.ios_app:
         device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
-        ios_simctl_control.prepare(args.ios_simctl, args.ios_profiles, os.getcwd(), device_name, args.binary, args.ios_device_type, args.ios_runtime)
+        ios_simctl_control.prepare(
+            args.ios_simctl,
+            args.ios_profiles,
+            os.getcwd(),
+            device_name,
+            args.binary,
+            args.ios_device_type,
+            args.ios_runtime,
+        )
         res = ios_simctl_control.run(args.ios_simctl, args.ios_profiles, os.getcwd(), device_name, ["list"])
         ios_simctl_control.cleanup(args.ios_simctl, args.ios_profiles, os.getcwd(), device_name)
     elif args.android_app:
@@ -94,7 +106,9 @@ def get_tests(args):
             logger.info("Install test apk")
             android.install_app(device_name, args.binary, app_name)
             logger.info("Run test apk with list")
-            res = android.run_list(device_name, entry_point, app_name, end_marker, ['list', '--ya-report={}'.format(end_marker)])
+            res = android.run_list(
+                device_name, entry_point, app_name, end_marker, ['list', '--ya-report={}'.format(end_marker)]
+            )
     else:
         res = process.execute([args.binary, "list"])
     tests = []
@@ -169,21 +183,37 @@ def load_tests_from_log(opts, suite, boost_log_path):
                 except ValueError:
                     pass
                 to.append(
-                    "[[unimp]]{}[[rst]]:{} {}".format(path, el.attributes["line"].value, strings_to_utf8(formatter(el) or ""))
+                    "[[unimp]]{}[[rst]]:{} {}".format(
+                        path, el.attributes["line"].value, strings_to_utf8(formatter(el) or "")
+                    )
                 )
 
         def format_exception(el):
             lines = [u"[[bad]]{}[[rst]]".format(el.childNodes[0].wholeText)]
             for el in el.getElementsByTagName("LastCheckpoint"):
-                lines.append(u"[[unimp]]{}[[rst]]:{} last checkpoint".format(el.attributes["file"].value, el.attributes["line"].value))
+                lines.append(
+                    u"[[unimp]]{}[[rst]]:{} last checkpoint".format(
+                        el.attributes["file"].value, el.attributes["line"].value
+                    )
+                )
             return u"\n".join(lines)
 
         add_message(messages, "Message", lambda el: el.childNodes and el.childNodes[0].wholeText)
         add_message(messages, "Info", lambda el: el.childNodes and el.childNodes[0].wholeText)
-        add_message(warnings, "Warning", lambda el: el.childNodes and u"warning: [[warn]]{}[[rst]]".format(el.childNodes[0].wholeText))
-        add_message(errors, "Error", lambda el: el.childNodes and u"error: [[bad]]{}[[rst]]".format(el.childNodes[0].wholeText))
+        add_message(
+            warnings,
+            "Warning",
+            lambda el: el.childNodes and u"warning: [[warn]]{}[[rst]]".format(el.childNodes[0].wholeText),
+        )
+        add_message(
+            errors, "Error", lambda el: el.childNodes and u"error: [[bad]]{}[[rst]]".format(el.childNodes[0].wholeText)
+        )
         add_message(errors, "Exception", lambda el: el.childNodes and u"exception {}".format(format_exception(el)))
-        add_message(errors, "FatalError", lambda el: el.childNodes and u"fatal error: [[bad]]{}[[rst]]".format(el.childNodes[0].wholeText))
+        add_message(
+            errors,
+            "FatalError",
+            lambda el: el.childNodes and u"fatal error: [[bad]]{}[[rst]]".format(el.childNodes[0].wholeText),
+        )
 
         if test_case_el.hasAttribute("skipped"):
             status = Status.SKIPPED
@@ -229,8 +259,12 @@ def run_tests(opts):
 
     if opts.ios_app:
         device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
-        ios_simctl_control.prepare(opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name, cmd[0], opts.ios_device_type, opts.ios_runtime)
-        exit_code = ios_simctl_control.run(opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name, cmd[1:]).exit_code
+        ios_simctl_control.prepare(
+            opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name, cmd[0], opts.ios_device_type, opts.ios_runtime
+        )
+        exit_code = ios_simctl_control.run(
+            opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name, cmd[1:]
+        ).exit_code
         ios_simctl_control.cleanup(opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name)
     elif opts.android_app:
         if opts.android_arch not in ('i686', 'x86_64', 'armv8a'):
@@ -247,7 +281,11 @@ def run_tests(opts):
         device_report_path = '/data/data/{}/files/report.xml'.format(app_name)
         device_log_path = '/data/data/{}/files/log.xml'.format(app_name)
         end_marker = '/data/data/{}/files/ya.end'.format(app_name)
-        run_params += ['--report_sink={}'.format(device_report_path), '--log_sink={}'.format(device_log_path), '--ya-report={}'.format(end_marker)]
+        run_params += [
+            '--report_sink={}'.format(device_report_path),
+            '--log_sink={}'.format(device_log_path),
+            '--ya-report={}'.format(end_marker),
+        ]
         with android_control.AndroidEmulator(os.getcwd(), opts.android_sdk, opts.android_avd, arch) as android:
             logger.info("AVD name is {}".format(device_name))
             try:
@@ -265,7 +303,14 @@ def run_tests(opts):
                         #     we can't pull file from /data/data/{app_name}/files/ (have no permission), but we can copy it to /sdcard/ and pull from there
                         # current x-86_64 emulator:
                         #     we can't copy report file to /sdcard/ (/sdcard/ is read-only), but we can pull it from /data/data/{app_name}/files/
-                        android.extract_result(device_name, app_name, [(device_report_path, report_path), (device_log_path, log_path), ])
+                        android.extract_result(
+                            device_name,
+                            app_name,
+                            [
+                                (device_report_path, report_path),
+                                (device_log_path, log_path),
+                            ],
+                        )
                         logger.info("Extracted")
                         break
                     except android_control.RetryableException as e:
@@ -283,6 +328,7 @@ def run_tests(opts):
         proc = process.execute(cmd, stderr=sys.stderr, wait=False)
 
         if hasattr(signal, "SIGUSR2"):
+
             def smooth_shutdown(signo, frame):
                 os.kill(proc.process.pid, signal.SIGQUIT)
                 _, status = subprocess._eintr_retry_call(os.waitpid, proc.process.pid, 0)

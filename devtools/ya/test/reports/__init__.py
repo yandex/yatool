@@ -1,4 +1,12 @@
-__all__ = ['JUnitReportGenerator', 'ConsoleReporter', 'DryReporter', 'StdErrReporter', 'TextTransformer', 'AllureReportGenerator', 'AllureReportNotFoundError']
+__all__ = [
+    'JUnitReportGenerator',
+    'ConsoleReporter',
+    'DryReporter',
+    'StdErrReporter',
+    'TextTransformer',
+    'AllureReportGenerator',
+    'AllureReportNotFoundError',
+]
 
 from .junit import JUnitReportGenerator
 from .console import ConsoleReporter

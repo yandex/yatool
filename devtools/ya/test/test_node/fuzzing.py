@@ -146,7 +146,9 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
     if app_config.in_house:
         storage = sandbox_storage.get_sandbox_storage("$(BUILD_ROOT)", opts.custom_fetcher, opts.oauth_token)
         for resource in resources:
-            resource_node_uid = sandbox.inject_download_sandbox_resource_node(graph, resource, opts, suite.global_resources)
+            resource_node_uid = sandbox.inject_download_sandbox_resource_node(
+                graph, resource, opts, suite.global_resources
+            )
             outputs = storage.get_sandbox_fetcher_output_paths(resource)
             inputs.extend(outputs)
             deps.append(resource_node_uid)
@@ -174,7 +176,9 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
     if app_config.in_house:
         for resource in testdeps.get_test_sandbox_resources(suite):
             node_cmd.extend(["--sandbox-resource", str(resource)])
-            resource_node_uid = sandbox.inject_download_sandbox_resource_node(graph, resource, opts, suite.global_resources)
+            resource_node_uid = sandbox.inject_download_sandbox_resource_node(
+                graph, resource, opts, suite.global_resources
+            )
             deps.append(resource_node_uid)
 
     if suite.test_run_cwd:

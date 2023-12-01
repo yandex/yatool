@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     external_tools.py
     mds_storage.py
@@ -18,7 +20,7 @@ PEERDIR(
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/svn
     )

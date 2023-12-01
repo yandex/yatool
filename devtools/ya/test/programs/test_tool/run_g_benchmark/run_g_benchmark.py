@@ -32,7 +32,9 @@ def parse_args():
     parser.add_argument("-b", "--binary", required=True, help="Path to the unittest binary")
     parser.add_argument("-t", "--tracefile", help="Path to the output trace log")
     parser.add_argument("-o", "--output-dir", help="Path to the output dir")
-    parser.add_argument("-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)")
+    parser.add_argument(
+        "-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)"
+    )
     parser.add_argument("-p", "--project-path", help="Project path relative to arcadia")
     parser.add_argument("--gdb-path", help="gdb path")
     parser.add_argument("--gdb-debug", action="store_true")
@@ -40,7 +42,9 @@ def parse_args():
     parser.add_argument("--test-list", action="store_true", help="List of tests")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--truncate-logs", action="store_true")
-    parser.add_argument("--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary")
+    parser.add_argument(
+        "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
+    )
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -52,7 +56,18 @@ def parse_args():
     return args
 
 
-def dump_test_info(suite_name, binary, tracefile, exit_code, benchmarks_run_output_path, project_path, output_path, res, gdb_path, need_core):
+def dump_test_info(
+    suite_name,
+    binary,
+    tracefile,
+    exit_code,
+    benchmarks_run_output_path,
+    project_path,
+    output_path,
+    res,
+    gdb_path,
+    need_core,
+):
     suite = benchmark.gen_suite(project_path)
     with open(benchmarks_run_output_path, 'r') as afile:
         benchmark_result = json.load(afile)
@@ -90,20 +105,26 @@ def dump_test_info(suite_name, binary, tracefile, exit_code, benchmarks_run_outp
                     "repetition_index": repetition_index,
                 }
                 status = const.Status.GOOD
-                elapsed_time = float(iterations * cpu_time) / (10 ** 9)
+                elapsed_time = float(iterations * cpu_time) / (10**9)
         if "name" in b:
             full_test_name = suite_name + "::" + b["name"]
-            suite.chunk.tests.append(facility.TestCase(full_test_name, status, path=project_path, metrics=metrics, elapsed=elapsed_time))
+            suite.chunk.tests.append(
+                facility.TestCase(full_test_name, status, path=project_path, metrics=metrics, elapsed=elapsed_time)
+            )
 
     if exit_code:
         if exit_code == const.TestRunExitCode.TimeOut:
             suite.add_chunk_error("[[bad]]benchmark was killed by timeout[[rst]]", status=const.Status.TIMEOUT)
         else:
-            suite.add_chunk_error("[[bad]]Test crashed with exit_code: {}[[rst]]".format(exit_code), status=const.Status.CRASHED)
+            suite.add_chunk_error(
+                "[[bad]]Test crashed with exit_code: {}[[rst]]".format(exit_code), status=const.Status.CRASHED
+            )
 
     if res and res.returncode < 0 and not exts.windows.on_win():
         filename = os.path.basename(binary)
-        shared.postprocess_coredump(binary, os.getcwd(), res.pid, suite.chunk.logs, gdb_path, need_core, filename, output_path)
+        shared.postprocess_coredump(
+            binary, os.getcwd(), res.pid, suite.chunk.logs, gdb_path, need_core, filename, output_path
+        )
     if os.path.exists(BENCH_STDOUT):
         with open(BENCH_STDOUT, 'r') as afile:
             stdout_content = "\n" + afile.read()
@@ -135,7 +156,16 @@ def try_fix_output_after_fail(benchmarks_run_output_path):
         afile.write(content)
 
 
-def run_benchmarks(binary, benchmarks_list, output_path, benchmarks_run_output_path, additional_arguments=None, gdb_path=None, gdb_debug=False, test_mode=False):
+def run_benchmarks(
+    binary,
+    benchmarks_list,
+    output_path,
+    benchmarks_run_output_path,
+    additional_arguments=None,
+    gdb_path=None,
+    gdb_debug=False,
+    test_mode=False,
+):
     additional_arguments = additional_arguments or []
 
     benchmark_filter = '|'.join(["^{}$"] * len(benchmarks_list)).format(*map(escape_regex, benchmarks_list)) or "$^"
@@ -160,11 +190,15 @@ def run_benchmarks(binary, benchmarks_list, output_path, benchmarks_run_output_p
             exit_code = proc.returncode
         else:
             try:
+
                 def shutdown_with_core(r):
                     if hasattr(signal, "SIGQUIT"):
                         os.kill(r.pid, signal.SIGQUIT)
                         r.wait()
-                res = shared.tee_execute(cmd, BENCH_STDOUT, BENCH_STDERR, strip_ansi_codes=False, on_timeout=shutdown_with_core)
+
+                res = shared.tee_execute(
+                    cmd, BENCH_STDOUT, BENCH_STDERR, strip_ansi_codes=False, on_timeout=shutdown_with_core
+                )
                 exit_code = res.returncode
             except process.SignalInterruptionError as e:
                 res = e.res
@@ -235,9 +269,29 @@ def main():
     benchmarks_run_output_path = os.path.join(args.output_dir, "bench_out.json")
     logger.info("benchmarks_run_output_path: %s", benchmarks_run_output_path)
 
-    exit_code, res = run_benchmarks(args.binary, benchmarks_list, args.output_dir, benchmarks_run_output_path, args.test_binary_args, args.gdb_path, args.gdb_debug, args.test_mode)
+    exit_code, res = run_benchmarks(
+        args.binary,
+        benchmarks_list,
+        args.output_dir,
+        benchmarks_run_output_path,
+        args.test_binary_args,
+        args.gdb_path,
+        args.gdb_debug,
+        args.test_mode,
+    )
 
-    dump_test_info(suite_name, args.binary, args.tracefile, exit_code, benchmarks_run_output_path, args.project_path, args.output_dir, res, args.gdb_path, args.need_core)
+    dump_test_info(
+        suite_name,
+        args.binary,
+        args.tracefile,
+        exit_code,
+        benchmarks_run_output_path,
+        args.project_path,
+        args.output_dir,
+        res,
+        args.gdb_path,
+        args.need_core,
+    )
 
     return 0
 

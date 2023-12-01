@@ -46,7 +46,12 @@ def make_name_filter(filter_names):
             filter_full_names.add(name)
 
     def predicate(testname):
-        return testname in filter_full_names or any([fnmatch.fnmatch(escape_for_fnmatch(testname), escape_for_fnmatch(filter_name)) for filter_name in filter_names])
+        return testname in filter_full_names or any(
+            [
+                fnmatch.fnmatch(escape_for_fnmatch(testname), escape_for_fnmatch(filter_name))
+                for filter_name in filter_names
+            ]
+        )
 
     return predicate
 
@@ -59,11 +64,13 @@ def make_testname_filter(filter_names):
 def timeout_filter(max_timeout):
     def filter_function(test_suite):
         return max_timeout is None or test_suite.declared_timeout <= max_timeout
+
     return filter_function
 
 
 def filter_test_size(test_size_filters):
     if test_size_filters:
+
         def filter_function(test_suite):
             return test_suite.test_size in test_size_filters
 
@@ -151,6 +158,7 @@ def tags_filter(tags, list_mode=False):
         if exclude:
             fit = fit and not suite_tags & exclude
         return fit
+
     return filter_function
 
 
@@ -165,6 +173,7 @@ def get_project_path_filters(opts):
 
 def project_path_filter(project_paths):
     if project_paths:
+
         def filter_function(test_suite):
             return test_suite.project_path in project_paths
 
@@ -182,6 +191,7 @@ def filter_test_files(opts):
         if not files:
             return True
         return files & set(test_suite.get_test_files() or [])
+
     return filter_function
 
 
@@ -202,7 +212,11 @@ def filter_chunks(opts):
 
 
 def filter_unsupported_cross_compiled_tests(target_platform, skip):
-    if skip and target_platform['platform']['host']['os'] == "LINUX" and target_platform['platform']['target']['os'] in ("DARWIN", "IOS"):
+    if (
+        skip
+        and target_platform['platform']['host']['os'] == "LINUX"
+        and target_platform['platform']['target']['os'] in ("DARWIN", "IOS")
+    ):
         return lambda s: False
     return lambda s: True
 
@@ -210,6 +224,7 @@ def filter_unsupported_cross_compiled_tests(target_platform, skip):
 def fixed_test_names(filters, opts):
     filter_func = make_testname_filter(filters)
     if filters:
+
         def filter_function(test_suite):
             tests = test_suite.get_computed_test_names(opts)
             # we need to run test node and apply filters afterwards if suite doesn't provide computable test names
@@ -246,14 +261,20 @@ def filter_suites(suites, opts, tc):
     test_size_filters = tc.get("test_size_filters") or opts.test_size_filters
     if not test_size_filters:
         sizes = [test.const.TestSize.Small, test.const.TestSize.Medium, test.const.TestSize.Large]
-        test_size_filters.extend(sizes[:opts.run_tests])
+        test_size_filters.extend(sizes[: opts.run_tests])
     else:
         test_size_filters = [f.lower() for f in test_size_filters]
 
-    suites = apply_filter(suites, filter_unsupported_cross_compiled_tests(tc, opts.skip_cross_compiled_tests), 'unsupported cross-compiled tests')
+    suites = apply_filter(
+        suites,
+        filter_unsupported_cross_compiled_tests(tc, opts.skip_cross_compiled_tests),
+        'unsupported cross-compiled tests',
+    )
     suites = apply_filter(suites, lambda s: False if s.get_skipped_reason() else True, lambda s: s.get_skipped_reason())
     suites = apply_filter(suites, filter_test_size(test_size_filters), 'size')
-    suites = apply_filter(suites, filter_suite_type(tc.get("test_type_filters") or opts.test_type_filters), 'suite type')
+    suites = apply_filter(
+        suites, filter_suite_type(tc.get("test_type_filters") or opts.test_type_filters), 'suite type'
+    )
     suites = apply_filter(suites, tags_filter(opts.test_tags_filter, list_mode=opts.list_tests), 'tags')
     suites = apply_filter(suites, project_path_filter(opts.tests_path_filters), 'project path')
     suites = apply_filter(suites, filter_test_files(opts), 'filename filter')

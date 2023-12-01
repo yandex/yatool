@@ -1,9 +1,10 @@
 PY23_LIBRARY()
 
-PY_SRCS(
-    # TODO refactor this module
-    NAMESPACE test.filter
+STYLE_PYTHON()
 
+PY_SRCS(
+    NAMESPACE test.filter
+    # TODO refactor this module
     __init__.py
 )
 

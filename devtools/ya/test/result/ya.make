@@ -1,9 +1,8 @@
 PY23_LIBRARY()
 
 PY_SRCS(
-    # TODO refactor module
     NAMESPACE test.result
-
+    # TODO refactor module
     __init__.py
 )
 

@@ -76,7 +76,6 @@ def strings_to_utf8(data):
 
 
 class SubtestInfo(object):
-
     skipped_prefix = '[SKIPPED] '
 
     @classmethod

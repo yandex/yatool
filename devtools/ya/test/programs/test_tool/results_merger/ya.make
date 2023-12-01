@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     results_merger.py
 )
@@ -10,7 +12,6 @@ PEERDIR(
     devtools/ya/test/reports
     devtools/ya/test/result
     devtools/ya/test/util
-
     contrib/python/six
 )
 

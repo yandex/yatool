@@ -8,6 +8,8 @@ PEERDIR(
     devtools/ya/yalibrary/graph
 )
 
+STYLE_PYTHON()
+
 PY_SRCS(
     run_custom_lint.py
 )

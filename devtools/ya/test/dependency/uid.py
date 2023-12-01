@@ -72,7 +72,7 @@ class TestUidGenerator(object):
                         key, rev = line.strip().split(" ")[:2]
                         cls.Path_To_Rev[key] = rev
                     elif line.startswith(ATD_BASE_REV_PREFIX):
-                        cls.ATD_Base_Rev = line[len(ATD_BASE_REV_PREFIX):].strip(" \n")
+                        cls.ATD_Base_Rev = line[len(ATD_BASE_REV_PREFIX) :].strip(" \n")
                         logger.debug("Will use r{} for arcadia_tests_data".format(cls.ATD_Base_Rev))
             if not base_rev_only and not cls.Path_To_Rev:
                 raise NoATDInfoException("PathToRev is empty")
@@ -93,7 +93,9 @@ class TestUidGenerator(object):
         """
 
         # XXX extra debug for a specific project, for more info see https://st.yandex-team.ru/DEVTOOLS-7588
-        logging_needed = test.project_path.startswith("web/app_host/conf/graph_generator/tests/light") and test._modulo_index == 0
+        logging_needed = (
+            test.project_path.startswith("web/app_host/conf/graph_generator/tests/light") and test._modulo_index == 0
+        )
 
         def debug(*args):
             if logging_needed:
@@ -106,9 +108,11 @@ class TestUidGenerator(object):
 
         except AttributeError:
             paths = testdeps.get_test_related_paths(test, arc_root, opts)
-            paths.extend([
-                os.path.join(arc_root, "ya"),
-            ])
+            paths.extend(
+                [
+                    os.path.join(arc_root, "ya"),
+                ]
+            )
             paths = testdeps.remove_redundant_paths(paths)
             test_paths_hashes = imprint.generate_path_imprint(paths, log=logging_needed)
             if logging_needed:
@@ -116,6 +120,7 @@ class TestUidGenerator(object):
                 test_paths_hashes_clean = None
                 try:
                     from core.imprint import Imprint
+
                     imprint_clean = Imprint()
                     test_paths_hashes_clean = imprint_clean.generate_path_imprint(paths, log=logging_needed)
                 except Exception as e:
@@ -125,14 +130,19 @@ class TestUidGenerator(object):
 
         affecting_tags = sorted([t for t in test.tags if t.startswith(("ya:", "sb:"))])
 
-        imprint_parts = [
-            test.name,
-            test.project_path,
-            test_paths_hashes,
-            test.timeout,
-            test.get_fork_mode(),
-            test.get_split_factor(opts),
-        ] + deps + sorted(test._original_requirements.items()) + affecting_tags
+        imprint_parts = (
+            [
+                test.name,
+                test.project_path,
+                test_paths_hashes,
+                test.timeout,
+                test.get_fork_mode(),
+                test.get_split_factor(opts),
+            ]
+            + deps
+            + sorted(test._original_requirements.items())
+            + affecting_tags
+        )
 
         imprint_parts.append("{}={}".format("sbr_uid_ext", test.get_sandbox_uid_extension()))
 
@@ -143,7 +153,10 @@ class TestUidGenerator(object):
         sandbox_resources = testdeps.get_test_sandbox_resources(test)
         imprint_parts += ["sandbox-resource-{}-ro".format(resource.get_id()) for resource in sandbox_resources]
 
-        imprint_parts += ["sandbox-resource-ext-{}-ro".format(resource) for resource in testdeps.get_test_ext_sbr_resources(test, arc_root)]
+        imprint_parts += [
+            "sandbox-resource-ext-{}-ro".format(resource)
+            for resource in testdeps.get_test_ext_sbr_resources(test, arc_root)
+        ]
 
         tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
         if tests_paths:
@@ -162,7 +175,9 @@ class TestUidGenerator(object):
                     revision = arcadia_tests_data_repo["revision"]
                     user = "robot-canons-dloader"
                     user_key_file = get_robot_canons_dloader_key_path(arc_root)
-                    branch_url = cls._cut_off_arcadia_from_url(arcadia_tests_data_repo["repository"]).replace("svn://", svn.ARCADIA_SVN_HOST.rstrip("/") + "/")
+                    branch_url = cls._cut_off_arcadia_from_url(arcadia_tests_data_repo["repository"]).replace(
+                        "svn://", svn.ARCADIA_SVN_HOST.rstrip("/") + "/"
+                    )
                     svn_tests_paths = testdeps.get_test_data_svn_paths(test, branch_url)
 
                     for path in svn_tests_paths:
@@ -171,7 +186,14 @@ class TestUidGenerator(object):
         if test.recipes:
             imprint_parts.append(test.recipes)
 
-        debug("%s paths: %s, hashes: %s, imprints: %s (%s)", test, paths, test_paths_hashes, imprint_parts, socket.gethostname())
+        debug(
+            "%s paths: %s, hashes: %s, imprints: %s (%s)",
+            test,
+            paths,
+            test_paths_hashes,
+            imprint_parts,
+            socket.gethostname(),
+        )
         return imprint.combine_imprints(*imprint_parts)
 
     @classmethod

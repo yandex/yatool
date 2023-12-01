@@ -40,7 +40,6 @@ REPLACEMENTS = {
 
 
 class OpenFileAction(object):
-
     def __init__(self, path, mode):
         self._path = path
         self._mode = mode
@@ -77,7 +76,13 @@ def strip_markers(command):
         if part in markers_with_values + markers_for_canonize + markers_with_list_values:
             if part in markers_for_canonize:
                 marker_val = found_markers[CANONIZE_PATH]
-                marker_val.append((command.pop(0), part in (CANONIZE_FILE_LOCALLY, CANONIZE_DIR_LOCALLY), part in (CANONIZE_DIR, CANONIZE_DIR_LOCALLY)))
+                marker_val.append(
+                    (
+                        command.pop(0),
+                        part in (CANONIZE_FILE_LOCALLY, CANONIZE_DIR_LOCALLY),
+                        part in (CANONIZE_DIR, CANONIZE_DIR_LOCALLY),
+                    )
+                )
                 part = CANONIZE_PATH
             elif part in markers_with_list_values:
                 current = found_markers.get(part, [])

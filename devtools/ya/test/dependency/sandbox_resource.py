@@ -9,6 +9,7 @@ class Reference(object):
     '''
     Incapsulates sandbox resource reference in ya.make files: resource identifier and optional target_dir download to
     '''
+
     def __init__(self, id, target_dir):
         self.__id = int(id)
         self.__target_dir = target_dir
@@ -32,7 +33,7 @@ class Reference(object):
         scheme = "sbr://"
         if not uri.startswith(scheme):
             raise ValueError("Sandbox uri must be of 'sbr://<resource id>[=target_dir]' pattern, got '{}'".format(uri))
-        return Reference.from_string(uri[len(scheme):])
+        return Reference.from_string(uri[len(scheme) :])
 
     @staticmethod
     def from_string(val):

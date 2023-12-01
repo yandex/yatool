@@ -70,7 +70,11 @@ def main():
                     diff = "\n".join(differ.compare(formatted.splitlines(), original_lines))
 
                     out_lines.append(diff)
-                    err_lines.append("[[imp]]Code needs to be formatted.[[rst]] Run [[alt1]]ya tool go fmt {}[[rst]]".format(go_relative_path))
+                    err_lines.append(
+                        "[[imp]]Code needs to be formatted.[[rst]] Run [[alt1]]ya tool go fmt {}[[rst]]".format(
+                            go_relative_path
+                        )
+                    )
                     failed = True
                     ok = False
             if ok:

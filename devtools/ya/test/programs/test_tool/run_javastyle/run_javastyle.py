@@ -78,7 +78,9 @@ def wait_for_server_startup(proc, log, timeout):
                     logger.debug("Lock is acquired by another process")
                     return
                 else:
-                    raise Exception("jstyle server failed with {} exit code, see logs for more info".format(proc.returncode))
+                    raise Exception(
+                        "jstyle server failed with {} exit code, see logs for more info".format(proc.returncode)
+                    )
 
         raise Exception("Failed to start jstyle server in {} seconds".format(timeout))
 
@@ -112,7 +114,8 @@ def execute(java_cmd, config_file, input_file, lock_file, logs_dir):
             start = datetime.datetime.now()
 
             request = urllib2.request.Request(
-                url, headers={'Method': 'GET', 'Config-file': config_file, 'Input-file': input_file})
+                url, headers={'Method': 'GET', 'Config-file': config_file, 'Input-file': input_file}
+            )
             response = urllib2.request.urlopen(request)
             headers = response.info()
             exit_code = int(headers['Ret-code'])
@@ -217,7 +220,7 @@ def main():
         filter_func = test_filter.make_testname_filter(args.tests_filters)
         test_cases = {tc: test_cases[tc] for tc in test_cases if filter_func('{}::{}'.format(tc, TEST_TYPE))}
     if args.modulo > 1:
-        test_cases = {tc: test_cases[tc] for tc in sorted(test_cases.keys())[args.modulo_index:: args.modulo]}
+        test_cases = {tc: test_cases[tc] for tc in sorted(test_cases.keys())[args.modulo_index :: args.modulo]}
     if args.list:
         sys.stdout.write(os.linesep.join(sorted(test_cases.keys())))
         return 0
@@ -267,12 +270,14 @@ def main():
             return 1
         if res.std_out.find('Starting audit...') == -1:
             logger.error(
-                'Something wrong with checkstyle lib( did not find "Starting audit..." in stdout ):\n' + res.std_out)
+                'Something wrong with checkstyle lib( did not find "Starting audit..." in stdout ):\n' + res.std_out
+            )
             return 1
 
         parser = re.compile('^\\[ERROR\\]\\s+' + re.escape(args.source_root + os.path.sep) + '([^:]+):(\\d+:.+)$')
         checkstyle_err_parser = re.compile(
-            '^([^:]+)' + re.escape(': Exception was thrown while processing') + '\\s+(.+)$')
+            '^([^:]+)' + re.escape(': Exception was thrown while processing') + '\\s+(.+)$'
+        )
         err_dict = collections.defaultdict(list)
         try_again = None
         for line in res.std_out.split('\n'):

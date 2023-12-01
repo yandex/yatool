@@ -58,14 +58,12 @@ class AndroidEmulator(object):
             dest_ini.write(content)
 
     def run_cmd(self, device_id, cmd):
-        return process.execute(
-            self._get_adb_cmd(device_id) + cmd,
-            check_exit_code=True,
-            env=self.env
-        )
+        return process.execute(self._get_adb_cmd(device_id) + cmd, check_exit_code=True, env=self.env)
 
     def chmod(self, device_id, path, permissions, recursive=False):
-        self.run_cmd(device_id, ['shell', 'su root chmod {}{} {}'.format('-R ' if recursive else '', permissions, path)])
+        self.run_cmd(
+            device_id, ['shell', 'su root chmod {}{} {}'.format('-R ' if recursive else '', permissions, path)]
+        )
 
     def get_temp_dir(self, app_name):
         return '/data/data/{}/'.format(app_name)
@@ -74,20 +72,24 @@ class AndroidEmulator(object):
         if device_name in self.running_devices:
             return
         self._prepare_device(device_name)
-        process.execute(
-            self._get_adb_cmd() + ['start-server'],
-            check_exit_code=True,
-            env=self.env
-        )
+        process.execute(self._get_adb_cmd() + ['start-server'], check_exit_code=True, env=self.env)
         re_port = self.port_manager.get_port()
         que = Queue.Queue()
         t = threading.Thread(target=lambda q, sname: q.put(get_port_from_socket(sname)), args=(que, re_port))
         t.start()
         p = process.execute(
             [
-                os.path.join(self.sdk_root, 'android_sdk', EMULATOR_PATH), '@' + device_name, '-no-window', '-no-audio', '-no-skin', '-report-console', 'tcp:{}'.format(str(re_port))
+                os.path.join(self.sdk_root, 'android_sdk', EMULATOR_PATH),
+                '@' + device_name,
+                '-no-window',
+                '-no-audio',
+                '-no-skin',
+                '-report-console',
+                'tcp:{}'.format(str(re_port)),
             ],
-            check_exit_code=True, env=self.env, wait=False
+            check_exit_code=True,
+            env=self.env,
+            wait=False,
         )
         self.running_devices[device_name] = {'proc': p}
         t.join()
@@ -98,29 +100,16 @@ class AndroidEmulator(object):
         device_id = 'emulator-' + port.decode()
         self.running_devices[device_name]['device_id'] = device_id
         process.execute(
-            self._get_adb_cmd(device_id) + [
-                'wait-for-device', 'shell', "while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;"
-            ],
+            self._get_adb_cmd(device_id)
+            + ['wait-for-device', 'shell', "while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;"],
             check_exit_code=True,
             env=self.env,
         )
 
     def install_app(self, device_name, app_path, app_name):
         device_id = self._get_device_id(device_name)
-        process.execute(
-            self._get_adb_cmd(device_id) + [
-                'uninstall', app_name
-            ],
-            check_exit_code=False,
-            env=self.env
-        )
-        process.execute(
-            self._get_adb_cmd(device_id) + [
-                'install', app_path
-            ],
-            check_exit_code=True,
-            env=self.env
-        )
+        process.execute(self._get_adb_cmd(device_id) + ['uninstall', app_name], check_exit_code=False, env=self.env)
+        process.execute(self._get_adb_cmd(device_id) + ['install', app_path], check_exit_code=True, env=self.env)
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
@@ -129,19 +118,24 @@ class AndroidEmulator(object):
         push_dir = '/sdcard/'
         self.run_cmd(device_id, ['push', self.check_marker_script, push_dir + self.check_marker_script])
 
-        self.run_cmd(device_id, ['shell', 'su', 'root', 'cp', push_dir + self.check_marker_script, self.get_temp_dir(app_name) + self.check_marker_script])
+        self.run_cmd(
+            device_id,
+            [
+                'shell',
+                'su',
+                'root',
+                'cp',
+                push_dir + self.check_marker_script,
+                self.get_temp_dir(app_name) + self.check_marker_script,
+            ],
+        )
         self.chmod(device_id, self.get_temp_dir(app_name) + self.check_marker_script, '777')
 
     def run_test(self, device_name, entry_point, app_name, end_marker, args):
         device_id = self._get_device_id(device_name)
         try:
             process.execute(
-                self._get_adb_cmd(device_id) + [
-                    'shell', 'logcat', '-c'
-                ],
-                check_exit_code=True,
-                env=self.env,
-                timeout=10
+                self._get_adb_cmd(device_id) + ['shell', 'logcat', '-c'], check_exit_code=True, env=self.env, timeout=10
             )
         except process.TimeoutError:
             pass
@@ -155,24 +149,18 @@ class AndroidEmulator(object):
                 run_args += ['--ei', args[i], '0']
                 i += 1
         run_args += [entry_point]
-        process.execute(
-            run_args,
-            check_exit_code=True,
-            env=self.env
-        )
+        process.execute(run_args, check_exit_code=True, env=self.env)
         self.push_check_marker_script(device_id, app_name, end_marker)
-        self.run_cmd(device_id, ['shell', 'run-as', app_name, 'sh', '{}{}'.format(self.get_temp_dir(app_name), self.check_marker_script)])
+        self.run_cmd(
+            device_id,
+            ['shell', 'run-as', app_name, 'sh', '{}{}'.format(self.get_temp_dir(app_name), self.check_marker_script)],
+        )
 
     def run_list(self, device_name, entry_point, app_name, end_marker, args):
         device_id = self._get_device_id(device_name)
         try:
             process.execute(
-                self._get_adb_cmd(device_id) + [
-                    'shell', 'logcat', '-c'
-                ],
-                check_exit_code=True,
-                env=self.env,
-                timeout=10
+                self._get_adb_cmd(device_id) + ['shell', 'logcat', '-c'], check_exit_code=True, env=self.env, timeout=10
             )
         except process.TimeoutError:
             pass
@@ -186,7 +174,10 @@ class AndroidEmulator(object):
             env=self.env,
         )
         self.push_check_marker_script(device_id, app_name, end_marker)
-        self.run_cmd(device_id, ['shell', 'run-as', app_name, 'sh', '{}{}'.format(self.get_temp_dir(app_name), self.check_marker_script)])
+        self.run_cmd(
+            device_id,
+            ['shell', 'run-as', app_name, 'sh', '{}{}'.format(self.get_temp_dir(app_name), self.check_marker_script)],
+        )
         res = self.run_cmd(device_id, ['shell', 'run-as', app_name, 'cat', end_marker])
         return res
 
@@ -194,13 +185,11 @@ class AndroidEmulator(object):
         device_id = self._get_device_id(device_name)
         try:
             process.execute(
-                self._get_adb_cmd(device_id) + [
-                    'shell', 'logcat', 'unit_tests:I', '*:S', '-d'
-                ],
+                self._get_adb_cmd(device_id) + ['shell', 'logcat', 'unit_tests:I', '*:S', '-d'],
                 stdout=sys.stdout,
                 stderr=sys.stderr,
                 env=self.env,
-                timeout=10
+                timeout=10,
             )
         except process.TimeoutError:
             pass
@@ -211,12 +200,10 @@ class AndroidEmulator(object):
             temp_name = '/sdcard/' + os.path.basename(src)
             try:
                 process.execute(
-                    self._get_adb_cmd(device_id) + [
-                        'shell', 'su', 'root', 'cp', src, temp_name
-                    ],
+                    self._get_adb_cmd(device_id) + ['shell', 'su', 'root', 'cp', src, temp_name],
                     check_exit_code=True,
                     env=self.env,
-                    timeout=10
+                    timeout=10,
                 )
             except Exception as e:
                 raise RetryableException("Can't copy file:\n" + str(e))
@@ -237,7 +224,9 @@ class AndroidEmulator(object):
         return self.running_devices[device_name]['device_id']
 
     def _get_adb_cmd(self, device_id=None):
-        return [self.adb_path, ] + (['-s', device_id] if device_id else [])
+        return [
+            self.adb_path,
+        ] + (['-s', device_id] if device_id else [])
 
     def cleanup(self):
         for p in self.running_devices.values():
@@ -245,11 +234,7 @@ class AndroidEmulator(object):
                 p['proc'].kill()
             except InvalidExecutionStateError:
                 pass  # procces allready stopped, do nothing
-        process.execute(
-            self._get_adb_cmd() + ['kill-server'],
-            check_exit_code=True,
-            env=self.env
-        )
+        process.execute(self._get_adb_cmd() + ['kill-server'], check_exit_code=True, env=self.env)
         self.port_manager.release()
 
     def __enter__(self):

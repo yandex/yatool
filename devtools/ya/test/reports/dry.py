@@ -1,5 +1,4 @@
 class DryReporter(object):
-
     def on_tests_start(self):
         pass
 

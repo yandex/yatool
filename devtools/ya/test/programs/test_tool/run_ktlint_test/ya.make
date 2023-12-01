@@ -1,6 +1,8 @@
 PY23_LIBRARY()
 
-PY_SRCS(run_ktlint_test.py)
+PY_SRCS(
+    run_ktlint_test.py
+)
 
 PEERDIR(
     devtools/ya/exts
@@ -18,4 +20,6 @@ STYLE_PYTHON()
 
 END()
 
-RECURSE(tests)
+RECURSE(
+    tests
+)

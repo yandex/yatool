@@ -156,16 +156,20 @@ def build_container_comment(container):
     header = "{} test{}".format(len(container.tests), '' if len(container.tests) == 1 else 's')
     if container.tests:
         test_results = [test.status for test in container.tests]
-        header += ': {}[[rst]]'.format(", ".join(test_common.get_formatted_statuses(test_results.count, "[[{marker}]]{count} - {status}[[rst]]")))
+        header += ': {}[[rst]]'.format(
+            ", ".join(test_common.get_formatted_statuses(test_results.count, "[[{marker}]]{count} - {status}[[rst]]"))
+        )
     return "\n\n".join([_f for _f in [header, container.get_comment()] if _f])
 
 
 def get_suite_metrics(suite):
     metrics = copy.deepcopy(suite.metrics)
-    metrics.update({
-        # XXX space if required to make this metrics first on the CI page
-        " test_count": len(suite.tests),
-    })
+    metrics.update(
+        {
+            # XXX space if required to make this metrics first on the CI page
+            " test_count": len(suite.tests),
+        }
+    )
     for redundant_metric in ["suite_finish_timestamp", "suite_start_timestamp"]:
         if redundant_metric in metrics:
             del metrics[redundant_metric]
@@ -208,17 +212,20 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
         # XXX: remove after release ya-bn with real uids
         if suite.is_skipped() and suite.uid is None:
             suite.uid = "skipped:{}".format(
-                get_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name()))
+                get_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name())
+            )
         general_info = get_blank_record()
-        general_info.update({
-            "type": suite.get_ci_type_name(),
-            "path": suite.project_path,
-            "tags": suite.tags,
-            "uid": suite.uid,
-            "target_platform_descriptor": suite.target_platform_descriptor,
-            "is_skipped": suite.is_skipped(),
-            "test_size": suite.test_size,
-        })
+        general_info.update(
+            {
+                "type": suite.get_ci_type_name(),
+                "path": suite.project_path,
+                "tags": suite.tags,
+                "uid": suite.uid,
+                "target_platform_descriptor": suite.target_platform_descriptor,
+                "is_skipped": suite.is_skipped(),
+                "test_size": suite.test_size,
+            }
+        )
 
         if general_info["type"] == "test":
             general_info["size"] = suite.test_size
@@ -227,15 +234,17 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
         suite_id = get_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name())
         # WIP: https://st.yandex-team.ru/DEVTOOLS-8716
         suite_hid = get_hash_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name())
-        suite_entry.update({
-            "id": suite_id,
-            "hid": suite_hid,
-            "suite": True,
-            "name": suite.get_type(),
-            "rich-snippet": build_container_comment(suite),
-            "links": get_test_logs(suite.logs, suite.name, merger_out_dir),
-            "metrics": get_suite_metrics(suite),
-        })
+        suite_entry.update(
+            {
+                "id": suite_id,
+                "hid": suite_hid,
+                "suite": True,
+                "name": suite.get_type(),
+                "rich-snippet": build_container_comment(suite),
+                "links": get_test_logs(suite.logs, suite.name, merger_out_dir),
+                "metrics": get_suite_metrics(suite),
+            }
+        )
         # Relaxed status which doesn't depend on status of testcases.
         # For more info see https://st.yandex-team.ru/DEVTOOLS-8750
         relaxed_status = None
@@ -272,23 +281,29 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
         for i, chunk in enumerate(suite.chunks):
             entry = copy.deepcopy(general_info)
             chunk_name = "{}".format(chunk.get_name())
-            chunk_id = get_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name(), chunk_name=chunk_name)
-            chunk_hid = get_hash_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name(), chunk_name=chunk_name)
+            chunk_id = get_id(
+                suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name(), chunk_name=chunk_name
+            )
+            chunk_hid = get_hash_id(
+                suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name(), chunk_name=chunk_name
+            )
 
             # TODO WIP
-            entry.update({
-                "chunk": True,
-                "id": chunk_id,
-                "hid": chunk_hid,
-                "links": get_test_logs(chunk.logs, suite.name, merger_out_dir),
-                "metrics": chunk.metrics,
-                "name": suite.get_type(),
-                "rich-snippet": build_container_comment(chunk),
-                "status": convert_test_status(chunk.get_status()),
-                "subtest_name": chunk_name,
-                "suite_id": suite_id,
-                "suite_hid": suite_hid,
-            })
+            entry.update(
+                {
+                    "chunk": True,
+                    "id": chunk_id,
+                    "hid": chunk_hid,
+                    "links": get_test_logs(chunk.logs, suite.name, merger_out_dir),
+                    "metrics": chunk.metrics,
+                    "name": suite.get_type(),
+                    "rich-snippet": build_container_comment(chunk),
+                    "status": convert_test_status(chunk.get_status()),
+                    "subtest_name": chunk_name,
+                    "suite_id": suite_id,
+                    "suite_hid": suite_hid,
+                }
+            )
             error_type = get_test_error_type(chunk.get_status())
             if error_type:
                 entry["error_type"] = error_type
@@ -298,39 +313,40 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
             entries.append(entry)
 
             for test in chunk.tests:
-
                 # Don't make copy from suite_entry, it may contain or not some fields
                 # and they may be inherited and not overwritten by mistake
                 entry = copy.deepcopy(general_info)
                 test_class_name = test.get_class_name() or "noname_suite"
-                entry.update({
-                    "id": get_id(
-                        test.path or suite.project_path,
-                        test.get_class_name(),
-                        test.get_test_case_name(),
-                        suite.get_ci_type_name(),
-                        suite_id=effective_suite_id
-                    ),
-                    # WIP: https://st.yandex-team.ru/DEVTOOLS-8716
-                    "hid": get_hash_id(
-                        test.path or suite.project_path,
-                        test.get_class_name(),
-                        test.get_test_case_name(),
-                        suite.get_ci_type_name(),
-                        suite_id=effective_suite_hid
-                    ),
-                    "suite_id": suite_id,
-                    "suite_hid": suite_hid,
-                    "chunk_id": chunk_id,
-                    "chunk_hid": chunk_hid,
-                    # there may be Y_UNIT_TEST_SUITE() without arguments, but we must not leave 'name' empty
-                    "name": test_class_name,
-                    "subtest_name": truncate_test_name(test_class_name, test.get_test_case_name()),
-                    "rich-snippet": test.comment,
-                    "duration": test.elapsed,
-                    "links": get_test_logs(test.logs, suite.name, merger_out_dir),
-                    "status": convert_test_status(test.status),
-                })
+                entry.update(
+                    {
+                        "id": get_id(
+                            test.path or suite.project_path,
+                            test.get_class_name(),
+                            test.get_test_case_name(),
+                            suite.get_ci_type_name(),
+                            suite_id=effective_suite_id,
+                        ),
+                        # WIP: https://st.yandex-team.ru/DEVTOOLS-8716
+                        "hid": get_hash_id(
+                            test.path or suite.project_path,
+                            test.get_class_name(),
+                            test.get_test_case_name(),
+                            suite.get_ci_type_name(),
+                            suite_id=effective_suite_hid,
+                        ),
+                        "suite_id": suite_id,
+                        "suite_hid": suite_hid,
+                        "chunk_id": chunk_id,
+                        "chunk_hid": chunk_hid,
+                        # there may be Y_UNIT_TEST_SUITE() without arguments, but we must not leave 'name' empty
+                        "name": test_class_name,
+                        "subtest_name": truncate_test_name(test_class_name, test.get_test_case_name()),
+                        "rich-snippet": test.comment,
+                        "duration": test.elapsed,
+                        "links": get_test_logs(test.logs, suite.name, merger_out_dir),
+                        "status": convert_test_status(test.status),
+                    }
+                )
                 if test.path:
                     entry["path"] = test.path
 

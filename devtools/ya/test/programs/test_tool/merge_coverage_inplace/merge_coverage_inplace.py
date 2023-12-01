@@ -51,10 +51,16 @@ def add_resolved_file(merged_coverage, current_coverage):
                 merged_coverage[filename]['segments'] = data['segments']
             merged_coverage[filename]['functions'] = data.get('functions', {})
         if ext in list(const.COVERAGE_PYTHON_EXTS) + [".java", ".nlg"]:
-            merged_coverage[filename]['segments'] = lib_coverage.merge.merge_segments(merged_coverage[filename]['segments'], current_coverage[filename]['segments'])
+            merged_coverage[filename]['segments'] = lib_coverage.merge.merge_segments(
+                merged_coverage[filename]['segments'], current_coverage[filename]['segments']
+            )
         else:
-            merged_coverage[filename]['segments'] = lib_coverage.merge.merge_granular_coverage_segments(merged_coverage[filename]['segments'], current_coverage[filename]['segments'])
-        lib_coverage.merge.merge_functions_inplace(merged_coverage[filename]['functions'], current_coverage[filename].get('functions', {}))
+            merged_coverage[filename]['segments'] = lib_coverage.merge.merge_granular_coverage_segments(
+                merged_coverage[filename]['segments'], current_coverage[filename]['segments']
+            )
+        lib_coverage.merge.merge_functions_inplace(
+            merged_coverage[filename]['functions'], current_coverage[filename].get('functions', {})
+        )
 
 
 def merge_coverage(resolved_coverage_files, output_path):

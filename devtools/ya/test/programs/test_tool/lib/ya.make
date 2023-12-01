@@ -2,7 +2,9 @@ PY23_LIBRARY()
 
 STYLE_PYTHON()
 
-PY_SRCS(__init__.py)
+PY_SRCS(
+    __init__.py
+)
 
 # !! Keep this list in sync with the RECURSE list in test_tool/ya.make
 IF (NOT YA_OPENSOURCE)
@@ -31,7 +33,6 @@ IF (NOT YA_OPENSOURCE)
         )
     ENDIF()
 ENDIF()
-
 
 PEERDIR(
     devtools/ya/test/programs/test_tool/build_clang_coverage_report

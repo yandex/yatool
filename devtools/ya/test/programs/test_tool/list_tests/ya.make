@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     list_tests.py
 )
@@ -17,7 +19,7 @@ PEERDIR(
     devtools/ya/test/util
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/test/dependency/sandbox_storage
     )

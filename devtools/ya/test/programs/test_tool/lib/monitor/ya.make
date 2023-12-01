@@ -10,7 +10,9 @@ PY_SRCS(
 )
 
 IF (OS_LINUX)
-    PY_SRCS(statvfs.pyx)
+    PY_SRCS(
+        statvfs.pyx
+    )
 ENDIF()
 
 PEERDIR(

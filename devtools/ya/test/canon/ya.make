@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE test.canon
     compare.py
@@ -22,7 +24,7 @@ PEERDIR(
     contrib/python/diff-match-patch
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/svn
         devtools/ya/test/canon/upload

@@ -42,8 +42,20 @@ def main():
     parser.add_argument("--out-path", help="Path to the output test_cases")
     parser.add_argument("--list", action="store_true", help="List of tests", default=False)
     parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--no-snippet-from-stdout", dest="snippet_from_stdout", action="store_false", help="Don't add checker stdout to the subtest snippet", default=True)
-    parser.add_argument("--no-snippet-from-stderr", dest="snippet_from_stderr", action="store_false", help="Don't add checker stderr to the subtest snippet", default=True)
+    parser.add_argument(
+        "--no-snippet-from-stdout",
+        dest="snippet_from_stdout",
+        action="store_false",
+        help="Don't add checker stdout to the subtest snippet",
+        default=True,
+    )
+    parser.add_argument(
+        "--no-snippet-from-stderr",
+        dest="snippet_from_stderr",
+        action="store_false",
+        help="Don't add checker stderr to the subtest snippet",
+        default=True,
+    )
     parser.add_argument("--batch", action="store_true", default=False)
     parser.add_argument("--batch-name", action="store", default=None)
     parser.add_argument("--token", dest="token", action='store', help="access token")
@@ -87,14 +99,21 @@ def main():
 
     tests = []
     for test_name, test_path, checker_args in get_test_cases():
-        cmd = [sys.executable] + args.checker.split(" ") + checker_args + test.util.shared.get_oauth_token_options(args, test_tool_mode=True)
+        cmd = (
+            [sys.executable]
+            + args.checker.split(" ")
+            + checker_args
+            + test.util.shared.get_oauth_token_options(args, test_tool_mode=True)
+        )
 
         out_path = test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(test_name, args.check_name))
         err_path = test.common.get_unique_file_path(logs_dir, "{}.{}.err".format(test_name, args.check_name))
 
         started = time.time()
         with runtime.bypass_signals(["SIGQUIT", "SIGUSR2"]) as reg:
-            res = shared.tee_execute(cmd, out_path, err_path, strip_ansi_codes=True, on_startup=lambda proc: reg.register(proc.pid))
+            res = shared.tee_execute(
+                cmd, out_path, err_path, strip_ansi_codes=True, on_startup=lambda proc: reg.register(proc.pid)
+            )
 
         duration = time.time() - started
 

@@ -20,7 +20,9 @@ PEERDIR(
 )
 
 IF (NOT YA_OPENSOURCE)
-    PEERDIR(build/internal/plugins/_lib/nots)
+    PEERDIR(
+        build/internal/plugins/_lib/nots
+    )
     PY_SRCS(
         NAMESPACE test.util
         ts_utils.py

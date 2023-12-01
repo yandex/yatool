@@ -42,6 +42,8 @@ class ToolsResolver(object):
         if len(found) == 1:
             return found[0][1]
         elif not found:
-            logger.warning("Target platform has requested SYSTEM_PYTHON, but no target depends on it. Is PEERDIR(build/platform/python) missing?")
+            logger.warning(
+                "Target platform has requested SYSTEM_PYTHON, but no target depends on it. Is PEERDIR(build/platform/python) missing?"
+            )
             return "NO_EXTERNAL_PYTHON_DEPENDENCY_IS_REQUESTED"
         raise AssertionError(global_resource)

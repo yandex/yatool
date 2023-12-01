@@ -30,7 +30,16 @@ import test.const
 import test.util.tools
 import build.plugins.lib._metric_resolvers as mr
 
-ATTRS_TO_STATE_HASH = ['_modulo', 'project_path', 'global_resources', 'recipes', 'requirements', 'timeout', 'test_size', 'name']
+ATTRS_TO_STATE_HASH = [
+    '_modulo',
+    'project_path',
+    'global_resources',
+    'recipes',
+    'requirements',
+    'timeout',
+    'test_size',
+    'name',
+]
 WINDOWS_CRIT_LEN = 8192
 
 yatest_logger = logging.getLogger(__name__)
@@ -65,7 +74,15 @@ class AbstractTestSuite(facility.Suite):
     def get_resource_tools(self):
         return []
 
-    def __init__(self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, split_file_name=None, multi_target_platform_run=False):
+    def __init__(
+        self,
+        dart_info,
+        modulo=1,
+        modulo_index=0,
+        target_platform_descriptor=None,
+        split_file_name=None,
+        multi_target_platform_run=False,
+    ):
         """
         :param dart_info: dart info the `test.dart` file
         """
@@ -84,7 +101,9 @@ class AbstractTestSuite(facility.Suite):
 
         # TODO only PerformedTestSuite may have empty dart. remove 'if' after removing inheritance
         if 'SOURCE-FOLDER-PATH' in dart_info:
-            assert not dart_info['SOURCE-FOLDER-PATH'].startswith("/"), 'Source folder path must be relative ({})'.format(dart_info['SOURCE-FOLDER-PATH'])
+            assert not dart_info['SOURCE-FOLDER-PATH'].startswith(
+                "/"
+            ), 'Source folder path must be relative ({})'.format(dart_info['SOURCE-FOLDER-PATH'])
         self.dart_info = dart_info
         self.symlinks_dir = None  # TODO: only for fleur tests, fix and remove
         self._work_dir = None
@@ -206,7 +225,11 @@ class AbstractTestSuite(facility.Suite):
         for flt in self._additional_filters:
             total_filter_len += len(flt)
         if exts.windows.on_win() and total_filter_len > WINDOWS_CRIT_LEN:
-            yatest_logger.warn("run test cmd for suite %s may be too long, current length of all 'last failed' filters: %s", repr(self.name), total_filter_len)
+            yatest_logger.warn(
+                "run test cmd for suite %s may be too long, current length of all 'last failed' filters: %s",
+                repr(self.name),
+                total_filter_len,
+            )
 
     def clear_additional_filters(self):
         self._additional_filters = []
@@ -310,7 +333,16 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def _custom_dependencies(self):
-        return list(set([x for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ') if x and not x == "$TEST_DEPENDS_VALUE"] + [self.project_path]))
+        return list(
+            set(
+                [
+                    x
+                    for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ')
+                    if x and not x == "$TEST_DEPENDS_VALUE"
+                ]
+                + [self.project_path]
+            )
+        )
 
     @property
     def recipes(self):
@@ -348,7 +380,7 @@ class AbstractTestSuite(facility.Suite):
             ('mds', 'mds', False),
             ('arcadia/', 'arcadia', True),
             ('arcadia_tests_data/', 'atd', True),
-            ('ext', 'ext', False)
+            ('ext', 'ext', False),
         )
 
         if self._test_data_map is None:
@@ -358,7 +390,7 @@ class AbstractTestSuite(facility.Suite):
                 for prefix, dtype, remove_prefix in types:
                     if entry.startswith(prefix):
                         if remove_prefix:
-                            x = entry[len(prefix):]
+                            x = entry[len(prefix) :]
                         else:
                             x = entry
                         self._test_data_map[dtype].add(x)
@@ -533,12 +565,9 @@ class AbstractTestSuite(facility.Suite):
     def generate_trace_file(self, trace_file_path, append=False):
         mode = "a" if append else "w"
         with io.open(trace_file_path, mode, encoding='utf8') as trace_file:
+
             def trace(name, value):
-                event = {
-                    'timestamp': time.time(),
-                    'value': value,
-                    'name': name
-                }
+                event = {'timestamp': time.time(), 'value': value, 'name': name}
                 try:
                     trace_file.write(six.text_type(json.dumps(event) + '\n'))
                 except UnicodeDecodeError:
@@ -547,7 +576,9 @@ class AbstractTestSuite(facility.Suite):
 
             suite_event = {}
             if self._errors:
-                suite_event['errors'] = [(test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in self._errors]
+                suite_event['errors'] = [
+                    (test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in self._errors
+                ]
             if self.logs:
                 suite_event['logs'] = self.logs
             if self.metrics:
@@ -563,7 +594,9 @@ class AbstractTestSuite(facility.Suite):
                 if chunk.metrics:
                     chunk_event['metrics'] = chunk.metrics
                 if chunk._errors:
-                    chunk_event['errors'] = [(test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in chunk._errors]
+                    chunk_event['errors'] = [
+                        (test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in chunk._errors
+                    ]
 
                 if chunk_event:
                     if chunk.filename:
@@ -690,7 +723,9 @@ class AbstractTestSuite(facility.Suite):
                     self.add_build_dep(node['outputs'][-1], 'unspecified', uid, [])
 
             if not found:
-                msg = "Cannot resolve dependency '{}' for test '{} ({})'".format(suite_dep, self.project_path, self.name)
+                msg = "Cannot resolve dependency '{}' for test '{} ({})'".format(
+                    suite_dep, self.project_path, self.name
+                )
                 self._dependency_errors.append(msg)
                 yatest_logger.warn(msg)
 
@@ -860,7 +895,11 @@ class AbstractTestSuite(facility.Suite):
         errors = []
         default_timeout = test.const.TestSize.get_default_timeout(self.test_size)
         if self.timeout > default_timeout:
-            errors.append("Test timeout {} exceeds maximum allowed timeout {} for size {}".format(self.timeout, default_timeout, self.test_size))
+            errors.append(
+                "Test timeout {} exceeds maximum allowed timeout {} for size {}".format(
+                    self.timeout, default_timeout, self.test_size
+                )
+            )
         return errors
 
     @property
@@ -930,18 +969,29 @@ class PythonTestSuite(AbstractTestSuite):
 
 
 class StyleTestSuite(PythonTestSuite):
-
     def get_test_related_paths(self, arc_root, opts):
         return []
 
 
 class PerformedTestSuite(AbstractTestSuite):
-
-    def __init__(self, name=None, project_path=None, size=test.const.TestSize.Small, tags=None, target_platform_descriptor=None, suite_type=None, suite_ci_type=None, multi_target_platform_run=False, uid=None):  # noqa
-        dart = {
-            'TAG': tags or []
-        }
-        super(PerformedTestSuite, self).__init__(dart, target_platform_descriptor=target_platform_descriptor, multi_target_platform_run=multi_target_platform_run)
+    def __init__(
+        self,
+        name=None,
+        project_path=None,
+        size=test.const.TestSize.Small,
+        tags=None,
+        target_platform_descriptor=None,
+        suite_type=None,
+        suite_ci_type=None,
+        multi_target_platform_run=False,
+        uid=None,
+    ):  # noqa
+        dart = {'TAG': tags or []}
+        super(PerformedTestSuite, self).__init__(
+            dart,
+            target_platform_descriptor=target_platform_descriptor,
+            multi_target_platform_run=multi_target_platform_run,
+        )
         self._name = name
         self._suite_type = suite_type
         self._suite_ci_type = suite_ci_type
@@ -973,7 +1023,6 @@ class PerformedTestSuite(AbstractTestSuite):
 
 
 class DiffTestSuite(AbstractTestSuite):
-
     def __init__(self, project_path, revision, target_platform_descriptor):
         super(DiffTestSuite, self).__init__({}, target_platform_descriptor=target_platform_descriptor)
         self._project_path = project_path
@@ -1020,14 +1069,23 @@ class DiffTestSuite(AbstractTestSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir('$(BUILD_ROOT)', self.project_path, self.name)
         output_dir = os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME)
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_diff_test', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--suite-name", self.get_type_name(),
-            "--project-path", self.project_path,
-            "--output-dir", output_dir,
-            "--work-dir", test_work_dir,
-            "--trace-path", os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
-            "--source-root", opts.arc_root,
-            "--revision", self._revision,
+        cmd = test.util.tools.get_test_tool_cmd(
+            opts, 'run_diff_test', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            "--suite-name",
+            self.get_type_name(),
+            "--project-path",
+            self.project_path,
+            "--output-dir",
+            output_dir,
+            "--work-dir",
+            test_work_dir,
+            "--trace-path",
+            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            "--source-root",
+            opts.arc_root,
+            "--revision",
+            self._revision,
         ]
         for flt in opts.tests_filters + opts.test_files_filter:
             cmd += ["--filter", flt]
@@ -1051,7 +1109,11 @@ class DiffTestSuite(AbstractTestSuite):
         try:
             tests = json.loads(list_cmd_result.std_err)
             for t in tests:
-                result.append(test_common.SubtestInfo(test_common.strings_to_utf8(t["class"]), test_common.strings_to_utf8(t["test"])))
+                result.append(
+                    test_common.SubtestInfo(
+                        test_common.strings_to_utf8(t["class"]), test_common.strings_to_utf8(t["test"])
+                    )
+                )
             return result
         except Exception as e:
             ei = sys.exc_info()
@@ -1084,9 +1146,13 @@ class SkippedTestSuite(object):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir('$(BUILD_ROOT)', self.project_path, self.name)
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_skipped_test', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--trace-path", os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
-            "--reason", self.get_comment(),
+        cmd = test.util.tools.get_test_tool_cmd(
+            opts, 'run_skipped_test', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            "--trace-path",
+            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            "--reason",
+            self.get_comment(),
         ]
         return cmd
 
@@ -1113,12 +1179,13 @@ class SkippedTestSuite(object):
 
 class WrappingTestSuite(object):
     """
-        Class-mixin to inherit by suites which wrap other types of test suites.
+    Class-mixin to inherit by suites which wrap other types of test suites.
 
-        A wrapping suite has it's own type (returning by get_type() method) and can be filtered
-        by this type. But get_type() class method is useless if we want to get a wrapped suite name
-        because the name is a property of an instance not a class.
+    A wrapping suite has it's own type (returning by get_type() method) and can be filtered
+    by this type. But get_type() class method is useless if we want to get a wrapped suite name
+    because the name is a property of an instance not a class.
     """
+
     def get_wrapped_type(self):
         """
         returns a wrapped suite type name.

@@ -117,11 +117,11 @@ def setup_yt_token(args):
         else:
             logger.debug("Use oauth to get yt_token")
             from yalibrary import oauth
+
             token = oauth.get_token(core.config.get_user())
             if token is not None:
                 os.environ[yt_token_var_name] = token
             else:
-
                 logger.error("Can't setup yt token. specify YT_TOKEN_PATH variable in your environment")
                 return None
         return yt_token_var_name

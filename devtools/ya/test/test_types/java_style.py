@@ -19,11 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class JavaStyleTestSuite(test_types.StyleTestSuite):
-
     JSTYLE_MIGRATIONS_FILE = "build/rules/jstyle/migrations.yaml"
 
     def __init__(self, dart_info, target_platform_descriptor=None, multi_target_platform_run=False):
-        super(JavaStyleTestSuite, self).__init__(dart_info, target_platform_descriptor=target_platform_descriptor, multi_target_platform_run=multi_target_platform_run)
+        super(JavaStyleTestSuite, self).__init__(
+            dart_info,
+            target_platform_descriptor=target_platform_descriptor,
+            multi_target_platform_run=multi_target_platform_run,
+        )
         self.initialized = False
         self.deps = None
         self.my_sources = []
@@ -80,18 +83,28 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test_tools.get_test_tool_cmd(opts, 'run_javastyle', self.global_resources, wrapper=True, run_on_target_platform=False) + [
-            '--source-root', '$(SOURCE_ROOT)',
-            '--trace-path', os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            '--out-path', os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
-            '--java', commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_resource),
-            '--runner-lib-path', self.jstyle_runner_path,
-            '--config-xml', self.config_xml,
+        cmd = test_tools.get_test_tool_cmd(
+            opts, 'run_javastyle', self.global_resources, wrapper=True, run_on_target_platform=False
+        ) + [
+            '--source-root',
+            '$(SOURCE_ROOT)',
+            '--trace-path',
+            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            '--out-path',
+            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            '--java',
+            commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_resource),
+            '--runner-lib-path',
+            self.jstyle_runner_path,
+            '--config-xml',
+            self.config_xml,
             '--verbose',
-            '--modulo', str(self._modulo),
-            '--modulo-index', str(self._modulo_index),
+            '--modulo',
+            str(self._modulo),
+            '--modulo-index',
+            str(self._modulo_index),
         ]
-        if (opts and getattr(opts, 'use_jstyle_server')):
+        if opts and getattr(opts, 'use_jstyle_server'):
             cmd += ["--use-jstyle-server"]
 
         if not (opts and getattr(opts, 'disable_jstyle_migrations')):
@@ -103,8 +116,11 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         return cmd
 
     def get_run_cmd_inputs(self, opts):
-        return super(JavaStyleTestSuite, self).get_run_cmd_inputs(opts) + self.my_index_files \
+        return (
+            super(JavaStyleTestSuite, self).get_run_cmd_inputs(opts)
+            + self.my_index_files
             + ([self.config_xml] if self.config_xml.startswith('$(SOURCE_ROOT)') else [])
+        )
 
     def get_list_cmd_inputs(self, opts):
         return super(JavaStyleTestSuite, self).get_list_cmd_inputs(opts) + self.my_index_files
@@ -150,8 +166,16 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
 
 class KtlintTestSuite(LintTestSuite):
-    def __init__(self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False):
-        super(KtlintTestSuite, self).__init__(dart_info, modulo, modulo_index, target_platform_descriptor, multi_target_platform_run=multi_target_platform_run)
+    def __init__(
+        self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
+    ):
+        super(KtlintTestSuite, self).__init__(
+            dart_info,
+            modulo,
+            modulo_index,
+            target_platform_descriptor,
+            multi_target_platform_run=multi_target_platform_run,
+        )
         self._files = self.get_suite_files()
 
     @property
@@ -168,8 +192,8 @@ class KtlintTestSuite(LintTestSuite):
 
     def get_resource_tools(self):
         if "KTLINT_OLD" in self.dart_info["KTLINT_BINARY"]:
-            return ("ktlint_old", )
-        return ("ktlint", )
+            return ("ktlint_old",)
+        return ("ktlint",)
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         work_dir = test_common.get_test_suite_work_dir(
@@ -181,13 +205,21 @@ class KtlintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_ktlint_test', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--srclist-path", self._get_files()[0],
-            "--binary", self.dart_info["KTLINT_BINARY"],
-            "--trace-path", os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            "--source-root", "$(SOURCE_ROOT)",
-            "--project-path", self.project_path,
-            "--output-dir", os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+        cmd = test.util.tools.get_test_tool_cmd(
+            opts, 'run_ktlint_test', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            "--srclist-path",
+            self._get_files()[0],
+            "--binary",
+            self.dart_info["KTLINT_BINARY"],
+            "--trace-path",
+            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            "--source-root",
+            "$(SOURCE_ROOT)",
+            "--project-path",
+            self.project_path,
+            "--output-dir",
+            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
         ]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:

@@ -12,9 +12,13 @@ PEERDIR(
     library/python/testing/coverage_utils
 )
 
-PY_SRCS(build_clang_coverage_report.py)
+PY_SRCS(
+    build_clang_coverage_report.py
+)
 
-RESOURCE_FILES(res/style.html)
+RESOURCE_FILES(
+    res/style.html
+)
 
 END()
 

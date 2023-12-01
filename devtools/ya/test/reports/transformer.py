@@ -3,7 +3,6 @@ import re
 
 
 class TextTransformer(object):
-
     def __init__(self, replacements, use_re=False):
         self._replacements = replacements
         self._use_re = use_re

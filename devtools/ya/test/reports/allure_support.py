@@ -14,7 +14,6 @@ class AllureReportNotFoundError(Exception):
 
 
 class AllureReportGenerator(object):
-
     def __init__(self):
         self._allure_path = yalibrary.tools.tool('allure')
         self._java_path = yalibrary.tools.tool('java')
@@ -36,16 +35,12 @@ class AllureReportGenerator(object):
                 if "allure" in dirs:
                     for _file in os.listdir(os.path.join(root, "allure")):
                         exts.fs.symlink(
-                            os.path.abspath(os.path.join(root, "allure", _file)),
-                            os.path.join(allure_dir, _file)
+                            os.path.abspath(os.path.join(root, "allure", _file)), os.path.join(allure_dir, _file)
                         )
         else:
             allure_dir = build_dir
 
-        cmd = [
-            self._allure_path,
-            "generate", allure_dir, "-o", output_dir
-        ]
+        cmd = [self._allure_path, "generate", allure_dir, "-o", output_dir]
 
         if new_allure:
             cmd += ["--clean"]

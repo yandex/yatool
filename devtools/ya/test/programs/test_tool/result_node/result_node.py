@@ -17,7 +17,13 @@ def get_options():
     parser.disable_interspersed_args()
     parser.add_option("--test-name-filter", dest="test_name_filters", action='append', default=[])
     parser.add_option("--omitted-test-status", dest="omitted_test_statuses", action='append', default=[])
-    parser.add_option("--filter-description", dest="filter_description", default=None, help="Current tests filters description", action='store')
+    parser.add_option(
+        "--filter-description",
+        dest="filter_description",
+        default=None,
+        help="Current tests filters description",
+        action='store',
+    )
     parser.add_option("--show-passed", default=False, dest="show_passed", help="Show passed tests", action='store_true')
     parser.add_option("--show-deselected", default=False, help="Show deselected tests", action='store_true')
     parser.add_option("--show-discovered", default=False, help="Show discovered tests", action='store_true')
@@ -28,14 +34,21 @@ def get_options():
     parser.add_option("--result-root", help="result root", action='store'),
     parser.add_option("--source-root", help="source root", action='store', default="")
     parser.add_option(
-        "--log-level", dest="log_level",
-        help="logging level", action='store', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    parser.add_option(
-        "--fail-exit-code", dest="fail_exit_code", help="exit code on fail", action='store', default='1'
-    )
+    parser.add_option("--fail-exit-code", dest="fail_exit_code", help="exit code on fail", action='store', default='1')
     parser.add_option("--allure", dest="allure_report", help="allure file path", action='store', default=None)
-    parser.add_option("--inline-diff", action="store_true", help="Don't extract diffs to files. Disable truncation of the comments printed on the terminal", default=False)
+    parser.add_option(
+        "--inline-diff",
+        action="store_true",
+        help="Don't extract diffs to files. Disable truncation of the comments printed on the terminal",
+        default=False,
+    )
     parser.add_option("--show-test-cwd", action="store_true", help="show test cwd in the console report", default=False)
     parser.add_option("--show-metrics", action="store_true", help="show test metrics", default=False)
     parser.add_option("--show-failed", action="store_true", help="show failed only", default=False)
@@ -133,9 +146,8 @@ def main():
     )
 
     filter_message = test.util.shared.build_filter_message(
-        options.filter_description,
-        options.test_name_filters,
-        get_number_of_empty_suites(suites))
+        options.filter_description, options.test_name_filters, get_number_of_empty_suites(suites)
+    )
     if filter_message:
         app_ctx.display.emit_message(filter_message)
 

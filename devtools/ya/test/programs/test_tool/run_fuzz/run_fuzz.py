@@ -136,6 +136,7 @@ def watchdog_killer(proc, fuzzing):
 
             def kill(pid):
                 return os.killpg(proc.pid, signal.SIGKILL)
+
             # kill working processes, not main process - it doesn't set proper handler for SIGTERM in this case
             if fuzzing:
                 for child_pid in yatest.common.process._nix_get_proc_children(proc.pid):

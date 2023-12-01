@@ -45,7 +45,11 @@ def merge_darts(darts):
                 if field in darts_map[dart_uid] and field in dart_info:
                     darts_map[dart_uid][field].extend(dart_info[field])
                 else:
-                    raise AssertionError("field {} not found in dartinfo. old dart: {} new dart: {}".format(field, darts_map[dart_uid], dart_info))
+                    raise AssertionError(
+                        "field {} not found in dartinfo. old dart: {} new dart: {}".format(
+                            field, darts_map[dart_uid], dart_info
+                        )
+                    )
     for dart_uid, dart_info in six.iteritems(darts_map):
         for field in MERGE_FIELDS:
             if field in dart_info:

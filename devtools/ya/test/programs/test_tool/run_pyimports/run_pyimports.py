@@ -45,7 +45,9 @@ def main():
     for program in args.programs:
         # Bypass terminating signals from run_test to target program
         with runtime.bypass_signals(["SIGQUIT", "SIGUSR2"]) as reg:
-            p = subprocess.Popen([program] + args.skip, env=env, stderr=subprocess.PIPE, **({'text': True} if six.PY3 else {}))
+            p = subprocess.Popen(
+                [program] + args.skip, env=env, stderr=subprocess.PIPE, **({'text': True} if six.PY3 else {})
+            )
             reg.register(p.pid)
             _, err = p.communicate()
 

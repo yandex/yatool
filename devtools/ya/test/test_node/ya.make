@@ -1,8 +1,9 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE test.test_node
-
     __init__.py
 )
 
@@ -37,4 +38,5 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/test/dependency/sandbox_storage
     )
 ENDIF()
+
 END()

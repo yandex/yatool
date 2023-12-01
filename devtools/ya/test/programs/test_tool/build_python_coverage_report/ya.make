@@ -2,7 +2,9 @@ PY23_LIBRARY()
 
 STYLE_PYTHON()
 
-PY_SRCS(build_python_coverage_report.py)
+PY_SRCS(
+    build_python_coverage_report.py
+)
 
 PEERDIR(
     contrib/python/coverage

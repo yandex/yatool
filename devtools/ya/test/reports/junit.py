@@ -27,7 +27,6 @@ from xml.sax.saxutils import escape
 
 
 class JUnitReportGenerator(object):
-
     def create(self, file_path, suites, fix_links_func=None):
         doc = minidom.getDOMImplementation().createDocument(None, None, None)
         suites_element = self.create_element(doc, doc, 'testsuites')
@@ -39,15 +38,19 @@ class JUnitReportGenerator(object):
             report.write(common.to_utf8(doc.toprettyxml()))
 
     def add_suite(self, doc, suites_element, suite, fix_links_func):
-
         suite_run_time = sum([test_case.elapsed for test_case in suite.tests])
         if suite.get_status() == const.Status.TIMEOUT:
             suite_run_time = max([suite.timeout, suite_run_time])
-        suite_element = self.create_element(doc, suites_element, "testsuite", {
-            'name': self._format_name(suite.project_path),
-            'tests': len(suite.tests),
-            'time': suite_run_time,
-        })
+        suite_element = self.create_element(
+            doc,
+            suites_element,
+            "testsuite",
+            {
+                'name': self._format_name(suite.project_path),
+                'tests': len(suite.tests),
+                'time': suite_run_time,
+            },
+        )
 
         stat = {"failures": 0, "skipped": 0}
 
@@ -91,7 +94,11 @@ class JUnitReportGenerator(object):
             add_test(facility.TestCase(suite.get_type(), suite.get_status(), suite.get_comment(), logs=suite.logs))
         for chunk in suite.chunks:
             if chunk.get_comment():
-                add_test(facility.TestCase("{} chunk".format(chunk.get_name()), chunk.get_status(), chunk.get_comment(), logs=chunk.logs))
+                add_test(
+                    facility.TestCase(
+                        "{} chunk".format(chunk.get_name()), chunk.get_status(), chunk.get_comment(), logs=chunk.logs
+                    )
+                )
             for test_case in chunk.tests:
                 add_test(test_case)
 
@@ -116,14 +123,16 @@ class JUnitReportGenerator(object):
         return name.replace("::", ".")
 
 
-_legal_chars = (0x09, 0x0A, 0x0d)
+_legal_chars = (0x09, 0x0A, 0x0D)
 _legal_ranges = (
     (0x20, 0x7E),
     (0x80, 0xD7FF),
     (0xE000, 0xFFFD),
     (0x10000, 0x10FFFF),
 )
-_legal_xml_re = [unicode("%s-%s") % (unichr(low), unichr(high)) for (low, high) in _legal_ranges if low < sys.maxunicode]
+_legal_xml_re = [
+    unicode("%s-%s") % (unichr(low), unichr(high)) for (low, high) in _legal_ranges if low < sys.maxunicode
+]
 _legal_xml_re = [unichr(x) for x in _legal_chars] + _legal_xml_re
 illegal_xml_re = re.compile(unicode('[^%s]') % unicode('').join(_legal_xml_re))
 
@@ -133,8 +142,11 @@ def _xml_escape(ustring):
     Taken from py module
     """
     escape = {
-        unicode('"'): unicode('&quot;'), unicode('<'): unicode('&lt;'), unicode('>'): unicode('&gt;'),
-        unicode('&'): unicode('&amp;'), unicode("'"): unicode('&apos;'),
+        unicode('"'): unicode('&quot;'),
+        unicode('<'): unicode('&lt;'),
+        unicode('>'): unicode('&gt;'),
+        unicode('&'): unicode('&amp;'),
+        unicode("'"): unicode('&apos;'),
     }
     charef_rex = re.compile(unicode("|").join(escape.keys()))
 
@@ -155,4 +167,5 @@ def bin_xml_escape(arg):
             return '#x%02X' % i
         else:
             return '#x%04X' % i
+
     return illegal_xml_re.sub(repl, arg)

@@ -2,7 +2,9 @@ PY23_LIBRARY()
 
 STYLE_PYTHON()
 
-PY_SRCS(build_ts_coverage_report.py)
+PY_SRCS(
+    build_ts_coverage_report.py
+)
 
 PEERDIR(
     devtools/ya/exts

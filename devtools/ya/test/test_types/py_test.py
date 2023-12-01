@@ -24,12 +24,9 @@ class PyTestSuite(common.PythonTestSuite):
     """
     Support for pytest framework http://pytest.org/
     """
+
     def __init__(self, dart_info, *args, **kwargs):
-        super(PyTestSuite, self).__init__(
-            dart_info,
-            *args,
-            **kwargs
-        )
+        super(PyTestSuite, self).__init__(dart_info, *args, **kwargs)
         if 'SOURCE-FOLDER-PATH' in dart_info:
             self.pytest_output_dir_deps = {dart_info['SOURCE-FOLDER-PATH']}
         else:
@@ -97,24 +94,38 @@ class PyTestSuite(common.PythonTestSuite):
         )
         output_dir = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
         cmd = [
-            "--basetemp", os.path.join('$(BUILD_ROOT)', "tmp"),
-            "--capture", "no",
+            "--basetemp",
+            os.path.join('$(BUILD_ROOT)', "tmp"),
+            "--capture",
+            "no",
             "-vv",
             # avoid loading custom pytest.ini files for now
-            "-c", self._get_ini_file_path(),
-            "-p", "no:factor",
+            "-c",
+            self._get_ini_file_path(),
+            "-p",
+            "no:factor",
             "--doctest-modules",
-            "--ya-trace", os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            "--build-root", '$(BUILD_ROOT)',
-            "--source-root", "$(SOURCE_ROOT)",
-            "--output-dir", output_dir,
-            "--durations", "0",
-            "--project-path", self.project_path,
-            "--test-tool-bin", test.util.tools.get_test_tool_path(opts, self.global_resources, test.const.TEST_TOOL_TARGET in self.global_resources),
+            "--ya-trace",
+            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            "--build-root",
+            '$(BUILD_ROOT)',
+            "--source-root",
+            "$(SOURCE_ROOT)",
+            "--output-dir",
+            output_dir,
+            "--durations",
+            "0",
+            "--project-path",
+            self.project_path,
+            "--test-tool-bin",
+            test.util.tools.get_test_tool_path(
+                opts, self.global_resources, test.const.TEST_TOOL_TARGET in self.global_resources
+            ),
             # XXX
             # version allows library/python/pytest/plugins/ya.py stay compatible with ya and ya-dev
             # if changes in ya-dev are not backward-compatible (like changes in tracefile format)
-            "--ya-version", "2",
+            "--ya-version",
+            "2",
             # "--valgrind-path", os.path.join("$(VALGRIND)", "valgrind", "valgrind"),
         ]
 
@@ -136,13 +147,13 @@ class PyTestSuite(common.PythonTestSuite):
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:
                 if flt.startswith("mark:"):
-                    cmd += ["-m", flt[len("mark:"):]]
+                    cmd += ["-m", flt[len("mark:") :]]
                 else:
                     cmd += ["--test-filter", flt]
 
         for flt in self._additional_filters:
             if flt.startswith("mark:"):
-                cmd += ["-m", flt[len("mark:"):]]
+                cmd += ["-m", flt[len("mark:") :]]
             else:
                 cmd += ["--test-filter", flt]
 
@@ -153,17 +164,18 @@ class PyTestSuite(common.PythonTestSuite):
             cmd += ["--pdb", "--pdbcls", "IPython.terminal.debugger:TerminalPdb"]
 
         if opts and getattr(opts, "allure_report"):
-            cmd += [
-                "--alluredir", os.path.join(work_dir, "allure")
-            ]
+            cmd += ["--alluredir", os.path.join(work_dir, "allure")]
             if not self._use_arcadia_python:
                 logger.warning("allure report may not be built if any of allure dependencies is not installed")
 
         if self._modulo > 1:
             cmd += [
-                "--modulo", str(self._modulo),
-                "--modulo-index", str(self._modulo_index),
-                "--partition-mode", self.get_fork_partition_mode(),
+                "--modulo",
+                str(self._modulo),
+                "--modulo-index",
+                str(self._modulo_index),
+                "--partition-mode",
+                self.get_fork_partition_mode(),
             ]
         if self.get_fork_mode() == "subtests":
             cmd.append("--split-by-tests")
@@ -175,18 +187,18 @@ class PyTestSuite(common.PythonTestSuite):
             cmd += ["--report-deselected"]
 
         if opts and getattr(opts, 'test_debug'):
-            cmd += [
-                "--test-debug",
-                "--pdb-on-sigusr1"
-            ]
+            cmd += ["--test-debug", "--pdb-on-sigusr1"]
 
         if opts and getattr(opts, 'flags'):
             for key in sorted(opts.flags.keys()):
-                if key in ['RECURSE_PARTITION_INDEX', 'RECURSE_PARTITIONS_COUNT', 'CONSISTENT_DEBUG', 'CONSISTENT_DEBUG_LIGHT']:
+                if key in [
+                    'RECURSE_PARTITION_INDEX',
+                    'RECURSE_PARTITIONS_COUNT',
+                    'CONSISTENT_DEBUG',
+                    'CONSISTENT_DEBUG_LIGHT',
+                ]:
                     continue
-                cmd += [
-                    '--flags', "{}={}".format(key, opts.flags[key])
-                ]
+                cmd += ['--flags', "{}={}".format(key, opts.flags[key])]
 
         sanitizer_name = opts.sanitize or opts.flags.get('SANITIZER_TYPE')
         if sanitizer_name:
@@ -220,11 +232,21 @@ class PyTestSuite(common.PythonTestSuite):
             tests_line = list_cmd_result.std_err.splitlines()[-1]
             tests = json.loads(tests_line)
             for t in tests:
-                result.append(test_common.SubtestInfo(test_common.strings_to_utf8(t["class"]), test_common.strings_to_utf8(t["test"]), tags=t.get("tags", [])))
+                result.append(
+                    test_common.SubtestInfo(
+                        test_common.strings_to_utf8(t["class"]),
+                        test_common.strings_to_utf8(t["test"]),
+                        tags=t.get("tags", []),
+                    )
+                )
             return result
         except Exception as e:
             ei = sys.exc_info()
-            six.reraise(ei[0], "{}\nListing output: {}".format(str(e), list_cmd_result.std_err or list_cmd_result.std_out), ei[2])
+            six.reraise(
+                ei[0],
+                "{}\nListing output: {}".format(str(e), list_cmd_result.std_err or list_cmd_result.std_out),
+                ei[2],
+            )
 
     @property
     def _old_pytest(self):
@@ -245,7 +267,6 @@ class PyTestSuite(common.PythonTestSuite):
 
 
 class PyTestScriptSuite(PyTestSuite):
-
     def _script_path(self, root):
         return os.path.join(root, "contrib", "python", "pytest", "pytest.py")
 
@@ -254,12 +275,17 @@ class PyTestScriptSuite(PyTestSuite):
         return inputs + [self._script_path('$(SOURCE_ROOT)'), self.binary_path('$(SOURCE_ROOT)')]
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
-        cmd = test_common.get_python_cmd(opts=opts, suite=self) + [
-            "-B",  # prevent from creating pytest cache
-            self._script_path('$(SOURCE_ROOT)'),
-            self.binary_path('$(SOURCE_ROOT)'),
-            "-p", "ya",
-        ] + self.get_run_cmd_args(opts, retry, for_dist_build)
+        cmd = (
+            test_common.get_python_cmd(opts=opts, suite=self)
+            + [
+                "-B",  # prevent from creating pytest cache
+                self._script_path('$(SOURCE_ROOT)'),
+                self.binary_path('$(SOURCE_ROOT)'),
+                "-p",
+                "ya",
+            ]
+            + self.get_run_cmd_args(opts, retry, for_dist_build)
+        )
 
         if self._use_arcadia_python:
             cmd.insert(1, "-S")
@@ -272,11 +298,9 @@ class PyTestScriptSuite(PyTestSuite):
         for path in [
             ("library", "python", "testing", "yatest_common"),
             ("library", "python", "testing"),
-
             # pytest facility
             ("library", "python", "pytest"),
             ("library", "python", "pytest", "plugins"),
-
             ("contrib", "python", "atomicwrites"),
             ("contrib", "python", "attrs"),
             ("contrib", "python", "funcsigs"),
@@ -379,11 +403,21 @@ class PyTestBinSuite(PyTestSuite):
             with open(filename) as afile:
                 tests = json.load(afile)
             for t in tests:
-                result.append(test_common.SubtestInfo(test_common.strings_to_utf8(t["class"]), test_common.strings_to_utf8(t["test"]), tags=t.get("tags", [])))
+                result.append(
+                    test_common.SubtestInfo(
+                        test_common.strings_to_utf8(t["class"]),
+                        test_common.strings_to_utf8(t["test"]),
+                        tags=t.get("tags", []),
+                    )
+                )
             return result
         except Exception as e:
             ei = sys.exc_info()
-            six.reraise(ei[0], "{}\nListing output: {}".format(str(e), list_cmd_result.std_err or list_cmd_result.std_out), ei[2])
+            six.reraise(
+                ei[0],
+                "{}\nListing output: {}".format(str(e), list_cmd_result.std_err or list_cmd_result.std_out),
+                ei[2],
+            )
 
 
 class Py3TestBinSuite(PyTestBinSuite):
@@ -397,7 +431,6 @@ class Py3TestBinSuite(PyTestBinSuite):
 
 
 class ExecTest(PyTestBinSuite):
-
     @classmethod
     def get_type_name(cls):
         return "exectest"
@@ -424,7 +457,9 @@ class ExecTest(PyTestBinSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
         cmd = ["--test-param", "commands={}".format(self.dart_info.get("BLOB", ""))]
-        cmd += test.util.tools.get_test_tool_cmd(opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True)
+        cmd += test.util.tools.get_test_tool_cmd(
+            opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True
+        )
         cmd += self.get_run_cmd_args(opts, retry, for_dist_build)
         cmd += ["--noconftest"]
         return cmd
@@ -435,7 +470,6 @@ class ExecTest(PyTestBinSuite):
 
 
 class LintTestSuite(common.StyleTestSuite):
-
     def get_suite_files(self):
         files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.dart_info.get("FILES", []) if _f]]
         return sorted(files)
@@ -476,9 +510,16 @@ class LintTestSuite(common.StyleTestSuite):
 
 
 class PyLintTestSuite(LintTestSuite):
-
-    def __init__(self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False):
-        super(PyLintTestSuite, self).__init__(dart_info, modulo, modulo_index, target_platform_descriptor, multi_target_platform_run=multi_target_platform_run)
+    def __init__(
+        self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
+    ):
+        super(PyLintTestSuite, self).__init__(
+            dart_info,
+            modulo,
+            modulo_index,
+            target_platform_descriptor,
+            multi_target_platform_run=multi_target_platform_run,
+        )
         self._files = self.get_suite_files()
 
     def _add_checker_stderr(self):
@@ -510,13 +551,24 @@ class PyLintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_check', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--source-root", "$(SOURCE_ROOT)",
-            "--checker", self.get_checker(opts, for_dist_build),
-            "--check-name", self.get_type_name(),
-            "--trace-path", os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            "--out-path", os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
-        ] + self._get_files(opts)
+        cmd = (
+            test.util.tools.get_test_tool_cmd(
+                opts, 'run_check', self.global_resources, wrapper=True, run_on_target_platform=True
+            )
+            + [
+                "--source-root",
+                "$(SOURCE_ROOT)",
+                "--checker",
+                self.get_checker(opts, for_dist_build),
+                "--check-name",
+                self.get_type_name(),
+                "--trace-path",
+                os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+                "--out-path",
+                os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            ]
+            + self._get_files(opts)
+        )
         if not self._add_checker_stderr():
             cmd += ["--no-snippet-from-stderr"]
         if not self._add_checker_stdout():
@@ -545,7 +597,6 @@ class PyLintTestSuite(LintTestSuite):
 
 
 class CheckImportsTestSuite(PyLintTestSuite):
-
     @classmethod
     def get_ci_type_name(cls):
         return "test"
@@ -598,7 +649,6 @@ class CheckImportsTestSuite(PyLintTestSuite):
 
 
 class GoFmtTestSuite(PyLintTestSuite):
-
     @classmethod
     def get_type_name(cls):
         return 'gofmt'
@@ -616,12 +666,24 @@ class GoFmtTestSuite(PyLintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_go_fmt', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--gofmt", '{}/bin/gofmt'.format(self.global_resources.get(test.const.GO_TOOLS_RESOURCE, test.const.GO_TOOLS_RESOURCE)),
-            "--source-root", "$(SOURCE_ROOT)",
-            "--trace-path", os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            "--out-path", os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
-        ] + self._get_files(opts)
+        cmd = (
+            test.util.tools.get_test_tool_cmd(
+                opts, 'run_go_fmt', self.global_resources, wrapper=True, run_on_target_platform=True
+            )
+            + [
+                "--gofmt",
+                '{}/bin/gofmt'.format(
+                    self.global_resources.get(test.const.GO_TOOLS_RESOURCE, test.const.GO_TOOLS_RESOURCE)
+                ),
+                "--source-root",
+                "$(SOURCE_ROOT)",
+                "--trace-path",
+                os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+                "--out-path",
+                os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            ]
+            + self._get_files(opts)
+        )
         for f in opts.tests_filters + self._additional_filters:
             cmd += ["--tests-filters", f]
         return cmd
@@ -640,7 +702,6 @@ class GoFmtTestSuite(PyLintTestSuite):
 
 
 class GoVetTestSuite(PyLintTestSuite):
-
     @classmethod
     def get_type_name(cls):
         return 'govet'
@@ -666,11 +727,20 @@ class GoVetTestSuite(PyLintTestSuite):
 
 class ClasspathClashTestSuite(PyLintTestSuite):
     def __init__(self, dart_info, target_platform_descriptor=None, multi_target_platform_run=False):
-        super(ClasspathClashTestSuite, self).__init__(dart_info, target_platform_descriptor=target_platform_descriptor, multi_target_platform_run=multi_target_platform_run)
+        super(ClasspathClashTestSuite, self).__init__(
+            dart_info,
+            target_platform_descriptor=target_platform_descriptor,
+            multi_target_platform_run=multi_target_platform_run,
+        )
         self.test_name = dart_info["TEST-NAME"]
-        self.ignored = sorted({('ignore_class:' + i) for i in dart_info.get("IGNORE_CLASSPATH_CLASH", "").split(" ") if i})
+        self.ignored = sorted(
+            {('ignore_class:' + i) for i in dart_info.get("IGNORE_CLASSPATH_CLASH", "").split(" ") if i}
+        )
         self.strict = "STRICT_CLASSPATH_CLASH" in self.dart_info
-        self.classpath = [os.path.join(consts.BUILD_ROOT, os.path.relpath(item, '$B')) for item in self.dart_info.get('CLASSPATH').split()]
+        self.classpath = [
+            os.path.join(consts.BUILD_ROOT, os.path.relpath(item, '$B'))
+            for item in self.dart_info.get('CLASSPATH').split()
+        ]
         self.deps = sorted(set([os.path.relpath(x, consts.BUILD_ROOT) for x in self.classpath]))
 
     @classmethod

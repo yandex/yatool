@@ -13,7 +13,6 @@ class NoResourceInCacheException(Exception):
 
 
 class MdsStorage(object):
-
     mds_prefix = "https://storage.yandex-team.ru/get-devtools/"
 
     def __init__(self, storage_root, use_cached_only=True):
@@ -36,7 +35,7 @@ class MdsStorage(object):
 
         for tar_archive_suffix in (".tar.gz", ".tar"):
             if resource_file.endswith(tar_archive_suffix):
-                resource_dir = resource_file[:-len(tar_archive_suffix)]
+                resource_dir = resource_file[: -len(tar_archive_suffix)]
                 if not os.path.exists(resource_dir):
                     logger.debug("Extracting %s to %s", resource_id, resource_dir)
                     exts.archive.extract_from_tar(resource_file, resource_dir)

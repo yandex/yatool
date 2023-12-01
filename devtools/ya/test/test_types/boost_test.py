@@ -12,16 +12,25 @@ from test.test_types import common as common_types
 class BoostTestSuite(common_types.AbstractTestSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
-            '$(BUILD_ROOT)', self.project_path, self.name, retry,
+            '$(BUILD_ROOT)',
+            self.project_path,
+            self.name,
+            retry,
             target_platform_descriptor=self.target_platform_descriptor,
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(opts, 'run_boost_test', self.global_resources, wrapper=True, run_on_target_platform=False) + [
-            '--binary', self.binary_path('$(BUILD_ROOT)'),
-            '--tracefile', os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
-            '--output-dir', os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
-            '--project-path', self.project_path,
+        cmd = test.util.tools.get_test_tool_cmd(
+            opts, 'run_boost_test', self.global_resources, wrapper=True, run_on_target_platform=False
+        ) + [
+            '--binary',
+            self.binary_path('$(BUILD_ROOT)'),
+            '--tracefile',
+            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            '--output-dir',
+            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            '--project-path',
+            self.project_path,
             '--verbose',
         ]
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:

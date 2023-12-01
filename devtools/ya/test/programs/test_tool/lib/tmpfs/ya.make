@@ -2,10 +2,14 @@ PY23_LIBRARY()
 
 STYLE_PYTHON()
 
-PY_SRCS(__init__.py)
+PY_SRCS(
+    __init__.py
+)
 
 IF (OS_LINUX)
-    PY_SRCS(mount.pyx)
+    PY_SRCS(
+        mount.pyx
+    )
     PEERDIR(
         devtools/ya/test/programs/test_tool/lib/unshare
     )

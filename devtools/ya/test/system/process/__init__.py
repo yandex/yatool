@@ -34,6 +34,7 @@ def execute(
         creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
         create_new_process_group = False
     if create_new_process_group or stdout_to_stderr:
+
         def preexec_fn():
             if create_new_process_group:
                 os.setpgrp()

@@ -100,7 +100,9 @@ def parse_args():
     )
     parser.add_argument("--test-list-path", help="path to test list calculated in list_node", default=None)
     parser.add_argument("--stop-signal", default=0, type=int)
-    parser.add_argument("--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary")
+    parser.add_argument(
+        "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
+    )
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -182,7 +184,14 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
                 cmd += [filename]
 
             process.execute(
-                cmd, timeout=list_timeout, on_timeout=on_timeout, collect_cores=False, check_sanitizer=False, cwd=cwd, stdin=stdin, text=True
+                cmd,
+                timeout=list_timeout,
+                on_timeout=on_timeout,
+                collect_cores=False,
+                check_sanitizer=False,
+                cwd=cwd,
+                stdin=stdin,
+                text=True,
             )
 
             result = exts.fs.read_text(filename).strip().split("\n")
@@ -257,7 +266,6 @@ class DeepDict(dict):
 
 
 class State(object):
-
     pretest, started, finished = range(3)
 
 
@@ -448,10 +456,7 @@ def shorten_wine_paths(wine_path, cmd):
             os.symlink(cwd, test_drive_cwd)
 
         tmpdir = os.environ.get("TMPDIR", "")
-        wine_tmp = os.path.join(
-            tmpdir,
-            os.path.join(test_drive_cwd, "_wine_tmp")
-        )
+        wine_tmp = os.path.join(tmpdir, os.path.join(test_drive_cwd, "_wine_tmp"))
 
         if not os.path.exists(wine_tmp):
             if os.path.exists(tmpdir):
@@ -792,7 +797,9 @@ def launch_tests(
             entry_name = "chunk"
             logger.debug("Trying to recover dump core file")
 
-        filename = "{}.{}".format(os.path.basename(binary), entry_name.replace("::", ".").replace('/', '.').replace('\\', '.'))
+        filename = "{}.{}".format(
+            os.path.basename(binary), entry_name.replace("::", ".").replace('/', '.').replace('\\', '.')
+        )
         backtrace = shared.postprocess_coredump(
             binary, os.getcwd(), res.pid, res.logs[entry_name], gdb_path, collect_cores, filename, logsdir
         )

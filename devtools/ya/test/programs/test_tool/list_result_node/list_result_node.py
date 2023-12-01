@@ -18,14 +18,22 @@ def get_options():
     parser.disable_interspersed_args()
     parser.add_option("--test-name-filter", dest="test_name_filters", action='append', default=[])
     parser.add_option("--report-skipped-suites", dest="report_skipped_suites", action='store_true', default=False)
-    parser.add_option("--filter-description", dest="filter_description", default=None, help="Current tests filters description", action='store')
     parser.add_option(
-        "--log-level", dest="log_level",
-        help="logging level", action='store', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+        "--filter-description",
+        dest="filter_description",
+        default=None,
+        help="Current tests filters description",
+        action='store',
     )
     parser.add_option(
-        "--fail-exit-code", dest="fail_exit_code", help="exit code on fail", action='store', default='1'
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
+    parser.add_option("--fail-exit-code", dest="fail_exit_code", help="exit code on fail", action='store', default='1')
     return parser.parse_args()
 
 
@@ -77,7 +85,9 @@ def get_projects(report_skipped_suites):
 
 
 def format_tags(tags):
-    return " [tags: {}]".format(", ".join(['[[warn]]{}[[rst]]'.format(t) if t.startswith("ya") else t for t in sorted(tags)]))
+    return " [tags: {}]".format(
+        ", ".join(['[[warn]]{}[[rst]]'.format(t) if t.startswith("ya") else t for t in sorted(tags)])
+    )
 
 
 def main():
@@ -91,9 +101,8 @@ def main():
 
     projects = get_projects(options.report_skipped_suites)
     filter_message = test.util.shared.build_filter_message(
-        options.filter_description,
-        options.test_name_filters,
-        get_number_of_empty_suites(projects))
+        options.filter_description, options.test_name_filters, get_number_of_empty_suites(projects)
+    )
     if filter_message:
         display.emit_message(filter_message)
         display.emit_message()

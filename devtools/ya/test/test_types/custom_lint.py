@@ -60,14 +60,23 @@ class CustomLintTestSuite(LintTestSuite, WrappingTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(opts, "run_custom_lint", self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            "--source-root", SOURCE_ROOT,
-            "--build-root", BUILD_ROOT,
-            "--project-path", os.path.join(SOURCE_ROOT, self.project_path),
-            "--trace-path", os.path.join(work_dir, test.const.TRACE_FILE_NAME),
-            "--out-path", os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
-            "--lint-name", self._lint_name,
-            "--linter", self._linter,
+        cmd = test.util.tools.get_test_tool_cmd(
+            opts, "run_custom_lint", self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            "--source-root",
+            SOURCE_ROOT,
+            "--build-root",
+            BUILD_ROOT,
+            "--project-path",
+            os.path.join(SOURCE_ROOT, self.project_path),
+            "--trace-path",
+            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            "--out-path",
+            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            "--lint-name",
+            self._lint_name,
+            "--linter",
+            self._linter,
         ]
         for dep in sorted(self._custom_dependencies):
             cmd += ["--depends", dep]

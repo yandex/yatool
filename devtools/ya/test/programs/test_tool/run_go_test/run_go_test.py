@@ -48,7 +48,9 @@ def parse_args():
     parser.add_argument("-b", "--binary", required=True, help="Path to the unittest binary")
     parser.add_argument("-t", "--trace-path", help="Path to the output trace log")
     parser.add_argument("-o", "--output-dir", help="Path to the output dir")
-    parser.add_argument("-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)")
+    parser.add_argument(
+        "-f", "--test-filter", default=[], action="append", help="Run only specified tests (binary name or mask)"
+    )
     parser.add_argument("-p", "--project-path", help="Project path relative to arcadia")
     parser.add_argument("--timeout", default=0, type=int)
     parser.add_argument("--benchmark-timeout", default=0, type=int)
@@ -66,7 +68,9 @@ def parse_args():
     parser.add_argument("--gdb-debug", action="store_true")
     parser.add_argument("--gdb-path", help="Path to gdb")
     parser.add_argument("--dlv-debug", action="store_true")
-    parser.add_argument("--dlv-args", help="Dlv extra command line options. Has no effect unless --dlv-debug is also specified")
+    parser.add_argument(
+        "--dlv-args", help="Dlv extra command line options. Has no effect unless --dlv-debug is also specified"
+    )
     parser.add_argument("--dlv-path", help="Path to dlv")
     parser.add_argument("--report-deselected", help="Report deselected tests to trace file", action="store_true")
     parser.add_argument("--wine-path", action="store", default="")
@@ -74,7 +78,9 @@ def parse_args():
     parser.add_argument("--no-subtest-report", action="store_true")
     parser.add_argument("--test-list-path", help="path to test list calculated in list_node", default=None)
     parser.add_argument("--total-report", action="store_true")
-    parser.add_argument("--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary")
+    parser.add_argument(
+        "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
+    )
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -133,8 +139,12 @@ def get_tests(args, wine_path, stderr=None):
         else:
             selected = tests
         if args.modulo != 1:
-            chunk_selected = test_splitter.get_splitted_tests(selected, args.modulo, args.modulo_index, args.partition_mode)
-            chunk_deselected = test_splitter.get_splitted_tests(deselected, args.modulo, args.modulo_index, args.partition_mode)
+            chunk_selected = test_splitter.get_splitted_tests(
+                selected, args.modulo, args.modulo_index, args.partition_mode
+            )
+            chunk_deselected = test_splitter.get_splitted_tests(
+                deselected, args.modulo, args.modulo_index, args.partition_mode
+            )
             return chunk_selected, chunk_deselected
         else:
             return selected, deselected
@@ -364,7 +374,9 @@ def fill_suite(suite, suite_name, test_names, opts):
     for test in test_names:
         splited_test = test.rsplit('::')[-1]
         full_test_name = get_full_test_name(suite_name, splited_test)
-        test_case = facility.TestCase(full_test_name, const.Status.NOT_LAUNCHED, "test was not launched", path=opts.project_path)
+        test_case = facility.TestCase(
+            full_test_name, const.Status.NOT_LAUNCHED, "test was not launched", path=opts.project_path
+        )
         suite.chunk.tests.append(test_case)
 
 
@@ -407,7 +419,9 @@ def parse_benchmark_results(content):
                     metrics[name] = value
 
                 ns_per_op = float(metrics.get("ns_per_op", 0))
-                test_results.update_test_status(test_name, status="PASS", duration=float(iterations_count * ns_per_op) / 10 ** 9, metrics=metrics)
+                test_results.update_test_status(
+                    test_name, status="PASS", duration=float(iterations_count * ns_per_op) / 10**9, metrics=metrics
+                )
 
     test_results.fix_subbenchmarks_statuses()
 
@@ -420,13 +434,13 @@ def obtain_backtrace(text):
     prefix = "SIGQUIT: quit\n"
     start = text.find(prefix)
     if start != -1:
-        return text[start + len(prefix):].strip()
+        return text[start + len(prefix) :].strip()
 
 
 def strip_registers(bt):
     m = re.search(r"^r[a-z0-9]+\s+0x[0-9a-f]+$", bt, flags=re.MULTILINE)
     if m:
-        bt = bt[:m.start(0)]
+        bt = bt[: m.start(0)]
     return bt.strip()
 
 
@@ -439,8 +453,10 @@ def colorize_bt(text):
         # Goroutine colorization
         (re.compile(r"^(goroutine [0-9]+ \[.*?\])", flags=re.MULTILINE), r"[[c:light-cyan]]\1[[rst]]"),
         # File path and line number
-        (re.compile(r"(/[/A-Za-z0-9\+_\.\-]+):([0-9]+)((\s+\+0x[a-f0-9]+)?)$", flags=re.MULTILINE),
-         r"[[rst]]\1:[[c:magenta]]\2[[rst]]\3"),
+        (
+            re.compile(r"(/[/A-Za-z0-9\+_\.\-]+):([0-9]+)((\s+\+0x[a-f0-9]+)?)$", flags=re.MULTILINE),
+            r"[[rst]]\1:[[c:magenta]]\2[[rst]]\3",
+        ),
         # Addresses
         (re.compile(r"\b(0x[a-f0-9]+)\b"), r"[[c:light-grey]]\1[[rst]]"),
     ]
@@ -475,7 +491,9 @@ def run_tests(opts):
     tests, deselected = get_tests(opts, opts.wine_path)
     if opts.report_deselected:
         for deselected_test in deselected:
-            test_case = facility.TestCase(deselected_test, const.Status.DESELECTED, path=opts.project_path, logs={'logsdir': opts.output_dir})
+            test_case = facility.TestCase(
+                deselected_test, const.Status.DESELECTED, path=opts.project_path, logs={'logsdir': opts.output_dir}
+            )
             suite.chunk.tests.append(test_case)
     if not tests:
         shared.dump_trace_file(suite, opts.tracefile)
@@ -557,7 +575,12 @@ def run_tests(opts):
 
             if info.status in ["RUN", "CONT", "PAUSE", "NAME"] and exit_code == const.TestRunExitCode.TimeOut:
                 if '/' in test_name:  # it's subtest and it wasn't added to empty suite before
-                    test_case = facility.TestCase(full_test_name, const.Status.NOT_LAUNCHED, "Subtest was launched as a part of a test function that exceeded timeout", path=opts.project_path)
+                    test_case = facility.TestCase(
+                        full_test_name,
+                        const.Status.NOT_LAUNCHED,
+                        "Subtest was launched as a part of a test function that exceeded timeout",
+                        path=opts.project_path,
+                    )
                     empty_suite.chunk.tests.append(test_case)
 
                 if (first_not_finished is None) or info.seq_number < first_not_finished.seq_number:
@@ -601,12 +624,19 @@ def run_tests(opts):
     shared.dump_trace_file(empty_suite, opts.tracefile)
 
     if exit_code not in [0, const.TestRunExitCode.TimeOut]:
-        if cov_path and "cannot use -test.coverprofile because test binary was not built with coverage enabled" in std_err:
+        if (
+            cov_path
+            and "cannot use -test.coverprofile because test binary was not built with coverage enabled" in std_err
+        ):
             suite.add_chunk_error('Test did not provide coverage data', const.Status.DESELECTED)
         elif results and results.result == const.Status.GOOD:
-            suite.add_chunk_error('[[bad]]Test crashed with exit code: {} but all tests passed[[rst]]'.format(exit_code))
+            suite.add_chunk_error(
+                '[[bad]]Test crashed with exit code: {} but all tests passed[[rst]]'.format(exit_code)
+            )
         elif results is None or exit_code != 1:
-            suite.add_chunk_error('[[bad]]Test crashed with exit code: {}[[rst]]'.format(exit_code), const.Status.CRASHED)
+            suite.add_chunk_error(
+                '[[bad]]Test crashed with exit code: {}[[rst]]'.format(exit_code), const.Status.CRASHED
+            )
     elif exit_code == const.TestRunExitCode.TimeOut:
         bt = obtain_backtrace(std_err)
         if bt:
@@ -617,11 +647,16 @@ def run_tests(opts):
 
             bt = strip_registers(bt)
             bt = colorize_bt(bt)
-            suite.add_chunk_error('[[bad]]Chunk exceeded timeout - dumping goroutine stacktraces\n{}[[rst]]'.format(bt), const.Status.TIMEOUT)
+            suite.add_chunk_error(
+                '[[bad]]Chunk exceeded timeout - dumping goroutine stacktraces\n{}[[rst]]'.format(bt),
+                const.Status.TIMEOUT,
+            )
         else:
             logger.debug("No backtrack found among stderr log")
     elif results.parse_error:
-        suite.add_chunk_error('[[bad]]Test output parser error: {}[[rst]]'.format(results.parse_error), const.Status.CRASHED)
+        suite.add_chunk_error(
+            '[[bad]]Test output parser error: {}[[rst]]'.format(results.parse_error), const.Status.CRASHED
+        )
 
     shared.dump_trace_file(suite, opts.tracefile)
 

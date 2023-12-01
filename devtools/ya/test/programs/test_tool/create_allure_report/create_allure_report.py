@@ -19,11 +19,17 @@ def get_options():
     parser.disable_interspersed_args()
     parser.add_option("--log-path", dest="log_path", help="log file path", action='store')
     parser.add_option(
-        "--log-level", dest="log_level",
-        help="logging level", action='store', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     parser.add_option("--allure", dest="allure_report", help="allure file path", action='store', default=None)
-    parser.add_option("--allure-tars", dest="allure_tars", help="list of allure report tars", action='append', default=[])
+    parser.add_option(
+        "--allure-tars", dest="allure_tars", help="list of allure report tars", action='append', default=[]
+    )
     return parser.parse_args()
 
 

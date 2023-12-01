@@ -1,6 +1,8 @@
 PY3_LIBRARY()
 
-PY_SRCS(resolve_java_coverage.py)
+PY_SRCS(
+    resolve_java_coverage.py
+)
 
 PEERDIR(
     contrib/deprecated/python/ujson
@@ -15,4 +17,6 @@ STYLE_PYTHON()
 
 END()
 
-RECURSE_FOR_TESTS(tests)
+RECURSE_FOR_TESTS(
+    tests
+)

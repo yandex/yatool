@@ -64,7 +64,6 @@ class DiffTestResultSanityCheckException(Exception):
 
 
 class VCS(object):
-
     name = None
 
     def active(self):
@@ -91,15 +90,16 @@ class SvnRepo(VCS):
     def apply(self, test_canonical_dir):
         test_suite_canonical_dir = os.path.abspath(os.path.join(test_canonical_dir, ".."))
         test_suite_dir = os.path.abspath(os.path.join(test_suite_canonical_dir, ".."))
-        if svn.is_under_control(test_suite_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY) and not svn.is_under_control(
-                test_suite_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY):
+        if svn.is_under_control(
+            test_suite_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY
+        ) and not svn.is_under_control(test_suite_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY):
             # if test suite canonical dir is not under svn - add it (only it)
             yatest_logger.debug("Adding to svn test suite canonical dir %s", test_suite_canonical_dir)
             svn.svn_add(test_suite_canonical_dir, depth='empty', svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY)
         if (
-            os.path.exists(test_canonical_dir) and
-            svn.is_under_control(test_suite_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY) and
-            not svn.is_under_control(test_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY)
+            os.path.exists(test_canonical_dir)
+            and svn.is_under_control(test_suite_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY)
+            and not svn.is_under_control(test_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY)
         ):
             # add test canonical dir
             svn.svn_add(test_canonical_dir, svn_choose_policy=SvnRepo.SVN_CHOOSE_POLICY)
@@ -129,13 +129,18 @@ class HgRepo(VCS):
     name = "hg"
 
     def __init__(self, arcadia_root):
-        self._active = test.system.process.execute([tools.tool('hg'), "branch"], cwd=arcadia_root, check_exit_code=False).exit_code == 0
+        self._active = (
+            test.system.process.execute([tools.tool('hg'), "branch"], cwd=arcadia_root, check_exit_code=False).exit_code
+            == 0
+        )
 
     def active(self):
         return self._active
 
     def apply(self, test_canonical_dir):
-        st = test.system.process.execute([tools.tool('hg'), "status", test_canonical_dir, "-T", "json"], cwd=test_canonical_dir)
+        st = test.system.process.execute(
+            [tools.tool('hg'), "status", test_canonical_dir, "-T", "json"], cwd=test_canonical_dir
+        )
         status = json.loads(st.std_out)
         to_be_added = []
         to_be_removed = []
@@ -156,7 +161,12 @@ class ArcRepo(VCS):
 
     def __init__(self, arcadia_root):
         self.arcadia_root = arcadia_root
-        self._active = test.system.process.execute([tools.tool('arc'), "branch"], cwd=arcadia_root, check_exit_code=False).exit_code == 0
+        self._active = (
+            test.system.process.execute(
+                [tools.tool('arc'), "branch"], cwd=arcadia_root, check_exit_code=False
+            ).exit_code
+            == 0
+        )
 
     def active(self):
         return self._active
@@ -166,7 +176,6 @@ class ArcRepo(VCS):
 
 
 class DummyRepo(VCS):
-
     def __init__(self, arcadia_root):
         pass
 
@@ -226,7 +235,6 @@ def recursive_replace_uri_pattern(data, backend, replacer):
 
 
 class CanonicalData(object):
-
     def __init__(
         self,
         arc_path,
@@ -250,7 +258,6 @@ class CanonicalData(object):
         no_src_changes=False,
         backend=None,
     ):
-
         self._arc_path = arc_path
         self._max_str_len = max_str_len
         self._max_file_size = max_file_size
@@ -325,7 +332,9 @@ class CanonicalData(object):
             # Try to find test results by legacy name
             legacy_test_name = self._get_legacy_test_name(project_path, test_name)
             if legacy_test_name:
-                canonical_results_path = self._try_to_get_canonical_results_path(project_path, legacy_test_name, test_description)
+                canonical_results_path = self._try_to_get_canonical_results_path(
+                    project_path, legacy_test_name, test_description
+                )
         if canonical_results_path:
             return self._get_canonical_file_for_test(canonical_results_path, test_description)
         else:
@@ -336,7 +345,9 @@ class CanonicalData(object):
         canonical_results_path = os.path.join(self.get_suite_canon_dir(project_path), const.CANON_RESULT_FILE_NAME)
 
         if not os.path.exists(canonical_results_path):
-            yatest_logger.debug("Test %s does not have canonical results by %s", test_description, canonical_results_path)
+            yatest_logger.debug(
+                "Test %s does not have canonical results by %s", test_description, canonical_results_path
+            )
             return None
 
         results = self._get_canonical_file_for_test(canonical_results_path, test_description)
@@ -352,18 +363,22 @@ class CanonicalData(object):
         return None
 
     def _try_to_get_canonical_results_path(self, project_path, test_name, test_description):
-        canonical_results_path = os.path.join(self.get_test_canon_dir(project_path, test_name), const.CANON_RESULT_FILE_NAME)
+        canonical_results_path = os.path.join(
+            self.get_test_canon_dir(project_path, test_name), const.CANON_RESULT_FILE_NAME
+        )
         if os.path.exists(canonical_results_path):
             return canonical_results_path
         else:
-            yatest_logger.debug("Test %s does not have canonical results by %s", test_description, canonical_results_path)
+            yatest_logger.debug(
+                "Test %s does not have canonical results by %s", test_description, canonical_results_path
+            )
             return None
 
     def _get_legacy_test_name(self, project_path, test_name):
         # Remove project name from test module name
         prefix = project_path.replace('/', '.').replace('-', '_') + '.'
         if test_name.startswith(prefix):
-            return test_name[len(prefix):]
+            return test_name[len(prefix) :]
         else:
             return None
 
@@ -376,7 +391,9 @@ class CanonicalData(object):
         try:
             res = self._get_canonical_file(filename)
         except Exception as e:
-            raise Exception("Looks like canonical file '{}' for test '{}' is broken: {}".format(filename, test_description, e))
+            raise Exception(
+                "Looks like canonical file '{}' for test '{}' is broken: {}".format(filename, test_description, e)
+            )
         return res
 
     def canonize(self, suite):
@@ -410,7 +427,13 @@ class CanonicalData(object):
                         canonical_results = self.get_canonical_results(suite.project_path, canonical_name)
                         dir_for_extracted_files = os.path.join(root_dir_for_extracted_files, suitable_canonical_name)
                         exts.fs.ensure_dir(dir_for_extracted_files)
-                        test_case.result = self._prepare_result(test_case.result, canonical_result_dir, dir_for_extracted_files, canonical_results, upload_targets)
+                        test_case.result = self._prepare_result(
+                            test_case.result,
+                            canonical_result_dir,
+                            dir_for_extracted_files,
+                            canonical_results,
+                            upload_targets,
+                        )
                         if external_diff_tool_check(test_case.result, canonical_results):
                             comparer = test_canon_compare.ResultsComparer(
                                 canonical_name,
@@ -488,7 +511,9 @@ class CanonicalData(object):
                     current_res = self._copy_test_canonical_results(results_root, suite.project_path, canonical_name)
                     if current_res is not None:
                         fix_canonical_result(current_res)
-                        yatest_logger.debug("Will copy the current result of test %s with status %s", canonical_name, test_case.status)
+                        yatest_logger.debug(
+                            "Will copy the current result of test %s with status %s", canonical_name, test_case.status
+                        )
                         suite_result[canonical_name] = current_res
                     else:
                         yatest_logger.debug("Test %s does not have canonical result", canonical_name)
@@ -501,7 +526,9 @@ class CanonicalData(object):
                     external_data = external.ExternalDataInfo(value)
                     if external_data.is_file:
                         # NOTE: checksum is omitted here
-                        return dict(external.ExternalDataInfo.serialize_file(os.path.relpath(external_data.path, results_root)))
+                        return dict(
+                            external.ExternalDataInfo.serialize_file(os.path.relpath(external_data.path, results_root))
+                        )
                     return value
                 return value
 
@@ -512,7 +539,9 @@ class CanonicalData(object):
 
             suite_result = external.apply(set_proper_external_path, suite_result)
             if suite.save_old_canondata:
-                canonical_results_path = os.path.join(self.get_suite_canon_dir(suite.project_path), const.CANON_RESULT_FILE_NAME)
+                canonical_results_path = os.path.join(
+                    self.get_suite_canon_dir(suite.project_path), const.CANON_RESULT_FILE_NAME
+                )
                 suite_result_saved = self._get_canonical_file(canonical_results_path)
                 canon_dir = self.get_suite_canon_dir(suite.project_path)
                 data_list = os.listdir(canon_dir)
@@ -530,7 +559,9 @@ class CanonicalData(object):
                     return res
 
                 with open(os.path.join(results_root, const.CANON_RESULT_FILE_NAME), "w") as result_file:
-                    json.dump(suite_result, result_file, indent=4, ensure_ascii=False, separators=(',', ': '), sort_keys=True)
+                    json.dump(
+                        suite_result, result_file, indent=4, ensure_ascii=False, separators=(',', ': '), sort_keys=True
+                    )
                     result_file.write('\n')
 
                 self._apply_changes(self.get_suite_canon_dir(suite.project_path), results_root)
@@ -539,7 +570,9 @@ class CanonicalData(object):
     def save(self, suite):
         for test_case in suite.tests:
             try:
-                test_case.result = self._save_test(self._get_canonical_test_name(suite, test_case), test_case.result, suite.output_dir())
+                test_case.result = self._save_test(
+                    self._get_canonical_test_name(suite, test_case), test_case.result, suite.output_dir()
+                )
             except Exception as e:
                 yatest_logger.debug(traceback.format_exc())
                 message = "Error while saving results {} from {}: {}".format(test_case.name, suite.project_path, e)
@@ -570,7 +603,12 @@ class CanonicalData(object):
                         if test_case.is_diff_test:
                             self._process_diff_test(suite, test_case)
                         else:
-                            self._verify_test(suite.project_path, self._get_canonical_test_name(suite, test_case), test_case.result, output_dir)
+                            self._verify_test(
+                                suite.project_path,
+                                self._get_canonical_test_name(suite, test_case),
+                                test_case.result,
+                                output_dir,
+                            )
                     except DiffTestResultSanityCheckException as e:
                         test_case.comment = "[[bad]]{}[[rst]]".format(e)
                         test_case.status = test_const.Status.FAIL
@@ -581,7 +619,9 @@ class CanonicalData(object):
                             if isinstance(e, CanonicalDataMissingError):
                                 test_case.comment = "[[warn]]Test case is makred with [[imp]]xfaildiff[[warn]]: no canon data found as expected"
                             else:
-                                test_case.comment = "[[warn]]Test results expectedly differ ([[imp]]xfaildiff[[warn]]) from canonical:[[unimp]]\n{}".format(error)
+                                test_case.comment = "[[warn]]Test results expectedly differ ([[imp]]xfaildiff[[warn]]) from canonical:[[unimp]]\n{}".format(
+                                    error
+                                )
                             test_case.status = test_const.Status.XFAIL
                         else:
                             test_case.comment = "[[bad]]Test results differ from canonical:\n{}".format(error)
@@ -590,7 +630,9 @@ class CanonicalData(object):
                         if getattr(e, 'diff_path', None):
                             test_case.logs["diff"] = e.diff_path
                     except Exception:
-                        test_case.comment = "[[bad]]Unexpected error while verifying canonical results:\n{}".format(traceback.format_exc())
+                        test_case.comment = "[[bad]]Unexpected error while verifying canonical results:\n{}".format(
+                            traceback.format_exc()
+                        )
                         test_case.status = test_const.Status.FAIL
                     else:
                         # verification succeed, check that it's expected
@@ -600,25 +642,35 @@ class CanonicalData(object):
 
                 else:
                     yatest_logger.debug("Test did not pass, will not verify test output with possible canonical one")
-                yatest_logger.debug("Test %s status: %s", self._get_canonical_test_name(suite, test_case), test_const.Status.TO_STR[test_case.status])
+                yatest_logger.debug(
+                    "Test %s status: %s",
+                    self._get_canonical_test_name(suite, test_case),
+                    test_const.Status.TO_STR[test_case.status],
+                )
                 if test_case.comment:
                     yatest_logger.debug(os.linesep + common.to_utf8(strip_markup(test_case.comment)))
 
     def _process_diff_test(self, suite, test_case):
         def process_diff(value, value_path):
-            if any([
-                not value_path and (type(value) != dict or external.is_external(value)),
-                value_path and not external.is_external(value),
-                len(value_path) > 1,
-                type(test_case.result) != dict
-            ]):
-                raise DiffTestResultSanityCheckException("diff test result must be dict of <key>->yatest.common.canonical_file()")
+            if any(
+                [
+                    not value_path and (type(value) != dict or external.is_external(value)),
+                    value_path and not external.is_external(value),
+                    len(value_path) > 1,
+                    type(test_case.result) != dict,
+                ]
+            ):
+                raise DiffTestResultSanityCheckException(
+                    "diff test result must be dict of <key>->yatest.common.canonical_file()"
+                )
 
             err = "Error in diff test result['{}']".format(value_path)
             if value_path:
                 value_path = value_path[0]
                 if not external.is_external(value):
-                    raise DiffTestResultSanityCheckException("{}: {}".format(err, "value must be a yatest.common.canonical_file"))
+                    raise DiffTestResultSanityCheckException(
+                        "{}: {}".format(err, "value must be a yatest.common.canonical_file")
+                    )
 
                 external_data = external.ExternalDataInfo(value)
                 if not external_data.is_file:
@@ -631,7 +683,9 @@ class CanonicalData(object):
         if not test_case.result:
             raise DiffTestResultSanityCheckException("diff test must have a result")
 
-        test_case.result = self._save_test(self._get_canonical_test_name(suite, test_case), test_case.result, suite.output_dir(), is_diff_test=True)
+        test_case.result = self._save_test(
+            self._get_canonical_test_name(suite, test_case), test_case.result, suite.output_dir(), is_diff_test=True
+        )
         external.apply(process_diff, test_case.result)
 
     def _verify_test(self, project_path, test_name, test_result, output_path):
@@ -652,7 +706,11 @@ class CanonicalData(object):
                 raise CanonicalResultVerificationException(common.to_utf8(diff), diff_path)
         else:
             if test_result is not None:
-                raise CanonicalDataMissingError("Cannot find canonical data for {}, canonize test results or ensure the canonical data exists in {}".format(test_name, const.CANON_DATA_DIR_NAME))
+                raise CanonicalDataMissingError(
+                    "Cannot find canonical data for {}, canonize test results or ensure the canonical data exists in {}".format(
+                        test_name, const.CANON_DATA_DIR_NAME
+                    )
+                )
 
     def _save_test(self, test_name, test_result, output_path, is_diff_test=False):
         result_dir = os.path.join(output_path, "results", self._get_canonical_filename(test_name))
@@ -679,7 +737,15 @@ class CanonicalData(object):
             result_groups.pop()
         return result_groups
 
-    def _prepare_result(self, test_result, result_folder, dir_for_extracted_files, current_result=None, upload_targets=None, force_save_locally=False):
+    def _prepare_result(
+        self,
+        test_result,
+        result_folder,
+        dir_for_extracted_files,
+        current_result=None,
+        upload_targets=None,
+        force_save_locally=False,
+    ):
         def prepare(value, value_path):
             if external.is_external(value):
                 external_data = external.ExternalDataInfo(value)
@@ -692,12 +758,14 @@ class CanonicalData(object):
                         force_save_locally or external_data.get("local", False),
                         upload_targets,
                         diff_tool=external_data.get("diff_tool"),
-                        diff_tool_timeout=external_data.get("diff_tool_timeout")
+                        diff_tool_timeout=external_data.get("diff_tool_timeout"),
                     )
                 return value
             if isinstance(value, six.string_types):
                 if len(value) > self._max_str_len:
-                    return self._extract(dir_for_extracted_files, result_folder, value, value_path, current_result, upload_targets)
+                    return self._extract(
+                        dir_for_extracted_files, result_folder, value, value_path, current_result, upload_targets
+                    )
             return value
 
         if test_result is not None:
@@ -710,7 +778,9 @@ class CanonicalData(object):
         with open(extracted_path, "w") as extracted:
             extracted.write(value)
         save_locally = self._should_be_saved_locally(value, extracted_path)
-        return self._save_path(canonical_dir, extracted_path, value_path, current_result, save_locally, delayed_upload_args)
+        return self._save_path(
+            canonical_dir, extracted_path, value_path, current_result, save_locally, delayed_upload_args
+        )
 
     def _should_be_saved_locally(self, value, filename):
         locally = True
@@ -735,7 +805,7 @@ class CanonicalData(object):
         save_locally,
         delayed_upload_args,
         diff_tool=None,
-        diff_tool_timeout=None
+        diff_tool_timeout=None,
     ):
         exts.fs.ensure_dir(canonical_dir)
         checksum = exts.hashing.md5_path(saving_path)
@@ -763,30 +833,35 @@ class CanonicalData(object):
 
         # save file in repository
         canonical_file_pattern = self._get_canonical_filename(os.path.basename(saving_path))
-        canonical_path = common.get_unique_file_path(canonical_dir, canonical_file_pattern,
-                                                     create_file=not os.path.isdir(saving_path))
+        canonical_path = common.get_unique_file_path(
+            canonical_dir, canonical_file_pattern, create_file=not os.path.isdir(saving_path)
+        )
         if os.path.isdir(saving_path):
             exts.fs.copytree3(saving_path, canonical_path, dirs_exist_ok=True)
         else:
             exts.fs.copy_file(saving_path, canonical_path)
 
         if save_locally or not self._max_file_size:
-            saved = dict(external.ExternalDataInfo.serialize_file(
-                canonical_path,
-                checksum,
-                diff_tool=diff_tool,
-                diff_tool_timeout=diff_tool_timeout,
-                local=save_locally,
-                size=os.path.getsize(canonical_path)
-            ))
+            saved = dict(
+                external.ExternalDataInfo.serialize_file(
+                    canonical_path,
+                    checksum,
+                    diff_tool=diff_tool,
+                    diff_tool_timeout=diff_tool_timeout,
+                    local=save_locally,
+                    size=os.path.getsize(canonical_path),
+                )
+            )
         else:
-            saved = dict(external.ExternalDataInfo.serialize_file(
-                canonical_path,
-                checksum,
-                diff_tool=diff_tool,
-                diff_tool_timeout=diff_tool_timeout,
-                size=os.path.getsize(canonical_path)
-            ))
+            saved = dict(
+                external.ExternalDataInfo.serialize_file(
+                    canonical_path,
+                    checksum,
+                    diff_tool=diff_tool,
+                    diff_tool_timeout=diff_tool_timeout,
+                    size=os.path.getsize(canonical_path),
+                )
+            )
             delayed_upload_args.append(saved)
 
         return saved
@@ -805,10 +880,13 @@ class CanonicalData(object):
         return "[{} in {}]".format(test_name, project_path)
 
     def get_test_canon_dir(self, project_path, test_name):
-        return os.path.join(self._arc_path, project_path, const.CANON_DATA_DIR_NAME,
-                            self._sub_path or "",
-                            self._get_canonical_filename(test_name),
-                            )
+        return os.path.join(
+            self._arc_path,
+            project_path,
+            const.CANON_DATA_DIR_NAME,
+            self._sub_path or "",
+            self._get_canonical_filename(test_name),
+        )
 
     def get_suite_canon_dir(self, project_path):
         return os.path.join(self._arc_path, project_path, const.CANON_DATA_DIR_NAME, self._sub_path or "")
@@ -828,7 +906,7 @@ class CanonicalData(object):
         # Reduce filename length to avoid hitting FS limit
         if len(name) > lenght_limit:
             hashsum = exts.hashing.fast_hash(name)
-            name = "{}-{}".format(name[:lenght_limit - len(hashsum) - 1], hashsum)
+            name = "{}-{}".format(name[: lenght_limit - len(hashsum) - 1], hashsum)
         return name
 
     def _get_canonical_test_name(self, suite, test_case):
@@ -837,7 +915,7 @@ class CanonicalData(object):
         test_class_name = ".".join(test_name_split[1:])
 
         if test_name.endswith(".py"):
-            test_name = test_name[:-len(".py")]
+            test_name = test_name[: -len(".py")]
             return "{}.{}".format(test_name, test_class_name)
         elif test_name == "exectest":  # XXX
             return "{}.{}".format(test_name, test_class_name)

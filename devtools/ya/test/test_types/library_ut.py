@@ -10,7 +10,6 @@ from test.util import tools, shared
 
 
 class UnitTestSuite(common_types.AbstractTestSuite):
-
     def support_splitting(self, opts=None):
         """
         Does test suite support splitting
@@ -25,23 +24,36 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
-            '$(BUILD_ROOT)', self.project_path, self.name, retry,
+            '$(BUILD_ROOT)',
+            self.project_path,
+            self.name,
+            retry,
             split_count=self._modulo,
             split_index=self._modulo_index,
             target_platform_descriptor=self.target_platform_descriptor,
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = tools.get_test_tool_cmd(opts, 'run_ut', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            '--binary', self.binary_path('$(BUILD_ROOT)'),
-            '--trace-path', os.path.join(test_work_dir, const.TRACE_FILE_NAME),
-            '--output-dir', os.path.join(test_work_dir, const.TESTING_OUT_DIR_NAME),
-            '--modulo', str(self._modulo),
-            '--modulo-index', str(self._modulo_index),
-            '--partition-mode', self.get_fork_partition_mode(),
-            '--project-path', self.project_path,
+        cmd = tools.get_test_tool_cmd(
+            opts, 'run_ut', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            '--binary',
+            self.binary_path('$(BUILD_ROOT)'),
+            '--trace-path',
+            os.path.join(test_work_dir, const.TRACE_FILE_NAME),
+            '--output-dir',
+            os.path.join(test_work_dir, const.TESTING_OUT_DIR_NAME),
+            '--modulo',
+            str(self._modulo),
+            '--modulo-index',
+            str(self._modulo_index),
+            '--partition-mode',
+            self.get_fork_partition_mode(),
+            '--project-path',
+            self.project_path,
             # remove hardcoded restriction on obtaining list of the tests
-            '--list-timeout', str(int(self.timeout * 0.5)),
+            '--list-timeout',
+            str(int(self.timeout * 0.5)),
             '--verbose',
         ]
 
@@ -56,6 +68,7 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
         if getattr(opts, 'clang_coverage'):
             import signal
+
             cmd += ['--stop-signal', str(int(signal.SIGUSR2))]
 
         build_type = getattr(opts, 'build_type') or ''
@@ -109,13 +122,19 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
         )
 
-        cmd = tools.get_test_tool_cmd(opts, 'run_ut', self.global_resources, wrapper=True, run_on_target_platform=True) + [
-            '--binary', self.binary_path('$(BUILD_ROOT)'),
+        cmd = tools.get_test_tool_cmd(
+            opts, 'run_ut', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            '--binary',
+            self.binary_path('$(BUILD_ROOT)'),
             '--test-list',
             # don't allow to hang up the node that displays the list of tests
-            '--list-timeout', str(min(40, int(self.timeout * 0.5))),
-            '--project-path', self.project_path,
-            '--trace-path', os.path.join(test_work_dir, const.TRACE_FILE_NAME),
+            '--list-timeout',
+            str(min(40, int(self.timeout * 0.5))),
+            '--project-path',
+            self.project_path,
+            '--trace-path',
+            os.path.join(test_work_dir, const.TRACE_FILE_NAME),
         ]
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:
@@ -124,7 +143,10 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def list(cls, cmd, cwd):
-        return [test_common.SubtestInfo(*info) for info in shared.get_testcases_info(process.execute(cmd, check_exit_code=False, cwd=cwd))]
+        return [
+            test_common.SubtestInfo(*info)
+            for info in shared.get_testcases_info(process.execute(cmd, check_exit_code=False, cwd=cwd))
+        ]
 
     @property
     def supports_canonization(self):

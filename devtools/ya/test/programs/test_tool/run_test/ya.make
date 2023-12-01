@@ -34,7 +34,7 @@ PEERDIR(
     library/python/testing/yatest_common
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/test/dependency/sandbox_storage
     )
@@ -46,7 +46,6 @@ IF (OS_LINUX)
     PEERDIR(
         library/python/prctl
     )
-
     IF (NOT YA_OPENSOURCE AND ARCH_X86_64)
         PEERDIR(
             devtools/optrace/python
@@ -56,4 +55,6 @@ ENDIF()
 
 END()
 
-RECURSE_FOR_TESTS(tests)
+RECURSE_FOR_TESTS(
+    tests
+)

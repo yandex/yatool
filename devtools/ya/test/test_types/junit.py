@@ -30,7 +30,6 @@ def strip_root(s):
 
 
 class JavaTestSuite(test_types.AbstractTestSuite):
-
     test_list_output_path = 'junit_tests_list.txt'
 
     runner_path = graph_base.hacked_normpath(consts.T_RUNNER_PATH)

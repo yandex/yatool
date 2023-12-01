@@ -10,6 +10,7 @@ from test.util import shared, tools
 
 try:
     import yalibrary.svn as svn
+
     svn_available = True
 except ImportError:
     svn_available = False
@@ -24,13 +25,19 @@ def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root")
     parser.add_argument("--build-root")
-    parser.add_argument("--corpus-description", dest="corpus_descriptions", help="Files to upload", action="append", default=[])
+    parser.add_argument(
+        "--corpus-description", dest="corpus_descriptions", help="Files to upload", action="append", default=[]
+    )
     parser.add_argument("--output", help="Output filename")
     parser.add_argument("--log-path")
     parser.add_argument("--write-results-inplace", action='store_true')
     parser.add_argument(
-        "--log-level", dest="log_level",
-        help="logging level", action='store', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     return parser.parse_args()
 
@@ -69,11 +76,13 @@ def main():
         if resource_id not in corpus_data["corpus_parts"]:
             corpus_data["corpus_parts"].append(resource_id)
 
-        updated_projects.append({
-            "project_path": project_path,
-            "resource_id": resource_id,
-            "corpus_data": corpus_data,
-        })
+        updated_projects.append(
+            {
+                "project_path": project_path,
+                "resource_id": resource_id,
+                "corpus_data": corpus_data,
+            }
+        )
 
     # create node's output files for skipped files
     for project_path in skipped_projects:

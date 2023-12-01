@@ -32,9 +32,23 @@ def parse_args():
     parser.add_argument("--lint-name", help="Lint name")
     parser.add_argument("--linter", required=True, help="Path to linter binary (optional")
     parser.add_argument("--depends", required=False, action="append", help="Depends. The option can be repeated")
-    parser.add_argument("--global-resource", required=False, dest="global_resources", action="append", help="Global resource. Format 'var_name::resources_path'. The option can be repeated")
-    parser.add_argument("--config", required=False, dest="configs", action="append", help="Configuration file. The option can be repeated")
-    parser.add_argument("--extra-param", required=False, dest="extra_params", action="append", help="Additional linter parameters")
+    parser.add_argument(
+        "--global-resource",
+        required=False,
+        dest="global_resources",
+        action="append",
+        help="Global resource. Format 'var_name::resources_path'. The option can be repeated",
+    )
+    parser.add_argument(
+        "--config",
+        required=False,
+        dest="configs",
+        action="append",
+        help="Configuration file. The option can be repeated",
+    )
+    parser.add_argument(
+        "--extra-param", required=False, dest="extra_params", action="append", help="Additional linter parameters"
+    )
     parser.add_argument('files', nargs='*')
     return parser.parse_args()
 
@@ -107,7 +121,9 @@ def main():
                 message = file_report.get("message", "")
                 test_status = STATUSES.get(status)
                 if test_status is None:
-                    raise ValueError("Unknown status: '{}'. Expected one of: {}".format(status, ",".join(STATUSES.keys())))
+                    raise ValueError(
+                        "Unknown status: '{}'. Expected one of: {}".format(status, ",".join(STATUSES.keys()))
+                    )
                 suite.chunk.tests.append(
                     facility.TestCase(
                         test_name,

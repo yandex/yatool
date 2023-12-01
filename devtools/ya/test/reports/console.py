@@ -21,7 +21,6 @@ def get_display():
 
 
 class _FileDisplay(object):
-
     def __init__(self, path):
         self._path = path
 
@@ -31,19 +30,18 @@ class _FileDisplay(object):
 
 
 class ConsoleReporter(object):
-
     def __init__(
-            self,
-            show_passed=True,
-            show_test_cwd=False,
-            show_metrics=False,
-            truncate=True,
-            show_deselected=False,
-            omitted_test_statuses=None,
-            show_suite_logs_for_tags=None,
-            out_path=None,
-            show_skipped=None,
-            display=None,
+        self,
+        show_passed=True,
+        show_test_cwd=False,
+        show_metrics=False,
+        truncate=True,
+        show_deselected=False,
+        omitted_test_statuses=None,
+        show_suite_logs_for_tags=None,
+        out_path=None,
+        show_skipped=None,
+        display=None,
     ):
         self._show_passed = show_passed
         self._show_test_cwd = show_test_cwd
@@ -94,17 +92,21 @@ class ConsoleReporter(object):
         self._display.emit_message('[[bad]]Keyboard interrupt[[rst]]')
 
     def _get_logs_frame(self, status, entry):
-        if status not in (
-            const.Status.CRASHED,
-            const.Status.FAIL,
-            const.Status.FLAKY,
-            const.Status.GOOD,
-            const.Status.INTERNAL,
-            const.Status.NOT_LAUNCHED,
-            const.Status.TIMEOUT,
-            const.Status.XFAIL,
-            const.Status.XPASS,
-        ) or not entry.logs:
+        if (
+            status
+            not in (
+                const.Status.CRASHED,
+                const.Status.FAIL,
+                const.Status.FLAKY,
+                const.Status.GOOD,
+                const.Status.INTERNAL,
+                const.Status.NOT_LAUNCHED,
+                const.Status.TIMEOUT,
+                const.Status.XFAIL,
+                const.Status.XPASS,
+            )
+            or not entry.logs
+        ):
             return ""
         lines = []
         for name in sorted(entry.logs):
@@ -117,9 +119,16 @@ class ConsoleReporter(object):
                 if log_path.startswith("http"):
                     log_path = log_path.replace(os.sep, "/")  # if it is a link - change all seps to /
                 else:
-                    log_path = log_path.replace("/", os.sep)  # some parts like project_path always come with linux slashes
-            lines.append("[[imp]]{name}:{marker} [[path]]{filename}[[rst]]".format(
-                marker=self.get_status_marker(const.Status.TO_STR[status]), name=name.capitalize(), filename=log_path))
+                    log_path = log_path.replace(
+                        "/", os.sep
+                    )  # some parts like project_path always come with linux slashes
+            lines.append(
+                "[[imp]]{name}:{marker} [[path]]{filename}[[rst]]".format(
+                    marker=self.get_status_marker(const.Status.TO_STR[status]),
+                    name=name.capitalize(),
+                    filename=log_path,
+                )
+            )
         return "\n".join(lines)
 
     def on_test_suite_finish(self, test_suite):
@@ -155,10 +164,7 @@ class ConsoleReporter(object):
         def dump_chunk_header(chunk):
             ntests = len(chunk.tests)
             msg = '{} [[imp]]{}[[rst]] ran [[imp]]{}[[rst]] test{}'.format(
-                "-" * 6,
-                chunk.get_name(),
-                ntests,
-                '' if ntests == 1 else 's'
+                "-" * 6, chunk.get_name(), ntests, '' if ntests == 1 else 's'
             )
 
             if chunk.metrics:
@@ -250,7 +256,11 @@ class ConsoleReporter(object):
 
             test_results = [test.status for test in test_suite.tests]
             if test_results:
-                msg += ': {}[[rst]]'.format(", ".join(common.get_formatted_statuses(test_results.count, "[[{marker}]]{count} - {status}[[rst]]")))
+                msg += ': {}[[rst]]'.format(
+                    ", ".join(
+                        common.get_formatted_statuses(test_results.count, "[[{marker}]]{count} - {status}[[rst]]")
+                    )
+                )
             msg += ' [[imp]]{}[[rst]]'.format(test_suite.project_path)
 
             lines.append(msg)

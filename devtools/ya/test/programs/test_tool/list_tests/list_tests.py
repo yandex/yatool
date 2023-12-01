@@ -48,19 +48,27 @@ def get_options():
     parser.add_option("--test-param", dest="test_param", default=[], action='append')
     parser.add_option("--split-by-tests", dest="split_by_tests", default=True)
     parser.add_option("--test-suite-name", dest="test_suite_name", help="name of the running test suite", default=None)
-    parser.add_option("--test-suite-class", dest="test_suite_class", help="type of the running test suite", default=None)
+    parser.add_option(
+        "--test-suite-class", dest="test_suite_class", help="type of the running test suite", default=None
+    )
     parser.add_option("--test-info-path", dest="test_info_path", help="path to test info", default=None)
     parser.add_option("--test-list-path", dest="test_list_path", help="path to test list", default=None)
-    parser.add_option("--test-tags", dest="test_tags", action='append', help="tags of the running test suite", default=[])
+    parser.add_option(
+        "--test-tags", dest="test_tags", action='append', help="tags of the running test suite", default=[]
+    )
     parser.add_option("--test-size", dest="test_size", help="size of the running test suite (e.g. 'fat')", default=None)
-    parser.add_option("--test-type", dest="test_type", help="type of the running test suite (e.g. 'pytest')", default=None)
+    parser.add_option(
+        "--test-type", dest="test_type", help="type of the running test suite (e.g. 'pytest')", default=None
+    )
     parser.add_option("--project-path", dest="project_path", help="project path arcadia root related")
     parser.add_option("--source-root", dest="source_root", help="source route", action='store')
     parser.add_option("--build-root", dest="build_root", help="build route", action='store')
     parser.add_option("--token", dest="token", help="uploaded resource owner token", action='store')
     parser.add_option("--token-path", dest="token_path", help="path to uploaded resource owner token", action='store')
     parser.add_option("--target-platform-descriptor", dest="target_platform_descriptor")
-    parser.add_option("--multi-target-platform-run", dest="multi_target_platform_run", action='store_true', default=False)
+    parser.add_option(
+        "--multi-target-platform-run", dest="multi_target_platform_run", action='store_true', default=False
+    )
     parser.add_option("--is-skipped", dest="is_skipped", action='store_true', default=False)
     parser.add_option("--test-data-root", dest="data_root", help="test data route", action='store')
     parser.add_option("--test-name", dest="computed_test_name", default=[], action='append')
@@ -68,26 +76,34 @@ def get_options():
         "--sandbox-resources-root", dest="sandbox_resources_root", help="sandbox resources root", action='store'
     )
     parser.add_option(
-        "--test-related-path", dest="test_related_paths",
+        "--test-related-path",
+        dest="test_related_paths",
         help="list of paths requested by wrapper (suite) or test - these paths will form PYTHONPATH",
         action='append',
         default=[],
     )
     parser.add_option(
-        "--test-data-path", dest="test_data_paths",
+        "--test-data-path",
+        dest="test_data_paths",
         help="list of test data paths that test declared to be dependent on",
         action='append',
         default=[],
     )
     parser.add_option(
-        "--sandbox-resource", dest="sandbox_resources",
+        "--sandbox-resource",
+        dest="sandbox_resources",
         help="list of sandbox resources that test is depend on",
-        action="append", default=[]
+        action="append",
+        default=[],
     )
     parser.add_option("--log-path", dest="log_path", help="log file path", action='store')
     parser.add_option(
-        "--log-level", dest="log_level",
-        help="logging level", action='store', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     parser.add_option("--no-clean-environment", dest="create_clean_environment", action='store_false', default=True)
     options, cmd = parser.parse_args()
@@ -131,7 +147,11 @@ def main():
     test_data_paths = options.test_data_paths or []
     for path in test_data_paths:
         if not os.path.exists(path):
-            logger.error("{}: specified DATA '{}' doesn't exist".format(os.path.join(options.project_path, "CMakeLists.txt"), path))
+            logger.error(
+                "{}: specified DATA '{}' doesn't exist".format(
+                    os.path.join(options.project_path, "CMakeLists.txt"), path
+                )
+            )
     sandbox_resources = options.sandbox_resources
 
     resources_root = build_root
@@ -147,15 +167,20 @@ def main():
         options.project_path,
         options.test_suite_name,
         target_platform_descriptor=options.target_platform_descriptor,
-        multi_target_platform_run=options.multi_target_platform_run)
+        multi_target_platform_run=options.multi_target_platform_run,
+    )
 
     out_dir = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
     exts.fs.create_dirs(out_dir)
 
     if options.create_clean_environment:
         new_source_root, new_build_root, new_data_root = testroot.create_environment(
-            options.test_related_paths, test_data_paths,
-            source_root, build_root, data_root, cwd,
+            options.test_related_paths,
+            test_data_paths,
+            source_root,
+            build_root,
+            data_root,
+            cwd,
             testroot.EnvDataMode.Symlinks,  # wait no copy data to environment during listing
         )
     else:
@@ -165,14 +190,28 @@ def main():
 
     if options.computed_test_name:
         test_cases = [facility.TestCase(testname, None) for testname in options.computed_test_name]
-        dump_tests(options, [{"test": tc.get_class_name(), "subtest": tc.get_test_case_name(), "skipped": False, "tags": options.test_tags} for tc in test_cases], None)
+        dump_tests(
+            options,
+            [
+                {
+                    "test": tc.get_class_name(),
+                    "subtest": tc.get_test_case_name(),
+                    "skipped": False,
+                    "tags": options.test_tags,
+                }
+                for tc in test_cases
+            ],
+            None,
+        )
         return
 
     list_cmd = test.util.shared.change_cmd_root(list_cmd, source_root, new_source_root, build_root)
 
     # change roots in the env's PYTHONPATH
     env = os.environ.copy()
-    python_paths = test.util.shared.change_cmd_root(options.test_related_paths, source_root, new_source_root, build_root)
+    python_paths = test.util.shared.change_cmd_root(
+        options.test_related_paths, source_root, new_source_root, build_root
+    )
     python_dirs = set()
     for p in python_paths:
         if os.path.isfile(p):
@@ -206,7 +245,9 @@ def main():
         tests_chunks = []
         modulo = int(options.modulo)
         for i in range(modulo):
-            chunk = test_splitter.filter_tests_by_modulo(test_classes, modulo, i, bool(options.split_by_tests), options.partition_mode)
+            chunk = test_splitter.filter_tests_by_modulo(
+                test_classes, modulo, i, bool(options.split_by_tests), options.partition_mode
+            )
             tests_chunks.append([])
             for cls, tsts in chunk.items():
                 tests_chunks[i].extend(cls + '::' + t for t in tsts)
@@ -231,7 +272,8 @@ def dump_tests(options, tests, error=None):
                 "target-platform-descriptor": options.target_platform_descriptor,
                 "error": error,
             },
-            res_file, ensure_ascii=False
+            res_file,
+            ensure_ascii=False,
         )
 
 
