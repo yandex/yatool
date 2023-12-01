@@ -1,8 +1,9 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE build.ymake2
-
     __init__.py
     consts.py
     run_ymake.pyx
@@ -25,7 +26,9 @@ PEERDIR(
 )
 
 IF (NOT YA_OPENSOURCE)
-    PEERDIR(devtools/ya/yalibrary/diagnostics)
+    PEERDIR(
+        devtools/ya/yalibrary/diagnostics
+    )
 ENDIF()
 
 END()

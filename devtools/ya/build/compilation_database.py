@@ -125,7 +125,12 @@ def create_patterns(params, graph, app_ctx):
             if resource_type == 'base64':
                 where = fetcher.fetch_base64_resource(build_root, resource_uri)
             else:
-                where = fetcher.fetch_resource_if_need(app_ctx.fetchers_storage.get_by_type(resource_type), tool_root, resource_uri, strip_prefix=strip_prefix)
+                where = fetcher.fetch_resource_if_need(
+                    app_ctx.fetchers_storage.get_by_type(resource_type),
+                    tool_root,
+                    resource_uri,
+                    strip_prefix=strip_prefix,
+                )
             patterns[resource['pattern']] = where
     finally:
         shutil.rmtree(temp_dir)

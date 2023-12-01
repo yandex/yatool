@@ -51,14 +51,19 @@ def print_tests_results_to_console(builder, suites):
         show_metrics=builder.opts.show_metrics,
         truncate=not builder.opts.inline_diff,
         omitted_test_statuses=builder.opts.omitted_test_statuses,
-        show_suite_logs_for_tags=[test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else [],
+        show_suite_logs_for_tags=[test.const.YaTestTags.ForceSandbox]
+        if builder.opts.run_tagged_tests_on_sandbox
+        else [],
     )
 
-    filter_message = build_filter_message(filter_description, builder.opts.tests_filters, get_number_of_empty_suites(suites_to_show))
+    filter_message = build_filter_message(
+        filter_description, builder.opts.tests_filters, get_number_of_empty_suites(suites_to_show)
+    )
 
     if filter_message:
         # noinspection PyUnresolvedReferences
         import app_ctx
+
         app_ctx.display.emit_message(filter_message)
 
     for suite in suites_to_show:

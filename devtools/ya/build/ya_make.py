@@ -542,12 +542,26 @@ def configure_build_graph_cache_dir(app_ctx, opts):
         opts.build_graph_cache_resource = build_graph_cache_resource_dir.resource_id
 
         if build_graph_cache_resource_dir.safe_ymake_cache:
-            logger.debug('Safe caches set for resource {}: {}'.format(build_graph_cache_resource_dir.resource_id, build_graph_cache_resource_dir.safe_ymake_cache))
+            logger.debug(
+                'Safe caches set for resource {}: {}'.format(
+                    build_graph_cache_resource_dir.resource_id, build_graph_cache_resource_dir.safe_ymake_cache
+                )
+            )
             if opts.build_graph_use_ymake_cache_params and 'normal' in opts.build_graph_use_ymake_cache_params:
-                logger.debug('build_graph_use_ymake_cache_params before downgrade to safe caches: {}'.format(opts.build_graph_use_ymake_cache_params))
-                opts.build_graph_use_ymake_cache_params['normal'] = CacheKind.get_ymake_option(build_graph_cache_resource_dir.safe_ymake_cache)
+                logger.debug(
+                    'build_graph_use_ymake_cache_params before downgrade to safe caches: {}'.format(
+                        opts.build_graph_use_ymake_cache_params
+                    )
+                )
+                opts.build_graph_use_ymake_cache_params['normal'] = CacheKind.get_ymake_option(
+                    build_graph_cache_resource_dir.safe_ymake_cache
+                )
                 opts.build_graph_use_ymake_cache_params_str = json.dumps(opts.build_graph_use_ymake_cache_params)
-                logger.debug('build_graph_use_ymake_cache_params after downgrade to safe caches: {}'.format(opts.build_graph_use_ymake_cache_params))
+                logger.debug(
+                    'build_graph_use_ymake_cache_params after downgrade to safe caches: {}'.format(
+                        opts.build_graph_use_ymake_cache_params
+                    )
+                )
 
         download = not (opts.make_context_on_distbuild or opts.make_context_on_distbuild_only or opts.make_context_only)
         if download:

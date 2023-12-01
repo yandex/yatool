@@ -60,6 +60,7 @@ import devtools.libs.yaplatform.python.platform_map as platform_map
 try:
     import yalibrary.build_graph_cache as bg_cache
 except ImportError:
+
     class Mock:
         def configure_build_graph_cache_dir(*args, **kwargs):
             return None
@@ -989,10 +990,7 @@ def _load_stat(graph_stat_path):
         logger.exception("Can not load statistics: %r", e)
         try:
             core.report.telemetry.report(
-                core.report.ReportTypes.WTF_ERRORS,
-                {
-                    "graph.load_stat": traceback.format_exc()
-                }
+                core.report.ReportTypes.WTF_ERRORS, {"graph.load_stat": traceback.format_exc()}
             )
         except Exception as ee:
             logger.exception("Can not report error: %r", ee)
@@ -1048,10 +1046,7 @@ def _handle_error(*msg):
     logger.exception(*msg)
     try:
         core.report.telemetry.report(
-            core.report.ReportTypes.WTF_ERRORS,
-            {
-                "graph.add_stat_to_graph": traceback.format_exc()
-            }
+            core.report.ReportTypes.WTF_ERRORS, {"graph.add_stat_to_graph": traceback.format_exc()}
         )
     except Exception as e:
         logger.exception("Can not report error: %r", e)
@@ -1377,6 +1372,7 @@ class _GraphMaker(object):
                     no_ymake_retry=self._opts.no_ymake_retry,
                     tool_targets_queue_putter=pic_queue_putter,
                 )
+
             pic = self._exit_stack.enter_context(_AsyncContext(core_async.future(gen_pic, daemon=False)))
 
         if to_build_no_pic:
@@ -1752,7 +1748,7 @@ class _GraphMaker(object):
             patch_path=change_list,
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
-            disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no'))
+            disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
         )
 
         if test_dart:
@@ -2014,7 +2010,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
                 target['platform_name'],
                 target.get('c_compiler', opts.c_compiler),
                 target.get('cxx_compiler', opts.cxx_compiler),
-                opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
+                opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes',
             )
         )
         return target
@@ -3275,10 +3271,7 @@ def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_ver
         report_json.pop('SCM_DATA', None)
         report_json.pop('BUILD_DATE', None)
         report_json.pop('BUILD_TIMESTAMP', None)
-        core.report.telemetry.report(
-            core.report.ReportTypes.VCS_INFO,
-            report_json
-        )
+        core.report.telemetry.report(core.report.ReportTypes.VCS_INFO, report_json)
         yalibrary.debug_store.dump_debug['vcs_info'] = report_json
 
     timer.show_step('vcs info')

@@ -43,35 +43,43 @@ class ModulesFilesStatistic:
         if self._mode == Mode.NOT_STARTED or self._mode == Mode.NO_PRINTING:
             return
         if self._mode == Mode.MODULES_ONLY:
-            self._stream("[{ymake} ymakes processing] [{done}/{total} modules configured]".format(
-                ymake=self._current_ymake_processing,
-                done=self._modules_done,
-                total=self._modules_total,
-            ))
+            self._stream(
+                "[{ymake} ymakes processing] [{done}/{total} modules configured]".format(
+                    ymake=self._current_ymake_processing,
+                    done=self._modules_done,
+                    total=self._modules_total,
+                )
+            )
         if self._mode == Mode.MODULES_AND_FILES:
-            self._stream("[{ymake} ymakes processing] [{done}/{total} modules configured] [{files} files read]".format(
-                ymake=self._current_ymake_processing,
-                done=self._modules_done if self._module_stats_exist else "?",
-                total=self._modules_total if self._module_stats_exist else "?",
-                files=self._files_read
-            ))
+            self._stream(
+                "[{ymake} ymakes processing] [{done}/{total} modules configured] [{files} files read]".format(
+                    ymake=self._current_ymake_processing,
+                    done=self._modules_done if self._module_stats_exist else "?",
+                    total=self._modules_total if self._module_stats_exist else "?",
+                    files=self._files_read,
+                )
+            )
         if self._mode == Mode.MODULES_AND_RENDERED:
-            self._stream("[{ymake} ymakes processing] [{done}/{total} modules configured] [{r_done}/{r_total} modules rendered]".format(
-                ymake=self._current_ymake_processing,
-                done=self._modules_done if self._module_stats_exist else "?",
-                total=self._modules_total if self._module_stats_exist else "?",
-                r_done=self._rendered_done,
-                r_total=self._rendered_total,
-            ))
+            self._stream(
+                "[{ymake} ymakes processing] [{done}/{total} modules configured] [{r_done}/{r_total} modules rendered]".format(
+                    ymake=self._current_ymake_processing,
+                    done=self._modules_done if self._module_stats_exist else "?",
+                    total=self._modules_total if self._module_stats_exist else "?",
+                    r_done=self._rendered_done,
+                    r_total=self._rendered_total,
+                )
+            )
         if self._mode == Mode.MODULES_FILES_AND_RENDERED:
-            self._stream("[{ymake} ymakes processing] [{done}/{total} modules configured] [{files} files read] [{r_done}/{r_total} modules rendered]".format(
-                ymake=self._current_ymake_processing,
-                done=self._modules_done if self._module_stats_exist else "?",
-                total=self._modules_total if self._module_stats_exist else "?",
-                files=self._files_read,
-                r_done=self._rendered_done,
-                r_total=self._rendered_total,
-            ))
+            self._stream(
+                "[{ymake} ymakes processing] [{done}/{total} modules configured] [{files} files read] [{r_done}/{r_total} modules rendered]".format(
+                    ymake=self._current_ymake_processing,
+                    done=self._modules_done if self._module_stats_exist else "?",
+                    total=self._modules_total if self._module_stats_exist else "?",
+                    files=self._files_read,
+                    r_done=self._rendered_done,
+                    r_total=self._rendered_total,
+                )
+            )
 
     def _update_stats(self, event, delta_done, delta_total, delta_files, delta_rendered, delta_rendered_total):
         if delta_done:
@@ -126,7 +134,9 @@ class ModulesFilesStatistic:
         self._print_message()
         self._set_new_info_false()
 
-    def handler(self, event, delta_done=None, delta_total=None, delta_files=None, delta_rendered=None, delta_rendered_total=None):
+    def handler(
+        self, event, delta_done=None, delta_total=None, delta_files=None, delta_rendered=None, delta_rendered_total=None
+    ):
         typename = event["_typename"]
         timestamp = event["_timestamp"]
         with self._lock:
@@ -145,8 +155,10 @@ class ModulesFilesStatistic:
 
             if self._mode == Mode.MODULES_ONLY:
                 if typename == "NEvent.TFilesStat":
-                    if not self._module_stats_exist or \
-                            self._last_module_timestamp + self._files_threshold_mcs < timestamp :
+                    if (
+                        not self._module_stats_exist
+                        or self._last_module_timestamp + self._files_threshold_mcs < timestamp
+                    ):
                         self._mode = Mode.MODULES_AND_FILES
                 elif typename == "NEvent.TRenderModulesStat":
                     self._mode = Mode.MODULES_AND_RENDERED
@@ -163,15 +175,21 @@ class ModulesFilesStatistic:
 
             if self._mode == Mode.MODULES_AND_RENDERED:
                 if typename == "NEvent.TFilesStat":
-                    if not self._module_stats_exist or \
-                            self._last_module_timestamp + self._files_threshold_mcs < timestamp :
+                    if (
+                        not self._module_stats_exist
+                        or self._last_module_timestamp + self._files_threshold_mcs < timestamp
+                    ):
                         self._mode = Mode.MODULES_FILES_AND_RENDERED
                 elif typename == "NEvent.TConfModulesStat" or typename == "NEvent.TRenderModulesStat":
                     if self._next_timestamp_update <= timestamp or event['Total'] == event['Done']:
                         self._try_print_message(timestamp)
 
             if self._mode == Mode.MODULES_FILES_AND_RENDERED:
-                if typename == "NEvent.TConfModulesStat" or typename == "NEvent.TFilesStat" or typename == "NEvent.TRenderModulesStat":
+                if (
+                    typename == "NEvent.TConfModulesStat"
+                    or typename == "NEvent.TFilesStat"
+                    or typename == "NEvent.TRenderModulesStat"
+                ):
                     if self._next_timestamp_update <= timestamp:
                         self._try_print_message(timestamp)
 
@@ -189,9 +207,10 @@ class PrintProgressListener(object):
             self.modules_done = 0
             self.modules_total = 0
 
-    def __init__(self,
-                 modules_files_stats,  # type: ModulesFilesStatistic
-                 ):
+    def __init__(
+        self,
+        modules_files_stats,  # type: ModulesFilesStatistic
+    ):
         self.ymake_states = defaultdict(PrintProgressListener.YmakeLastState)
         self.modules_files_stats = modules_files_stats
 
@@ -284,7 +303,6 @@ class YmakeTimeStatistic:
         self.max_timestamp_ms = None
 
     def get_ymake_listener(self):
-
         def ymake_listener(event):
             if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake main":
                 thread_name = threading.current_thread().name
@@ -295,12 +313,14 @@ class YmakeTimeStatistic:
             elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake main":
                 thread_name = threading.current_thread().getName()
                 self.max_timestamp_ms = event["_timestamp"] / 1000
-                self.threads_time.append(ConfigureTask(
-                    start=self.current_open_threads[thread_name],
-                    end=event["_timestamp"],
-                    thread_name=thread_name,
-                    debug_id=event["debug_id"],
-                    ))
+                self.threads_time.append(
+                    ConfigureTask(
+                        start=self.current_open_threads[thread_name],
+                        end=event["_timestamp"],
+                        thread_name=thread_name,
+                        debug_id=event["debug_id"],
+                    )
+                )
                 del self.current_open_threads[thread_name]
 
         return ymake_listener

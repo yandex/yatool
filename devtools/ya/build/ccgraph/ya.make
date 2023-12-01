@@ -4,6 +4,8 @@ SRCS(
     ccgraph.cpp
 )
 
+STYLE_PYTHON()
+
 PY_SRCS(
     __init__.py
     cpp_string_wrapper.pyx

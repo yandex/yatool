@@ -77,14 +77,24 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
         expect_version = res['params']['gcc_version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
-                logger.warn('You are using -DIGNORE_MISMATCHED_XCODE_VERSION. Successful compilation and launch is not guaranteed.')
+                logger.warn(
+                    'You are using -DIGNORE_MISMATCHED_XCODE_VERSION. Successful compilation and launch is not guaranteed.'
+                )
             else:
                 logger.warn('Unsupported version of Xcode installed. To install supported version:')
                 logger.warn('1. Download supported version one of the ways below:')
                 logger.warn('   - Download supported version from https://xcodereleases.com/.')
-                logger.warn('   - Download from sandbox https://sandbox.yandex-team.ru/resources?type=XCODE_ARCHIVE&limit=20&offset=0&attrs={{"version":"{version}"}}.'.format(version=expect_version))
-                logger.warn('2. Select supported version with `sudo xcode-select -s <path-to-xcode-dir>/Contents/Developer`')
-                logger.warn('\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.')
+                logger.warn(
+                    '   - Download from sandbox https://sandbox.yandex-team.ru/resources?type=XCODE_ARCHIVE&limit=20&offset=0&attrs={{"version":"{version}"}}.'.format(
+                        version=expect_version
+                    )
+                )
+                logger.warn(
+                    '2. Select supported version with `sudo xcode-select -s <path-to-xcode-dir>/Contents/Developer`'
+                )
+                logger.warn(
+                    '\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.'
+                )
                 raise Exception('Unsupported Xcode version, installed = ' + version)
         res['params']['c_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang']).strip()
         res['params']['cxx_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang++']).strip()
@@ -137,11 +147,13 @@ def gen_tc(platform_name, c_compiler=None, cxx_compiler=None):
 
 
 def gen_cross_tc(host_name, target_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False):
-    return _resolve_cxx(host_for_target_platform_name(host_name, target_name),
-                        target_name,
-                        c_compiler,
-                        cxx_compiler,
-                        ignore_mismatched_xcode_version)
+    return _resolve_cxx(
+        host_for_target_platform_name(host_name, target_name),
+        target_name,
+        c_compiler,
+        cxx_compiler,
+        ignore_mismatched_xcode_version,
+    )
 
 
 def gen_host_tc(c_compiler=None, cxx_compiler=None):
@@ -273,14 +285,18 @@ def gen_conf(
         for p_dir in (os.path.join(prefix, 'plugins') for prefix in (build_path, build_internal_path)):
             if not os.path.isdir(p_dir):
                 continue
-            for f in iter_dir_files_recursively(p_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.py')):
+            for f in iter_dir_files_recursively(
+                p_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.py')
+            ):
                 yield f
 
     def iter_conf_parts():
         for conf_dir in (os.path.join(build_path, d) for d in ('conf', 'internal/conf', 'ymake.parts')):
             if not os.path.isdir(conf_dir):
                 continue
-            for f in iter_dir_files_recursively(conf_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.conf')):
+            for f in iter_dir_files_recursively(
+                conf_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.conf')
+            ):
                 yield f
 
     def iter_conf_files():

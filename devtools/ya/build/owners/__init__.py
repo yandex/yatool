@@ -32,7 +32,7 @@ def parse_owners(json_graph):
             if d['node-type'] == "Property" and d['name'].startswith('OWNER='):
                 assert node['name'].startswith('$S/')
                 components = os.path.dirname(node['name'][3:]).split(os.path.sep)
-                owners = d['name'][len('OWNER='):].split()
+                owners = d['name'][len('OWNER=') :].split()
                 current_item = owners_list
                 for component in components:
                     component_item = current_item['items'].get(component)
@@ -66,13 +66,7 @@ def parse_ymake_owners(plain_text):
 
 
 def _gen_node(items, logins, groups):
-    return {
-        'items': items,
-        'owners': {
-            'logins': logins,
-            'groups': groups
-        }
-    }
+    return {'items': items, 'owners': {'logins': logins, 'groups': groups}}
 
 
 def add_owner(owners, path, logins, groups):
@@ -81,10 +75,7 @@ def add_owner(owners, path, logins, groups):
 
     def inject_owner(node, parts):
         if len(parts) == 0:
-            node['owners'] = {
-                'logins': logins,
-                'groups': groups
-            }
+            node['owners'] = {'logins': logins, 'groups': groups}
             return
 
         head, tail = parts[0], parts[1:]

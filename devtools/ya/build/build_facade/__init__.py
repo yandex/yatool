@@ -70,7 +70,7 @@ def _gen(
         managed_dep_tree=managed_dep_tree,
         classpaths=classpaths,
         dump_file=dump_file,
-        disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no'))
+        disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
     )
     return (res, evlog_dump) if evlog else res
 
@@ -94,7 +94,9 @@ def gen_conf(
         if len(target_platforms) > 1:
             logger.error('Multiple target platforms are not supported by this code for now')
             raise NotImplementedError
-        toolchain_params = build.genconf.gen_cross_tc(host_platform, build.genconf.mine_platform_name(target_platforms[0]['platform_name']))
+        toolchain_params = build.genconf.gen_cross_tc(
+            host_platform, build.genconf.mine_platform_name(target_platforms[0]['platform_name'])
+        )
         flags = flags.copy()
         flags.update(target_platforms[0].get('flags', {}))
     else:
@@ -109,12 +111,22 @@ def gen_conf(
         use_local_conf=True,
         local_conf_path=None,
         extra_flags=flags,
-        tool_chain=toolchain_params
+        tool_chain=toolchain_params,
     )
     return generation_conf
 
 
-def gen_dependencies(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_dependencies(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -128,7 +140,17 @@ def gen_dependencies(build_root, build_type, build_targets, debug_options, flags
     )
 
 
-def gen_graph(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_graph(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -142,7 +164,17 @@ def gen_graph(build_root, build_type, build_targets, debug_options, flags, ymake
     )
 
 
-def gen_modules(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_modules(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -167,7 +199,7 @@ def gen_module_info(
     host_platform=None,
     target_platforms=None,
     modules_info_file=None,
-    modules_info_filter=None
+    modules_info_filter=None,
 ):
     return _gen(
         custom_build_directory=build_root,
@@ -180,7 +212,7 @@ def gen_module_info(
         host_platform=host_platform,
         target_platforms=target_platforms,
         modules_info_file=modules_info_file,
-        modules_info_filter=modules_info_filter
+        modules_info_filter=modules_info_filter,
     )
 
 
@@ -245,7 +277,7 @@ def gen_srcdeps(
     ymake_bin=None,
     platform=None,
     host_platform=None,
-    target_platforms=None
+    target_platforms=None,
 ):
     return _gen(
         custom_build_directory=build_root,
@@ -260,7 +292,18 @@ def gen_srcdeps(
     )
 
 
-def gen_json_graph(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None, custom_conf_dir=None):
+def gen_json_graph(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+    custom_conf_dir=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -275,7 +318,17 @@ def gen_json_graph(build_root, build_type, build_targets, debug_options, flags, 
     )
 
 
-def gen_include_targets(build_root=None, build_type='release', build_targets=None, debug_options=[], flags=[], ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_include_targets(
+    build_root=None,
+    build_type='release',
+    build_targets=None,
+    debug_options=[],
+    flags=[],
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -379,7 +432,17 @@ def gen_relation(
     )
 
 
-def gen_all_loops(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_all_loops(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -394,7 +457,17 @@ def gen_all_loops(build_root, build_type, build_targets, debug_options, flags, y
     )
 
 
-def gen_dir_loops(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_dir_loops(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -409,7 +482,17 @@ def gen_dir_loops(build_root, build_type, build_targets, debug_options, flags, y
     )
 
 
-def gen_build_targets(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_build_targets(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -423,7 +506,17 @@ def gen_build_targets(build_root, build_type, build_targets, debug_options, flag
     )
 
 
-def gen_owners(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_owners(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -437,7 +530,17 @@ def gen_owners(build_root, build_type, build_targets, debug_options, flags, ymak
     )
 
 
-def gen_filelist(build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, host_platform=None, target_platforms=None):
+def gen_filelist(
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
@@ -452,9 +555,19 @@ def gen_filelist(build_root, build_type, build_targets, debug_options, flags, ym
 
 
 def gen_plan_options(
-    arc_root, build_root, build_type, build_targets, debug_options, flags,
-    ymake_bin=None, platform=None, no_ymake_resource=False, custom_conf=None,
-    strict_inputs=False, dump_inputs_map=False, vcs_file=None,
+    arc_root,
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    no_ymake_resource=False,
+    custom_conf=None,
+    strict_inputs=False,
+    dump_inputs_map=False,
+    vcs_file=None,
 ):
     return core.yarg.Params(
         arc_root=arc_root,
@@ -478,7 +591,18 @@ def gen_plan_options(
     )
 
 
-def gen_plan(arc_root, build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None, no_ymake_resource=False, vcs_file=None):
+def gen_plan(
+    arc_root,
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    no_ymake_resource=False,
+    vcs_file=None,
+):
     return build.gen_plan.gen_plan(
         gen_plan_options(
             arc_root=arc_root,
@@ -509,14 +633,16 @@ def gen_java_projects(build_root, build_targets, flags, ymake_bin=None):
 
 def gen_test_dart(build_root, **kwargs):
     with temp_file() as test_dart:
-        kwargs.update(dict(
-            custom_build_directory=build_root,
-            run_tests=3,
-            dump_tests=test_dart,
-            debug_options=['x'] + kwargs.get('debug_options', []),
-            grab_stdout=True,
-            grab_stderr=True,
-        ))
+        kwargs.update(
+            dict(
+                custom_build_directory=build_root,
+                run_tests=3,
+                dump_tests=test_dart,
+                debug_options=['x'] + kwargs.get('debug_options', []),
+                grab_stdout=True,
+                grab_stderr=True,
+            )
+        )
 
         res, _ = build.ymake2.ymake_dump(**kwargs)
 

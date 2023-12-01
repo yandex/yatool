@@ -30,10 +30,7 @@ class Command(object):
 
 class Echo(Command):
     def __init__(self, text):
-        super(Echo, self).__init__(
-            ["echo", text],
-            echo=False
-        )
+        super(Echo, self).__init__(["echo", text], echo=False)
 
 
 class Rule(object):
@@ -72,9 +69,7 @@ class Clean(Rule):
             if rule.phony:
                 continue
 
-            self.recipe.append(Command(
-                ["rm", "-f"] + rule.targets
-            ))
+            self.recipe.append(Command(["rm", "-f"] + rule.targets))
 
 
 class Help(Rule):
@@ -127,7 +122,9 @@ class Dependency(object):
             for cmd in rule.recipe:
                 cmd.args = list(map(replace_path, cmd.args))
 
-        makefile.vars.append(Variable(self.var, self.default, "Path to {} {}".format(self.type, ".".join(map(str, self.version)))))
+        makefile.vars.append(
+            Variable(self.var, self.default, "Path to {} {}".format(self.type, ".".join(map(str, self.version))))
+        )
 
     def dump(self):
         pass
@@ -146,10 +143,7 @@ class Compiler(Dependency):
         try:
             with os.fdopen(fd, 'w') as f:
                 f.writelines(source)
-            output = run_process(
-                compiler,
-                args=['-E', path]
-            )
+            output = run_process(compiler, args=['-E', path])
         finally:
             os.remove(path)
 
@@ -157,7 +151,7 @@ class Compiler(Dependency):
         for line in output.split('\n'):
             parts = line.split('=', 1)
             if len(parts) == 2 and parts[0].startswith(PREFIX):
-                name, value = parts[0][len(PREFIX):], parts[1]
+                name, value = parts[0][len(PREFIX) :], parts[1]
                 if value != name:
                     values[name] = value
 
@@ -169,26 +163,11 @@ class Compiler(Dependency):
             return
 
         compilers = [
-            {
-                'type': 'clang',
-                'vars': [
-                    '__clang_major__',
-                    '__clang_minor__'
-                ]
-            },
-            {
-                'type': 'gcc',
-                'vars': [
-                    '__GNUC__',
-                    '__GNUC_MINOR__'
-                ]
-            }
+            {'type': 'clang', 'vars': ['__clang_major__', '__clang_minor__']},
+            {'type': 'gcc', 'vars': ['__GNUC__', '__GNUC_MINOR__']},
         ]
 
-        values = Compiler.get_vars(
-            self.path,
-            [v for c in compilers for v in c['vars']]
-        )
+        values = Compiler.get_vars(self.path, [v for c in compilers for v in c['vars']])
 
         for compiler in compilers:
             if compiler['vars'][0] not in values:
@@ -268,16 +247,14 @@ class MakefileGenerator(object):
         logger.info("Generating makefile...")
 
         makefile = Makefile(builtin=False, oneshell=True)
-        makefile.vars.extend([
-            Variable("BUILD_ROOT", "$(shell pwd)", "Path to the build directory"),
-            Variable("SOURCE_ROOT", "$(shell pwd)", "Path to the source directory")
-        ])
+        makefile.vars.extend(
+            [
+                Variable("BUILD_ROOT", "$(shell pwd)", "Path to the build directory"),
+                Variable("SOURCE_ROOT", "$(shell pwd)", "Path to the source directory"),
+            ]
+        )
 
-        makefile.deps.extend([
-            Compiler('CC'),
-            Compiler('CXX'),
-            Python([2, 7])
-        ])
+        makefile.deps.extend([Compiler('CC'), Compiler('CXX'), Python([2, 7])])
 
         all = Rule(["all"], phony=True)
         makefile.rules.append(all)
@@ -291,16 +268,10 @@ class MakefileGenerator(object):
                 output_dirs.add(os.path.dirname(output))
 
             for output_dir in output_dirs:
-                rule.recipe.append(Command(
-                    ["mkdir", "-p", output_dir]
-                ))
+                rule.recipe.append(Command(["mkdir", "-p", output_dir]))
 
             for cmd in node["cmds"]:
-                rule.recipe.append(Command(
-                    cmd["cmd_args"],
-                    stdout=cmd.get("stdout"),
-                    cwd=cmd.get("cwd")
-                ))
+                rule.recipe.append(Command(cmd["cmd_args"], stdout=cmd.get("stdout"), cwd=cmd.get("cwd")))
 
             if node["uid"] in graph["result"]:
                 all.prerequisites += node["outputs"]

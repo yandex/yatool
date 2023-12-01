@@ -21,7 +21,9 @@ def resolve(source_root, targets, cwd=None, root_detector=None):
         roots = [detector(x) for x in lst]
         unique_roots = list(set(_f for _f in roots if _f))
         if len(unique_roots) > 1:
-            raise InvalidTargetSpecification('Cannot find common Arcadia root for all targets. Found roots: {}'.format(unique_roots))
+            raise InvalidTargetSpecification(
+                'Cannot find common Arcadia root for all targets. Found roots: {}'.format(unique_roots)
+            )
         elif len(unique_roots) == 0:
             raise InvalidTargetSpecification('Cannot find Arcadia root. Try to run command in Arcadia directory')
         return unique_roots[0]
@@ -62,8 +64,9 @@ def resolve(source_root, targets, cwd=None, root_detector=None):
 
     if source_root is not None and targets:
         if source_root != targets_root:
-            raise InvalidTargetSpecification('Source root {} differ from {} targets root'
-                                             .format(source_root, targets_root))
+            raise InvalidTargetSpecification(
+                'Source root {} differ from {} targets root'.format(source_root, targets_root)
+            )
         return Targets(targets_root, targets)
 
     cwd_root = root_detector(cwd)

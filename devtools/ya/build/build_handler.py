@@ -57,6 +57,7 @@ def do_ya_make(params):
     # XXX
     if getattr(params, 'make_context_on_distbuild_only', False) or getattr(params, 'make_context_only', False):
         from devtools.ya.build.remote import remote_graph_generator
+
         remote_graph_generator.generate(params, app_ctx)
         stage_finished('context_generating')
         stage_finished('ya_make_handler')
@@ -65,6 +66,7 @@ def do_ya_make(params):
     # XXX
     if getattr(params, 'make_context_on_distbuild', False):
         from devtools.ya.build.remote import remote_graph_generator
+
         context = remote_graph_generator.generate(params, app_ctx)
         builder = context.builder
     elif params.custom_context:

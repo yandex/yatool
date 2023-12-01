@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 def fill_suites_results(builder, suites, output_root):
     import test.result
+
     replacements = [
         ("$(BUILD_ROOT)", output_root),
         ("$(SOURCE_ROOT)", "arcadia"),
     ]
     resolver = test.reports.TextTransformer(replacements)
-    test.result.fill_suites_results(
-        suites, builder, output_root, resolver)
+    test.result.fill_suites_results(suites, builder, output_root, resolver)
 
     return suites
 
@@ -63,7 +63,9 @@ def generate_results_report(builder):
         if builder.opts.remove_result_node:
             not_skipped_suites = fill_suites_results(builder, builder.ctx.tests, output_dir)
         else:
-            not_skipped_suites = fill_suites_results(builder, [t for t in builder.ctx.tests if not t.is_skipped()], output_dir)
+            not_skipped_suites = fill_suites_results(
+                builder, [t for t in builder.ctx.tests if not t.is_skipped()], output_dir
+            )
 
     suites = not_skipped_suites + skipped_suites
 
@@ -77,12 +79,23 @@ def generate_results_report(builder):
             test.reports.JUnitReportGenerator().create(
                 builder.opts.junit_path,
                 suites,
-                lambda link: ar2._fix_link_prefix_and_quote(link, output_dir, results_root)
+                lambda link: ar2._fix_link_prefix_and_quote(link, output_dir, results_root),
             )
             logger.info('Dump junit report to %s', builder.opts.junit_path)
 
     if builder.opts.build_results_report_file:
-        results = ar2.fix_links(ar2.prepare_results(suites, report_prototype, builder, builder.get_owners(), builder.ctx.configure_errors, output_dir, output_dir), results_root)
+        results = ar2.fix_links(
+            ar2.prepare_results(
+                suites,
+                report_prototype,
+                builder,
+                builder.get_owners(),
+                builder.ctx.configure_errors,
+                output_dir,
+                output_dir,
+            ),
+            results_root,
+        )
 
         report_type = builder.opts.build_report_type
         if report_type not in [CANONICAL_REPORT_TYPE, HUMAN_READABLE_REPORT_TYPE]:
@@ -94,9 +107,11 @@ def generate_results_report(builder):
         with open(report_file_path, 'w') as rep_file:
             if report_type == CANONICAL_REPORT_TYPE:
                 import ujson
+
                 ujson.dump(results, rep_file)
             else:
                 import exts.yjson as json
+
                 json.dump(results, rep_file, indent=4, sort_keys=True)
 
 
@@ -108,13 +123,20 @@ def generate_empty_tests_result_report(builder):
     stripped_tests = builder.ctx.stripped_tests
     if getattr(builder.opts, "list_tests", False):
         filter_message = util_shared.build_filter_message(
-            ', '.join(test_node._get_skipped_tests_annotations(stripped_tests or [])), getattr(builder.opts, 'tests_filters', []) + getattr(builder.opts, 'test_files_filter', []), 0)
+            ', '.join(test_node._get_skipped_tests_annotations(stripped_tests or [])),
+            getattr(builder.opts, 'tests_filters', []) + getattr(builder.opts, 'test_files_filter', []),
+            0,
+        )
         if filter_message:
             rc.get_display().emit_message(filter_message)
             rc.get_display().emit_message()
         rc.get_display().emit_message("Total 0 suites")
     elif not builder.opts.remove_result_node:
-        filter_message = util_shared.build_filter_message(', '.join(test_node._get_skipped_tests_annotations(stripped_tests or [])), builder.opts.tests_filters if builder.opts else [], 0)
+        filter_message = util_shared.build_filter_message(
+            ', '.join(test_node._get_skipped_tests_annotations(stripped_tests or [])),
+            builder.opts.tests_filters if builder.opts else [],
+            0,
+        )
         if filter_message:
             rc.get_display().emit_message(filter_message)
         reporter = rc.ConsoleReporter(

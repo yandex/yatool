@@ -1,8 +1,9 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE build.build_facade
-
     __init__.py
 )
 

@@ -17,18 +17,22 @@ logger = logging.getLogger(__name__)
 
 def create_frepkage(build_context, graph, arc_root):
     import devtools.ya.build.source_package as source_package
+
     '''
         Build frozen repository package
     '''
+
     def dump_build_context(temp_dir):
         result_uids = graph['result']
 
-        build_context.update({
-            'graph': graph,
-            'lite_graph': bgraph.build_lite_graph(graph),
-            # Strip irrelevant tests
-            'tests': {uid: data for uid, data in six.iteritems(build_context['tests']) if uid in result_uids}
-        })
+        build_context.update(
+            {
+                'graph': graph,
+                'lite_graph': bgraph.build_lite_graph(graph),
+                # Strip irrelevant tests
+                'tests': {uid: data for uid, data in six.iteritems(build_context['tests']) if uid in result_uids},
+            }
+        )
 
         ctx_file = os.path.join(temp_dir, 'build_context.json')
 
@@ -53,7 +57,9 @@ def create_frepkage(build_context, graph, arc_root):
                             cmd_fix_required = bool(external_inputs[arg])
                         else:
                             if os.path.isfile(arg):
-                                external_inputs[arg] = 'external_inputs/{}/{}'.format(get_count(), os.path.basename(arg))
+                                external_inputs[arg] = 'external_inputs/{}/{}'.format(
+                                    get_count(), os.path.basename(arg)
+                                )
                                 cmd_fix_required = True
                             else:
                                 external_inputs[arg] = None

@@ -123,8 +123,9 @@ class ArcPrefetcher:
 
     def _process_targets(self, targets):
         targets = self._dedup_targets(targets)
-        paged_targets = (targets[i:i + self.MAX_PREFETCH_TARGETS] for i in
-                         range(0, len(targets), self.MAX_PREFETCH_TARGETS))
+        paged_targets = (
+            targets[i : i + self.MAX_PREFETCH_TARGETS] for i in range(0, len(targets), self.MAX_PREFETCH_TARGETS)
+        )
 
         for t in paged_targets:
             if self._stop_requested:

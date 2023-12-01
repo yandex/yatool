@@ -1,8 +1,9 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE build.genconf
-
     __init__.py
 )
 
@@ -15,7 +16,9 @@ PEERDIR(
 )
 
 IF (NOT YA_OPENSOURCE)
-    PEERDIR(devtools/ya/yalibrary/diagnostics)
+    PEERDIR(
+        devtools/ya/yalibrary/diagnostics
+    )
 ENDIF()
 
 END()

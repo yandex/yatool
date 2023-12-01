@@ -1,8 +1,9 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE build.gen_plan
-
     __init__.py
 )
 
@@ -17,7 +18,7 @@ PEERDIR(
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/svn
     )

@@ -21,7 +21,9 @@ class BuildErrorWithLink(object):
 
 def make_build_errors_by_project(graph, errors, errors_links):
     node_by_uid = {node['uid']: node for node in graph}
-    project_by_uid = {node['uid']: (BuildPlan.node_name(node), BuildPlan.node_platform(node), node['uid']) for node in graph}
+    project_by_uid = {
+        node['uid']: (BuildPlan.node_name(node), BuildPlan.node_platform(node), node['uid']) for node in graph
+    }
 
     def limited_union(dest, source, limit):
         for x in source:
@@ -109,14 +111,22 @@ def make_build_errors_by_project(graph, errors, errors_links):
     project_build_errors_with_links = {}
     for project, deps in six.iteritems(project_failed_deps):
         deps_paths = sorted([d[0] for d in deps])
-        project_build_errors_with_links[project] = [BuildErrorWithLink('Depends on broken targets:\n{}'.format('\n'.join(deps_paths)), [])]
+        project_build_errors_with_links[project] = [
+            BuildErrorWithLink('Depends on broken targets:\n{}'.format('\n'.join(deps_paths)), [])
+        ]
 
     for uid in six.iterkeys(node_by_uid):
         if is_module(uid) and calc_failed_deps(uid) and define_status(uid) == BROKEN:
-            project_build_errors_with_links[project_by_uid[uid]] = sorted(collect_build_errors(uid), key=lambda x: x.error)
+            project_build_errors_with_links[project_by_uid[uid]] = sorted(
+                collect_build_errors(uid), key=lambda x: x.error
+            )
 
-    project_build_errors = {project: [e.error for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)}
-    project_build_errors_links = {project: [e.links for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)}
+    project_build_errors = {
+        project: [e.error for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)
+    }
+    project_build_errors_links = {
+        project: [e.links for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)
+    }
 
     node_build_errors = {}
     node_build_errors_links = {}
@@ -129,11 +139,28 @@ def make_build_errors_by_project(graph, errors, errors_links):
                 node_build_errors[uid] += [(d, errors[d])]
                 node_build_errors_links[uid] += [(d, errors_links.get(d, []))]
 
-    return project_build_errors, project_build_errors_links, project_failed_deps, node_build_errors, node_build_errors_links
+    return (
+        project_build_errors,
+        project_build_errors_links,
+        project_failed_deps,
+        node_build_errors,
+        node_build_errors_links,
+    )
 
 
 class BuildResult(object):
-    def __init__(self, errors, failed_deps, node_build_errors, ok_nodes=None, build_metrics=None, build_errors_links=None, node_build_errors_links=None, node_status_map=None, exit_code_map=None):
+    def __init__(
+        self,
+        errors,
+        failed_deps,
+        node_build_errors,
+        ok_nodes=None,
+        build_metrics=None,
+        build_errors_links=None,
+        node_build_errors_links=None,
+        node_status_map=None,
+        exit_code_map=None,
+    ):
         self.build_errors = errors
         self.failed_deps = failed_deps
         self.node_build_errors = node_build_errors

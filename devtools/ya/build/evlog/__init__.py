@@ -73,7 +73,20 @@ def missing_dirs(evlog, force_root_dirs):
     logger.debug('Missing dirs via jbuild %s', sorted(set(java_dirs)))
     logger.debug('Skipped root dirs %s', sorted(root_dirs))
 
-    all_unique = sorted(set(peerdirs + no_makefiles + recurses + addincls + src_dirs + invalid_dirs + bad_incl + invalid_files + data_dirs + java_dirs))
+    all_unique = sorted(
+        set(
+            peerdirs
+            + no_makefiles
+            + recurses
+            + addincls
+            + src_dirs
+            + invalid_dirs
+            + bad_incl
+            + invalid_files
+            + data_dirs
+            + java_dirs
+        )
+    )
 
     all_filtered = [x for x in all_unique if x]
 
@@ -110,9 +123,9 @@ def parse_failed_deps_and_errors(evlog, targets, arc_root, build_root):
                 stderr = event['StdErr']
             elif 'StdError' in event:
                 stderr = event['StdError']
-            failed_targets_[name].append(stderr
-                                         .replace(build_root, '$(BUILD_ROOT)')
-                                         .replace(arc_root, '$(SOURCE_ROOT)'))
+            failed_targets_[name].append(
+                stderr.replace(build_root, '$(BUILD_ROOT)').replace(arc_root, '$(SOURCE_ROOT)')
+            )
         elif event['_typename'] == "NEvent.TTaskInducedFailure":
             if 'BrokenDeps' in event:
                 for b in event['BrokenDeps']:

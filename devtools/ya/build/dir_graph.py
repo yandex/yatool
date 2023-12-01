@@ -143,6 +143,7 @@ def _prepare(deps_map, type_miner):
         kf = fix(k)
         if kf is not None:
             if type_miner:
+
                 def func(edge):
                     return type_miner(edge.type)
 

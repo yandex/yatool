@@ -95,9 +95,7 @@ def _global_params(check):
     ]
 
 
-def _configure_params(
-        buildable, build_type=None, continue_on_fail=False, check=True
-):
+def _configure_params(buildable, build_type=None, continue_on_fail=False, check=True):
     return _global_params(check=check) + [
         core.yarg.Param('custom_build_directory', default_value=None),
         core.yarg.Param('abs_targets', default_value=[]),
@@ -157,19 +155,13 @@ def _gen_graph_params():
 
 def ymake_gen_proj(**kwargs):
     logger.debug('Generate project with {0}'.format(kwargs))
-    res, _ = core.yarg.behave(
-        kwargs,
-        core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_proj_params())
-    )
+    res, _ = core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_proj_params()))
     return res
 
 
 def _ymake_build(**kwargs):
     logger.debug('Run build with {0}'.format(kwargs))
-    return core.yarg.behave(
-        kwargs,
-        core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params())
-    )
+    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
 
 
 def ymake_dump(**kwargs):
@@ -179,7 +171,7 @@ def ymake_dump(**kwargs):
         core.yarg.Behaviour(
             action=_prepare_and_run_ymake,
             params=_gen_graph_params(),
-        )
+        ),
     )
 
 
@@ -187,12 +179,12 @@ def ymake_gen_graph(**kwargs):
     logger.debug('Run gen graph with {0}'.format(kwargs))
 
     res, evlog = core.yarg.behave(
-        kwargs,
-        core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_graph_params())
+        kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_graph_params())
     )
 
     if app_config.in_house:
         import yalibrary.diagnostics as diag
+
         if diag.is_active():
             diag.save('ymake-build-json', stdout=res.stdout, stderr=res.stderr)
 
@@ -395,7 +387,7 @@ def _prepare_and_run_ymake(**kwargs):
             use_local_conf=True,
             local_conf_path=None,
             extra_flags=kwargs['flags'],
-            tool_chain=toolchain_params
+            tool_chain=toolchain_params,
         )
         kwargs['custom_conf'] = custom_conf
 
@@ -448,10 +440,7 @@ def _run_ymake(**kwargs):
         'stages': _stages,
         "metrics": _metrics,
     }
-    _debug_info = {  # for dump_debug
-        'run': _run_info,
-        'kwargs': kwargs
-    }
+    _debug_info = {'run': _run_info, 'kwargs': kwargs}  # for dump_debug
 
     def stages_listener(j):
         try:
@@ -459,7 +448,7 @@ def _run_ymake(**kwargs):
 
             if _type in ('NEvent.TStageStarted', 'NEvent.TStageFinished'):
                 name = j['StageName']
-                ts = j['_timestamp'] / 10 ** 6
+                ts = j['_timestamp'] / 10**6
 
                 if _type == 'NEvent.TStageStarted':
                     _stages[name]['start'] = ts
@@ -551,7 +540,12 @@ def _run_ymake(**kwargs):
                 kwargs['json_compression_codec'] = compress_ymake_output_codec
                 is_output_compressed = True
 
-            args = _cons_ymake_args(**kwargs) + ['--quiet'] + (['--events', enabled_events] if enabled_events else []) + targets
+            args = (
+                _cons_ymake_args(**kwargs)
+                + ['--quiet']
+                + (['--events', enabled_events] if enabled_events else [])
+                + targets
+            )
             _run_info['args'] = [binary] + args
 
             _stat_info_preparing['finish'] = time.time()
@@ -577,9 +571,12 @@ def _run_ymake(**kwargs):
             _stat_info_postprocessing['start'] = time.time()
             if app_config.in_house:
                 import yalibrary.diagnostics as diag
+
                 if diag.is_active() and custom_build_dir:
                     with tmp.temp_file() as tar_gz_file:
-                        exts.archive.create_tar(custom_build_dir, tar_gz_file, exts.archive.GZIP, exts.archive.Compression.Best)
+                        exts.archive.create_tar(
+                            custom_build_dir, tar_gz_file, exts.archive.GZIP, exts.archive.Compression.Best
+                        )
                         diag.save('ymake-cache', ymake_cache_arch=exts.fs.read_file(tar_gz_file))
 
             if exit_code != 0 and check:
@@ -601,16 +598,19 @@ def _run_ymake(**kwargs):
         _run_info['exception'] = {
             'type': type(e).__name__,
             'msg': str(e),
-            'args': list(map(exts.strings.to_str, e.args))
+            'args': list(map(exts.strings.to_str, e.args)),
         }
         raise
     finally:
         if _stat_info_postprocessing.get('start'):
             _stat_info_postprocessing['finish'] = time.time()
-            _stat_info_postprocessing['duration'] = _stat_info_postprocessing['finish'] - _stat_info_postprocessing['start']
+            _stat_info_postprocessing['duration'] = (
+                _stat_info_postprocessing['finish'] - _stat_info_postprocessing['start']
+            )
 
         try:
             import app_ctx
+
             app_ctx.dump_debug['ymake_run_{}'.format(_ymake_unique_run_id)] = _debug_info
             # Store file
             app_ctx.dump_debug['yamke_run_{}_conf_file'.format(_ymake_unique_run_id)] = kwargs.get('custom_conf', None)
@@ -618,10 +618,7 @@ def _run_ymake(**kwargs):
             logger.exception("While store debug info")
 
         logger.debug("ymake_run_info: %s", json.dumps(_run_info))
-        core.report.telemetry.report(
-            core.report.ReportTypes.RUN_YMAKE,
-            _run_info
-        )
+        core.report.telemetry.report(core.report.ReportTypes.RUN_YMAKE, _run_info)
 
     return YMakeResult(exit_code, stdout, stderr, meta_data), events
 
