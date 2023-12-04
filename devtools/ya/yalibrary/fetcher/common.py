@@ -82,12 +82,12 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):
         accepted_schemas = force_accepted_schemas
 
     resource_type, rest = resource_uri.split(':', 1)
-    if resource_type in accepted_schemas:
-        resource_id = rest
-        return ParsedResourceUri(resource_type, resource_uri, resource_id, None)
-    elif resource_type == 'https':
+    if resource_type == 'https':
         resource_url, resource_id = resource_uri.split('#')
         return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url)
+    elif resource_type in accepted_schemas:
+        resource_id = rest
+        return ParsedResourceUri(resource_type, resource_uri, resource_id, None)
     elif resource_type == 'base64':
         return ParsedResourceUri(resource_type, resource_uri, None, rest)
     else:
