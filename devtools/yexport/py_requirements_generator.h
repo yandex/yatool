@@ -51,11 +51,13 @@ public:
     static THolder<TPyRequirementsGenerator> Load(const std::filesystem::path& arcadiaRoot, EPyVer pyVer);
 
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
-    void Render(const std::filesystem::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled) override;
     void SetProjectName(const std::string& projectName) override;
 
     void Render(IInputStream& pyDepsDump, IOutputStream& dest) const;
+
 private:
+    void Render(ECleanIgnored cleanIgnored) override;
+
 
     TCoordExtractor ExtractContribCoords_;
     std::filesystem::path PyDepsDumpPath_;

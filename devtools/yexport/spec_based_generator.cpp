@@ -30,11 +30,9 @@ THashSet<fs::path> TSpecBasedGenerator::CollectFilesToCopy() const {
     return result;
 }
 
-void TSpecBasedGenerator::CopyFiles(const fs::path& exportRoot) {
+void TSpecBasedGenerator::CopyFiles() {
     THashSet<fs::path> files = CollectFilesToCopy();
-    for (const auto& path: files) {
-        fs::create_directories((exportRoot/path.c_str()).parent_path());
-        fs::copy_file(GeneratorDir/path.c_str(), exportRoot/path.c_str(), fs::copy_options::overwrite_existing);
-        spdlog::info("{} saved", path.c_str());
+    for (const auto& path : files) {
+        ExportFileManager->Copy(GeneratorDir / path, path);
     }
 }

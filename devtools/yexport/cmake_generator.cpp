@@ -1,13 +1,14 @@
 #include "cmake_generator.h"
 #include "generator_spec.h"
-#include "fs_helpers.h"
 #include "path_hash.h"
 #include "read_sem_graph.h"
 #include "render_cmake.h"
 #include "generator_spec.h"
 
 #include <library/cpp/digest/md5/md5.h>
+#include <library/cpp/resource/resource.h>
 
+#include <util/generic/scope.h>
 #include <util/generic/vector.h>
 #include <util/system/fs.h>
 #include <util/system/file.h>
@@ -27,30 +28,32 @@ namespace {
         }
         fmt::format_to(bufIt, "endif()\n");
     }
-
-    void SaveCMakeModule(const fs::path& exportRoot, const std::string_view& mod) {
-        SaveResource(mod, exportRoot/"cmake");
-        spdlog::info("cmake/{} saved", mod);
+    void SaveResource(TExportFileManager& exportFileManager, const fs::path& relativeToExportRoot) {
+        std::string resource = relativeToExportRoot.filename();
+        auto out = exportFileManager.Open(relativeToExportRoot);
+        const auto content = NResource::Find(resource);
+        out.Write(content.data(), content.size());
     }
 
-    void SaveBuildScript(const fs::path& exportRoot, const std::string_view& script) {
-        SaveResource(script, exportRoot/CmakeScriptsRoot);
-        spdlog::info("{}/{} saved", CmakeScriptsRoot, script);
+    void SaveCMakeModule(TExportFileManager& exportFileManager, const std::string_view& mod) {
+        SaveResource(exportFileManager, fs::path("cmake") / mod);
     }
 
-    void SaveConanProfile(const fs::path& exportRoot, const std::string_view& profile) {
-        SaveResource(profile, exportRoot/"cmake/conan-profiles");
-        spdlog::info("cmake/conan-profiles/{} saved", profile);
+    void SaveBuildScript(TExportFileManager& exportFileManager, const std::string_view& script) {
+        SaveResource(exportFileManager, fs::path(CmakeScriptsRoot) / script);
+    }
+
+    void SaveConanProfile(TExportFileManager& exportFileManager, const std::string_view& profile) {
+        SaveResource(exportFileManager, fs::path("cmake") / "conan-profiles" / profile);
     }
 }
 
-
-TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, const fs::path& exportRoot, ECleanIgnored cleanIgnored)
+TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored)
     : ProjectName(name)
     , ArcadiaRoot(arcadiaRoot)
-    , ExportRoot(exportRoot)
     , CleanIgnored(cleanIgnored)
-{}
+{
+}
 
 TPlatformConf::TPlatformConf(std::string_view platformName) {
     if (platformName == "linux" || platformName == "linux-x86_64") {
@@ -105,10 +108,11 @@ TPlatform::TPlatform(std::string_view platformName)
     : Conf(platformName)
     , Graph(nullptr)
     , Name(platformName)
-{}
+{
+}
 
-TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaRoot, const fs::path& exportRoot)
-    : Conf(name, arcadiaRoot, exportRoot)
+TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaRoot)
+    : Conf(name, arcadiaRoot)
 {
     // TODO(YMAKE-91) Use info exported from ymake
     UpdateGlobalModules();
@@ -119,8 +123,8 @@ void TCMakeGenerator::UpdateGlobalModules() {
 }
 
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
-    const auto generatorDir = arcadiaRoot/GENERATORS_ROOT/generator;
-    const auto generatorFile = generatorDir/GENERATOR_FILE;
+    const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
+    const auto generatorFile = generatorDir / GENERATOR_FILE;
     if (!fs::exists(generatorFile)) {
         throw yexception() << fmt::format("[error] Failed to load generator {}. No {} file found", generator, generatorFile.c_str());
     }
@@ -156,14 +160,14 @@ void TCMakeGenerator::RenderPlatform(TPlatform& platform) {
     }
 }
 
-void TCMakeGenerator::Render(const fs::path& exportRoot, ECleanIgnored cleanIgnored) {
-    Conf.ExportRoot = exportRoot;
+void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     Conf.CleanIgnored = cleanIgnored;
+
     for (auto& platform : Platforms) {
         RenderPlatform(platform);
     }
 
-    CopyFiles(exportRoot);
+    CopyFiles();
 
     MergePlatforms();
     RenderRootCMakeList();
@@ -171,7 +175,7 @@ void TCMakeGenerator::Render(const fs::path& exportRoot, ECleanIgnored cleanIgno
     CopyArcadiaScripts();
     RenderConanRequirements();
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
-        Cleaner.Clean(Conf.ExportRoot);
+        Cleaner.Clean(*ExportFileManager);
     }
 }
 
@@ -184,15 +188,16 @@ void TCMakeGenerator::MergePlatforms() const {
             }
 
             bool isDifferent = false;
-            TString md5 = MD5::File((dir/platform.Conf.CMakeListsFile).string());
+            TString md5 = ExportFileManager->MD5(dir / platform.Conf.CMakeListsFile);
             TVector<TPlatformConf> dirPlatforms;
+            dirPlatforms.push_back(platform.Conf);
             for (const auto& otherPlatform : Platforms) {
                 if (platform.Conf.Platform == otherPlatform.Conf.Platform) {
                     continue;
                 }
 
                 if (otherPlatform.SubDirs.contains(dir)) {
-                    if (md5 != MD5::File((dir/otherPlatform.Conf.CMakeListsFile).string())) {
+                    if (md5 != ExportFileManager->MD5(dir / otherPlatform.Conf.CMakeListsFile)) {
                         isDifferent = true;
                     }
                     dirPlatforms.push_back(otherPlatform.Conf);
@@ -201,16 +206,15 @@ void TCMakeGenerator::MergePlatforms() const {
                 }
             }
             if (isDifferent) {
-                dirPlatforms.push_back(platform.Conf);
                 fmt::memory_buffer buf;
                 FormatCommonCMakeText(buf, dirPlatforms);
-                TFile out = OpenOutputFile(dir/NCMake::CMakeListsFile);
+                auto out = ExportFileManager->Open(dir / NCMake::CMakeListsFile);
                 out.Write(buf.data(), buf.size());
-            }
-            else {
-                NFs::Rename((dir/platform.Conf.CMakeListsFile).string(), (dir/NCMake::CMakeListsFile).string());
+            } else {
+                auto finalPath = dir / NCMake::CMakeListsFile;
+                ExportFileManager->CopyFromExportRoot(dir / platform.Conf.CMakeListsFile, finalPath);
                 for (const auto& platform : dirPlatforms) {
-                    NFs::Remove((dir/platform.CMakeListsFile).string());
+                    ExportFileManager->Remove(dir / platform.CMakeListsFile);
                 }
             }
             visitedDirs.insert(dir);
@@ -231,8 +235,7 @@ bool TCMakeGenerator::SaveGlobalVars(std::string_view modName) const {
     if (!hasGlobalVars) {
         return false;
     }
-
-    TFile out = OpenOutputFile(Conf.ExportRoot/"cmake"/modName);
+    auto out = ExportFileManager->Open(fs::path("cmake") / modName);
     fmt::memory_buffer buf;
     auto bufIt = std::back_inserter(buf);
 
@@ -247,7 +250,6 @@ bool TCMakeGenerator::SaveGlobalVars(std::string_view modName) const {
     }
     out.Write(buf.data(), buf.size());
 
-    spdlog::info("cmake/{} saved", modName);
     return true;
 }
 
@@ -275,7 +277,7 @@ TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
 }
 
 void TCMakeGenerator::RenderRootCMakeList() const {
-    TFile out = OpenOutputFile(Conf.ExportRoot/NCMake::CMakeListsFile);
+    auto out = ExportFileManager->Open(NCMake::CMakeListsFile);
     fmt::memory_buffer buf;
     auto bufIt = std::back_inserter(buf);
 
@@ -309,7 +311,7 @@ void TCMakeGenerator::RenderRootCMakeList() const {
     }
 
     for (const auto& script: GlobalProperties.ExtraScripts) {
-        SaveBuildScript(Conf.ExportRoot, script);
+        SaveBuildScript(*ExportFileManager, script);
     }
 
     if (SaveGlobalVars("global_vars.cmake")) {
@@ -330,26 +332,18 @@ void TCMakeGenerator::RenderRootCMakeList() const {
     fmt::format_to(bufIt, "endif()\n");
 
     out.Write(buf.data(), buf.size());
-
-    spdlog::info("Root {} saved", NCMake::CMakeListsFile);
-
 }
 
 void TCMakeGenerator::SaveCMakeModules() const {
     for (const auto& [name, flags] : GlobalProperties.GlobalModules) {
-        SaveCMakeModule(Conf.ExportRoot, name);
+        SaveCMakeModule(*ExportFileManager, name);
     }
 }
 
 void TCMakeGenerator::CopyArcadiaScripts() const {
-    const auto scriptsDest = Conf.ExportRoot/CmakeScriptsRoot;
-    if (fs::exists(scriptsDest) && fs::equivalent(scriptsDest, Conf.ArcadiaRoot/ArcadiaScriptsRoot)) {
-        return;
-    }
+    auto arcadiaScriptDir = Conf.ArcadiaRoot / ArcadiaScriptsRoot;
     for (const auto& script: GlobalProperties.ArcadiaScripts) {
-        const auto dest = scriptsDest/script;
-        fs::create_directories(dest.parent_path());
-        fs::copy_file(Conf.ArcadiaRoot/ArcadiaScriptsRoot/script, dest, fs::copy_options::overwrite_existing);
+        ExportFileManager->Copy(arcadiaScriptDir / script, CmakeScriptsRoot / script);
     }
 }
 
@@ -367,22 +361,24 @@ void TCMakeGenerator::RenderConanRequirements() const {
             case EPlatform::EP_Windows_x86_64_Cuda:
             case EPlatform::EP_Other:
                 break;
-            case EPlatform::EP_Android_Arm: SaveConanProfile(Conf.ExportRoot, "android.armv7.profile"); break;
-            case EPlatform::EP_Android_Arm64: SaveConanProfile(Conf.ExportRoot, "android.arm64.profile"); break;
-            case EPlatform::EP_Android_x86: SaveConanProfile(Conf.ExportRoot, "android.x86.profile"); break;
-            case EPlatform::EP_Android_x86_64: SaveConanProfile(Conf.ExportRoot, "android.x86_64.profile"); break;
+            case EPlatform::EP_Android_Arm: SaveConanProfile(*ExportFileManager, "android.armv7.profile"); break;
+            case EPlatform::EP_Android_Arm64: SaveConanProfile(*ExportFileManager, "android.arm64.profile"); break;
+            case EPlatform::EP_Android_x86: SaveConanProfile(*ExportFileManager, "android.x86.profile"); break;
+            case EPlatform::EP_Android_x86_64: SaveConanProfile(*ExportFileManager, "android.x86_64.profile"); break;
             case EPlatform::EP_Linux_Aarch64:
             case EPlatform::EP_Linux_Aarch64_Cuda:
-                SaveConanProfile(Conf.ExportRoot, "linux.aarch64.profile");
+                SaveConanProfile(*ExportFileManager, "linux.aarch64.profile");
                 break;
             case EPlatform::EP_Linux_Ppc64LE:
             case EPlatform::EP_Linux_Ppc64LE_Cuda:
-                SaveConanProfile(Conf.ExportRoot, "linux.ppc64le.profile");
+                SaveConanProfile(*ExportFileManager, "linux.ppc64le.profile");
                 break;
-            case EPlatform::EP_MacOs_Arm64: SaveConanProfile(Conf.ExportRoot, "macos.arm64.profile"); break;
+            case EPlatform::EP_MacOs_Arm64:
+                SaveConanProfile(*ExportFileManager, "macos.arm64.profile");
+                break;
         }
     }
-    auto dest = OpenOutputFile(Conf.ExportRoot/"conanfile.txt");
+    auto out = ExportFileManager->Open("conanfile.txt");
     fmt::memory_buffer buf;
     auto bufIt = std::back_inserter(buf);
 
@@ -414,6 +410,5 @@ void TCMakeGenerator::RenderConanRequirements() const {
     }
 
     fmt::format_to(bufIt, "\n[generators]\ncmake_find_package\ncmake_paths\n");
-    dest.Write(buf.data(), buf.size());
-    spdlog::info("conanfile.txt saved");
+    out.Write(buf.data(), buf.size());
 }

@@ -24,7 +24,7 @@ public:
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
 
 protected:
-    void CopyFiles(const fs::path& exportRoot);
+    void CopyFiles();
 
     fs::path GeneratorDir;
     TGeneratorSpec GeneratorSpec;

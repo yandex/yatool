@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 using TNoReentryConstVisitor = TNoReentryVisitorBase<
     TVisitorStateItemBase,
     TGraphIteratorStateItemBase<true, TSemGraph>,
-    TGraphIteratorStateBase<TGraphIteratorStateItemBase<true, TSemGraph>>> ;
+    TGraphIteratorStateBase<TGraphIteratorStateItemBase<true, TSemGraph>>>;
 
 void TDirCleaner::CollectDirs(const TSemGraph& graph, const TVector<TNodeId>& startDirs) {
     const std::set<TStringBuf> remove = [&] {
@@ -58,21 +58,28 @@ void TDirCleaner::CollectDirs(const TSemGraph& graph, const TVector<TNodeId>& st
     }
 }
 
-void TDirCleaner::Clean(const std::filesystem::path& exportRoot) const {
+void TDirCleaner::Clean(TExportFileManager& exportFileManager) const {
     struct TStackFrame {
         fs::directory_iterator Tail;
         bool Keep = false;
+
+        fs::path RelativeTo(const fs::path& exportRoot) {
+            if (Tail == fs::directory_iterator{}){
+                return {};
+            }
+            return  Tail->path().lexically_relative(exportRoot);
+        }
     };
 
     for (const auto& remove: DirsToRemove) {
         if (SubdirsToKeep.contains(remove)) {
             continue;
         }
-        auto absPath = exportRoot/remove;
-        if (!fs::exists(absPath)) {
+        if (!exportFileManager.Exists(remove)) {
             continue;
         }
 
+        auto absPath = exportFileManager.GetExportRoot() / remove;
         TStack<TStackFrame> stack;
         stack.push({.Tail = fs::directory_iterator{std::move(absPath)}, .Keep = false});
 
@@ -86,7 +93,7 @@ void TDirCleaner::Clean(const std::filesystem::path& exportRoot) const {
                         stack.top().Keep = true;
                     } else {
                         spdlog::info("removing ignored dir: {}", stack.top().Tail->path().string());
-                        fs::remove(stack.top().Tail->path());
+                        exportFileManager.Remove(stack.top().RelativeTo(exportFileManager.GetExportRoot()));
                     }
                     ++stack.top().Tail;
                 }
@@ -95,14 +102,14 @@ void TDirCleaner::Clean(const std::filesystem::path& exportRoot) const {
 
             for (; top.Tail != fs::directory_iterator{}; ++top.Tail) {
                 if (top.Tail->is_directory()) {
-                    if (SubdirsToKeep.contains(top.Tail->path().lexically_relative(exportRoot))) {
+                    if (SubdirsToKeep.contains(top.RelativeTo(exportFileManager.GetExportRoot()))) {
                         top.Keep = true;
                     } else {
                         stack.push({.Tail = fs::directory_iterator{top.Tail->path()}, .Keep = false});
                     }
                     break;
                 }
-                fs::remove(top.Tail->path());
+                exportFileManager.Remove(top.RelativeTo(exportFileManager.GetExportRoot()));
             }
         }
     }

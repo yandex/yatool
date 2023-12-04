@@ -44,7 +44,6 @@ public:
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
-    void Render(const std::filesystem::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled) override;
 
     void AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph);
     THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
@@ -52,6 +51,8 @@ public:
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
         return TargetReplacements_.ApplyReplacement(path, inputSem);
     }
+private:
+    void Render(ECleanIgnored cleanIgnored) override;
 
     EAttrTypes GetAttrType(const std::string& attrGroup, const std::string& attrMacro) const;
 
@@ -60,7 +61,7 @@ private:
     bool IsExcludeInLibraryClasspath(const std::string& library, const std::string& exclude);
     void AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath);
 
-    void RenderSubdir(const fs::path& root, const fs::path& subdir, const TJinjaList& data);
+    void RenderSubdir(const fs::path& subdir, const TJinjaList& data);
 
     std::string ProjectName;
     fs::path ArcadiaRoot;

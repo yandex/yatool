@@ -70,11 +70,10 @@ endif()
 )";
     std::string ProjectName;
     fs::path ArcadiaRoot;
-    fs::path ExportRoot;
     ECleanIgnored CleanIgnored = ECleanIgnored::Disabled;
 
     TProjectConf() = default;
-    TProjectConf(std::string_view name, const fs::path& arcadiaRoot, const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
+    TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
 };
 
 struct TPlatformConf {
@@ -130,16 +129,16 @@ private:
     void UpdateGlobalModules();
     void RenderPlatform(TPlatform& platform);
 
+    virtual void Render(ECleanIgnored cleanIgnored) override;
+
 public:
     TCMakeGenerator() = default;
-    TCMakeGenerator(std::string_view name, const fs::path& arcadiaRoot, const fs::path& exportRoot);
+    TCMakeGenerator(std::string_view name, const fs::path& arcadiaRoot);
 
     static THolder<TCMakeGenerator> Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir = "");
 
     void SetProjectName(const std::string& projectName) override;
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
-
-    void Render(const std::filesystem::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled) override;
 
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
         return TargetReplacements_.ApplyReplacement(path, inputSem);

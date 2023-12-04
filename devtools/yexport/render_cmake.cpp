@@ -1,6 +1,5 @@
 #include "render_cmake.h"
 #include "cmake_generator.h"
-#include "fs_helpers.h"
 #include "builder.h"
 
 #include <devtools/yexport/known_modules.h_serialized.h>
@@ -126,16 +125,17 @@ namespace {
     public:
         class TBuilder;
 
-        TCMakeProject(const TProjectConf& projectConf, TPlatform& platform)
+        TCMakeProject(const TProjectConf& projectConf, TPlatform& platform, TExportFileManager* exportFileManager)
         : ProjectConf(projectConf)
         , Platform(platform)
+        , ExportFileManager(exportFileManager)
         {
         }
 
         void Save() {
             // const auto dest
             THashSet<fs::path> platformDirs;
-            TFile out = OpenOutputFile(ProjectConf.ExportRoot/Platform.Conf.CMakeListsFile);
+            auto out = ExportFileManager->Open(Platform.Conf.CMakeListsFile);
             fmt::memory_buffer buf;
             auto bufIt = std::back_inserter(buf);
 
@@ -143,7 +143,7 @@ namespace {
 
             for (const auto* subdir: SubdirsOrder) {
                 Y_ASSERT(subdir);
-                Platform.SubDirs.insert(ProjectConf.ExportRoot/subdir->first);
+                Platform.SubDirs.insert(subdir->first);
                 if (subdir->second.IsTopLevel) {
                     fmt::format_to(bufIt, "add_subdirectory({})\n", subdir->first.c_str());
                 }
@@ -151,7 +151,6 @@ namespace {
             }
 
             out.Write(buf.data(), buf.size());
-            spdlog::info("Root {} saved", Platform.Conf.CMakeListsFile);
         }
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
@@ -170,7 +169,7 @@ namespace {
         }
 
         void SaveSubdirCMake(const fs::path& subdir, const TCMakeList& data) {
-            TFile out = OpenOutputFile(ProjectConf.ExportRoot/subdir/Platform.Conf.CMakeListsFile);
+            auto out = ExportFileManager->Open(subdir / Platform.Conf.CMakeListsFile);
             fs::path epilogue{ProjectConf.ArcadiaRoot/subdir/CMakeEpilogueFile};
             fs::path prologue{ProjectConf.ArcadiaRoot/subdir/CMakePrologueFile};
 
@@ -278,8 +277,6 @@ namespace {
             if (fs::exists(epilogue)) {
                 writeToFile(epilogue);
             }
-
-            spdlog::info("{}/{} saved", subdir.string(), Platform.Conf.CMakeListsFile);
         }
 
     private:
@@ -292,13 +289,14 @@ namespace {
         TVector<TSubdirsTableElem*> SubdirsOrder;
         const TProjectConf& ProjectConf;
         TPlatform& Platform;
+        TExportFileManager* ExportFileManager;
     };
 
     class TCMakeProject::TBuilder: public TGeneratorBuilder<TSubdirsTableElem, TCMakeTarget> {
     public:
 
         TBuilder(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
-        : Project(projectConf, platform)
+        : Project(projectConf, platform, cmakeGenerator->GetExportFileManager())
         , Platform(platform)
         , GlobalProperties(globalProperties)
         , CMakeGenerator(cmakeGenerator)

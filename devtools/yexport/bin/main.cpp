@@ -57,7 +57,7 @@ int main(int argc, char** argv) try {
         generator->LoadSemGraph("", opts.SemGraphs.front());
     }
     ECleanIgnored cleanIgnored = opts.CleanIgnored ? ECleanIgnored::Enabled : ECleanIgnored::Disabled;
-    generator->Render(opts.ExportRoot, cleanIgnored);
+    generator->RenderTo(opts.ExportRoot, cleanIgnored);
 
     return 0;
 } catch (const TReadGraphException& err) {

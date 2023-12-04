@@ -1,5 +1,8 @@
 #pragma once
 
+#include <devtools/yexport/diag/trace.h>
+#include <devtools/yexport/export_file_manager.h>
+
 #include <util/generic/ptr.h>
 #include <util/generic/vector.h>
 
@@ -15,11 +18,19 @@ enum class ECleanIgnored {
 class TYexportGenerator {
 public:
     TYexportGenerator() noexcept = default;
-    virtual ~TYexportGenerator() = default;;
+    virtual ~TYexportGenerator() = default;
 
     virtual void LoadSemGraph(const std::string& platform, const fs::path& semGraph) = 0;
-    virtual void Render(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled) = 0;
     virtual void SetProjectName(const std::string& projectName) = 0;
+
+    void RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
+    TExportFileManager* GetExportFileManager();
+
+protected:
+    virtual void Render(ECleanIgnored cleanIgnored) = 0;
+
+    THolder<TExportFileManager> ExportFileManager;
+
 };
 
 THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir = "");

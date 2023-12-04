@@ -1,0 +1,10 @@
+option optimize_for = SPEED;
+
+import "library/cpp/eventlog/proto/events_extension.proto";
+
+package NEvent;
+
+message TFileExported {
+    option (message_id) = 33;
+    required string FilePath = 1;
+}

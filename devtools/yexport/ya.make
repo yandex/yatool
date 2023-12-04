@@ -3,7 +3,7 @@ LIBRARY()
 SRCS(
     cmake_generator.cpp
     dir_cleaner.cpp
-    fs_helpers.cpp
+    export_file_manager.cpp
     generator_spec.cpp
     jinja_generator.cpp
     path_hash.cpp
@@ -63,6 +63,7 @@ PEERDIR(
     library/cpp/digest/md5
     library/cpp/json
     library/cpp/getopt/small
+    devtools/yexport/diag
     devtools/ymake
     devtools/ymake/compact_graph
     devtools/ymake/common
@@ -77,6 +78,7 @@ END()
 
 RECURSE(
     bin
+    diag
     docs
     it
     ut

@@ -1,5 +1,4 @@
 #include "jinja_generator.h"
-#include "fs_helpers.h"
 #include "read_sem_graph.h"
 #include "builder.h"
 
@@ -534,26 +533,26 @@ EAttrTypes TJinjaGenerator::GetAttrType(const std::string& attrGroup, const std:
     return EAttrTypes::Unknown;
 }
 
-void TJinjaGenerator::Render(const fs::path& exportRoot, ECleanIgnored) {
-    CopyFiles(exportRoot);
+void TJinjaGenerator::Render(ECleanIgnored)
+{
+    CopyFiles();
     // Render subdir lists and collect information for root list
     auto [subdirsIt, subdirsInserted] = JinjaAttrs.emplace("subdirs", jinja2::ValuesList{});
     for (const auto* subdir: SubdirsOrder) {
         subdirsIt->second.asList().emplace_back(std::string(subdir->first.c_str()));
-        RenderSubdir(exportRoot, subdir->first, subdir->second);
+        RenderSubdir(subdir->first, subdir->second);
     }
 
     JinjaAttrs.emplace("arcadiaRoot", ArcadiaRoot);
-    JinjaAttrs.emplace("exportRoot", exportRoot);
+    JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
     JinjaAttrs.emplace("projectName", ProjectName);
     const auto& tmpls = GeneratorSpec.Root.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++) {
         const auto& tmpl = tmpls[templateIndex];
         //TODO: change name of result file
-        TFile out = OpenOutputFile(exportRoot/tmpl.ResultName.c_str());
+        auto out = ExportFileManager->Open(tmpl.ResultName);
         TString renderResult = Templates[templateIndex].RenderAsString(std::as_const(JinjaAttrs)).value();
         out.Write(renderResult.data(), renderResult.size());
-        spdlog::info("Root {} saved", tmpl.ResultName);
     }
 }
 
@@ -570,7 +569,7 @@ void TJinjaGenerator::AddExcludesToTarget(const TJinjaTarget* target, jinja2::Va
                 continue;
             }
 
-            for (const auto& excludeId: excludesIt->second) {
+            for (const auto& excludeId : excludesIt->second) {
                 auto strExclude = NodeCoords[excludeId];
                 std::erase(strExclude, '"');
 
@@ -593,7 +592,7 @@ void TJinjaGenerator::AddExcludesToTarget(const TJinjaTarget* target, jinja2::Va
     }
 }
 
-void TJinjaGenerator::RenderSubdir(const fs::path& root, const fs::path& subdir, const TJinjaList &data) {
+void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const TJinjaList &data) {
     const auto& tmpls = GeneratorSpec.Targets.begin()->second.Templates;
 
     THashMap<std::string, jinja2::ValuesMap> paramsByTarget;
@@ -605,13 +604,13 @@ void TJinjaGenerator::RenderSubdir(const fs::path& root, const fs::path& subdir,
         jinjaAttrs.emplace("isTest", target->isTest);
         jinjaAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
 
-        AddExcludesToTarget(target, jinjaAttrs, static_cast<std::string>(root/subdir) + "/*");
+        AddExcludesToTarget(target, jinjaAttrs, ExportFileManager->GetExportRoot() / subdir / "*");
 
         auto paramsByTargetIter = paramsByTarget.find(target->Macro);
         if (paramsByTargetIter == paramsByTarget.end()) {
             jinja2::ValuesMap defaultTargetParams;
             defaultTargetParams.emplace("arcadiaRoot", ArcadiaRoot);
-            defaultTargetParams.emplace("exportRoot", root);
+            defaultTargetParams.emplace("exportRoot", ExportFileManager->GetExportRoot());
             defaultTargetParams.emplace("hasTest", false);
             defaultTargetParams.emplace("targets", jinja2::ValuesList{});
             paramsByTargetIter = paramsByTarget.emplace(target->Macro, std::move(defaultTargetParams)).first;
@@ -627,14 +626,12 @@ void TJinjaGenerator::RenderSubdir(const fs::path& root, const fs::path& subdir,
 
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++){
         const auto& tmpl = tmpls[templateIndex];
-        TFile out = OpenOutputFile(root/subdir/tmpl.ResultName);
+        auto out = ExportFileManager->Open(subdir / tmpl.ResultName);
 
         for (auto& [targetName, params]: paramsByTarget) {
             TString renderResult = TargetTemplates[targetName][templateIndex].RenderAsString(std::as_const(params)).value();
             out.Write(renderResult.data(), renderResult.size());
         }
-
-        spdlog::info("{}/{} saved", subdir.string(), tmpl.ResultName.c_str());
     }
 }
 

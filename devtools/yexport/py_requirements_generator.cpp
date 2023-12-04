@@ -113,9 +113,9 @@ void TPyRequirementsGenerator::LoadSemGraph(const std::string&, const fs::path& 
     PyDepsDumpPath_ = graph;
 }
 
-void TPyRequirementsGenerator::Render(const std::filesystem::path& exportRoot, ECleanIgnored) {
+void TPyRequirementsGenerator::Render(ECleanIgnored) {
     TFileInput in{PyDepsDumpPath_.string()};
-    TFileOutput out{(exportRoot / REQUIRES_FILE).string()};
+    TFileOutput out = ExportFileManager->Open(REQUIRES_FILE);
     Render(in, out);
 }
 
