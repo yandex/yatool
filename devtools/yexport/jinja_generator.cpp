@@ -191,30 +191,33 @@ private:
     TNodeId LastUntrackedDependencyId;
 
     bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        bool r = true;
         if (values.size() > 1) {
             spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrMacro, nodePath);
-            return false;
+            r = false;
         }
         attrs.insert_or_assign(attrMacro, values.empty() ? std::string{} : values[0].asString());
-        return true;
+        return r;
     }
 
     bool SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        bool r = true;
         if (values.size() > 1) {
             spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrMacro, nodePath);
-            return false;
+            r = false;
         }
         attrs.insert_or_assign(attrMacro, values.empty() ? false : IsTrue(values[0].asString()));
-        return true;
+        return r;
     }
 
     bool SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        bool r = true;
         if (values.size() > 0) {
             spdlog::error("trying to add {} elements to 'flag' type attribute {} at node {}, type 'flag' should have only 0 element", values.size(), attrMacro, nodePath);
-            return false;
+            r = false;
         }
         attrs.insert_or_assign(attrMacro, true);
-        return true;
+        return r;
     }
 
     bool SetListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
@@ -302,6 +305,11 @@ public:
         Attrs2SemNameType(generatorSpec, ATTRGROUP_ROOT, ESNT_RootAttr);
         Attrs2SemNameType(generatorSpec, ATTRGROUP_TARGET, ESNT_TargetAttr);
         Attrs2SemNameType(generatorSpec, ATTRGROUP_INDUCED, ESNT_InducedAttr);
+        if (const auto* tests = generatorSpec.Merge.FindPtr("test")) {
+            for (const auto& item: *tests) {
+                TestSubdirs.push_back(item.c_str());
+            }
+        }
         SemName2Type_.emplace("IGNORED", ESNT_Ignored);
     }
 
