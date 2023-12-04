@@ -22,7 +22,8 @@ class TmpfsUsageMonitor(pollmon.PollMonitor):
 
     def setup_monitor(self):
         st = self.get_vfs_stats()
-        assert st['f_fsid'] == 0, "Mount point doesn't look like tmpfs: %s f_fsid=%d" % (self.mount_point, st['f_fsid'])
+        # TODO work in progress, see DEVTOOLSSUPPORT-39152
+        # assert st['f_fsid'] == 0, "Mount point doesn't look like tmpfs: %s f_fsid=%d" % (self.mount_point, st['f_fsid'])
         self.block_size = st['f_bsize']
 
     def poll(self):
