@@ -78,15 +78,19 @@ class TermView(object):
 
         if len(s) < lim:
             return s
-        return s[:lim - 3] + '...'
+        return s[: lim - 3] + '...'
 
     def _fmt_status(self, task_status, pre, post):
         if isinstance(task_status, str):
-            return pack.pack_status(pre + [1, pack.Truncatable(task_status)] + post, _calc_len, self._max_len, trim=self._ninja)[0]
+            return pack.pack_status(
+                pre + [1, pack.Truncatable(task_status)] + post, _calc_len, self._max_len, trim=self._ninja
+            )[0]
 
         ans = None
         for v in task_status:
-            ans, ans_len = pack.pack_status(pre + [1, pack.Truncatable(v)] + post, _calc_len, self._max_len, trim=self._ninja)
+            ans, ans_len = pack.pack_status(
+                pre + [1, pack.Truncatable(v)] + post, _calc_len, self._max_len, trim=self._ninja
+            )
             break
         return ans
 
@@ -109,7 +113,11 @@ class TermView(object):
     def _default_status_configuration(self, tag=None, post=None):
         if not tag:
             tag = self._default_status
-        return (['|[[unimp]]{}[[rst]]|'.format(helpers.percent_to_string(100.0 * self._status.progress()))], tag, post or [])
+        return (
+            ['|[[unimp]]{}[[rst]]|'.format(helpers.percent_to_string(100.0 * self._status.progress()))],
+            tag,
+            post or [],
+        )
 
     def tick(self, *extra):
         if time.time() - self._last_updated > 1:
@@ -165,7 +173,12 @@ class TermView(object):
             if len(active) > 1:
                 post.extend(['[[unimp]]+{} more[[rst]]'.format(len(active) - 1), ' / '])
             post.extend(list(extra))
-            self._emit_status(*self._default_status_configuration('[[c:yellow]]AUXILIARY TASKS [[unimp]][{}][[rst]]'.format(self._fmt_aux_task(active[0][0])), post=post))
+            self._emit_status(
+                *self._default_status_configuration(
+                    '[[c:yellow]]AUXILIARY TASKS [[unimp]][{}][[rst]]'.format(self._fmt_aux_task(active[0][0])),
+                    post=post,
+                )
+            )
             return
 
         if self._ninja:

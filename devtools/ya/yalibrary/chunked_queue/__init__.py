@@ -54,8 +54,7 @@ class ChunkedQueue(object):
         fs.create_dirs(self._locks_dir)
         self._active_tag = uniq_name()
         self._active_chunk = ActiveChunk(
-            os.path.join(self._data_dir, self._active_tag),
-            os.path.join(self._locks_dir, self._active_tag)
+            os.path.join(self._data_dir, self._active_tag), os.path.join(self._locks_dir, self._active_tag)
         )
 
     def cleanup(self, max_items=None):
@@ -81,6 +80,7 @@ class ChunkedQueue(object):
                 consumer([json.loads(x) for x in fs.read_file(path).splitlines()])
             except Exception:
                 import traceback
+
                 logger.debug(traceback.format_exc())
             else:
                 with filelock.FileLock(os.path.join(self._locks_dir, name)):  # XXX: use non blocking interface

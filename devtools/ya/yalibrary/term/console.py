@@ -23,12 +23,14 @@ def empty_str(bytes=False):
 @func.lazy
 def ecma_48_sgr_regex():
     import re
+
     return re.compile(six.u(ECMA_48_PATTERN))
 
 
 @func.lazy
 def ecma_48_sgr_regex_bytes():
     import re
+
     return re.compile(six.b(ECMA_48_PATTERN))
 
 
@@ -59,11 +61,13 @@ def strip_ansi_codes(s):
 
 def get_term_interface_attrs():
     import termios
+
     return [termios.tcgetattr(fd) if os.isatty(fd) else None for fd in range(3)]
 
 
 def set_term_interface_attrs(stdin_attr, stdout_attr, stderr_attr, when):
     import termios
+
     for fd, attr in zip(range(3), (stdin_attr, stdout_attr, stderr_attr)):
         if attr:
             termios.tcsetattr(fd, when, attr)
@@ -90,6 +94,7 @@ def connect_real_tty(device='/dev/tty'):
 
 def restore_referral(stdout_info, stderr_info):
     import termios
+
     sys.stdout.flush()
     sys.stderr.flush()
 

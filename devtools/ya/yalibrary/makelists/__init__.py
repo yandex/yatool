@@ -23,6 +23,7 @@ def from_file(path, keep_on=False):
         logger.error('Fail build tree from makefile - {}'.format(path))
         if keep_on:
             import traceback
+
             logger.error(traceback.format_exc())
         else:
             raise
@@ -38,6 +39,7 @@ def from_str(raw_data, keep_on=False):
         logger.error('Fail build tree from makefile content\n{}'.format(raw_data))
         if keep_on:
             import traceback
+
             logger.error(traceback.format_exc())
         else:
             raise
@@ -180,7 +182,7 @@ def get_patterns(string):
         end = string.find('}', beg)
         if end == -1:
             raise mk_common.MkLibException('Unexpected end of pattern at {string}'.format(string=string))
-        patterns.append(string[beg: end + 1])
+        patterns.append(string[beg : end + 1])
         beg = string.find('${', end)
 
     return patterns

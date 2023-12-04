@@ -30,7 +30,6 @@ ESPRESSO_HTML_SCHEME = {
     Colors.RED: "color:#ff3333;",
     Colors.WHITE: "color:#d3d7cf;",
     Colors.YELLOW: "color:#f0e53a;",
-
     Colors.LIGHT_BLUE: "color:#43a8ed;font-weight:bold;",
     Colors.LIGHT_CYAN: "color:#34e2e2;font-weight:bold;",
     Colors.LIGHT_DEFAULT: "color:#eeeeec;font-weight:bold;",
@@ -40,7 +39,6 @@ ESPRESSO_HTML_SCHEME = {
     Colors.LIGHT_RED: "color:#ef2929;font-weight:bold;",
     Colors.LIGHT_WHITE: "color:#eeeeec;font-weight:bold;",
     Colors.LIGHT_YELLOW: "color:#fffb5c;font-weight:bold;",
-
     Colors.DARK_BLUE: "color:#43a8ed;opacity:0.6;",
     Colors.DARK_CYAN: "color:#34e2e2;opacity:0.6;",
     Colors.DARK_DEFAULT: "color:#eeeeec;opacity:0.6;",
@@ -62,7 +60,6 @@ MATERIAL_HTML_SCHEME = {
     Colors.RED: "color:#b7141e;",
     Colors.WHITE: "color:#efefef;",
     Colors.YELLOW: "color:#fd7b08;",
-
     Colors.LIGHT_BLUE: "color:#54a4f4;font-weight:bold;",
     Colors.LIGHT_CYAN: "color:#26bbd1;font-weight:bold;",
     Colors.LIGHT_DEFAULT: "color:#424242;font-weight:bold;",
@@ -72,7 +69,6 @@ MATERIAL_HTML_SCHEME = {
     Colors.LIGHT_RED: "color:#e83a3f;font-weight:bold;",
     Colors.LIGHT_WHITE: "color:#d9d9d9;font-weight:bold;",
     Colors.LIGHT_YELLOW: "color:#fd8e08;font-weight:bold;",
-
     Colors.DARK_BLUE: "color:#54a4f4;opacity:0.6;",
     Colors.DARK_CYAN: "color:#26bbd1;opacity:0.6;",
     Colors.DARK_DEFAULT: "color:#424242;opacity:0.6;",

@@ -1,4 +1,4 @@
-from .common import (   # noqa
+from .common import (  # noqa
     FIXED_NAME,
     RENAME,
     UNTAR,

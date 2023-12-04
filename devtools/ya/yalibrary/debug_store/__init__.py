@@ -1,5 +1,6 @@
 def dummy_init():
     from yalibrary.debug_store.store import EvLogStore
+
     return EvLogStore()
 
 

@@ -34,6 +34,7 @@ class Display(object):
     def __init__(self, stream, formatter, text_encoding=None):
         if exts.windows.on_win():
             import colorama
+
             colorama.init(wrap=False)
             stream = colorama.AnsiToWin32(stream).stream
 
@@ -123,21 +124,25 @@ if __name__ == '__main__':
     for support in [
         yalibrary.formatter.TermSupport(),
         yalibrary.formatter.HtmlSupport(),
-        yalibrary.formatter.PlainSupport()
+        yalibrary.formatter.PlainSupport(),
     ]:
         s, m = time.time(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         refs.append(yalibrary.formatter.Formatter(support).format_message(data))
-        print("{:13} time:{:0.3f} len:{:<8} mem used: {}".format(
-            support.__class__.__name__,
-            time.time() - s,
-            len(refs[-1]),
-            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - m))
+        print(
+            "{:13} time:{:0.3f} len:{:<8} mem used: {}".format(
+                support.__class__.__name__,
+                time.time() - s,
+                len(refs[-1]),
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - m,
+            )
+        )
 
     # 20 MiB
     data = "\x1b[31;1m123\x1b[0m312123" * 1024 * 1024
     s, m = time.time(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     d = yalibrary.formatter.ansi_codes_to_markup(data)
-    print("ansi_codes_to_markup time:{:0.3f} len:{:<8} mem used: {}".format(
-        time.time() - s,
-        len(d),
-        resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - m))
+    print(
+        "ansi_codes_to_markup time:{:0.3f} len:{:<8} mem used: {}".format(
+            time.time() - s, len(d), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - m
+        )
+    )

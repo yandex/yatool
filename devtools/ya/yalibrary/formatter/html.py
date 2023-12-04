@@ -28,7 +28,11 @@ class HtmlSupport(formatter.BaseSupport):
     def decorate(self, marker, text):
         color = self.profile.get(marker)
         if marker == palette.Highlight.PATH:
-            return '<a href="%s" target="_blank" style="%s">%s</a>' % (quote_url(text), self.scheme[color], escape(text))
+            return '<a href="%s" target="_blank" style="%s">%s</a>' % (
+                quote_url(text),
+                self.scheme[color],
+                escape(text),
+            )
         elif color:
             return '<span style="%s">%s</span>' % (self.scheme[color], escape(text))
         return escape(text)

@@ -349,7 +349,9 @@ class _ArcVersion(_CommonUtils):
         env = os.environ.copy()
         env['TZ'] = ''
 
-        describe = svn_run_svn_tool('arc', ['describe', '--svn', '--dirty', '--first-parent'], env=env, cwd=arc_root).strip()
+        describe = svn_run_svn_tool(
+            'arc', ['describe', '--svn', '--dirty', '--first-parent'], env=env, cwd=arc_root
+        ).strip()
 
         info = describe.split('-')
         revision = info[0].replace('r', '') if len(info) > 0 else str(-1)

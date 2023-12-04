@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.platform_matcher
     __init__.py
@@ -14,8 +16,10 @@ PEERDIR(
     library/python/resource
 )
 
-IF(PYTHON2)
-    PEERDIR(contrib/deprecated/python/typing)
+IF (PYTHON2)
+    PEERDIR(
+        contrib/deprecated/python/typing
+    )
 ENDIF()
 
 END()

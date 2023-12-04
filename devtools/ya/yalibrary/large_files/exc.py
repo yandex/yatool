@@ -8,7 +8,4 @@ class ExternalFileException(Exception):
         return self.message, self.path
 
     def __repr__(self):
-        return "<ExternalFileException: `{}` {}>".format(
-            self.path,
-            self.message
-        )
+        return "<ExternalFileException: `{}` {}>".format(self.path, self.message)

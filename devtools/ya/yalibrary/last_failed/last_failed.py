@@ -34,7 +34,6 @@ class SizeFilter(object):
 
 
 class AgeFilter(object):
-
     def __init__(self, age_limit):
         self.now = time.time()
         self.age_limit = age_limit
@@ -137,14 +136,21 @@ def cache_test_statuses(res, tests, garbage_dir, last_failed_tests):
         new_statuses_info = _get_suite_statuses(res, suite)
         if new_statuses_info:
             logger.debug("{} status info: {}".format(suite, new_statuses_info))
-        all_suite_res.append((params_hash, new_statuses_info,))
+        all_suite_res.append(
+            (
+                params_hash,
+                new_statuses_info,
+            )
+        )
         if new_statuses_info:
             is_all_empty = False
 
     if is_all_empty and last_failed_tests:
-        logger.info("you probably renamed or deleted all known failed tests.\n"
-                    "      The status store will be cleared.\n"
-                    "      Next test run will restart all tests")
+        logger.info(
+            "you probably renamed or deleted all known failed tests.\n"
+            "      The status store will be cleared.\n"
+            "      Next test run will restart all tests"
+        )
         for h, _ in all_suite_res:
             status_storage.put(h, {})
     else:

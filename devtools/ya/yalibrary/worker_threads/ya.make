@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.worker_threads
     __init__.py
@@ -7,10 +9,11 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
-
     contrib/python/six
 )
 
 END()
 
-RECURSE_FOR_TESTS(tests)
+RECURSE_FOR_TESTS(
+    tests
+)

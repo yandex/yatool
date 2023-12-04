@@ -35,6 +35,7 @@ def deploy_tool(archive, extract_to, post_process, resource_info, resource_uri, 
     if UNTAR == post_process:
         try:
             import exts.archive
+
             logger.debug("extract {0} to {1} dir (strip_prefix={2})".format(archive, extract_to, strip_prefix))
             exts.archive.extract_from_tar(archive, extract_to, strip_components=strip_prefix)
         finally:
@@ -75,6 +76,7 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):
     if not force_accepted_schemas:
         try:
             import app_ctx
+
             accepted_schemas = app_ctx.fetchers_storage.accepted_schemas()
         except ImportError:  # internal tests have no app_ctx
             accepted_schemas = {'sbr'}
@@ -97,12 +99,12 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):
 @curry
 def stringify_memoize(orig_func, cache_kwarg=None):
     '''
-        Creative rethinking of pg's caching approach.
+    Creative rethinking of pg's caching approach.
 
-        Memoize a function using it's parameters stringification as a key.
-        If cache_kwarg is not None it's value is used as a name for additional kwarg.
-        Passing this kwarg with False value disable memoization for the particular call.
-        Notice: this kwarg will be never passed to the original function.
+    Memoize a function using it's parameters stringification as a key.
+    If cache_kwarg is not None it's value is used as a name for additional kwarg.
+    Passing this kwarg with False value disable memoization for the particular call.
+    Notice: this kwarg will be never passed to the original function.
     '''
     memoized_func = memoize(func=orig_func, key=lambda args, kwargs: str((args, list(sorted(kwargs)))))
     if cache_kwarg is None:

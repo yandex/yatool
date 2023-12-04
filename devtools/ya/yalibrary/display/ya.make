@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.display
     __init__.py
@@ -12,4 +14,6 @@ PEERDIR(
 
 END()
 
-RECURSE(tests)
+RECURSE(
+    tests
+)

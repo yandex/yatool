@@ -44,7 +44,15 @@ class _Bottle(object):
             binname = self.__executable
         else:
             binname = None
-        self.__fetcher = yalibrary.fetcher.get_tool_chain_fetcher(core.config.tool_root(toolscache_version()), toolchain_name, bottle_name, self.__formula, for_platform, binname, force_refetch)
+        self.__fetcher = yalibrary.fetcher.get_tool_chain_fetcher(
+            core.config.tool_root(toolscache_version()),
+            toolchain_name,
+            bottle_name,
+            self.__formula,
+            for_platform,
+            binname,
+            force_refetch,
+        )
 
     def resolve(self, cache=True):
         return self.__fetcher.fetch_if_need(cache=cache).where
@@ -83,7 +91,9 @@ class _Bottler(object):
             visited.add(bottle_name)
             value = bottles[bottle_name]
             if isinstance(value, dict):
-                return _Bottle(toolchain_name, bottle_name, value['formula'], value.get('executable'), for_platform, force_refetch)
+                return _Bottle(
+                    toolchain_name, bottle_name, value['formula'], value.get('executable'), for_platform, force_refetch
+                )
             else:
                 bottle_name = value
 
@@ -191,7 +201,9 @@ class _ToolChain(object):
         resolved_sys_libs = []
         if tool_root is not None:
             tool_name_var = "$({0})".format(tool_root.upper())
-            resolved_sys_libs = [path.replace(tool_name_var, self.toolchain_root(tool_name, for_platform)) for path in sys_libs]
+            resolved_sys_libs = [
+                path.replace(tool_name_var, self.toolchain_root(tool_name, for_platform)) for path in sys_libs
+            ]
         return ' '.join(resolved_sys_libs)
 
     def environ(self, tool_name):
@@ -215,7 +227,15 @@ class _ToolChain(object):
         return _bottle(tc, location['bottle'], for_platform).resolve()
 
 
-def tool(name, toolchain_extra=None, with_params=False, for_platform=None, target_platform=None, cache=True, force_refetch=False):
+def tool(
+    name,
+    toolchain_extra=None,
+    with_params=False,
+    for_platform=None,
+    target_platform=None,
+    cache=True,
+    force_refetch=False,
+):
     if target_platform:
         if toolchain_extra:
             raise ToolResolveException("toolchain and target platform should not be specified together")
@@ -281,7 +301,12 @@ def iter_tools(name, tn_filter=None):
                             res_os = platform.get('os', None)
                             if not res_os:
                                 raise UnsupportedToolchain('OS should be defined. %s', platform)
-                            return {'os': res_os, 'arch': platform.get('arch', 'x86_64'), 'toolchain': tn, 'visible_name': tn}
+                            return {
+                                'os': res_os,
+                                'arch': platform.get('arch', 'x86_64'),
+                                'toolchain': tn,
+                                'visible_name': tn,
+                            }
 
                     host = load_toolchain('host')
                     target = load_toolchain('target', host)
@@ -305,7 +330,14 @@ def iter_tools(name, tn_filter=None):
                     pp = pp.copy()
                     pp['sys_lib'] = pp['sys_lib'].get(p['target']['os'], [])
 
-                res = {'platform': p, 'env': descr.get('env', {}), 'params': pp, 'formula': formula, 'name': trn, 'bottle_name': bottle_name}
+                res = {
+                    'platform': p,
+                    'env': descr.get('env', {}),
+                    'params': pp,
+                    'formula': formula,
+                    'name': trn,
+                    'bottle_name': bottle_name,
+                }
                 root = res.get('params', {}).get('match_root', None)
 
                 if root:
@@ -320,7 +352,6 @@ def iter_tools(name, tn_filter=None):
                             return dict((subst(k), subst(v)) for k, v in x.items())
 
                         if isinstance(x, list):
-
                             return [subst(v) for v in x]
                         if isinstance(x, six.string_types):
                             if x == root:
@@ -351,7 +382,6 @@ def get_tool_for_ide(name, ide):
 
 
 def resolve_tool(name, host, target):
-
     def filter_host(tool_name, tool_host):
         avail = set()
         ok = False
@@ -364,13 +394,15 @@ def resolve_tool(name, host, target):
                 yield tool
 
         if not ok:
-            raise UnsupportedPlatform('Unsupported host platforms %s for tool %s, use one of %s' % (tool_host, tool_name, ', '.join(sorted(avail))))
+            raise UnsupportedPlatform(
+                'Unsupported host platforms %s for tool %s, use one of %s'
+                % (tool_host, tool_name, ', '.join(sorted(avail)))
+            )
 
     return _resolve_tool(name, host, target, filter_host)
 
 
 def resolve_tool_by_host_os(name, host_os, target):
-
     def filter_host(tool_name, tool_host_os):
         avail = set()
         ok = False
@@ -384,13 +416,15 @@ def resolve_tool_by_host_os(name, host_os, target):
                 yield tool
 
         if not ok:
-            raise UnsupportedPlatform('Unsupported host os %s for tool %s, use one of %s' % (tool_host_os, tool_name, ', '.join(sorted(avail))))
+            raise UnsupportedPlatform(
+                'Unsupported host os %s for tool %s, use one of %s'
+                % (tool_host_os, tool_name, ', '.join(sorted(avail)))
+            )
 
     return _resolve_tool(name, host_os, target, filter_host)
 
 
 def _resolve_tool(name, host, target, filter_host):
-
     def filter_target():
         avail = set()
         ok = False
@@ -405,7 +439,9 @@ def _resolve_tool(name, host, target, filter_host):
                 yield tool
 
         if not ok:
-            raise UnsupportedPlatform('Unsupported target platform %s for tool %s, use one of %s' % (target, name, ', '.join(sorted(avail))))
+            raise UnsupportedPlatform(
+                'Unsupported target platform %s for tool %s, use one of %s' % (target, name, ', '.join(sorted(avail)))
+            )
 
     for t in filter_target():
         return t

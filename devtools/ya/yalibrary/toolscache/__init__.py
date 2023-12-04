@@ -39,6 +39,7 @@ def _logs_are_enabled():
     try:
         # Check if logs are enabled.
         import app_ctx
+
         app_ctx.file_log
         return True
     except (ImportError, AttributeError):
@@ -55,6 +56,7 @@ def _log_name():
             log_file = os.path.join(directory, '{}.{}.tclog'.format(now.strftime(_LOG_FILE_NAME_FMT), core.gsid.uid()))
 
             import app_ctx
+
             app_ctx.dump_debug['tc_log'] = log_file
 
             return log_file
@@ -76,13 +78,19 @@ def _retry_grpc(e):
 
     # UNKNOWN for grpc#15623: "Stream removed" in details
     # FAILED_PRECONDITION and UNIMPLEMENTED for race during server shutdown.
-    return e.code() in [grpc.StatusCode.CANCELLED, grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.UNKNOWN,
-                        grpc.StatusCode.FAILED_PRECONDITION, grpc.StatusCode.UNIMPLEMENTED]
+    return e.code() in [
+        grpc.StatusCode.CANCELLED,
+        grpc.StatusCode.UNAVAILABLE,
+        grpc.StatusCode.DEADLINE_EXCEEDED,
+        grpc.StatusCode.UNKNOWN,
+        grpc.StatusCode.FAILED_PRECONDITION,
+        grpc.StatusCode.UNIMPLEMENTED,
+    ]
 
 
 @contextlib.contextmanager
 def _with_no_tc_notification(cls, thr_ident):
-    """ Ignore tc notifications for thread thr_ident """
+    """Ignore tc notifications for thread thr_ident"""
     cls._in_progress_thread = thr_ident
     yield
     cls._in_progress_thread = None
@@ -102,13 +110,14 @@ class _Server(object):
 
         @classmethod
         def get_stat_dict(cls):
-            return {'grpc_exceptions': cls._grpc_exceptions,
-                    'restarts_failed': cls._restarts_failed,
-                    'restarts_backward': cls._restarts_backward,
-                    'non_cached': cls._non_cached,
-                    'tc': _SERVER._tc_enable,
-                    'ac': _SERVER._ac_enable,
-                    }
+            return {
+                'grpc_exceptions': cls._grpc_exceptions,
+                'restarts_failed': cls._restarts_failed,
+                'restarts_backward': cls._restarts_backward,
+                'non_cached': cls._non_cached,
+                'tc': _SERVER._tc_enable,
+                'ac': _SERVER._ac_enable,
+            }
 
     _tc_lock = threading.Lock()
     _ac_lock = threading.Lock()
@@ -157,6 +166,7 @@ class _Server(object):
             if not opts:
                 try:
                     import app_ctx
+
                     params = app_ctx.params
                 except (ImportError, AttributeError):
                     logger.debug("Tools cache app_ctx unavailable, use global setup")
@@ -170,6 +180,7 @@ class _Server(object):
 
             try:
                 import app_ctx
+
                 dump_debug = app_ctx.dump_debug
             except (ImportError, AttributeError):
                 logger.debug("Dump debug unavailable")
@@ -213,7 +224,11 @@ class _Server(object):
 
             if cls._ini_file is None and 'cache_dir' not in cls._ac_config_options and hasattr(params, 'bld_dir'):
                 cls._bld_dir = os.path.join(params.bld_dir, 'cache', '7')
-            elif cls._ini_file is None and 'cache_dir' not in cls._ac_config_options and getattr(params, 'custom_build_directory', None):
+            elif (
+                cls._ini_file is None
+                and 'cache_dir' not in cls._ac_config_options
+                and getattr(params, 'custom_build_directory', None)
+            ):
                 cls._bld_dir = os.path.join(params.custom_build_directory, 'cache', '7')
             try:
                 dump_debug['build_cache_root'] = cls._bld_dir
@@ -237,10 +252,14 @@ class _Server(object):
             cls._tc_cache_size = getattr(params, "tools_cache_size", None)
 
             if cls._ac_cache_size is not None:
-                cls._ac_cache_size = min(8223372036854775808, long(cls._ac_cache_size) if six.PY2 else int(cls._ac_cache_size))  # noqa
+                cls._ac_cache_size = min(
+                    8223372036854775808, long(cls._ac_cache_size) if six.PY2 else int(cls._ac_cache_size)  # noqa
+                )
 
             if cls._tc_cache_size is not None:
-                cls._tc_cache_size = min(8223372036854775808, long(cls._tc_cache_size) if six.PY2 else int(cls._tc_cache_size))  # noqa
+                cls._tc_cache_size = min(
+                    8223372036854775808, long(cls._tc_cache_size) if six.PY2 else int(cls._tc_cache_size)  # noqa
+                )
 
             if params.tools_cache_bin:
                 cls._full_path = params.tools_cache_bin
@@ -258,9 +277,20 @@ class _Server(object):
             if 'sb_id' in cls._tc_config_options:
                 cls._sb_id = cls._tc_config_options['sb_id']
 
-            logger.debug("Tools cache parameters: tc enabled=%s, tc master=%s, ac enabled=%s, ac master=%s, tc_lock_file=%s, ac_lock_file=%s, binary=%s, ini=%s, tc_conf=%s, ac_conf=%s, gl_conf=%s",
-                         cls._tc_enable, cls._tc_master, cls._ac_enable, cls._ac_master, cls._tc_lock_file, cls._ac_lock_file,
-                         cls._full_path, cls._ini_file, cls._tc_config_options, cls._ac_config_options, cls._gl_config_options)
+            logger.debug(
+                "Tools cache parameters: tc enabled=%s, tc master=%s, ac enabled=%s, ac master=%s, tc_lock_file=%s, ac_lock_file=%s, binary=%s, ini=%s, tc_conf=%s, ac_conf=%s, gl_conf=%s",
+                cls._tc_enable,
+                cls._tc_master,
+                cls._ac_enable,
+                cls._ac_master,
+                cls._tc_lock_file,
+                cls._ac_lock_file,
+                cls._full_path,
+                cls._ini_file,
+                cls._tc_config_options,
+                cls._ac_config_options,
+                cls._gl_config_options,
+            )
 
             cls._read_config = True
 
@@ -270,6 +300,7 @@ class _Server(object):
             return True
         else:
             from devtools.distbuild.libs.gsid_classifier.python import gsid_classifier
+
             return gsid_classifier.USER_BUILD == gsid_classifier.classify_gsid(core.gsid.flat_session_id())
 
     @classmethod
@@ -278,24 +309,29 @@ class _Server(object):
             with _with_no_tc_notification(cls, thr_ident):
                 cls._fetch_ya_tc()
 
-        args = ["--daemonize"] + \
-            (["--ini-file", cls._ini_file] if cls._ini_file else ["--tools_cache-lock_file", cls._tc_lock_file]) + \
-            ([] if _logs_are_enabled() else ["--no-logs"]) + \
-            (["--tools_cache-sb_id", cls._sb_id] if cls._sb_id else []) + \
-            (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else []) + \
-            ["--tools_cache-master_mode", "true" if cls._tc_master else "false"] + \
-            (["--tools_cache-disk_limit={}".format(cls._tc_cache_size)] if cls._tc_cache_size is not None else []) + \
-            ["--tools_cache-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._tc_config_options)] + \
-            ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)] + \
-            [("ALL-" if cls._single_instance else "TC-") + core.gsid.flat_session_id()]
+        args = (
+            ["--daemonize"]
+            + (["--ini-file", cls._ini_file] if cls._ini_file else ["--tools_cache-lock_file", cls._tc_lock_file])
+            + ([] if _logs_are_enabled() else ["--no-logs"])
+            + (["--tools_cache-sb_id", cls._sb_id] if cls._sb_id else [])
+            + (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else [])
+            + ["--tools_cache-master_mode", "true" if cls._tc_master else "false"]
+            + (["--tools_cache-disk_limit={}".format(cls._tc_cache_size)] if cls._tc_cache_size is not None else [])
+            + ["--tools_cache-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._tc_config_options)]
+            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)]
+            + [("ALL-" if cls._single_instance else "TC-") + core.gsid.flat_session_id()]
+        )
 
-        new_args = (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else []) + \
-            (["--grpc-service=all"] if cls._single_instance else ["--grpc-service=tools_cache"])
+        new_args = (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else []) + (
+            ["--grpc-service=all"] if cls._single_instance else ["--grpc-service=tools_cache"]
+        )
 
         if cls._single_instance:
-            new_args += (["--ac-master_mode", "true" if cls._ac_master else "false"]) + \
-                (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else []) + \
-                ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)]
+            new_args += (
+                (["--ac-master_mode", "true" if cls._ac_master else "false"])
+                + (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else [])
+                + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)]
+            )
 
         logger.debug("run {0} with args {1}".format(cls._full_path, args + new_args))
         p = extp.popen([cls._full_path] + args + new_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -310,7 +346,7 @@ class _Server(object):
             diag_output = "out={}, err={}".format(out, err)
 
         if p.returncode:
-            logger.debug("Command failed with code=%s %s", p.returncode,  diag_output)
+            logger.debug("Command failed with code=%s %s", p.returncode, diag_output)
             raise subprocess.CalledProcessError(p.returncode, [cls._full_path] + args, output=diag_output)
 
     @classmethod
@@ -319,26 +355,32 @@ class _Server(object):
         out = cls.check_status()
         assert out.State == 2, str(out)
 
-        args = ["--daemonize"] + \
-            (["--ini-file", cls._ini_file] if cls._ini_file else ["--tools_cache-lock_file", cls._tc_lock_file, "--ac-lock_file", cls._ac_lock_file]) + \
-            ([] if _logs_are_enabled() else ["--no-logs"]) + \
-            (["--tools_cache-sb_id", cls._sb_id] if cls._sb_id else []) + \
-            (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else []) + \
-            (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else []) + \
-            (["--ac-master_mode", "true" if cls._ac_master else "false"]) + \
-            (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else []) + \
-            (["--ac-disk_limit={}".format(cls._ac_cache_size)] if cls._ac_cache_size is not None else []) + \
-            ["--grpc-service=build_cache"] + \
-            ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)] + \
-            ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)] + \
-            ["AC-" + core.gsid.flat_session_id()]
+        args = (
+            ["--daemonize"]
+            + (
+                ["--ini-file", cls._ini_file]
+                if cls._ini_file
+                else ["--tools_cache-lock_file", cls._tc_lock_file, "--ac-lock_file", cls._ac_lock_file]
+            )
+            + ([] if _logs_are_enabled() else ["--no-logs"])
+            + (["--tools_cache-sb_id", cls._sb_id] if cls._sb_id else [])
+            + (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else [])
+            + (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else [])
+            + (["--ac-master_mode", "true" if cls._ac_master else "false"])
+            + (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else [])
+            + (["--ac-disk_limit={}".format(cls._ac_cache_size)] if cls._ac_cache_size is not None else [])
+            + ["--grpc-service=build_cache"]
+            + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)]
+            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)]
+            + ["AC-" + core.gsid.flat_session_id()]
+        )
 
         logger.debug("run {0} with args {1}".format(cls._full_path, args))
         p = extp.popen([cls._full_path] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         diag_output = "out={}, err={}".format(out, err)
         if p.returncode:
-            logger.debug("Command failed with code=%s %s", p.returncode,  diag_output)
+            logger.debug("Command failed with code=%s %s", p.returncode, diag_output)
             raise subprocess.CalledProcessError(p.returncode, [cls._full_path] + args, output=diag_output)
 
     @classmethod
@@ -346,6 +388,7 @@ class _Server(object):
     def _fetch_ya_tc(cls):
         # other ya-tc may remove requested one
         import yalibrary.tools as tools
+
         return os.path.realpath(tools.tool("ya-tc", cache=False))
 
     @classmethod
@@ -360,14 +403,22 @@ class _Server(object):
             logger.debug("Tools cache server resource download/parameters")
 
             import yalibrary.tools as tools
+
             with _with_no_tc_notification(cls, thr_ident):
                 # Start from p.1.
                 # Relying on yalibrary.fetcher
-                cls._sb_path, cls._sb_path_id = os.path.split(tools.toolchain_root("ya-tc", toolchain_extra=None, for_platform=None))
+                cls._sb_path, cls._sb_path_id = os.path.split(
+                    tools.toolchain_root("ya-tc", toolchain_extra=None, for_platform=None)
+                )
                 cls._sb_id = tools.resource_id("ya-tc", toolchain_extra=None, for_platform=None).replace('sbr:', '')
                 cls._full_path = cls._fetch_ya_tc()
 
-            logger.debug("Tools cache server resource download/parameters done: id=%s, path_id=%s, full_path=%s", cls._sb_id, cls._sb_path_id, cls._full_path)
+            logger.debug(
+                "Tools cache server resource download/parameters done: id=%s, path_id=%s, full_path=%s",
+                cls._sb_id,
+                cls._sb_path_id,
+                cls._full_path,
+            )
 
             # Should be set in reverse order of checks to avoid races.
             cls._done = True
@@ -375,10 +426,10 @@ class _Server(object):
     @classmethod
     @retry.retrying(max_times=6, retry_sleep=lambda i, t: 1)
     def _start_with_lock(cls, thr_ident, read_address, diag, start_tc):
-        """ Needs "cls._tc_lock if start_tc else cls._ac_lock" captured
-            Permit at most 3 concurrent versions of server potentially replacing each other.
-            Timeouts for single instance of server should be tuned elsewhere.
-            Additional attempts for high load environment.
+        """Needs "cls._tc_lock if start_tc else cls._ac_lock" captured
+        Permit at most 3 concurrent versions of server potentially replacing each other.
+        Timeouts for single instance of server should be tuned elsewhere.
+        Additional attempts for high load environment.
         """
         full_address = read_address()
         if full_address is not None:
@@ -413,6 +464,7 @@ class _Server(object):
 
         def read_address():
             from devtools.local_cache.psingleton.python import systemptr
+
             full_address = systemptr.get_server_info(cls._tc_lock_file, log_file=_log_name(), non_blocking=False)
             pid, ctime, address = full_address
             if address:
@@ -438,7 +490,10 @@ class _Server(object):
 
         def read_address():
             from devtools.local_cache.psingleton.python import systemptr
-            full_address = systemptr.get_server_info(cls._ac_lock_file, log_file=_log_name(), non_blocking=False, fresh=True)
+
+            full_address = systemptr.get_server_info(
+                cls._ac_lock_file, log_file=_log_name(), non_blocking=False, fresh=True
+            )
             pid, ctime, address = full_address
             if address:
                 cls._ac_full_address = full_address
@@ -483,10 +538,16 @@ class _Server(object):
             if resource_id not in (cls._sb_id, cls._sb_path_id):
                 return False
 
-            logger.debug("Ignore grpc error {} for ya-tc notification about itself, remote: pid={}".format(grpc_exc, pid))
+            logger.debug(
+                "Ignore grpc error {} for ya-tc notification about itself, remote: pid={}".format(grpc_exc, pid)
+            )
             return True
 
-        full_address = cls._tc_cache_address(thr_ident, diag, verbose=verbose) if tc else cls._ac_cache_address(diag, verbose=verbose)
+        full_address = (
+            cls._tc_cache_address(thr_ident, diag, verbose=verbose)
+            if tc
+            else cls._ac_cache_address(diag, verbose=verbose)
+        )
         pid, ctime, address = full_address
         if address is not None:
             try:
@@ -495,9 +556,15 @@ class _Server(object):
                 if tc and ignore_ya_tc_notification(pid, e):
                     return
                 if hasattr(e, 'details') and hasattr(e, 'code'):
-                    logger.debug("grpc error accessing {} cache {} {}, remote: pid={}".format("TC" if tc else "AC", e.code(), e.details(), pid))
+                    logger.debug(
+                        "grpc error accessing {} cache {} {}, remote: pid={}".format(
+                            "TC" if tc else "AC", e.code(), e.details(), pid
+                        )
+                    )
                 else:
-                    logger.debug("grpc error accessing {} cache {}, remote: pid={}".format("TC" if tc else "AC", e, pid))
+                    logger.debug(
+                        "grpc error accessing {} cache {}, remote: pid={}".format("TC" if tc else "AC", e, pid)
+                    )
                 if tc:
                     cls._tc_full_address = None
                 else:
@@ -510,7 +577,9 @@ class _Server(object):
             raise AssertionError(msg)
 
     @classmethod
-    def unary_method(cls, method, diag, tc, verbose=True, ignore_error_for_tc=False, ignore_exception=False, retries=4, **kwargs):
+    def unary_method(
+        cls, method, diag, tc, verbose=True, ignore_error_for_tc=False, ignore_exception=False, retries=4, **kwargs
+    ):
         @retry.retrying(max_times=retries, raise_exception=lambda e: not _retry_grpc(e), retry_sleep=lambda i, t: i)
         def wrapper(*args, **kwargs):
             return cls.unary_method_no_retry(*args, **kwargs)
@@ -529,7 +598,13 @@ class _Server(object):
 
         kwargs = {'sbpath': resource_dir, 'sbid': resource_id}
 
-        return cls.unary_method(notify_resource_used, diag='(request for resource {})'.format(resource_id), tc=True, ignore_error_for_tc=True, **kwargs)
+        return cls.unary_method(
+            notify_resource_used,
+            diag='(request for resource {})'.format(resource_id),
+            tc=True,
+            ignore_error_for_tc=True,
+            **kwargs
+        )
 
     @classmethod
     def tc_force_gc(cls, max_cache_size):
@@ -537,7 +612,9 @@ class _Server(object):
 
         kwargs = {'disk_limit': max_cache_size}
 
-        return cls.unary_method(force_gc, diag='(force gc tools cache {})'.format(max_cache_size), tc=True, verbose=True, **kwargs)
+        return cls.unary_method(
+            force_gc, diag='(force gc tools cache {})'.format(max_cache_size), tc=True, verbose=True, **kwargs
+        )
 
     @classmethod
     def lock_resource(cls, where):
@@ -587,7 +664,16 @@ class _Server(object):
     def put_uid(cls, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names):
         from devtools.local_cache.ac.python.ac import put_uid
 
-        kwargs = {'uid': uid, 'root_path': root_path, 'blobs': blobs, 'weight': weight, 'hardlink': hardlink, 'replace': replace, 'is_result': is_result, 'file_names': file_names}
+        kwargs = {
+            'uid': uid,
+            'root_path': root_path,
+            'blobs': blobs,
+            'weight': weight,
+            'hardlink': hardlink,
+            'replace': replace,
+            'is_result': is_result,
+            'file_names': file_names,
+        }
 
         return cls.unary_method(put_uid, diag='(put uid {})'.format(uid), tc=False, verbose=True, **kwargs)
 
@@ -639,7 +725,9 @@ class _Server(object):
 
         kwargs = {'total_size': total_size, 'min_last_access': min_last_access, 'max_object_size': max_object_size}
 
-        return cls.unary_method(synchronous_gc, diag='(synchronous gc {})'.format(kwargs), tc=False, verbose=True, **kwargs)
+        return cls.unary_method(
+            synchronous_gc, diag='(synchronous gc {})'.format(kwargs), tc=False, verbose=True, **kwargs
+        )
 
 
 _SERVER = _Server()
@@ -832,6 +920,7 @@ class ACCache(object):
         import hashlib
 
         try:
+
             def convert(uid, info):
                 blobs = []
                 file_names = []
@@ -847,7 +936,16 @@ class ACCache(object):
                     file_names.append(rel_path)
 
                 r, metadata = [None] * 2
-                out = _SERVER.put_uid(uid, root_path='', blobs=blobs, weight=0, hardlink=True, replace=True, is_result=False, file_names=file_names)
+                out = _SERVER.put_uid(
+                    uid,
+                    root_path='',
+                    blobs=blobs,
+                    weight=0,
+                    hardlink=True,
+                    replace=True,
+                    is_result=False,
+                    file_names=file_names,
+                )
                 if out:
                     r, metadata = out
                     self._set_stats(r.Stats)
@@ -855,6 +953,7 @@ class ACCache(object):
                 self._acccount_failure('put', r, metadata=metadata)
 
             from yalibrary.store import new_store
+
             new_store.NewStore(new_store_path).convert(convert, state)
         except Exception as e:
             logger.debug("Did not complete conversion for %s", e)
@@ -880,7 +979,11 @@ class ACCache(object):
 
             return '{:8.3f}{}'.format(size, unit)
 
-        display.emit_message('Total disk size: {:10}, # of files: {:7}, # of graph nodes: {:7}'.format(__fmt_size(self._fs_size), self._blob_count, self._uid_count))
+        display.emit_message(
+            'Total disk size: {:10}, # of files: {:7}, # of graph nodes: {:7}'.format(
+                __fmt_size(self._fs_size), self._blob_count, self._uid_count
+            )
+        )
         display.emit_message('')
         display.emit_message('{:10} {:5} - {}'.format('Disk size', 'freq', 'file path'))
         for item in r.FileStats:
@@ -910,6 +1013,13 @@ class ACCache(object):
 
     def stats(self, execution_log):
         for k in self.timers.keys():
-            stat_dict = {'timing': (0, self.timers[k]), 'total_time': True, 'count': self.counters[k], 'prepare': '', 'type': 'AC', 'failures': self.failures[k]}
+            stat_dict = {
+                'timing': (0, self.timers[k]),
+                'total_time': True,
+                'count': self.counters[k],
+                'prepare': '',
+                'type': 'AC',
+                'failures': self.failures[k],
+            }
             core.report.telemetry.report('AC_stats-{}'.format(k), stat_dict)
             execution_log["$(AC-{})".format(k)] = stat_dict

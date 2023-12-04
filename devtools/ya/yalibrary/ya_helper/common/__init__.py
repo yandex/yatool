@@ -48,7 +48,7 @@ class CleanEnv(LoggerCounter):
 
 def level_up(s, indent=4, first_symbol='|'):
     if not isinstance(s, (tuple, list, set)):
-        s = (s, )
+        s = (s,)
     s = '\n'.join(map(str, s))
 
     if indent > 0:
@@ -70,8 +70,6 @@ _K = tp.TypeVar("_K")
 
 def sorted_items(d):
     # type: (dict[tp.Any, _K]) -> tp.Iterable[tuple[tp.Any, _K]]
-    """ For python2 compatibility """
-    for key in sorted(
-        d.keys(), key=lambda k: (k is None, isinstance(k, (float, int)), k)
-    ):
+    """For python2 compatibility"""
+    for key in sorted(d.keys(), key=lambda k: (k is None, isinstance(k, (float, int)), k)):
         yield key, d[key]

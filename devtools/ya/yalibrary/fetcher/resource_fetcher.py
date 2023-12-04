@@ -66,14 +66,18 @@ def fetch_resource_if_need(
     binname=None,
     force_refetch=False,
     keep_directory_packed=False,
-    strip_prefix=None
+    strip_prefix=None,
 ):
     parsed_uri = parse_resource_uri(resource_uri)
     post_process, target_is_tool_dir = install_params
     resource_dir = get_resource_dir_name(resource_uri, strip_prefix)
     result_dir = os.path.join(root_dir, resource_dir)
 
-    logger.debug("Fetching {} from {} to {} dir, post_process={})".format(parsed_uri.resource_id, parsed_uri.resource_uri, result_dir, post_process))
+    logger.debug(
+        "Fetching {} from {} to {} dir, post_process={})".format(
+            parsed_uri.resource_id, parsed_uri.resource_uri, result_dir, post_process
+        )
+    )
 
     downloader = _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed)
 
@@ -106,6 +110,7 @@ def select_resource(item, platform=None):
 def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed):
     try:
         import app_ctx
+
         normal_fetched_schemas = app_ctx.fetchers_storage.accepted_schemas()
     except ImportError:  # internal tests have no app_ctx
         normal_fetched_schemas = {'sbr'}
@@ -153,11 +158,7 @@ class _HttpDownloader(DownloaderBase):
         self._info = resource_info
 
     def __call__(self, download_to):
-        http_client.download_file(
-            url=self._url,
-            path=download_to,
-            expected_md5=self._md5
-        )
+        http_client.download_file(url=self._url, path=download_to, expected_md5=self._md5)
         return self._info
 
 
@@ -174,9 +175,7 @@ class _HttpDownloaderWithConfigMapping(_HttpDownloader):
         url = mapping["resources"][resource_id]
 
         super(_HttpDownloaderWithConfigMapping, self).__init__(
-            resource_url=url,
-            resource_md5=None,
-            resource_info=resource_info
+            resource_url=url, resource_md5=None, resource_info=resource_info
         )
 
 
@@ -191,11 +190,7 @@ class _DefaultDownloader(DownloaderBase):
     def __call__(self, download_to):
         try:
             return self._fetcher.fetch_resource(
-                self._resource_id,
-                download_to,
-                self._progress_callback,
-                self._state,
-                self._keep_directory_packed
+                self._resource_id, download_to, self._progress_callback, self._state, self._keep_directory_packed
             )
         finally:
             if isinstance(self._progress_callback, ProgressPrinter):

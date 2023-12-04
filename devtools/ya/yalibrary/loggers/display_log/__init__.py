@@ -3,11 +3,11 @@ import logging
 
 class DisplayStreamHandler(logging.StreamHandler):
     level_map = {
-        logging.DEBUG:       ('Debug', '[[unimp]]'),
-        logging.INFO:        ('Info',  '[[good]]'),
-        logging.WARNING:     ('Warn',  '[[warn]]'),
-        logging.ERROR:       ('Error', '[[bad]]'),
-        logging.CRITICAL:    ('Fatal', '[[bad]]'),
+        logging.DEBUG: ('Debug', '[[unimp]]'),
+        logging.INFO: ('Info', '[[good]]'),
+        logging.WARNING: ('Warn', '[[warn]]'),
+        logging.ERROR: ('Error', '[[bad]]'),
+        logging.CRITICAL: ('Fatal', '[[bad]]'),
     }
 
     def __init__(self, display, replacements):

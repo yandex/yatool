@@ -12,9 +12,10 @@ IF (PYTHON2)
     )
 ENDIF()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.status_view
-
     __init__.py
     helpers.py
     status.py
@@ -24,4 +25,6 @@ PY_SRCS(
 
 END()
 
-RECURSE_FOR_TESTS(tests)
+RECURSE_FOR_TESTS(
+    tests
+)

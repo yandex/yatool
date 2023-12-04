@@ -30,7 +30,7 @@ class ExternalFile:
 
         self.project_path = project_path
 
-        self.file_path = file_name[:-len(self.EXTENSION)] if file_name.endswith(self.EXTENSION) else file_name
+        self.file_path = file_name[: -len(self.EXTENSION)] if file_name.endswith(self.EXTENSION) else file_name
         """ Relative or absolute path to original file """
 
         self.orig_file_path = os.path.join(self.project_path, self.file_path) if self.project_path else self.file_path
@@ -126,18 +126,16 @@ class ExternalFile:
                         if data['file_name'] != self.local_file_name:
                             raise ExternalFileException(
                                 "Parameter `file_name` should be equal to "
-                                ".external file name (`{}` / `{}`)".format(
-                                    data['file_name'], self.local_file_name
-                                ))
+                                ".external file name (`{}` / `{}`)".format(data['file_name'], self.local_file_name)
+                            )
                 else:
                     if 'file_name' not in data:
                         raise ExternalFileException("Parameter `file_name` is required")
                     if data['file_name'] != self.local_file_name:
                         raise ExternalFileException(
                             "Parameter `file_name` should be equal to "
-                            ".external file name (`{}` / `{}`)".format(
-                                data['file_name'], self.local_file_name
-                            ))
+                            ".external file name (`{}` / `{}`)".format(data['file_name'], self.local_file_name)
+                        )
 
             elif storage == "MDS":
                 for k in ["namespace", "sha1"]:
@@ -150,23 +148,16 @@ class ExternalFile:
             patterns = []
 
             if storage == "SANDBOX":
-                patterns.extend((
-                    ('resource_link', RESOURCE_LINK_PATTERN),
-                    ('download_link', DOWNLOAD_LINK_PATTERN)
-                ))
+                patterns.extend((('resource_link', RESOURCE_LINK_PATTERN), ('download_link', DOWNLOAD_LINK_PATTERN)))
             elif storage == "MDS":
                 download_link_pattern_mds = r"https:\/\/.*/get-{}/{}".format(data["namespace"], data["resource_id"])
-                patterns.append(
-                    ('download_link', download_link_pattern_mds)
-                )
+                patterns.append(('download_link', download_link_pattern_mds))
             else:
                 raise NotImplementedError()
 
             for field, pattern in patterns:
                 if not (re.match(pattern, data[field])):
-                    raise ExternalFileException("Parameter `{}` should match the pattern `{}`".format(
-                        field, pattern
-                    ))
+                    raise ExternalFileException("Parameter `{}` should match the pattern `{}`".format(field, pattern))
 
         except ExternalFileException as e:
             e.path = self.external_file_path

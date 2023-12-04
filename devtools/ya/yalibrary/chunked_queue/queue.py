@@ -80,6 +80,7 @@ class Chunk(object):
 
     def consume_lines(self, lines_filter):
         with self._lock:
+
             class reopener:
                 def __enter__(rself):
                     rself._opened = self._stream is not None
@@ -153,8 +154,11 @@ class Queue(object):
     def analyze(self, analyzer):
         with self._consume_lock:
             for chunk_name in sorted(os.listdir(self._data_dir)):
-                chunk = Chunk(self._data_dir, chunk_name) \
-                    if os.path.basename(chunk_name) != self._active_chunk.tag else self._active_chunk
+                chunk = (
+                    Chunk(self._data_dir, chunk_name)
+                    if os.path.basename(chunk_name) != self._active_chunk.tag
+                    else self._active_chunk
+                )
                 for x in chunk.analyze(analyzer):
                     yield x
 
@@ -167,6 +171,9 @@ class Queue(object):
     def strip(self, lines_filter):
         with self._consume_lock:
             for chunk_name in sorted(os.listdir(self._data_dir)):
-                chunk = Chunk(self._data_dir, chunk_name) \
-                    if os.path.basename(chunk_name) != self._active_chunk.tag else self._active_chunk
+                chunk = (
+                    Chunk(self._data_dir, chunk_name)
+                    if os.path.basename(chunk_name) != self._active_chunk.tag
+                    else self._active_chunk
+                )
                 chunk.consume_lines(lines_filter)

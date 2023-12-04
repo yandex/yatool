@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.vcs.vcsversion
     __init__.py
@@ -19,7 +21,7 @@ IF (PYTHON2)
         PEERDIR(
             devtools/ya/yalibrary/svn
         )
-    ENDIF() 
+    ENDIF()
 ENDIF()
 
 END()

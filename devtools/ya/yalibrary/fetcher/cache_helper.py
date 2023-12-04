@@ -6,9 +6,7 @@ from contextlib2 import ExitStack
 from exts import filelock, fs, hashing, windows
 from yalibrary import toolscache
 
-from .common import (
-    clean_dir
-)
+from .common import clean_dir
 
 
 _GUARD_FILE_NAME = "INSTALLED"
@@ -21,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class _InfraProcessSync(object):
     """Not all file locks guarantee synchronization among threads in a process"""
+
     _lock = threading.Lock()
     _SIZE_OF_LOCK_VECTOR = 128
     _being_downloaded = [None] * _SIZE_OF_LOCK_VECTOR
@@ -74,9 +73,9 @@ def install_resource(resource_path, installer, force_refetch=False):
 
 def update_resource(resource_path, updater):
     '''
-        Update existing resource cache or create new if it doesn't exist before.
-        Newly created resource cache is incomplete (doesn't have resource and guard files)
-        and it is subject to delete during `true' resource install (by install_resource() function)
+    Update existing resource cache or create new if it doesn't exist before.
+    Newly created resource cache is incomplete (doesn't have resource and guard files)
+    and it is subject to delete during `true' resource install (by install_resource() function)
     '''
     with safe_resource_lock(resource_path):
         if not os.path.exists(resource_path):

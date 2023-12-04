@@ -93,7 +93,9 @@ PLATFORM_REPLACEMENTS = {
 
 
 def get_platform_replacements(platform, custom_platform_replacements):
-    platform_replacements = PLATFORM_REPLACEMENTS if custom_platform_replacements is None else custom_platform_replacements
+    platform_replacements = (
+        PLATFORM_REPLACEMENTS if custom_platform_replacements is None else custom_platform_replacements
+    )
     return platform_replacements.get(platform, [])
 
 
@@ -105,7 +107,11 @@ def match_platform(expect, platforms, custom_platform_replacements=None):
     for platform_ in platforms:
         canonized = canonize_full_platform(platform_)
         if canonized in canonized_platforms:
-            raise InvalidPlatformSpecification('Platforms "{}" and "{}" have the same canonized form "{}"'.format(platform_, canonized_platforms[canonized], canonized))
+            raise InvalidPlatformSpecification(
+                'Platforms "{}" and "{}" have the same canonized form "{}"'.format(
+                    platform_, canonized_platforms[canonized], canonized
+                )
+            )
         canonized_platforms[canonized] = platform_
 
     if expect in canonized_platforms:

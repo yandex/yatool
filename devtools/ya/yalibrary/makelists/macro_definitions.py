@@ -151,9 +151,12 @@ class Node(object):
             raise AssertionError("At least one argument is required")
 
         if names:
+
             def match(x):
                 return x in names
+
         else:
+
             def match(x):
                 return x == name
 
@@ -243,7 +246,9 @@ class Macro(Node):
 
     MODIFIERS = {
         'PY_SRCS': ['NAMESPACE', 'MAIN'],
-        'RESOURCE_FILES': ['PREFIX', ],
+        'RESOURCE_FILES': [
+            'PREFIX',
+        ],
     }
 
     def set_modifier(self, node_modifier):
@@ -251,7 +256,11 @@ class Macro(Node):
             raise MacroException('Macro {} can not have any modifiers'.format(self.NAME))
 
         if node_modifier.NAME not in self.MODIFIERS[self.NAME]:
-            raise MacroException('Modifier {} not allowed for macro {} (expected names are {})'.format(node_modifier.NAME, self.NAME, self.MODIFIERS[self.NAME]))
+            raise MacroException(
+                'Modifier {} not allowed for macro {} (expected names are {})'.format(
+                    node_modifier.NAME, self.NAME, self.MODIFIERS[self.NAME]
+                )
+            )
 
         attr_name = node_modifier.NAME.lower()
         old_modifier = getattr(self, attr_name, None)
@@ -303,6 +312,7 @@ class Macro(Node):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
         START = 1
         VALUE = 2
@@ -466,8 +476,11 @@ class Value(Node):
                 cur_len = 0
                 i = 0
                 while i < len(words):
-                    if cur_len + len(words[i]) <= MAX_OUTPUT_STRING_LEN \
-                       or not cur_len and len(words[i]) > MAX_OUTPUT_STRING_LEN:
+                    if (
+                        cur_len + len(words[i]) <= MAX_OUTPUT_STRING_LEN
+                        or not cur_len
+                        and len(words[i]) > MAX_OUTPUT_STRING_LEN
+                    ):
                         cur_len = cur_len + len(words[i])
                         string.append(words[i])
                     else:
@@ -530,7 +543,6 @@ class MakeList(Node):
         super(MakeList, self).__init__(name, TYPE_UNKNOWN)
 
     def _find_project(self):
-
         def _find_projects_recursivly(obj):
             num_proj = 0
             proj = None
@@ -656,8 +668,7 @@ class Project(Macro):
 
         before_node = self.find_nodes('END')
         if len(before_node) != 1:
-            raise MacroException('error: failed insert new {} macro: {}'.format(ResourceFiles.NAME,
-                                                                                before_node))
+            raise MacroException('error: failed insert new {} macro: {}'.format(ResourceFiles.NAME, before_node))
 
         resource_files = ResourceFiles()
         if prefix is not None:
@@ -930,6 +941,7 @@ class Peerdir(Macro):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
 
         START = 1
@@ -1071,6 +1083,7 @@ class _GenericSrcs(Macro):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
         START = 1
         MOD = 2
@@ -1193,6 +1206,7 @@ class ResourceFiles(_GenericSrcs):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
         START = 1
         PREFIX = 2
@@ -1464,6 +1478,7 @@ class Flags(Macro):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
         START = 1
         VALUE = 2
@@ -1548,6 +1563,7 @@ class Addincl(Macro):
 
     def parse_tokens(self, tokens):
         from .com_handler import CommentsHandler
+
         com_h = CommentsHandler(self, 1)
         START = 1
         VALUE = 2
@@ -1842,8 +1858,19 @@ class Resource(Macro):
 
 
 class AddTestValue(Value):
-    def __init__(self, type, paths, data=None, depends=None, timeout=None, fork_tests=False, fork_subtests=False,
-                 split_factor=None, test_size=None, tags=None):
+    def __init__(
+        self,
+        type,
+        paths,
+        data=None,
+        depends=None,
+        timeout=None,
+        fork_tests=False,
+        fork_subtests=False,
+        split_factor=None,
+        test_size=None,
+        tags=None,
+    ):
         super(AddTestValue, self).__init__('')
         self.type = type
         self.rel_paths = paths or []
@@ -2148,7 +2175,13 @@ class LicenseMacro(Macro):
             if value.comment and value.comment == value.key():
                 out.append('    {}'.format(value.key()))
             elif value.comment.strip():
-                out.append('    {}{} {}'.format(value.key()[:-len(value.comment)], '' if i >= latest_non_comment else value.suffix(), value.key()[-len(value.comment):]))
+                out.append(
+                    '    {}{} {}'.format(
+                        value.key()[: -len(value.comment)],
+                        '' if i >= latest_non_comment else value.suffix(),
+                        value.key()[-len(value.comment) :],
+                    )
+                )
             else:
                 out.append('    {}{}'.format(value.key(), '' if i == len(values) - 1 else value.suffix()))
 

@@ -44,19 +44,50 @@ class ResourceNotFound(RuntimeError):
 
 
 @stringify_memoize
-def get_tool_chain_fetcher(root, toolchain_name, bottle_name, formula, for_platform=None, binname=None, force_refetch=False):
+def get_tool_chain_fetcher(
+    root, toolchain_name, bottle_name, formula, for_platform=None, binname=None, force_refetch=False
+):
     if for_platform is None:
         for_platform = platform_matcher.my_platform()
     formula = get_formula_value(formula)
     platform_replacements = formula.get("platform_replacements")
     if "by_platform" in formula:
-        return _ToolChainByPlatformFetcher(root, toolchain_name, platform_replacements, formula["by_platform"], for_platform, binname, force_refetch)
+        return _ToolChainByPlatformFetcher(
+            root, toolchain_name, platform_replacements, formula["by_platform"], for_platform, binname, force_refetch
+        )
     elif "latest_matched" in formula:
-        return _ToolChainLatestMatchedResourceFetcher(root, toolchain_name, platform_replacements, formula["latest_matched"], for_platform, binname, force_refetch, bottle_name)
+        return _ToolChainLatestMatchedResourceFetcher(
+            root,
+            toolchain_name,
+            platform_replacements,
+            formula["latest_matched"],
+            for_platform,
+            binname,
+            force_refetch,
+            bottle_name,
+        )
     elif "latest_matched_trs" in formula:
-        return _ToolChainLatestMatchedTRSResourceFetcher(root, toolchain_name, platform_replacements, formula["latest_matched_trs"], for_platform, binname, force_refetch, bottle_name)
+        return _ToolChainLatestMatchedTRSResourceFetcher(
+            root,
+            toolchain_name,
+            platform_replacements,
+            formula["latest_matched_trs"],
+            for_platform,
+            binname,
+            force_refetch,
+            bottle_name,
+        )
     elif "sandbox_id" in formula:
-        return _ToolChainSandboxFetcher(root, toolchain_name, platform_replacements, formula['match'], formula["sandbox_id"], for_platform, binname, force_refetch)
+        return _ToolChainSandboxFetcher(
+            root,
+            toolchain_name,
+            platform_replacements,
+            formula['match'],
+            formula["sandbox_id"],
+            for_platform,
+            binname,
+            force_refetch,
+        )
     else:
         raise Exception("Unsupported formula: {}".format(formula))
 
@@ -102,7 +133,9 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
     @stringify_memoize(cache_kwarg='cache')
     def fetch_if_need(self):
         if self._force_refetch or not self._check():
-            logger.debug("{0}: try to fetch by {1} for '{2}'".format(self._toolchain_name, self._details(), self._platform))
+            logger.debug(
+                "{0}: try to fetch by {1} for '{2}'".format(self._toolchain_name, self._details(), self._platform)
+            )
             self._where = self._fetch()
             logger.debug("{0}: successfully fetched into {1}".format(self._toolchain_name, self._where))
         return _ToolChainInfo(self._where)
@@ -120,14 +153,24 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
             logger.debug("{0}: will use '{1}' platform".format(self._toolchain_name, best_match))
             return by_platform[best_match]
         else:
-            raise platform_matcher.PlatformNotSupportedException('{}: platform ({}) not matched to any of {}'.format(self._toolchain_name, self._platform, by_platform.keys()))
+            raise platform_matcher.PlatformNotSupportedException(
+                '{}: platform ({}) not matched to any of {}'.format(
+                    self._toolchain_name, self._platform, by_platform.keys()
+                )
+            )
 
     def _resource_path(self, resource_id):
         return os.path.join(self._root, str(resource_id))
 
     def _fetch(self):
         resource = self._get_matched_resource()
-        return fetch_resource_if_need(None, self._root, self._get_resource_uri(resource), force_refetch=self._force_refetch, **self._binname_kwargs)
+        return fetch_resource_if_need(
+            None,
+            self._root,
+            self._get_resource_uri(resource),
+            force_refetch=self._force_refetch,
+            **self._binname_kwargs
+        )
 
     def _details(self):
         raise NotImplementedError()
@@ -142,7 +185,9 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
 class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
     def __init__(self, root, name, platform_replacements, match, sid, for_platform, binname, force_refetch):
-        super(_ToolChainSandboxFetcher, self).__init__(root, name, platform_replacements, for_platform, binname, force_refetch)
+        super(_ToolChainSandboxFetcher, self).__init__(
+            root, name, platform_replacements, for_platform, binname, force_refetch
+        )
         self.__task_ids = _to_list(sid)
         self.__match = match.lower()
         self.__platform_cache_needs_refreshing = False
@@ -173,7 +218,9 @@ class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
                         self.__platform_cache_needs_refreshing = False
                         logger.debug('{}: platform mapping is loaded from {}'.format(self._toolchain_name, cache_path))
                         return {k: r for k, r in by_platform.items() if r['task']['id'] in task_id_set}
-        logger.debug('{}: platform mapping is not found in tools cache for {}'.format(self._toolchain_name, self._details()))
+        logger.debug(
+            '{}: platform mapping is not found in tools cache for {}'.format(self._toolchain_name, self._details())
+        )
         return None
 
     def _load_by_platform_from_sandbox(self):
@@ -219,7 +266,7 @@ class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
                         'id': mapping_tasks[task_id][platform],
                         'task': {
                             'id': task_id,
-                        }
+                        },
                     }
         return by_platform
 
@@ -238,7 +285,14 @@ class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
     def _fetch(self):
         resource = self._get_matched_resource()
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
-        where = fetch_resource_if_need(fetcher, self._root, self._get_resource_uri(resource), progress_callback, force_refetch=self._force_refetch, **self._binname_kwargs)
+        where = fetch_resource_if_need(
+            fetcher,
+            self._root,
+            self._get_resource_uri(resource),
+            progress_callback,
+            force_refetch=self._force_refetch,
+            **self._binname_kwargs
+        )
         self._install_cache(resource)
         self._install_symlink(resource)
         return where
@@ -277,7 +331,9 @@ class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
 
 class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
     def __init__(self, root, name, platform_replacements, by_platform, for_platform, binname, force_refetch):
-        super(_ToolChainByPlatformFetcher, self).__init__(root, name, platform_replacements, for_platform, binname, force_refetch)
+        super(_ToolChainByPlatformFetcher, self).__init__(
+            root, name, platform_replacements, for_platform, binname, force_refetch
+        )
         self.__by_platform = by_platform
 
     # Dumped once
@@ -331,8 +387,12 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
     _DISABLE_AUTO_UPDATE_FILE_NAME = '.disable.auto.update'
     _updated_toolchains = set()
 
-    def __init__(self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name):
-        super(_ToolChainLatestMatchedResourceFetcher, self).__init__(root, toolchain_name, platform_replacements, for_platform, binname, force_refetch)
+    def __init__(
+        self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name
+    ):
+        super(_ToolChainLatestMatchedResourceFetcher, self).__init__(
+            root, toolchain_name, platform_replacements, for_platform, binname, force_refetch
+        )
         self.__params = params
         self.__bottle_name = bottle_name
         self.__update_interval = params.get('update_interval', self._DEFAULT_UPDATE_INTERVAL)
@@ -340,7 +400,9 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         if params.get('ignore_platform', False):
             self.__platforms = []
         else:
-            platforms = [for_platform] + platform_matcher.get_platform_replacements(for_platform, self._platform_replacements)
+            platforms = [for_platform] + platform_matcher.get_platform_replacements(
+                for_platform, self._platform_replacements
+            )
             self.__platforms = self._add_default_arch(platforms)
 
     def _add_default_arch(self, platforms):
@@ -413,7 +475,10 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         if os.path.exists(info_path):
             info = self._read_info()
             update_time = info['update_time']
-            if self.__force_update and self._toolchain_name not in _ToolChainLatestMatchedResourceFetcher._updated_toolchains:
+            if (
+                self.__force_update
+                and self._toolchain_name not in _ToolChainLatestMatchedResourceFetcher._updated_toolchains
+            ):
                 logger.debug('{}: force update'.format(self._toolchain_name))
                 _ToolChainLatestMatchedResourceFetcher._updated_toolchains.add(self._toolchain_name)
             elif update_time > update_time_threshold or self.__is_auto_update_disabled:
@@ -449,7 +514,11 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
                 logger.debug('%s: found resource: %s', self._toolchain_name, self._compact_res_info(resource))
                 return resource
             failed_queries.append(json.dumps(sb_api_query))
-        raise ResourceNotFound('{}: no resource is found. Sandbox queries made:\n{}'.format(self._toolchain_name, ',\n'.join(failed_queries)))
+        raise ResourceNotFound(
+            '{}: no resource is found. Sandbox queries made:\n{}'.format(
+                self._toolchain_name, ',\n'.join(failed_queries)
+            )
+        )
 
     def _get_sb_api_queries(self, platforms=None, limit=1):
         from sandbox.common.types.resource import State as ResourceState
@@ -484,7 +553,14 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
             self._dump_resources_to_file(dump_file)
         resource_id = self._get_matched_resource_id()
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
-        fetch_resource_if_need(fetcher, self._root, self._get_resource_uri(resource_id), progress_callback, force_refetch=self._force_refetch, **self._binname_kwargs)
+        fetch_resource_if_need(
+            fetcher,
+            self._root,
+            self._get_resource_uri(resource_id),
+            progress_callback,
+            force_refetch=self._force_refetch,
+            **self._binname_kwargs
+        )
         return self._install_symlink(resource_id)
 
     def _install_symlink(self, resource_id):
@@ -517,8 +593,12 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
     _DISABLE_AUTO_UPDATE_FILE_NAME = '.disable.auto.update'
     _updated_toolchains = set()
 
-    def __init__(self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name):
-        super(_ToolChainLatestMatchedTRSResourceFetcher, self).__init__(root, toolchain_name, platform_replacements, for_platform, binname, force_refetch)
+    def __init__(
+        self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name
+    ):
+        super(_ToolChainLatestMatchedTRSResourceFetcher, self).__init__(
+            root, toolchain_name, platform_replacements, for_platform, binname, force_refetch
+        )
         self.__params = params
         self.__bottle_name = bottle_name
         self.__update_interval = params.get('update_interval', self._DEFAULT_UPDATE_INTERVAL)
@@ -526,7 +606,9 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
         if params.get('ignore_platform', False):
             self.__platforms = []
         else:
-            platforms = [for_platform] + platform_matcher.get_platform_replacements(for_platform, self._platform_replacements)
+            platforms = [for_platform] + platform_matcher.get_platform_replacements(
+                for_platform, self._platform_replacements
+            )
             self.__platforms = self._add_default_arch(platforms)
 
     def _add_default_arch(self, platforms):
@@ -599,7 +681,10 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
         if os.path.exists(info_path):
             info = self._read_info()
             update_time = info['update_time']
-            if self.__force_update and self._toolchain_name not in _ToolChainLatestMatchedResourceFetcher._updated_toolchains:
+            if (
+                self.__force_update
+                and self._toolchain_name not in _ToolChainLatestMatchedResourceFetcher._updated_toolchains
+            ):
                 logger.debug('{}: force update'.format(self._toolchain_name))
                 _ToolChainLatestMatchedTRSResourceFetcher._updated_toolchains.add(self._toolchain_name)
             elif update_time > update_time_threshold or self.__is_auto_update_disabled:
@@ -623,7 +708,7 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
             artifact_id = fetcher.find_resource(
                 project_name=self.__params['query']['project'],
                 bucket_name=self.__params['query']['bucket'],
-                label_name=label
+                label_name=label,
             )
             artifact_info = fetcher.get_resource_info(artifact_id=artifact_id)
             artifact_platform = artifact_info.get('spec', {}).get('attributes', {}).get('platform', 'any')
@@ -633,17 +718,19 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
                 last_match = artifact_info
                 break
         if not last_match:
-            raise ResourceNotFound('{}: no resource is found. Search queries made:\n{}\nExpected platforms:\n{}'.format(
-                self._toolchain_name,
-                ',\n'.join(
-                    '{}/{}:{}'.format(
-                        self.__params['query']['project'],
-                        self.__params['query']['bucket'],
-                        '[{}]'.format(', '.join(self.__params['query']['labels'])),
-                    )
-                ),
-                '\n'.join(self.__platforms),
-            ))
+            raise ResourceNotFound(
+                '{}: no resource is found. Search queries made:\n{}\nExpected platforms:\n{}'.format(
+                    self._toolchain_name,
+                    ',\n'.join(
+                        '{}/{}:{}'.format(
+                            self.__params['query']['project'],
+                            self.__params['query']['bucket'],
+                            '[{}]'.format(', '.join(self.__params['query']['labels'])),
+                        )
+                    ),
+                    '\n'.join(self.__platforms),
+                )
+            )
         return {'id': last_match['meta']['id']}
 
     def _get_resource_uri(self, resource_id):
@@ -658,7 +745,14 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
             self._dump_resources_to_file(dump_file)
         resource_id = self._get_matched_resource_id()
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'trs')
-        fetch_resource_if_need(fetcher, self._root, self._get_resource_uri(resource_id), progress_callback, force_refetch=self._force_refetch, **self._binname_kwargs)
+        fetch_resource_if_need(
+            fetcher,
+            self._root,
+            self._get_resource_uri(resource_id),
+            progress_callback,
+            force_refetch=self._force_refetch,
+            **self._binname_kwargs
+        )
         return self._install_symlink(resource_id)
 
     def _install_symlink(self, resource_id):
@@ -685,13 +779,18 @@ class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
             artifact_id = fetcher.find_resource(
                 project_name=self.__params['query']['project'],
                 bucket_name=self.__params['query']['bucket'],
-                label_name=label
+                label_name=label,
             )
             artifact_info = fetcher.get_resource_info(artifact_id=artifact_id)
             platform = artifact_info.get('spec', {}).get('attributes', {}).get('platform', 'any')
             if platform not in found_platforms:
                 found_platforms.add(platform)
-                resources.append({'id': artifact_info['meta']['id'], 'attributes': artifact_info.get('spec', {}).get('attributes', {})})
+                resources.append(
+                    {
+                        'id': artifact_info['meta']['id'],
+                        'attributes': artifact_info.get('spec', {}).get('attributes', {}),
+                    }
+                )
 
         _dump_resources_file(dump_file, resources, self.__bottle_name)
 
@@ -720,9 +819,12 @@ def _get_fetcher(name, resource_type):
         import app_ctx
 
         if getattr(app_ctx, 'state') and getattr(app_ctx, 'display'):
+
             def display_progress(percent=None):
                 if app_ctx.state.check_cancel_state():
-                    app_ctx.display.emit_status('Downloading [[imp]]{}[[rst]] - [[imp]]{:.1f}%[[rst]]'.format(name, percent))
+                    app_ctx.display.emit_status(
+                        'Downloading [[imp]]{}[[rst]] - [[imp]]{:.1f}%[[rst]]'.format(name, percent)
+                    )
 
             def display_finish():
                 app_ctx.display.emit_status('')
@@ -756,11 +858,13 @@ def _get_fetcher(name, resource_type):
 
 def _list_all_resources(**kwargs):
     from yalibrary.yandex.sandbox import SandboxClient
+
     return _do_sandbox_method(SandboxClient.list_all_resources, **kwargs)
 
 
 def _list_resources(**kwargs):
     from yalibrary.yandex.sandbox import SandboxClient
+
     return _do_sandbox_method(SandboxClient.list_resources, **kwargs)
 
 
@@ -768,6 +872,7 @@ def _do_sandbox_method(method, **kwargs):
     rest_params = {'total_wait': _SB_REST_API_TIMEOUT, 'check_for_cancel': _get_cancel_checker()}
     guards.update_guard(guards.GuardTypes.FETCH)
     from yalibrary.yandex.sandbox import SandboxClient
+
     try:
         return method(SandboxClient(token=_get_sandbox_token(), rest_params=rest_params), **kwargs)
     except requests.HTTPError as e:
@@ -782,6 +887,7 @@ def _do_sandbox_method(method, **kwargs):
 def _get_cancel_checker():
     try:
         import app_ctx
+
         return app_ctx.state.check_cancel_state
     except (ImportError, AttributeError):
         return None
@@ -790,6 +896,7 @@ def _get_cancel_checker():
 def _get_sandbox_token():
     try:
         import app_ctx
+
         _, _, sandbox_token = app_ctx.fetcher_params
         return sandbox_token
     except (ImportError, AttributeError):

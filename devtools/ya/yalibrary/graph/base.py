@@ -34,6 +34,7 @@ def traverse(items, ideps=None, before=None, after=None, on_loop=None, depth=-1)
     cols = collections.defaultdict(lambda: 0)
 
     if not ideps:
+
         def ideps(item):
             return item.deps
 
@@ -74,6 +75,7 @@ def parse_resources(resources_dart):
 
 def uniq_first_case(lst, key=None):
     if key is None:
+
         def key(x):
             return x
 
@@ -90,10 +92,12 @@ def uniq_first_case(lst, key=None):
 
 def dag_transitive_closure(items, ideps=None, excludes=None, on_loop=None):
     if not ideps:
+
         def ideps(item):
             return item.deps
 
     if not excludes:
+
         def excludes(fr, to):
             return False
 

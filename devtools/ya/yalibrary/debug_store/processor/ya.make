@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.debug_store.processor
     __init__.py
@@ -26,4 +28,3 @@ RESOURCE_FILES(
 )
 
 END()
-

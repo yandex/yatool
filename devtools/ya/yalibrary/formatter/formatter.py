@@ -19,7 +19,6 @@ SUFFIXES = {0: "b", 1: "K", 2: "M", 3: "G", 4: "T"}
 
 
 class DryFormatter(object):
-
     def format_status(self, text):
         return "##status##{}".format(text)
 
@@ -58,14 +57,15 @@ class Formatter(object):
 
 
 class BaseSupport(object):
-
     def __init__(self, scheme=None, profile=None):
         _profile = palette.DEFAULT_PALETTE.copy()
         _profile.update(profile or {})
         scheme = scheme or palette.EMPTY_SCHEME
         for marker, color in _profile.items():
             if color and color not in scheme:
-                raise AssertionError("Color '{}' for '{}' marker is not specified in scheme ({})".format(color, marker, scheme))
+                raise AssertionError(
+                    "Color '{}' for '{}' marker is not specified in scheme ({})".format(color, marker, scheme)
+                )
 
         self.scheme = scheme
         self.profile = _profile
@@ -87,9 +87,9 @@ class BaseSupport(object):
         if not text:
             return text
         if marker and marker.startswith("c:"):
-            if marker[len("c:"):] not in self.scheme:
+            if marker[len("c:") :] not in self.scheme:
                 return text
-            return self.colorize(marker[len("c:"):], text)
+            return self.colorize(marker[len("c:") :], text)
         return self.decorate(marker, text)
 
     def decorate(self, marker, text):
@@ -113,11 +113,11 @@ def tags_iter(iter_regex, text, is_tag):
 
     for match in re.finditer(iter_regex, text):
         if is_tag(match.group(1)):
-            yield text[text_end:match.start()], True
+            yield text[text_end : match.start()], True
             yield match.group(1), False
             text_end = match.end()
 
-    yield text[text_end:len(text)], True
+    yield text[text_end : len(text)], True
 
 
 def transform(text, transformer, is_marker, iter_regex):
@@ -148,7 +148,7 @@ def truncate(data, limit, markers=None):
     markers = markers or palette.Highlight._MARKERS.values()
     for match in MARKUP_RE.finditer(data):
         if match.end() > limit and match.start() < limit and match.group(1) in markers:
-            return data[:match.start()]
+            return data[: match.start()]
     return data[:limit]
 
 
@@ -211,13 +211,15 @@ def truncate_middle(data, limit, ellipsis="...", message=""):
     ellipsis = six.ensure_binary(ellipsis)
     message = six.ensure_binary(message)
 
-    limit -= (len(ellipsis) + len(message))
+    limit -= len(ellipsis) + len(message)
     throw_out_interval_start = limit // 2
     throw_out_interval_stop = len(data) - limit + limit // 2
 
     truncated_fragment = None
     for fragment, next_fragment in _pairwise(_TaggedFragment.split(data)):
-        if (fragment.belongs(throw_out_interval_start) and fragment.tag_name == b"path") or fragment.belongs_to_tag(throw_out_interval_start):
+        if (fragment.belongs(throw_out_interval_start) and fragment.tag_name == b"path") or fragment.belongs_to_tag(
+            throw_out_interval_start
+        ):
             throw_out_interval_start = fragment.start
         elif fragment.belongs(throw_out_interval_start):
             truncated_fragment = fragment
@@ -249,7 +251,7 @@ def format_size(v, suffixes=None):
         return "0" + suffixes[0]
     log = int(math.log(v, 2))
     k = log // 10
-    v = float(v) / 1024 ** k
+    v = float(v) / 1024**k
     if v >= 100:
         return "{}{}".format(int(v), suffixes[k])
     return "{:.1f}{}".format(v, suffixes[k])

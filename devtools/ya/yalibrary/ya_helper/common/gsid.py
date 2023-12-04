@@ -17,12 +17,14 @@ class GSIDParts(LoggerCounter):
     def create_from_environ(cls):
         # type: () -> GSIDParts
         import os
+
         return GSIDParts(os.environ.get('GSID'))
 
-    def __init__(self,
-                 raw_gsid=None,  # type: str
-                 _parts=None,  # type: dict
-                 ):
+    def __init__(
+        self,
+        raw_gsid=None,  # type: str
+        _parts=None,  # type: dict
+    ):
         self.original_parts = defaultdict(list)
         self._raw_gsid = raw_gsid
 
@@ -58,7 +60,9 @@ class GSIDParts(LoggerCounter):
             if value in self.original_parts[key]:
                 return  # do nothing
 
-            log_err = "Replace key `{}` with different value: `{}` (expected one of `{}`)".format(key, value, self.original_parts[key])
+            log_err = "Replace key `{}` with different value: `{}` (expected one of `{}`)".format(
+                key, value, self.original_parts[key]
+            )
 
             if not force:
                 # Value not in original parts
@@ -68,17 +72,19 @@ class GSIDParts(LoggerCounter):
 
         if key in self.updated_parts:
             if self[key] != value:
-                log_err = "Replace key `{}` with different value: `{}` (expected `{}`)".format(key, value,
-                                                                                               self[key])
+                log_err = "Replace key `{}` with different value: `{}` (expected `{}`)".format(key, value, self[key])
                 if not force:
                     raise ValueError(log_err, self, key, value, self[key])
                 else:
                     self.logger.warning(log_err)
 
         if self.ITEM_SPLITTER in value:
-            raise ValueError("Symbol `{}` forbidden in value `{}` by key `{}`".format(
-                self.ITEM_SPLITTER, value, key
-            ), self, key, value)
+            raise ValueError(
+                "Symbol `{}` forbidden in value `{}` by key `{}`".format(self.ITEM_SPLITTER, value, key),
+                self,
+                key,
+                value,
+            )
 
         self.updated_parts[key] = value
 
@@ -99,7 +105,10 @@ class GSIDParts(LoggerCounter):
         raise KeyError(key)
 
     def __str__(self):
-        return self._raw_gsid + " " + self.ITEM_SPLITTER.join(
-            "{}{}{}".format(k, self.VALUE_SPLITTER, self[k])
-            for k in sorted(six.iterkeys(self.updated_parts))
+        return (
+            self._raw_gsid
+            + " "
+            + self.ITEM_SPLITTER.join(
+                "{}{}{}".format(k, self.VALUE_SPLITTER, self[k]) for k in sorted(six.iterkeys(self.updated_parts))
+            )
         )

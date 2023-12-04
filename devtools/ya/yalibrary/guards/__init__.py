@@ -57,6 +57,7 @@ def guarded(name, value=None, checker=lambda x: x is None, switch_off=lambda: Fa
         def boo(*args, **kwargs):
             with Guard(name, value, checker, switch_off):
                 return func(*args, **kwargs)
+
         return boo
 
     return guardian

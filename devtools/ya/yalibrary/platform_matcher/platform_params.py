@@ -66,7 +66,6 @@ def make_yamake_options(platforms=None, build_vars=None, host_platform_flags=Non
 
 
 def transform_toolchain(alias, target_platforms, toolchain_transforms):
-
     # XXX: remove after DEVTOOLS-6216
 
     platforms_params = {}
@@ -78,7 +77,6 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
             for target_platform, platform_params in platforms_params.items():
                 platform_name = target_platform.split(',')[0]
                 if toolchain.startswith(platform_name):
-
                     params_to_replace = {}
 
                     for param in platform_params:
@@ -103,7 +101,11 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
                     extra_params = set(toolchain_params).difference(set(platform_params))
                     missed_params = set(platform_params).difference(set(toolchain_params))
 
-                    if '--target-platform-build-type' in extra_params and 'release' in extra_params and '--target-platform-build-type' not in platform_params:
+                    if (
+                        '--target-platform-build-type' in extra_params
+                        and 'release' in extra_params
+                        and '--target-platform-build-type' not in platform_params
+                    ):
                         extra_params.remove('--target-platform-build-type')
                         extra_params.remove('release')
 
@@ -173,7 +175,7 @@ def get_target_platform_alias(toolchain_string, toolchain_transforms):
             toolchain_chunks.remove(chunk)
             toolchain_chunks.append('TIDY=yes')
 
-    toolchain_chunks = toolchain_chunks[: 2] + list(sorted(set(toolchain_chunks[2:])))
+    toolchain_chunks = toolchain_chunks[:2] + list(sorted(set(toolchain_chunks[2:])))
     alias_key = '-'.join(toolchain_chunks)
     logging.debug('Searching alias for toolchain: %s, and alias key: %s', toolchain_string, alias_key)
     alias = toolchain_transforms.get(alias_key)

@@ -12,10 +12,12 @@ def get_resource_dict_sb(res_info, update_external=True):
         "md5": res_info["md5"],
         "task": res_info["task"],
         "skynet_id": res_info['skynet_id'],
-        "file_name": res_info['file_name']
+        "file_name": res_info['file_name'],
     }
     if update_external:
-        ret.update({
-            "storage": "SANDBOX",
-        })
+        ret.update(
+            {
+                "storage": "SANDBOX",
+            }
+        )
     return ret

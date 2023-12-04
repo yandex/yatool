@@ -96,7 +96,9 @@ class WorkerThreads(object):
                             logger.debug('Found job %s %s with prio %s', best_key, elem, max_prio)
                             return best_key, elem
 
-                        logger.debug('Cannot find any job from %s', dict((k, len(v)) for k, v in self._active_set.items()))
+                        logger.debug(
+                            'Cannot find any job from %s', dict((k, len(v)) for k, v in self._active_set.items())
+                        )
 
                         self._state.check_cancel_state()
                         self._condition.wait()
@@ -151,7 +153,13 @@ class WorkerThreads(object):
         else:
             with self._condition:
                 self._active += 1
-                heapq.heappush(self._active_set[res], (-prio, action,))
+                heapq.heappush(
+                    self._active_set[res],
+                    (
+                        -prio,
+                        action,
+                    ),
+                )
                 if len(self._active_set[res]) == 1:
                     self._condition.notify()
 
@@ -195,8 +203,11 @@ class WorkerThreads(object):
 
                         import sys
                         import traceback
+
                         t, v, _ = sys.exc_info()
-                        self._evlog_writer('pending-exceptions', type=str(t), value=str(v), traceback=traceback.format_exc())
+                        self._evlog_writer(
+                            'pending-exceptions', type=str(t), value=str(v), traceback=traceback.format_exc()
+                        )
                     except Exception:
                         pass
             except Queue.Empty:

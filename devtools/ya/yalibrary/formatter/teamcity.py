@@ -4,7 +4,6 @@ from . import formatter
 
 
 class TeamCitySupport(formatter.BaseSupport):
-
     def format(self, txt):
         return "##teamcity[message text='{}']\n".format(self._escape(txt))
 

@@ -38,6 +38,7 @@ class GeneratorModuleWrapper(contextlib2._GeneratorContextManager):
         except Exception as e:
             logger.warning('Exception during module "%s" stopping: %s', self._name, e)
             from traceback import format_exc
+
             logger.debug("%s", format_exc())
         finally:
             logger.debug('Module "%s" stopped in %f', self._name, time.time() - st)
@@ -88,4 +89,8 @@ class AppCtx(object):
         try:
             return self._kv[item]
         except KeyError:
-            raise ContextConfigurationError("Application context wasn't configured to handle '{}' module. Available modules is: [{}]".format(item, ', '.join(sorted(self._kv.keys()))))
+            raise ContextConfigurationError(
+                "Application context wasn't configured to handle '{}' module. Available modules is: [{}]".format(
+                    item, ', '.join(sorted(self._kv.keys()))
+                )
+            )

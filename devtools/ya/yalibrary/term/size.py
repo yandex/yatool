@@ -5,11 +5,10 @@ def termsize(stream=sys.stdout):
     import fcntl
     import struct
     import termios
+
     rows, cols, _, _ = struct.unpack(
-        'HHHH',
-        fcntl.ioctl(stream.fileno(),
-                    termios.TIOCGWINSZ,
-                    struct.pack('HHHH', 0, 0, 0, 0)))
+        'HHHH', fcntl.ioctl(stream.fileno(), termios.TIOCGWINSZ, struct.pack('HHHH', 0, 0, 0, 0))
+    )
     return rows, cols
 
 

@@ -7,6 +7,7 @@ import sys
 try:
     import six as six_  # noqa
 except ImportError:
+
     class six_:
         if sys.version_info[0] == 3:
             text_type = str
