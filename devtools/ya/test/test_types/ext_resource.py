@@ -32,7 +32,7 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
     def _need_auth(self):
         return True
 
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         raise NotImplementedError()
 
 
@@ -40,7 +40,7 @@ class CheckResourceTestSuite(ExtResourceAbstractSuite):
     def get_sandbox_uid_extension(self):
         return self.dart_info.get('SBR-UID-EXT')
 
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         cmd = ["check_resource"]
 
         if dist_build:
@@ -60,7 +60,7 @@ class CheckDataSbrTestSuite(CheckResourceTestSuite):
 
 
 class CheckMDSTestSuite(ExtResourceAbstractSuite):
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         return "check_mds"
 
     @property
@@ -69,7 +69,7 @@ class CheckMDSTestSuite(ExtResourceAbstractSuite):
 
 
 class CheckExternalTestSuite(ExtResourceAbstractSuite):
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         return "check_external --source-root $(SOURCE_ROOT) --project-path " + self.project_path
 
     def get_test_related_paths(self, source_root, opts):

@@ -36,12 +36,20 @@ def main():
     parser.add_argument('--skip', action="append", default=[])
     parser.add_argument('--markup', action="store_true")
     parser.add_argument('--gdb-path')
+    parser.add_argument('--trace-dir')
     args = parser.parse_args()
 
-    failed = False
     env = os.environ.copy()
+
+    trace_dir = args.trace_dir
+    trace_filepath = os.path.join(trace_dir, "import_trace.%e.%p.json")
+    env["Y_PYTHON_TRACE_FILE"] = trace_filepath
+    env["Y_PYTHON_TRACE_FORMAT"] = "evlog"
+
     entry_point = "library.python.testing.import_test.import_test:main"
     env["Y_PYTHON_ENTRY_POINT"] = entry_point
+
+    failed = False
     for program in args.programs:
         # Bypass terminating signals from run_test to target program
         with runtime.bypass_signals(["SIGQUIT", "SIGUSR2"]) as reg:

@@ -535,7 +535,7 @@ class PyLintTestSuite(LintTestSuite):
     def batch_name(self):
         raise NotImplementedError()
 
-    def get_checker(self, opts, for_dist_build):
+    def get_checker(self, opts, for_dist_build, out_path):
         raise NotImplementedError()
 
     def _need_auth(self):
@@ -551,6 +551,8 @@ class PyLintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
+        out_path = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
+
         cmd = (
             test.util.tools.get_test_tool_cmd(
                 opts, 'run_check', self.global_resources, wrapper=True, run_on_target_platform=True
@@ -559,13 +561,13 @@ class PyLintTestSuite(LintTestSuite):
                 "--source-root",
                 "$(SOURCE_ROOT)",
                 "--checker",
-                self.get_checker(opts, for_dist_build),
+                self.get_checker(opts, for_dist_build, out_path),
                 "--check-name",
                 self.get_type_name(),
                 "--trace-path",
                 os.path.join(work_dir, test.const.TRACE_FILE_NAME),
                 "--out-path",
-                os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+                out_path,
             ]
             + self._get_files(opts)
         )
@@ -601,13 +603,16 @@ class CheckImportsTestSuite(PyLintTestSuite):
     def get_ci_type_name(cls):
         return "test"
 
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         cmd = 'run_pyimports --markup'
 
         skips_list = self.dart_info.get('NO-CHECK', [])
         if skips_list:
             for s in skips_list:
                 cmd += " --skip {}".format(s)
+
+        cmd += " --trace-dir={}".format(out_path)
+
         return cmd
 
     def _get_files(self, opts=None):
@@ -709,7 +714,7 @@ class GoVetTestSuite(PyLintTestSuite):
     def get_test_dependencies(self):
         return [self.project_path]
 
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         return 'run_go_vet'
 
     @property
@@ -759,7 +764,7 @@ class ClasspathClashTestSuite(PyLintTestSuite):
     def get_test_dependencies(self):
         return [_f for _f in self.deps if _f]
 
-    def get_checker(self, opts, dist_build):
+    def get_checker(self, opts, dist_build, out_path):
         return "run_classpath_clash"
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
