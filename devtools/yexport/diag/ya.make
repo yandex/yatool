@@ -5,6 +5,7 @@ PEERDIR(
 )
 
 SRCS(
+    exception.cpp
     trace.cpp
 )
 

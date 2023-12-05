@@ -22,6 +22,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <fstream>
 #include <span>
 
 template<typename Values>
@@ -482,7 +483,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     const auto generatorDir = arcadiaRoot/GENERATORS_ROOT/generator;
     const auto generatorFile = generatorDir/GENERATOR_FILE;
     if (!fs::exists(generatorFile)) {
-        throw yexception() << fmt::format("[error] Failed to load generator {}. No {} file found", generator, generatorFile.c_str());
+        YEXPORT_THROW(fmt::format("Failed to load generator {}. No {} file found", generator, generatorFile.c_str()));
     }
     THolder<TJinjaGenerator> result = MakeHolder<TJinjaGenerator>();
 
@@ -495,7 +496,16 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 
         for (const auto& source : sources) {
             targets.push_back(jinja2::Template(result->JinjaEnv.get()));
-            targets.back().LoadFromFile(generatorDir/source.Template);
+
+            auto path = generatorDir / source.Template;
+            std::ifstream file(path);
+            if (!file.good()) {
+                YEXPORT_THROW("Failed to open jinja template: " << path.c_str());
+            }
+            auto res = targets.back().Load(file, path);
+            if (!res.has_value()) {
+                spdlog::error("Failed to load jinja template due: {}", res.error().ToString());
+            }
         }
     };
 
@@ -558,9 +568,14 @@ void TJinjaGenerator::Render(ECleanIgnored)
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++) {
         const auto& tmpl = tmpls[templateIndex];
         //TODO: change name of result file
-        auto out = ExportFileManager->Open(tmpl.ResultName);
-        TString renderResult = Templates[templateIndex].RenderAsString(std::as_const(JinjaAttrs)).value();
-        out.Write(renderResult.data(), renderResult.size());
+        jinja2::Result<TString> result = Templates[templateIndex].RenderAsString(std::as_const(JinjaAttrs));
+        if (result.has_value()) {
+            auto out = ExportFileManager->Open(tmpl.ResultName);
+            TString renderResult = result.value();
+            out.Write(renderResult.data(), renderResult.size());
+        } else {
+            spdlog::error("Failed to generate {} due to jinja template error: {}", tmpl.ResultName, result.error().ToString());
+        }
     }
 }
 
@@ -634,11 +649,18 @@ void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const TJinjaList &dat
 
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++){
         const auto& tmpl = tmpls[templateIndex];
-        auto out = ExportFileManager->Open(subdir / tmpl.ResultName);
 
-        for (auto& [targetName, params]: paramsByTarget) {
-            TString renderResult = TargetTemplates[targetName][templateIndex].RenderAsString(std::as_const(params)).value();
-            out.Write(renderResult.data(), renderResult.size());
+        auto outPath = subdir / tmpl.ResultName;
+        auto out = ExportFileManager->Open(outPath);
+
+        for (auto& [targetName, params] : paramsByTarget) {
+            jinja2::Result<TString> result = TargetTemplates[targetName][templateIndex].RenderAsString(std::as_const(params));
+            if (result.has_value()) {
+                TString renderResult = result.value();
+                out.Write(renderResult.data(), renderResult.size());
+            } else {
+                spdlog::error("Failed to render jinja template to {} due to: {}", outPath.c_str(), result.error().ToString());
+            }
         }
     }
 }

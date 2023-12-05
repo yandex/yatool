@@ -19,8 +19,8 @@ public:
     ~TExportFileManager();
 
     TFile Open(const fs::path& relativeToRoot);
-    bool Copy(const fs::path& source, const fs::path& destRelativeToRoot);
-    bool CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot);
+    bool Copy(const fs::path& source, const fs::path& destRelativeToRoot, bool logError = true);
+    bool CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError = true);
     bool Exists(const fs::path& relativeToRoot);
     void Remove(const fs::path& relativeToRoot);
     TString MD5(const fs::path& relativeToRoot);

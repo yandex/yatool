@@ -4,6 +4,8 @@
 
 #include <library/cpp/digest/md5/md5.h>
 
+#include <spdlog/spdlog.h>
+
 TExportFileManager::TExportFileManager(const fs::path& exportRoot)
     : ExportRoot_(exportRoot)
 {
@@ -21,8 +23,11 @@ TFile TExportFileManager::Open(const fs::path& relativeToRoot) {
 
     return TFile{absPath.string(), CreateAlways};
 }
-bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelativeToRoot) {
+bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelativeToRoot, bool logError) {
     if (!fs::exists(source)) {
+        if (logError) {
+            spdlog::error("Failed to copy {} to {} because source does not exist", source.c_str(), (ExportRoot_ / destRelativeToRoot).c_str());
+        }
         return false;
     }
     auto absPath = ExportRoot_ / destRelativeToRoot;
@@ -34,8 +39,8 @@ bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelati
     CreatedFiles_.insert(destRelativeToRoot);
     return true;
 }
-bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot) {
-    return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot);
+bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError) {
+    return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot, logError);
 }
 bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
     return fs::exists(ExportRoot_ / relativeToRoot);

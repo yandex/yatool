@@ -1,5 +1,6 @@
 #pragma once
 
+#include <devtools/yexport/diag/exception.h>
 #include <devtools/yexport/diag/trace.h>
 #include <devtools/yexport/export_file_manager.h>
 

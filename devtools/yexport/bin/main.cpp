@@ -60,13 +60,14 @@ int main(int argc, char** argv) try {
     generator->RenderTo(opts.ExportRoot, cleanIgnored);
 
     return 0;
-} catch (const TReadGraphException& err) {
-    spdlog::error("{}", err.what());
+} catch (const TYExportException& err) {
+    spdlog::error("Caught TYExportException: {}", err.what());
+    auto trace = err.GetCallStack();
+    for (size_t i = 0; i < trace.size(); ++i) {
+        spdlog::error("#{}: {}", i, trace[i]);
+    }
     return 1;
-} catch (const TBadGeneratorSpec& err) {
-    spdlog::error("{}", err.what());
-    return 1;
-} catch (const std::system_error& err) {
-    spdlog::error("{}", err.what());
+} catch (const std::exception& err) {
+    spdlog::error("Caught exception: {}", err.what());
     return 1;
 }
