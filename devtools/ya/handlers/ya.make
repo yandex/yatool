@@ -3,16 +3,17 @@ PY23_LIBRARY(ya-lib)
 SRCDIR(devtools/ya)
 
 PEERDIR(
-    devtools/ya/handlers/make
-    devtools/ya/handlers/package
-    devtools/ya/handlers/test
-    devtools/ya/handlers/tool
-    devtools/ya/handlers/ide
     devtools/ya/handlers/dump
     devtools/ya/handlers/gc
     devtools/ya/handlers/gen_config
-    devtools/ya/handlers/maven_import
+    devtools/ya/handlers/ide
     devtools/ya/handlers/java
+    devtools/ya/handlers/krevedko
+    devtools/ya/handlers/make
+    devtools/ya/handlers/maven_import
+    devtools/ya/handlers/package
+    devtools/ya/handlers/test
+    devtools/ya/handlers/tool
     # devtools/ya/handlers/analyze_make
 )
 
@@ -31,7 +32,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/exec
         devtools/ya/handlers/fetch
         devtools/ya/handlers/fix_includes
-        devtools/ya/handlers/krevedko
         devtools/ya/handlers/notify
         devtools/ya/handlers/paste
         devtools/ya/handlers/pr
