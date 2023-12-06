@@ -15,6 +15,8 @@
 
 #include <spdlog/spdlog.h>
 
+namespace NYexport {
+
 namespace {
     void FormatCommonCMakeText(fmt::memory_buffer& buf, const TVector<TPlatformConf>& platforms) {
         auto bufIt = std::back_inserter(buf);
@@ -411,4 +413,6 @@ void TCMakeGenerator::RenderConanRequirements() const {
 
     fmt::format_to(bufIt, "\n[generators]\ncmake_find_package\ncmake_paths\n");
     out.Write(buf.data(), buf.size());
+}
+
 }

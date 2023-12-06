@@ -6,9 +6,13 @@
 
 #include <filesystem>
 
+namespace NYexport {
+
 class TSemGraph;
 
 class TReadGraphException: public yexception {};
 
 std::pair<THolder<TSemGraph>, TVector<TNodeId>> ReadSemGraph(const std::filesystem::path& path, bool useManagedPeersClosure = false);
 std::pair<THolder<TSemGraph>, TVector<TNodeId>> ReadSemGraph(IInputStream& in, bool useManagedPeersClosure = false);
+
+}

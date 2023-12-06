@@ -15,6 +15,8 @@
 
 #include <filesystem>
 
+using namespace NYexport;
+
 int main(int argc, char** argv) try {
     auto opts = TOpts::Parse(argc, argv);
 

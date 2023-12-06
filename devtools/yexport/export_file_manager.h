@@ -6,6 +6,8 @@
 #include <util/system/file.h>
 #include <filesystem>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 /*
@@ -32,3 +34,5 @@ private:
     THashSet<fs::path> CreatedFiles_;
     fs::path ExportRoot_;
 };
+
+}

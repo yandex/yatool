@@ -9,6 +9,8 @@
 #include <vector>
 #include <map>
 
+namespace NYexport {
+
 struct TReplacement {
     TNodeSemantics Replacement;
     TNodeSemantics Addition;
@@ -69,3 +71,5 @@ private:
     /// Get inclusive iterators range from map by min and max path
     static std::tuple<TPathMapIt, TPathMapIt> GetRange(const TPathMap& map, TPathView minPath, TPathView maxPath);
 };
+
+}

@@ -6,6 +6,8 @@
 #include <devtools/ymake/compact_graph/graph.h>
 #include <devtools/ymake/compact_graph/iter.h>
 
+namespace NYexport {
+
 using TNodeSemantic = TVector<std::string>; ///< One semantic function: *name, args...
 using TNodeSemantics = TVector<TNodeSemantic>; ///< List of semantic functions
 
@@ -53,12 +55,14 @@ void IterateAll(typename TVisitor::TState& state, TSemGraph::TConstNodeRef node,
     }
 }
 
-template <>
-inline TSemNodeData Deleted<TSemNodeData>(void) {
-    return TSemNodeData{};
 }
 
 template <>
-inline bool Deleted(TSemNodeData node) {
+inline NYexport::TSemNodeData Deleted<NYexport::TSemNodeData>(void) {
+    return NYexport::TSemNodeData{};
+}
+
+template <>
+inline bool Deleted(NYexport::TSemNodeData node) {
     return node.NodeType == EMNT_Deleted;
 }

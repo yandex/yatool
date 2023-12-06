@@ -6,8 +6,9 @@
 
 #include <fstream>
 
-using namespace std::literals;
+namespace NYexport {
 
+using namespace std::literals;
 
 namespace NKeys {
     constexpr const char* Root = "root";
@@ -211,4 +212,6 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
     } catch (const std::out_of_range& err) {
         throw TBadGeneratorSpec{err.what()};
     }
+}
+
 }

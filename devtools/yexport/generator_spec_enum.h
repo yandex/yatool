@@ -1,5 +1,7 @@
 #pragma once
 
+namespace NYexport {
+
 enum class EAttrTypes {
     Str /* "str" */,
     Bool /* "bool" */,
@@ -10,3 +12,5 @@ enum class EAttrTypes {
     Dict /* "dict" */,
     Unknown /* "unknown" */,
 };
+
+}

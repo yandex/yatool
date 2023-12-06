@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NGenerators {
+namespace NYexport::NGenerators {
 
 constexpr const char* HARDCODED_CMAKE_GENERATOR = "hardcoded-cmake";
 constexpr const char* HARDCODED_PY3_REQUIREMENTS_GENERATOR = "python-requirements";

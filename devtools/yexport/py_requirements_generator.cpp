@@ -11,6 +11,8 @@
 
 #include <fmt/format.h>
 
+namespace NYexport {
+
 namespace {
 
     constexpr std::string_view REQUIRES_FILE = "requirements.txt";
@@ -167,4 +169,6 @@ void TPyRequirementsGenerator::Render(IInputStream& pyDepsDump, IOutputStream& d
             dest << fmt::format("{}=={}\n", name, ver);
         }
     }
+}
+
 }

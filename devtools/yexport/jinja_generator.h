@@ -18,6 +18,8 @@
 
 #include <filesystem>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 struct TJinjaTarget {
@@ -85,3 +87,5 @@ private:
     THashMap<std::string, TNodeId> NodeIds;
     THashMap<std::string, std::string> LibraryExcludes;
 };
+
+}

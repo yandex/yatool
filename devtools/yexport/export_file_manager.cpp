@@ -6,6 +6,8 @@
 
 #include <spdlog/spdlog.h>
 
+namespace NYexport {
+
 TExportFileManager::TExportFileManager(const fs::path& exportRoot)
     : ExportRoot_(exportRoot)
 {
@@ -58,4 +60,6 @@ TString TExportFileManager::MD5(const fs::path& relativeToRoot) {
 
 fs::path TExportFileManager::GetExportRoot() const {
     return ExportRoot_;
+}
+
 }

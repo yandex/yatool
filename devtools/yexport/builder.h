@@ -2,6 +2,7 @@
 
 #include <span>
 
+namespace NYexport {
 
 template <typename TSubdirsTableElem, typename TBuilderTarget>
 class TGeneratorBuilder {
@@ -58,3 +59,5 @@ private:
     TSubdirsTableElem* PrevList = nullptr;
     TBuilderTarget* PrevTarget = nullptr;
 };
+
+}

@@ -3,6 +3,8 @@
 
 #include <util/generic/vector.h>
 
+namespace NYexport {
+
 TYExportException::TYExportException() {
     BackTrace_.Capture();
 }
@@ -20,4 +22,6 @@ TVector<TString> TYExportException::GetCallStack() const {
         trace.push_back(rs.Name);
     }
     return trace;
+}
+
 }

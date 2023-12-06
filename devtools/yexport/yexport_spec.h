@@ -6,6 +6,8 @@
 #include <vector>
 #include <filesystem>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 using TPathStr = std::string;
@@ -38,3 +40,5 @@ struct TBadYexportSpec: public std::runtime_error {
         : std::runtime_error{std::move(msg)}
     {}
 };
+
+}

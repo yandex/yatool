@@ -9,6 +9,7 @@
 #include <functional>
 #include <string>
 
+namespace NYexport {
 
 struct TContribCoords {
     std::string Name;
@@ -62,3 +63,5 @@ private:
     TCoordExtractor ExtractContribCoords_;
     std::filesystem::path PyDepsDumpPath_;
 };
+
+}

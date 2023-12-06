@@ -18,6 +18,8 @@
 #include <span>
 #include <type_traits>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 using namespace std::literals;
 using namespace NKnownModules;
@@ -1097,4 +1099,6 @@ THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TVector<TNodeId>& start
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
     IterateAll(graph, startDirs, visitor);
     return visitor.TakeFinalizedProject().GetSubdirsTable();
+}
+
 }

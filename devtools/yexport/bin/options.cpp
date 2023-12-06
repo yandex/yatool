@@ -5,6 +5,8 @@
 
 #include <library/cpp/getopt/small/last_getopt.h>
 
+using namespace NYexport;
+
 TOpts TOpts::Parse(int argc, char** argv) {
     TOpts ret;
     NLastGetopt::TOpts opts;

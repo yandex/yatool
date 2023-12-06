@@ -25,6 +25,8 @@
 #include <fstream>
 #include <span>
 
+namespace NYexport {
+
 template<typename Values>
 concept IterableValues = std::ranges::range<Values>;
 
@@ -673,4 +675,6 @@ THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() c
         res.emplace(subdir->first, targets);
     }
     return res;
+}
+
 }

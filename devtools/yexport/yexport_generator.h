@@ -9,6 +9,8 @@
 
 #include <filesystem>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 enum class ECleanIgnored {
@@ -36,3 +38,5 @@ protected:
 
 THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir = "");
 TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot);
+
+}

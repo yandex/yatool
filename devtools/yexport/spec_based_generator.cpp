@@ -3,6 +3,8 @@
 
 #include <spdlog/spdlog.h>
 
+namespace NYexport {
+
 void TSpecBasedGenerator::OnAttribute(const std::string& attribute) {
     UsedAttributes.insert(attribute);
 }
@@ -35,4 +37,6 @@ void TSpecBasedGenerator::CopyFiles() {
     for (const auto& path : files) {
         ExportFileManager->Copy(GeneratorDir / path, path);
     }
+}
+
 }

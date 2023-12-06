@@ -8,6 +8,8 @@
 
 #include <span>
 
+namespace NYexport {
+
 namespace {
 
     struct TDepInfo {
@@ -400,4 +402,6 @@ std::pair<THolder<TSemGraph>, TVector<TNodeId>> ReadSemGraph(IInputStream& in, b
     TSemGraphCallbacks semGraphCallbacks{*res, useManagedPeersClosure};
     NJson::ReadJson(&in, &semGraphCallbacks);
     return std::make_pair(std::move(res), semGraphCallbacks.TakeStartDirs());
+}
+
 }

@@ -11,6 +11,8 @@
 
 #include <spdlog/spdlog.h>
 
+namespace NYexport {
+
 THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir) {
     if (generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
         return TCMakeGenerator::Load(arcadiaRoot, generator, configDir);
@@ -48,4 +50,6 @@ TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot) {
         }
     }
     return generators;
+}
+
 }

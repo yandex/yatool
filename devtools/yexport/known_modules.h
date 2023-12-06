@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NKnownModules {
+namespace NYexport::NKnownModules {
 
     enum class EKnownModules {
         Antlr /* "antlr.cmake" */,

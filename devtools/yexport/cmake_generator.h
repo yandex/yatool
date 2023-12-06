@@ -15,6 +15,8 @@
 
 #include <type_traits>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 namespace NCMake {
@@ -144,3 +146,5 @@ public:
         return TargetReplacements_.ApplyReplacement(path, inputSem);
     }
 };
+
+}

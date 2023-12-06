@@ -11,6 +11,8 @@
 #include <string>
 #include <type_traits>
 
+namespace NYexport {
+
 /// Common base class for generators configurable with generator.toml specs
 class TSpecBasedGenerator : public TYexportGenerator {
 public:
@@ -36,3 +38,5 @@ protected:
 private:
     THashSet<fs::path> CollectFilesToCopy() const;
 };
+
+}

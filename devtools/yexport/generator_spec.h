@@ -14,6 +14,8 @@
 #include <vector>
 #include <iosfwd>
 
+namespace NYexport {
+
 namespace fs = std::filesystem;
 
 struct TTemplate{
@@ -74,3 +76,5 @@ using enum ESpecFeatures;
 
 TGeneratorSpec ReadGeneratorSpec(const std::filesystem::path& path, ESpecFeatures features = All);
 TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::path& path, ESpecFeatures features = All);
+
+}

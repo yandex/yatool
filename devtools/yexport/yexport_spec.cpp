@@ -9,6 +9,8 @@
 
 #include <fstream>
 
+namespace NYexport {
+
 namespace NKeys {
     constexpr const char* TargetReplacements = "target_replacements"; ///< Array of target replacements
     constexpr const char* ReplacePathPrefixes = "replace_path_prefixes"; ///< Path prefixes for replacing
@@ -218,4 +220,6 @@ void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetRe
     } catch (const std::out_of_range& err) {
         throw TBadYexportSpec{err.what()};
     }
+}
+
 }

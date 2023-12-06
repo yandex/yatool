@@ -3,6 +3,8 @@
 #include <util/string/split.h>
 #include <util/str_stl.h>
 
+namespace NYexport {
+
 static constexpr const char* SEPARATORS = "/";
 
 /// Validate replacement spec before add
@@ -186,4 +188,6 @@ std::tuple<TTargetReplacements::TPathMapIt, TTargetReplacements::TPathMapIt> TTa
         min = map.lower_bound(TPathStr{minPath});
     }
     return { min, max };
+}
+
 }

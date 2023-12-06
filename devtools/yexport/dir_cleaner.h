@@ -8,6 +8,8 @@
 
 #include <filesystem>
 
+namespace NYexport {
+
 class TDirCleaner {
 public:
     void CollectDirs(const TSemGraph& graph, const TVector<TNodeId>& startDirs);
@@ -17,3 +19,5 @@ private:
     THashSet<std::filesystem::path> DirsToRemove;
     THashSet<std::filesystem::path> SubdirsToKeep;
 };
+
+}
