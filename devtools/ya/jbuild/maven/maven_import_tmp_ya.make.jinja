@@ -18,6 +18,12 @@ RUN_JAVA_PROGRAM(
 {% if minimal_pom_validation -%}
         --minimal-pom-validation
 {% endif -%}
+{% if repo_auth_username -%}
+        --repo-auth-username {{ repo_auth_username }}
+{% endif -%}
+{% if repo_auth_password -%}
+        --repo-auth-password {{ repo_auth_password }}
+{% endif -%}
     CLASSPATH devtools/maven-import
     OUT {{ session_id }}/{{ artifact|replace(":", "_") }}.meta
 )

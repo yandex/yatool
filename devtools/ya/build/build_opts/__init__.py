@@ -735,6 +735,8 @@ class MavenImportOptions(SandboxUploadOptions):
         self.canonize_licenses = True
         self.minimal_pom_validation = True
         self.local_jar_resources = not app_config.in_house
+        self.repo_auth_username = None
+        self.repo_auth_password = None
 
     def consumer(self):
         import jbuild.maven.maven_import as mi
@@ -812,6 +814,18 @@ class MavenImportOptions(SandboxUploadOptions):
                 help='Local resources in repo instead upload to sandbox',
                 hook=SetConstValueHook('local_jar_resources', True),
                 group=MAVEN_OPT_GROUP,
+            ),
+            ArgConsumer(
+                ['--repo-auth-username'],
+                help='Username for repo with authentication (like bucket)',
+                hook=SetValueHook('repo_auth_username'),
+                group=AUTH_OPT_GROUP,
+            ),
+            ArgConsumer(
+                ['--repo-auth-password'],
+                help='Username for repo with authentication (like bucket)',
+                hook=SetValueHook('repo_auth_password'),
+                group=AUTH_OPT_GROUP,
             ),
         ]
 

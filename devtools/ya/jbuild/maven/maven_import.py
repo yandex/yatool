@@ -410,6 +410,8 @@ def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, res
                     resolve_type=resolve_type,
                     session_id=session_id,
                     minimal_pom_validation=opts.minimal_pom_validation,
+                    repo_auth_username=opts.repo_auth_username,
+                    repo_auth_password=opts.repo_auth_password,
                 )
             )
     merge_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
