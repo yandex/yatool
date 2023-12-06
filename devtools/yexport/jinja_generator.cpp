@@ -178,10 +178,10 @@ public:
             case EAttrTypes::Str: return SetStrAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
             case EAttrTypes::Bool: return SetBoolAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
             case EAttrTypes::Flag: return SetFlagAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::List: return SetListAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Set: return SetSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::SortedSet: return SetSortedSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Dict: return SetDictAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
+            case EAttrTypes::List: return AppendToListAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
+            case EAttrTypes::Set: return AppendToSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
+            case EAttrTypes::SortedSet: return AppendToSortedSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
+            case EAttrTypes::Dict: return AppendToDictAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
             default:{
                 spdlog::error("Unknown attribute {} type at node {}", attrMacro, nodePath);
                 return false;
@@ -223,42 +223,48 @@ private:
         return r;
     }
 
-    bool SetListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        attrs.insert_or_assign(attrMacro, values);
+    bool AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
+        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto& attr = attrIt->second.asList();
+        for (const auto& value : values) {
+            attr.emplace_back(value);
+        }
         return true;
     }
 
-    bool SetSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        std::unordered_set<std::string> set;
+    bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
+        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto& attr = attrIt->second.asList();
+        std::set<std::string> set;
+        if (!attr.empty()) {
+            for (const auto& value : attr) {
+                set.emplace(value.asString());
+            }
+        }
         for (const auto& value : values) {
             set.emplace(value.asString());
         }
-        attrs.insert_or_assign(attrMacro, jinja2::ValuesList(set.begin(), set.end()));
+        attr = jinja2::ValuesList(set.begin(), set.end()); // replace by new list constructed from set
         return true;
     }
 
-    bool SetSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        std::set<std::string> set;
-        for (const auto& value: values) {
-            set.emplace(value.asString());
-        }
-        attrs.insert_or_assign(attrMacro, jinja2::ValuesList(set.begin(), set.end()));
-        return true;
+    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        return AppendToSetAttr(attrs, attrMacro, values, nodePath);
     }
 
-    bool SetDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
         bool r = true;
-        jinja2::ValuesMap dict;
+        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
+        auto& attr = attrIt->second.asMap();
         for (const auto& value : values) {
             auto keyval = std::string_view(value.asString());
             if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
                 spdlog::error("trying to add invalid element {} to 'dict' type attribute {} at node {}, each element must be in key=value format without spaces around =", keyval, attrMacro, nodePath);
                 r = false;
             } else {
-                dict.emplace(keyval.substr(0, pos), keyval.substr(pos + 1));
+                attr.emplace(keyval.substr(0, pos), keyval.substr(pos + 1));
             }
         }
-        attrs.insert_or_assign(attrMacro, std::move(dict));
         return r;
     }
 };
