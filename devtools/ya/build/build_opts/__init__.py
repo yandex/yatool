@@ -2523,6 +2523,13 @@ class DistCacheOptions(DistCacheSetupOptions):
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
                 ),
+                ArgConsumer(
+                    ['--no-bazel-remote-store'],
+                    help='Disable Bazel-remote storage',
+                    hook=SetConstValueHook('bazel_remote_store', False),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
                 ConfigConsumer('bazel_remote_store'),
                 ArgConsumer(
                     ['--bazel-remote-base-uri'],
