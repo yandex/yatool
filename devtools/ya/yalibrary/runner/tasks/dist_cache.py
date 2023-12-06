@@ -41,7 +41,7 @@ class PutInDistCacheTask(object):
         return 'put_in_dist_cache[{}]'.format(self._node.kv.get('p', '??'))
 
     def status(self):
-        tags = ['[[c:yellow]]YT_UPLOAD[[rst]]']
+        tags = ['[[c:yellow]]{}_UPLOAD[[rst]]'.format(self._dist_cache.tag())]
         if not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
         return self._fmt_node(self._node, tags)
@@ -141,7 +141,7 @@ class RestoreFromDistCacheTask(object):
         return 'restore_from_dist_cache[{}]'.format(self._node.kv.get('p', '??'))
 
     def status(self):
-        tags = ['[[c:green]]YT_DOWNLOAD[[rst]]']
+        tags = ['[[c:green]]{}_DOWNLOAD[[rst]]'.format(self._dist_cache.tag())]
         if not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
         return self._fmt_node(self._node, tags)

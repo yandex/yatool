@@ -8,6 +8,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/core/report
     devtools/ya/exts
+    devtools/ya/yalibrary/store
 )
 
 STYLE_PYTHON()

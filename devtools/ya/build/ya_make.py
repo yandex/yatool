@@ -475,9 +475,9 @@ def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
             },
         )
         logger.warning(
-            'Can\'t use YT cache: %s... <Truncated. Complete message will be available in debug logs>', err[:100]
+            'Can\'t use dist cache: %s... <Truncated. Complete message will be available in debug logs>', err[:100]
         )
-        logger.debug('Can\'t use YT cache: %s', err)
+        logger.debug('Can\'t use dist cache: %s', err)
         if opts.yt_store_exclusive or heater_mode:
             raise
         return None
@@ -659,13 +659,7 @@ def replace_dist_cache_results(graph, opts, dist_cache, app_ctx):
             return uid
         return None
 
-    dist_cache.set_clock('has')
-
-    result = core_async.par_map(check, graph['graph'], opts.dist_store_threads)
-
-    dist_cache.release_clock('has')
-
-    result = set(result)
+    result = set(core_async.par_map(check, graph['graph'], opts.dist_store_threads))
     result.discard(None)
     return list(sorted(result))
 
@@ -870,7 +864,7 @@ class Context(object):
         for node in self.graph['graph'] if self.graph is not None else lite_graph['graph']:
             nodes_map[node['uid']] = node
 
-        print_status("Configuring local and YT store caches")
+        print_status("Configuring local and dist store caches")
         self.dist_cache = make_dist_cache(
             dist_cache_future, self.opts, nodes_map.keys(), heater_mode=not self.opts.yt_store_wt
         )

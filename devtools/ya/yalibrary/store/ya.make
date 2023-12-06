@@ -2,6 +2,7 @@ PY23_LIBRARY()
 
 PY_SRCS(
     NAMESPACE yalibrary.store
+    dist_store.py
     hash_map.py
     file_store.py
     usage_map.py

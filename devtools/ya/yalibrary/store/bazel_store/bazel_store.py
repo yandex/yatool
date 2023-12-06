@@ -5,18 +5,15 @@ import json.decoder as json_decoder
 import logging
 import os
 import os.path as os_path
-import time
 
 import requests
 import requests.adapters
 import requests.auth
-import six
 from six.moves.urllib import parse
 
-from core import report
-from exts import func
+from exts.func import memoize
 from exts import hashing
-from exts.timer import AccumulateTime
+from yalibrary.store.dist_store import DistStore
 
 DOWNLOAD_CHUNK_SIZE = 1 << 15
 META_VERSION = '1'
@@ -157,52 +154,20 @@ class BazelStoreClient(object):
         return False
 
 
-# XXX see YA-1354
-class BazelStore(BazelStoreClient):
+class BazelStore(DistStore):
     def __init__(self, *args, **kwargs):
-        self._readonly = kwargs.pop('readonly')
-        super(BazelStore, self).__init__(*args, **kwargs)
-        self._data_size = {'put': 0, 'get': 0}
-        self._timers = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._counters = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._failures = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._cache_hit = {'requested': 0, 'found': 0}
-        self._clocks = {}
-        self._meta = {}
+        super(BazelStore, self).__init__(
+            name='bazel-store', stats_name='bazel_store_status', tag='BAZEL', readonly=kwargs.pop('readonly')
+        )
+        self._client = BazelStoreClient(*args, **kwargs)
 
-    def _inc_time(self, x, tag):
-        self._timers[tag] += x
-        self._counters[tag] += 1
+    def _get_data_size(self, meta_info):
+        return sum(x.get('size', 0) for x in meta_info['files'].values())
 
-    def try_restore(self, uid, into_dir, filter_func=None):
-        with AccumulateTime(lambda x: self._inc_time(x, 'get')):
-            try:
-                meta = self.get_data(into_dir, uid, filter_func)
-            except BazelStoreException:
-                self._count_failure('get')
-                return False
-
-            data_size = self._get_data_size(meta)
-            self._inc_data_size(data_size, 'get')
-            return True
-
-    # Probe uid only once to speed up processing
-    # _inc_cache_hit() relies on caching
-    @func.memoize(thread_safe=False)
-    def has(self, uid):
-        with AccumulateTime(lambda x: self._inc_time(x, 'has')):
-            found = self.exists(uid)
-
-            logger.debug('Bazel-remote Probing %s => %s', uid, found)
-            self._inc_cache_hit(found)
-            return found
-
-    def load_meta(self, uids, heater_mode=False, refresh_on_read=False):
-        # Meta preloading is no required for bazel store
-        return
-
-    def readonly(self):
-        return self._readonly
+    def _inc_cache_hit(self, found):
+        self._cache_hit['requested'] += 1
+        if found:
+            self._cache_hit['found'] += 1
 
     def fits(self, node):
         if isinstance(node, dict):
@@ -224,87 +189,50 @@ class BazelStore(BazelStoreClient):
             return False
         return True
 
-    def _count_failure(self, tag):
-        self._failures[tag] += 1
+    def load_meta(self, uids, heater_mode=False, refresh_on_read=False):
+        # Meta preloading is no required for bazel store
+        return
+
+    @memoize(thread_safe=False)
+    def _do_has(self, uid):
+        found = self._client.exists(uid)
+
+        logger.debug('Bazel-remote Probing %s => %s', uid, found)
+        self._inc_cache_hit(found)
+        return found
+
+    def _do_put(self, uid, root_dir, files, codec=None):
+        name = files[0][len(root_dir) + 1 :] if len(files) else 'none'
+        logger.debug('Put %s(%s) to Bazel-remote', name, uid)
+        if uid in self._meta or self.readonly():
+            # should never happen
+            logger.debug('Put %s(%s) to Bazel-remote completed(no-op)', name, uid)
+            return True
+
+        try:
+            meta = self._client.put_data(files, root_dir, uid, name)
+            self._meta[uid] = meta
+        except BazelStoreException as e:
+            logger.debug('Put %s(%s) to Bazel-remote failed: %s', name, uid, e)
+            self._count_failure('put')
+            return False
+
+        data_size = self._get_data_size(meta)
+        logger.debug('Put %s(%s) size=%d to Bazel-remote completed', name, uid, data_size)
+        self._inc_data_size(data_size, 'put')
+        return True
+
+    def _do_try_restore(self, uid, into_dir, filter_func=None):
+        try:
+            meta = self._client.get_data(into_dir, uid, filter_func)
+        except BazelStoreException:
+            self._count_failure('get')
+            return False
+
+        data_size = self._get_data_size(meta)
+        self._inc_data_size(data_size, 'get')
+        return True
 
     @property
     def avg_compression_ratio(self):
         return 1.0
-
-    def put(self, uid, root_dir, files, codec=None):
-        with AccumulateTime(lambda x: self._inc_time(x, 'put')):
-            name = files[0][len(root_dir) + 1 :] if len(files) else 'none'
-            logger.debug('Put %s(%s) to Bazel-remote', name, uid)
-            if uid in self._meta or self._readonly:
-                # should never happen
-                logger.debug('Put %s(%s) to Bazel-remote completed(no-op)', name, uid)
-                return True
-
-            try:
-                meta = self.put_data(files, root_dir, uid, name)
-                self._meta[uid] = meta
-            except BazelStoreException as e:
-                logger.debug('Put %s(%s) to Bazel-remote failed: %s', name, uid, e)
-                self._count_failure('put')
-                return False
-
-            data_size = self._get_data_size(meta)
-            logger.debug('Put %s(%s) size=%d to Bazel-remote completed', name, uid, data_size)
-            self._inc_data_size(data_size, 'put')
-            return True
-
-    def _get_data_size(self, meta_info):
-        return sum(x.get('size', 0) for x in meta_info['files'].values())
-
-    def _inc_data_size(self, size, tag):
-        assert tag in self._data_size, tag
-        self._data_size[tag] += size
-
-    def _inc_cache_hit(self, found):
-        self._cache_hit['requested'] += 1
-        if found:
-            self._cache_hit['found'] += 1
-
-    # XXX see YA-1354
-    def stats(self, execution_log, evlog_writer):
-        for k, v in six.iteritems(self._data_size):
-            stat_dict = {'data_size': v, 'type': 'bazel-store'}
-            report.telemetry.report('bazel_store_stats-{}-data-size'.format(k), stat_dict)
-            execution_log['$(bazel-store-{}-data-size)'.format(k)] = stat_dict
-        execution_log['$(bazel-store-cache-hit)'] = self._cache_hit
-
-        for k, v in six.iteritems(self._timers):
-            stat_dict = {
-                'count': self._counters[k],
-                'failures': self._failures[k],
-                'prepare': '',
-                'timing': (0, self._timers[k]),
-                'total_time': True,
-                'type': 'bazel-store',
-            }
-            report.telemetry.report('bazel_store_stats-{}'.format(k), stat_dict)
-            execution_log["$(bazel-store-{})".format(k)] = stat_dict
-
-        if evlog_writer:
-            stats = {
-                'cache_hit': self._cache_hit,
-                'put': {
-                    'count': self._counters['put'],
-                    'data_size': self._data_size['put'],
-                },
-                'get': {
-                    'count': self._counters['get'],
-                    'data_size': self._data_size['get'],
-                },
-            }
-            evlog_writer('stats', **stats)
-
-    def set_clock(self, tag):
-        self._clocks[tag] = (time.time(), self._timers[tag])
-
-    def release_clock(self, tag):
-        try:
-            st, timer = self._clocks[tag]
-            self._timers[tag] = timer + (time.time() - st)
-        except KeyError:
-            raise BazelStoreException('Clock %s does not set', tag)
