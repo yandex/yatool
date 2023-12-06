@@ -101,7 +101,7 @@ class AndroidEmulator(object):
         self.running_devices[device_name]['device_id'] = device_id
         process.execute(
             self._get_adb_cmd(device_id)
-            + ['wait-for-device', 'shell', "while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;"],
+            + ['wait-for-device', 'shell', "'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'"],
             check_exit_code=True,
             env=self.env,
         )
