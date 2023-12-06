@@ -73,7 +73,7 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
     else:
         res = tools.resolve_tool('c++', host, target)
     if is_local(res):
-        version = subprocess.check_output(['xcodebuild', '-version']).split()[1]
+        version = subprocess.check_output(['xcodebuild', '-version'], text=True).split()[1]
         expect_version = res['params']['gcc_version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
