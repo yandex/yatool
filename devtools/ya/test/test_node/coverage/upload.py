@@ -40,7 +40,7 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
     root_path = list(roots)[0]
 
     node_log_path = "$(BUILD_ROOT)/coverage_create_root.txt"
-    node_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", global_resources) + [
+    node_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", global_resources, python="py2") + [
         "--log-path",
         node_log_path,
     ]
@@ -96,7 +96,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
     cmds = []
 
     if opts and opts.coverage_direct_upload_yt:
-        stool_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", suite.global_resources) + [
+        stool_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", suite.global_resources, python="py2") + [
             "--log-path",
             node_log_path,
         ]

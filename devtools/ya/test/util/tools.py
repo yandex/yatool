@@ -233,10 +233,10 @@ def get_wine32_path(global_resources):
 
 
 def get_test_tool_cmd(opts, tool_name, global_resources, wrapper=False, run_on_target_platform=False, python=None):
-    if not python:
-        py_ver = "py3" if getattr(opts, 'test_tool3_handlers', {}).get(tool_name, False) else "py2"
-    else:
+    if python:
         py_ver = python
+    else:
+        py_ver = "py3"
 
     if py_ver == "py2":
         cmd = [

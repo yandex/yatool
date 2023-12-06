@@ -1876,7 +1876,6 @@ class InterimOptions(core.yarg.Options):
         self.use_command_file_in_testtool = False
         self.use_throttling = False
         self.remove_implicit_data_path = False
-        self.test_tool3_handlers = {}
 
     def consumer(self):
         return [
@@ -1975,7 +1974,6 @@ class InterimOptions(core.yarg.Options):
                 'YA_REMOVE_IMPLICIT_DATA_PATH',
                 hook=core.yarg.SetValueHook('remove_implicit_data_path', core.yarg.return_true_if_enabled),
             ),
-            core.yarg.ConfigConsumer('test_tool3_handlers'),
         ]
 
     def postprocess2(self, params):

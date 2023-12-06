@@ -1181,7 +1181,6 @@ def get_suite_uid(suite, graph, arc_root, opts, is_for_distbuild, out_dir, has_s
         # Allows to change test's uid per suite type
         imprint_parts.append(str(opts.test_types_fakeid.get(suite.get_type(), '')))
         imprint_parts.append(str(opts.test_fakeid))
-        imprint_parts.append(str(opts.test_tool3_handlers.get('run_test', False)))
         imprint_parts.append(str(retries))
         imprint_parts.append(str(has_split_files))
 
@@ -1866,7 +1865,7 @@ def create_upload_frepkage_node(filename, global_resources, opts):
     hostname = socket.getfqdn()
     username = getpass.getuser()
 
-    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", global_resources) + [
+    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", global_resources, python="py2") + [
         "--target",
         filename,
         "--output",
