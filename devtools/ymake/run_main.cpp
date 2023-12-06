@@ -4,6 +4,7 @@
 #include "conf.h"
 #include "main.h"
 #include "run_python.h"
+#include "trace_start.h"
 
 #include <devtools/ymake/diag/trace.h>
 
@@ -31,6 +32,8 @@ static void SigInt(int) {
 using namespace NLastGetopt;
 
 int YMakeMain(int argc, char** argv) {
+    TraceYmakeStart(argc, argv);
+
 #if !defined(_win_)
     SetEnv("LC_ALL", "C");
 #else

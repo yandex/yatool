@@ -166,6 +166,7 @@ SRCS(
     sysincl_resolver.cpp
     spdx.cpp
     tools_miner.cpp
+    trace_start.cpp
     transitive_constraints.cpp
     transitive_requirements_check.cpp
     transitive_state.cpp
