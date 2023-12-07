@@ -861,7 +861,7 @@ void TDirParser::ReadMakeFile(const TString& makefile) {
 
 
 void TDirParser::ApplyDiscard() {
-    if (Discarded) {
+    if (bool failOnRecurse = Conf.ShouldFailOnRecurse(); Discarded || failOnRecurse) {
         // Don't perform deep cleanup of modules here:
         // - If Discard condition was held at module's END processing
         //   then module will not be committed and added to the lists.
@@ -872,8 +872,10 @@ void TDirParser::ApplyDiscard() {
         Modules.clear();
         ModuleCount = 0;
         MultiModuleName = {};
-        Recurses.clear();
-        TestRecurses.clear();
+        if (!failOnRecurse) {
+            Recurses.clear();
+            TestRecurses.clear();
+        }
     }
 }
 
