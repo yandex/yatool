@@ -19,6 +19,7 @@ class VSCodeAllOptions(core.yarg.Options):
         self.files_visibility = None
         self.goroot = None
         self.patch_gopls = True
+        self.dlv_enabled = True
         self.compile_commands_fix = True
         self.allow_project_inside_arc = False
         self.languages = []
@@ -127,6 +128,12 @@ class VSCodeAllOptions(core.yarg.Options):
                 ["--no-gopls-fix"],
                 help="Do not use patched gopls",
                 hook=core.yarg.SetConstValueHook("patch_gopls", False),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--no-dlv'],
+                help='Do not use dlv from ya tool',
+                hook=core.yarg.SetConstValueHook('dlv_enabled', False),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(

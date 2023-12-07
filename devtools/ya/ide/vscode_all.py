@@ -122,7 +122,7 @@ class VSCodeProject(object):
         if self.is_go:
             if not self.params.goroot:
                 tools_list.append("go")
-            if self.params.debug_enabled:
+            if self.params.debug_enabled and self.params.dlv_enabled:
                 tools_list.append("dlv")
             if self.params.patch_gopls:
                 tools_list.append("gopls")
@@ -432,7 +432,7 @@ class VSCodeProject(object):
             alt_tools = {}
             if self.params.patch_gopls:
                 alt_tools["gopls"] = tool_fetcher("gopls")[0]
-            if self.params.debug_enabled:
+            if self.params.debug_enabled and self.params.dlv_enabled:
                 alt_tools["dlv"] = tool_fetcher("dlv")[0]
             if alt_tools:
                 workspace["settings"]["go.alternateTools"] = alt_tools
