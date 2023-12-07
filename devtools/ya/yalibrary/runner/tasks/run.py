@@ -109,7 +109,9 @@ def _fix_output(out, rmap, mask_roots=False):
         return line
 
     out = formatter.ansi_codes_to_markup(out)
-    return '\n'.join(transform_line(six.ensure_str(fl)) for fl in (line for line in out.splitlines() if valid_line(line)))
+    return '\n'.join(
+        transform_line(six.ensure_str(fl)) for fl in (line for line in out.splitlines() if valid_line(line))
+    )
 
 
 class ExecutorBase(object):

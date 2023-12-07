@@ -23,10 +23,16 @@ class PutInDistCacheTask(object):
     def __call__(self, *args, **kwargs):
         start_time = time.time()
         try:
-            self._ok = self._dist_cache.put(self._node.uid, self._build_root.path, list(self._build_root.output), codec=self._dist_cache_codec)
+            self._ok = self._dist_cache.put(
+                self._node.uid, self._build_root.path, list(self._build_root.output), codec=self._dist_cache_codec
+            )
         finally:
             self._build_root.dec()
-        self._execution_log[str(self)] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'put to dist cache'}
+        self._execution_log[str(self)] = {
+            'timing': (start_time, time.time()),
+            'prepare': '',
+            'type': 'put to dist cache',
+        }
 
     def __str__(self):
         return 'PutInDistCache({})'.format(self._node.uid)
@@ -65,7 +71,9 @@ class RestoreFromDistCacheTask(object):
         if save_links_for_files:
             self._fix_outputs_for_links()
             self._filter = self._save_links_filter
-        self._build_root = build_root_set.new(self._outputs, node.refcount, dir_outputs=node.dir_outputs, compute_hash=node.hashable)
+        self._build_root = build_root_set.new(
+            self._outputs, node.refcount, dir_outputs=node.dir_outputs, compute_hash=node.hashable
+        )
 
     def _fix_outputs_for_links(self):
         outputs = []
@@ -126,7 +134,11 @@ class RestoreFromDistCacheTask(object):
                 self._ctx.fast_fail()
             else:
                 self._ctx.exec_run_node(self._node, self)
-        self._execution_log[str(self)] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'get from dist cache'}
+        self._execution_log[str(self)] = {
+            'timing': (start_time, time.time()),
+            'prepare': '',
+            'type': 'get from dist cache',
+        }
 
     def __str__(self):
         return 'FromDistCache({})'.format(str(self._node))

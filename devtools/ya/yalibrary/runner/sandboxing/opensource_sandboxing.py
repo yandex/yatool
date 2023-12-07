@@ -10,7 +10,7 @@ class FuseManager(object):
         yield
 
     # We need those arguments to maintain interface
-    def manage(self, node, patterns):   # noqa
+    def manage(self, node, patterns):  # noqa
         return self.do_nothing()
 
 

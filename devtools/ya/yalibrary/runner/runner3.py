@@ -151,10 +151,14 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     test_threads = ctx.opts.test_threads or threads
     net_threads = ctx.opts.yt_store_threads or 3
     io_limit = min(ctx.opts.link_threads or 2, threads)
-    cap = worker_threads.ResInfo(io=io_limit, cpu=threads, test=test_threads, download=threads+net_threads, upload=net_threads)
+    cap = worker_threads.ResInfo(
+        io=io_limit, cpu=threads, test=test_threads, download=threads + net_threads, upload=net_threads
+    )
 
     worker_threads_count = threads + 1 + net_threads
-    workers = worker_threads.WorkerThreads(state, worker_threads_count, worker_threads.ResInfo(), cap, getattr(app_ctx, 'evlog', None))
+    workers = worker_threads.WorkerThreads(
+        state, worker_threads_count, worker_threads.ResInfo(), cap, getattr(app_ctx, 'evlog', None)
+    )
 
     class WorkersContext(object):
         def __enter__(self):
@@ -183,7 +187,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             ctx.opts.incremental_build_dirs_cleanup,
             workers.add,
             ctx.opts.limit_build_root_size,
-            validate_content=ctx.opts.validate_build_root_content
+            validate_content=ctx.opts.validate_build_root_content,
         )
     )
     continue_on_fail = graph['conf'].get('keepon', False)
@@ -198,12 +202,15 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     patterns = ptn.Patterns()
     patterns['SOURCE_ROOT'] = win_path_fix(ctx.src_dir)
     patterns['TOOL_ROOT'] = win_path_fix(ctx.res_dir)
-    patterns['TESTS_DATA_ROOT'] = win_path_fix(ctx.opts.arcadia_tests_data_path or os.path.normpath(os.path.join(ctx.src_dir, '..', 'arcadia_tests_data')))
+    patterns['TESTS_DATA_ROOT'] = win_path_fix(
+        ctx.opts.arcadia_tests_data_path or os.path.normpath(os.path.join(ctx.src_dir, '..', 'arcadia_tests_data'))
+    )
     patterns['RESOURCE_ROOT'] = win_path_fix(transient_resource_dir)
 
     if ctx.opts.oauth_token_path:
         patterns['YA_TOKEN_PATH'] = win_path_fix(ctx.opts.oauth_token_path)
     elif ctx.opts.oauth_token:
+
         class TokenContext(object):
             def __init__(self, transient_resource_dir):
                 self._token_file = os.path.join(transient_resource_dir, '.ya_token')
@@ -295,7 +302,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             if len(self.outputs) < lim:
                 outputs = self.outputs
             else:
-                outputs = self.outputs[: lim] + ["<{} more outputs>".format(len(self.outputs) - lim)]
+                outputs = self.outputs[:lim] + ["<{} more outputs>".format(len(self.outputs) - lim)]
             return self.uid + ' '.join(outputs)
 
         def format(self):
@@ -351,7 +358,9 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     timer.show_step('build ref count')
 
     queue_status = status_view.Status()
-    term_view = status_view.TermView(queue_status, display, ninja, opts.ext_progress, False, output_replacements=output_replacements)
+    term_view = status_view.TermView(
+        queue_status, display, ninja, opts.ext_progress, False, output_replacements=output_replacements
+    )
     ticker = status_view.TickThrottle(term_view.tick, 0.1)
 
     class TermContext(object):
@@ -395,19 +404,28 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
             if not opts.use_distbuild:
                 import yalibrary.runner.tasks.run
+
                 if opts.local_executor:
                     if not opts.executor_address:
                         from devtools.executor.python import executor
+
                         # Don't cache_stderr to avoid belated reading of special tags
-                        _, opts.executor_address = executor.start_executor(cache_stderr=False, debug=core.config.is_test_mode())
+                        _, opts.executor_address = executor.start_executor(
+                            cache_stderr=False, debug=core.config.is_test_mode()
+                        )
                     self.executor_type = yalibrary.runner.tasks.run.LocalExecutor
                 else:
                     self.executor_type = yalibrary.runner.tasks.run.PopenExecutor
 
             import yalibrary.runner.tasks.cache
+
             self.compact_cache_task = yalibrary.runner.tasks.cache.CompactCacheTask(cache, state, opts, execution_log)
-            self.clean_symres_task = yalibrary.runner.tasks.cache.CleanSymresTask(symlink_result, state, opts, execution_log)
-            self.clean_build_task = yalibrary.runner.tasks.cache.CleanBuildRootTask(build_root_set, state, opts, execution_log)
+            self.clean_symres_task = yalibrary.runner.tasks.cache.CleanSymresTask(
+                symlink_result, state, opts, execution_log
+            )
+            self.clean_build_task = yalibrary.runner.tasks.cache.CleanBuildRootTask(
+                build_root_set, state, opts, execution_log
+            )
             self.content_uids = opts.force_content_uids
             logger.debug("content UIDs %s in runner", "*enabled*" if self.content_uids else "*disabled*")
 
@@ -425,6 +443,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.clean_symres_task = exit_stack.enter_context(SymresLock())
             save_links_for = getattr(opts, 'save_links_for', [])
             import yalibrary.runner.tasks.prepare
+
             if self.opts.use_distbuild:
                 res_nodes = [x for x in nodes if x.is_result_node()]
                 if self.opts.output_only_tests:  # XXX
@@ -440,23 +459,40 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                         res_nodes = [n for n in res_nodes if "test_results_node" in n.kv]
 
                 self.results = frozenset([n.uid for n in res_nodes])
-                self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllDistNodesTask(nodes, self, opts.download_artifacts or download_test_results, res_nodes)
+                self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllDistNodesTask(
+                    nodes, self, opts.download_artifacts or download_test_results, res_nodes
+                )
             else:
-                self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllNodesTask(nodes, self, cache, dist_cache)
+                self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllNodesTask(
+                    nodes, self, cache, dist_cache
+                )
 
-            self.save_links_regex = re.compile("|".join(fnmatch.translate(e) for e in save_links_for)) if save_links_for else None
+            self.save_links_regex = (
+                re.compile("|".join(fnmatch.translate(e) for e in save_links_for)) if save_links_for else None
+            )
 
         def fast_fail(self, fatal=False):
             if fatal or not continue_on_fail:
+
                 def stopping():
                     raise EarlyStoppingException()
+
                 state.stopping(stopping)
 
         def exec_run_node(self, node, parent_task):
             import yalibrary.runner.tasks.resource
-            deps = [self.task_cache(x, self.prepare_node) for x in node.dep_nodes()] + \
-                [self.pattern_cache(x) for x in node.unresolved_patterns()] + \
-                [self.resource_cache(tuple(sorted(x.items())), deps=yalibrary.runner.tasks.resource.PrepareResource.dep_resources(self, x)) for x in node.resources]
+
+            deps = (
+                [self.task_cache(x, self.prepare_node) for x in node.dep_nodes()]
+                + [self.pattern_cache(x) for x in node.unresolved_patterns()]
+                + [
+                    self.resource_cache(
+                        tuple(sorted(x.items())),
+                        deps=yalibrary.runner.tasks.resource.PrepareResource.dep_resources(self, x),
+                    )
+                    for x in node.resources
+                ]
+            )
 
             self.runq.add(self.run_node(node), joint=parent_task, deps=deps)
 
@@ -464,12 +500,29 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             import yalibrary.runner.tasks.pattern
 
             # XXX: remove transient_resource_dir needed for $(VCS) pattern only.
-            return yalibrary.runner.tasks.pattern.PreparePattern(pattern, self, ctx.res_dir, transient_resource_dir, resources_map, fetchers_storage, fetch_resource_if_need, execution_log)
+            return yalibrary.runner.tasks.pattern.PreparePattern(
+                pattern,
+                self,
+                ctx.res_dir,
+                transient_resource_dir,
+                resources_map,
+                fetchers_storage,
+                fetch_resource_if_need,
+                execution_log,
+            )
 
         def prepare_resource(self, uri_description):
             import yalibrary.runner.tasks.resource
 
-            return yalibrary.runner.tasks.resource.PrepareResource(uri_description, self, transient_resource_dir, fetchers_storage, fetch_resource_if_need, execution_log, cache)
+            return yalibrary.runner.tasks.resource.PrepareResource(
+                uri_description,
+                self,
+                transient_resource_dir,
+                fetchers_storage,
+                fetch_resource_if_need,
+                execution_log,
+                cache,
+            )
 
         def prepare_node(self, node):
             import yalibrary.runner.tasks.prepare
@@ -479,23 +532,40 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         def restore_from_dist_cache(self, node):
             import yalibrary.runner.tasks.dist_cache
 
-            return yalibrary.runner.tasks.dist_cache.RestoreFromDistCacheTask(node, build_root_set, self, dist_cache, fmt_node, execution_log, self.save_links_regex)
+            return yalibrary.runner.tasks.dist_cache.RestoreFromDistCacheTask(
+                node, build_root_set, self, dist_cache, fmt_node, execution_log, self.save_links_regex
+            )
 
         def put_in_dist_cache(self, node, build_root):
             import yalibrary.runner.tasks.dist_cache
 
-            return yalibrary.runner.tasks.dist_cache.PutInDistCacheTask(node, build_root, dist_cache, opts.yt_store_codec, fmt_node, execution_log)
+            return yalibrary.runner.tasks.dist_cache.PutInDistCacheTask(
+                node, build_root, dist_cache, opts.yt_store_codec, fmt_node, execution_log
+            )
 
         def restore_from_cache(self, node):
             import yalibrary.runner.tasks.cache
 
-            return yalibrary.runner.tasks.cache.RestoreFromCacheTask(node, build_root_set.new(node.outputs, node.refcount, node.dir_outputs, compute_hash=node.hashable),
-                                                                     self, cache, dist_cache, execution_log)
+            return yalibrary.runner.tasks.cache.RestoreFromCacheTask(
+                node,
+                build_root_set.new(node.outputs, node.refcount, node.dir_outputs, compute_hash=node.hashable),
+                self,
+                cache,
+                dist_cache,
+                execution_log,
+            )
 
         def put_in_cache(self, node, build_root):
             import yalibrary.runner.tasks.cache
 
-            return yalibrary.runner.tasks.cache.PutInCacheTask(node, build_root, cache, opts.cache_codec, execution_log, dir_outputs_test_mode=self.opts.dir_outputs_test_mode)
+            return yalibrary.runner.tasks.cache.PutInCacheTask(
+                node,
+                build_root,
+                cache,
+                opts.cache_codec,
+                execution_log,
+                dir_outputs_test_mode=self.opts.dir_outputs_test_mode,
+            )
 
         def write_through_caches(self, node, build_root):
             import yalibrary.runner.tasks.cache
@@ -509,10 +579,21 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             import yalibrary.runner.tasks.result
 
             return yalibrary.runner.tasks.result.ResultNodeTask(
-                node, self, callback, need_output, output_result, need_symlinks, symlink_result,
+                node,
+                self,
+                callback,
+                need_output,
+                output_result,
+                need_symlinks,
+                symlink_result,
                 suppress_outputs_conf,
-                install_result, bin_result, lib_result,
-                res, fmt_node, ctx.cache_test_statuses, provider=provider
+                install_result,
+                bin_result,
+                lib_result,
+                res,
+                fmt_node,
+                ctx.cache_test_statuses,
+                provider=provider,
             )
 
         def eager_result(self, provider):
@@ -521,7 +602,11 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
             node = provider._node
             if node.uid in self.results:
-                self.runq.add(self.result_node(node, provider), deps=[self.clean_symres_task], inplace_execution=self.opts.eager_execution)
+                self.runq.add(
+                    self.result_node(node, provider),
+                    deps=[self.clean_symres_task],
+                    inplace_execution=self.opts.eager_execution,
+                )
 
         def run_node(self, node):
             import yalibrary.runner.tasks.run
@@ -540,15 +625,23 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                 callback,
                 cache,
                 dist_cache,
-                ienv.manager()
+                ienv.manager(),
             )
 
         def run_dist_node(self, node):
             import yalibrary.runner.tasks.distbuild
 
             return yalibrary.runner.tasks.distbuild.DistDownloadTask(
-                node, self, build_root_set, self.patterns, self.save_links_regex, callback, dist_cache, self.opts.mds_read_account, execution_log,
-                dump_evlog_stat=self.opts.evlog_dump_node_stat
+                node,
+                self,
+                build_root_set,
+                self.patterns,
+                self.save_links_regex,
+                callback,
+                dist_cache,
+                self.opts.mds_read_account,
+                execution_log,
+                dump_evlog_stat=self.opts.evlog_dump_node_stat,
             )
 
         def dispatch_uid(self, uid, *args, **kwargs):
@@ -623,18 +716,19 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                 continue
             stderr = getattr(task_info.task, "raw_stderr", None)
             if rc:
-                logger.debug("Task %s failed with %s exit code: %s", task_info.task, rc, '\n' + stderr if stderr else 'no strderr was provided')
+                logger.debug(
+                    "Task %s failed with %s exit code: %s",
+                    task_info.task,
+                    rc,
+                    '\n' + stderr if stderr else 'no strderr was provided',
+                )
                 task_uid = getattr(task_info.task, 'uid', getattr(task_info.task, 'short_name', 'UnknownTask'))
                 exit_code_map[task_uid] = rc
             elif stderr:
                 if len(stderr) <= TRUNCATE_STDERR * 2:
                     truncated_stderr = stderr
                 else:
-                    truncated_stderr = "\n".join((
-                        stderr[:TRUNCATE_STDERR],
-                        "...",
-                        stderr[-TRUNCATE_STDERR:]
-                    ))
+                    truncated_stderr = "\n".join((stderr[:TRUNCATE_STDERR], "...", stderr[-TRUNCATE_STDERR:]))
                 logger.debug("Task %s has stderr:\n%s", task_info.task, truncated_stderr)
 
     merged_exit_code = core.error.merge_exit_codes([0] + list(exit_code_map.values()))
@@ -646,18 +740,20 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             yield {
                 'name': str(task_info.task),  # TODO: better
                 'timing': task_info.timing,
-                'type': task_info.task.short_name()
+                'type': task_info.task.short_name(),
             }
 
     data = statcalc.calc_stat(replay_info)
-    data.update({
-        'critical_path': list(calc_critical_path()),
-        'wall_time': wall_time,
-        'build_type': opts.build_type,
-        'flags': opts.flags,
-        'rel_targets': opts.rel_targets,
-        'threads': opts.build_threads,
-    })
+    data.update(
+        {
+            'critical_path': list(calc_critical_path()),
+            'wall_time': wall_time,
+            'build_type': opts.build_type,
+            'flags': opts.flags,
+            'rel_targets': opts.rel_targets,
+            'threads': opts.build_threads,
+        }
+    )
 
     logger.debug('Profile of graph execution %s', json.dumps(data))
     core.report.telemetry.report(core.report.ReportTypes.PROFILE_BY_TYPE, data)

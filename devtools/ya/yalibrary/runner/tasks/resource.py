@@ -28,7 +28,9 @@ class _ExternalResource(object):
 
 
 class PrepareResource(object):
-    def __init__(self, uri_description, ctx, resource_root, fetchers_storage, fetch_resource_if_need, execution_log, cache):
+    def __init__(
+        self, uri_description, ctx, resource_root, fetchers_storage, fetch_resource_if_need, execution_log, cache
+    ):
         self._uri_description = dict(uri_description)
         self._ctx = ctx
         self._fetchers_storage = fetchers_storage
@@ -52,7 +54,9 @@ class PrepareResource(object):
 
         accepted_resource_types = {'ext'} | ctx.fetchers_storage.accepted_schemas()
 
-        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(resource_type, ', '.join(sorted(accepted_resource_types)))
+        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
+            resource_type, ', '.join(sorted(accepted_resource_types))
+        )
 
         if resource_type != 'ext':
             return None
@@ -62,7 +66,7 @@ class PrepareResource(object):
         if sb_resource_id is None:
             return None
 
-        return [ctx.resource_cache((('uri', 'sbr:{}'.format(sb_resource_id)), ))]
+        return [ctx.resource_cache((('uri', 'sbr:{}'.format(sb_resource_id)),))]
 
     def __call__(self, *args, **kwargs):
         try:
@@ -71,10 +75,16 @@ class PrepareResource(object):
             logging.debug('Fetched resource %s to %s', self._uri_description, path)
             uri = self._uri_description['uri']
             if uri in self._ctx.resources:
-                raise Exception("Inconsistent parameters for resources %s, %s", self._uri_description, self._ctx.resources[uri])
+                raise Exception(
+                    "Inconsistent parameters for resources %s, %s", self._uri_description, self._ctx.resources[uri]
+                )
             self._ctx.resources[uri] = self._uri_description
             finish_time = time.time()
-            self._execution_log[uri] = {'timing': (start_time, finish_time), 'prepare': '', 'type': 'resources', }
+            self._execution_log[uri] = {
+                'timing': (start_time, finish_time),
+                'prepare': '',
+                'type': 'resources',
+            }
         except Cancelled:
             logging.debug("Fetching of the %s resource was cancelled", self._uri_description)
             self._ctx.fast_fail()
@@ -92,7 +102,9 @@ class PrepareResource(object):
         resource_type, address = uri.split(':', 1)
         accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
 
-        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(resource_type, ', '.join(sorted(accepted_resource_types)))
+        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
+            resource_type, ', '.join(sorted(accepted_resource_types))
+        )
 
         def progress_callback(percent):
             self._ctx.state.check_cancel_state()
@@ -108,10 +120,17 @@ class PrepareResource(object):
                 if self._cache.try_restore(self.uid, result_path):
                     return result_path
 
-            result = os.path.abspath(self._fetch_resource_if_need(self._fetchers_storage.get_by_type(resource_type), resource_root_sbr, uri,
-                                                                  progress_callback, self._ctx.state,
-                                                                  install_params=(fetcher.FIXED_NAME, False),
-                                                                  keep_directory_packed=True))
+            result = os.path.abspath(
+                self._fetch_resource_if_need(
+                    self._fetchers_storage.get_by_type(resource_type),
+                    resource_root_sbr,
+                    uri,
+                    progress_callback,
+                    self._ctx.state,
+                    install_params=(fetcher.FIXED_NAME, False),
+                    keep_directory_packed=True,
+                )
+            )
 
             files = list([os.path.join(result, file_name) for file_name in os.listdir(result)])
             self._cache.put(self.uid, result, files)

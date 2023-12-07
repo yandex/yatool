@@ -37,7 +37,13 @@ class LruStore(object):
         res = self.data.get(key, None)
 
         if res:
-            res = dict((x, y,) for x, y, z in res)
+            res = dict(
+                (
+                    x,
+                    y,
+                )
+                for x, y, z in res
+            )
 
         return res
 

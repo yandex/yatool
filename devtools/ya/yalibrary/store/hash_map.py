@@ -71,7 +71,7 @@ class OpenHashMap(object):
     def __delitem__(self, key):
         h = self._hash(key)
         offset = self._offset(h)
-        self._mm[offset:offset + self._item_size] = b'\0' * self._item_size
+        self._mm[offset : offset + self._item_size] = b'\0' * self._item_size
 
     def flush(self):
         self._mm.flush()

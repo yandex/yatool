@@ -1,5 +1,7 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.runner.fs
     __init__.py
@@ -11,5 +13,4 @@ PEERDIR(
 
 END()
 
-RECURSE(
-)
+RECURSE()

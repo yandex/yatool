@@ -65,9 +65,8 @@ class Patterns(object):
             elif isinstance(obj, six.binary_type):
                 # This will fail only on python3
                 raise TypeError(
-                    "Can't process pattern for binary string `{!r}`, check logs and convert it into str".format(
-                        obj
-                    ))
+                    "Can't process pattern for binary string `{!r}`, check logs and convert it into str".format(obj)
+                )
             elif isinstance(obj, collections_abc.Iterable):
                 for v in obj:
                     for x in Patterns._iter(v):

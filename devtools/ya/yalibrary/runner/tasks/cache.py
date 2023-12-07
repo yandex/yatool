@@ -22,7 +22,11 @@ class CompactCacheTask(object):
 
             start_time = time.time()
             tc_force_gc(getattr(self._opts, 'cache_size'))
-            self._execution_log['compact_tc_cache'] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'clean'}
+            self._execution_log['compact_tc_cache'] = {
+                'timing': (start_time, time.time()),
+                'prepare': '',
+                'type': 'clean',
+            }
 
     def fmt_size(self):
         def sizeof_fmt(num, suffix='B'):
@@ -73,6 +77,7 @@ class CleanSymresTask(object):
         start_time = time.time()
         try:
             from exts.plocker import Lock, LOCK_EX, LOCK_SH, LOCK_NB, LockException
+
             if self._opts.strip_symlinks or self._opts.auto_clean_results_cache:
                 # Blocking only in non-automatic mode.
                 timeout = 1000000000 if self._opts.strip_symlinks else 2
@@ -82,7 +87,9 @@ class CleanSymresTask(object):
                 except LockException:
                     pass
         finally:
-            self._shared_lock = Lock(self._symlink_store.file_lock_name, mode='w', timeout=1000000000, flags=LOCK_SH | LOCK_NB)
+            self._shared_lock = Lock(
+                self._symlink_store.file_lock_name, mode='w', timeout=1000000000, flags=LOCK_SH | LOCK_NB
+            )
             # released in runner3.py
             self._shared_lock.acquire()
             self._execution_log["clean symres"] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'clean'}
@@ -123,7 +130,11 @@ class CleanBuildRootTask(object):
 
         start_time = time.time()
         self._build_root_set.cleanup()
-        self._execution_log["clean temp build dir"] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'clean'}
+        self._execution_log["clean temp build dir"] = {
+            'timing': (start_time, time.time()),
+            'prepare': '',
+            'type': 'clean',
+        }
 
     def __str__(self):
         return 'CleanBuildRoot'
@@ -167,7 +178,11 @@ class PutInCacheTask(object):
                 self._cache.put_dependencies(self._node.uid, self._node.deps)
         finally:
             self._build_root.dec()
-        self._execution_log[str(self)] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'put into local cache, clean build dir'}
+        self._execution_log[str(self)] = {
+            'timing': (start_time, time.time()),
+            'prepare': '',
+            'type': 'put into local cache, clean build dir',
+        }
 
     def __str__(self):
         return 'PutInCache({})'.format(self._node.uid)
@@ -202,9 +217,12 @@ class RestoreFromCacheTask(object):
         return self._node.uid
 
     def should_put_in_dist_cache(self):
-        return self._dist_cache and not self._dist_cache.readonly() \
-            and self._dist_cache.fits(self._node) \
+        return (
+            self._dist_cache
+            and not self._dist_cache.readonly()
+            and self._dist_cache.fits(self._node)
             and not self._dist_cache.has(self._node.uid)
+        )
 
     def __call__(self, *args, **kwargs):
         start_time = time.time()
@@ -220,12 +238,20 @@ class RestoreFromCacheTask(object):
 
             if self.should_put_in_dist_cache():
                 self._build_root.inc()
-                self._ctx.runq.add(self._ctx.put_in_dist_cache(self._node, self._build_root), deps=[], inplace_execution=self._ctx.opts.eager_execution)
+                self._ctx.runq.add(
+                    self._ctx.put_in_dist_cache(self._node, self._build_root),
+                    deps=[],
+                    inplace_execution=self._ctx.opts.eager_execution,
+                )
 
             self._ctx.eager_result(self)
         else:
             self._ctx.exec_run_node(self._node, self)
-        self._execution_log[str(self)] = {'timing': (start_time, time.time()), 'prepare': '', 'type': 'get from local cache'}
+        self._execution_log[str(self)] = {
+            'timing': (start_time, time.time()),
+            'prepare': '',
+            'type': 'get from local cache',
+        }
 
     def __str__(self):
         return 'FromCache({})'.format(str(self._node))
@@ -252,13 +278,25 @@ class WriteThroughCachesTask(object):
 
     def __call__(self, *args, **kwargs):
         if self._ctx.opts.yt_store_wt or not self._dist_cache or self._dist_cache.readonly():
-            self._ctx.runq.add(self._ctx.put_in_cache(self._node, self._build_root), deps=[], inplace_execution=self._ctx.opts.eager_execution)
+            self._ctx.runq.add(
+                self._ctx.put_in_cache(self._node, self._build_root),
+                deps=[],
+                inplace_execution=self._ctx.opts.eager_execution,
+            )
         else:
             self._build_root.dec()
 
-        if self._dist_cache and not self._dist_cache.readonly() and self._dist_cache.fits(self._node) \
-                and not self._dist_cache.has(self._node.uid):
-            self._ctx.runq.add(self._ctx.put_in_dist_cache(self._node, self._build_root), deps=[], inplace_execution=self._ctx.opts.eager_execution)
+        if (
+            self._dist_cache
+            and not self._dist_cache.readonly()
+            and self._dist_cache.fits(self._node)
+            and not self._dist_cache.has(self._node.uid)
+        ):
+            self._ctx.runq.add(
+                self._ctx.put_in_dist_cache(self._node, self._build_root),
+                deps=[],
+                inplace_execution=self._ctx.opts.eager_execution,
+            )
         else:
             self._build_root.dec()
 

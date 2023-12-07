@@ -88,10 +88,16 @@ class PrepareAllNodesTask(UniqueTask):
                     tp.add_deps(node, x)
 
                 def add_run_node(node, *args, **kwargs):
-                    deps = [self._ctx.task_cache(x) for x in node.dep_nodes()] + \
-                        [self._ctx.pattern_cache(x) for x in node.unresolved_patterns()] + \
-                        [self._ctx.resource_cache(tuple(sorted(x.items())),
-                                                  deps=PrepareResource.dep_resources(self._ctx, x)) for x in node.resources]
+                    deps = (
+                        [self._ctx.task_cache(x) for x in node.dep_nodes()]
+                        + [self._ctx.pattern_cache(x) for x in node.unresolved_patterns()]
+                        + [
+                            self._ctx.resource_cache(
+                                tuple(sorted(x.items())), deps=PrepareResource.dep_resources(self._ctx, x)
+                            )
+                            for x in node.resources
+                        ]
+                    )
                     self._ctx.task_cache(node, self._ctx.run_node, deps=deps)
                     tp.notify_dependants(node)
 
@@ -103,7 +109,9 @@ class PrepareAllNodesTask(UniqueTask):
 
         if not self._ctx.opts.eager_execution:
             for node in results:
-                self._ctx.runq.add(self._ctx.result_node(node), deps=[self._ctx.task_cache(node), self._ctx.clean_symres_task])
+                self._ctx.runq.add(
+                    self._ctx.result_node(node), deps=[self._ctx.task_cache(node), self._ctx.clean_symres_task]
+                )
 
     def __str__(self):
         return 'PrepareAllNodes'
@@ -137,7 +145,9 @@ class PrepareAllDistNodesTask(UniqueTask):
             node.refcount += 1
             self._ctx.task_cache(node, self._ctx.run_dist_node, dispatch=False)
             if not self._ctx.opts.eager_execution:
-                self._ctx.runq.add(self._ctx.result_node(node), deps=[self._ctx.task_cache(node), self._ctx.clean_symres_task])
+                self._ctx.runq.add(
+                    self._ctx.result_node(node), deps=[self._ctx.task_cache(node), self._ctx.clean_symres_task]
+                )
 
         self._ctx.signal_ready()
 
@@ -166,8 +176,13 @@ class PrepareNodeTask(object):
     def __call__(self, *args, **kwargs):
         cacheable = not self._ctx.opts.clear_build and self._node.cacheable
         local_cache_task = cacheable and self._cache.has(self._node.uid)
-        dist_cache_task = cacheable and not local_cache_task and self._dist_cache and self._dist_cache.fits(self._node) \
+        dist_cache_task = (
+            cacheable
+            and not local_cache_task
+            and self._dist_cache
+            and self._dist_cache.fits(self._node)
             and self._dist_cache.has(self._node.uid)
+        )
 
         if local_cache_task:
             self._ctx.runq.add(self._ctx.restore_from_cache(self._node), joint=self)

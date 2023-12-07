@@ -38,7 +38,7 @@ class LruQueue(object):
             self._update_queue.push(key + '|' + str(stamp) + '|' + str(id))
 
     def __action(self, consumer, value):
-        """ Wrapper for consumer to use in sieve, avoids double processing """
+        """Wrapper for consumer to use in sieve, avoids double processing"""
         try:
             key, stamp, id = value.split('|')
             stamp = int(stamp)
@@ -52,7 +52,7 @@ class LruQueue(object):
             yield key, stamp, ret
 
     def __strip_action(self, line_to_retain, value):
-        """ Wrapper for consumer to use in sieve, avoids double processing """
+        """Wrapper for consumer to use in sieve, avoids double processing"""
         try:
             key, stamp, id = value.split('|')
             stamp = int(stamp)
@@ -68,8 +68,10 @@ class LruQueue(object):
 
     def sieve(self, eraser, max_chunks=None):
         if self._updater:
-            return chain(self._update_queue.sieve_current_chunk(lambda value: self.__action(self._updater, value)),
-                         self._queue.sieve(lambda value: self.__action(eraser, value), max_chunks))
+            return chain(
+                self._update_queue.sieve_current_chunk(lambda value: self.__action(self._updater, value)),
+                self._queue.sieve(lambda value: self.__action(eraser, value), max_chunks),
+            )
 
         return self._queue.sieve(lambda value: self.__action(eraser, value), max_chunks)
 

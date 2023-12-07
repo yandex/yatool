@@ -31,13 +31,15 @@ def _untared_path(path):
     exts = ['.tar', '.tar.zstd']
     for ext in exts:
         if path.endswith(ext):
-            new_path = path[:-len(ext)]
+            new_path = path[: -len(ext)]
             if new_path:
                 return new_path
     return path + '_unpacked'
 
 
-def process_output(self, output, pat, tared_kind=TARED_NONE, legacy_install=False, legacy_bin_dir=False, legacy_lib_dir=False):
+def process_output(
+    self, output, pat, tared_kind=TARED_NONE, legacy_install=False, legacy_bin_dir=False, legacy_lib_dir=False
+):
     if not output.startswith('$(B'):
         return False
 
@@ -60,7 +62,11 @@ def process_output(self, output, pat, tared_kind=TARED_NONE, legacy_install=Fals
             return func(built, output, **kwargs)
         except Exception as exc:
             import errno
-            if isinstance(exc, OSError) and exc.errno in (errno.EEXIST, errno.ENOENT, ):
+
+            if isinstance(exc, OSError) and exc.errno in (
+                errno.EEXIST,
+                errno.ENOENT,
+            ):
                 logger.debug('Concurrent processing of result %s from %s', output, built)
             elif on_win() and isinstance(exc, WindowsError) and exc.winerror in RETRIABLE_FILE_ERRORS:
                 logger.debug('Concurrent processing of result %s from %s', output, built)
@@ -85,9 +91,10 @@ def process_output(self, output, pat, tared_kind=TARED_NONE, legacy_install=Fals
         default_suppress_outputs = self._suppress_outputs_conf['default_suppress_outputs']
         add_result = self._suppress_outputs_conf['add_result']
         suppress_outputs = self._suppress_outputs_conf['suppress_outputs']
-        return (any([path.endswith(x) for x in default_suppress_outputs]) and
-                not any([path.endswith(x) for x in add_result])) or \
-            any([path.endswith(x) for x in suppress_outputs])
+        return (
+            any([path.endswith(x) for x in default_suppress_outputs])
+            and not any([path.endswith(x) for x in add_result])
+        ) or any([path.endswith(x) for x in suppress_outputs])
 
     if self._need_test_trace_file and built.endswith('ytest.report.trace'):
         result['trace_file'] = built
@@ -155,10 +162,24 @@ def process_output(self, output, pat, tared_kind=TARED_NONE, legacy_install=Fals
 class ResultNodeTask(object):
     node_type = 'ResultNode'
 
-    def __init__(self, node, ctx, callback, need_output, output_result, need_symlinks, symlink_result,
-                 suppress_outputs_conf,
-                 install_result, bin_result, lib_result,
-                 res, fmt_node, need_test_trace_file, provider=None):
+    def __init__(
+        self,
+        node,
+        ctx,
+        callback,
+        need_output,
+        output_result,
+        need_symlinks,
+        symlink_result,
+        suppress_outputs_conf,
+        install_result,
+        bin_result,
+        lib_result,
+        res,
+        fmt_node,
+        need_test_trace_file,
+        provider=None,
+    ):
         self._ok = True
         self._node = node
         self._ctx = ctx
@@ -180,7 +201,7 @@ class ResultNodeTask(object):
         logger.debug("ResultsNodeTask for %s created (provider=%s)", self._node.uid, self._provider)
 
     def __call__(self, deps):
-        for x in ([self._provider] if self._provider else deps):
+        for x in [self._provider] if self._provider else deps:
             if hasattr(x, 'build_root') and x.build_root.ok:
                 pat = self._ctx.patterns.sub()
                 pat['BUILD_ROOT'] = x.build_root.path
@@ -195,21 +216,32 @@ class ResultNodeTask(object):
 
                 for o in x.build_root.result_output:
                     if o not in self._node.tared_outputs:
-                        self._ok &= process_output(self, o, pat, legacy_install=legacy_install, legacy_bin_dir=legacy_bin_dir, legacy_lib_dir=legacy_lib_dir)
+                        self._ok &= process_output(
+                            self,
+                            o,
+                            pat,
+                            legacy_install=legacy_install,
+                            legacy_bin_dir=legacy_bin_dir,
+                            legacy_lib_dir=legacy_lib_dir,
+                        )
                     else:
-                        self._ok &= process_output(self, o, pat, str_to_tared_kind(self._node.kv.get('tared_kind', 'dir')))
+                        self._ok &= process_output(
+                            self, o, pat, str_to_tared_kind(self._node.kv.get('tared_kind', 'dir'))
+                        )
 
                 x.build_root.dec()
 
                 break
         else:
             self._ok = False
-        self._callback({
-            'uid': self._node.uid,
-            'status': 0 if self._ok else 1,
-            'build_root': self._build_root,
-            'result_node': True,
-        })
+        self._callback(
+            {
+                'uid': self._node.uid,
+                'status': 0 if self._ok else 1,
+                'build_root': self._build_root,
+                'result_node': True,
+            }
+        )
         logger.debug("Result node %s processed successfully: %s", self._node.uid, self._ok)
 
     def __str__(self):

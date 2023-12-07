@@ -31,7 +31,9 @@ class ResultStore(object):
         elif not os.path.isdir(self.root):
             logger.warning('Can\'t create result directory %s', self.root)
 
-    def _put_with_path_transform(self, target, path, action, transform_path, forced_existing_dir_removal=False, tared=False):
+    def _put_with_path_transform(
+        self, target, path, action, transform_path, forced_existing_dir_removal=False, tared=False
+    ):
         path = self.normpath(path)
         output_path = os.path.join(self.root, transform_path(path))
 
@@ -50,7 +52,15 @@ class ResultStore(object):
         action(target, output_path, tared)
         return output_path
 
-    def put(self, target, path, action=yalibrary.runner.fs.make_hardlink, forced_existing_dir_removal=False, tared=False, tared_nodir=False):
+    def put(
+        self,
+        target,
+        path,
+        action=yalibrary.runner.fs.make_hardlink,
+        forced_existing_dir_removal=False,
+        tared=False,
+        tared_nodir=False,
+    ):
         output_path = self._put_with_path_transform(
             target,
             path,
@@ -79,7 +89,15 @@ class SymlinkResultStore(ResultStore):
         self.symlinks = {}
         self.file_lock_name = os.path.join(root, 'consume.lock')
 
-    def put(self, target, path, target_action=yalibrary.runner.fs.make_hardlink, forced_existing_dir_removal=False, tared=False, tared_nodir=False):
+    def put(
+        self,
+        target,
+        path,
+        target_action=yalibrary.runner.fs.make_hardlink,
+        forced_existing_dir_removal=False,
+        tared=False,
+        tared_nodir=False,
+    ):
         path = self.normpath(path)
         symlink_path = os.path.join(self.src_root, path)
         symlinkable_path = self._put_with_path_transform(
@@ -95,7 +113,7 @@ class SymlinkResultStore(ResultStore):
         if tared and tared_nodir:
             symlinkable_path_unpacked = self._put_with_path_transform(
                 target,
-                symlink_path+'_unpacked',
+                symlink_path + '_unpacked',
                 action=target_action,
                 transform_path=lambda p: self.symlinkable(p),
                 forced_existing_dir_removal=False,
@@ -118,7 +136,9 @@ class SymlinkResultStore(ResultStore):
     def commit(self):
         for path, target in six.iteritems(self.symlinks):
             if self.prepare_src_dir(path):
-                yalibrary.runner.fs.make_symlink(target, os.path.join(self.src_root, path), warn_is_file=True, compare_file=True)
+                yalibrary.runner.fs.make_symlink(
+                    target, os.path.join(self.src_root, path), warn_is_file=True, compare_file=True
+                )
 
     def prepare_src_dir(self, path):
         dir_path = os.path.dirname(path)
@@ -136,7 +156,12 @@ class SymlinkResultStore(ResultStore):
                             exts.fs.ensure_dir(dir_link_target)
                         return True
                     else:
-                        logger.debug("Cannot create parent directory %s for target %s, existing link points to %s", dir_symlink_path, path, dir_link_target)
+                        logger.debug(
+                            "Cannot create parent directory %s for target %s, existing link points to %s",
+                            dir_symlink_path,
+                            path,
+                            dir_link_target,
+                        )
                         return False
                 if not os.path.isdir(dir_symlink_path):
                     break
@@ -212,4 +237,10 @@ class LegacyInstallResultStore(ResultStore):
         super(LegacyInstallResultStore, self).__init__(root)
 
     def put(self, target, path, action=yalibrary.runner.fs.make_hardlink, forced_existing_dir_removal=False):
-        return self._put_with_path_transform(target, path, action, transform_path=lambda p: os.path.basename(p), forced_existing_dir_removal=forced_existing_dir_removal)
+        return self._put_with_path_transform(
+            target,
+            path,
+            action,
+            transform_path=lambda p: os.path.basename(p),
+            forced_existing_dir_removal=forced_existing_dir_removal,
+        )

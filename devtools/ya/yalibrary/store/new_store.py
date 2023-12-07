@@ -1,5 +1,6 @@
 import collections
 import six
+
 if six.PY3:
     import contextlib
 else:
@@ -40,7 +41,7 @@ class NewStoreItemInfo(object):
 class NewStore(object):
     def __init__(self, store_path):
         def touch_finalizer(stamp, key):
-            """ 'touch'es HASHes left over from 'has'. See _get_file_info """
+            """'touch'es HASHes left over from 'has'. See _get_file_info"""
 
             if not key.startswith(ItemType.UID):
                 logger.debug('Unknown prefix %s', key)
@@ -88,7 +89,7 @@ class NewStore(object):
                         'size': size,
                         'codec': codec,
                         'mode': mode,
-                        'fsize': fsize
+                        'fsize': fsize,
                     }
 
                 content = json.dumps({'files': file_map, 'uid': uid})
@@ -131,7 +132,9 @@ class NewStore(object):
                     self._lru.touch(ItemType.HASH + file_info['hash'])
 
                     path = os.path.join(into_dir, rel_path)
-                    path_in_storage = self._file_store.extract_file(file_info['hash'], path, file_info['codec'], mode=file_info['mode'])
+                    path_in_storage = self._file_store.extract_file(
+                        file_info['hash'], path, file_info['codec'], mode=file_info['mode']
+                    )
                     to_clean.append(path)
                     file_size = fs.get_file_size(path_in_storage)
                     if file_size != file_info['size']:
@@ -258,6 +261,7 @@ class NewStore(object):
         """
         Move data from the cache to another
         """
+
         def mover(stamp, key):
             state.check_cancel_state()
             if key.startswith(ItemType.UID):
@@ -353,6 +357,13 @@ class NewStore(object):
 
     def stats(self, execution_log):
         for k, v in six.iteritems(self.timers):
-            stat_dict = {'timing': (0, v), 'total_time': True, 'count': self.counters[k], 'prepare': '', 'type': 'new-store', 'failures': self.failures[k]}
+            stat_dict = {
+                'timing': (0, v),
+                'total_time': True,
+                'count': self.counters[k],
+                'prepare': '',
+                'type': 'new-store',
+                'failures': self.failures[k],
+            }
             core.report.telemetry.report('new_store_stats-{}'.format(k), stat_dict)
             execution_log["$(new-store-{})".format(k)] = stat_dict

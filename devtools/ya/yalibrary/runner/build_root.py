@@ -42,7 +42,17 @@ class OutputsExceedLimitError(BuildRootError):
 
 
 class BuildRoot(object):
-    def __init__(self, path, keep, outputs, limit_output_size, refcount, dir_outputs=None, validate_content=False, compute_hash=True):
+    def __init__(
+        self,
+        path,
+        keep,
+        outputs,
+        limit_output_size,
+        refcount,
+        dir_outputs=None,
+        validate_content=False,
+        compute_hash=True,
+    ):
         self.path = path
         self._keep = keep
         self._original_outputs = list(outputs)
@@ -112,7 +122,9 @@ class BuildRoot(object):
                 cached_hash = self.read_hashes()
                 immediate_hash = self.read_hashes(force_recalc=True)
                 if cached_hash != immediate_hash:
-                    raise BuildRootIntegrityError('Content hash mismatch in {}: {} != {}'.format(self.path, cached_hash, immediate_hash))
+                    raise BuildRootIntegrityError(
+                        'Content hash mismatch in {}: {} != {}'.format(self.path, cached_hash, immediate_hash)
+                    )
 
         if self._limit_output_size:
             self.validate_outputs_size()
@@ -130,10 +142,9 @@ class BuildRoot(object):
                 for file, size in sorted(file_sizes.items(), key=lambda item: item[1], reverse=True)[:5]
             ]
             raise OutputsExceedLimitError(
-                'Task output size {total_size} exceeds limit {max_total_size}, largest outputs are\n{large_files}'
-                .format(total_size=total_files_size,
-                        max_total_size=max_size,
-                        large_files=top_5)
+                'Task output size {total_size} exceeds limit {max_total_size}, largest outputs are\n{large_files}'.format(
+                    total_size=total_files_size, max_total_size=max_size, large_files=top_5
+                )
             )
 
     @property
@@ -177,7 +188,11 @@ class BuildRoot(object):
     def extract_dir_outputs(self):
         dir_outputs_archive_map = self.dir_outputs_archive_map
         for dir_output, dir_output_archive_path in dir_outputs_archive_map.items():
-            if not os.path.exists(dir_output) and dir_output_archive_path is not None and exts.archive.is_archive_type(dir_output_archive_path):
+            if (
+                not os.path.exists(dir_output)
+                and dir_output_archive_path is not None
+                and exts.archive.is_archive_type(dir_output_archive_path)
+            ):
                 archive.extract_from_tar(dir_output_archive_path, dir_output)
 
     def propagate_dir_outputs(self):
@@ -267,15 +282,19 @@ class BuildRoot(object):
                     # We don't need to copy file with hash info
                     continue
                 try:
-                    runner_fs.make_hardlink(x, os.path.join(into, os.path.relpath(x, self.path)), retries=1,
-                                            prepare=True)
-                except OSError as e:  # check if this output was added to outputs with dir_outputs, it may be removed by another process while we collecting it
+                    runner_fs.make_hardlink(
+                        x, os.path.join(into, os.path.relpath(x, self.path)), retries=1, prepare=True
+                    )
+                except (
+                    OSError
+                ) as e:  # check if this output was added to outputs with dir_outputs, it may be removed by another process while we collecting it
                     if x in self._initial_outputs or errno.ENOENT != e.errno:
                         raise
                     else:
                         logger.warning(
                             "Stealing file %s does not exist. This file was added with --dir-outputs. Probably, it was deleted by another process",
-                            x)
+                            x,
+                        )
         except OSError as e:
             logger.error('Cannot steal from %s into %s: %s', self.path, into, str(e))
 
@@ -356,9 +375,16 @@ class BuildRootSet(object):
             return '{0:06x}'.format(self._id)
 
     def new(self, outputs, refcount, dir_outputs=None, compute_hash=True):
-        root = BuildRoot(os.path.join(self._build_root, self._gen_id()), self._keep or not self._incremental_cleanup,
-                         outputs, self._limit_output_size, refcount, dir_outputs,
-                         validate_content=self._validate_content, compute_hash=compute_hash)
+        root = BuildRoot(
+            os.path.join(self._build_root, self._gen_id()),
+            self._keep or not self._incremental_cleanup,
+            outputs,
+            self._limit_output_size,
+            refcount,
+            dir_outputs,
+            validate_content=self._validate_content,
+            compute_hash=compute_hash,
+        )
         self._roots.append(root)
 
         return root

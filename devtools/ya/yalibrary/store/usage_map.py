@@ -21,7 +21,10 @@ class UsageMap(object):
     def touch(self, key, stamp=None, id=0):
         if stamp is None:
             stamp = time.time()
-        self._hmap[key] = (stamp, id,)
+        self._hmap[key] = (
+            stamp,
+            id,
+        )
 
     def last_usage(self, key):
         try:

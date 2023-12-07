@@ -127,7 +127,12 @@ class Store(object):
                 compress.decompress(inner_path, into, codec)
                 os.chmod(into, mode)
             elif mode is None or (mode & in_mode) != mode:
-                logger.debug("Blob and target files have incompatible permissions (%s, %s), will NOT hardlink %s", in_mode, mode, into)
+                logger.debug(
+                    "Blob and target files have incompatible permissions (%s, %s), will NOT hardlink %s",
+                    in_mode,
+                    mode,
+                    into,
+                )
                 fs.copy_file(inner_path, into)
                 os.chmod(into, mode)
             else:

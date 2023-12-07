@@ -15,7 +15,9 @@ import yalibrary.worker_threads as worker_threads
 
 
 class PreparePattern(object):
-    def __init__(self, pattern, ctx, res_dir, build_root, resources_map, fetchers_storage, fetch_resource_if_need, execution_log):
+    def __init__(
+        self, pattern, ctx, res_dir, build_root, resources_map, fetchers_storage, fetch_resource_if_need, execution_log
+    ):
         self._pattern = pattern
         self._ctx = ctx
         self._res_dir = res_dir
@@ -38,7 +40,11 @@ class PreparePattern(object):
             start_time = time.time()
             self._ctx.patterns[self._pattern] = self.fetch(self._resources_map[self._pattern])
             finish_time = time.time()
-            self._execution_log["$({})".format(self._pattern)] = {'timing': (start_time, finish_time), 'prepare': '', 'type': 'tools'}
+            self._execution_log["$({})".format(self._pattern)] = {
+                'timing': (start_time, finish_time),
+                'prepare': '',
+                'type': 'tools',
+            }
         except Cancelled:
             logging.debug("Fetching of the %s resource was cancelled", self._pattern)
             self._ctx.fast_fail()
@@ -60,10 +66,13 @@ class PreparePattern(object):
         resource_type, resource_id = resource.split(':', 1)
         accepted_resource_types = {'file', 'https', 'base64'} | self._fetchers_storage.accepted_schemas()
 
-        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(resource_type, ', '.join(sorted(accepted_resource_types)))
+        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
+            resource_type, ', '.join(sorted(accepted_resource_types))
+        )
         strip_prefix = resource_desc.get('strip_prefix')
 
         if resource_type in ({'https'} | self._fetchers_storage.accepted_schemas()):
+
             def progress_callback(percent):
                 self._ctx.state.check_cancel_state()
                 self._percent = percent

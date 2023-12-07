@@ -41,6 +41,7 @@ class SizeStore(object):
 if __name__ == '__main__':
     import time
     import os
+
     t1 = time.time()
     ss = SizeStore(os.path.abspath('ss'))
     delta = time.time() - t1

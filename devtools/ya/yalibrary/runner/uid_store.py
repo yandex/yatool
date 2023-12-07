@@ -103,6 +103,7 @@ class UidStore(object):
         used_file_uids = set()
         file_uids_to_remove = set()
         for uid, files in sorted(self._lru_store.data.items(), key=lambda x: item_timestamp(x[1]), reverse=True):
+
             def get(file):
                 try:
                     return self._file_store.get(file)

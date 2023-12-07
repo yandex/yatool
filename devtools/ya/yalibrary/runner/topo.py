@@ -61,6 +61,7 @@ class Topo(object):
     When last node in node's set calls notify, all of them become completed (c).
     notify_dependants should be called once for each node and when node is in (s) from _when_ready.
     """
+
     def __init__(self):
         self._deps = collections.defaultdict(list)
         self._who_awaits = collections.defaultdict(list)

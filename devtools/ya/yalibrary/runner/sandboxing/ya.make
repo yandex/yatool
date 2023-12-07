@@ -1,16 +1,16 @@
 PY23_LIBRARY()
 
+STYLE_PYTHON()
+
 PY_SRCS(
     NAMESPACE yalibrary.runner.sandboxing
-
     __init__.py
     opensource_sandboxing.py
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PY_SRCS(
         NAMESPACE yalibrary.runner.sandboxing
-
         yandex_sandboxing.py
     )
     PEERDIR(
@@ -22,12 +22,11 @@ IF(NOT YA_OPENSOURCE)
             devtools/ya/yalibrary/runner/sandboxing/fusefs/python
         )
     ENDIF()
-
 ENDIF()
 
 END()
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     RECURSE(
         fusefs
         tests
