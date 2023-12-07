@@ -1610,8 +1610,9 @@ class _GraphMaker(object):
             graph = self._gen_graph_json(ymake_opts, purpose=debug_id)
 
         if should_run_tc_tests:
-            with open(test_dart_path) as dart:
-                tc_tests = self._gen_tests(dart.read(), tc)
+            with self._stager.scope("gen-tests-{}".format(_shorten_debug_id(debug_id))):
+                with open(test_dart_path) as dart:
+                    tc_tests = self._gen_tests(dart.read(), tc)
 
         java_darts = []
 

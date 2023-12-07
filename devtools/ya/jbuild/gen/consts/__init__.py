@@ -3,8 +3,9 @@ import os
 import test.const as tconst
 
 # Roots
-SOURCE_ROOT = '$(SOURCE_ROOT)'
 BUILD_ROOT = '$(BUILD_ROOT)'
+BUILD_ROOT_SHORT = '$B'
+SOURCE_ROOT = '$(SOURCE_ROOT)'
 
 
 # Java modules

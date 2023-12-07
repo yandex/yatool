@@ -742,11 +742,14 @@ class ClasspathClashTestSuite(PyLintTestSuite):
             {('ignore_class:' + i) for i in dart_info.get("IGNORE_CLASSPATH_CLASH", "").split(" ") if i}
         )
         self.strict = "STRICT_CLASSPATH_CLASH" in self.dart_info
-        self.classpath = [
-            os.path.join(consts.BUILD_ROOT, os.path.relpath(item, '$B'))
+
+        paths = [
+            item[len(consts.BUILD_ROOT_SHORT) + 1 :] if item.startswith(consts.BUILD_ROOT_SHORT) else item
             for item in self.dart_info.get('CLASSPATH').split()
         ]
-        self.deps = sorted(set([os.path.relpath(x, consts.BUILD_ROOT) for x in self.classpath]))
+
+        self.classpath = ["{}/{}".format(consts.BUILD_ROOT, p) for p in paths]
+        self.deps = sorted(set(paths))
 
     @classmethod
     def get_type_name(cls):
@@ -770,7 +773,7 @@ class ClasspathClashTestSuite(PyLintTestSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
         cmd = super(ClasspathClashTestSuite, self).get_run_cmd(opts, retry, for_dist_build)
         cmd.append(consts.BUILD_ROOT)
-        cmd += [os.path.relpath(i, consts.BUILD_ROOT) for i in self.classpath]
+        cmd += [x[len(consts.BUILD_ROOT) + 1 :] for x in self.classpath]
         cmd += self.ignored
         if for_dist_build or self.strict:
             cmd.append('--')
