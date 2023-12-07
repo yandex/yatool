@@ -9,11 +9,6 @@ import core.config
 import logging
 import argparse
 
-try:
-    import cProfile as profile
-except ImportError:
-    import profile
-
 import core.error
 import core.respawn
 import core.sig_handler
@@ -23,7 +18,6 @@ from core.yarg import LazyCommand, try_load_handler
 from core.logger import init_logger
 from core.plugin_loader import explore_plugins
 from library.python import mlockall
-from library.python import svn_version
 
 import app
 
@@ -174,6 +168,8 @@ def main(args):
     a, args = p.parse_max(args[1:])
 
     if a.version:
+        from library.python import svn_version
+
         print("\n".join(svn_version.svn_version().split("\n")[:-2]))
         INDENT = "    "
         print(INDENT + "Python version: {}".format(sys.version).replace("\n", ""))
@@ -235,6 +231,12 @@ def main(args):
         )
 
     if a.profile:
-        profile.runctx('do_app()', globals(), locals())
+        # Keep profile modules off the critical path
+        try:
+            import cProfile as profile
+        except ImportError:
+            import profile
+
+        profile.runctx('do_app()', globals(), locals(), sort='cumulative')
     else:
         do_app()
