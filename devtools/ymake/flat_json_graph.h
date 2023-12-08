@@ -63,6 +63,30 @@ namespace NFlatJsonGraph {
             return *this;
         }
 
+        TNodeWriter& AddProp(TStringBuf name, bool val) {
+            JsonWriter.WriteKey(name);
+            JsonWriter.WriteBool(val);
+            return *this;
+        }
+
+        TNodeWriter& AddProp(TStringBuf name, const std::string& val) {
+            JsonWriter.WriteKey(name);
+            JsonWriter.WriteString(val);
+            return *this;
+        }
+
+        TNodeWriter& AddProp(TStringBuf name, i64 val) {
+            JsonWriter.WriteKey(name);
+            JsonWriter.WriteLongLong(val);
+            return *this;
+        }
+
+        TNodeWriter& AddProp(TStringBuf name, ui64 val) {
+            JsonWriter.WriteKey(name);
+            JsonWriter.WriteULongLong(val);
+            return *this;
+        }
+
     private:
         NJsonWriter::TBuf& JsonWriter;
     };
@@ -80,11 +104,11 @@ namespace NFlatJsonGraph {
         TNodeWriter AddNode(TConstDepNodeRef node);
         TNodeWriter AddNode(EMakeNodeType type, ui32 id, TStringBuf name, EIDFormat format);
 
-        void AddLink(TConstDepRef dep);
-        void AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format);
+        TNodeWriter AddLink(TConstDepRef dep);
+        TNodeWriter AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format);
 
     private:
-        void FinishNode();
+        void FinishNode(bool reopen);
         TString CreateComplexId(EMakeNodeType type, ui32 id) const;
 
     private:

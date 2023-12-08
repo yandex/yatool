@@ -537,6 +537,26 @@ public:
         return Graph(node).ToString(*node);
     }
 
+    /// Inplace replacement NodeIds to ElemIds
+    static TVector<ui32> NodeToElemIds(const TDepGraph& graph, TVector<TNodeId>&& nodeIds) {
+        for (auto& nodeId : nodeIds) {
+            // Inplace replacement NodeId to ElemId
+            nodeId = graph.Get(nodeId)->ElemId;
+        }
+        return nodeIds;
+    }
+
+    /// Converting to vector replacement NodeIds to ElemIds
+    template<class TNodeIds>
+    static TVector<ui32> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
+        TVector<ui32> elemIds;
+        elemIds.reserve(nodeIds.size());
+        for (const auto nodeId : nodeIds) {
+            elemIds.emplace_back(graph.Get(nodeId)->ElemId);
+        }
+        return elemIds;
+    }
+
     /// @brief compact edges and nodes: node refs are invalidated
     /// This will only update edges and refs from symbols
     void Compact() {

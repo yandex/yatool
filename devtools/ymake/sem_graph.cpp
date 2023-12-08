@@ -240,7 +240,9 @@ namespace {
                 ModulesStack.pop();
             }
             if (UseFileId(dep.From()->NodeType) && UseFileId(dep.To()->NodeType) && AcceptDep(state)) {
-                JsonWriter.AddLink(dep);
+                auto node = JsonWriter.AddLink(dep);
+                AddExcludeProperty(node, dep);
+                AddIsClosureProperty(node, dep);
             }
         }
 
@@ -259,6 +261,69 @@ namespace {
                 }
             }
             return res;
+        }
+
+        void AddExcludeProperty(NFlatJsonGraph::TNodeWriter node, TConstDepRef dep) {
+            auto excludeNodeIds = ComputeExcludeNodeIds(dep);
+            if (!excludeNodeIds.empty()) {
+                // To dependences attribute name after ':' add info about type ([] - array) and element type (NodeId)
+                // P.S. In sem-graph Id of node is ElemId from dep-graph, that is why typename of element is "NodeId"
+                node.AddProp("Excludes:[NodeId]", TDepGraph::NodeToElemIds(RestoreContext.Graph, excludeNodeIds));
+            }
+        }
+
+        void AddIsClosureProperty(NFlatJsonGraph::TNodeWriter node, TConstDepRef dep) {
+            auto isClosure = ComputeIsClosure(dep);
+            if (isClosure) {
+                node.AddProp("IsClosure:bool", isClosure);
+            }
+        }
+
+        THashSet<TNodeId> ComputeExcludeNodeIds(TConstDepRef dep) {
+            if (!IsDirectPeerdirDep(dep)) {
+                return {};
+            }
+            const TModule* fromMod = RestoreContext.Modules.Get(dep.From()->ElemId);
+            const TModule* toMod = RestoreContext.Modules.Get(dep.To()->ElemId);
+            if (!fromMod->IsDependencyManagementApplied() || !toMod->IsDependencyManagementApplied()) {
+                // Excludes can compute only if both modules under DM
+                return {};
+            }
+            const auto& lists = RestoreContext.Modules.GetNodeListStore();
+            auto toManagedPeersClosureListId = RestoreContext.Modules.GetModuleNodeIds(toMod->GetId()).UniqPeers;
+            const auto& toManagedPeersClosure = lists.GetList(toManagedPeersClosureListId).Data();
+            if (toManagedPeersClosure.empty()) {
+                // Empty closure, nothing can be excluded
+                return {};
+            }
+            THashSet<TNodeId> excludeNodeIds(toManagedPeersClosure.begin(), toManagedPeersClosure.end());
+            auto fromManagedPeersClosureListId = RestoreContext.Modules.GetModuleNodeIds(fromMod->GetId()).UniqPeers;
+            const auto& fromManagedPeersClosure = lists.GetList(fromManagedPeersClosureListId).Data();
+            // Remove from TO (library) managed peers closure all FROM (program) managed peers closure ids
+            // As result, after subtracting sets, we found all nodes for exclude by this dependency
+            for (auto nodeId : fromManagedPeersClosure) {
+                if (auto nodeIt = excludeNodeIds.find(nodeId); nodeIt != excludeNodeIds.end()) {
+                    excludeNodeIds.erase(nodeIt);
+                }
+            }
+            return excludeNodeIds;
+        }
+
+        bool ComputeIsClosure(TConstDepRef dep) {
+            if (!IsDirectPeerdirDep(dep)) {
+                // Managed peers closure added to sem graph as direct peerdirs
+                return false;
+            }
+            const TModule* fromMod = RestoreContext.Modules.Get(dep.From()->ElemId);
+            if (!fromMod->IsDependencyManagementApplied()) {
+                // IsClosure can compute only if FROM module under DM
+                return false;
+            }
+            const auto& lists = RestoreContext.Modules.GetNodeListStore();
+            auto fromManagedDirectPeersListId = RestoreContext.Modules.GetModuleNodeIds(fromMod->GetId()).ManagedDirectPeers;
+            const auto& fromManagedDirectPeersList = lists.GetList(fromManagedDirectPeersListId).Data();
+            // Absent in direct peers, but is IsDirectPeerdirDep (see above) => is closure
+            return Find(fromManagedDirectPeersList, dep.To().Id()) == fromManagedDirectPeersList.end();
         }
 
     private:

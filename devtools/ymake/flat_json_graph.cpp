@@ -14,7 +14,7 @@ namespace NFlatJsonGraph {
     }
 
     TWriter::~TWriter() {
-        FinishNode();
+        FinishNode(false);
         JsonWriter.EndList();
         JsonWriter.EndObject();
     }
@@ -24,9 +24,7 @@ namespace NFlatJsonGraph {
     }
 
     TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, EIDFormat format) {
-        if (std::exchange(UnfinishedNode, true)) {
-            JsonWriter.EndObject();
-        }
+        FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Node");
@@ -39,19 +37,17 @@ namespace NFlatJsonGraph {
         JsonWriter.WriteKey("Name");
         JsonWriter.WriteString(name);
         JsonWriter.WriteKey("NodeType");
-        TStringStream ss;
-        ss << type;
-        JsonWriter.WriteString(ss.Str());
+        JsonWriter.WriteString(TStringBuilder() << type);
 
         return TNodeWriter{JsonWriter};
     }
 
-    void TWriter::AddLink(TConstDepRef dep) {
-        AddLink(dep.From()->ElemId, dep.From()->NodeType, dep.To()->ElemId, dep.To()->NodeType, dep.Value(), EIDFormat::Simple);
+    TNodeWriter TWriter::AddLink(TConstDepRef dep) {
+        return AddLink(dep.From()->ElemId, dep.From()->NodeType, dep.To()->ElemId, dep.To()->NodeType, dep.Value(), EIDFormat::Simple);
     }
 
-    void TWriter::AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format) {
-        FinishNode();
+    TNodeWriter TWriter::AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format) {
+        FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Dep");
@@ -68,14 +64,13 @@ namespace NFlatJsonGraph {
             JsonWriter.WriteInt(toId);
         }
         JsonWriter.WriteKey("DepType");
-        TStringStream ss;
-        ss << type;
-        JsonWriter.WriteString(ss.Str());
-        JsonWriter.EndObject();
+        JsonWriter.WriteString(TStringBuilder() << type);
+
+        return TNodeWriter{JsonWriter};
     }
 
-    void TWriter::FinishNode() {
-        if (std::exchange(UnfinishedNode, false)) {
+    void TWriter::FinishNode(bool reopen) {
+        if (std::exchange(UnfinishedNode, reopen)) {
             JsonWriter.EndObject();
         }
     }
