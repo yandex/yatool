@@ -5,6 +5,7 @@ USE_PYTHON3()
 PEERDIR(
     contrib/libs/yaml-cpp
     contrib/python/PyYAML
+    contrib/python/python-rapidjson
     contrib/python/six
     contrib/libs/fmt
     contrib/libs/re2
