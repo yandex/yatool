@@ -34,6 +34,10 @@ THashSet<fs::path> TSpecBasedGenerator::CollectFilesToCopy() const {
 
 void TSpecBasedGenerator::CopyFiles() {
     THashSet<fs::path> files = CollectFilesToCopy();
+    if (!files.empty() && !ExportFileManager) {
+        spdlog::error("Can't copy files, empty ExportFileManager");
+        return;
+    }
     for (const auto& path : files) {
         ExportFileManager->Copy(GeneratorDir / path, path);
     }

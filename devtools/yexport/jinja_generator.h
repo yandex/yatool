@@ -53,6 +53,8 @@ public:
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
         return TargetReplacements_.ApplyReplacement(path, inputSem);
     }
+
+    void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
 private:
     void Render(ECleanIgnored cleanIgnored) override;
 
@@ -63,7 +65,13 @@ private:
     bool IsExcludeInLibraryClasspath(const std::string& library, const std::string& exclude);
     void AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath);
 
-    void RenderSubdir(const fs::path& subdir, const TJinjaList& data);
+    void RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs);
+
+    jinja2::ValuesMap FinalizeAllAttrs();
+    const jinja2::ValuesMap& FinalizeRootAttrs();
+    jinja2::ValuesMap FinalizeSubdirsAttrs();
+
+    static void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0);
 
     std::string ProjectName;
     fs::path ArcadiaRoot;

@@ -162,6 +162,11 @@ void TCMakeGenerator::RenderPlatform(TPlatform& platform) {
     }
 }
 
+/// Get dump of attributes tree with values for testing
+void TCMakeGenerator::Dump(IOutputStream&) {
+    spdlog::error("Dump of Cmake generator now yet supported");
+}
+
 void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     Conf.CleanIgnored = cleanIgnored;
 

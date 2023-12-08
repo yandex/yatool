@@ -9,6 +9,8 @@
 
 #include <util/stream/file.h>
 
+#include <spdlog/spdlog.h>
+
 #include <fmt/format.h>
 
 namespace NYexport {
@@ -113,6 +115,11 @@ THolder<TPyRequirementsGenerator> TPyRequirementsGenerator::Load(const std::file
 
 void TPyRequirementsGenerator::LoadSemGraph(const std::string&, const fs::path& graph) {
     PyDepsDumpPath_ = graph;
+}
+
+/// Get dump of attributes tree with values for testing
+void TPyRequirementsGenerator::Dump(IOutputStream&) {
+    spdlog::error("Dump of Python generator now yet supported");
 }
 
 void TPyRequirementsGenerator::Render(ECleanIgnored) {

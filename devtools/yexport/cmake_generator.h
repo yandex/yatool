@@ -145,6 +145,8 @@ public:
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
         return TargetReplacements_.ApplyReplacement(path, inputSem);
     }
+
+    void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
 };
 
 }

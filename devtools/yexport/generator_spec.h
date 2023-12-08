@@ -49,7 +49,8 @@ inline const std::string ATTRGROUP_ROOT = "root";       // Root of all targets a
 inline const std::string ATTRGROUP_TARGET = "target";   // Target for generator attribute
 inline const std::string ATTRGROUP_INDUCED = "induced"; // Target for generator induced attribute (add to list for parent node in graph)
 
-inline const std::string LIST_ITEM_TYPE = ".ITEM";      // Magic suffix for set list item type
+inline const std::string LIST_ITEM_TYPE = "-ITEM";      // Magic suffix for set list item type
+inline const char ATTR_DIVIDER = '-';                   // Divider char for tree of attributes
 
 struct TGeneratorSpec {
     TTargetSpec Root;

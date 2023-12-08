@@ -4,6 +4,10 @@
 #include <contrib/libs/toml11/toml/parser.hpp>
 #include <contrib/libs/toml11/toml/value.hpp>
 
+#include <util/generic/set.h>
+
+#include <spdlog/spdlog.h>
+
 #include <fstream>
 
 namespace NYexport {
@@ -107,33 +111,69 @@ namespace {
         return targetSpec;
     }
 
+    std::tuple<std::string, const toml::array*> GetAttrTypeCopy(const toml::value& attrDesc) {
+        std::string attrType;
+        const toml::array* copy;
+        if (attrDesc.is_table()) {
+            const auto& attrTable = attrDesc.as_table();
+            const auto typeIt = attrTable.find(NKeys::Type);
+            attrType = typeIt != attrTable.end() ? typeIt->second.as_string() : "";
+            const auto copyIt = attrTable.find(NKeys::Copy);
+            copy = copyIt != attrTable.end() ? &copyIt->second.as_array() : nullptr;
+        } else {
+            attrType = attrDesc.as_string();
+            copy = nullptr;
+        }
+        return { attrType, copy };
+    }
+
+    void ParseAttr(TAttrsSpec& attrsSpec, const std::string& attrName, const toml::value& attrDesc) {
+        auto [attrType, copy] = GetAttrTypeCopy(attrDesc);
+        EAttrTypes eattrType = EAttrTypes::Unknown;
+        std::string curAttrName = attrName;
+        std::string_view curAttrType = attrType;
+        do {
+            if (!attrsSpec.Items.contains(curAttrName)) { // don't overwrite already defined attributes
+                if (TryFromString(curAttrType, eattrType)) {
+                    attrsSpec.Items[curAttrName].Type = eattrType;
+                }
+                if (eattrType == EAttrTypes::Unknown) {
+                    throw TBadGeneratorSpec(
+                        toml::format_error("[error] invalid attr type", attrDesc, " value must be one of the following data types: " + GetEnumAllNames<EAttrTypes>())
+                    );
+                }
+            } else if (curAttrName.size() != attrName.size() // upper attribute
+                        && attrsSpec.Items[curAttrName].Type != EAttrTypes::Dict) { // must be dict
+                throw TBadGeneratorSpec(
+                    toml::format_error("[error] invalid upper attr " + curAttrName + " type", attrDesc, " upper attr type must be dict")
+                );
+            }
+            if (copy) { // append copy values to current attribute spec
+                auto& attrCopy = attrsSpec.Items[curAttrName].Copy;
+                for (const auto& copyItem : *copy) {
+                    if (copyItem.is_string()) {
+                        attrCopy.insert(fs::path{std::string(copyItem.as_string())});
+                    } else {
+                        throw TBadGeneratorSpec(
+                            toml::format_error("[error] invalid copy item value", copyItem, " each copy item must be string")
+                        );
+                    }
+                }
+            }
+            // Search attribute divider in attribute name
+            if (auto divPos = curAttrName.rfind(ATTR_DIVIDER); divPos == std::string::npos) {
+                break;
+            } else {
+                curAttrName = curAttrName.substr(0, divPos);
+                curAttrType = "dict"; // all upper attributes are dicts (if not predefined another)
+            }
+        } while (true);
+    }
+
     TAttrsSpec ParseAttrsSpec(const toml::value& attrs) {
         TAttrsSpec attrsSpec;
         for (const auto& item : attrs.as_table()) {
-            EAttrTypes value = EAttrTypes::Unknown;
-            if (item.second.is_table()) {
-                const auto& table = item.second.as_table();
-                const auto typeIt = table.find(NKeys::Type);
-                if (typeIt != table.end()) {
-                    if (TryFromString(typeIt->second.as_string(), value)) {
-                        attrsSpec.Items[item.first].Type = value;
-                    }
-                }
-                const auto copyIt = table.find(NKeys::Copy);
-                if (copyIt != table.end()) {
-                    for (const auto& arrayItem : copyIt->second.as_array()) {
-                        if (arrayItem.is_string()) {
-                            attrsSpec.Items[item.first].Copy.insert(fs::path{std::string(arrayItem.as_string())});
-                        }
-                    }
-                }
-            } else if (TryFromString(item.second.as_string(), value)) {
-                attrsSpec.Items[item.first].Type = value;
-            }
-            if (value == EAttrTypes::Unknown) {
-                throw TBadGeneratorSpec(toml::format_error("[error] invalid attrs value", toml::find(attrs, item.first),
-            " value must be one of the following data types: " + GetEnumAllNames<EAttrTypes>()));
-            }
+            ParseAttr(attrsSpec, item.first, item.second);
         }
         return attrsSpec;
     }
@@ -190,9 +230,45 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
         if (inducedIt != attrs.end()) {
             auto [targetIt, targetInserted] = attrs.emplace(ATTRGROUP_TARGET, TAttrsSpec{});
             auto& targetItems = targetIt->second.Items;
-            for (const auto& [attrMacro, attrSpec]: inducedIt->second.Items) {
-                targetItems[attrMacro] = TAttrsSpecValue{ .Type = EAttrTypes::List }; // induced attributes are always list in target attributes
-                targetItems[attrMacro + LIST_ITEM_TYPE] = attrSpec; // type of list item is taken from induced definition
+            for (const auto& [attrName, attrSpec]: inducedIt->second.Items) {
+                std::string upperAttrName;
+                auto lastDivPos = attrName.find(ATTR_DIVIDER);
+                const auto& targetAttrName = lastDivPos != std::string::npos ? (upperAttrName = attrName.substr(0, lastDivPos)) : attrName;
+                auto targetAttrNameIt = targetItems.find(targetAttrName);
+                if (targetAttrNameIt == targetItems.end()) {
+                    targetItems[targetAttrName] = TAttrsSpecValue{ .Type = EAttrTypes::List }; // induced attributes are always list in target attributes
+                } else {
+                    auto& targetAttrSpec = targetAttrNameIt->second;
+                    if (targetAttrSpec.Type != EAttrTypes::List) {
+                        spdlog::error("non-list induced attribute found {} of type {}, set to list", targetAttrName, (int)targetAttrSpec.Type);
+                        targetAttrSpec.Type = EAttrTypes::List;
+                    }
+                }
+
+                TAttrsSpecValue upperAttrSpec;
+                if (lastDivPos != std::string::npos) {
+                    upperAttrSpec = attrSpec;
+                    upperAttrSpec.Type = EAttrTypes::Dict;
+                }
+                const auto& targetAttrItemSpec = lastDivPos != std::string::npos ? upperAttrSpec : attrSpec;
+                auto targetAttrItem = targetAttrName + LIST_ITEM_TYPE;
+                auto targetAttrItemIt = targetItems.find(targetAttrItem);
+                if (targetAttrItemIt == targetItems.end()) {
+                    targetItems[targetAttrItem] = targetAttrItemSpec; // type of list item
+                } else {
+                    auto& curTargetAttrItemSpec = targetAttrItemIt->second;
+                    if (curTargetAttrItemSpec.Type != targetAttrItemSpec.Type) {
+                        spdlog::error("induced attribute item {} type {}, overwritten to {}", targetAttrItem, (int)curTargetAttrItemSpec.Type, (int)targetAttrItemSpec.Type);
+                        curTargetAttrItemSpec.Type = targetAttrItemSpec.Type;
+                    }
+                    if (curTargetAttrItemSpec.Copy.empty()) {
+                        curTargetAttrItemSpec.Copy = targetAttrItemSpec.Copy;
+                    } else if (!targetAttrItemSpec.Copy.empty()) { // merge sets
+                        for (const auto& copyItem : targetAttrItemSpec.Copy) {
+                            curTargetAttrItemSpec.Copy.emplace(copyItem);
+                        }
+                    }
+                }
             }
         }
 

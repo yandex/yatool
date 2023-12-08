@@ -34,6 +34,7 @@ void TYexportGenerator::RenderTo(const fs::path& exportRoot, ECleanIgnored clean
     };
     Render(cleanIgnored);
 }
+
 TExportFileManager* TYexportGenerator::GetExportFileManager(){
     return ExportFileManager.Get();
 }

@@ -56,6 +56,7 @@ public:
 
     void Render(IInputStream& pyDepsDump, IOutputStream& dest) const;
 
+    void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
 private:
     void Render(ECleanIgnored cleanIgnored) override;
 

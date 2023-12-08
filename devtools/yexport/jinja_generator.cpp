@@ -64,7 +64,7 @@ public:
             spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrMacro, nodePath);
             return false;
         }
-        auto [listAttrIt, inserted] = CurTarget->JinjaAttrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto [listAttrIt, _] = CurTarget->JinjaAttrs.emplace(attrMacro, jinja2::ValuesList{});
         if (value.isList()) {
             // Never create list of lists, if value also list, concat all lists to one big list
             for (const auto& v: value.asList()) {
@@ -162,8 +162,20 @@ public:
         return Project->ApplyReplacement(path, inputSem);
     }
 
+    std::tuple<std::string, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs) {
+        auto upperAttrName = attrNameWithDividers.substr(0, lastDivPos); // current attr for tree
+        // Parse upperAttrName for all tree levels
+        while ((lastDivPos = upperAttrName.rfind(ATTR_DIVIDER)) != std::string::npos) {
+            jinja2::ValuesMap upJinjaAttrs;
+            upJinjaAttrs.emplace(upperAttrName.substr(lastDivPos + 1), std::move(treeJinjaAttrs));
+            treeJinjaAttrs = std::move(upJinjaAttrs);
+            upperAttrName = upperAttrName.substr(0, lastDivPos);
+        }
+        return {upperAttrName, treeJinjaAttrs};
+    }
+
     template<IterableValues Values>
-    bool SetAttrValue(jinja2::ValuesMap& JinjaAttrs, const std::string& attrGroup, const std::string& attrMacro, const Values& values, const std::string& nodePath) {
+    bool SetAttrValue(jinja2::ValuesMap& jinjaAttrs, const std::string& attrGroup, const std::string& attrMacro, const Values& values, const std::string& nodePath) {
         jinja2::ValuesList jvalues;
         const jinja2::ValuesList* valuesPtr;
         if constexpr(std::same_as<Values, jinja2::ValuesList>) {
@@ -174,19 +186,47 @@ public:
         }
         auto attrType = Project->GetAttrType(attrGroup, attrMacro);
         Y_ASSERT(attrType != EAttrTypes::Unknown);
+        // If attrName has attribute divider use temp treeJinjaAttrs for set attr
+        auto lastDivPos = attrMacro.rfind(ATTR_DIVIDER);
+        jinja2::ValuesMap tempJinjaAttrs;
+        std::string treeAttrName;
+        jinja2::ValuesMap& setJinjaAttrs = lastDivPos == std::string::npos ? jinjaAttrs : tempJinjaAttrs;
+        const std::string& setAttrName = lastDivPos == std::string::npos ? attrMacro : attrMacro.substr(lastDivPos + 1);
+        bool r = false;
         switch (attrType) {
-            case EAttrTypes::Str: return SetStrAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Bool: return SetBoolAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Flag: return SetFlagAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::List: return AppendToListAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Set: return AppendToSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::SortedSet: return AppendToSortedSetAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            case EAttrTypes::Dict: return AppendToDictAttr(JinjaAttrs, attrMacro, *valuesPtr, nodePath);
-            default:{
+            case EAttrTypes::Str:
+                r = SetStrAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::Bool:
+                r = SetBoolAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::Flag:
+                r = SetFlagAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::List:
+                r = AppendToListAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::Set:
+                r = AppendToSetAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::SortedSet:
+                r = AppendToSortedSetAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            case EAttrTypes::Dict:
+                r = AppendToDictAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
+                break;
+            default:
                 spdlog::error("Unknown attribute {} type at node {}", attrMacro, nodePath);
-                return false;
-            };
         }
+        if (!r || lastDivPos == std::string::npos) {
+            return r;
+        }
+
+        // Convert attrName with dividers to upperAttrName and tree of attributes base on ValuesMap
+        auto [upperAttrName, treeJinjaAttrs] = MakeTreeJinjaAttrs(attrMacro, lastDivPos, std::move(tempJinjaAttrs));
+        // Merge result tree attrubutes to jinjaAttrs
+        MergeTreeToAttr(jinjaAttrs, upperAttrName, treeJinjaAttrs);
+        return true;
     }
 
 private:
@@ -224,7 +264,7 @@ private:
     }
 
     bool AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
         auto& attr = attrIt->second.asList();
         for (const auto& value : values) {
             attr.emplace_back(value);
@@ -233,7 +273,7 @@ private:
     }
 
     bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
         auto& attr = attrIt->second.asList();
         std::set<std::string> set;
         if (!attr.empty()) {
@@ -254,7 +294,7 @@ private:
 
     bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
         bool r = true;
-        auto [attrIt, inserted] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
+        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
         auto& attr = attrIt->second.asMap();
         for (const auto& value : values) {
             auto keyval = std::string_view(value.asString());
@@ -266,6 +306,25 @@ private:
             }
         }
         return r;
+    }
+
+    void MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesMap& tree) {
+        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
+        MergeTree(attrIt->second.asMap(), tree);
+    }
+
+    void MergeTree(jinja2::ValuesMap& attr, const jinja2::ValuesMap& tree) {
+        for (auto& [attrName, attrValue]: tree) {
+            if (attrValue.isMap()) {
+                auto [attrIt, _] = attr.emplace(attrName, jinja2::ValuesMap{});
+                MergeTree(attrIt->second.asMap(), attrValue.asMap());
+            } else {
+                if (attr.contains(attrName)) {
+                    spdlog::error("overwrite dict element {}", attrName);
+                }
+                attr[attrName] = attrValue;
+            }
+        }
     }
 };
 
@@ -400,7 +459,7 @@ public:
             const auto semNameType = semNameIt == SemName2Type_.end() ? ESNT_Unknown : semNameIt->second;
             const auto semArgs = std::span{sem}.subspan(1);
 
-            if (semName == "consumer_classpath" && !semArgs.empty()) {
+            if (semName == "consumer-classpath" && !semArgs.empty()) {
                 nodeCoords = semArgs[0];
             } else if (semName == "peers_closure") {
                 peersClosure = semArgs;
@@ -478,7 +537,7 @@ private:
 
     template<IterableValues Values>
     void StoreInducedAttrValues(TNodeId nodeId, const std::string& attrMacro, const Values& values, const std::string& nodePath) {
-        auto [nodeIt, inserted] = InducedAttrs_.emplace(nodeId, jinja2::ValuesMap{});
+        auto [nodeIt, _] = InducedAttrs_.emplace(nodeId, jinja2::ValuesMap{});
         ProjectBuilder.SetInducedAttr(nodeIt->second, attrMacro, values, nodePath);
     }
 };
@@ -559,24 +618,30 @@ EAttrTypes TJinjaGenerator::GetAttrType(const std::string& attrGroup, const std:
     return EAttrTypes::Unknown;
 }
 
-void TJinjaGenerator::Render(ECleanIgnored)
-{
+/// Get dump of attributes tree with values for testing
+void TJinjaGenerator::Dump(IOutputStream& out) {
+    Dump(out, FinalizeAllAttrs());
+}
+
+void TJinjaGenerator::Render(ECleanIgnored) {
     CopyFiles();
-    // Render subdir lists and collect information for root list
-    auto [subdirsIt, subdirsInserted] = JinjaAttrs.emplace("subdirs", jinja2::ValuesList{});
-    for (const auto* subdir: SubdirsOrder) {
-        subdirsIt->second.asList().emplace_back(std::string(subdir->first.c_str()));
-        RenderSubdir(subdir->first, subdir->second);
+
+    const auto& rootAttrs = FinalizeRootAttrs();
+    auto subdirsAttrs = FinalizeSubdirsAttrs();
+    for (const auto* subdirItem: SubdirsOrder) {
+        const auto& subdir = subdirItem->first;
+        RenderSubdir(subdir, subdirsAttrs[subdir.c_str()].asMap());
     }
 
-    JinjaAttrs.emplace("arcadiaRoot", ArcadiaRoot);
-    JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
-    JinjaAttrs.emplace("projectName", ProjectName);
     const auto& tmpls = GeneratorSpec.Root.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++) {
         const auto& tmpl = tmpls[templateIndex];
         //TODO: change name of result file
-        jinja2::Result<TString> result = Templates[templateIndex].RenderAsString(std::as_const(JinjaAttrs));
+        jinja2::Result<TString> result = Templates[templateIndex].RenderAsString(rootAttrs);
+        if (!ExportFileManager) {
+            spdlog::error("Can't save render result to {}, empty ExportFileManager", tmpl.ResultName);
+            continue;
+        }
         if (result.has_value()) {
             auto out = ExportFileManager->Open(tmpl.ResultName);
             TString renderResult = result.value();
@@ -588,9 +653,9 @@ void TJinjaGenerator::Render(ECleanIgnored)
 }
 
 void TJinjaGenerator::AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath) {
-    if (targetMap.contains("consumer_classpath") && targetMap.contains("excludes_rules")) {
+    if (targetMap.contains("consumer-classpath") && targetMap.contains("excludes_rules")) {
         targetMap.emplace("lib_excludes", jinja2::ValuesMap{});
-        for (const auto& library: targetMap["consumer_classpath"].asList()) {
+        for (const auto& library: targetMap["consumer-classpath"].asList()) {
             jinja2::ValuesList libraryExcludes;
             const auto& strLibrary = library.asString();
 
@@ -623,46 +688,22 @@ void TJinjaGenerator::AddExcludesToTarget(const TJinjaTarget* target, jinja2::Va
     }
 }
 
-void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const TJinjaList &data) {
-    const auto& tmpls = GeneratorSpec.Targets.begin()->second.Templates;
-
-    THashMap<std::string, jinja2::ValuesMap> paramsByTarget;
-
-    for (auto* target: data.Targets) {
-        auto& jinjaAttrs = target->JinjaAttrs;
-        jinjaAttrs.emplace("name", target->Name);
-        jinjaAttrs.emplace("macro", target->Macro);
-        jinjaAttrs.emplace("isTest", target->isTest);
-        jinjaAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
-
-        AddExcludesToTarget(target, jinjaAttrs, ExportFileManager->GetExportRoot() / subdir / "*");
-
-        auto paramsByTargetIter = paramsByTarget.find(target->Macro);
-        if (paramsByTargetIter == paramsByTarget.end()) {
-            jinja2::ValuesMap defaultTargetParams;
-            defaultTargetParams.emplace("arcadiaRoot", ArcadiaRoot);
-            defaultTargetParams.emplace("exportRoot", ExportFileManager->GetExportRoot());
-            defaultTargetParams.emplace("hasTest", false);
-            defaultTargetParams.emplace("targets", jinja2::ValuesList{});
-            paramsByTargetIter = paramsByTarget.emplace(target->Macro, std::move(defaultTargetParams)).first;
-        }
-
-        if (target->isTest) {
-            paramsByTargetIter->second.emplace("hasTest", true);
-        }
-        paramsByTargetIter->second["targets"].asList().push_back(jinjaAttrs);
-    }
-
+void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs) {
     TemplateFs->SetRootFolder((ArcadiaRoot/subdir).string());
-
+    const auto& tmpls = GeneratorSpec.Targets.begin()->second.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++){
         const auto& tmpl = tmpls[templateIndex];
 
         auto outPath = subdir / tmpl.ResultName;
+
+        if (!ExportFileManager) {
+            spdlog::error("Can't save render result to {}, empty ExportFileManager", outPath.c_str());
+            continue;
+        }
         auto out = ExportFileManager->Open(outPath);
 
-        for (auto& [targetName, params] : paramsByTarget) {
-            jinja2::Result<TString> result = TargetTemplates[targetName][templateIndex].RenderAsString(std::as_const(params));
+        for (const auto& [targetName, targetNameAttrs] : subdirAttrs) {
+            jinja2::Result<TString> result = TargetTemplates[targetName][templateIndex].RenderAsString(targetNameAttrs.asMap());
             if (result.has_value()) {
                 TString renderResult = result.value();
                 out.Write(renderResult.data(), renderResult.size());
@@ -681,6 +722,95 @@ THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() c
         res.emplace(subdir->first, targets);
     }
     return res;
+}
+
+jinja2::ValuesMap TJinjaGenerator::FinalizeAllAttrs() {
+    jinja2::ValuesMap allAttrs;
+    allAttrs.emplace("root", FinalizeRootAttrs());
+    allAttrs.emplace("subdirs", FinalizeSubdirsAttrs());
+    return allAttrs;
+}
+
+const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
+    if (JinjaAttrs.contains("projectName")) { // already finilized
+        return JinjaAttrs;
+    }
+    auto [subdirsIt, subdirsInserted] = JinjaAttrs.emplace("subdirs", jinja2::ValuesList{});
+    for (const auto* subdir: SubdirsOrder) {
+        subdirsIt->second.asList().emplace_back(subdir->first.c_str());
+    }
+    JinjaAttrs.emplace("arcadiaRoot", ArcadiaRoot);
+    if (ExportFileManager) {
+        JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
+    }
+    JinjaAttrs.emplace("projectName", ProjectName);
+    return JinjaAttrs;
+}
+
+jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
+    jinja2::ValuesMap subdirsAttrs;
+    for (const auto* subdirItem: SubdirsOrder) {
+        const auto& subdir = subdirItem->first;
+        auto& subdirData = subdirItem->second;
+        auto [subdirIt, _] = subdirsAttrs.emplace(subdir.c_str(), jinja2::ValuesMap{});
+        jinja2::ValuesMap& subdirAttrs = subdirIt->second.asMap();
+        for (auto* target: subdirData.Targets) {
+            auto& targetAttrs = target->JinjaAttrs;
+            targetAttrs.emplace("name", target->Name);
+            targetAttrs.emplace("macro", target->Macro);
+            targetAttrs.emplace("isTest", target->isTest);
+            targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
+
+            AddExcludesToTarget(target, targetAttrs, (ExportFileManager ? ExportFileManager->GetExportRoot() : fs::path{}) / subdir / "*");
+
+            auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
+            if (targetNameAttrsIt == subdirAttrs.end()) {
+                jinja2::ValuesMap defaultTargetParams;
+                defaultTargetParams.emplace("arcadiaRoot", ArcadiaRoot);
+                if (ExportFileManager) {
+                    defaultTargetParams.emplace("exportRoot", ExportFileManager->GetExportRoot());
+                }
+                defaultTargetParams.emplace("hasTest", false);
+                defaultTargetParams.emplace("targets", jinja2::ValuesList{});
+                targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetParams)).first;
+            }
+            auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
+            if (target->isTest) {
+                targetNameAttrs.emplace("hasTest", true);
+            }
+            targetNameAttrs["targets"].asList().emplace_back(targetAttrs);
+        }
+    }
+    return subdirsAttrs;
+}
+
+static std::string Indent(int depth) {
+    return std::string(depth * 4, ' ');
+}
+
+void TJinjaGenerator::Dump(IOutputStream& out, const jinja2::Value& value, int depth) {
+    if (value.isMap()) {
+        out << "{\n";
+        for (const auto& [key, val] : value.asMap()) {
+            out << Indent(depth + 1) << key << ": ";
+            Dump(out, val, depth + 1);
+        }
+        out << Indent(depth) << "}";
+    } else if (value.isList()) {
+        out << "[\n";
+        for (const auto& val : value.asList()) {
+            out << Indent(depth + 1);
+            Dump(out, val, depth + 1);
+        }
+        out << Indent(depth) << "]";
+    }  else if (value.isString()) {
+        out << '"' << value.asString() << '"';
+    } else if (value.isEmpty()) {
+        out << "EMPTY";
+    } else {
+        out << (value.get<bool>() ? "true" : "false");
+    }
+    out << ",\n";
 }
 
 }
