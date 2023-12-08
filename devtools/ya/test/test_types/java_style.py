@@ -18,6 +18,9 @@ import yalibrary.graph.base as graph_base
 logger = logging.getLogger(__name__)
 
 
+KTLINT_TEST_TYPE = "ktlint"
+
+
 class JavaStyleTestSuite(test_types.StyleTestSuite):
     JSTYLE_MIGRATIONS_FILE = "build/rules/jstyle/migrations.yaml"
 
@@ -59,8 +62,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
     def get_type_name(cls):
         return "jstyle"
 
-    @classmethod
-    def get_type(cls):
+    def get_type(self):
         return "java.style"
 
     @property
@@ -140,6 +142,9 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
     @property
     def supports_canonization(self):
+        return False
+
+    def support_retries(self):
         return False
 
     @classmethod
@@ -233,7 +238,10 @@ class KtlintTestSuite(LintTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "ktlint"
+        return KTLINT_TEST_TYPE
+
+    def get_type(self):
+        return KTLINT_TEST_TYPE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']

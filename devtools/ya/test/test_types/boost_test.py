@@ -9,6 +9,9 @@ from test.system import process
 from test.test_types import common as common_types
 
 
+BOOST_TEST_TYPE = "boost_test"
+
+
 class BoostTestSuite(common_types.AbstractTestSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -47,7 +50,10 @@ class BoostTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "boost_test"
+        return BOOST_TEST_TYPE
+
+    def get_type(self):
+        return BOOST_TEST_TYPE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']
@@ -78,3 +84,6 @@ class BoostTestSuite(common_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
         return ["SIGUSR2"]
+
+    def support_retries(self):
+        return True

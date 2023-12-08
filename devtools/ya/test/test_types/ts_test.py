@@ -11,6 +11,10 @@ from jbuild.gen import consts
 logger = logging.getLogger(__name__)
 
 
+JEST_TEST_TYPE = "jest"
+HERMIONE_TEST_TYPE = "hermione"
+
+
 class BaseTestSuite(common_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
@@ -19,6 +23,9 @@ class BaseTestSuite(common_types.AbstractTestSuite):
     @property
     def supports_clean_environment(self):
         return False
+
+    def support_retries(self):
+        return True
 
     @property
     def test_for_path(self):
@@ -73,7 +80,10 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 class JestTestSuite(BaseTestSuite):
     @classmethod
     def get_type_name(cls):
-        return "jest"
+        return JEST_TEST_TYPE
+
+    def get_type(self):
+        return JEST_TEST_TYPE
 
     def support_splitting(self, opts=None):
         # TODO: Implement (https://st.yandex-team.ru/FEI-25459)
@@ -113,7 +123,10 @@ class JestTestSuite(BaseTestSuite):
 class HermioneTestSuite(BaseTestSuite):
     @classmethod
     def get_type_name(cls):
-        return "hermione"
+        return HERMIONE_TEST_TYPE
+
+    def get_type(self):
+        return HERMIONE_TEST_TYPE
 
     def support_splitting(self, opts=None):
         return True
@@ -167,9 +180,15 @@ class EslintTestSuite(common_types.AbstractTestSuite):
     def get_type_name(cls):
         return 'eslint'
 
+    def get_type(self):
+        return 'eslint'
+
     @classmethod
     def get_ci_type_name(cls):
         return 'style'
+
+    def support_retries(self):
+        return False
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return []

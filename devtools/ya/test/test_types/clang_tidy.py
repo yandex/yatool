@@ -6,6 +6,9 @@ from test import common as test_common
 from test.test_types import common as common_types
 
 
+CLANG_TIDY_TEST_TYPE = "clang_tidy"
+
+
 class ClangTidySuite(common_types.AbstractTestSuite):
     def __init__(self, *args, **kwargs):
         super(ClangTidySuite, self).__init__(*args, **kwargs)
@@ -62,6 +65,9 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         """
         return False
 
+    def support_retries(self):
+        return False
+
     @classmethod
     def get_ci_type_name(self):
         return "style"
@@ -109,11 +115,10 @@ class ClangTidySuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "clang_tidy"
+        return CLANG_TIDY_TEST_TYPE
 
-    @classmethod
-    def get_type(cls):
-        return "clang_tidy"
+    def get_type(self):
+        return CLANG_TIDY_TEST_TYPE
 
     def global_tidy_library(self):
         library_path = self.dart_info["GLOBAL-LIBRARY-PATH"].replace("$B", "$(BUILD_ROOT)")

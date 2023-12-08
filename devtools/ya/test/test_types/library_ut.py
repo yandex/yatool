@@ -9,6 +9,9 @@ from test.test_types import common as common_types
 from test.util import tools, shared
 
 
+UNITTEST_TYPE = "unittest"
+
+
 class UnitTestSuite(common_types.AbstractTestSuite):
     def support_splitting(self, opts=None):
         """
@@ -20,6 +23,9 @@ class UnitTestSuite(common_types.AbstractTestSuite):
         """
         Does test suite support list_node before test run
         """
+        return True
+
+    def support_retries(self):
         return True
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
@@ -106,12 +112,15 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "unittest"
+        return UNITTEST_TYPE
+
+    def get_type(self):
+        return UNITTEST_TYPE
 
     # TODO remove property when dartinfo's TEST-NAME will be 'unittest' for library_ut
     @property
     def name(self):
-        return "unittest"
+        return UNITTEST_TYPE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         test_work_dir = test_common.get_test_suite_work_dir(

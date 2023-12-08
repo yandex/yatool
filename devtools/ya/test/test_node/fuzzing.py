@@ -34,7 +34,7 @@ def inject_fuzz_postprocess_nodes(arc_root, graph, suites, opts):
     upload_nodes = []
     outputs = []
     for suite in suites:
-        if suite.get_type() != fuzz_test.FuzzTestSuite.get_type():
+        if suite.get_type() != fuzz_test.FUZZ_TEST_TYPE:
             continue
 
         output_file = suite.work_dir(test.const.GENERATED_CORPUS_DIR_NAME + ".tar")

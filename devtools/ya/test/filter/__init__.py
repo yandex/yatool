@@ -92,14 +92,12 @@ def filter_suite_type(type_filters):
         include, exclude = parse_simple_set_op_notation(get_test_type_regex(), type_filters)
 
         def filter_function(test_suite):
-            suite_types = {test_suite.get_type()}
-            if isinstance(test_suite, common_suites.WrappingTestSuite):
-                suite_types.add(test_suite.get_wrapped_type())
+            suite_type = test_suite.get_type()
             fit = True
             if include:
-                fit = suite_types & include
+                fit = suite_type in include
             if fit and exclude:
-                fit = not (suite_types & exclude)
+                fit = suite_type not in exclude
             return fit
 
         return filter_function

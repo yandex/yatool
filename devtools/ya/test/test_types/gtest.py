@@ -1,6 +1,9 @@
 from test.test_types import library_ut
 
 
+GTEST_TYPE = "gtest"
+
+
 class GUnitTestSuite(library_ut.UnitTestSuite):
     """
     GTEST fully supports UNITTESTS's interface.
@@ -8,8 +11,11 @@ class GUnitTestSuite(library_ut.UnitTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "gtest"
+        return GTEST_TYPE
+
+    def get_type(self):
+        return GTEST_TYPE
 
     @property
     def name(self):
-        return "gtest"
+        return GTEST_TYPE

@@ -20,6 +20,14 @@ import test.util.tools
 logger = logging.getLogger(__name__)
 
 
+PYTEST_TYPE = "pytest"
+EXEC_TEST_TYPE = "exectest"
+IMPORT_TEST_TYPE = "import_test"
+GOFMT_TEST_TYPE = "gofmt"
+GOVET_TEST_TYPE = "govet"
+CLASSPATH_CLASH_TYPE = "classpath.clash"
+
+
 class PyTestSuite(common.PythonTestSuite):
     """
     Support for pytest framework http://pytest.org/
@@ -42,6 +50,9 @@ class PyTestSuite(common.PythonTestSuite):
         """
         Does test suite support list_node before test run
         """
+        return True
+
+    def support_retries(self):
         return True
 
     def get_test_files(self, opts=None):
@@ -73,7 +84,10 @@ class PyTestSuite(common.PythonTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "pytest"
+        return PYTEST_TYPE
+
+    def get_type(self):
+        return PYTEST_TYPE
 
     @staticmethod
     def _get_ini_file_path():
@@ -314,8 +328,7 @@ class PyTestScriptSuite(PyTestSuite):
             paths.insert(0, os.path.join(arc_root, *path))
         return paths
 
-    @classmethod
-    def get_type(cls):
+    def get_type(self):
         return "pytest_script"
 
     @property
@@ -325,6 +338,9 @@ class PyTestScriptSuite(PyTestSuite):
     @property
     def supports_allure(self):
         return True
+
+    def support_retries(self):
+        return False
 
 
 class PyTestBinSuite(PyTestSuite):
@@ -382,9 +398,8 @@ class PyTestBinSuite(PyTestSuite):
     def get_type_name(cls):
         return "pytest.bin"
 
-    @classmethod
-    def get_type(cls):
-        return "pytest"
+    def get_type(self):
+        return PYTEST_TYPE
 
     @classmethod
     def list(cls, cmd, cwd):
@@ -425,23 +440,21 @@ class Py3TestBinSuite(PyTestBinSuite):
     def get_type_name(cls):
         return "py3test.bin"
 
-    @classmethod
-    def get_type(cls):
+    def get_type(self):
         return "py3test"
 
 
 class ExecTest(PyTestBinSuite):
     @classmethod
     def get_type_name(cls):
-        return "exectest"
+        return EXEC_TEST_TYPE
 
-    @classmethod
-    def get_type(cls):
-        return "exectest"
+    def get_type(self):
+        return EXEC_TEST_TYPE
 
     @property
     def name(self):
-        return self.get_type_name()
+        return EXEC_TEST_TYPE
 
     @property
     def supports_fork_test_files(self):
@@ -473,6 +486,9 @@ class LintTestSuite(common.StyleTestSuite):
     def get_suite_files(self):
         files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.dart_info.get("FILES", []) if _f]]
         return sorted(files)
+
+    def support_retries(self):
+        return False
 
     @classmethod
     def get_ci_type_name(cls):
@@ -589,7 +605,7 @@ class PyLintTestSuite(LintTestSuite):
         return None
 
     def get_computed_test_names(self, opts):
-        typename = self.get_type_name()
+        typename = self.get_type()
         return ["{}::{}".format(os.path.basename(filename), typename) for filename in self._get_files()]
 
     @property
@@ -628,11 +644,14 @@ class CheckImportsTestSuite(PyLintTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "import_test"
+        return IMPORT_TEST_TYPE
+
+    def get_type(self):
+        return IMPORT_TEST_TYPE
 
     @property
     def name(self):
-        return self.get_type_name()
+        return IMPORT_TEST_TYPE
 
     def setup_environment(self, env, opts):
         """
@@ -644,8 +663,7 @@ class CheckImportsTestSuite(PyLintTestSuite):
     def setup_pythonpath_env(self):
         return False
 
-    @classmethod
-    def support_retries(cls):
+    def support_retries(self):
         return False
 
     @property
@@ -656,7 +674,10 @@ class CheckImportsTestSuite(PyLintTestSuite):
 class GoFmtTestSuite(PyLintTestSuite):
     @classmethod
     def get_type_name(cls):
-        return 'gofmt'
+        return GOFMT_TEST_TYPE
+
+    def get_type(self):
+        return GOFMT_TEST_TYPE
 
     def get_test_dependencies(self):
         return []
@@ -709,7 +730,10 @@ class GoFmtTestSuite(PyLintTestSuite):
 class GoVetTestSuite(PyLintTestSuite):
     @classmethod
     def get_type_name(cls):
-        return 'govet'
+        return GOVET_TEST_TYPE
+
+    def get_type(self):
+        return GOVET_TEST_TYPE
 
     def get_test_dependencies(self):
         return [self.project_path]
@@ -753,7 +777,10 @@ class ClasspathClashTestSuite(PyLintTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return 'classpath.clash'
+        return CLASSPATH_CLASH_TYPE
+
+    def get_type(self):
+        return CLASSPATH_CLASH_TYPE
 
     @property
     def name(self):

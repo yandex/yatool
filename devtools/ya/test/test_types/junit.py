@@ -25,6 +25,9 @@ import yalibrary.graph.base as graph_base
 logger = logging.getLogger(__name__)
 
 
+JAVA_TEST_TYPE = "java"
+
+
 def strip_root(s):
     return s[3:]
 
@@ -147,6 +150,9 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         """
         return True
 
+    def support_retries(self):
+        return True
+
     @property
     def supports_allure(self):
         return True
@@ -163,9 +169,8 @@ class JavaTestSuite(test_types.AbstractTestSuite):
     def get_type_name(cls):
         return "junit"
 
-    @classmethod
-    def get_type(cls):
-        return "java"
+    def get_type(self):
+        return JAVA_TEST_TYPE
 
     def get_test_dependencies(self):
         assert self.initialized

@@ -1,6 +1,10 @@
 from test.test_types import py_test
 
 
+VALIDATE_RESOURCE_TEST_TYPE = "validate_resource"
+VALIDATE_DATA_SBR_TEST_TYPE = "validate_data_sbr"
+
+
 class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
     @classmethod
     def get_ci_type_name(cls):
@@ -8,7 +12,14 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return 'validate_resource'
+        return VALIDATE_RESOURCE_TEST_TYPE
+
+    def get_type(self):
+        return VALIDATE_RESOURCE_TEST_TYPE
+
+    @property
+    def name(self):
+        return VALIDATE_RESOURCE_TEST_TYPE
 
     @classmethod
     def is_batch(cls):
@@ -21,7 +32,7 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
         return req
 
     def get_computed_test_names(self, opts):
-        return ["{}::{}".format(self.test_project_filename, self.get_type_name())]
+        return ["{}::{}".format(self.test_project_filename, self.get_type())]
 
     def batch_name(self):
         return self.test_project_filename
@@ -48,24 +59,23 @@ class CheckResourceTestSuite(ExtResourceAbstractSuite):
 
         return ' '.join(cmd)
 
-    @property
-    def name(self):
-        return self.get_type_name()
-
 
 class CheckDataSbrTestSuite(CheckResourceTestSuite):
     @classmethod
     def get_type_name(cls):
-        return "validate_data_sbr"
+        return VALIDATE_DATA_SBR_TEST_TYPE
+
+    def get_type(self):
+        return VALIDATE_DATA_SBR_TEST_TYPE
+
+    @property
+    def name(self):
+        return VALIDATE_DATA_SBR_TEST_TYPE
 
 
 class CheckMDSTestSuite(ExtResourceAbstractSuite):
     def get_checker(self, opts, dist_build, out_path):
         return "check_mds"
-
-    @property
-    def name(self):
-        return self.get_type_name()
 
 
 class CheckExternalTestSuite(ExtResourceAbstractSuite):
@@ -74,7 +84,3 @@ class CheckExternalTestSuite(ExtResourceAbstractSuite):
 
     def get_test_related_paths(self, source_root, opts):
         return ["{}/{}/{}".format(source_root, self.project_path, x) for x in self._get_files()]
-
-    @property
-    def name(self):
-        return self.get_type_name()

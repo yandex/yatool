@@ -41,6 +41,7 @@ ATTRS_TO_STATE_HASH = [
     'name',
 ]
 WINDOWS_CRIT_LEN = 8192
+DIFF_TEST_TYPE = "canon_diff"
 
 yatest_logger = logging.getLogger(__name__)
 
@@ -55,14 +56,13 @@ class AbstractTestSuite(facility.Suite):
         """
         used to determine suite internal type name
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
-    @classmethod
-    def get_type(cls):
+    def get_type(self):
         """
         returns human readable suite type name
         """
-        return cls.get_type_name()
+        raise NotImplementedError()
 
     @classmethod
     def get_ci_type_name(cls):
@@ -181,12 +181,11 @@ class AbstractTestSuite(facility.Suite):
         """
         return False
 
-    @classmethod
-    def support_retries(cls):
+    def support_retries(self):
         """
         Does test suite support retries
         """
-        return cls.get_type() in test.const.REGULAR_TEST_TYPES
+        raise NotImplementedError()
 
     @property
     def smooth_shutdown_signals(self):
@@ -972,6 +971,9 @@ class StyleTestSuite(PythonTestSuite):
     def get_test_related_paths(self, arc_root, opts):
         return []
 
+    def support_retries(self):
+        return False
+
 
 class PerformedTestSuite(AbstractTestSuite):
     def __init__(
@@ -1031,11 +1033,14 @@ class DiffTestSuite(AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "canon_diff"
+        return DIFF_TEST_TYPE
+
+    def get_type(self):
+        return DIFF_TEST_TYPE
 
     @property
     def name(self):
-        return self.get_type_name()
+        return DIFF_TEST_TYPE
 
     @property
     def project_path(self):
@@ -1064,6 +1069,9 @@ class DiffTestSuite(AbstractTestSuite):
 
     @property
     def supports_canonization(self):
+        return False
+
+    def support_retries(self):
         return False
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
@@ -1175,20 +1183,3 @@ class SkippedTestSuite(object):
     def requirements(self):
         # distbuild fails if finds some requirements, e.g. ram_disk:8, even for skipped tests, TODO: DEVTOOLS-5005 - stop sending skipped tests to distbs
         return {}
-
-
-class WrappingTestSuite(object):
-    """
-    Class-mixin to inherit by suites which wrap other types of test suites.
-
-    A wrapping suite has it's own type (returning by get_type() method) and can be filtered
-    by this type. But get_type() class method is useless if we want to get a wrapped suite name
-    because the name is a property of an instance not a class.
-    """
-
-    def get_wrapped_type(self):
-        """
-        returns a wrapped suite type name.
-        Result of the method is used in test filtering only (--test-type option).
-        """
-        raise NotImplementedError()

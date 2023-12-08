@@ -11,6 +11,9 @@ from test.system import process
 from test.test_types import common as common_types
 
 
+FUZZ_TEST_TYPE = "fuzz"
+
+
 class FuzzTestSuite(common_types.AbstractTestSuite):
     def __init__(self, *args, **kwargs):
         super(FuzzTestSuite, self).__init__(*args, **kwargs)
@@ -98,11 +101,14 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "fuzz"
+        return FUZZ_TEST_TYPE
+
+    def get_type(self):
+        return FUZZ_TEST_TYPE
 
     @property
     def name(self):
-        return self.get_type_name()
+        return FUZZ_TEST_TYPE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--list']
@@ -118,8 +124,11 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
     def supports_canonization(self):
         return False
 
+    def support_retries(self):
+        return True
+
     def get_computed_test_names(self, opts):
-        return ["{}::test".format(self.get_type_name())]
+        return ["{}::test".format(self.get_type())]
 
     def get_test_related_paths(self, root, opts):
         paths = super(FuzzTestSuite, self).get_test_related_paths(root, opts)

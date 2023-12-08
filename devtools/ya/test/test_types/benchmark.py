@@ -8,6 +8,10 @@ import test.system.process as process
 from test.test_types import common as common_types
 
 
+GBENCHMARK_TEST_TYPE = "g_benchmark"
+YBENCHMARK_TEST_TYPE = "benchmark"
+
+
 class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
     def support_splitting(self, opts=None):
         """
@@ -24,6 +28,9 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
         Does test suite support list_node before test run
         """
         return False
+
+    def support_retries(self):
+        return True
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         raise NotImplementedError
@@ -57,7 +64,10 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
 class GBenchmarkSuite(AbstractBenchmarkSuite):
     @classmethod
     def get_type_name(cls):
-        return "g_benchmark"
+        return GBENCHMARK_TEST_TYPE
+
+    def get_type(self):
+        return GBENCHMARK_TEST_TYPE
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -110,7 +120,10 @@ class GBenchmarkSuite(AbstractBenchmarkSuite):
 class YBenchmarkSuite(AbstractBenchmarkSuite):
     @classmethod
     def get_type_name(cls):
-        return "benchmark"
+        return YBENCHMARK_TEST_TYPE
+
+    def get_type(self):
+        return YBENCHMARK_TEST_TYPE
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(

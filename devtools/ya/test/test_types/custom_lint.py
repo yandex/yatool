@@ -7,11 +7,10 @@ import test.util.shared
 import test.util.tools
 
 from test.test_types.py_test import LintTestSuite
-from test.test_types.common import WrappingTestSuite
 from yalibrary.graph.const import BUILD_ROOT, SOURCE_ROOT
 
 
-class CustomLintTestSuite(LintTestSuite, WrappingTestSuite):
+class CustomLintTestSuite(LintTestSuite):
     def __init__(self, dart_info, **kwargs):
         super(CustomLintTestSuite, self).__init__(dart_info, **kwargs)
         self._files = self.get_suite_files()
@@ -41,7 +40,7 @@ class CustomLintTestSuite(LintTestSuite, WrappingTestSuite):
     def get_type_name(cls):
         return "custom_lint"
 
-    def get_wrapped_type(self):
+    def get_type(self):
         return self._lint_name
 
     @property

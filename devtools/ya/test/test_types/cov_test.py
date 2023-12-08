@@ -8,6 +8,9 @@ from test.system import process
 from test.test_types import common as common_types
 
 
+COVERAGE_EXTRACTOR_TEST_TYPE = "coverage_extractor"
+
+
 class CoverageExtractorTestSuite(common_types.AbstractTestSuite):
     def __init__(self, *args, **kwargs):
         super(CoverageExtractorTestSuite, self).__init__(*args, **kwargs)
@@ -41,7 +44,7 @@ class CoverageExtractorTestSuite(common_types.AbstractTestSuite):
         return self.get_run_cmd(opts) + ['--list']
 
     def get_computed_test_names(self, opts):
-        return ["{}::test".format(self.get_type_name())]
+        return ["{}::test".format(self.get_type())]
 
     @classmethod
     def list(cls, cmd, cwd):
@@ -56,14 +59,16 @@ class CoverageExtractorTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return 'coverage_extractor'
+        return COVERAGE_EXTRACTOR_TEST_TYPE
+
+    def get_type(self):
+        return COVERAGE_EXTRACTOR_TEST_TYPE
 
     @property
     def name(self):
-        return self.get_type_name()
+        return COVERAGE_EXTRACTOR_TEST_TYPE
 
-    @classmethod
-    def support_retries(cls):
+    def support_retries(self):
         return False
 
     @property

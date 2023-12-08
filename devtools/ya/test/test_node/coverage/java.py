@@ -18,7 +18,7 @@ def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_
     uids = []
 
     for suite in tests:
-        if suite.get_type() != junit.JavaTestSuite.get_type():
+        if suite.get_type() != junit.JAVA_TEST_TYPE:
             continue
         uid = uid_gen.get_random_uid("jacoco-report")
         script_path = "$(SOURCE_ROOT)/build/scripts/extract_jacoco_report.py"

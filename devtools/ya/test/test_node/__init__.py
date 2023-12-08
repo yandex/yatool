@@ -669,7 +669,7 @@ def create_test_node(
         )
 
     # don't download corpus if certain case is specified
-    if suite.get_type() == fuzz_test.FuzzTestSuite.get_type() and not getattr(opts, "fuzz_case_filename", None):
+    if suite.get_type() == fuzz_test.FUZZ_TEST_TYPE and not getattr(opts, "fuzz_case_filename", None):
         fuzz_automa = util_tools.get_corpus_data_path(suite.project_path, arc_root)
         if os.path.exists(fuzz_automa):
             with open(fuzz_automa) as afile:

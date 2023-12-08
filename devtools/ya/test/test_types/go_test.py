@@ -8,6 +8,10 @@ from test.system import process
 from test.test_types import common as common_types
 
 
+GO_TEST_TYPE = "go_test"
+GO_BENCH_TEST_TYPE = "go_bench"
+
+
 class GoTestSuite(common_types.AbstractTestSuite):
     def support_splitting(self, opts=None):
         """
@@ -23,6 +27,9 @@ class GoTestSuite(common_types.AbstractTestSuite):
         """
         Does test suite support list_node before test run
         """
+        return True
+
+    def support_retries(self):
         return True
 
     @property
@@ -103,7 +110,10 @@ class GoTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "go_test"
+        return GO_TEST_TYPE
+
+    def get_type(self):
+        return GO_TEST_TYPE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']
@@ -139,6 +149,9 @@ class GoBenchSuite(GoTestSuite):
         """
         return False
 
+    def support_retries(self):
+        return True
+
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         go_bench_timeout = self.dart_info.get('GO_BENCH_TIMEOUT')
         cmd = super(GoBenchSuite, self).get_run_cmd(opts, retry, for_dist_build) + ["--bench-run"]
@@ -148,4 +161,7 @@ class GoBenchSuite(GoTestSuite):
 
     @classmethod
     def get_type_name(cls):
-        return "go_bench"
+        return GO_BENCH_TEST_TYPE
+
+    def get_type(self):
+        return GO_BENCH_TEST_TYPE
