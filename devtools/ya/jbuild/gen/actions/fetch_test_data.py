@@ -6,6 +6,8 @@ import jbuild.gen.node as node
 
 import yalibrary.graph.commands as graph_commands
 
+import test.util.tools as util_tools
+
 
 def fetch_test_data(path, target, ctx):
     if getattr(ctx.opts, 'omit_test_data', None):
@@ -17,10 +19,8 @@ def fetch_test_data(path, target, ctx):
         resource_name = 'resource'
         resource_info = 'resource_info.json'
         fetch_cmd = graph_commands.Cmd(
-            cmd=[
-                ctx.global_resources.get('TEST_TOOL_HOST_RESOURCE_GLOBAL', '$(TEST_TOOL_HOST_RESOURCE_GLOBAL)')
-                + '/test_tool',
-                'download',
+            cmd=util_tools.get_test_tool_cmd(ctx.opts, "download", ctx.global_resources)
+            + [
                 '--storage-root',
                 '$(BUILD_ROOT)',
                 '--id',
