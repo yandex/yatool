@@ -95,7 +95,7 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
                 logger.warn(
                     '\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.'
                 )
-                raise Exception('Unsupported Xcode version, installed = ' + version)
+                raise Exception('Unsupported Xcode version, installed = {}'.format(version))
         res['params']['c_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang']).strip()
         res['params']['cxx_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang++']).strip()
         res['params']['actool'] = subprocess.check_output(['xcrun', '--find', 'actool']).strip()
