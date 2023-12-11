@@ -7,9 +7,11 @@ import signal
 import subprocess
 import sys
 
+import six
+
 import devtools.ya.test.programs.test_tool.lib.runtime as runtime
 import library.python.cores as cores
-import six
+from test import const
 
 
 def colorize(text):
@@ -28,6 +30,14 @@ def colorize(text):
     for regex, substitution in filters:
         text = regex.sub(substitution, text)
     return text
+
+
+def get_exit_codes(data):
+    # Return first non-zero rc
+    for rc in data:
+        if rc:
+            return rc
+    return 0
 
 
 def main():
@@ -49,7 +59,7 @@ def main():
     entry_point = "library.python.testing.import_test.import_test:main"
     env["Y_PYTHON_ENTRY_POINT"] = entry_point
 
-    failed = False
+    error_codes = []
     for program in args.programs:
         # Bypass terminating signals from run_test to target program
         with runtime.bypass_signals(["SIGQUIT", "SIGUSR2"]) as reg:
@@ -59,13 +69,14 @@ def main():
             reg.register(p.pid)
             _, err = p.communicate()
 
-        failed |= bool(p.returncode)
+        exit_code = p.returncode
 
         if p.returncode:
             if -p.returncode == getattr(signal, "SIGUSR2", 0):
                 sys.stderr.write(
                     "[[bad]]Import test has overrun timeout and was terminated, see stderr logs for more info.\n"
                 )
+                exit_code = const.TestRunExitCode.TimeOut
             else:
                 sys.stderr.write("[[bad]]Import test failed with [[imp]]{}[[bad]] return code.".format(p.returncode))
 
@@ -80,6 +91,8 @@ def main():
             else:
                 sys.stderr.write(err)
 
+        error_codes.append(exit_code)
+
         if p.returncode < 0:
             core_path = cores.recover_core_dump_file(program, os.getcwd(), p.pid)
 
@@ -88,7 +101,7 @@ def main():
                 continue
 
             if not args.gdb_path:
-                sys.stderr.write("No gddb path specified\n")
+                sys.stderr.write("No gdb path specified\n")
                 continue
 
             # XXX We can't register core dump file here to make it available in test logs,
@@ -97,7 +110,7 @@ def main():
                 bt = cores.get_gdb_full_backtrace(program, core_path, args.gdb_path)
                 sys.stderr.write("Backtrace:\n{}".format(bt))
 
-    return 0 if not failed else 1
+    return get_exit_codes(error_codes)
 
 
 if __name__ == "__main__":

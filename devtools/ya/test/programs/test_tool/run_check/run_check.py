@@ -134,9 +134,16 @@ def main():
             if args.snippet_from_stderr:
                 snippet += err
 
+        if res.returncode == 0:
+            status = test.const.Status.GOOD
+        elif res.returncode == test.const.TestRunExitCode.TimeOut:
+            status = test.const.Status.TIMEOUT
+        else:
+            status = test.const.Status.FAIL
+
         test_case = facility.TestCase(
             "{}::{}".format(test_name, args.check_name),
-            test.const.Status.GOOD if res.returncode == 0 else test.const.Status.FAIL,
+            status,
             cores.colorize_backtrace(snippet),
             duration,
             logs=logs,

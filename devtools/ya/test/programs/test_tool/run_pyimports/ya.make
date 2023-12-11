@@ -7,8 +7,9 @@ PY_SRCS(
 )
 
 PEERDIR(
-    library/python/cores
     contrib/python/six
+    devtools/ya/test/const
+    library/python/cores
 )
 
 END()
