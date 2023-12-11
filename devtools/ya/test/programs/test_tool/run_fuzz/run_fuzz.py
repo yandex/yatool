@@ -124,6 +124,7 @@ def watchdog_killer(proc, fuzzing):
         return
 
     def func():
+        logger.debug("Watchdog for %d pid initialized", proc.pid)
         SHUTDOWN_REQUESTED.wait()
         alive = proc.poll() is None
         logger.debug("Event occurred for watchdog killer thread (proc %d is alive: %s)", proc.pid, alive)
