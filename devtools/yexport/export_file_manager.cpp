@@ -3,6 +3,9 @@
 #include <devtools/yexport/diag/trace.h>
 
 #include <library/cpp/digest/md5/md5.h>
+#include <library/cpp/resource/resource.h>
+
+#include <spdlog/spdlog.h>
 
 #include <spdlog/spdlog.h>
 
@@ -22,27 +25,48 @@ TFile TExportFileManager::Open(const fs::path& relativeToRoot) {
     auto absPath = ExportRoot_ / relativeToRoot;
     fs::create_directories(absPath.parent_path());
     CreatedFiles_.insert(relativeToRoot);
-
+    spdlog::debug("[TExportFileManager] Opened file: {}", relativeToRoot.c_str());
     return TFile{absPath.string(), CreateAlways};
 }
 bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelativeToRoot, bool logError) {
     if (!fs::exists(source)) {
         if (logError) {
-            spdlog::error("Failed to copy {} to {} because source does not exist", source.c_str(), (ExportRoot_ / destRelativeToRoot).c_str());
+            spdlog::error("[TExportFileManager] Failed to copy file: {}", source.c_str());
+        } else {
+            spdlog::debug("[TExportFileManager] Failed to copy file: {}", source.c_str());
         }
         return false;
     }
     auto absPath = ExportRoot_ / destRelativeToRoot;
     if (fs::exists(absPath) && fs::equivalent(absPath, source)) {
+        spdlog::debug("[TExportFileManager] Skipping file copy becase source is same as destination: {}", source.c_str());
         return true;
     }
     fs::create_directories(absPath.parent_path());
     fs::copy_file(source, absPath, fs::copy_options::overwrite_existing);
     CreatedFiles_.insert(destRelativeToRoot);
+    spdlog::debug("[TExportFileManager] Copied file: {}", source.c_str());
     return true;
 }
 bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError) {
     return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot, logError);
+}
+bool TExportFileManager::CopyResource(const fs::path& relativeToRoot, bool logError) {
+    std::string resource = relativeToRoot.filename();
+    try {
+        const auto content = NResource::Find(resource);
+        auto out = Open(relativeToRoot);
+        out.Write(content.data(), content.size());
+        spdlog::debug("[TExportFileManager] Copied resource: {}", relativeToRoot.c_str());
+        return true;
+    } catch (const std::exception& ex) {
+        if (logError) {
+            spdlog::error("[TExportFileManager] Failed to copy resource {} due: {}", relativeToRoot.c_str(), ex.what());
+        } else {
+            spdlog::debug("[TExportFileManager] Failed to copy resource {} due: {}", relativeToRoot.c_str(), ex.what());
+        }
+        return false;
+    }
 }
 bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
     return fs::exists(ExportRoot_ / relativeToRoot);

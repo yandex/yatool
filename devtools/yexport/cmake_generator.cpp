@@ -6,7 +6,6 @@
 #include "generator_spec.h"
 
 #include <library/cpp/digest/md5/md5.h>
-#include <library/cpp/resource/resource.h>
 
 #include <util/generic/scope.h>
 #include <util/generic/vector.h>
@@ -30,23 +29,9 @@ namespace {
         }
         fmt::format_to(bufIt, "endif()\n");
     }
-    void SaveResource(TExportFileManager& exportFileManager, const fs::path& relativeToExportRoot) {
-        std::string resource = relativeToExportRoot.filename();
-        auto out = exportFileManager.Open(relativeToExportRoot);
-        const auto content = NResource::Find(resource);
-        out.Write(content.data(), content.size());
-    }
-
-    void SaveCMakeModule(TExportFileManager& exportFileManager, const std::string_view& mod) {
-        SaveResource(exportFileManager, fs::path("cmake") / mod);
-    }
-
-    void SaveBuildScript(TExportFileManager& exportFileManager, const std::string_view& script) {
-        SaveResource(exportFileManager, fs::path(CmakeScriptsRoot) / script);
-    }
 
     void SaveConanProfile(TExportFileManager& exportFileManager, const std::string_view& profile) {
-        SaveResource(exportFileManager, fs::path("cmake") / "conan-profiles" / profile);
+        exportFileManager.CopyResource( fs::path("cmake") / "conan-profiles" / profile);
     }
 }
 
@@ -117,11 +102,10 @@ TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaR
     : Conf(name, arcadiaRoot)
 {
     // TODO(YMAKE-91) Use info exported from ymake
-    UpdateGlobalModules();
 }
 
 void TCMakeGenerator::UpdateGlobalModules() {
-    GlobalProperties.GlobalModules.emplace("global_flags.cmake", TGlobalCMakeModuleFlags{true});
+    GlobalProperties.GlobalModules.emplace("cmake/global_flags.cmake");
 }
 
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
@@ -135,8 +119,6 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     result->Conf.ArcadiaRoot = arcadiaRoot;
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile, CopyFilesOnly);
     result->GeneratorDir = generatorDir;
-
-    result->UpdateGlobalModules();
 
     result->ReadYexportSpec(configDir);
     return result;
@@ -170,17 +152,18 @@ void TCMakeGenerator::Dump(IOutputStream&) {
 void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     Conf.CleanIgnored = cleanIgnored;
 
+    UpdateGlobalModules();
     for (auto& platform : Platforms) {
         RenderPlatform(platform);
     }
 
-    CopyFiles();
+    CopyFilesAndResources();
 
     MergePlatforms();
     RenderRootCMakeList();
-    SaveCMakeModules();
     CopyArcadiaScripts();
     RenderConanRequirements();
+
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.Clean(*ExportFileManager);
     }
@@ -311,14 +294,8 @@ void TCMakeGenerator::RenderRootCMakeList() const {
     fmt::format_to(bufIt, "# Can't set it in cuda.cmake because of CMake policy subdirectory stack rules\n");
     fmt::format_to(bufIt, "cmake_policy(SET CMP0104 OLD)\n\n");
 
-    for (const auto& [name, flags] : GlobalProperties.GlobalModules) {
-        if (flags.IncludeInRootCMakeList) {
-            fmt::format_to(bufIt, "include(cmake/{})\n", name);
-        }
-    }
-
-    for (const auto& script: GlobalProperties.ExtraScripts) {
-        SaveBuildScript(*ExportFileManager, script);
+    for (const auto& path : GlobalProperties.GlobalModules) {
+        fmt::format_to(bufIt, "include({})\n", path.c_str());
     }
 
     if (SaveGlobalVars("global_vars.cmake")) {
@@ -339,12 +316,6 @@ void TCMakeGenerator::RenderRootCMakeList() const {
     fmt::format_to(bufIt, "endif()\n");
 
     out.Write(buf.data(), buf.size());
-}
-
-void TCMakeGenerator::SaveCMakeModules() const {
-    for (const auto& [name, flags] : GlobalProperties.GlobalModules) {
-        SaveCMakeModule(*ExportFileManager, name);
-    }
 }
 
 void TCMakeGenerator::CopyArcadiaScripts() const {

@@ -9,6 +9,10 @@ TYExportException::TYExportException() {
     BackTrace_.Capture();
 }
 
+TYExportException::TYExportException(const std::string& what) : TYExportException() {
+    *this << what;
+}
+
 const TBackTrace* TYExportException::BackTrace() const noexcept {
     return &BackTrace_;
 }

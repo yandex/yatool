@@ -5,8 +5,18 @@
 
 namespace NYexport {
 
+const TGeneratorSpec& TSpecBasedGenerator::GetGeneratorSpec() const {
+    return GeneratorSpec;
+}
+
+const fs::path& TSpecBasedGenerator::GetGeneratorDir() const {
+    return GeneratorDir;
+}
+
 void TSpecBasedGenerator::OnAttribute(const std::string& attribute) {
     UsedAttributes.insert(attribute);
+    auto rules = GeneratorSpec.GetRules(attribute);
+    UsedRules.insert(rules.begin(), rules.end());
 }
 
 void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
@@ -20,25 +30,25 @@ void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
 
 THashSet<fs::path> TSpecBasedGenerator::CollectFilesToCopy() const {
     THashSet<fs::path> result;
-    result.insert(GeneratorSpec.Root.Copy.begin(), GeneratorSpec.Root.Copy.end());
 
-    for (auto const& [key, value] : GeneratorSpec.Attrs) {
-        for (auto const& [tableName, item] : value.Items) {
-            if (UsedAttributes.contains(tableName)) {
+    for (auto rule : UsedRules) {
+        result.insert(rule->Copy.begin(), rule->Copy.end());
+    }
+
+    result.insert(GeneratorSpec.Root.Copy.begin(), GeneratorSpec.Root.Copy.end());
+    for (const auto& [key, value] : GeneratorSpec.Attrs) {
+        for (const auto& [attrName, item] : value.Items) {
+            if (UsedAttributes.contains(attrName)) {
                 result.insert(item.Copy.begin(), item.Copy.end());
             }
         }
     }
+
     return result;
 }
 
-void TSpecBasedGenerator::CopyFiles() {
-    THashSet<fs::path> files = CollectFilesToCopy();
-    if (!files.empty() && !ExportFileManager) {
-        spdlog::error("Can't copy files, empty ExportFileManager");
-        return;
-    }
-    for (const auto& path : files) {
+void TSpecBasedGenerator::CopyFilesAndResources() {
+    for (const auto& path : CollectFilesToCopy()) {
         ExportFileManager->Copy(GeneratorDir / path, path);
     }
 }

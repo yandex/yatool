@@ -19,6 +19,8 @@ public:
     TSpecBasedGenerator() noexcept = default;
     virtual ~TSpecBasedGenerator() = default;
 
+    const TGeneratorSpec& GetGeneratorSpec() const;
+    const fs::path& GetGeneratorDir() const;
     void OnAttribute(const std::string& attribute);
 
     static constexpr const char* GENERATOR_FILE = "generator.toml";
@@ -26,16 +28,18 @@ public:
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
 
 protected:
-    void CopyFiles();
+    void CopyFilesAndResources();
 
     fs::path GeneratorDir;
     TGeneratorSpec GeneratorSpec;
     THashSet<std::string> UsedAttributes;
+    THashSet<const TGeneratorRule*> UsedRules;
     TTargetReplacements TargetReplacements_;
 
     void ReadYexportSpec(fs::path configDir = "");
 
 private:
+    THashSet<fs::path> CollectResourcesToCopy() const;
     THashSet<fs::path> CollectFilesToCopy() const;
 };
 

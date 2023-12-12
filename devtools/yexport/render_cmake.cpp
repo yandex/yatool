@@ -2,8 +2,6 @@
 #include "cmake_generator.h"
 #include "builder.h"
 
-#include <devtools/yexport/known_modules.h_serialized.h>
-
 #include <devtools/ymake/compact_graph/query.h>
 
 #include <library/cpp/resource/resource.h>
@@ -22,7 +20,6 @@ namespace NYexport {
 
 namespace fs = std::filesystem;
 using namespace std::literals;
-using namespace NKnownModules;
 
 namespace {
     constexpr std::string_view YMAKE_SOURCE_PREFIX = "$S/";
@@ -53,12 +50,6 @@ namespace {
     std::string GetToolBinVariable(TStringBuf toolName) {
         return fmt::format("TOOL_{}_bin", toolName);
     }
-
-    const THashMap<EKnownModules, TVector<std::string_view>> ModScripts = {
-        {EKnownModules::YandexCommon, {"export_script_gen.py", "split_unittest.py", "generate_vcs_info.py"}},
-        {EKnownModules::Swig, {"gather_swig_java.cmake"}},
-        {EKnownModules::RecursiveLibrary, {"create_recursive_library_for_cmake.py"}}
-    };
 
     enum class EConstraintType {
         AtLeast,
@@ -425,12 +416,10 @@ namespace {
 
         void RequireConanPackage(const std::string& name) {
             GlobalProperties.ConanPackages.insert(name);
-            GlobalProperties.GlobalModules.emplace("conan.cmake", TGlobalCMakeModuleFlags{true});
         }
 
         void RequireConanToolPackage(const std::string& name) {
             GlobalProperties.ConanToolPackages.insert(name);
-            GlobalProperties.GlobalModules.emplace("conan.cmake", TGlobalCMakeModuleFlags{true});
         }
 
         void ImportConanArtefact(const std::string& importSpec) {
@@ -461,19 +450,10 @@ namespace {
         }
 
         void UseGlobalFindModule(const std::string& pkg) {
-            GlobalProperties.GlobalModules.emplace(fmt::format("Find{}.cmake", pkg), TGlobalCMakeModuleFlags{false});
-        }
-
-        void UseGlobalModule(EKnownModules mod) {
-            GlobalProperties.GlobalModules.emplace(ToString(mod), TGlobalCMakeModuleFlags{true});
-
-            const auto scripts = ModScripts.find(mod);
-            if (scripts == ModScripts.end()) {
-                return;
-            }
-            for (std::string_view script: scripts->second) {
-                GlobalProperties.ExtraScripts.insert(std::string{script});
-            }
+            fs::path path = fmt::format("cmake/Find{}.cmake", pkg);
+            auto exportFileManager = CMakeGenerator->GetExportFileManager();
+            const auto& generatorDir = CMakeGenerator->GetGeneratorDir();
+            exportFileManager->Copy(generatorDir / path, path);
         }
 
         void FindPackage(const std::string& name, TSet<std::string> components) {
@@ -500,6 +480,14 @@ namespace {
 
         void AddSemantics(const std::string& semantica) {
             CMakeGenerator->OnAttribute(semantica);
+            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetRules(semantica)) {
+                const auto& addValues = rulePtr->AddValues;
+                if (auto valuesIt = addValues.find("includes"); valuesIt != addValues.end()) {
+                    for (const auto& value : valuesIt->second) {
+                        GlobalProperties.GlobalModules.emplace(value);
+                    }
+                }
+            }
         }
 
         const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
@@ -638,9 +626,6 @@ namespace {
 
                 ProjectBuilder.AddSemantics(semName);
 
-                if (const auto it = MacroToModuleMap.find(semName); it != MacroToModuleMap.end()) {
-                    ProjectBuilder.UseGlobalModule(it->second);
-                }
                 if (semName == "IGNORED") {
                     traverseFurther = false;
                 } else if (KnownTargets.contains(semName)) {
@@ -1023,61 +1008,6 @@ namespace {
             "run_antlr",
             "set_property",
             "add_jar"
-        };
-        THashMap<TStringBuf, EKnownModules> MacroToModuleMap = {
-            { "add_global_library_for", EKnownModules::YandexCommon },
-            { "add_fat_object", EKnownModules::FatObject },
-            { "add_shared_library", EKnownModules::SharedLibs },
-            { "add_recursive_library", EKnownModules::RecursiveLibrary },
-            { "archive", EKnownModules::YandexCommon },
-            { "conan_add_remote", EKnownModules::Conan },
-            { "conan_check", EKnownModules::Conan },
-            { "conan_cmake_autodetect", EKnownModules::Conan },
-            { "conan_cmake_configure", EKnownModules::Conan },
-            { "conan_cmake_detect_unix_libcxx", EKnownModules::Conan },
-            { "conan_cmake_detect_vs_runtime", EKnownModules::Conan },
-            { "conan_cmake_generate_conanfile", EKnownModules::Conan },
-            { "conan_cmake_install", EKnownModules::Conan },
-            { "conan_cmake_run", EKnownModules::Conan },
-            { "conan_cmake_settings", EKnownModules::Conan },
-            { "conan_cmake_setup_conanfile", EKnownModules::Conan },
-            { "conan_config_install", EKnownModules::Conan },
-            { "conan_load_buildinfo", EKnownModules::Conan },
-            { "conan_parse_arguments", EKnownModules::Conan },
-            { "copy_file", EKnownModules::YandexCommon },
-            { "curdir_masm_flags", EKnownModules::Masm },
-            { "generate_enum_serilization", EKnownModules::YandexCommon },
-            { "llvm_compile_c", EKnownModules::LlvmTools },
-            { "llvm_compile_cxx", EKnownModules::LlvmTools },
-            { "old_conan_cmake_install", EKnownModules::Conan },
-            { "resources", EKnownModules::YandexCommon },
-            { "run_antlr", EKnownModules::Antlr },
-            { "target_joined_source", EKnownModules::YandexCommon },
-            { "target_ev_messages", EKnownModules::Protobuf },
-            { "target_proto_messages", EKnownModules::Protobuf },
-            { "target_proto_plugin", EKnownModules::Protobuf },
-            { "target_ragel_lexers", EKnownModules::YandexCommon },
-            { "target_yasm_source", EKnownModules::YandexCommon },
-            { "vcs_info", EKnownModules::YandexCommon },
-            { "target_bison_parser", EKnownModules::Bison },
-            { "target_flex_lexers", EKnownModules::Bison},
-            { "target_fbs_source", EKnownModules::Fbs },
-            { "target_cuda_flags", EKnownModules::Cuda },
-            { "target_cuda_cflags", EKnownModules::Cuda },
-            { "target_rodata_sources", EKnownModules::Archive },
-            { "target_proto_outs", EKnownModules::Protobuf },
-            { "target_proto_addincls", EKnownModules::Protobuf },
-            { "target_sources_custom", EKnownModules::YandexCommon },
-            { "use_export_script", EKnownModules::YandexCommon },
-            { "target_cuda_sources", EKnownModules::Cuda },
-            { "target_cython_sources", EKnownModules::Cython },
-            { "target_cython_options", EKnownModules::Cython },
-            { "target_cython_include_directories", EKnownModules::Cython },
-            { "set_python_type_for_cython", EKnownModules::Cython },
-            { "swig_add_library", EKnownModules::Swig },
-            { "add_jar", EKnownModules::Swig },
-            { "add_yunittest", EKnownModules::YandexCommon },
-            { "set_yunittest_property", EKnownModules::YandexCommon }
         };
         THashSet<TString> BundledFindModules = {"AIO", "IDN", "JNITarget"};
         TCMakeProject::TBuilder ProjectBuilder;

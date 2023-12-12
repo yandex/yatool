@@ -12,7 +12,6 @@
 
 namespace NYexport {
 
-using namespace std::literals;
 
 namespace NKeys {
     constexpr const char* Root = "root";
@@ -22,14 +21,66 @@ namespace NKeys {
     constexpr const char* Dest = "dest";
     constexpr const char* Copy = "copy";
     constexpr const char* Targets = "targets";
+    constexpr const char* Attr = "attr";
     constexpr const char* Attrs = "attrs";
     constexpr const char* Merge = "merge";
     constexpr const char* Type = "type";
-    constexpr const char* Rules = "rules";
     constexpr const char* UseManagedPeersClosure = "use_managed_peers_closure";
+    constexpr const char* Rules = "rules";
+    constexpr const char* AddValues = "add_values";
+    constexpr const char* Values = "values";
+}
+
+#define VERIFY_GENSPEC(CONDITION, VALUE, ERROR, COMMENT) YEXPORT_VERIFY(CONDITION, TBadGeneratorSpec(), toml::format_error(ERROR, VALUE, COMMENT))
+
+
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetRules(const std::string attr) const {
+    if (auto it = AttrToRuleId.find(attr); it != AttrToRuleId.end()) {
+        TRuleSet result;
+        for (const auto& id : it->second) {
+            result.insert(&Rules.at(id));
+        }
+        return result;
+    }
+    return {};
 }
 
 namespace {
+    //Following functions take pointer to a value in order to prevent implicit construction of new value from vector/unordered_map and following segfault
+    const auto& AsTable(const toml::value* value) {
+        VERIFY_GENSPEC(value->is_table(), *value, NGeneratorSpecError::WrongFieldType, "Should be a table");
+        return value->as_table();
+    }
+    const auto& AsArray(const toml::value* value) {
+        VERIFY_GENSPEC(value->is_array(), *value, NGeneratorSpecError::WrongFieldType, "Should be an array");
+        return value->as_array();
+    }
+    const auto& AsString(const toml::value* value) {
+        VERIFY_GENSPEC(value->is_string(), *value, NGeneratorSpecError::WrongFieldType, "Should be a string");
+        return value->as_string().str;
+    }
+    const auto& At(const toml::value* value, const std::string& fieldName) {
+        const auto& table = AsTable(value);
+        VERIFY_GENSPEC(table.contains(fieldName), *value, NGeneratorSpecError::MissingField, "Should contain field: " + fieldName);
+        return table.at(fieldName);
+    }
+    const toml::value* Find(const toml::value* value, const std::string& fieldName) {
+        const auto& table = AsTable(value);
+        auto it = table.find(fieldName);
+        if (it != table.end()) {
+            return &(it->second);
+        }
+        return nullptr;
+    }
+    THashSet<fs::path> ExtractPathes(const toml::value* value) {
+        THashSet<fs::path> result;
+        const auto& arr = AsArray(value);
+        for (const auto& file : arr) {
+            result.insert(fs::path(AsString(&file)));
+        }
+        return result;
+    }
+
     void ParseOneTemplate(TTargetSpec& targetSpec, const toml::value& tmpl) {
         if (tmpl.is_string()) {
             TTemplate templateResult;
@@ -104,9 +155,10 @@ namespace {
         if (features != CopyFilesOnly) {
             ParseTemplates(targetSpec, target);
         }
-
-        for (const auto& item : toml::find_or<toml::array>(target, NKeys::Copy, toml::array{})) {
-            targetSpec.Copy.insert(toml::get<std::string>(item));
+        const auto* copy = Find(&target, NKeys::Copy);
+        if (copy) {
+            const auto files = ExtractPathes(copy);
+            targetSpec.Copy.insert(files.begin(), files.end());
         }
         return targetSpec;
     }
@@ -178,19 +230,32 @@ namespace {
         return attrsSpec;
     }
 
-    void ParseRules(const toml::value& value, THashMap<std::string, TAttrsSpec>& attrs) {
-        const auto& table = value.as_table();
-        if (!table.contains(NKeys::Attrs) || !table.contains(NKeys::Copy)) {
-            return;
+    TGeneratorRule ParseRule(const toml::value& value) {
+        const auto& attrs = At(&value, NKeys::Attrs);
+        const auto& attrArray = AsArray(&attrs);
+        VERIFY_GENSPEC(!attrArray.empty(), value, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
+
+        TGeneratorRule rule;
+        for(const auto& attr : attrArray){
+            rule.Attributes.insert(AsString(&attr));
         }
-        THashSet<fs::path> filesToCopy;
-        for (const auto& file : table.at(NKeys::Copy).as_array()) {
-            filesToCopy.insert(fs::path(file.as_string().str));
+        if (const auto* copy = Find(&value, NKeys::Copy); copy){
+            rule.Copy = ExtractPathes(copy);
         }
-        auto& targetAttrs = attrs[ATTRGROUP_TARGET];
-        for (const auto& attr : table.at(NKeys::Attrs).as_array()) {
-            targetAttrs.Items[attr.as_string().str].Copy.insert(filesToCopy.begin(), filesToCopy.end());
+        if (const auto* add_values= Find(&value, NKeys::AddValues); add_values){
+            for(const auto& add_value : AsArray(add_values)) {
+                const auto& attr = AsString(&At(&add_value, NKeys::Attr));
+                const auto& values = At(&add_value, NKeys::Values);
+                const auto& valuesArray = AsArray(&values);
+                VERIFY_GENSPEC(!valuesArray.empty(), values, NGeneratorSpecError::SpecificationError, "add_value should have one or more values to add");
+                for (const auto& value : valuesArray) {
+                    rule.AddValues[attr].push_back(AsString(&value));
+                }
+            }
         }
+
+        VERIFY_GENSPEC(!rule.Copy.empty() || !rule.AddValues.empty(), value, NGeneratorSpecError::SpecificationError, "Module should have non empty field [copy] or [add_values]");
+        return rule;
     }
 
     std::vector<std::filesystem::path> ParseMergeSpec(const toml::value& value) {
@@ -277,11 +342,15 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
         }
 
         for (const auto& value : find_or<toml::array>(doc, NKeys::Rules, toml::array{})) {
-            ParseRules(value, genspec.Attrs);
+            auto& rules = genspec.Rules;
+            const auto& [ruleId, rule] = *rules.emplace(rules.size(), ParseRule(value)).first;
+
+            for(const auto& attr : rule.Attributes) {
+                genspec.AttrToRuleId[attr].push_back(ruleId);
+            }
         }
 
         genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
-
         return genspec;
     } catch (const toml::exception& err) {
         throw TBadGeneratorSpec{err.what()};

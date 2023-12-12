@@ -2,8 +2,6 @@
 #include "read_sem_graph.h"
 #include "builder.h"
 
-#include <devtools/yexport/known_modules.h_serialized.h>
-
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
 
@@ -624,7 +622,7 @@ void TJinjaGenerator::Dump(IOutputStream& out) {
 }
 
 void TJinjaGenerator::Render(ECleanIgnored) {
-    CopyFiles();
+    CopyFilesAndResources();
 
     const auto& rootAttrs = FinalizeRootAttrs();
     auto subdirsAttrs = FinalizeSubdirsAttrs();

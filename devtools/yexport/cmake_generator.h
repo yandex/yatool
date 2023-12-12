@@ -97,18 +97,13 @@ struct TPlatform {
     explicit TPlatform(std::string_view platformName);
 };
 
-struct TGlobalCMakeModuleFlags {
-    bool IncludeInRootCMakeList = true;
-};
-
 struct TGlobalProperties {
     TSet<std::string> Languages;
     TSet<std::string> ConanPackages;
     TSet<std::string> ConanToolPackages;
     TSet<std::string> ConanImports;
     TSet<std::string> ConanOptions;
-    TMap<std::string, TGlobalCMakeModuleFlags> GlobalModules; // key is name
-    TSet<std::string> ExtraScripts;
+    TSet<fs::path> GlobalModules; // module pathes
     THashSet<fs::path> ArcadiaScripts;
 };
 
@@ -124,7 +119,6 @@ private:
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
     void RenderRootCMakeList() const;
-    void SaveCMakeModules() const;
     void CopyArcadiaScripts() const;
     void RenderConanRequirements() const;
 
