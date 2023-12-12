@@ -406,7 +406,14 @@ def gen_stats_uid(params, platform, tags, outputs, node_type):
             str(sorted(tags)),
             str(sorted(outputs)),
             str(sorted(params.flags.items())),
-            str(sorted(params.target_platforms)),
+            # python can't sort dicts
+            str(
+                sorted(
+                    # for consistent sorting/md5 between ya-bin2 & ya-bin3
+                    json.dumps(target_platform, sort_keys=True, indent=0, separators=(',', ':'))
+                    for target_platform in params.target_platforms
+                )
+            ),
         ]
 
         strs.append(hashing.md5_path(os.path.join(path_to_autocheck_dir, "autocheck.yaml")))
