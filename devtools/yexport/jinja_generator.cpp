@@ -776,7 +776,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             }
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
             if (target->isTest) {
-                targetNameAttrs.emplace("hasTest", true);
+                targetNameAttrs.insert_or_assign("hasTest", true);
             }
             targetNameAttrs["targets"].asList().emplace_back(targetAttrs);
         }
@@ -791,9 +791,20 @@ static std::string Indent(int depth) {
 void TJinjaGenerator::Dump(IOutputStream& out, const jinja2::Value& value, int depth) {
     if (value.isMap()) {
         out << "{\n";
-        for (const auto& [key, val] : value.asMap()) {
-            out << Indent(depth + 1) << key << ": ";
-            Dump(out, val, depth + 1);
+        const auto& map = value.asMap();
+        if (!map.empty()) {
+            // Sort map keys before dumping
+            TVector<std::string> keys;
+            keys.reserve(map.size());
+            for (const auto& [key, _] : map) {
+                keys.emplace_back(key);
+            }
+            Sort(keys);
+            for (const auto& key : keys) {
+                out << Indent(depth + 1) << key << ": ";
+                const auto it = map.find(key);
+                Dump(out, it->second, depth + 1);
+            }
         }
         out << Indent(depth) << "}";
     } else if (value.isList()) {
