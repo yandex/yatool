@@ -107,8 +107,6 @@ class JestTestSuite(BaseTestSuite):
                 self.dart_info.get("CONFIG-PATH"),
                 "--timeout",
                 str(self.timeout),
-                "--jest",
-                self.dart_info.get(self.dart_info.get("JEST-ROOT-VAR-NAME") or "JEST_RESOURCE_GLOBAL"),
                 "--verbose",
             ]
         )
