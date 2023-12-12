@@ -255,7 +255,7 @@ namespace {
             }
 
             auto writeToFile = [&out](const fs::path& path) {
-                TFileInput fileInput(TFile{path.string(), RdOnly});
+                TFileInput fileInput(TFile{path, RdOnly});
                 TString fileData = fileInput.ReadAll();
                 out.Write(fileData.data(), fileData.size());
                 out.Write("\n", 1);

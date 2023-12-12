@@ -26,7 +26,7 @@ TFile TExportFileManager::Open(const fs::path& relativeToRoot) {
     fs::create_directories(absPath.parent_path());
     CreatedFiles_.insert(relativeToRoot);
     spdlog::debug("[TExportFileManager] Opened file: {}", relativeToRoot.c_str());
-    return TFile{absPath.string(), CreateAlways};
+    return TFile{absPath, CreateAlways};
 }
 bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelativeToRoot, bool logError) {
     if (!fs::exists(source)) {
