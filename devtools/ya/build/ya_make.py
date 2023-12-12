@@ -399,12 +399,19 @@ def init_bazel_remote_cache(opts):
                 with open(password_file) as afile:
                     password = afile.read()
 
+            def fits_filter(node):
+                # XXX Noda -> <dict>
+                if not isinstance(node, dict):
+                    node = node.args
+                return is_dist_cache_suitable(node, None, opts)
+
             return bazel_store.BazelStore(
                 base_uri=base_uri,
                 username=getattr(opts, 'bazel_remote_username', None),
                 password=password,
                 readonly=getattr(opts, 'bazel_remote_readonly', True),
                 max_connections=getattr(opts, 'dist_store_threads', 24),
+                fits_filter=fits_filter,
             )
 
 
@@ -677,8 +684,14 @@ def is_dist_cache_suitable(node, result, opts):
     if module_tag in ('jar_runable', 'jar_runnable', 'jar_testable'):
         return False
 
-    # If all checks are passed - result nodes are suitable
-    return 'module_type' in node.get('target_properties', {}) or node['uid'] in result
+    if 'module_type' in node.get('target_properties', {}):
+        return True
+
+    # If all checks are passed - all result nodes are suitable
+    if result is not None:
+        return node['uid'] in result
+    # If result node are not specified -
+    return True
 
 
 # XXX see YA-1354

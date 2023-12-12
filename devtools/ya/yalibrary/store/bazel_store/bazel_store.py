@@ -157,7 +157,11 @@ class BazelStoreClient(object):
 class BazelStore(DistStore):
     def __init__(self, *args, **kwargs):
         super(BazelStore, self).__init__(
-            name='bazel-store', stats_name='bazel_store_status', tag='BAZEL', readonly=kwargs.pop('readonly')
+            name='bazel-store',
+            stats_name='bazel_store_status',
+            tag='BAZEL',
+            readonly=kwargs.pop('readonly'),
+            fits_filter=kwargs.pop('fits_filter', None),
         )
         self._client = BazelStoreClient(*args, **kwargs)
 
@@ -176,11 +180,17 @@ class BazelStore(DistStore):
         else:
             outputs = node.outputs
             kv = node.kv or {}
+
         if not len(outputs):
             return False
+
+        if self._fits_filter and not self._fits_filter(node):
+            return False
+
         p = kv.get('p')
         if p in EXCLUDED_P:
             return False
+
         for o in outputs:
             for p in 'library/cpp/svnversion', 'library/cpp/build_info':
                 if o.startswith('$(BUILD_ROOT)/' + p):

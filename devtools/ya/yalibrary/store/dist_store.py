@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DistStore(object):
-    def __init__(self, name, stats_name, tag, readonly):
+    def __init__(self, name, stats_name, tag, readonly, fits_filter=None):
         self._readonly = readonly
         self._timers = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
         self._time_intervals = {'has': [], 'put': [], 'get': [], 'get-meta': []}
@@ -22,6 +22,7 @@ class DistStore(object):
         self._name = name
         self._stats_name = stats_name
         self._tag = tag
+        self._fits_filter = fits_filter
 
     def _inc_time(self, x, tag):
         cur_time = time.time()
