@@ -287,17 +287,10 @@ namespace {
         return mod && mod->IsFakeModule();
     }
 
-    bool ValidateRecurseDep(TDepGraph& graph, const TDepTreeNode& node, const TDepTreeNode& depNode, const EDepType depType, bool reportNoYamake) {
+    bool ValidateRecurseDep(TDepGraph& graph, const TDepTreeNode& node, const TDepTreeNode& depNode, const EDepType depType) {
         auto actualDepDirType = graph.GetNodeById(depNode)->NodeType;
         if (IsInvalidDir(actualDepDirType)) {
             const TFileView depDirName = graph.GetFileName(depNode);
-
-            // FIXME(spreis): This is broken for quite a long time. Need to fix all hidden issues and remove this hack.
-            if ((!reportNoYamake) &&
-                (depType == EDT_Include) &&
-                (graph.Names().FileConf.YPathExists(depDirName, EPathKind::Dir))) {
-                return true;
-            }
 
             auto makefileName = NPath::SmartJoin(graph.GetFileName(node).GetTargetStr(), "ya.make");
             TScopedContext context(graph.Names().FileConf.Add(makefileName), makefileName, false);
@@ -420,7 +413,6 @@ void TYMake::AddRecursesToStartTargets() {
     const auto iterateAllGraph = Diag()->ShowAllBadRecurses;
     TModulesInfo modulesInfo(Graph, Modules);
     const auto& nodes = iterateAllGraph ? UpdIter->RecurseQueue.GetAllNodes() : UpdIter->RecurseQueue.GetReachableNodes();
-    bool reportNoYamake = Conf.ShouldReportRecurseNoYamake();
     for (const auto& node : nodes) {
         const auto deps = UpdIter->RecurseQueue.GetDeps(node);
         if (deps) {
@@ -430,7 +422,7 @@ void TYMake::AddRecursesToStartTargets() {
                     continue;
                 }
                 const auto& [depNode, depType] = dep;
-                if (!ValidateRecurseDep(Graph, node, depNode, depType, reportNoYamake)) {
+                if (!ValidateRecurseDep(Graph, node, depNode, depType)) {
                     continue;
                 }
                 if (IsDependsDep(node.NodeType, depType, depNode.NodeType) && UpdIter->RecurseQueue.IsReachable(depNode)) {

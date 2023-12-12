@@ -57,15 +57,13 @@ bool TMakeCmd::operator!=(const TMakeCmd& rhs) const {
 }
 
 template <>
-void TMakeNode::WriteAsJson(TJsonWriter& writer, bool EnableNodeSelfUidPrint) const {
+void TMakeNode::WriteAsJson(TJsonWriter& writer) const {
     writer.OpenMap();
 
     writer.Write("uid", this->Uid);
 
-    if (EnableNodeSelfUidPrint) {
-        Y_ASSERT(!this->SelfUid.empty());
-        writer.Write("self_uid", this->SelfUid);
-    }
+    Y_ASSERT(!this->SelfUid.empty());
+    writer.Write("self_uid", this->SelfUid);
 
     writer.OpenArray("cmds");
     for (const auto& x : this->Cmds) {
@@ -182,8 +180,8 @@ bool TMakeNode::operator!=(const TMakeNode& rhs) const {
     return !(rhs == *this);
 }
 
-TMakePlan::TMakePlan(NJson::TJsonWriter& writer, bool EnableNodeSelfUidPrint)
-    : Writer(writer), EnableNodeSelfUidPrint(EnableNodeSelfUidPrint) {
+TMakePlan::TMakePlan(NJson::TJsonWriter& writer)
+    : Writer(writer) {
 }
 
 TMakePlan::~TMakePlan() {
@@ -216,7 +214,7 @@ void TMakePlan::Flush() {
     }
 
     for (const auto& x : this->Nodes) {
-        x.WriteAsJson(Writer, EnableNodeSelfUidPrint);
+        x.WriteAsJson(Writer);
     }
 
     Nodes.clear();

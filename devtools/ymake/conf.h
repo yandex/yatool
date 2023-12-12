@@ -82,44 +82,16 @@ public:
         return TraverseDepends;
     }
 
-    bool ShouldAddGlobalSrcsToResults() const {
-        return AddGlobalSrcToResults;
-    }
-
     bool ShouldAddPeerdirsGenTests() const {
         return AddPeerdirsGenTests;
-    }
-
-    bool ShouldChkPeersForGlobalSrcs() const {
-        return ChkPeersForGlobalSrcs;
-    }
-
-    bool ShouldCheckGoIncorrectDeps() const {
-        return CheckGoIncorrectDeps;
-    }
-
-    bool ShouldReportRecurseNoYamake() const {
-        return ReportRecurseNoYamake;
     }
 
     bool ShouldAddPeersToInputs() const {
         return AddPeersToInputs;
     }
 
-    bool ShouldForceResolveMacroIncls() const {
-        return ForceResolveForMacroIncls;
-    }
-
     bool ShouldAddDataPaths() const {
         return AddDataPaths;
-    }
-
-    bool ShouldWriteSelfUids() const {
-        return SelfUidsEnabled;
-    }
-
-    bool ShouldResolveOutInclsStrictly() const {
-        return StrictOutInclsResolving;
     }
 
     bool ShouldForceListDirInResolving() const {
@@ -136,18 +108,6 @@ public:
 
     bool ShouldReportMissingAddincls() const noexcept {
         return ReportMissingAddincls;
-    }
-
-    bool ShouldReportAllDupSrc() const {
-        return ReportAllDupSrc;
-    }
-
-    bool IsReresolveForGeneratedFilesEnabled() const {
-        return ReresolveForGeneratedFiles;
-    }
-
-    bool ShouldIgnoreDupSrcFor(TStringBuf name) const {
-        return DupSrcIgnoreSet.contains(name);
     }
 
     TStringBuf GetUidsSalt() const {
@@ -179,25 +139,16 @@ private:
     bool TraverseDepends = false;
     bool AddGlobalSrcToResults = false;
     bool AddPeerdirsGenTests = false;
-    bool ChkPeersForGlobalSrcs = false;
-    bool CheckGoIncorrectDeps = false;
-    bool ReportRecurseNoYamake = false;
     bool AddPeersToInputs = false;
-    bool ForceResolveForMacroIncls = false;
     bool AddDataPaths = false;
-    bool SelfUidsEnabled = false;
-    bool StrictOutInclsResolving = false;
     bool ForceListDirInResolving = false;
     bool CheckDependsInDart = false;
     bool NeedDirHints = false;
-    bool ReportAllDupSrc = false;
-    bool ReresolveForGeneratedFiles = false;
     bool ReportMissingAddincls = true;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
     THashMap<TString, TString> DefaultRequirements;
-    THashSet<TStringBuf> DupSrcIgnoreSet;
 };
 
 TBuildConfiguration* GlobalConf();

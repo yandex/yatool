@@ -252,31 +252,15 @@ void TBuildConfiguration::FillMiscValues() {
     TraverseDepsTests = TraverseAllRecurses && NYMake::IsTrue(CommandConf.EvalValue("RECURSIVE_ADD_PEERS_TESTS"));
     FailOnRecurse = NYMake::IsTrue(CommandConf.EvalValue("FAIL_ON_RECURSE"));
     TraverseDepends = NYMake::IsTrue(CommandConf.EvalValue("TRAVERSE_DEPENDS"));
-    AddGlobalSrcToResults = NYMake::IsTrue(CommandConf.EvalValue("GLOBAL_SRCS_IN_RESULTS"));
     AddPeerdirsGenTests = NYMake::IsTrue(CommandConf.EvalValue("ADD_PEERDIRS_GEN_TESTS"));
-    ChkPeersForGlobalSrcs = NYMake::IsTrue(CommandConf.EvalValue("CHKPEERS_GLOBAL_SRCS"));
-    CheckGoIncorrectDeps = NYMake::IsTrue(CommandConf.EvalValue("CHECK_GO_INCORRECT_DEPS"));
-    ReportRecurseNoYamake = NYMake::IsTrue(CommandConf.EvalValue("REPORT_RECURSE_NO_YAMAKE"));
     AddPeersToInputs = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_PEERS_TO_INPUTS"));
-    ForceResolveForMacroIncls = NYMake::IsTrue(CommandConf.EvalValue("FORCE_RESOLVE_MACRO_INCLS"));
     AddDataPaths = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_DATA"));
-    SelfUidsEnabled = NYMake::IsTrue(CommandConf.EvalValue("ENABLE_NODE_SELF_UID"));
-    StrictOutInclsResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_OUTPUT_INCLUDES_AS_INCLUDES"));
     ForceListDirInResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_FORCE_LISTDIR"));
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
     NeedDirHints = NYMake::IsTrue(CommandConf.EvalValue("EMIT_NEEDDIR_HINTS"));
 
-    const auto reportAllDupSrc = CommandConf.EvalValue("REPORT_ALL_DUPSRC");
-    ReportAllDupSrc = NYMake::IsTrue(reportAllDupSrc);
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
         ReportMissingAddincls = !NYMake::IsTrue(val);
-    }
-
-    const auto reresolveForGeneratedFiles = CommandConf.EvalValue("ENABLE_RERESOLVE_FOR_GENERATED_FILES");
-    ReresolveForGeneratedFiles = NYMake::IsTrue(reresolveForGeneratedFiles);
-
-    for (const auto name : StringSplitter(CommandConf.EvalValue("_DUPSRC_IGNORE_LIST")).Split(' ').SkipEmpty()) {
-        DupSrcIgnoreSet.insert(name);
     }
 
     if (CacheConfig.empty()) {

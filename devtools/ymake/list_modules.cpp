@@ -19,7 +19,6 @@ namespace {
 }
 
 void TYMake::ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& modules, TVector<TNodeId>& globSrcs) const {
-    bool listGlobSrcs = Conf.ShouldAddGlobalSrcsToResults();
     TNodeId nodeStart = startTarget.Id;
     auto node = Graph[nodeStart];
     if (!IsModuleType(node->NodeType)) {
@@ -33,7 +32,7 @@ void TYMake::ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& mod
         modules.push_back(node.Id());
     }
 
-    if (listGlobSrcs && node->NodeType == EMNT_Library && !IsCompleteTarget(Modules, node->ElemId)) {
+    if (node->NodeType == EMNT_Library && !IsCompleteTarget(Modules, node->ElemId)) {
         for (auto xdep: node.Edges()) {
             if (IsGlobalSrcDep(xdep) && xdep.To()->NodeType == EMNT_NonParsedFile) {
                 globSrcs.push_back(xdep.To().Id());

@@ -713,21 +713,12 @@ TCommandInfo::ECmdInfoState TCommandInfo::CheckInputs(TModuleBuilder& modBuilder
                     return;
                 }
             } else {
-                if (Conf->ShouldResolveOutInclsStrictly()) {
-                    // Only try to resolve as known by default (without FS check),
-                    // delay actual resolvig as include until InducedDeps property is applied.
-                    modBuilder.ResolveAsKnownWithoutCheck(outputInclude);
-                    auto resolveFile = modBuilder.MakeUnresolved(outputInclude.Name);
-                    outputInclude.Name = modBuilder.GetStr(resolveFile);
-                    outputInclude.ElemId = resolveFile.GetElemId();
-                } else {
-                    // FIXME(spreis): this will be removed when strict resolving become default
-                    modBuilder.ResolveInducedDepPath(outputInclude, InputDir, TModuleResolver::LastTry);
-                    if (!CheckForDirectory(outputInclude, Cmd, "output include"sv)) {
-                        state = SKIPPED;
-                        return;
-                    }
-                }
+                // Only try to resolve as known by default (without FS check),
+                // delay actual resolvig as include until InducedDeps property is applied.
+                modBuilder.ResolveAsKnownWithoutCheck(outputInclude);
+                auto resolveFile = modBuilder.MakeUnresolved(outputInclude.Name);
+                outputInclude.Name = modBuilder.GetStr(resolveFile);
+                outputInclude.ElemId = resolveFile.GetElemId();
             }
             Y_ASSERT(outputInclude.ElemId); // Must be filled in all ways
         }
@@ -770,11 +761,9 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
 
             // We do not consider outputs of module command that macth main module output as a DupSrc issue
-            if (Conf->ShouldReportAllDupSrc() && !mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
+            if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
                 if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(fid)) {
-                    if (!Conf->ShouldIgnoreDupSrcFor(output.Name)) {
-                        ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
-                    }
+                    ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
                 }
             }
 

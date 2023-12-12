@@ -69,7 +69,7 @@ struct TMakeNodeDescription {
     bool operator==(const TMakeNodeDescription& rhs) const;
     bool operator!=(const TMakeNodeDescription& rhs) const;
 
-    void WriteAsJson(NJson::TJsonWriter&, bool) const;
+    void WriteAsJson(NJson::TJsonWriter&) const;
 };
 
 using TMakeCmd = TMakeCmdDescription<NCache::TOriginal, NCache::TJoinedCommand>;
@@ -77,7 +77,6 @@ using TMakeNode = TMakeNodeDescription<NCache::TOriginal, NCache::TJoinedOrigina
 
 struct TMakePlan {
     NJson::TJsonWriter& Writer;
-    bool EnableNodeSelfUidPrint = false;
     THashMap<TString, TMd5Sig> Inputs;
     TVector<TMakeNode> Nodes;
     TVector<TMakeUid> Results;
@@ -88,7 +87,7 @@ private:
     bool ConfWritten = false;
 
 public:
-    TMakePlan(NJson::TJsonWriter& writer, bool EnableNodeSelfUidPrint);
+    explicit TMakePlan(NJson::TJsonWriter& writer);
     ~TMakePlan();
 
     void Flush();

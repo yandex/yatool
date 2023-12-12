@@ -541,9 +541,7 @@ void TDGIterAddable::RepeatResolving(TYMake& ymake, TAddIterStack& stack, TFileH
     if (Node.NodeType == EMNT_File) {
         ymake.IncParserManager.ProcessFile(*fileContent, ymake.GetFileProcessContext(module, node));
     } else if (Node.NodeType == EMNT_NonParsedFile) {
-        if (!ymake.Conf.IsReresolveForGeneratedFilesEnabled()) {
-            return;
-        } else if (auto ptr = module->RawIncludes.FindPtr(Node.ElemId)) {
+        if (auto ptr = module->RawIncludes.FindPtr(Node.ElemId)) {
             node.NodeType = Node.NodeType;
             node.ElemId = Node.ElemId;
 
@@ -939,7 +937,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
         case EMNT_NonParsedFile:
             if (Add && !Add->NeedInit2 && Dep.DepType != EDT_Include) {
                 Add->InitDepsRule();
-                TAddDepContext context(*Add, ymake.Conf.IsReresolveForGeneratedFilesEnabled() && ymake.Conf.WriteDepsCache);
+                TAddDepContext context(*Add, ymake.Conf.WriteDepsCache);
                 InduceDeps(context, TPropertiesStateWrapper(props, ymake.UpdIter->GetPropsToUse(Node), restrictedProps));
 
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {

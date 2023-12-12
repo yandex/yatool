@@ -1481,7 +1481,7 @@ public:
         if (IsTooldirDep(dep) || IsPeerdirDep(dep)) {
             return false;
         }
-        return *dep == EDT_Include || *dep == EDT_BuildFrom || (RestoreContext.Conf.ShouldChkPeersForGlobalSrcs() && IsGlobalSrcDep(dep));
+        return *dep == EDT_Include || *dep == EDT_BuildFrom || IsGlobalSrcDep(dep);
     }
 
     bool Enter(TState& state) {
@@ -2033,11 +2033,9 @@ void TYMake::DumpBuildTargets(IOutputStream& cmsg) {
             cmsg << Conf.RealPath(Graph.GetFileName(Graph.Get(mod))) << Endl;
         }
 
-        if (Conf.ShouldAddGlobalSrcsToResults()) {
-            cmsg << "Will also build:" << Endl;
-            for (const auto& obj : glSrcIds) {
-                cmsg << Conf.RealPath(Graph.GetFileName(Graph.Get(obj))) << Endl;
-            }
+        cmsg << "Will also build:" << Endl;
+        for (const auto& obj : glSrcIds) {
+            cmsg << Conf.RealPath(Graph.GetFileName(Graph.Get(obj))) << Endl;
         }
     }
 }

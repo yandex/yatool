@@ -908,9 +908,7 @@ void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TV
         const auto peers = restorer.GetPeers().Data();
         checker.Check(*startModule, startModuleNode.Id());
 
-        if (restoreContext.Conf.ShouldCheckGoIncorrectDeps()) {
-            CheckGoTestIncorrectDep(startModule,restoreContext);
-        }
+        CheckGoTestIncorrectDep(startModule,restoreContext);
 
         for (TNodeId peer : peers) {
             const auto node = restoreContext.Graph.Get(peer);

@@ -339,7 +339,7 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
                 TInclude alias{TInclude::EKind::System, sysinclPath};
                 ResolveSingleInclude(src, alias, result, langId);
             }
-        } else if (Conf.ShouldForceResolveMacroIncls()) {
+        } else {
             YConfErr(BadIncl) << "Can't resolve macro target " << include.Path << " from " << src << Endl;
         }
         return;

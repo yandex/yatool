@@ -341,7 +341,7 @@ namespace {
     TString RenderMakeNode(const TMakeNode& node) {
         TStringStream out;
         NJson::TJsonWriter jsonWriter(&out, false, false);
-        node.WriteAsJson(jsonWriter, false);
+        node.WriteAsJson(jsonWriter);
         return out.Str();
     };
 
@@ -666,7 +666,7 @@ void ExportJSON(TYMake& yMake) {
 
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
         NJson::TJsonWriter jsonWriter(output.Get(), false);
-        TMakePlan plan(jsonWriter, yMake.Conf.ShouldWriteSelfUids());
+        TMakePlan plan(jsonWriter);
 
         FORCE_TRACE(U, NEvent::TStageStarted("Render JSON"));
         RenderJSONGraph(yMake, plan);
