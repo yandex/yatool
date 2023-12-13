@@ -580,7 +580,7 @@ def configure_build_graph_cache_dir(app_ctx, opts):
         logger.debug("Build graph cache enabled")
     except Exception as e:
         build_graph_cache.reset_build_graph_cache(opts)
-        logger.debug("(ya_make) Build graph cache disabled %s", e)
+        logger.exception("(ya_make) Build graph cache disabled %s", e)
 
 
 def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Failed):
