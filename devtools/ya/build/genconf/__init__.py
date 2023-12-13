@@ -73,7 +73,10 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
     else:
         res = tools.resolve_tool('c++', host, target)
     if is_local(res):
-        version = subprocess.check_output(['xcodebuild', '-version'], text=True).split()[1]
+        kwargs = {}
+        if six.PY3:
+            kwargs['text'] = True
+        version = subprocess.check_output(['xcodebuild', '-version'], **kwargs).split()[1]
         expect_version = res['params']['gcc_version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
@@ -102,8 +105,8 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
         res['params']['ibtool'] = subprocess.check_output(['xcrun', '--find', 'ibtool']).strip()
         res['params']['simctl'] = subprocess.check_output(['xcrun', '--find', 'simctl']).strip()
         res['params']['profiles'] = os.path.join(
-            subprocess.check_output(['xcrun', '-sdk', 'iphoneos', '--show-sdk-platform-path']).strip(),
-            'Library/Developer/CoreSimulator/Profiles'.encode(),
+            six.ensure_str(subprocess.check_output(['xcrun', '-sdk', 'iphoneos', '--show-sdk-platform-path']).strip()),
+            'Library/Developer/CoreSimulator/Profiles',
         )
         res['params']['ar'] = subprocess.check_output(['xcrun', '--find', 'libtool']).strip()
         res['params']['strip'] = subprocess.check_output(['xcrun', '--find', 'strip']).strip()
