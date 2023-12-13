@@ -172,7 +172,7 @@ def gen_specific_tc_for_ide(ide):
 
 
 def parse_local_ymake(path):
-    local_ymake_content = exts.fs.read_file(path)
+    local_ymake_content = exts.fs.read_text(path)
 
     def get_kv():
         res = []
