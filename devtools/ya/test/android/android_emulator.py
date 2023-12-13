@@ -109,7 +109,7 @@ class AndroidEmulator(object):
                 self._get_adb_cmd(device_id) + ['get-state'],
                 check_exit_code=True,
                 env=self.env,
-            ).std_out
+            ).stdout
 
         emulator_state = get_emulator_state()
         while emulator_state != 'device':
