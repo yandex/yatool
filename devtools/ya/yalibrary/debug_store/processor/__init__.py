@@ -191,6 +191,7 @@ class BaseDumpItem(object):
             ).generate(self.workdir / self.HTML_FILE_NAME)
         except Exception:
             self.logger.exception("While creating HTML file")
+            self.logger.warning("Data: %s", debug_bundle_data)
 
         files_list = self.workdir / self.FILES_LIST
         self.logger.debug("Write file list info into %s", files_list)

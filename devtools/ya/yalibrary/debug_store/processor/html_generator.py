@@ -36,7 +36,7 @@ class HTMLGenerator:
         self.env.filters['pretty_delta'] = pretty_delta
         self.env.filters['sort_files_info'] = _sort_files_info
 
-        self.template = self.env.from_string(rs.resfs_read("template.jinja2"))
+        self.template = self.env.from_string(six.ensure_str(rs.resfs_read("template.jinja2")))
 
     def _found_tracebacks(self, log_file):
         if log_file is None:
@@ -124,7 +124,6 @@ class HTMLGenerator:
             'resources': self.debug_bundle.get('resources', {}),
             'exit_code': self.debug_bundle.get('exit_code'),
         }
-
         to_path.write_text(six.ensure_text(self.template.render(**data)), encoding='utf-8')
 
     def _check_ymake_runs(self):
