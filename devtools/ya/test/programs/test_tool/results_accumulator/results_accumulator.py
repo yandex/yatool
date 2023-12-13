@@ -124,7 +124,7 @@ def merge_coverage_merge_logs(files, dst):
         files = [filename for filename, _ in sorted(stat, key=lambda x: x[1])]
         # make sure there will be the smallest and the largest logs
         max_files -= 2
-        step = len(files) // max_files
+        step = int(len(files) // max_files)
         files = [files[0]] + files[1:-1:step][:max_files] + [files[-1]]
 
     shared.concatenate_files(files, dst)
