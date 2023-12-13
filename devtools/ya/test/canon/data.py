@@ -707,9 +707,7 @@ class CanonicalData(object):
         else:
             if test_result is not None:
                 raise CanonicalDataMissingError(
-                    "Cannot find canonical data for {}, canonize test results or ensure the canonical data exists in {}".format(
-                        test_name, const.CANON_DATA_DIR_NAME
-                    )
+                    "No canonical data for test {}, canonize test results using -Z option".format(test_name)
                 )
 
     def _save_test(self, test_name, test_result, output_path, is_diff_test=False):
