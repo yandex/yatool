@@ -103,7 +103,7 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
         res['params']['simctl'] = subprocess.check_output(['xcrun', '--find', 'simctl']).strip()
         res['params']['profiles'] = os.path.join(
             subprocess.check_output(['xcrun', '-sdk', 'iphoneos', '--show-sdk-platform-path']).strip(),
-            'Library/Developer/CoreSimulator/Profiles',
+            'Library/Developer/CoreSimulator/Profiles'.encode(),
         )
         res['params']['ar'] = subprocess.check_output(['xcrun', '--find', 'libtool']).strip()
         res['params']['strip'] = subprocess.check_output(['xcrun', '--find', 'strip']).strip()
