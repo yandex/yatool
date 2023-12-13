@@ -1,8 +1,10 @@
+import logging
 import os
 import sys
 import threading
 import socket
 import six.moves.queue as Queue
+import time
 
 
 import exts.fs
@@ -11,6 +13,8 @@ import test.system.process as process
 
 from yatest.common.network import PortManager
 from yatest.common.process import InvalidExecutionStateError
+
+logger = logging.getLogger(__name__)
 
 ADB_PATH = 'platform-tools/adb'
 EMULATOR_PATH = 'emulator/emulator'
@@ -99,12 +103,19 @@ class AndroidEmulator(object):
         port = port[0]
         device_id = 'emulator-' + port.decode()
         self.running_devices[device_name]['device_id'] = device_id
-        process.execute(
-            self._get_adb_cmd(device_id)
-            + ['wait-for-device', 'shell', "'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'"],
-            check_exit_code=True,
-            env=self.env,
-        )
+
+        def get_emulator_state():
+            return process.execute(
+                self._get_adb_cmd(device_id) + ['get-state'],
+                check_exit_code=True,
+                env=self.env,
+            ).std_out
+
+        emulator_state = get_emulator_state()
+        while emulator_state != 'device':
+            logger.info('Emulator state {}'.format(emulator_state))
+            time.sleep(1)
+            emulator_state = get_emulator_state()
 
     def install_app(self, device_name, app_path, app_name):
         device_id = self._get_device_id(device_name)
@@ -113,7 +124,7 @@ class AndroidEmulator(object):
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
-            check_script.write('while [[ ! -f {} ]]; do sleep 1; done;'.format(end_marker))
+            check_script.write('while [[ ! -f {} ]]; do sleep 1; done; input keyevent 82'.format(end_marker))
 
         push_dir = '/sdcard/'
         self.run_cmd(device_id, ['push', self.check_marker_script, push_dir + self.check_marker_script])
