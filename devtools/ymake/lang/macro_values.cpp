@@ -2,7 +2,13 @@
 
 #include <devtools/ymake/symbols/cmd_store.h>
 
+#include <fmt/format.h>
+
 namespace {
+
+    constexpr static ui32 COORD_BITS = 20;
+    constexpr static ui32 COORD_MASK = (1 << COORD_BITS) - 1;
+    constexpr static ui32 COORD_ARRAY_FLAG = 1 << COORD_BITS;
 
     constexpr ui16 FunctionArity(EMacroFunctions func) noexcept {
         ui16 res = 0;
@@ -69,7 +75,13 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
             return NPolexpr::TConstId(ST_TOOLS, Refs.Add(val.Data));
         else if constexpr (std::is_same_v<T, TInput>)
             return NPolexpr::TConstId(ST_INPUTS, val.Coord);
-        else if constexpr (std::is_same_v<T, TOutput>)
+        else if constexpr (std::is_same_v<T, TInputs>) {
+            // _obviously_, storing a proper array would be better,
+            // but a naive implementation might actually be not as efficient;
+            // TODO a general array storage
+            auto encoded = fmt::format("{}", fmt::join(val.Coords, " "));
+            return NPolexpr::TConstId(ST_INPUTS, Strings.Add(encoded) | COORD_ARRAY_FLAG);
+        } else if constexpr (std::is_same_v<T, TOutput>)
             return NPolexpr::TConstId(ST_OUTPUTS, val.Coord);
         else if constexpr (std::is_same_v<T, TCmdPattern>)
             return NPolexpr::TConstId(ST_PATTERN, CmdPattern.Add(val.Data));
@@ -82,8 +94,16 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
             return Strings.GetName<TCmdView>(id.GetIdx()).GetStr();
         case ST_TOOLS:
             return TTool {.Data = Refs.GetName<TCmdView>(id.GetIdx()).GetStr()};
-        case ST_INPUTS:
-            return TInput {.Coord = id.GetIdx()};
+        case ST_INPUTS: {
+            auto idx = id.GetIdx();
+            if ((idx & COORD_ARRAY_FLAG) == 0)
+                return TInput {.Coord = idx};
+            auto result = TInputs();
+            auto encoded = Strings.GetName<TCmdView>(idx & COORD_MASK).GetStr();
+            for (auto coord : StringSplitter(encoded).Split(' '))
+                result.Coords.push_back(FromString<ui32>(coord.Token()));
+            return result;
+        }
         case ST_OUTPUTS:
             return TOutput {.Coord = id.GetIdx()};
         case ST_PATTERN:

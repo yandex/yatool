@@ -44,6 +44,10 @@ public:
         ui32 Coord;
         bool operator==(const TInput&) const = default;
     };
+    struct TInputs {
+        TVector<ui32> Coords;
+        bool operator==(const TInputs&) const = default;
+    };
     struct TOutput {
         ui32 Coord;
         bool operator==(const TOutput&) const = default;
@@ -52,7 +56,7 @@ public:
         std::string_view Data;
         bool operator==(const TCmdPattern&) const = default;
     };
-    using TValue = std::variant<std::string_view, TTool, TInput, TOutput, TCmdPattern>;
+    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TCmdPattern>;
 
     enum EStorageType {
         ST_LITERALS,

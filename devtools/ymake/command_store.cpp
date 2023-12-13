@@ -2,6 +2,7 @@
 #include "add_dep_adaptor.h"
 #include "add_dep_adaptor_inline.h"
 
+#include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/lang/cmd_parser.h>
 #include <devtools/ymake/polexpr/evaluate.h>
@@ -85,7 +86,19 @@ namespace {
                         if (unwrappedArgs.size() != 1)
                             throw std::runtime_error{"Invalid number of arguments"};
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return TMacroValues::TInput {.Coord = CollectCoord(arg0, Inputs)};
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() == 1) {
+                            // one does not simply reuse the original argument,
+                            // since it might have been transformed (e.g., dequoted)
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
+                            return TMacroValues::TInput {.Coord = CollectCoord(pooledName, Inputs)};
+                        }
+                        auto result = TMacroValues::TInputs();
+                        for (auto& name : names) {
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(name)));
+                            result.Coords.push_back(CollectCoord(pooledName, Inputs));
+                        }
+                        return result;
                     }
                     case EMacroFunctions::Output: {
                         if (unwrappedArgs.size() != 1)
@@ -805,6 +818,7 @@ TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr) const {
                 [](std::string_view          val) { return fmt::format("'{}'", val); },
                 [](TMacroValues::TTool       val) { return fmt::format("Tool{{'{}'}}", val.Data); },
                 [](TMacroValues::TInput      val) { return fmt::format("Input{{{}}}", val.Coord); },
+                [](TMacroValues::TInputs     val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
                 [](TMacroValues::TOutput     val) { return fmt::format("Output{{{}}}", val.Coord); },
                 [](TMacroValues::TCmdPattern val) { return fmt::format("'{}'", val.Data); }
             }, Values.GetValue(id));
@@ -879,7 +893,14 @@ void TCommands::WriteShellCmd(ICommandSequenceWriter* writer, const NPolexpr::TE
                 auto [term, endTerm] = ::NPolexpr::Evaluate<TTermValue>(cmdExpr, beginTerm, [&](auto id, auto&&... args) -> TTermValue {
                     if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
                         static_assert(sizeof...(args) == 0);
-                        return TString(ConstToString(Values.GetValue(id), ctx));
+                        auto val = Values.GetValue(id);
+                        if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
+                            auto result = TVector<TString>();
+                            for (auto& coord : inputs->Coords)
+                                result.push_back(ConstToString(TMacroValues::TInput {.Coord = coord}, ctx));
+                            return result;
+                        }
+                        return TString(ConstToString(val, ctx));
                     }
                     else if constexpr (std::is_same_v<decltype(id), NPolexpr::EVarId>) {
                         static_assert(sizeof...(args) == 0);
@@ -1042,6 +1063,9 @@ TString TCommands::ConstToString(const TMacroValues::TValue& value, const TEvalC
         [&](TMacroValues::TInput val) {
             return TString(ctx.Vars.at("INPUT").at(val.Coord).Name);
         },
+        [&](const TMacroValues::TInputs&) -> TString {
+            Y_ABORT();
+        },
         [&](TMacroValues::TOutput val) {
             return TString(ctx.Vars.at("OUTPUT").at(val.Coord).Name);
         },
@@ -1056,6 +1080,7 @@ TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
         [](std::string_view          val) { return TString(val); },
         [](TMacroValues::TTool       val) { return TString(val.Data); },
         [](TMacroValues::TInput      val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TInputs     val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TOutput     val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TCmdPattern val) { return TString(val.Data); }
     }, Values.GetValue(node));
