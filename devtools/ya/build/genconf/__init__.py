@@ -73,10 +73,14 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
     else:
         res = tools.resolve_tool('c++', host, target)
     if is_local(res):
-        kwargs = {}
-        if six.PY3:
-            kwargs['text'] = True
-        version = subprocess.check_output(['xcodebuild', '-version'], **kwargs).split()[1]
+
+        def get_output(*args):
+            kwargs = {}
+            if six.PY3:
+                kwargs['text'] = True
+            return subprocess.check_output(tuple(args), **kwargs).strip()
+
+        version = get_output('xcodebuild', '-version').split()[1]
         expect_version = res['params']['gcc_version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
@@ -99,20 +103,18 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
                     '\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.'
                 )
                 raise Exception('Unsupported Xcode version, installed = {}'.format(version))
-        res['params']['c_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang']).strip()
-        res['params']['cxx_compiler'] = subprocess.check_output(['xcrun', '--find', 'clang++']).strip()
-        res['params']['actool'] = subprocess.check_output(['xcrun', '--find', 'actool']).strip()
-        res['params']['ibtool'] = subprocess.check_output(['xcrun', '--find', 'ibtool']).strip()
-        res['params']['simctl'] = subprocess.check_output(['xcrun', '--find', 'simctl']).strip()
+        res['params']['c_compiler'] = get_output('xcrun', '--find', 'clang')
+        res['params']['cxx_compiler'] = get_output('xcrun', '--find', 'clang++')
+        res['params']['actool'] = get_output('xcrun', '--find', 'actool')
+        res['params']['ibtool'] = get_output('xcrun', '--find', 'ibtool')
+        res['params']['simctl'] = get_output('xcrun', '--find', 'simctl')
         res['params']['profiles'] = os.path.join(
-            six.ensure_str(subprocess.check_output(['xcrun', '-sdk', 'iphoneos', '--show-sdk-platform-path']).strip()),
+            get_output('xcrun', '-sdk', 'iphoneos', '--show-sdk-platform-path'),
             'Library/Developer/CoreSimulator/Profiles',
         )
-        res['params']['ar'] = subprocess.check_output(['xcrun', '--find', 'libtool']).strip()
-        res['params']['strip'] = subprocess.check_output(['xcrun', '--find', 'strip']).strip()
-        res['params']['dwarf_tool'] = {
-            'DARWIN': subprocess.check_output(['xcrun', '--find', 'dsymutil']).strip() + ' -flat'
-        }
+        res['params']['ar'] = get_output('xcrun', '--find', 'libtool')
+        res['params']['strip'] = get_output('xcrun', '--find', 'strip')
+        res['params']['dwarf_tool'] = {'DARWIN': get_output('xcrun', '--find', 'dsymutil') + ' -flat'}
     # res is referencing to the cached dict
     return res.copy()
 
