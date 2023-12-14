@@ -397,6 +397,16 @@ namespace {
             CurTarget->DirMacros.push_back({name, ConvertMacroArgs(args)});
         }
 
+        bool SupportsAllocator() const {
+            if (!CurTarget) {
+                spdlog::error("attempt to check support allocator while there is no active target");
+                return false;
+            }
+            // Ugly hack here. In Jinja generator world PROGRAM and DLL target should use their own templates
+            // and handle allocators in a different way then other target types
+            return CurTarget->Macro == "add_executable"sv || (CurTarget->Macro == "add_library" && !CurTarget->MacroArgs.empty() && CurTarget->MacroArgs[0] == "SHARED"sv);
+        }
+
         void AddGlobalVar(const std::string& name, std::span<const std::string> args) {
             auto& platformGlobalVars = Platform.GlobalVars;
             if (args.empty() || platformGlobalVars.contains(name)) {
@@ -742,7 +752,8 @@ namespace {
                     // ${tool;rootrel:...} is broken :(
                     const auto fres = TargetsDict.find(std::string_view(semArgs[1]).substr("${CMAKE_BINARY_DIR}/"sv.size()));
                     if (fres == TargetsDict.end()) {
-                        spdlog::error("No proto plugin tool found '{}' for target '{}'", semArgs[1], ProjectBuilder.CurrentTarget()->Name);
+                        const auto* curTarget = ProjectBuilder.CurrentTarget();
+                        spdlog::error("No proto plugin tool found '{}' for target '{}'", semArgs[1], curTarget ? curTarget->Name : "NO_TARGET");
                         return false;
                     }
                     const std::string patchedArgs[] = {semArgs[0], fres->second->Name};
@@ -823,12 +834,13 @@ namespace {
                 }
                 const auto allocIt = InducedAllocator.find(dep.To().Id());
                 if (allocIt != InducedAllocator.end()) {
-                    if (supportsAllocator(*ProjectBuilder.CurrentTarget())) {
+                    if (ProjectBuilder.SupportsAllocator()) {
                         ProjectBuilder.AddTargetMacro("target_allocator", allocIt->second, EMacroMergePolicy::ConcatArgs);
                     } else {
+                        const auto* curTarget = ProjectBuilder.CurrentTarget();
                         ProjectBuilder.AddTargetAttr(
                             "target_link_libraries",
-                            ProjectBuilder.CurrentTarget()->InterfaceTarget ? ECMakeAttrScope::Interface : ECMakeAttrScope::Public,
+                            curTarget && curTarget->InterfaceTarget ? ECMakeAttrScope::Interface : ECMakeAttrScope::Public,
                             allocIt->second
                         );
                     }
@@ -860,12 +872,6 @@ namespace {
 
             spdlog::error("invalid value for FAKE_MODULE argument: {}", args[1]);
             return false;
-        }
-
-        bool supportsAllocator(const TCMakeTarget& tgt) const {
-            // Ugly hack here. In Jinja generator world PROGRAM and DLL target should use their own templates
-            // and handle allocators in a different way then other target types
-            return tgt.Macro == "add_executable"sv || (tgt.Macro == "add_library" && !tgt.MacroArgs.empty() && tgt.MacroArgs[0] == "SHARED"sv);
         }
 
         void AddTool(TStringBuf arcadiaPath, TStringBuf toolName) {
