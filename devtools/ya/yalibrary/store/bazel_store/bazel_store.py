@@ -19,7 +19,7 @@ DOWNLOAD_CHUNK_SIZE = 1 << 15
 META_VERSION = '1'
 SHA256_LENGTH = 64
 
-EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP'])
+EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL'])
 
 logger = logging.getLogger(__name__)
 
