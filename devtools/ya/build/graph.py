@@ -92,7 +92,6 @@ ALLOWED_EXTRA_RESOURCES = {
     'YTEXEC': 'ytexec',
     'KTLINT': 'ktlint',
     'KTLINT_OLD': 'ktlint_old',
-    'CLANG_TIDY_BIN': 'clang-tidy',
 }
 
 PLATFORM_FLAGS = set(['MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'])
@@ -2889,10 +2888,6 @@ def _merge_target_graphs(
             # All required results will be added later while injecting tests.
             logger.debug("Drop graph's result (%d)", len(graph.get_result()))
             graph.set_result([])
-
-        if clang_tidy_mode:
-            clang_resource = host_tool_resolver.resolve("clang-tidy", "CLANG_TIDY_BIN")
-            graph.add_resource(clang_resource)
 
         if _should_run_tests(opts, tpc):
             debug_id = 'test_tool_tc%s-{ispic}' % graph_handles_num
