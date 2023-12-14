@@ -50,11 +50,11 @@ namespace {
 
 TContribCoords TDefaultContribExtractor::operator()(std::string_view graphModPath) const {
     const auto mk = GetYaMakePath(graphModPath);
-    TFileInput in{mk.string()};
+    TFileInput in{mk};
     auto ver = ExtractVersion(mk, in);
     if (ver.empty()) {
         const auto mk2 = GetYaMakePath(graphModPath, PyVer_);
-        TFileInput in2{mk2.string()};
+        TFileInput in2{mk2};
         ver = ExtractVersion(mk2, in2);
         if (ver.empty()) {
             throw yexception() << fmt::format("{}: No VERSION statement found for contrib", GetModdir(graphModPath));
@@ -123,7 +123,7 @@ void TPyRequirementsGenerator::Dump(IOutputStream&) {
 }
 
 void TPyRequirementsGenerator::Render(ECleanIgnored) {
-    TFileInput in{PyDepsDumpPath_.string()};
+    TFileInput in{PyDepsDumpPath_};
     TFileOutput out = ExportFileManager->Open(REQUIRES_FILE);
     Render(in, out);
 }

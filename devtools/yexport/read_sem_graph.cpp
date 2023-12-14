@@ -393,7 +393,7 @@ namespace {
 }
 
 std::pair<THolder<TSemGraph>, TVector<TNodeId>> ReadSemGraph(const std::filesystem::path& path, bool useManagedPeersClosure) {
-    TFileInput in{path.string()};
+    TFileInput in{path};
     return ReadSemGraph(in, useManagedPeersClosure);
 }
 
