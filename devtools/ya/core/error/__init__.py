@@ -22,6 +22,7 @@ TEMPORARY_ERROR_MESSAGES = [
 
 # Node exit codes
 class ExitCodes(object):
+    NO_TESTS_COLLECTED = 9
     TEST_FAILED = 10
     COMPILATION_FAILED = 11
     INFRASTRUCTURE_ERROR = 12

@@ -1538,8 +1538,15 @@ class YaMake(object):
 
         # XXX Don't try to inspect test statuses in listing mode.
         # Listing mode uses different test's info data channel and doesn't set proper test status
-        if not self.opts.list_tests:
-            return self.exit_code or get_suites_exit_code(self.ctx.tests, self.opts.test_fail_exit_code)
+        if self.opts.run_tests and not self.opts.list_tests:
+            if self.ctx.tests:
+                return self.exit_code or get_suites_exit_code(self.ctx.tests, self.opts.test_fail_exit_code)
+            else:
+                # TODO Remove --no-tests-is-error option and fail with NO_TESTS_COLLECTED exit code by default. For more info see YA-1087
+                # Return a special exit code if tests were requested, but no tests were run.
+                if self.opts.no_tests_is_error:
+                    return self.exit_code or core.error.ExitCodes.NO_TESTS_COLLECTED
+
         return self.exit_code
 
     def _test_console_report(self):
@@ -1674,7 +1681,9 @@ class YaMake(object):
 
             self.exit_code = self._calc_exit_code()
 
-            if self.exit_code:
+            if self.exit_code == core.error.ExitCodes.NO_TESTS_COLLECTED:
+                self.app_ctx.display.emit_message("[[bad]]Failed - No tests collected[[rst]]")
+            elif self.exit_code:
                 self.app_ctx.display.emit_message('[[bad]]Failed[[rst]]')
             else:
                 self.app_ctx.display.emit_message('[[good]]Ok[[rst]]')

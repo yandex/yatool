@@ -1876,6 +1876,7 @@ class InterimOptions(core.yarg.Options):
         self.use_command_file_in_testtool = False
         self.use_throttling = False
         self.remove_implicit_data_path = False
+        self.no_tests_is_error = False
 
     def consumer(self):
         return [
@@ -1973,6 +1974,12 @@ class InterimOptions(core.yarg.Options):
             core.yarg.EnvConsumer(
                 'YA_REMOVE_IMPLICIT_DATA_PATH',
                 hook=core.yarg.SetValueHook('remove_implicit_data_path', core.yarg.return_true_if_enabled),
+            ),
+            TestArgConsumer(
+                ['--no-tests-is-error'],
+                help='Return a special exit code if tests were requested, but no tests were run',
+                hook=core.yarg.SetConstValueHook('no_tests_is_error', True),
+                visible=self.Visible,
             ),
         ]
 
