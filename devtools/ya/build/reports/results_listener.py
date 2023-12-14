@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -54,11 +55,22 @@ class BuildResultsListener(object):
             self._on_trace_stage(build_stage)
 
     def _extract_stderr(self, res):
-        from yalibrary.yandex.distbuild import distbs
+        import app_config
 
-        return distbs.extract_stderr(
-            res, self._opts.mds_read_account, download_stderr=self._opts.download_failed_nodes_stderr
-        )
+        if app_config.in_house:
+            from yalibrary.yandex.distbuild import distbs
+
+            return distbs.extract_stderr(
+                res, self._opts.mds_read_account, download_stderr=self._opts.download_failed_nodes_stderr
+            )
+        else:
+            stderrs = copy.copy(res.get('stderrs', []))
+            if self._opts.arc_root:
+                stderrs = [i.replace(self._opts.arc_root, '$(SOURCE_ROOT)') for i in stderrs]
+            build_root = res.get('build_root')
+            if build_root:
+                stderrs = [i.replace(build_root, '$(BUILD_ROOT)') for i in stderrs]
+            return '\n'.join(stderrs), []
 
     def _on_completed(self, uid, res):
         if 'node-type' not in self._nodes[uid]:
