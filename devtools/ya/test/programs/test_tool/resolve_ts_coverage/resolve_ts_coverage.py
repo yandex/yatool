@@ -77,7 +77,7 @@ def file_coverage_to_unified_format(filename, file_cov_info):
                 start_column - 1 if start_column > 0 else 0,
                 segment_end["line"] - 1,
                 end_column - 1 if end_column > 0 else 0,
-                1 if file_cov_info["s"][s_id] else 0,
+                file_cov_info["s"][s_id],
             ]
         )
     # Easier to check manually if we have it sorted
