@@ -882,6 +882,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     const ui64 groupId = Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER);
     for (auto& input : GetInput()) {
         YDIAG(DG) << "Input dep: " << input.Name << Endl;
+
         if (finalTargetCmd) {
             modBuilder.AddDep(input, inputNode, true, groupId);
         } else {
@@ -896,6 +897,15 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                 nodeType = EMNT_NonParsedFile;
             }
 
+            if (nodeType == EMNT_NonParsedFile && TFileConf::IsLink(input.ElemId)) {
+                ui32 targetId = TFileConf::GetTargetId(input.ElemId);
+                auto inputNode = Graph->GetFileNodeById(targetId);
+                if (inputNode.IsValid() && IsModuleType(inputNode->NodeType)) {
+                    input.Name = NPath::GetTargetFromLink(input.Name);
+                    input.ElemId = targetId;
+                    nodeType = inputNode->NodeType;
+                }
+            }
             node.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
         }
         if (TFileConf::IsLink(input.ElemId) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
