@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: termcolor
-Version: 2.3.0
+Version: 2.4.0
 Summary: ANSI color formatting for output in terminal
 Project-URL: Changelog, https://github.com/termcolor/termcolor/releases
 Project-URL: Homepage, https://github.com/termcolor/termcolor
@@ -16,18 +16,17 @@ Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python
-Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3 :: Only
-Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Topic :: Terminals
-Requires-Python: >=3.7
+Requires-Python: >=3.8
 Provides-Extra: tests
 Requires-Dist: pytest; extra == 'tests'
 Requires-Dist: pytest-cov; extra == 'tests'
@@ -124,3 +123,21 @@ cprint("Attention!", "red", attrs=["bold"], file=sys.stderr)
 | Windows      | no      | no   | no        | no         | yes     | no        |
 | Cygwin SSH   | yes     | no   | color     | color      | color   | yes       |
 | Mac Terminal | yes     | no   | yes       | yes        | yes     | yes       |
+
+## Overrides
+
+Terminal colour detection can be disabled or enabled in several ways.
+
+In order of precedence:
+
+1. Calling `colored` or `cprint` with a truthy `no_color` disables colour.
+2. Calling `colored` or `cprint` with a truthy `force_color` forces colour.
+3. Setting the `ANSI_COLORS_DISABLED` environment variable to any value disables colour.
+4. Setting the [`NO_COLOR`](https://no-color.org/) environment variable to any value
+   disables colour.
+5. Setting the [`FORCE_COLOR`](https://force-color.org/) environment variable to any
+   value forces colour.
+6. Setting the `TERM` environment variable to `dumb`, or using such a
+   [dumb terminal](https://en.wikipedia.org/wiki/Computer_terminal#Character-oriented_terminal),
+   disables colour.
+7. Finally, termcolor will attempt to detect whether the terminal supports colour.
