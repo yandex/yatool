@@ -189,8 +189,14 @@ def sigalarm_handler(signum, frame):
     )
 
 
-def postprocess_outputs(suite, tags, output_dir, truncate=False, truncate_limit=None):
+def postprocess_outputs(suite, tags, output_dir, truncate=False, truncate_limit=None, keep_symlinks=False):
     stages.stage("postprocess_outputs")
+
+    if keep_symlinks:
+        logger.debug("Symlinks will be kept")
+    else:
+        logger.debug("Removing symlinks: %s", output_dir)
+        tools.remove_links(output_dir)
 
     if truncate and truncate_limit is not None:
         output_limit = truncate_limit
@@ -2196,15 +2202,12 @@ def finalize(options, suite, work_dir, test_rc, start_time, end_time, coverage, 
 
             exts.fs.copytree3(src, dst, copy_function=safe_copyfile, ignore=ignore, ignore_dangling_symlinks=True)
 
-    postprocess_outputs(suite, options.test_tags, out_dir, options.truncate_files, options.truncate_files_limit)
+    postprocess_outputs(
+        suite, options.test_tags, out_dir, options.truncate_files, options.truncate_files_limit, options.keep_symlinks
+    )
 
     if options.meta:
         dump_meta(options, test_rc, start_time, end_time)
-
-    if options.keep_symlinks:
-        logger.debug("Symlinks will be kept")
-    else:
-        tools.remove_links(out_dir)
 
     def onerror_skip(src, dst, exc_info):
         logger.debug("Failed to add %s to archive: %s", src, exc_info[1])
