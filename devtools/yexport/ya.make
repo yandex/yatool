@@ -6,6 +6,7 @@ SRCS(
     export_file_manager.cpp
     generator_spec.cpp
     jinja_generator.cpp
+    jinja_helpers.cpp
     path_hash.cpp
     py_requirements_generator.cpp
     read_sem_graph.cpp

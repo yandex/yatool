@@ -19,6 +19,14 @@ void TSpecBasedGenerator::OnAttribute(const std::string& attribute) {
     UsedRules.insert(rules.begin(), rules.end());
 }
 
+void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {
+    for (const auto& rule : UsedRules) {
+        for (const auto& [attr, values] : rule->AddValues) {
+            jinjaTemplate.AppendAttrValue(attr, values);
+        }
+    }
+}
+
 void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     if (!configDir.empty()) {
         auto yexportToml = configDir / YEXPORT_FILE;

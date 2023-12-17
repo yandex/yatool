@@ -19,7 +19,7 @@ namespace NYexport {
 
 namespace fs = std::filesystem;
 
-struct TTemplate{
+struct TTemplate {
     std::filesystem::path Template;
     std::string ResultName;
 

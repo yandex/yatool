@@ -4,6 +4,7 @@
 #include "yexport_generator.h"
 #include "path_hash.h"
 #include "target_replacements.h"
+#include "jinja_helpers.h"
 
 #include <util/generic/hash_set.h>
 
@@ -22,6 +23,7 @@ public:
     const TGeneratorSpec& GetGeneratorSpec() const;
     const fs::path& GetGeneratorDir() const;
     void OnAttribute(const std::string& attribute);
+    void ApplyRules(TTargetAttributes& map) const;
 
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";

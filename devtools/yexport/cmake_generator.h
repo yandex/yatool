@@ -2,6 +2,7 @@
 
 #include "generator_spec.h"
 #include "dir_cleaner.h"
+#include "jinja_helpers.h"
 #include "spec_based_generator.h"
 #include "yexport_generator.h"
 
@@ -114,7 +115,6 @@ private:
     TVector<TPlatform> Platforms;
     TGlobalProperties GlobalProperties;
 
-    bool SaveGlobalVars(std::string_view modName) const;
     bool GenerateCMakeLists(const TVector<fs::path>& semGraphs, const TVector<std::string>& platforms);
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
@@ -122,7 +122,6 @@ private:
     void CopyArcadiaScripts() const;
     void RenderConanRequirements() const;
 
-    void UpdateGlobalModules();
     void RenderPlatform(TPlatform& platform);
 
     virtual void Render(ECleanIgnored cleanIgnored) override;

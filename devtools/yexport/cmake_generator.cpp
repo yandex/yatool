@@ -104,10 +104,6 @@ TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaR
     // TODO(YMAKE-91) Use info exported from ymake
 }
 
-void TCMakeGenerator::UpdateGlobalModules() {
-    GlobalProperties.GlobalModules.emplace("cmake/global_flags.cmake");
-}
-
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
     const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
     const auto generatorFile = generatorDir / GENERATOR_FILE;
@@ -117,7 +113,7 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
     result->Conf.ArcadiaRoot = arcadiaRoot;
-    result->GeneratorSpec = ReadGeneratorSpec(generatorFile, CopyFilesOnly);
+    result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
     result->GeneratorDir = generatorDir;
 
     result->ReadYexportSpec(configDir);
@@ -152,7 +148,6 @@ void TCMakeGenerator::Dump(IOutputStream&) {
 void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     Conf.CleanIgnored = cleanIgnored;
 
-    UpdateGlobalModules();
     for (auto& platform : Platforms) {
         RenderPlatform(platform);
     }
@@ -212,37 +207,6 @@ void TCMakeGenerator::MergePlatforms() const {
     }
 }
 
-bool TCMakeGenerator::SaveGlobalVars(std::string_view modName) const {
-    bool hasGlobalVars = false;
-    for (const auto& platform : Platforms) {
-        if (platform.GlobalVars.empty()) {
-            continue;
-        }
-        hasGlobalVars = true;
-        break;
-    }
-
-    if (!hasGlobalVars) {
-        return false;
-    }
-    auto out = ExportFileManager->Open(fs::path("cmake") / modName);
-    fmt::memory_buffer buf;
-    auto bufIt = std::back_inserter(buf);
-
-    fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
-
-    for (const auto& platform : Platforms) {
-        fmt::format_to(bufIt, "if({})\n", platform.Conf.CMakeFlag);
-        for(const auto& [flag, args] : platform.GlobalVars) {
-            fmt::format_to(bufIt, "  set({} {})\n", flag, fmt::join(args, " "));
-        }
-        fmt::format_to(bufIt, "endif()\n\n");
-    }
-    out.Write(buf.data(), buf.size());
-
-    return true;
-}
-
 TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
     /*
         > If enabling ASM, list it last so that CMake can check whether compilers for other languages like C work for assembly too.
@@ -267,55 +231,52 @@ TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
 }
 
 void TCMakeGenerator::RenderRootCMakeList() const {
-    auto out = ExportFileManager->Open(NCMake::CMakeListsFile);
-    fmt::memory_buffer buf;
-    auto bufIt = std::back_inserter(buf);
+    const auto& rootTemplates = GeneratorSpec.Root.Templates;
+    auto attrSpecIt = GeneratorSpec.Attrs.find(ATTRGROUP_ROOT);
+    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.Attrs.end(), "No attribute specification for root");
 
-    fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
-    fmt::format_to(bufIt, "cmake_minimum_required(VERSION 3.15)\n");
-    fmt::format_to(bufIt, "project({} LANGUAGES", Conf.ProjectName);
-    for (const auto& lang : GetAdjustedLanguagesList()) {
-        fmt::format_to(bufIt, " {}", lang);
-    }
-    fmt::format_to(bufIt, ")\n\n");
-    fmt::format_to(bufIt, "set(BUILD_SHARED_LIBS Off)\n");
-    fmt::format_to(bufIt, "set(CMAKE_CXX_STANDARD 20)\n");
-    fmt::format_to(bufIt, "set(CMAKE_CXX_EXTENSIONS Off)\n");
-    fmt::format_to(bufIt, "set({}_MAX_LINK_JOBS 5 CACHE STRING \"Maximum parallel link jobs for Ninja generator\")\n", Conf.ProjectName);
-    fmt::format_to(bufIt, "set_property(GLOBAL PROPERTY JOB_POOLS link_jobs=${{{}_MAX_LINK_JOBS}})\n", Conf.ProjectName);
-    fmt::format_to(bufIt, "set(CMAKE_JOB_POOL_LINK link_jobs)\n");
-
-    fmt::format_to(bufIt, "\nlist(APPEND CMAKE_MODULE_PATH ${{CMAKE_BINARY_DIR}} ${{CMAKE_SOURCE_DIR}}/cmake)\n");
-    fmt::format_to(bufIt, "include_directories(${{CMAKE_SOURCE_DIR}} ${{CMAKE_BINARY_DIR}})\n");
-    fmt::format_to(bufIt, "list(APPEND CMAKE_CTEST_ARGUMENTS \"--output-on-failure\")\n");
-    fmt::format_to(bufIt, "enable_testing()\n");
-
-    fmt::format_to(bufIt, "\n# Disable 'empty CUDA_ARCHITECTURES not allowed' warning\n");
-    fmt::format_to(bufIt, "# Can't set it in cuda.cmake because of CMake policy subdirectory stack rules\n");
-    fmt::format_to(bufIt, "cmake_policy(SET CMP0104 OLD)\n\n");
-
-    for (const auto& path : GlobalProperties.GlobalModules) {
-        fmt::format_to(bufIt, "include({})\n", path.c_str());
-    }
-
-    if (SaveGlobalVars("global_vars.cmake")) {
-        fmt::format_to(bufIt, "include(cmake/global_vars.cmake)\n");
-    }
-
-    if (!GlobalProperties.ConanPackages.empty() || !GlobalProperties.ConanToolPackages.empty()) {
-        fmt::format_to(bufIt, "{}", Conf.ConanSetupSection);
-    }
-
-    for (auto it = Platforms.begin(); it != Platforms.end(); it++) {
-        if (it == Platforms.begin()) {
-            fmt::format_to(bufIt, "if ({})\n  include({})\n", it->Conf.CMakeFlag, it->Conf.CMakeListsFile);
-            continue;
+    TTargetAttributesPtr rootValueMap = TTargetAttributes::Create(attrSpecIt->second, "root");
+    // Fill value map
+    {
+        jinja2::ValuesList platform_cmakes, platform_flags;
+        for (auto it = Platforms.begin(); it != Platforms.end(); it++) {
+            platform_cmakes.push_back(it->Conf.CMakeListsFile);
+            platform_flags.push_back(it->Conf.CMakeFlag);
         }
-        fmt::format_to(bufIt, "elseif ({})\n  include({})\n", it->Conf.CMakeFlag, it->Conf.CMakeListsFile);
-    }
-    fmt::format_to(bufIt, "endif()\n");
+        jinja2::ValuesList globalVars;
+        for (const auto& platform : Platforms) {
+            auto varList = jinja2::ValuesList();
+            for (const auto& [flag, args] : platform.GlobalVars) {
+                auto arg_list = jinja2::ValuesList();
+                arg_list.push_back(flag);
+                arg_list.insert(arg_list.end(), args.begin(), args.end());
+                varList.push_back(arg_list);
+            }
+            globalVars.push_back(varList);
+        }
 
-    out.Write(buf.data(), buf.size());
+        rootValueMap->SetAttrValue("use_conan", (!GlobalProperties.ConanPackages.empty() || !GlobalProperties.ConanToolPackages.empty()));
+        rootValueMap->SetAttrValue("project_name", Conf.ProjectName);
+        rootValueMap->SetAttrValue("project_language_list", GetAdjustedLanguagesList());
+        rootValueMap->SetAttrValue("platform_cmakelists", platform_cmakes);
+        rootValueMap->SetAttrValue("platform_flags", platform_flags);
+        rootValueMap->SetAttrValue("platform_vars", globalVars);
+
+        ApplyRules(*rootValueMap);
+    }
+
+    // Render all root templates
+    {
+        for (const auto& tmpl : rootTemplates) {
+            TJinjaTemplate rootTempate;
+            auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template);
+            if (!loaded) {
+                continue;
+            }
+            rootTempate.SetValueMap(rootValueMap);
+            rootTempate.RenderTo(*ExportFileManager, tmpl.ResultName);
+        }
+    }
 }
 
 void TCMakeGenerator::CopyArcadiaScripts() const {
