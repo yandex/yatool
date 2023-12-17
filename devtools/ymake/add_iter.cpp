@@ -1109,14 +1109,16 @@ inline bool TUpdIter::Enter(TState& state) {
 
     const TDepsCacheId id = MakeDepsCacheId(st.Node.NodeType, st.Node.ElemId);
     auto [i, fresh] = Nodes.try_emplace(id, true, TNodeDebugOnly{Graph, id});
+    auto statusBeforeEnter = CheckNodeStatus(st.Node);
     fresh = fresh || !i->second.OnceEntered;
-    i->second.MarkedAsUnknown = false;
 
     YDIAG(GUpd) << "Enter: " << Graph.ToString(st.Node) << " fresh= " << BoolToChar(fresh) << '\n';
 
     bool propsPassingSetupDone = false;
 
     if (fresh) {
+        i->second.MarkedAsUnknown = false;
+
         st.EntryPtr = CurEnt = &*i; // used in functions
         i->second.Props.SetupRequiredIntents(st.Node.NodeType);
         i->second.OnceEntered = true;
@@ -1147,6 +1149,16 @@ inline bool TUpdIter::Enter(TState& state) {
                     YDebug() << "Module " << module->GetName() << " is reconfigured due to SRCDIR or ADDINCL changes" << Endl;
                     st.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                     return false;
+                }
+            }
+        } else if (st.Node.NodeType == EMNT_NonParsedFile && statusBeforeEnter != NGraphUpdater::ENodeStatus::Ready) {
+            if (!Graph.GetFileName(st.Node).IsLink()) {
+                if (const auto* module = YMake.Modules.Get(state[st.ModulePosition].Node.ElemId); module && module->IsLoaded()) {
+                    if (!module->GetOwnEntries().has(st.Node.ElemId) && !module->GetSharedEntries().has(st.Node.ElemId)) {
+                        state[st.ModulePosition].Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
+                        i->second.MarkedAsUnknown = true;
+                        return false;
+                    }
                 }
             }
         }
@@ -1759,6 +1771,15 @@ void TUpdIter::NukeModuleDir(TState& state) {
     while (!st.AtEnd()) {
         auto nodeIt = Nodes.find(MakeDepsCacheId(st.Dep.DepNode.NodeType, st.Dep.DepNode.ElemId));
         if (nodeIt != Nodes.end()) {
+            if (IsModuleType(st.Dep.DepNode.NodeType)) {
+                if (auto* module = YMake.Modules.Get(st.Dep.DepNode.ElemId); module) {
+                    for (auto id : module->GetOwnEntries()) {
+                        if (auto i = Nodes.find(MakeDepFileCacheId(id)); i != Nodes.end()) {
+                            i->second.MarkedAsUnknown = true;
+                        }
+                    }
+                }
+            }
             nodeIt->second.Props.ClearValues();
             nodeIt->second.OnceEntered = false;
         }
