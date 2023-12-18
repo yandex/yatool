@@ -816,9 +816,9 @@ class Context(object):
         self.output_replacements = [(opts.oauth_token, "<YA-TOKEN>")] if opts.oauth_token else []
 
         if getattr(opts, 'bazel_remote_store', False):
-            dist_cache_future = core_async.future(lambda: init_bazel_remote_cache(opts), daemon=False)
+            dist_cache_future = core_async.future(lambda: init_bazel_remote_cache(opts))
         else:
-            dist_cache_future = core_async.future(lambda: init_yt_dist_cache(opts), daemon=False)
+            dist_cache_future = core_async.future(lambda: init_yt_dist_cache(opts))
 
         display = getattr(app_ctx, 'display', None)
         print_status = get_print_status_func(opts, display, logger)
