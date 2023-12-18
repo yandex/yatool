@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 def upload_package(package_file_dir, _, opts):
-    logger.info('Uploading package to specified url (nebius cloud way)')
+    logger.info('Uploading package to specified urls (nebius cloud way)')
     for rep in opts.publish_to_list:
+        logger.info('Uploading to {}'.format(str(rep)))
         deb_file_name = list(filter(lambda x: x.endswith('.deb'), os.listdir(package_file_dir)))
         assert len(deb_file_name) == 1
         deb_file_name = os.path.join(package_file_dir, deb_file_name[0])
