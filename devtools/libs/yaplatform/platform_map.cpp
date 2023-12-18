@@ -3,6 +3,8 @@
 
 #include <library/cpp/json/json_reader.h>
 
+#include <util/generic/algorithm.h>
+#include <util/string/builder.h>
 
 namespace NYa {
     TPlatformMap MappingFromJsonString(TStringBuf mapping) {
@@ -81,10 +83,26 @@ namespace NYa {
         return ResourceVarName(baseName, desc.Uri, desc.StripPrefix);
     }
 
+
+    namespace {
+        TString EncodeUriForVar(TStringBuf uri) {
+            if (uri.size() < 48) {
+                // This allows up to 160bit hex + 7 chars for schema + ':'
+                auto good = AllOf(uri, [](char c) {
+                    return isalnum(c) || c == ':' || c == '_' || c == '-';
+                });
+                if (good) {
+                    return ToString(uri);
+                }
+            }
+            return ToString(THash<TStringBuf>()(uri));
+        }
+    }
+
     TString ResourceVarName(TStringBuf baseName, TStringBuf uri, ui32 stripPrefix) {
-        TString varName = TString::Join(baseName, "-", uri);
+        auto varName = TStringBuilder{} << baseName << "-" << EncodeUriForVar(uri);
         if (stripPrefix) {
-            varName += "-" + ToString(stripPrefix);
+            varName << "-" << stripPrefix;
         }
         return varName;
     }
