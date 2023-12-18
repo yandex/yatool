@@ -114,6 +114,7 @@ def get_common_env():
     skip = (
         "YA_CACHE_DIR",
         "YA_TIMEOUT",
+        "YA_TOKEN",
     )
     env_vars += [name for name in os.environ if name.startswith("YA_") and not name.startswith(skip)]
     return {name: os.environ.get(name) for name in env_vars}
