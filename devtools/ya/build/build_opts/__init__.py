@@ -2477,6 +2477,7 @@ class DistCacheOptions(DistCacheSetupOptions):
 
         # XXX see YA-1354
         self.dist_cache_evict_binaries = False
+        self.dist_cache_evict_cached = False
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
         self.yt_store = True
         self.yt_create_tables = False
@@ -2509,6 +2510,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.ADVANCED,
                 ),
                 ConfigConsumer('dist_cache_evict_binaries'),
+                ArgConsumer(
+                    ['--dist-cache-evict-cached'],
+                    help="Don't build or download build results if they are present in the dist cache",
+                    hook=SetConstValueHook('dist_cache_evict_cached', True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
+                ConfigConsumer('dist_cache_evict_cached'),
                 ArgConsumer(
                     ['--dist-store-threads'],
                     help='dist store max threads',

@@ -889,12 +889,14 @@ class Context(object):
         logger.debug("sandbox_run_test_uids: %s", sandbox_run_test_uids)
 
         # XXX see YA-1354
-        if opts.bazel_remote_store and not opts.bazel_remote_readonly:
+        if opts.bazel_remote_store and (not opts.bazel_remote_readonly or opts.dist_cache_evict_cached):
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
             logger.debug("Strip graph due bazel_remote_store mode")
             self.graph = lg.strip_graph(self.graph)
         # XXX see YA-1354
-        elif not opts.use_lite_graph and opts.yt_replace_result and not opts.add_result:
+        elif (
+            not opts.use_lite_graph and (opts.yt_replace_result or opts.dist_cache_evict_cached) and not opts.add_result
+        ):
             new_results, cached_results = replace_yt_results(self.graph, opts, self.dist_cache)
             self.graph['result'] = new_results
             logger.debug("Strip graph due yt_replace_result mode")
