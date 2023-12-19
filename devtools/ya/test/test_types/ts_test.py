@@ -295,8 +295,6 @@ class EslintTestSuite(common_types.AbstractTestSuite):
             self.dart_info.get('SOURCE-FOLDER-PATH'),
             "--nodejs",
             self._nodejs_resource,
-            "--eslint",
-            self._eslint_resource,
             "--eslint-config-path",
             self._eslint_config_path,
             "--tracefile",
