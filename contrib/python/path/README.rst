@@ -63,6 +63,8 @@ based on ``path``.
 Advantages
 ==========
 
+Path pie provides a superior experience to similar offerings.
+
 Python 3.4 introduced
 `pathlib <https://docs.python.org/3/library/pathlib.html>`_,
 which shares many characteristics with ``path``. In particular,
@@ -72,31 +74,32 @@ One may have imagined ``pathlib`` would supersede ``path``.
 But the implementation and the usage quickly diverge, and ``path``
 has several advantages over ``pathlib``:
 
-- ``path`` implements ``Path`` objects as a subclass of
-  ``str``, and as a result these ``Path``
-  objects may be passed directly to other APIs that expect simple
-  text representations of paths, whereas with ``pathlib``, one
-  must first cast values to strings before passing them to
-  APIs unaware of ``pathlib``. This shortcoming was `addressed
-  by PEP 519 <https://www.python.org/dev/peps/pep-0519/>`_,
-  in Python 3.6.
-- ``path`` goes beyond exposing basic functionality of a path
-  and exposes commonly-used behaviors on a path, providing
-  methods like ``rmtree`` (from shlib) and ``remove_p`` (remove
-  a file if it exists).
+- ``path`` implements ``Path`` objects as a subclass of ``str``, and as a
+  result these ``Path`` objects may be passed directly to other APIs that
+  expect simple text representations of paths, whereas with ``pathlib``, one
+  must first cast values to strings before passing them to APIs that do
+  not honor `PEP 519 <https://www.python.org/dev/peps/pep-0519/>`_
+  ``PathLike`` interface.
+- ``path`` give quality of life features beyond exposing basic functionality
+  of a path. ``path`` provides methods like ``rmtree`` (from shlib) and
+  ``remove_p`` (remove a file if it exists), properties like ``.permissions``,
+  and sophisticated ``walk``, ``TempDir``, and ``chmod`` behaviors.
 - As a PyPI-hosted package, ``path`` is free to iterate
   faster than a stdlib package. Contributions are welcome
   and encouraged.
-- ``path`` provides a uniform abstraction over its Path object,
+- ``path`` provides superior portability using a uniform abstraction
+  over its single Path object,
   freeing the implementer to subclass it readily. One cannot
   subclass a ``pathlib.Path`` to add functionality, but must
   subclass ``Path``, ``PosixPath``, and ``WindowsPath``, even
-  if one only wishes to add a ``__dict__`` to the subclass
+  to do something as simple as to add a ``__dict__`` to the subclass
   instances.  ``path`` instead allows the ``Path.module``
   object to be overridden by subclasses, defaulting to the
   ``os.path``. Even advanced uses of ``path.Path`` that
   subclass the model do not need to be concerned with
-  OS-specific nuances.
+  OS-specific nuances. ``path.Path`` objects are inherently "pure",
+  not requiring the author to distinguish between pure and non-pure
+  variants.
 
 This path project has the explicit aim to provide compatibility
 with ``pathlib`` objects where possible, such that a ``path.Path``
@@ -104,40 +107,6 @@ object is a drop-in replacement for ``pathlib.Path*`` objects.
 This project welcomes contributions to improve that compatibility
 where it's lacking.
 
-Alternatives
-============
-
-In addition to
-`pathlib <https://docs.python.org/3/library/pathlib.html>`_, the
-`pylib project <https://pypi.org/project/py/>`_ implements a
-`LocalPath <https://github.com/pytest-dev/py/blob/72601dc8bbb5e11298bf9775bb23b0a395deb09b/py/_path/local.py#L106>`_
-class, which shares some behaviors and interfaces with ``path``.
-
-Development
-===========
-
-To install a development version, use the Github links to clone or
-download a snapshot of the latest code. Alternatively, if you have git
-installed, you may be able to use ``pip`` to install directly from
-the repository::
-
-    pip install git+https://github.com/jaraco/path.git
-
-Testing
-=======
-
-Tests are invoked with `tox <https://pypi.org/project/tox>`_. After
-having installed tox, simply invoke ``tox`` in a checkout of the repo
-to invoke the tests.
-
-Tests are also run in continuous integration. See the badges above
-for links to the CI runs.
-
-Releasing
-=========
-
-Tagged releases are automatically published to PyPI by Azure
-Pipelines, assuming the tests pass.
 
 Origins
 =======
@@ -145,6 +114,7 @@ Origins
 The ``path.py`` project was initially released in 2003 by Jason Orendorff
 and has been continuously developed and supported by several maintainers
 over the years.
+
 
 For Enterprise
 ==============
@@ -154,10 +124,3 @@ Available as part of the Tidelift Subscription.
 This project and the maintainers of thousands of other packages are working with Tidelift to deliver one enterprise subscription that covers all of the open source you use.
 
 `Learn more <https://tidelift.com/subscription/pkg/pypi-path?utm_source=pypi-path&utm_medium=referral&utm_campaign=github>`_.
-
-Security Contact
-================
-
-To report a security vulnerability, please use the
-`Tidelift security contact <https://tidelift.com/security>`_.
-Tidelift will coordinate the fix and disclosure.
