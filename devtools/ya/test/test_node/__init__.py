@@ -820,6 +820,7 @@ def create_test_node(
         "requirements": requirements,
         "secrets": ['YA_COMMON_YT_TOKEN'],
         "tared_outputs": tared_outputs,
+        "test-category": suite.get_ci_type_name(),
         "uid": uid,
     }
 
