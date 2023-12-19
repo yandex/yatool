@@ -53,5 +53,4 @@ RECURSE(
     docs
     it
     ut
-    scripts
 )
