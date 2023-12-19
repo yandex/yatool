@@ -34,6 +34,13 @@ def get_options():
     parser = optparse.OptionParser()
     parser.disable_interspersed_args()
     parser.add_option("--source-root", dest="source_root", help="source route", action='store')
+    parser.add_option(
+        "--custom-canondata-path",
+        dest="custom_canondata_path",
+        help="Custom path to store canondata. Need for tests",
+        action='store',
+        default=None,
+    )
     parser.add_option("--dir-outputs", dest="dir_outputs", action='store_true', default=False)
     parser.add_option("--build-root", dest="build_root", help="build route", action='store')
     parser.add_option(
@@ -130,7 +137,7 @@ def main():
         mdsstorage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
 
     canonical_data = test.canon.data.CanonicalData(
-        arc_path=options.source_root,
+        arc_path=options.custom_canondata_path or options.source_root,
         sandbox_url=options.sandbox_url,
         sandbox_token=oauth_token,
         sandbox_storage=storage,

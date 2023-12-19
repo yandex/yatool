@@ -492,6 +492,7 @@ class CanonizationOptions(core.yarg.Options):
         self.test_diff = None
         self.canonization_backend = None
         self.canonization_scheme = "https"
+        self.custom_canondata_path = None
 
     def consumer(self):
         return [
@@ -522,6 +523,13 @@ class CanonizationOptions(core.yarg.Options):
                 hook=core.yarg.SetValueHook('test_diff'),
                 subgroup=CANONIZATION_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
+            ),
+            TestArgConsumer(
+                ['--custom-canondata-path'],
+                help='Store canondata in custom path instead of repository',
+                hook=core.yarg.SetValueHook('custom_canondata_path'),
+                subgroup=CANONIZATION_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
             ),
             TestArgConsumer(
                 ['--canonization-backend'],

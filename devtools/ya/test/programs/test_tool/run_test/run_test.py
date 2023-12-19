@@ -388,6 +388,13 @@ def parse_args(args=None):
         action='store_true',
     )
     parser.add_argument(
+        "--custom-canondata-path",
+        dest="custom_canondata_path",
+        help="Verify canondata against custom canondata",
+        action='store',
+        default=None,
+    )
+    parser.add_argument(
         "--dont-verify-results",
         dest="verify",
         help="do not perform result verification against the canonical one",
@@ -1971,7 +1978,7 @@ def main():
             if options.supports_canonization and any(t.result is not None for t in suite.chunk.tests):
                 stages.stage("canonical_data_verification")
                 canonical_data = canon_data.CanonicalData(
-                    arc_path=options.source_root,
+                    arc_path=options.custom_canondata_path or options.source_root,
                     sandbox_storage=cached_storage,
                     resource_owner=options.result_resource_owner,
                     ssh_keys=options.result_resource_owner_key,

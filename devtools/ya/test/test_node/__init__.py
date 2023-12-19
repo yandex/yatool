@@ -375,7 +375,8 @@ def create_test_node(
 
     if opts and getattr(opts, "test_stdout"):
         runner_cmd += ["--test-stdout"]
-
+    if opts.custom_canondata_path:
+        runner_cmd += ["--custom-canondata-path", opts.custom_canondata_path]
     # Don't add empty output if such type of python coverage can't be produced by node
     py2deps, py3deps = False, False
     if opts.python_coverage:
@@ -2186,6 +2187,8 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     ]
 
     suite_node = graph.get_node_by_uid(suite.uid)
+    if opts.custom_canondata_path:
+        node_cmd += ["--custom-canondata-path", opts.custom_canondata_path]
     if opts.dir_outputs:
         node_cmd += ["--dir-outputs"]
         for output in suite_node["dir_outputs"]:
