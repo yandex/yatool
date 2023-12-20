@@ -130,8 +130,9 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
         modules.append(('dump_debug', configure_debug(ctx)))
 
         # XXX waiting for YA-1028
-        if getattr(parameters, 'need_update_dist_priority', False) or getattr(
-            parameters, 'need_update_graph_gen_dist_priority', False
+        if not getattr(parameters, 'distbuild_no_svn', False) and (
+            getattr(parameters, 'need_update_dist_priority', False)
+            or getattr(parameters, 'need_update_graph_gen_dist_priority', False)
         ):
             from devtools.ya.app.modules import distbs_priority
 
