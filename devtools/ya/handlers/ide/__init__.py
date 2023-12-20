@@ -682,16 +682,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 core.common_opts.YaBin3Options(),
             ],
         )
-        self['vscode-ts'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_ts.gen_vscode_workspace),
-            description=get_description('Generate VSCode TypeScript project.', ref_name='typescript'),
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
-            + [
-                ide.vscode_ts.VSCodeTypeScriptOptions(),
-                core.common_opts.YaBin3Options(),
-            ],
-            visible=False,  # FIXME: remove when ready for public release
-        )
         self['venv'] = core.yarg.OptsHandler(
             action=app.execute(ide.venv.do_venv),
             description='Create or update python venv',
