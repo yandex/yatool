@@ -1935,6 +1935,7 @@ class FromSandbox(Macro):
         FILENAME = 4
         PREFIX = 6
         RENAME = 7
+        AUTOUPDATED = 8
         END = 5
 
         state = START
@@ -1964,6 +1965,9 @@ class FromSandbox(Macro):
                         value_obj._out_token = token.value
                         state = FILENAME
                         break
+                    elif token.value == 'AUTOUPDATED':
+                        state = AUTOUPDATED
+                        break
                     else:
                         state = RESOURCE
                 elif state == RESOURCE:
@@ -1975,6 +1979,10 @@ class FromSandbox(Macro):
                     break
                 elif state == PREFIX:
                     value_obj.prefix = token.value
+                    state = MODE
+                    break
+                elif state == AUTOUPDATED:
+                    value_obj.autoupdated = token.value
                     state = MODE
                     break
                 elif state == RENAME:
@@ -2011,6 +2019,7 @@ class FromSandbox(Macro):
             output = (
                 ('FILE ' if not value.is_archive else '')
                 + str(value.resource_id)
+                + (' AUTOUPDATED {}'.format(value.autoupdated) if value.autoupdated else '')
                 + (' PREFIX {}'.format(value.prefix) if value.prefix else '')
                 + (' RENAME {}'.format(' '.join(value.rename_files)) if value.rename_files else '')
                 + ' '
@@ -2035,6 +2044,7 @@ class FromSandboxValue(Value):
         self.filenames = filenames or []
         self.is_archive = True
         self.prefix = None
+        self.autoupdated = None
         self.rename_files = []
         self._out_token = ''
         self._make_value()
@@ -2046,6 +2056,9 @@ class FromSandboxValue(Value):
             parts.append('FILE')
 
         parts.append(str(self.resource_id))
+
+        if self.autoupdated:
+            parts += ['AUTOUPDATED', self.autoupdated]
 
         if self.prefix:
             parts += ['PREFIX', self.prefix]
