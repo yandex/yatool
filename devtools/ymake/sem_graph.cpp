@@ -194,18 +194,6 @@ namespace {
                     const auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider);
                     node.AddProp("semantics", sem);
                     auto mod = RestoreContext.Modules.Get(topNode->ElemId);
-                    if (mod && mod->IsDependencyManagementApplied()) {
-                        const auto& modListIds = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
-                        const auto& managedPeersClosure = lists.GetList(modListIds.UniqPeers).Data();
-                        if (!managedPeersClosure.empty()) {
-                            TVector<ui32> elemIds;
-                            elemIds.reserve(managedPeersClosure.size());
-                            for (const auto nodeId: managedPeersClosure) {
-                                elemIds.emplace_back(RestoreContext.Graph.Get(nodeId)->ElemId);
-                            }
-                            node.AddProp("ManagedPeersClosure", std::move(elemIds));
-                        }
-                    }
                     if (mod && mod->IsSemIgnore()) {
                         return false;
                     }
@@ -242,7 +230,35 @@ namespace {
             if (UseFileId(dep.From()->NodeType) && UseFileId(dep.To()->NodeType) && AcceptDep(state)) {
                 auto node = JsonWriter.AddLink(dep);
                 AddExcludeProperty(node, dep);
-                AddIsClosureProperty(node, dep);
+            }
+            // Each node visits onetime only. When left module node time to add peers closure deps
+            if (IsModuleType(dep.To()->NodeType)) {
+                auto modNode = dep.To();
+                auto mod = RestoreContext.Modules.Get(dep.To()->ElemId);
+                if (mod && mod->IsDependencyManagementApplied()) {
+                    // Add peers closure only for module under DM
+                    const auto& modListIds = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
+                    const auto& lists = RestoreContext.Modules.GetNodeListStore();
+                    const auto& managedPeersClosure = lists.GetList(modListIds.UniqPeers).Data();
+                    THashSet<TNodeId> closure(managedPeersClosure.begin(), managedPeersClosure.end());
+                    const auto& managedDirectPeers = lists.GetList(modListIds.ManagedDirectPeers).Data();
+                    // Erase from closure set all direct peers
+                    for (const auto directPeerId: managedDirectPeers) {
+                        closure.erase(directPeerId);
+                    }
+                    if (!closure.empty()) {
+                        // Add links to all peers closure (but not direct!) deps
+                        for (const auto peerId: closure) {
+                            auto peerNode = RestoreContext.Graph[peerId];
+                            auto peerMod = RestoreContext.Modules.Get(peerNode->ElemId);
+                            Y_ASSERT(peerMod);
+                            // Sem graph use ElemId as id of nodes, use TModule->GetId()
+                            auto node = JsonWriter.AddLink(mod->GetId(), mod->GetNodeType(), peerMod->GetId(), peerMod->GetNodeType(), EDepType::EDT_BuildFrom, NFlatJsonGraph::EIDFormat::Simple);
+                            AddExcludeProperty(node, modNode, peerNode, true); // generate Excludes attribute
+                            AddIsClosureProperty(node); // IsClosure flag attribute
+                        }
+                    }
+                }
             }
         }
 
@@ -264,7 +280,11 @@ namespace {
         }
 
         void AddExcludeProperty(NFlatJsonGraph::TNodeWriter node, TConstDepRef dep) {
-            auto excludeNodeIds = ComputeExcludeNodeIds(dep);
+            return AddExcludeProperty(node, dep.From(), dep.To(), IsDirectPeerdirDep(dep));
+        }
+
+        void AddExcludeProperty(NFlatJsonGraph::TNodeWriter node, TConstDepNodeRef fromNode, TConstDepNodeRef toNode, bool isDirectPeerdirDep) {
+            auto excludeNodeIds = ComputeExcludeNodeIds(fromNode, toNode, isDirectPeerdirDep);
             if (!excludeNodeIds.empty()) {
                 // To dependences attribute name after ':' add info about type ([] - array) and element type (NodeId)
                 // P.S. In sem-graph Id of node is ElemId from dep-graph, that is why typename of element is "NodeId"
@@ -272,19 +292,16 @@ namespace {
             }
         }
 
-        void AddIsClosureProperty(NFlatJsonGraph::TNodeWriter node, TConstDepRef dep) {
-            auto isClosure = ComputeIsClosure(dep);
-            if (isClosure) {
-                node.AddProp("IsClosure:bool", isClosure);
-            }
+        void AddIsClosureProperty(NFlatJsonGraph::TNodeWriter node) {
+            node.AddProp("IsClosure:bool", true);
         }
 
-        THashSet<TNodeId> ComputeExcludeNodeIds(TConstDepRef dep) {
-            if (!IsDirectPeerdirDep(dep)) {
+        THashSet<TNodeId> ComputeExcludeNodeIds(TConstDepNodeRef fromNode, TConstDepNodeRef toNode, bool isDirectPeerdirDep) {
+            if (!isDirectPeerdirDep) {
                 return {};
             }
-            const TModule* fromMod = RestoreContext.Modules.Get(dep.From()->ElemId);
-            const TModule* toMod = RestoreContext.Modules.Get(dep.To()->ElemId);
+            const TModule* fromMod = RestoreContext.Modules.Get(fromNode->ElemId);
+            const TModule* toMod = RestoreContext.Modules.Get(toNode->ElemId);
             if (!fromMod->IsDependencyManagementApplied() || !toMod->IsDependencyManagementApplied()) {
                 // Excludes can compute only if both modules under DM
                 return {};
@@ -307,23 +324,6 @@ namespace {
                 }
             }
             return excludeNodeIds;
-        }
-
-        bool ComputeIsClosure(TConstDepRef dep) {
-            if (!IsDirectPeerdirDep(dep)) {
-                // Managed peers closure added to sem graph as direct peerdirs
-                return false;
-            }
-            const TModule* fromMod = RestoreContext.Modules.Get(dep.From()->ElemId);
-            if (!fromMod->IsDependencyManagementApplied()) {
-                // IsClosure can compute only if FROM module under DM
-                return false;
-            }
-            const auto& lists = RestoreContext.Modules.GetNodeListStore();
-            auto fromManagedDirectPeersListId = RestoreContext.Modules.GetModuleNodeIds(fromMod->GetId()).ManagedDirectPeers;
-            const auto& fromManagedDirectPeersList = lists.GetList(fromManagedDirectPeersListId).Data();
-            // Absent in direct peers, but is IsDirectPeerdirDep (see above) => is closure
-            return Find(fromManagedDirectPeersList, dep.To().Id()) == fromManagedDirectPeersList.end();
         }
 
     private:
