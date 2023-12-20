@@ -31,9 +31,8 @@ concept IterableValues = std::ranges::range<Values>;
 class TJinjaGenerator::TBuilder: public TGeneratorBuilder<TSubdirsTableElem, TJinjaTarget> {
 public:
 
-    TBuilder(TJinjaGenerator* generator, TNodeId maxIdInSemGraph)
+    TBuilder(TJinjaGenerator* generator)
         : Project(generator)
-        , LastUntrackedDependencyId(maxIdInSemGraph)
     {}
 
     TTargetHolder CreateTarget(const std::string& targetMacro, const fs::path& targetDir, const std::string name, std::span<const std::string> macroArgs);
@@ -89,76 +88,6 @@ public:
     bool IsExcluded(TStringBuf path, std::span<const std::string> excludes) const noexcept {
         return AnyOf(excludes.begin(), excludes.end(), [path](TStringBuf exclude) { return NPath::IsPrefixOf(exclude, path); });
     };
-
-    template<typename TVisitorState>
-    void SetNodeClosure(const TVisitorState& state,
-                        const std::string& nodePath,
-                        const std::string& nodeCoords,
-                        std::span<const std::string> peersClosure,
-                        std::span<const std::string> peersClosureCoords,
-                        std::span<const std::string> excludes) {
-        if (peersClosure.size() != peersClosureCoords.size()) {
-            spdlog::error("amount of peers closure and their coords should be equal. Current path '{}' has {} peers and {} coords", nodePath, peersClosure.size(), peersClosureCoords.size());
-            return;
-        }
-
-        TNodeId nodeId = state.TopNode().Id();
-        TVector<TNodeId> peersClosureIds;
-        NDetail::TPeersClosure closure;
-        size_t peerInd = 0;
-
-        // Iterate over dependencies of contribs which are not in the semantic graph
-        for (const auto& peerCoord: peersClosureCoords) {
-            auto peerIdIt = Project->NodeIds.find(peerCoord);
-            if (peerIdIt == Project->NodeIds.end()) {
-                Project->NodeClosures.emplace(LastUntrackedDependencyId, NDetail::TPeersClosure{});
-                Project->NodePaths.emplace(LastUntrackedDependencyId, peersClosure[peerInd]);
-                Project->NodeCoords.emplace(LastUntrackedDependencyId, peerCoord);
-                peerIdIt = Project->NodeIds.emplace(peerCoord, LastUntrackedDependencyId).first;
-                ++LastUntrackedDependencyId;
-            }
-
-            TNodeId peerId = peerIdIt->second;
-            peersClosureIds.emplace_back(peerId);
-            closure.Merge(peerId, Project->NodeClosures[peerId].Exclude(
-                    [&](TNodeId id) { return IsExcluded(Project->NodePaths[id], excludes); },
-                    [&](TNodeId id) -> const NDetail::TPeersClosure& { return Project->NodeClosures[id]; }));
-
-            ++peerInd;
-        }
-
-        // Iterate over dependencies from the semantic graph
-        for (const auto& dep: state.TopNode().Edges()) {
-            if (!IsDirectPeerdirDep(dep)) {
-                continue;
-            }
-
-            TNodeId peerId = dep.To().Id();
-            peersClosureIds.emplace_back(peerId);
-            closure.Merge(peerId, Project->NodeClosures[peerId].Exclude(
-                    [&](TNodeId id) { return IsExcluded(Project->NodePaths[id], excludes); },
-                    [&](TNodeId id) -> const NDetail::TPeersClosure& { return Project->NodeClosures[id]; }));
-        }
-
-        if (!excludes.empty()) {
-            for (const auto* itemStats: closure.GetStableOrderStats()) {
-                if (!itemStats->second.Excluded) {
-                    continue;
-                }
-
-                const auto& excludeId = itemStats->first;
-                for (const auto& peerId: peersClosureIds) {
-                    if (Project->NodeClosures.at(peerId).ContainsWithAnyStatus(excludeId)) {
-                        CurTarget->LibExcludes[Project->NodeCoords[peerId]].emplace_back(excludeId);
-                    }
-                }
-            }
-        }
-
-        Project->NodeClosures.emplace(nodeId, std::move(closure));
-        Project->NodePaths.emplace(nodeId, nodePath);
-        Project->NodeCoords.emplace(nodeId, nodeCoords);
-    }
 
     void SetIsTest(bool isTestTarget) {
         CurTarget->isTest = isTestTarget;
@@ -237,7 +166,6 @@ public:
 
 private:
     TJinjaGenerator* Project;
-    TNodeId LastUntrackedDependencyId;
 
     bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
         bool r = true;
@@ -412,8 +340,8 @@ public:
         ESNT_Ignored,      // Must ignore this target for generator
     };
 
-    TJinjaGeneratorVisitor(TJinjaGenerator* generator, const TGeneratorSpec& generatorSpec, TNodeId maxIdInSemGraph)
-        : ProjectBuilder(generator, maxIdInSemGraph)
+    TJinjaGeneratorVisitor(TJinjaGenerator* generator, const TGeneratorSpec& generatorSpec)
+        : ProjectBuilder(generator)
     {
         for (const auto& item: generatorSpec.Targets) {
             SemName2Type_.emplace(item.first, ESNT_Target);
@@ -489,31 +417,15 @@ public:
         }
         const TSemNodeData& data = state.TopNode().Value();
         if (data.Sem.empty() || data.Sem.front().empty()) {
-            ProjectBuilder.SetNodeClosure(state, data.Path, "", {}, {}, {});
             TBase::Leave(state);
             return;
         }
-
-        std::string nodeCoords;
-        std::span<const std::string> peersClosure;
-        std::span<const std::string> peersClosureCoords;
-        std::span<const std::string> excludes;
 
         for (const auto& sem: ProjectBuilder.ApplyReplacement(data.Path, data.Sem)) {
             const auto& semName = sem[0];
             const auto semNameIt = SemName2Type_.find(semName);
             const auto semNameType = semNameIt == SemName2Type_.end() ? ESNT_Unknown : semNameIt->second;
             const auto semArgs = std::span{sem}.subspan(1);
-
-            if (semName == "consumer-classpath" && !semArgs.empty()) {
-                nodeCoords = semArgs[0];
-            } else if (semName == "peers_closure") {
-                peersClosure = semArgs;
-            } else if (semName == "peers_closure_coords" && !semArgs.empty()) {
-                peersClosureCoords = std::span{semArgs}.subspan(1);
-            } else if (semName == "excludes_rules") {
-                excludes = semArgs;
-            }
 
             if (semNameType == ESNT_Unknown || semNameType == ESNT_Target || semNameType == ESNT_Ignored) {
                 // Unknown semantic error reported at Enter()
@@ -526,7 +438,6 @@ public:
                 StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
             }
         }
-        ProjectBuilder.SetNodeClosure(state, data.Path, nodeCoords, peersClosure, peersClosureCoords, excludes);
         TBase::Leave(state);
     }
 
@@ -535,8 +446,8 @@ public:
         if (IsDirectPeerdirDep(dep)) {
             //Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
             bool isSameDir = false;
+            const auto toTarget = Mod2Target[dep.To().Id()];
             if (auto* curList = ProjectBuilder.CurrentList(); curList) {
-                const auto toTarget = Mod2Target[dep.To().Id()];
                 for (const auto target: curList->second.Targets) {
                     if (target == toTarget) {
                         isSameDir = true;
@@ -545,7 +456,7 @@ public:
                 }
             }
             const auto libIt = InducedAttrs_.find(dep.To().Id());
-            if (!isSameDir && libIt != InducedAttrs_.end()) {
+            if (!isSameDir && libIt != InducedAttrs_.end() && (!toTarget || !toTarget->isTest)) {
                 const TSemNodeData& data = dep.To().Value();
 /*
     Generating induced attributes and excludes< for example, project is
@@ -732,7 +643,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 }
 
 void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TJinjaGeneratorVisitor visitor(this, GeneratorSpec, graph.Size());
+    TJinjaGeneratorVisitor visitor(this, GeneratorSpec);
     IterateAll(graph, startDirs, visitor);
 }
 
@@ -758,13 +669,13 @@ void TJinjaGenerator::Dump(IOutputStream& out) {
 void TJinjaGenerator::Render(ECleanIgnored) {
     CopyFilesAndResources();
 
-    const auto& rootAttrs = FinalizeRootAttrs();
     auto subdirsAttrs = FinalizeSubdirsAttrs();
     for (const auto* subdirItem: SubdirsOrder) {
         const auto& subdir = subdirItem->first;
         RenderSubdir(subdir, subdirsAttrs[subdir.c_str()].asMap());
     }
 
+    const auto& rootAttrs = FinalizeRootAttrs();
     const auto& tmpls = GeneratorSpec.Root.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++) {
         const auto& tmpl = tmpls[templateIndex];
@@ -780,42 +691,6 @@ void TJinjaGenerator::Render(ECleanIgnored) {
             out.Write(renderResult.data(), renderResult.size());
         } else {
             spdlog::error("Failed to generate {} due to jinja template error: {}", tmpl.ResultName, result.error().ToString());
-        }
-    }
-}
-
-void TJinjaGenerator::AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath) {
-    if (targetMap.contains("consumer-classpath") && targetMap.contains("excludes_rules")) {
-        targetMap.emplace("lib_excludes", jinja2::ValuesMap{});
-        for (const auto& library: targetMap["consumer-classpath"].asList()) {
-            jinja2::ValuesList libraryExcludes;
-            const auto& strLibrary = library.asString();
-
-            const auto excludesIt = target->LibExcludes.find(strLibrary);
-            if (excludesIt == target->LibExcludes.end()) {
-                // Library has no excludes
-                continue;
-            }
-
-            for (const auto& excludeId : excludesIt->second) {
-                auto strExclude = NodeCoords[excludeId];
-                std::erase(strExclude, '"');
-
-                const auto groupPos = strExclude.find(':');
-                if (groupPos == std::string::npos) {
-                    spdlog::error("wrong exclude format '{}' can't find a group. Library {}. Problem in {}", strExclude, strLibrary, renderPath);
-                    continue;
-                }
-
-                const auto modulePos = strExclude.find(':', groupPos + 1);
-                if (modulePos == std::string::npos) {
-                    spdlog::error("wrong exclude format '{}' can't find a module. Library {}. Problem in {}", strExclude, strLibrary, renderPath);
-                    continue;
-                }
-
-                libraryExcludes.emplace_back(jinja2::ValuesList({strExclude.substr(0, groupPos), strExclude.substr(groupPos + 1, modulePos - groupPos - 1)}));
-            }
-            targetMap["lib_excludes"].asMap().emplace(strLibrary, libraryExcludes);
         }
     }
 }
@@ -892,8 +767,6 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             targetAttrs.emplace("macro", target->Macro);
             targetAttrs.emplace("isTest", target->isTest);
             targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
-
-            AddExcludesToTarget(target, targetAttrs, (ExportFileManager ? ExportFileManager->GetExportRoot() : fs::path{}) / subdir / "*");
 
             auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
             if (targetNameAttrsIt == subdirAttrs.end()) {

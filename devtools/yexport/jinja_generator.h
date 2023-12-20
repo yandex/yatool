@@ -28,7 +28,6 @@ struct TJinjaTarget {
     bool isTest;
     TVector<std::string> MacroArgs;
     jinja2::ValuesMap JinjaAttrs;
-    TMap<std::string, TVector<TNodeId>> LibExcludes;
 };
 
 struct TJinjaList {
@@ -63,9 +62,6 @@ private:
 
 private:
 
-    bool IsExcludeInLibraryClasspath(const std::string& library, const std::string& exclude);
-    void AddExcludesToTarget(const TJinjaTarget* target, jinja2::ValuesMap& targetMap, const std::string& renderPath);
-
     void RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs);
 
     jinja2::ValuesMap FinalizeAllAttrs();
@@ -86,15 +82,6 @@ private:
     TVector<TSubdirsTableElem*> SubdirsOrder;
     TDeque<TJinjaTarget> Targets;
     jinja2::ValuesMap JinjaAttrs;
-
-    THashMap<std::string, THashSet<std::string>> ClasspathByNodePath;
-    THashMap<std::string, std::string> NodePathByLibrary;
-
-    THashMap<TNodeId, NDetail::TPeersClosure> NodeClosures;
-    THashMap<TNodeId, std::string> NodePaths;
-    THashMap<TNodeId, std::string> NodeCoords;
-    THashMap<std::string, TNodeId> NodeIds;
-    THashMap<std::string, std::string> LibraryExcludes;
 };
 
 }
