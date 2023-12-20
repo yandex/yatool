@@ -223,6 +223,22 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
+                                        ('label', 'Lint'),
+                                        ('type', 'shell'),
+                                        ('command', 'ya tool nots lint'),
+                                        (
+                                            'group',
+                                            OrderedDict(
+                                                (
+                                                    ('kind', 'test'),
+                                                    ('isDefault', True),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
                                         ('label', 'Code reformat'),
                                         ('type', 'shell'),
                                         ('command', 'ya tool nots fmt'),
