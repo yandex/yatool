@@ -579,6 +579,22 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     result->ArcadiaRoot = arcadiaRoot;
     result->JinjaEnv->AddFilesystemHandler({}, result->TemplateFs);
     result->JinjaEnv->GetSettings().cacheSize = 0;
+    result->JinjaEnv->AddGlobal("split", jinja2::UserCallable{
+        .callable = [](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            auto str = params["str"].asString();
+            auto delimeter = params["delimeter"].asString();
+            jinja2::ValuesList list;
+            size_t bpos = 0;
+            size_t dpos;
+            while ((dpos = str.find(delimeter, bpos)) != std::string::npos) {
+                list.emplace_back(str.substr(bpos, dpos - bpos));
+                bpos = dpos + delimeter.size();
+            }
+            list.emplace_back(str.substr(bpos));
+            return list;
+        },
+        .argsInfo = { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
+    });
     result->GeneratorDir = generatorDir;
 
     if (result->GeneratorSpec.Targets.empty()) {
