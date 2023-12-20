@@ -63,13 +63,21 @@ public:
             return false;
         }
         auto [listAttrIt, _] = CurTarget->JinjaAttrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto& list = listAttrIt->second.asList();
+        if (ValueInList(list, value)) {
+            return true; // skip adding fully duplicate induced attributes
+        }
+        return AddValueToJinjaList(list, value);
+    }
+
+    static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& value) {
         if (value.isList()) {
             // Never create list of lists, if value also list, concat all lists to one big list
             for (const auto& v: value.asList()) {
-                listAttrIt->second.asList().emplace_back(v);
+                list.emplace_back(v);
             }
         } else {
-            listAttrIt->second.asList().emplace_back(value);
+            list.emplace_back(value);
         }
         return true;
     }
@@ -270,7 +278,31 @@ private:
         return true;
     }
 
-    bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
+    bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        bool r = true;
+        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+        auto& attr = attrIt->second.asList();
+        for (const auto& value : values) {
+            if (value.isMap() || value.isList()) {
+                spdlog::error("trying to add invalid type (map or list) element to set {} at {}", attrMacro, nodePath);
+                r = false;
+                continue;
+            }
+            bool exists = false;
+            for (const auto& v: attr) {
+                if (exists |= v.asString() == value.asString()) {
+                    break;
+                }
+            }
+            if (!exists) { // add to list only if not exists
+                attr.emplace_back(value);
+            }
+        }
+        return r;
+    }
+
+    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+        bool r = true;
         auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
         auto& attr = attrIt->second.asList();
         std::set<std::string> set;
@@ -280,14 +312,15 @@ private:
             }
         }
         for (const auto& value : values) {
+            if (value.isMap() || value.isList()) {
+                spdlog::error("trying to add invalid type (map or list) element to sorted set {} at {}", attrMacro, nodePath);
+                r = false;
+                continue;
+            }
             set.emplace(value.asString());
         }
         attr = jinja2::ValuesList(set.begin(), set.end()); // replace by new list constructed from set
-        return true;
-    }
-
-    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        return AppendToSetAttr(attrs, attrMacro, values, nodePath);
+        return r;
     }
 
     bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
@@ -323,6 +356,23 @@ private:
                 attr[attrName] = attrValue;
             }
         }
+    }
+
+    bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val) {
+        if (list.empty()) {
+            return false;
+        }
+        TStringBuilder valStr;
+        TStringBuilder listStr;
+        Dump(valStr.Out, val);
+        for (const auto& listVal : list) {
+            listStr.clear();
+            Dump(listStr.Out, listVal);
+            if (valStr == listStr) {
+                return true;
+            }
+        }
+        return false;
     }
 };
 
@@ -427,8 +477,6 @@ public:
             state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(semName, modDir, semArgs[1], semArgs.subspan(2));
             ProjectBuilder.SetIsTest(isTestTarget);
             Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder.CurrentTarget());
-            // TODO(svidyuk) populate target props on post order part of the traversal and keep track locally used tools only instead of global dict
-            TargetsDict.emplace(NPath::CutType(data.Path), ProjectBuilder.CurrentTarget());
         }
 
         return !isTargetIgnored;
@@ -499,8 +547,79 @@ public:
             const auto libIt = InducedAttrs_.find(dep.To().Id());
             if (!isSameDir && libIt != InducedAttrs_.end()) {
                 const TSemNodeData& data = dep.To().Value();
+/*
+    Generating induced attributes and excludes< for example, project is
+
+    prog --> lib1 with excluding ex1
+         \-> lib2 with excluding ex2
+
+    And toml is:
+
+    [attrs.induced]
+    consumer-classpath="str"
+    consumer-jar="str"
+
+    For prog must be attributes map:
+    ...
+    consumer: [
+        {
+            classpath: "lib1",
+            jar: "lib1.jar",
+            excludes: {
+                consumer: [
+                    {
+                        classpath: "ex1",
+                        jar: "ex1.jar",
+                    }
+                ],
+            },
+        },
+        {
+            classpath: "lib2",
+            jar: "lib2.jar",
+            excludes: {
+                consumer: [
+                    {
+                        classpath: "ex2",
+                        jar: "ex2.jar",
+                    }
+                ],
+            },
+        },
+    ]
+    ...
+*/
+                // Make excludes map for each induced library
+                jinja2::ValuesMap excludes;
+                // Extract excludes node ids from current dependence
+                if (const TSemDepData* depData = reinterpret_cast<const TSemGraph&>(dep.Graph()).GetDepData(dep); depData) {
+                    if (const auto excludesIt = depData->find(DEPATTR_EXCLUDES); excludesIt != depData->end()) {
+                        Y_ASSERT(excludesIt->second.isList());
+                        // for each excluded node id get all it induced attrs
+                        for (const auto& excludeNodeVal : excludesIt->second.asList()) {
+                            const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
+                            const auto excludeIt = InducedAttrs_.find(excludeNodeId);
+                            if (excludeIt != InducedAttrs_.end()) {
+                                // Put all induced attrs of excluded library to lists by induced attribute name
+                                for (const auto& [attrMacro, value]: excludeIt->second) {
+                                    auto [listIt, _] = excludes.emplace(attrMacro, jinja2::ValuesList{});
+                                    ProjectBuilder.AddValueToJinjaList(listIt->second.asList(), value);
+                                }
+                            } else {
+                                spdlog::debug("Not found induced for excluded node id {} at {}", excludeNodeId, data.Path);
+                            }
+                        }
+                    }
+                }
                 for (const auto& [attrMacro, value]: libIt->second) {
-                    ProjectBuilder.AddToTargetInducedAttr(attrMacro, value, data.Path);
+                    if (value.isMap() && !excludes.empty()) {
+                        // For each induced attribute in map format add submap with excludes
+                        jinja2::ValuesMap valueWithExcludes = value.asMap();
+                        valueWithExcludes.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
+                        ProjectBuilder.AddToTargetInducedAttr(attrMacro, valueWithExcludes, data.Path);
+                    } else {
+                        ProjectBuilder.AddToTargetInducedAttr(attrMacro, value, data.Path);
+                    }
                 }
             }
         }
@@ -508,7 +627,6 @@ public:
     }
 
 private:
-    THashMap<TStringBuf, const TJinjaTarget*> TargetsDict;
     THashMap<TNodeId, const TJinjaTarget*> Mod2Target;
 
     THashMap<TNodeId, jinja2::ValuesMap> InducedAttrs_;

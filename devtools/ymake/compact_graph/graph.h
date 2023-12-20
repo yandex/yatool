@@ -74,6 +74,11 @@ public:
         ToAndValue_ = Deleted;
     }
 
+    /// Compact internal representation of compact edge (to and value), can be used as id of compact edge
+    TNodeId Representation() const noexcept {
+        return ToAndValue_;
+    }
+
     Y_SAVELOAD_DEFINE(ToAndValue_);
 };
 

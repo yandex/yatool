@@ -16,6 +16,7 @@ namespace {
         ui32 From;
         ui32 To;
         EDepType Type;
+        TMaybe<TSemDepData> Data;
     };
 
     class TSemGraphCallbacks: public NJson::TJsonCallbacks {
@@ -38,6 +39,8 @@ namespace {
             Tools,
             Tests,
             SkippedKey,
+            ExcludeNodeIds,
+            IsClosureBool,
         };
 
         enum class ECurElem {
@@ -53,7 +56,7 @@ namespace {
             TMaybe<ui32> FromId;
             TMaybe<ui32> ToId;
             TMaybe<EDepType> DepType;
-            TVector<ui32> ManagedPeersClosure;
+            TMaybe<TSemDepData> DepData;
             TVector<ui32> Tools;
             TVector<ui32> Tests;
             bool StartDir = false;
@@ -85,18 +88,12 @@ namespace {
                         TDepInfo dep{
                             .From = curElem.FromId.GetRef(),
                             .To = curElem.ToId.GetRef(),
-                            .Type = curElem.DepType.GetRef()
+                            .Type = curElem.DepType.GetRef(),
+                            .Data = std::move(curElem.DepData),
                         };
-                        const auto nodeFromId = Id2Node[dep.From];
-                        const auto& nodeFrom = Graph.Get(nodeFromId);
-                        const auto& nodeTo = Graph.Get(Id2Node[dep.To]);
-                        if (UseManagedPeersClosure_ // if enabled managed peers closure instead direct peers
-                            && ManagedPeersClosureToLink.find(nodeFromId) != ManagedPeersClosureToLink.end() // and nodeFrom has managed peers closure
-                            && IsDirectPeerdirDep(nodeFrom->NodeType, dep.Type, nodeTo->NodeType)) { // then skip direct peersfrom sem graph
-                            break;
-                        }
+
                         if (!Link(dep))
-                            PostponedDeps.push_back(dep);
+                            PostponedDeps_.push_back(dep);
                         break;
                     }
                     case ECurElem::Node:
@@ -110,9 +107,6 @@ namespace {
                         if (curElem.StartDir) {
                             StartDirs.push_back(nodeId);
                         }
-                        if (!curElem.ManagedPeersClosure.empty()) {
-                            ManagedPeersClosureToLink.emplace(nodeId, std::move(curElem.ManagedPeersClosure));
-                        }
                         if (!curElem.Tools.empty()) {
                             ToolsToLink.emplace(nodeId, std::move(curElem.Tools));
                         }
@@ -123,7 +117,7 @@ namespace {
                 }
             }
             if (Path.size() == 1) {
-                for (const auto& dep: PostponedDeps) {
+                for (const auto& dep: PostponedDeps_) {
                     if (!Link(dep)) {
                         throw TReadGraphException() << fmt::format(
                             "Failed to add dependency {} -[{}]-> {}",
@@ -168,14 +162,16 @@ namespace {
                 LastKey = EPathElem::FromId;
             } else if (key == "ToId") {
                 LastKey = EPathElem::ToId;
-            } else if (key == "ManagedPeersClosure") {
-                LastKey = EPathElem::ManagedPeersClosure;
             } else if (key == "Tools") {
                 LastKey = EPathElem::Tools;
             } else if (key == "Tests") {
                 LastKey = EPathElem::Tests;
             } else if (key == "DepType") {
                 LastKey = EPathElem::DepType;
+            } else if (key == DEPATTR_EXCLUDES) {
+                LastKey = EPathElem::ExcludeNodeIds;
+            } else if (key == DEPATTR_IS_CLOSURE) {
+                LastKey = EPathElem::IsClosureBool;
             } else {
                 LastKey = EPathElem::SkippedKey;
             }
@@ -216,17 +212,23 @@ namespace {
             }
             return true;
         }
+
         bool OnInteger(long long val) override {
-            if (IsManagedPeersClosurePath()) {
-                CurElem.ManagedPeersClosure.push_back(static_cast<ui32>(val));
-                return true;
-            }
             if (IsToolsPath()) {
                 CurElem.Tools.push_back(static_cast<ui32>(val));
                 return true;
             }
             if (IsTestsPath()) {
                 CurElem.Tests.push_back(static_cast<ui32>(val));
+                return true;
+            }
+
+            if (IsExcludeNodeIdsArr() && CurElem.FromId.Defined() && CurElem.ToId.Defined()) {
+                if (!CurElem.DepData.Defined()) {
+                    CurElem.DepData = TSemDepData{};
+                }
+                auto [listIt, _] = CurElem.DepData->emplace(DEPATTR_EXCLUDES, jinja2::ValuesList{});
+                listIt->second.asList().push_back(jinja2::Value{static_cast<int64_t>(val)}); // jinja std::variant has only int64_t as integer type
                 return true;
             }
 
@@ -247,6 +249,16 @@ namespace {
             return true;
         }
 
+        bool OnBoolean(bool val) override {
+            if (LastKey == EPathElem::IsClosureBool && IsElemPath() && CurElem.FromId.Defined() && CurElem.ToId.Defined()) {
+                if (!CurElem.DepData.Defined()) {
+                    CurElem.DepData = TSemDepData{};
+                }
+                CurElem.DepData->emplace(DEPATTR_IS_CLOSURE, val);
+            }
+            return true;
+        }
+
         TVector<TNodeId> TakeStartDirs() noexcept {
             return std::move(StartDirs);
         }
@@ -258,22 +270,42 @@ namespace {
             if (from == Id2Node.end() || to == Id2Node.end()) {
                 return false;
             }
-            Graph.AddEdge(from->second, to->second, dep.Type);
-            return true;
-        }
-
-        bool LinkManagedPeersClosure(TNodeId outputNodeId, std::span<const ui32> managedPeersClosureElemIds) {
-            bool hasErrors = false;
-            for (ui32 managedPeersClosureElemId: managedPeersClosureElemIds) {
-                const auto it = Id2Node.find(managedPeersClosureElemId);
-                if (it == Id2Node.end()) {
-                    spdlog::error("node {} references unknown managed closure peer {}", Graph[outputNodeId]->Path, managedPeersClosureElemId);
-                    hasErrors = true;
-                    continue; // continue processing graph without edge to unknown node
+            const auto depHasData = dep.Data.Defined();
+            jinja2::ValuesMap::const_iterator excludesIt;
+            bool hasExcludes = false;
+            if (!UseManagedPeersClosure_ && depHasData) {
+                const auto& depAttrs = *dep.Data.Get();
+                const auto isClosureIt = depAttrs.find(DEPATTR_IS_CLOSURE);
+                if (isClosureIt != depAttrs.end() && isClosureIt->second.get<bool>()) {
+                    return true; // skip closure deps in direct peers mode
                 }
-                Graph.AddEdge(outputNodeId, it->second, EDT_BuildFrom);
             }
-            return hasErrors;
+            if (depHasData) {
+                const auto& depAttrs = *dep.Data.Get();
+                excludesIt = depAttrs.find(DEPATTR_EXCLUDES);
+                if (excludesIt != depAttrs.end()) {
+                    Y_ASSERT(excludesIt->second.isList());
+                    for (const auto& excludeNodeVal: excludesIt->second.asList()) {
+                        const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
+                        const auto it = Id2Node.find(excludeNodeId);
+                        if (it == Id2Node.end()) {
+                            return false; // Node for exclude not found, try create link later
+                        }
+                    }
+                    hasExcludes = true;
+                }
+            }
+            const auto edge = Graph.AddEdge(from->second, to->second, dep.Type);
+            if (depHasData && hasExcludes) {
+                auto& data = *dep.Data.Get();
+                for (auto& excludeNodeVal: excludesIt->second.asList()) {
+                    const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
+                    const auto it = Id2Node.find(excludeNodeId);
+                    excludeNodeVal = jinja2::Value{it->second};
+                }
+                Graph.SetDepData(edge, std::move(data));
+            }
+            return true;
         }
 
         bool LinkTools(TNodeId outputNodeId, std::span<const ui32> toolElems) {
@@ -327,10 +359,6 @@ namespace {
 
             if (Path.empty()) {
                 bool hasErrors = false;
-                if (UseManagedPeersClosure_) {
-                    for (const auto& [nodeId, peerElems]: ManagedPeersClosureToLink)
-                        hasErrors |= LinkManagedPeersClosure(nodeId, peerElems);
-                }
                 for (const auto& [nodeId, toolElems]: ToolsToLink)
                     hasErrors |= LinkTools(nodeId, toolElems);
                 for (const auto& [nodeId, testElems]: TestsToLink)
@@ -352,10 +380,6 @@ namespace {
             return std::equal(Path.begin(), Path.end(), std::begin(SemList), std::end(SemList));
         }
 
-        bool IsManagedPeersClosurePath() const noexcept {
-            return std::equal(Path.begin(), Path.end(), std::begin(ManagedPeersClosureArr), std::end(ManagedPeersClosureArr));
-        }
-
         bool IsToolsPath() const noexcept {
             return std::equal(Path.begin(), Path.end(), std::begin(ToolsArr), std::end(ToolsArr));
         }
@@ -364,13 +388,17 @@ namespace {
             return std::equal(Path.begin(), Path.end(), std::begin(TestsArr), std::end(TestsArr));
         }
 
+        bool IsExcludeNodeIdsArr() const noexcept {
+            return std::equal(Path.begin(), Path.end(), std::begin(ExcludeNodeIdsArr), std::end(ExcludeNodeIdsArr));
+        }
+
     private:
         constexpr static EPathElem GraphElemPrefix[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj};
-        constexpr static EPathElem ManagedPeersClosureArr[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::ManagedPeersClosure, EPathElem::Arr};
         constexpr static EPathElem ToolsArr[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::Tools, EPathElem::Arr};
         constexpr static EPathElem TestsArr[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::Tests, EPathElem::Arr};
         constexpr static EPathElem SemanticsItem[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::Semantics, EPathElem::Arr, EPathElem::Obj};
         constexpr static EPathElem SemList[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::Semantics, EPathElem::Arr, EPathElem::Obj, EPathElem::Sem, EPathElem::Arr};
+        constexpr static EPathElem ExcludeNodeIdsArr[] = {EPathElem::Obj, EPathElem::Data, EPathElem::Arr, EPathElem::Obj, EPathElem::ExcludeNodeIds, EPathElem::Arr};
 
         // Cur elem
         TCurElemData CurElem;
@@ -381,10 +409,9 @@ namespace {
 
         // Global mappings
         THashMap<ui32, TNodeId> Id2Node;
-        THashMap<TNodeId, TVector<ui32>> ManagedPeersClosureToLink;
         THashMap<TNodeId, TVector<ui32>> ToolsToLink;
         THashMap<TNodeId, TVector<ui32>> TestsToLink;
-        TDeque<TDepInfo> PostponedDeps;
+        TDeque<TDepInfo> PostponedDeps_;
 
         TSemGraph& Graph;
         TVector<TNodeId> StartDirs;

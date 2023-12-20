@@ -41,6 +41,7 @@ using TSubdirsTableElem = THashMap<fs::path, TJinjaList>::value_type;
 class TJinjaGenerator : public TSpecBasedGenerator {
 public:
     class TBuilder;
+    static constexpr std::string_view EXCLUDES_ATTR = "excludes";
 
     static THolder<TJinjaGenerator> Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir = "");
 
