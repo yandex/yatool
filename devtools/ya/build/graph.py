@@ -1695,8 +1695,6 @@ class _GraphMaker(object):
         flags.update(tc.get('params', {}).get('extra_flags', {}))
         flags.update(tc.get('flags', {}))
         flags[tc['name'].upper()] = 'yes'
-        flags['MY_YMAKE_BIN'] = self._ymake_bin
-        flags['REAL_YMAKE_BIN'] = self._real_ymake_bin
         flags['YA'] = 'yes'
 
         if not _is_tools_tc(tc) and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends):
