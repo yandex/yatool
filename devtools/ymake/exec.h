@@ -28,7 +28,7 @@ protected:
 
 struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
     virtual void WriteEnv(TStringBuf)          override { ythrow TNotImplemented(); }
-    virtual void RegisterPrimaryInput(TString) override { ythrow TNotImplemented(); }
+    virtual void RegisterPrimaryInput(TString) override {  }
     virtual void PostScript(TVars&)            override {  }
 protected:
     ~TCommandSequenceWriterStubs() = default;
