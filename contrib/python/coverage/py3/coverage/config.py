@@ -599,7 +599,7 @@ def _load_config_from_resource(resource_name):
     config_data = config_data.decode('utf-8')
     cp = HandyConfigParser(True)
     try:
-        cp.readfp(StringIO(config_data))
+        cp.read_file(StringIO(config_data))
     except configparser.Error as err:
         raise CoverageException("Couldn't read config %s: %s" % (resource_name, err))
     return cp, config_data
