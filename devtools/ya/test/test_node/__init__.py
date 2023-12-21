@@ -914,13 +914,16 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
         ytexec_tool = opts.ytexec_bin or "$(YTEXEC)/ytexec/ytexec"
         # yt_run_test steals args from run_test, no need to duplicate args
         ytexec_desc = "[TS-{uid}] {project_path}({test_type}) - chunk{split_index}"
+        description = ytexec_desc.format(
+            project_path=suite.project_path, test_type=suite.get_type(), split_index=split_index, uid=node["uid"]
+        )
+        if opts.ytexec_title_suffix:
+            description += " - {}".format(opts.ytexec_title_suffix)
         wrapper_cmd = util_tools.get_test_tool_cmd(opts, "ytexec_run_test", suite.global_resources) + [
             '--output-tar',
             output_tar,
             '--description',
-            ytexec_desc.format(
-                project_path=suite.project_path, test_type=suite.get_type(), split_index=split_index, uid=node["uid"]
-            ),
+            description,
             '--ytexec-tool',
             ytexec_tool,
             '--cpu',
