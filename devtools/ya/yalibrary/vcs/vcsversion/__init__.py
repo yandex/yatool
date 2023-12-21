@@ -106,7 +106,7 @@ def _dump_json(
 ):
     j = {}
     j['PROGRAM_VERSION'] = info['scm_text'] + "\n" + _SystemInfo._to_text(other_data)
-    j['CUSTOM_VERSION'] = str(_SystemInfo._to_text(custom_version))
+    j['CUSTOM_VERSION'] = str(_SystemInfo._to_text(custom_version)) if custom_version else ''
     j['SCM_DATA'] = info['scm_text']
     j['ARCADIA_SOURCE_PATH'] = _SystemInfo._to_text(arc_root)
     j['ARCADIA_SOURCE_URL'] = info.get('url', info.get('svn_url', ''))
