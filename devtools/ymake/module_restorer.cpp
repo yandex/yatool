@@ -48,7 +48,7 @@ namespace {
             return !parent.IsPeersComplete();
         }
 
-        void Finish(TStateItem& parentItem) {
+        void Finish(TStateItem& parentItem, void*) {
             TModule* parent = RestoreContext.Modules.Get(parentItem.Node()->ElemId);
             Y_ASSERT(parent);
 

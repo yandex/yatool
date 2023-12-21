@@ -47,6 +47,7 @@ struct TDebugOptions {
     bool DumpDependentDirs = false;
     bool DumpData = false;  // This is for DumpFiles and DumpSrcDeps
     bool DumpRenderedCmds = false; // byte
+    bool DumpExpressions = false;
     bool DumpBuildables = false;
     bool DumpTargetDepFiles = false;
     bool DumpGraphStuff = false;
@@ -59,6 +60,7 @@ struct TDebugOptions {
     bool DumpIncludeTargets = false;
     bool SkipMakeFilesInDumps = false;
     bool MarkMakeFilesInDumps = false;
+    bool DumpPretty = false;
 
     bool EntirelyParseFiles = false;
     bool PrintTargetAbsPath = false;

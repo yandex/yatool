@@ -187,6 +187,7 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xi", "only dump peerdirs (from all start targets)").SetFlag(&DumpPeers).NoArgument();
     opts.AddLongOption("xz", "dump recurses and peerdirs from start target").SetFlag(&DumpDependentDirs).NoArgument();
     opts.AddLongOption("xe", "also render and dump commands (for g)").SetFlag(&DumpRenderedCmds).NoArgument();
+    opts.AddLongOption("dump-expressions", "dump expressions (a.k.a. structured commands)").SetFlag(&DumpExpressions).NoArgument();
     opts.AddLongOption("xb", "also list buildables ordered by depth (for g)").SetFlag(&DumpBuildables).NoArgument();
     opts.AddLongOption("xw", "list buildables with its sources").SetFlag(&DumpTargetDepFiles).NoArgument();
     opts.AddLongOption("xJ", "export graph as JSON").SetFlag(&DumpAsJson).NoArgument();
@@ -228,6 +229,7 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     ).SetFlag(&CompletelyTrustFSCache).NoArgument();
     opts.AddLongOption("xskip-make-files", "skip make files for dumps").SetFlag(&SkipMakeFilesInDumps).NoArgument();
     opts.AddLongOption("xmark-make-files", "mark make files as makefile for dumps").SetFlag(&MarkMakeFilesInDumps).NoArgument();
+    opts.AddLongOption("dump-pretty", "additional formatting in dumps").SetFlag(&DumpPretty).NoArgument();
 
     auto dontWriteInternalCache = [this](){
         DontWriteInternalCache = true;

@@ -3,6 +3,7 @@
 #include "add_dep_adaptor_inline.h"
 
 #include <devtools/ymake/command_helpers.h>
+#include <devtools/ymake/commands/script_evaluator.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/lang/cmd_parser.h>
 #include <devtools/ymake/polexpr/evaluate.h>
@@ -13,11 +14,6 @@
 #include <fmt/format.h>
 #include <fmt/args.h>
 #include <util/generic/overloaded.h>
-
-struct TCommands::TEvalCtx {
-    const TVars& Vars;
-    TCommandInfo& CmdInfo;
-};
 
 namespace {
 
@@ -167,311 +163,6 @@ namespace {
 
     };
 
-    using TTermValue = std::variant<std::monostate, TString, TVector<TString>>;
-
-    TTermValue RenderClear(std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "Clear requires 1 argument";
-        }
-        return std::visit(TOverloaded{
-            [](std::monostate) -> TTermValue {
-                return std::monostate();
-            },
-            [&](const TString&) -> TTermValue {
-                return TString();
-            },
-            [&](const TVector<TString>& v) -> TTermValue {
-                if (v.empty())
-                    return std::monostate();
-                return TString();
-            }
-        }, args[0]);
-    }
-
-    TTermValue RenderPre(std::span<const TTermValue> args) {
-        if (args.size() != 2) {
-            throw yexception() << "Pre requires 2 arguments";
-        }
-        return std::visit(TOverloaded{
-
-            [](std::monostate) -> TTermValue {
-                return std::monostate();
-            },
-
-            [&](const TString& body) {
-                return std::visit(TOverloaded{
-                    [](std::monostate) -> TTermValue {
-                        ythrow TNotImplemented() << "Unexpected empty prefix";
-                    },
-                    [&](const TString& prefix) -> TTermValue {
-                        if (prefix.EndsWith(' ')) {
-                            auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
-                            return TVector<TString>{std::move(trimmedPrefix), body};
-                        }
-                        return prefix + body;
-                    },
-                    [&](const TVector<TString>& prefixes) -> TTermValue {
-                        TVector<TString> result;
-                        result.reserve(prefixes.size());
-                        for (auto& prefix : prefixes)
-                            result.push_back(prefix + body);
-                        return std::move(result);
-                    }
-                }, args[0]);
-            },
-
-            [&](const TVector<TString>& bodies) -> TTermValue {
-                return std::visit(TOverloaded{
-                    [](std::monostate) -> TTermValue {
-                        ythrow TNotImplemented() << "Unexpected empty prefix";
-                    },
-                    [&](const TString& prefix) -> TTermValue {
-                        TVector<TString> result;
-                        if (prefix.EndsWith(' ')) {
-                            auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
-                            result.reserve(bodies.size() * 2);
-                            for (auto& body : bodies) {
-                                result.push_back(trimmedPrefix);
-                                result.push_back(body);
-                            }
-                        } else {
-                            result.reserve(bodies.size());
-                            for (auto& body : bodies)
-                                result.push_back(prefix + body);
-                        }
-                        return std::move(result);
-                    },
-                    [&](const TVector<TString>& prefixes) -> TTermValue {
-                        Y_UNUSED(prefixes);
-                        ythrow TNotImplemented() << "Pre arguments should not both be arrays";
-                    }
-                }, args[0]);
-            }
-
-        }, args[1]);
-    }
-
-    TTermValue RenderSuf(std::span<const TTermValue> args) {
-        if (args.size() != 2) {
-            throw yexception() << "Suf requires 2 arguments";
-        }
-        auto suffix = std::get<TString>(args[0]);
-        return std::visit(TOverloaded{
-            [](std::monostate) -> TTermValue {
-                return std::monostate();
-            },
-            [&](const TString& body) -> TTermValue {
-                return body + suffix;
-            },
-            [&](const TVector<TString>& bodies) -> TTermValue {
-                TVector<TString> result;
-                result.reserve(bodies.size());
-                for (auto&& body : bodies)
-                    result.push_back(body + suffix);
-                return std::move(result);
-            }
-        }, args[1]);
-    }
-
-    TTermValue RenderQuo(std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "Quo requires 1 argument";
-        }
-        // "quo" is used to wrap pieces of the unparsed command line;
-        // the quotes in question should disappear after argument extraction,
-        // so for the arg-centric model this modifier is effectively a no-op
-        return args[0];
-    }
-
-    void RenderEnv(ICommandSequenceWriter* writer, const TCommands::TEvalCtx& ctx, std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "Env requires 1 argument";
-        }
-        std::visit(TOverloaded{
-            [](std::monostate) {
-                throw TNotImplemented();
-            },
-            [&](const TString& s) {
-                writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
-            },
-            [&](const TVector<TString>&) {
-                throw TNotImplemented();
-            }
-        }, args[0]);
-    }
-
-    void RenderKeyValue(const TCommands::TEvalCtx& ctx, std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "KeyValue requires 1 argument";
-        }
-        std::visit(TOverloaded{
-            [](std::monostate) {
-                throw TNotImplemented();
-            },
-            [&](const TString& s) {
-                // lifted from EMF_KeyValue processing
-                TString kvValue = ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false);
-                TStringBuf name(kvValue);
-                TStringBuf before;
-                TStringBuf after;
-                if (name.TrySplit(' ', before, after)) {
-                    TString val = TString{after};
-                    GetOrInit(ctx.CmdInfo.KV)[before] = val;
-                } else {
-                    GetOrInit(ctx.CmdInfo.KV)[name] = "yes";
-                }
-            },
-            [&](const TVector<TString>&) {
-                throw TNotImplemented();
-            }
-        }, args[0]);
-    }
-
-    TTermValue RenderCutExt(std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "Noext requires 1 argument";
-        }
-        auto apply = [](TString s) {
-            // lifted from EMF_CutExt processing:
-            size_t slash = s.rfind(NPath::PATH_SEP); //todo: windows slash!
-            if (slash == TString::npos)
-                slash = 0;
-            size_t dot = s.rfind('.');
-            if (dot != TString::npos && dot >= slash)
-                s = s.substr(0, dot);
-            return s;
-        };
-        return std::visit(TOverloaded{
-            [](std::monostate) -> TTermValue {
-                throw TNotImplemented();
-            },
-            [&](TString s) -> TTermValue {
-                return apply(std::move(s));
-            },
-            [&](TVector<TString> v) -> TTermValue {
-                for (auto& s : v)
-                    s = apply(std::move(s));
-                return std::move(v);
-            }
-        }, args[0]);
-    }
-
-    TTermValue RenderLastExt(std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "Lastext requires 1 argument";
-        }
-        auto apply = [](TString s) {
-            // lifted from EMF_LastExt processing:
-            // It would be nice to use some common utility function from common/npath.h,
-            // but Extension function implements rather strange behaviour
-            auto slash = s.rfind(NPath::PATH_SEP);
-            auto dot = s.rfind('.');
-            if (dot != TStringBuf::npos && (slash == TStringBuf::npos || slash < dot)) {
-                s = s.substr(dot + 1);
-            } else {
-                s.clear();
-            }
-            return s;
-        };
-        return std::visit(TOverloaded{
-            [](std::monostate) -> TTermValue {
-                throw TNotImplemented();
-            },
-            [&](TString s) -> TTermValue {
-                return apply(std::move(s));
-            },
-            [&](TVector<TString> v) -> TTermValue {
-                for (auto& s : v)
-                    s = apply(std::move(s));
-                return std::move(v);
-            }
-        }, args[0]);
-    }
-
-    TTermValue RenderExtFilter(std::span<const TTermValue> args) {
-        if (args.size() != 2) {
-            throw yexception() << "Ext requires 2 argument";
-        }
-        auto ext = std::get<TString>(args[0]);
-        return std::visit(TOverloaded{
-            [](std::monostate) -> TTermValue {
-                throw TNotImplemented();
-            },
-            [&](TString s) -> TTermValue {
-                return s.EndsWith(ext) ? args[1] : std::monostate();
-            },
-            [&](TVector<TString> v) -> TTermValue {
-                v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return !s.EndsWith(ext); }), v.end());
-                return std::move(v);
-            }
-        }, args[1]);
-    }
-
-    TTermValue RenderTODO1(std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "TODO1 requires 1 argument";
-        }
-        auto arg0 = std::visit(TOverloaded{
-            [](std::monostate) {
-                return TString("-");
-            },
-            [&](const TString& s) {
-                return s;
-            },
-            [&](const TVector<TString>& v) -> TString {
-                return fmt::format("{}", fmt::join(v, " "));
-            }
-        }, args[0]);
-        return fmt::format("TODO1({})", arg0);
-    }
-
-    TTermValue RenderTODO2(std::span<const TTermValue> args) {
-        if (args.size() != 2) {
-            throw yexception() << "TODO2 requires 2 arguments";
-        }
-        auto arg0 = std::visit(TOverloaded{
-            [](std::monostate) {
-                return TString("-");
-            },
-            [&](const TString& s) {
-                return s;
-            },
-            [&](const TVector<TString>& v) -> TString {
-                return fmt::format("{}", fmt::join(v, " "));
-            }
-        }, args[0]);
-        auto arg1 = std::visit(TOverloaded{
-            [](std::monostate) {
-                return TString("-");
-            },
-            [&](const TString& s) {
-                return s;
-            },
-            [&](const TVector<TString>& v) -> TString {
-                return fmt::format("{}", fmt::join(v, " "));
-            }
-        }, args[1]);
-        return fmt::format("TODO2({}, {})", arg0, arg1);
-    }
-
-    TTermValue RenderMsvsSource(ICommandSequenceWriter* writer, std::span<const TTermValue> args) {
-        if (args.size() != 1) {
-            throw yexception() << "MsvsSource requires 1 argument";
-        }
-        auto arg0 = std::visit(TOverloaded{
-            [](std::monostate) -> TString {
-                ythrow TNotImplemented();
-            },
-            [&](const TString& s) {
-                return s;
-            },
-            [&](const TVector<TString>&) -> TString {
-                ythrow TNotImplemented();
-            }
-        }, args[0]);
-        writer->RegisterPrimaryInput(arg0);
-        return arg0;
-    }
 
 }
 
@@ -499,6 +190,8 @@ void TCommands::Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, 
     auto processVar = [&](NPolexpr::EVarId id) {
 
         auto name = Values.GetVarName(id);
+        if (name.starts_with("__NOINLINE__"))
+            return;
         auto buildConf = GlobalConf();
         auto blockData = buildConf->BlockData.find(name);
         if (blockData != buildConf->BlockData.end())
@@ -881,99 +574,18 @@ TCommands::TCompiledCommand TCommands::Preevaluate(const NPolexpr::TExpression& 
     return result;
 }
 
-void TCommands::WriteShellCmd(ICommandSequenceWriter* writer, const NPolexpr::TExpression& cmdExpr, const TVars& vars, TCommandInfo& cmd) const {
-    // TODO? `const TCommandInfo&`
+void TCommands::WriteShellCmd(
+    ICommandSequenceWriter* writer,
+    const NPolexpr::TExpression& cmdExpr,
+    const TVars& vars,
+    TCommandInfo& cmd,
+    const TCmdConf* cmdConf
+) const {
+    NCommands::TScriptEvaluator se{this, cmdConf, &vars, &cmd};
     writer->BeginScript();
-    TEvalCtx ctx{vars, cmd};
-    auto endScr = NPolexpr::VisitFnArgs(cmdExpr, 0, Values.Func2Id(EMacroFunctions::Cmds), [&](size_t beginCmd) {
-        writer->BeginCommand();
-        auto endCmd = NPolexpr::VisitFnArgs(cmdExpr, beginCmd, Values.Func2Id(EMacroFunctions::Args), [&](size_t beginArg) {
-            TVector<TString> args;
-            auto endArg = NPolexpr::VisitFnArgs(cmdExpr, beginArg, Values.Func2Id(EMacroFunctions::Terms), [&](size_t beginTerm) {
-                auto [term, endTerm] = ::NPolexpr::Evaluate<TTermValue>(cmdExpr, beginTerm, [&](auto id, auto&&... args) -> TTermValue {
-                    if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
-                        static_assert(sizeof...(args) == 0);
-                        auto val = Values.GetValue(id);
-                        if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
-                            auto result = TVector<TString>();
-                            for (auto& coord : inputs->Coords)
-                                result.push_back(ConstToString(TMacroValues::TInput {.Coord = coord}, ctx));
-                            return result;
-                        }
-                        return TString(ConstToString(val, ctx));
-                    }
-                    else if constexpr (std::is_same_v<decltype(id), NPolexpr::EVarId>) {
-                        static_assert(sizeof...(args) == 0);
-                        return vars.EvalAllSplit(Values.GetVarName(id));
-                    }
-                    else if constexpr (std::is_same_v<decltype(id), NPolexpr::TFuncId>) {
-                        static_assert(sizeof...(args) == 1);
-                        switch (Values.Id2Func(id)) {
-                            case EMacroFunctions::Hide: return std::monostate();
-                            case EMacroFunctions::Clear: return RenderClear(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::Pre: return RenderPre(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::Suf: return RenderSuf(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::Quo: return RenderQuo(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::SetEnv: RenderEnv(writer, ctx, std::forward<decltype(args)...>(args...)); return {};
-                            case EMacroFunctions::CutExt: return RenderCutExt(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::LastExt: return RenderLastExt(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::ExtFilter: return RenderExtFilter(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::KeyValue: RenderKeyValue(ctx, std::forward<decltype(args)...>(args...)); return {};
-                            case EMacroFunctions::TODO1: return RenderTODO1(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::TODO2: return RenderTODO2(std::forward<decltype(args)...>(args...));
-                            case EMacroFunctions::MsvsSource: return RenderMsvsSource(writer, std::forward<decltype(args)...>(args...));
-                            default:
-                                break;
-                        }
-                        throw yexception() << "Don't know how to render configure time modifier " << Values.Id2Func(id) << " in expression: " + PrintCmd(cmdExpr);
-                    }
-                });
-
-                if (args.empty()) {
-                    std::visit(TOverloaded{
-                        [&](std::monostate) {
-                        },
-                        [&](TString&& s) {
-                            args.push_back(std::move(s));
-                        },
-                        [&](TVector<TString>&& v) {
-                            args = std::move(v);
-                        }
-                    }, std::move(term));
-                } else {
-                    std::visit(TOverloaded{
-                        [&](std::monostate) {
-                        },
-                        [&](TString&& s) {
-                            for (auto& arg : args)
-                                arg += s;
-                        },
-                        [&](TVector<TString>&& v) {
-                            auto result
-                                = fmt::format("{}", fmt::join(args, " "))
-                                + fmt::format("{}", fmt::join(v, " "));
-                            args = {TString(std::move(result))};
-                        }
-                    }, std::move(term));
-                }
-
-                return endTerm;
-            });
-            if (endArg == beginArg)
-                throw yexception() << "Could not evaluate a command argument";
-            for (auto&& arg : args)
-                if (!arg.empty())
-                    writer->WriteArgument(arg);
-            return endArg;
-        });
-        if (endCmd == beginCmd)
-            throw yexception() << "Could not evaluate a command";
-        writer->EndCommand();
-        return endCmd;
-    });
-    if (endScr != cmdExpr.GetNodes().size())
-        throw yexception() << "Could not evaluate a command sequence";
+    se.DoScript(&cmdExpr, 0, writer);
     writer->EndScript(cmd, vars);
+    // TODO? `const TCommandInfo&`
 }
 
 void TCommands::Save(TMultiBlobBuilder& builder) const {
@@ -1050,7 +662,7 @@ TVector<TStringBuf> TCommands::GetCommandTools(ui32 elemId) const {
     return result.Take();
 }
 
-TString TCommands::ConstToString(const TMacroValues::TValue& value, const TEvalCtx& ctx) const {
+TString TCommands::ConstToString(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const {
     return std::visit(TOverloaded{
         [](std::string_view val) {
              return TString(val);

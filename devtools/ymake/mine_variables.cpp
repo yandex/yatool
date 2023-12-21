@@ -44,7 +44,7 @@ TString MineResults(const TModules& modules, const TBuildConfiguration& conf, TF
 
 namespace {
     template<typename FDescend>
-    inline void MineThisVariable(const TConstDepNodeRef& nextNode, TVars& vars, FDescend descend) {
+    inline void MineThisVariable(const TConstDepNodeRef& nextNode, TVars& vars, bool structCmd, FDescend descend) {
         TStringBuf name = TDepGraph::GetCmdName(nextNode).GetStr();
         TStringBuf cmdName, cmd;
         ui64 id;
@@ -59,6 +59,7 @@ namespace {
         var.push_back(TVarStr(name, true, false));
         var.BaseVal = lvars.Base ? lvars.Base->Lookup(cmdName) : nullptr;
         var.back().NeedSubst = true;
+        var.back().StructCmd = structCmd;
     }
 }
 
@@ -118,7 +119,7 @@ void MineVariables(
                 YDIAG(MkCmd) << "*Result for " << TDepGraph::ToString(node) << ": " << resultPath << "\n";
                 continue;
             }
-            MineThisVariable(nextNode, vars, [&]() {
+            MineThisVariable(nextNode, vars, false, [&]() {
                 MineVariables(conf, nextNode, toolPaths, resultPaths, vars, lateOutsProps, modules);
             });
         }
@@ -142,6 +143,6 @@ void MineVariables(
         auto depType = *dep;
 
         if (depType == EDT_Include && nodeType == EMNT_BuildCommand)
-            MineThisVariable(nextNode, vars, [&]() {});
+            MineThisVariable(nextNode, vars, true, [&]() {});
     }
 }

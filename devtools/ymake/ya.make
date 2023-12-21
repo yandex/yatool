@@ -64,6 +64,8 @@ SRCS(
     cmd_properties.cpp
     command_helpers.cpp
     command_store.cpp
+    commands/function_evaluator.cpp
+    commands/script_evaluator.cpp
     conf.cpp
     config/config.cpp
     debug_log.cpp

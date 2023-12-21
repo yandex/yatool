@@ -108,6 +108,7 @@ struct TVarStr {
             ui16 TaredOut : 1;
             ui16 OutInclsFromInput: 1;
             ui16 OutputInThisModule: 1;  // Dynamic mark for vars created as outputs in current module
+            ui16 StructCmd: 1;
             ui16 : 0;              // Start next word
             // ^^^^^^^^^^^^^^^^^^^^
             // 48bits up until here
@@ -309,7 +310,7 @@ private:
     TFilterGlobalVarsFunc AcceptGlobalVarWithName;
 
 public:
-    TVars(const TVars* base = nullptr)
+    explicit TVars(const TVars* base = nullptr)
         : Base(base)
         , Id(0)
         , AcceptGlobalVarWithName([](const TStringBuf&) -> bool { return true; })

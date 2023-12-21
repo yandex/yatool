@@ -362,7 +362,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
         }
         auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
         Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, CmdInfo);
+        Commands->WriteShellCmd(acceptor, *expr, Vars, CmdInfo, &Graph.Names().CommandConf);
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";

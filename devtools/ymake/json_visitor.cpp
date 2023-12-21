@@ -405,7 +405,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
     }
 
     if (IsModule(currState) && std::exchange(currData.IsGlobalVarsCollectorStarted, false)) {
-        GlobalVarsCollector.Finish(currState);
+        GlobalVarsCollector.Finish(currState, &currData);
     }
 
     // Note that the following code should be unified with Left()

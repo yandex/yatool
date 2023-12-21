@@ -163,7 +163,7 @@ public:
     bool GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod);
 
     bool GetCommandInfoFromStructCmd(
-        const TCommands& commands,
+        TCommands& commands,
         ui32 cmdElemId,
         const TVector<TCommands::TCompiledCommand::TInput>& cmdInputs,
         const TVector<TCommands::TCompiledCommand::TOutput>& cmdOutputs,

@@ -766,7 +766,7 @@ namespace {
             return true;
         }
 
-        void Finish(TStateItem& parentItem) {
+        void Finish(TStateItem& parentItem, void*) {
             TModule* parent = RestoreContext.Modules.Get(parentItem.Node()->ElemId);
             Y_ASSERT(parent);
             if (!parent->GetAttrs().RequireDepManagement) {

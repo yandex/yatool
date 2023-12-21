@@ -125,6 +125,8 @@ static void PrintFlatGraph(const TYMake& ymake) {
                  << "-- " << *dep << " --> " << dep.To().Id() << ' ' << dep.To()->NodeType << ' ' << graph.ToString(dep.To()) << '(' << dep.To()->ElemId << ')' << Endl;
         }
     }
+    if (ymake.Conf.DumpPretty)
+        Cout << Endl;
 }
 
 namespace {
@@ -893,6 +895,17 @@ int main_real(TBuildConfiguration& conf) {
 
     if (conf.DumpGraphStuff) {
         yMake->DumpGraph();
+    }
+
+    if (conf.DumpExpressions) {
+        YInfo() << "Expression dump:" << Endl;
+        yMake->Commands.ForEachCommand([&](ECmdId id, const NPolexpr::TExpression& expr) {
+            yMake->Conf.Cmsg()
+                << static_cast<std::underlying_type_t<ECmdId>>(id) << " "
+                << yMake->Commands.PrintCmd(expr) << "\n";
+        });
+        if (yMake->Conf.DumpPretty)
+            yMake->Conf.Cmsg() << Endl;
     }
 
     if (conf.DumpModulesInfo) {

@@ -23,11 +23,25 @@ namespace NPolexpr {
         auto fId = TFuncId::FromRepr(fNode.GetIdx());
         if (fId.GetIdx() != expected.GetIdx())
             return pos;
-        ++pos;
         auto fArity = fNode.GetArity();
+        ++pos;
         for (size_t arg = 0; arg != fArity; ++arg)
             pos = visitor(pos);
         return pos;
+    }
+
+    struct TOptionalFnArgs {
+        size_t FirstArgOrFnPos;
+        size_t ArgCount;
+    };
+    inline TOptionalFnArgs GetFnArgs(const TExpression& expr, size_t pos, TFuncId expected) {
+        auto& fNode = expr.GetNodes()[pos];
+        if (fNode.GetType() != TExpression::TNode::EType::Function)
+            return {pos, 0};
+        auto fId = TFuncId::FromRepr(fNode.GetIdx());
+        if (fId.GetIdx() != expected.GetIdx())
+            return {pos, 0};
+        return {++pos, fNode.GetArity()};
     }
 
     template<typename TValue, typename TEvalFunc>

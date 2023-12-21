@@ -19,7 +19,7 @@ bool TGlobalVarsCollector::Start(const TStateItem& parentItem) {
     return true;
 }
 
-void TGlobalVarsCollector::Finish(const TStateItem& parentItem) {
+void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData* parentData) {
     auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
     TString parentName = TDepGraph::Graph(parentItem.Node()).ToString(parentItem.Node());
     for (const auto& dep : parentItem.Node().Edges()) {
@@ -35,7 +35,9 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem) {
             TUniqVector<TNodeId> lateOuts;
             MineVariables(RestoreContext.Conf, dep.To(), commandInfo.ToolPaths, commandInfo.ResultPaths, commandInfoVars, lateOuts, RestoreContext.Modules);
             TString objd = commandInfo.SubstMacro(nullptr, depName, ESM_DoSubst, commandInfoVars, ECF_Unset, true);
-            vars[varName].push_back(TVarStr(objd));
+            auto& var = vars[varName];
+            var.push_back(TVarStr(objd));
+            var.back().StructCmd = parentData->StructCmdDetected;
         }
     }
     parentVars.SetVarsComplete();

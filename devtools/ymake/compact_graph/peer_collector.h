@@ -30,7 +30,9 @@ struct TCollectorEntryStatsData: TEntryStatsData {
 //
 //     // Called after all peers of the module have been collected. State item for this module is going
 //     // to be destroyed and all important information should be saved by this method somewhere.
-//     void Finish(TStateItem& parentItem);
+//     // Here, TVisitorStateItemPtr is anything implicitly constructible from
+//     // TVisitorStateItem<TCollectorEntryStatsData>*.
+//     void Finish(TStateItem& parentItem, TVisitorStateItemPtr parentVisitorEntry);
 //
 //     // Called on each parentItem peer. There is strong guarantie that Start have been called for both
 //     // parent and peer module and Finish have been called for peer module but not parent.
@@ -61,7 +63,7 @@ public:
     void Leave(TState& state) {
         if (this->CurEnt && std::exchange(this->CurEnt->Started, false)) {
             Y_ASSERT(IsModule(state.Top()));
-            Collector.Finish(state.Top());
+            Collector.Finish(state.Top(), this->VisitorEntry(state.Top()));
         }
         TBase::Leave(state);
     }

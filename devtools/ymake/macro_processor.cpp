@@ -370,7 +370,7 @@ void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId) {
 }
 
 bool TCommandInfo::GetCommandInfoFromStructCmd(
-    const TCommands& commands,
+    TCommands& commands,
     ui32 cmdElemId,
     const TVector<TCommands::TCompiledCommand::TInput>& cmdInputs,
     const TVector<TCommands::TCompiledCommand::TOutput>& cmdOutputs,
@@ -403,10 +403,11 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
             if (!added)
                 continue; // the expected cause is `TModuleBuilder::AddGlobalVarDep` putting stuff into `ExternalVars`
             auto& dst = it->second;
-            if (var->size() == 1 && var->front().HasPrefix)
-                dst = *var;
-            else
-                dst.SetSingleVal(cmdVar, GetAll(var), 0);
+            auto val = EvalAll(var);
+            auto compiled = commands.Compile(val, vars, vars);
+            const ui32 cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
+            auto value = Graph->Names().CmdNameById(cmdElemId).GetStr();
+            dst.SetSingleVal(cmdVar, value, 0);
             if (!dst.IsReservedName && IsGlobalReservedVar(cmdVar))
                 dst.IsReservedName = true;
         }

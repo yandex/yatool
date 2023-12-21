@@ -29,7 +29,7 @@ using TJsonStateItem = TGraphIteratorStateItem<TJsonStackData, true>;
 struct TJSONEntryStats: public TJSONEntryStatsNewUID {
     union {
         ui8 AllFlags;
-        struct {  // 8 bits used
+        struct {  // 7 bits used
             bool IncludesMd5Started : 1;
             bool HasUsualEntry : 1;
             bool AddToOutputs : 1;
@@ -44,10 +44,6 @@ struct TJSONEntryStats: public TJSONEntryStatsNewUID {
             // Признак того, что все персистентные поля были вычислены
             // или загружены из кэша;
             bool Completed : 1;
-
-            // a (temporary) means of supporting different graph representations
-            // of variable context for old and new command styles
-            bool StructCmdDetected : 1;
         };
     };
 

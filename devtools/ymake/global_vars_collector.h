@@ -15,6 +15,6 @@ public:
     }
 
     bool Start(const TStateItem& parentItem);
-    void Finish(const TStateItem& parentItem);
+    void Finish(const TStateItem& parentItem, TEntryStatsData* parentData);
     void Collect(const TStateItem& parentItem, TConstDepNodeRef peerNode);
 };

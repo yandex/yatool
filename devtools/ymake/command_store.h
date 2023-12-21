@@ -5,6 +5,7 @@
 #include <devtools/ymake/lang/cmd_parser.h>
 #include <devtools/ymake/lang/macro_values.h>
 #include <devtools/ymake/vars.h>
+#include <devtools/ymake/symbols/cmd_store.h>
 
 #include <util/generic/hash.h>
 #include <util/generic/strbuf.h>
@@ -12,6 +13,11 @@
 
 class TAddDepAdaptor;
 class TDepGraph;
+
+namespace NCommands {
+    struct TEvalCtx;
+    class TScriptEvaluator;
+}
 
 enum class ECmdId: ui32 {
     Invalid = ~0u
@@ -23,9 +29,9 @@ enum class EOutputAccountingMode {
 };
 
 class TCommands {
-public:
-    struct TEvalCtx;
+    friend NCommands::TScriptEvaluator;
 
+public:
     struct TCompiledCommand {
         struct TInput {
             TStringBuf Name;
@@ -54,8 +60,14 @@ public:
     };
 
     struct SimpleCommandSequenceWriter: TCommandSequenceWriterStubs {
-        auto& Write(const TCommands& commands, const NPolexpr::TExpression& cmdExpr, const TVars& vars, TCommandInfo& cmd) {
-            commands.WriteShellCmd(this, cmdExpr, vars, cmd);
+        auto& Write(
+            const TCommands& commands,
+            const NPolexpr::TExpression& cmdExpr,
+            const TVars& vars,
+            TCommandInfo& cmd,
+            const TCmdConf* cmdConf
+        ) {
+            commands.WriteShellCmd(this, cmdExpr, vars, cmd, cmdConf);
             return *this;
         }
         auto Extract() {
@@ -110,7 +122,13 @@ public:
 
     TCompiledCommand Preevaluate(const NPolexpr::TExpression& expr, const TVars& vars, EOutputAccountingMode oam);
 
-    void WriteShellCmd(ICommandSequenceWriter* writer, const NPolexpr::TExpression& cmdExpr, const TVars& vars, TCommandInfo& cmd) const;
+    void WriteShellCmd(
+        ICommandSequenceWriter* writer,
+        const NPolexpr::TExpression& cmdExpr,
+        const TVars& vars,
+        TCommandInfo& cmd,
+        const TCmdConf* cmdConf
+    ) const;
 
     // TODO collect vars and tools while compiling
     TVector<TStringBuf> GetCommandVars(ui32 elemId) const;
@@ -119,13 +137,19 @@ public:
     void Save(TMultiBlobBuilder& builder) const;
     void Load(const TBlob& multi);
 
+    template<typename F>
+    void ForEachCommand(F f) const {
+        for (size_t i = 0; i != Commands.size(); ++i)
+            f(static_cast<ECmdId>(i), Commands[i]);
+    }
+
 protected:
     TMacroValues& GetValues() {
         return Values;
     }
 
 private:
-    TString ConstToString(const TMacroValues::TValue& value, const TEvalCtx& ctx) const;
+    TString ConstToString(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const;
     TString PrintRawCmdNode(NPolexpr::TConstId node) const;
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
 

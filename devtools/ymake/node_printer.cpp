@@ -674,6 +674,9 @@ static void DumpGraphInternal(TYMake& yMake) {
 
     printer.Formatter().AddTail();
 
+    if (yMake.Conf.DumpPretty)
+        yMake.Conf.Cmsg() << Endl;
+
     bool renderCmd = yMake.Conf.DumpRenderedCmds;
     bool listBuildables = yMake.Conf.DumpBuildables;
     if (!listBuildables && !renderCmd) {
@@ -705,6 +708,9 @@ static void DumpGraphInternal(TYMake& yMake) {
             yMake.Conf.Cmsg() << name << " depth = " << i.first << "\n";
         }
     }
+
+    if (yMake.Conf.DumpPretty)
+        yMake.Conf.Cmsg() << Endl;
 }
 
 void TYMake::DumpGraph() {
