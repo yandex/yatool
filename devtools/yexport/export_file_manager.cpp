@@ -7,8 +7,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <spdlog/spdlog.h>
-
 namespace NYexport {
 
 TExportFileManager::TExportFileManager(const fs::path& exportRoot)

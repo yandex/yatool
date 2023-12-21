@@ -10,6 +10,7 @@ struct TGeneratorArgs;
 struct TLoggingOpts {
     bool EnableEvlog = false;
     bool EnableStderr = true;
+    fs::path EvLogFilePath;
 };
 
 struct TOpts {

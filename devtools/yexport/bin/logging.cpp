@@ -1,24 +1,44 @@
 #include "logging.h"
 
+#include <devtools/yexport/diag/exception.h>
+
 #include <devtools/ymake/diag/common_msg/msg.ev.pb.h>
 #include <devtools/ymake/diag/common_display/trace.h>
 #include <devtools/ymake/diag/common_display/trace_sink.h>
 
 #include <util/stream/output.h>
+#include <util/stream/file.h>
+#include <util/system/file.h>
+#include <util/system/mutex.h>
 
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
 
-    class TTracer: public NYMake::ITraceSink {
+    class TDefaultTracer: public NYMake::ITraceSink {
     public:
         void Trace(const TString& ev) override {
             std::lock_guard guard{spdlog::details::console_mutex::mutex()};
             Cerr << ev << Endl;
         }
     };
-    NYMake::TScopedTraceSink<TTracer> GLOBAL_TRACER;
+
+    class TFileTracer: public NYMake::ITraceSink {
+    public:
+        TFileTracer(const fs::path& logPath)
+            : LogFileStream_(TFile(logPath.c_str(), CreateAlways))
+        {
+        }
+        void Trace(const TString& ev) override {
+            TGuard g(Mutex_);
+            LogFileStream_ << ev.c_str() << Endl;
+        }
+
+    private:
+        TMutex Mutex_;
+        TFileOutput LogFileStream_;
+    };
 
     class TEvlogSink: public spdlog::sinks::sink {
     public:
@@ -68,4 +88,15 @@ void SetupLogger(TLoggingOpts opts) {
         spdlog::default_logger()->sinks().push_back(std::make_shared<TEvlogSink>());
     }
     spdlog::cfg::load_env_levels();
+
+    static THolder<NYMake::ITraceSink> traceSink;
+    if (!opts.EvLogFilePath.empty()) {
+        try {
+            traceSink = MakeHolder<NYMake::TScopedTraceSink<TFileTracer>>(opts.EvLogFilePath);
+        } catch (const std::exception& ex) {
+            YEXPORT_THROW("Failed to open evlog file due to: " << ex.what());
+        }
+    } else {
+        traceSink = MakeHolder<NYMake::TScopedTraceSink<TDefaultTracer>>();
+    }
 }

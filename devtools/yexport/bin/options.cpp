@@ -15,6 +15,7 @@ TOpts TOpts::Parse(int argc, char** argv) {
     opts.AddLongOption('E', "events", "Turns on output in evlog format").StoreTrue(&ret.LoggingOpts.EnableEvlog);
     opts.AddLongOption('S', "quiet", "Turns off default output in stderr").StoreValue(&ret.LoggingOpts.EnableStderr, false);
     opts.AddLongOption('a', "arcadia-root", "Path to the arcadia root directory").StoreResult(&ret.ArcadiaRoot);
+    opts.AddLongOption('L', "evlog-path", "Path where the log file will be created").StoreResult(&ret.LoggingOpts.EvLogFilePath);
     opts.AddLongOption('e', "export-root", "Path to the export output root directory").StoreResult(&ret.ExportRoot);
     opts.AddLongOption('c', "configuration", "Path to directory with configuration").StoreResult(&ret.ConfigDir);
     opts.AddLongOption('t', "target", "Target project name").StoreResult(&ret.ProjectName);
