@@ -1,47 +1,20 @@
 #include "json_entry_stats.h"
 
 #include "json_saveload.h"
-#include "prop_names.h"
 
-TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool isFile)
-    : TJSONEntryStatsNewUID(nodeDebug, inStack, isFile)
-    , AllFlags(0)
-    , IsGlobalVarsCollectorStarted(false)
+TJsonStatsBase::~TJsonStatsBase() noexcept {
+}
+
+TJsonStatsOld::TJsonStatsOld(TNodeDebugOnly nodeDebug)
+    : ContextSign{nodeDebug, "TJSONEntryStats::ContextSign"sv}
     , IncludedContextSign{nodeDebug, "TJSONEntryStats::IncludedContextSign"sv}
-    , ContextSign{nodeDebug, "TJSONEntryStats::ContextSign"sv}
     , SelfContextSign{nodeDebug, "TJSONEntryStats::SelfContextSign"sv}
     , IncludedSelfContextSign{nodeDebug, "TJSONEntryStats::IncludedSelfContextSign"sv}
     , RenderId{nodeDebug, "TJSONEntryStats::RenderId"sv}
 {
 }
 
-TString TJSONEntryStats::GetNodeUid() const {
-#if !defined (NEW_UID_IMPL)
-    return ContextSign.ToBase64();
-#else
-    return GetFullUid().ToBase64();
-#endif
-}
-
-TString TJSONEntryStats::GetNodeSelfUid() const {
-#if !defined (NEW_UID_IMPL)
-    return SelfContextSign.ToBase64();
-#else
-    return GetSelfUid().ToBase64();
-#endif
-}
-
-void TJSONEntryStats::SetIncludedContextSign(const TMd5SigValue& md5) {
-    IncludedContextSign = md5;
-    YDIAG(Dev) << "Set IncludedContextSign, value is " << IncludedContextSign.ToBase64() << Endl;
-}
-
-void TJSONEntryStats::SetIncludedContextSign(const TMd5Value& oldMd5) {
-    IncludedContextSign.CopyFrom(oldMd5);
-    YDIAG(Dev) << "Set IncludedContextSign, value is " << IncludedContextSign.ToBase64() << Endl;
-}
-
-void TJSONEntryStats::SetContextSign(const TMd5SigValue& md5, TUidDebugNodeId id) {
+void TJsonStatsOld::SetContextSign(const TMd5SigValue& md5, TUidDebugNodeId id) {
     ContextSign = md5;
     if (Y_UNLIKELY(Diag()->UIDs)) {
         NUidDebug::LogContextMd5Assign(id, GetNodeUid());
@@ -49,7 +22,7 @@ void TJSONEntryStats::SetContextSign(const TMd5SigValue& md5, TUidDebugNodeId id
     YDIAG(Dev) << "Set ContextSign, value is " << ContextSign.ToBase64() << Endl;
 }
 
-void TJSONEntryStats::SetContextSign(const TMd5Value& oldMd5, TUidDebugNodeId id, TStringBuf contextSalt) {
+void TJsonStatsOld::SetContextSign(const TMd5Value& oldMd5, TUidDebugNodeId id, TStringBuf contextSalt) {
     TMd5Value md5 = oldMd5;
     md5.Update(contextSalt, "TJSONEntryStats::SetContextSign::<contextSalt>"sv);
     ContextSign.MoveFrom(std::move(md5));
@@ -59,7 +32,17 @@ void TJSONEntryStats::SetContextSign(const TMd5Value& oldMd5, TUidDebugNodeId id
     YDIAG(Dev) << "Set ContextSign, value is " << ContextSign.ToBase64() << Endl;
 }
 
-void TJSONEntryStats::SetSelfContextSign(const TMd5Value& oldMd5, TUidDebugNodeId id, TStringBuf contextSalt) {
+void TJsonStatsOld::SetIncludedContextSign(const TMd5SigValue& md5) {
+    IncludedContextSign = md5;
+    YDIAG(Dev) << "Set IncludedContextSign, value is " << IncludedContextSign.ToBase64() << Endl;
+}
+
+void TJsonStatsOld::SetIncludedContextSign(const TMd5Value& oldMd5) {
+    IncludedContextSign.CopyFrom(oldMd5);
+    YDIAG(Dev) << "Set IncludedContextSign, value is " << IncludedContextSign.ToBase64() << Endl;
+}
+
+void TJsonStatsOld::SetSelfContextSign(const TMd5Value& oldMd5, TUidDebugNodeId id, TStringBuf contextSalt) {
     TMd5Value md5 = oldMd5;
     md5.Update(contextSalt, "TJSONEntryStats::SetSelfContextSign::<contextSalt>"sv);
     SelfContextSign.MoveFrom(std::move(md5));
@@ -69,7 +52,7 @@ void TJSONEntryStats::SetSelfContextSign(const TMd5Value& oldMd5, TUidDebugNodeI
     YDIAG(Dev) << "Set SelfContextSign, value is " << SelfContextSign.ToBase64() << Endl;
 }
 
-void TJSONEntryStats::SetSelfContextSign(const TMd5SigValue& md5, TUidDebugNodeId id) {
+void TJsonStatsOld::SetSelfContextSign(const TMd5SigValue& md5, TUidDebugNodeId id) {
     SelfContextSign = md5;
     if (Y_UNLIKELY(Diag()->UIDs)) {
         NUidDebug::LogSelfContextMd5Assign(id, GetNodeUid());
@@ -77,7 +60,91 @@ void TJSONEntryStats::SetSelfContextSign(const TMd5SigValue& md5, TUidDebugNodeI
     YDIAG(Dev) << "Set SelfContextSign, value is " << SelfContextSign.ToBase64() << Endl;
 }
 
-void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {
+TJsonStatsNew::TJsonStatsNew(TNodeDebugOnly nodeDebug)
+    : StructureUID(nodeDebug, "TJSONEntryStats::StructureUID"sv)
+    , IncludeStructureUID(nodeDebug, "TJSONEntryStats::StructureForConsumerUID"sv)
+    , ContentUID(nodeDebug, "TJSONEntryStats::ContentUID"sv)
+    , IncludeContentUID(nodeDebug, "TJSONEntryStats::IncludeContentUID"sv)
+    , FullUID(nodeDebug, "TJSONEntryStats::FullUID"sv)
+    , SelfUID(nodeDebug, "TJSONEntryStats::SelfUID"sv)
+    , IsFullUIDCompleted(false)
+    , IsSelfUIDCompleted(false)
+{}
+
+void TJsonStatsNew::SetStructureUid(const TMd5SigValue& md5) {
+    StructureUID = md5;
+    YDIAG(Dev) << "Set StructureUID, value is " << StructureUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetStructureUid(const TMd5Value& oldMd5) {
+    StructureUID.CopyFrom(oldMd5);
+    YDIAG(Dev) << "Set StructureUID, value is " << StructureUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetIncludeStructureUid(const TMd5SigValue& md5) {
+    IncludeStructureUID = md5;
+    YDIAG(Dev) << "Set IncludeStructureUID, value is " << IncludeStructureUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetIncludeStructureUid(const TMd5Value& oldMd5) {
+    IncludeStructureUID.CopyFrom(oldMd5);
+}
+
+void TJsonStatsNew::SetContentUid(const TMd5SigValue& md5) {
+    ContentUID = md5;
+    YDIAG(Dev) << "Set ContentUID, value is " << ContentUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetContentUid(const TMd5Value& oldMd5) {
+    ContentUID.CopyFrom(oldMd5);
+    YDIAG(Dev) << "Set ContentUID, value is " << ContentUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetIncludeContentUid(const TMd5SigValue& md5) {
+    IncludeContentUID = md5;
+    YDIAG(Dev) << "Set IncludeContentUID, value is " << IncludeContentUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetIncludeContentUid(const TMd5Value& oldMd5) {
+    IncludeContentUID.CopyFrom(oldMd5);
+    YDIAG(Dev) << "Set ContentUID, value is " << IncludeContentUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetFullUid(const TMd5Value& oldMd5) {
+    FullUID.CopyFrom(oldMd5);
+    IsFullUIDCompleted = true;
+    YDIAG(Dev) << "Set FullUID, value is " << FullUID.ToBase64() << Endl;
+}
+
+void TJsonStatsNew::SetSelfUid(const TMd5Value& oldMd5) {
+    SelfUID.CopyFrom(oldMd5);
+    IsSelfUIDCompleted = true;
+    YDIAG(Dev) << "Set SelfUID, value is " << SelfUID.ToBase64() << Endl;
+}
+
+TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool isFile)
+    : TEntryStats(nodeDebug, inStack, isFile)
+    , TNodeDebugOnly{nodeDebug}
+    , AllFlags(0)
+    , IsGlobalVarsCollectorStarted(false)
+{
+}
+
+TString TJSONEntryStats::GetNodeUid(bool newUids) const {
+    if (newUids)
+        return NewUids()->GetNodeUid();
+    else
+        return OldUids()->GetNodeUid();
+}
+
+TString TJSONEntryStats::GetNodeSelfUid(bool newUids) const {
+    if (newUids)
+        return NewUids()->GetNodeSelfUid();
+    else
+        return OldUids()->GetNodeSelfUid();
+}
+
+void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept {
     buffer->Save<ui8>(static_cast<const TEntryStatsData*>(this)->AllFlags);
     buffer->Save<ui8>(AllFlags);
     buffer->SaveElemId(OutTogetherDependency, graph);
@@ -87,23 +154,23 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const no
     buffer->SaveElemIds(ExtraOuts, graph);
     buffer->SaveReservedVars(UsedReservedVars.Get(), graph);
 
-#if defined(NEW_UID_IMPL)
-    buffer->Save(StructureUID.GetRawData(), 16);
-    buffer->Save(IncludeStructureUID.GetRawData(), 16);
-    buffer->Save(ContentUID.GetRawData(), 16);
-    buffer->Save(IncludeContentUID.GetRawData(), 16);
-    buffer->Save(FullUID.GetRawData(), 16);
-    buffer->Save(SelfUID.GetRawData(), 16);
-#else
-    buffer->Save(IncludedContextSign.GetRawData(), 16);
-    buffer->Save(ContextSign.GetRawData(), 16);
-    buffer->Save(SelfContextSign.GetRawData(), 16);
-    buffer->Save(IncludedSelfContextSign.GetRawData(), 16);
-    buffer->Save(RenderId.GetRawData(), 16);
-#endif
+    if (newUids) {
+        buffer->Save(NewUids()->StructureUID.GetRawData(), 16);
+        buffer->Save(NewUids()->IncludeStructureUID.GetRawData(), 16);
+        buffer->Save(NewUids()->ContentUID.GetRawData(), 16);
+        buffer->Save(NewUids()->IncludeContentUID.GetRawData(), 16);
+        buffer->Save(NewUids()->FullUID.GetRawData(), 16);
+        buffer->Save(NewUids()->SelfUID.GetRawData(), 16);
+    } else {
+        buffer->Save(OldUids()->IncludedContextSign.GetRawData(), 16);
+        buffer->Save(OldUids()->ContextSign.GetRawData(), 16);
+        buffer->Save(OldUids()->SelfContextSign.GetRawData(), 16);
+        buffer->Save(OldUids()->IncludedSelfContextSign.GetRawData(), 16);
+        buffer->Save(OldUids()->RenderId.GetRawData(), 16);
+    }
 }
 
-bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept {
+bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids) noexcept {
     static_cast<TEntryStatsData*>(this)->AllFlags = buffer->Load<ui8>();
     AllFlags = buffer->Load<ui8>();
     if (!buffer->LoadElemId(&OutTogetherDependency, graph))
@@ -119,25 +186,25 @@ bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept
     if (!buffer->LoadReservedVars(&UsedReservedVars, graph))
         return false;
 
-#if defined (NEW_UID_IMPL)
-    buffer->LoadMd5(&StructureUID);
-    buffer->LoadMd5(&IncludeStructureUID);
-    buffer->LoadMd5(&ContentUID);
-    buffer->LoadMd5(&IncludeContentUID);
-    buffer->LoadMd5(&FullUID);
-    buffer->LoadMd5(&SelfUID);
+    if (newUids) {
+        buffer->LoadMd5(&NewUids()->StructureUID);
+        buffer->LoadMd5(&NewUids()->IncludeStructureUID);
+        buffer->LoadMd5(&NewUids()->ContentUID);
+        buffer->LoadMd5(&NewUids()->IncludeContentUID);
+        buffer->LoadMd5(&NewUids()->FullUID);
+        buffer->LoadMd5(&NewUids()->SelfUID);
 
-    IsSelfUIDCompleted = true;
-    IsFullUIDCompleted = true;
+        NewUids()->IsSelfUIDCompleted = true;
+        NewUids()->IsFullUIDCompleted = true;
 
-    Finished = true;
-#else
-    buffer->LoadMd5(&IncludedContextSign);
-    buffer->LoadMd5(&ContextSign);
-    buffer->LoadMd5(&SelfContextSign);
-    buffer->LoadMd5(&IncludedSelfContextSign);
-    buffer->LoadMd5(&RenderId);
-#endif
+        NewUids()->Finished = true;
+    } else {
+        buffer->LoadMd5(&OldUids()->IncludedContextSign);
+        buffer->LoadMd5(&OldUids()->ContextSign);
+        buffer->LoadMd5(&OldUids()->SelfContextSign);
+        buffer->LoadMd5(&OldUids()->IncludedSelfContextSign);
+        buffer->LoadMd5(&OldUids()->RenderId);
+    }
 
     HasUsualEntry = false;
     WasVisited = false;

@@ -3,15 +3,8 @@
 #include "module_restorer.h"
 #include "json_entry_stats.h"
 
-#ifdef NEW_UID_IMPL
 #include "json_visitor_new.h"
-#endif
 
-#ifndef NEW_UID_IMPL
-#include "json_visitor_empty.h"
-#endif
-
-#include "json_md5.h"
 #include "saveload.h"
 
 #include <devtools/ymake/command_store.h>
@@ -71,7 +64,7 @@ private:
     NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 
 public:
-    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs);
+    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids);
 
     using TBase::Nodes;
 

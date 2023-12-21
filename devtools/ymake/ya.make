@@ -106,6 +106,7 @@ SRCS(
     json_md5.cpp
     json_subst.cpp
     json_visitor.cpp
+    json_visitor_new.cpp
     lang/plugin_facade.cpp # XXX
     list_modules.cpp
     macro_processor.cpp
@@ -176,25 +177,6 @@ SRCS(
     vars.cpp
     ymake.cpp
 )
-
-IF(NOT OLD_UID_IMPL)
-    # TODO(YMAKE-880) Added for feature stabilization. Must be commented out before release:
-    # ENABLE(NEW_UID_IMPL)
-    # END OF TODO
-ENDIF()
-
-IF(NEW_UID_IMPL)
-    SRCS(
-        json_visitor_new.cpp
-        json_uid_structures.cpp
-    )
-    CFLAGS(GLOBAL -DNEW_UID_IMPL)
-ELSE()
-    SRCS(
-        json_uid_structures_empty.cpp
-        json_visitor_empty.cpp
-    )
-ENDIF()
 
 IF(NEW_UID_COMPARE)
     CFLAGS(GLOBAL -DNEW_UID_COMPARE)

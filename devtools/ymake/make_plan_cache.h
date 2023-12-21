@@ -45,9 +45,7 @@ public:
 private:
     TMakeNodeDescription<NCache::TCached, NCache::TJoinedCached, NCache::TJoinedCachedCommand> CachedNode;
     NCache::TCached InvalidationId;
-#if !defined (NEW_UID_IMPL)
     NCache::TCached PartialMatchId;
-#endif
     bool StrictInputs;
 
 public:
@@ -55,11 +53,7 @@ public:
     TMakeNodeSavedState(const TMakeNode& node, const TStringBuf& nodeName, const TStringBuf& nodeCacheUid, const TStringBuf& nodeRenderId, const TBuildConfiguration& conf, NCache::TConversionContext& context);
     void Restore(NCache::TConversionContext& context, TMakeNode* result) const;
 
-#if !defined (NEW_UID_IMPL)
     Y_SAVELOAD_DEFINE(CachedNode, InvalidationId, PartialMatchId, StrictInputs);
-#else
-    Y_SAVELOAD_DEFINE(CachedNode, InvalidationId, StrictInputs);
-#endif
 
 public:
     friend class TMakePlanCache;

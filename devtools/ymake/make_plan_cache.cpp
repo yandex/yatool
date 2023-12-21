@@ -1,9 +1,7 @@
 #include "make_plan_cache.h"
 
-#include "export_json.h"
 #include "json_visitor.h"
 #include "saveload.h"
-#include "ymake.h"
 
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/diag/stats.h>
@@ -220,11 +218,7 @@ TMakeNodeSavedState::TMakeNodeSavedState(const TMakeNode& node, const TStringBuf
     context.Convert(nodeCacheUid, CachedNode.Uid);
     context.Convert(node, CachedNode);
     context.Convert(nodeName, InvalidationId);
-#if !defined (NEW_UID_IMPL)
     context.Convert(nodeRenderId, PartialMatchId);
-#else
-    Y_UNUSED(nodeRenderId);
-#endif
     StrictInputs = conf.DumpInputsInJSON;
 }
 
@@ -361,9 +355,7 @@ void TMakePlanCache::Load(TBlob& namesBlob, TBlob& nodesBlob) {
 
     for (TMakeNodeSavedState& node : RestoredNodes) {
         FullMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.CachedNode.Uid, node.StrictInputs}, std::reference_wrapper<TMakeNodeSavedState>(node));
-    #if !defined (NEW_UID_IMPL)
         PartialMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.PartialMatchId, node.StrictInputs}, std::reference_wrapper<TMakeNodeSavedState>(node));
-    #endif
     }
 
     Stats.Set(NStats::EJsonCacheStats::FullMatchLoadedItems, FullMatchMap.size());

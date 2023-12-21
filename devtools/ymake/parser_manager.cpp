@@ -2,13 +2,13 @@
 
 #include "ymake.h"
 #include "makefile_loader.h"
-#include "add_node_context_inline.h"
 #include "general_parser.h"
-#include "module_builder.h"
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/macro_processor.h>
+#include <devtools/ymake/module_wrapper.h>
 #include <devtools/ymake/add_dep_adaptor.h>
+#include <devtools/ymake/add_node_context_inline.h>
 
 #include <util/datetime/base.h>
 #include <util/string/util.h>

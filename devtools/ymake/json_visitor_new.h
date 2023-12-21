@@ -17,7 +17,7 @@ private:
     TCommands& Commands;
 public:
 
-    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs);
+    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids);
 
     bool AcceptDep(TState& state);
     bool Enter(TState& state);
@@ -31,8 +31,13 @@ public:
     // Returning from a child node. The child node should be finished, while the parent is not.
     void PassToParent(TState& state);
 
+    bool ShouldUseNewUids() const noexcept {
+        return NewUids;
+    }
+
 protected:
     TGraphLoops Loops;
+    const bool NewUids;
 
 private:
 

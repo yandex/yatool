@@ -38,18 +38,9 @@
 #include <util/stream/output.h>
 #include <util/system/types.h>
 
-#include <new>
-
 using EDebugUidType = NDebugEvents::NExportJson::EUidType;
 
-#if !defined(NEW_UID_IMPL)
-#   define UIDS_ASSERT(condition, message) Y_ASSERT(condition)
-#else
-#   define UIDS_ASSERT(condition, message) do { if (!bool(condition)) ythrow yexception() << message; } while (false)
-#endif
-
 namespace {
-#if !defined(NEW_UID_IMPL)
     TMd5SigValue CombineMd5Signs(TNodeDebugOnly nodeDebug, TStringBuf valueName, const std::initializer_list<TMd5SigValue>& signs) {
         TMd5Value md5{nodeDebug, "CombineMd5Signs::<md5>"};
         for (const auto& sign : signs) {
@@ -59,14 +50,12 @@ namespace {
         finalSign.MoveFrom(std::move(md5));
         return finalSign;
     }
-#endif
 
-#if defined(NEW_UID_IMPL)
     TMd5Value ComputeUIDForPeersLateOutsNode(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         // structure uid ноды
         TMd5Value md5{"ComputeUIDForPeersLateOutsNode::<md5>"sv};
-        md5.Update(nodeInfo.GetStructureUid(), "ComputeUIDForPeersLateOutsNode::<StructureUid>"sv);
+        md5.Update(nodeInfo.NewUids()->GetStructureUid(), "ComputeUIDForPeersLateOutsNode::<StructureUid>"sv);
 
         // full uids of dependencies
         if (nodeInfo.NodeDeps) {
@@ -74,13 +63,12 @@ namespace {
                 const auto depIt = cmdBuilder.Nodes.find(dep);
                 Y_ASSERT(depIt != cmdBuilder.Nodes.end());
 
-                const TMd5SigValue& depFullUid = depIt->second.GetFullUid();
+                const TMd5SigValue& depFullUid = depIt->second.NewUids()->GetFullUid();
                 md5.Update(depFullUid, "ComputeUIDForPeersLateOutsNode::<depFullUid>"sv);
             }
         }
         return md5;
     }
-#endif
 
     class TJSONRenderer {
     private:
@@ -108,8 +96,17 @@ namespace {
 
     public:
         TJSONRenderer(TYMake& ymake, TJSONVisitor& cmdBuilder, const TNodeId& nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* resultNode)
-                : Graph(ymake.Graph), Modules(ymake.Modules), Conf(ymake.Conf), NodeInfo(nodeInfo), NodeId(nodeId), ModuleId(cmdBuilder.GetModuleByNode(nodeId)), NodeDebug(Graph, nodeId)
-                , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}, CmdBuilder(cmdBuilder), DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid()), Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(ymake)
+                : Graph(ymake.Graph)
+                , Modules(ymake.Modules)
+                , Conf(ymake.Conf)
+                , NodeInfo(nodeInfo)
+                , NodeId(nodeId)
+                , ModuleId(cmdBuilder.GetModuleByNode(nodeId))
+                , NodeDebug(Graph, nodeId)
+                , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
+                , CmdBuilder(cmdBuilder)
+                , DumpInfo(nodeInfo.GetNodeUid(cmdBuilder.ShouldUseNewUids()), nodeInfo.GetNodeSelfUid(cmdBuilder.ShouldUseNewUids()))
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(ymake)
         {
             PrepareDeps();
 
@@ -166,20 +163,20 @@ namespace {
         };
 
         TString CalculateCacheUid() {
-#if !defined(NEW_UID_IMPL)
-            const auto baseRenderId = NodeInfo.GetRenderId();
-            TMd5Value md5 = CalculateDepsId();
-            md5.Update(baseRenderId, "TJSONRenderer::CalculateCacheUid::<baseRenderId>"sv);
-            RenderId.MoveFrom(std::move(md5));
-            return CombineMd5Signs(NodeDebug, "TJSONRenderer::CalculateCacheUid::<return>", {NodeInfo.GetContextSign(), RenderId}).ToBase64();
-#else
-            const TModule* mod = GetModule();
-            if (mod && ModuleId == NodeId && mod->GetAttrs().UsePeersLateOuts) {
-                auto uid = ComputeUIDForPeersLateOutsNode(CmdBuilder, NodeId).ToBase64();
-                return uid;
+            if (!CmdBuilder.ShouldUseNewUids()) {
+                const auto baseRenderId = NodeInfo.OldUids()->GetRenderId();
+                TMd5Value md5 = CalculateDepsId();
+                md5.Update(baseRenderId, "TJSONRenderer::CalculateCacheUid::<baseRenderId>"sv);
+                RenderId.MoveFrom(std::move(md5));
+                return CombineMd5Signs(NodeDebug, "TJSONRenderer::CalculateCacheUid::<return>", {NodeInfo.OldUids()->GetContextSign(), RenderId}).ToBase64();
+            } else {
+                const TModule* mod = GetModule();
+                if (mod && ModuleId == NodeId && mod->GetAttrs().UsePeersLateOuts) {
+                    auto uid = ComputeUIDForPeersLateOutsNode(CmdBuilder, NodeId).ToBase64();
+                    return uid;
+                }
+                return NodeInfo.NewUids()->GetStructureUid().ToBase64();
             }
-            return NodeInfo.GetStructureUid().ToBase64();
-#endif
         }
 
         void RefreshNode(TMakeNode& node) {
@@ -233,23 +230,23 @@ namespace {
             auto depsIt = node.Deps.begin();
             for (const auto& [_, depId] : NodeDeps) {
                 const auto dependency = CmdBuilder.Nodes.find(depId);
-                UIDS_ASSERT(dependency != CmdBuilder.Nodes.end(), "No dependency in visitor");
+                Y_ASSERT(dependency != CmdBuilder.Nodes.end());
                 if (dependency->second.HasBuildCmd) {
-                    UIDS_ASSERT(depsIt != node.Deps.end(), "Tried to replace past the end of node.Deps");
-                    *depsIt = dependency->second.GetNodeUid();
+                    Y_ASSERT(depsIt != node.Deps.end());
+                    *depsIt = dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids());
                     depsIt++;
                 }
             }
             depsIt = node.ToolDeps.begin();
             for (const auto& [name, depId] : ToolDeps) {
                 const auto dependency = CmdBuilder.Nodes.find(depId);
-                UIDS_ASSERT(dependency != CmdBuilder.Nodes.end(), "No tool in visitor");
-                UIDS_ASSERT(dependency->second.HasBuildCmd, "Tool has not build command");
-                UIDS_ASSERT(depsIt != node.ToolDeps.end(), "Tried to replace past the end of node.ToolDeps");
-                *depsIt = dependency->second.GetNodeUid();
+                Y_ASSERT(dependency != CmdBuilder.Nodes.end());
+                Y_ASSERT(dependency->second.HasBuildCmd);
+                Y_ASSERT(depsIt != node.ToolDeps.end());
+                *depsIt = dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids());
                 depsIt++;
             }
-            UIDS_ASSERT(depsIt == node.ToolDeps.end(), "Not all tool dependencies was replaced");
+            Y_ASSERT(depsIt == node.ToolDeps.end());
         }
 
         TMd5Value CalculateDepsId() {
@@ -396,21 +393,20 @@ namespace {
         renderer.RenderNodeDelayed();
         const auto nodeName = yMake.Graph.GetNameFast(nodeId);
 
-#if !defined(NEW_UID_IMPL)
-        TString renderId = renderer.CalculateRenderId();
-        restored = cache.RestoreByRenderId(renderId, node);
-        BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
-        if (restored) {
-            renderer.RefreshNode(*node);
-            // Update node in cache to avoid partial rendering next time
-            cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
-            cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
-            return;
-        }
-#else
-        // Removal of renderId now would make the code even uglier, so leave it empty as it's really unused.
         TString renderId{};
-#endif
+
+        if (!cmdbuilder.ShouldUseNewUids()) {
+            TString renderId = renderer.CalculateRenderId();
+            restored = cache.RestoreByRenderId(renderId, node);
+            BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
+            if (restored) {
+                renderer.RefreshNode(*node);
+                // Update node in cache to avoid partial rendering next time
+                cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
+                cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
+                return;
+            }
+        }
 
         renderer.CompleteRendering();
         cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
@@ -432,7 +428,7 @@ namespace {
             }
 #endif
         } catch (const std::exception& renderError) {
-#if !defined (NEW_UID_IMPL)
+#if !defined (YMAKE_DEBUG)
             Y_UNUSED(renderError, RenderJsonNodeFullString, RestoreJsonNodeFromCacheString);
             throw;
 #else
@@ -452,6 +448,8 @@ namespace {
             } catch (const std::exception& restoreError) {
                 Cerr << "JSON restore from cache failed: " << restoreError.what() << '\n';
             }
+
+            throw;
 #endif
         }
 
@@ -460,17 +458,16 @@ namespace {
         }
     }
 
-#if !defined(NEW_UID_IMPL)
-    void ComputeFullUID(TJSONVisitor&, TNodeId) {
-#else
     void ComputeFullUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
+        Y_ASSERT(cmdBuilder.ShouldUseNewUids());
+
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
-        if (nodeInfo.IsFullUidCompleted()) {
+        if (nodeInfo.NewUids()->IsFullUidCompleted()) {
             return;
         }
         // self uid ноды
         TMd5Value md5{"ComputeFullUID::<md5>"sv};
-        md5.Update(nodeInfo.GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
+        md5.Update(nodeInfo.NewUids()->GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
 
         // full uids of dependencies
         if (nodeInfo.NodeDeps) {
@@ -480,32 +477,29 @@ namespace {
 
                 const TJSONEntryStats& depData = depIt->second;
 
-                if (!depData.IsFullUidCompleted()) {
+                if (!depData.NewUids()->IsFullUidCompleted()) {
                     ComputeFullUID(cmdBuilder, dep);
                 }
-                const TMd5SigValue& depFullUid = depData.GetFullUid();
+                const TMd5SigValue& depFullUid = depData.NewUids()->GetFullUid();
                 md5.Update(depFullUid, "ComputeFullUID::<depFullUid>"sv);
             }
         }
-        nodeInfo.SetFullUid(md5);
-#endif
+        nodeInfo.NewUids()->SetFullUid(md5);
     }
 
-#if !defined(NEW_UID_IMPL)
-    void ComputeSelfUID(TJSONVisitor&, TNodeId) {
-#else
     void ComputeSelfUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
+        Y_ASSERT(cmdBuilder.ShouldUseNewUids());
+
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
-        if (nodeInfo.IsSelfUidCompleted()) {
+        if (nodeInfo.NewUids()->IsSelfUidCompleted()) {
             return;
         }
         // структурный uid главного output'a
         TMd5Value md5{"ComputeSelfUID::<md5>"sv};
-        md5.Update(nodeInfo.GetStructureUid(), "ComputeSelfUID::<StructureUid>"sv);
-        md5.Update(nodeInfo.GetContentUid(), "ComputeSelfUID::<ContentUid>"sv);
+        md5.Update(nodeInfo.NewUids()->GetStructureUid(), "ComputeSelfUID::<StructureUid>"sv);
+        md5.Update(nodeInfo.NewUids()->GetContentUid(), "ComputeSelfUID::<ContentUid>"sv);
 
-        nodeInfo.SetSelfUid(md5);
-#endif
+        nodeInfo.NewUids()->SetSelfUid(md5);
     }
 
     void UpdateUids(TJSONVisitor& cmdbuilder, TNodeId nodeId) {
@@ -523,7 +517,7 @@ namespace {
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
         THolder<TJSONVisitor> cmdbuilderHolder;
         auto cmdBuilderReset = [&]() {
-            cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, startTargets));
+            cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, startTargets, conf.ShouldUseNewUids()));
         };
 
         cmdBuilderReset();
@@ -588,7 +582,8 @@ namespace {
             cache.LoadFromFile();
 
             for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
-                UpdateUids(cmdbuilder, nodeId);
+                if (cmdbuilder.ShouldUseNewUids())
+                    UpdateUids(cmdbuilder, nodeId);
 
                 const auto& node = cmdbuilder.Nodes.at(nodeId);
                 RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node);
@@ -613,7 +608,7 @@ namespace {
             if (resultIt->second.OutTogetherDependency != 0 && !resultIt->second.HasBuildCmd) {
                 resultIt = cmdbuilder.Nodes.find(resultIt->second.OutTogetherDependency);
             }
-            plan.Results.push_back(resultIt->second.GetNodeUid());
+            plan.Results.push_back(resultIt->second.GetNodeUid(cmdbuilder.ShouldUseNewUids()));
         }
         std::sort(plan.Results.begin(), plan.Results.end());
 

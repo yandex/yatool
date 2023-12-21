@@ -110,6 +110,10 @@ public:
         return ReportMissingAddincls;
     }
 
+    bool ShouldUseNewUids() const noexcept {
+        return UseNewUids;
+    }
+
     TStringBuf GetUidsSalt() const {
         return UidsSalt;
     }
@@ -145,6 +149,7 @@ private:
     bool CheckDependsInDart = false;
     bool NeedDirHints = false;
     bool ReportMissingAddincls = true;
+    bool UseNewUids = false;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;

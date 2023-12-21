@@ -2,7 +2,6 @@
 
 #include "exec.h"
 #include "vars.h"
-#include "conf.h"
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/make_plan/make_plan.h>
@@ -12,6 +11,7 @@
 #include <util/system/types.h>
 
 class TYMake;
+class TModule;
 class TModules;
 class TJSONVisitor;
 struct TCommandInfo;

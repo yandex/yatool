@@ -3,7 +3,6 @@
 #include "vars.h"
 #include "module_restorer.h"
 #include "prop_names.h"
-#include "ymake.h"
 #include "json_saveload.h"
 
 #include <devtools/ymake/symbols/symbols.h>
@@ -17,6 +16,7 @@
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/dependency_management.h>
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/parser_manager.h>
 
 #include <library/cpp/digest/md5/md5.h>
 
@@ -57,8 +57,8 @@ inline bool NeedToPassInputs(const TConstDepRef& dep) {
     return true;
 }
 
-TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs)
-    : TBase{restoreContext, commands, startDirs}
+TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids)
+    : TBase{restoreContext, commands, startDirs, newUids}
     , Commands{commands}
     , GlobalVarsCollector(restoreContext)
 {
@@ -116,7 +116,7 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
 
     for (const auto& [nodeId, nodeData] : Nodes) {
         TSaveBuffer buffer{&rawBuffer};
-        nodeData.Save(&buffer, graph);
+        nodeData.Save(&buffer, graph, NewUids);
         buffer.SaveNodeDataToStream(output, nodeId, graph);
     }
 
@@ -157,9 +157,10 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
         auto [it, added] = Nodes.try_emplace(nodeRef.Id(), TJSONEntryStats::TItemDebug{graph, nodeRef.Id()});
         auto& [_, nodeData] = *it;
         nodeData.InStack = false;
+        nodeData.InitUids(NewUids);
         Y_ASSERT(added);
 
-        if (!nodeData.Load(&buffer, graph)) {
+        if (!nodeData.Load(&buffer, graph, NewUids)) {
             CacheStats.Inc(NStats::EUidsCacheStats::DiscardedNodes);
             Nodes.erase(nodeRef.Id());
         }
@@ -239,7 +240,7 @@ bool TJSONVisitor::Enter(TState& state) {
     if (fresh) {
         TNodeDebugOnly nodeDebug{graph, node.Id()};
         if (!currState.Hash) {
-            currState.Hash = new TJsonMd5(nodeDebug, graph.ToString(node), graph.Names());
+            currState.Hash = new TJsonMd5Old(nodeDebug, graph.ToString(node), graph.Names());
         }
 
         if (nodeType == EMNT_File || nodeType == EMNT_MakeFile) {
@@ -250,12 +251,12 @@ bool TJSONVisitor::Enter(TState& state) {
             // Если это редкий режим, вынести под условие.
             Inputs.push_back(std::make_pair(elemId, fileData.HashSum));
 
-            if (!currDone) {
+            if (!currDone && !NewUids) {
                 TMd5Value md5{nodeDebug, "TJSONVisitor::Enter::<md5#1>"sv};
                 md5.Update(fileData.HashSum.RawData, sizeof(fileData.HashSum.RawData), "TJSONVisitor::Enter::<fileData.HashSum>"sv);
-                md5.Update(currState.Hash->GetName(), "TJSONVisitor::Enter::<currentState.Hash->GetName()>"sv);
-                currData.SetContextSign(md5, currState.Hash->GetId(), TStringBuf(""));
-                currData.SetSelfContextSign(md5, currState.Hash->GetId(), TStringBuf(""));
+                md5.Update(currState.Hash->Old()->GetName(), "TJSONVisitor::Enter::<currentState.Hash->GetName()>"sv);
+                currData.OldUids()->SetContextSign(md5, currState.Hash->Old()->GetId(), TStringBuf(""));
+                currData.OldUids()->SetSelfContextSign(md5, currState.Hash->Old()->GetId(), TStringBuf(""));
             }
         }
 
@@ -277,13 +278,13 @@ bool TJSONVisitor::Enter(TState& state) {
             }
         }
 
-        if (!currDone && state.HasIncomingDep() && IsGlobalSrcDep(state.IncomingDep())) {
+        if (!currDone && !NewUids && state.HasIncomingDep() && IsGlobalSrcDep(state.IncomingDep())) {
             const auto* mod = prntState->Module;
             Y_ENSURE(mod != nullptr);
             if (mod->GetGlobalLibId() == node->ElemId) {
                 TString props = SerializeTargetProperties(mod, ERenderModuleType::Library, /* isGlobalNode */ true);
-                currState.Hash->ContextMd5Update(props.data(), props.size());
-                currState.Hash->RenderMd5Update(props.data(), props.size());
+                currState.Hash->Old()->ContextMd5Update(props.data(), props.size());
+                currState.Hash->Old()->RenderMd5Update(props.data(), props.size());
             }
         }
 
@@ -295,7 +296,7 @@ bool TJSONVisitor::Enter(TState& state) {
             }
         }
 
-        if (!currDone && nodeType == EMNT_BuildCommand && (!state.HasIncomingDep() || !IsIndirectSrcDep(state.IncomingDep()))) {
+        if (!currDone && !NewUids && nodeType == EMNT_BuildCommand && (!state.HasIncomingDep() || !IsIndirectSrcDep(state.IncomingDep()))) {
             TMd5Value md5{nodeDebug, "TJSONVisitor::Enter::<md5#2>"sv};
             auto name = currState.GetCmdName();
 
@@ -308,18 +309,18 @@ bool TJSONVisitor::Enter(TState& state) {
                 } else {
                     md5.Update(val.data(), val.size(), "TJSONVisitor::Enter::<cmd value>"sv);
                 }
-                currState.Hash->RenderMd5Update(val.data(), val.size());
+                currState.Hash->Old()->RenderMd5Update(val.data(), val.size());
             } else {
                 auto expr = Commands.Get(Commands.IdByElemId(currState.GetCmdName().GetElemId()));
                 Y_ASSERT(expr);
                 Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
                     md5.Update(data, size, "TJSONVisitor::Enter::<StreamCmdRepr>"sv);
-                    currState.Hash->RenderMd5Update(data, size);
+                    currState.Hash->Old()->RenderMd5Update(data, size);
                 });
             }
-            currData.SetContextSign(md5, currState.Hash->GetId(), RestoreContext.Conf.GetUidsSalt());
-            currData.SetSelfContextSign(md5, currState.Hash->GetId(), RestoreContext.Conf.GetUidsSalt());
-            currData.SetRenderId(currState.Hash->GetRenderMd5(), currState.Hash->GetId());
+            currData.OldUids()->SetContextSign(md5, currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
+            currData.OldUids()->SetSelfContextSign(md5, currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
+            currData.OldUids()->SetRenderId(currState.Hash->Old()->GetRenderMd5(), currState.Hash->Old()->GetId());
         }
 
         if (const auto it = Loops.Node2Loop.find(node.Id())) {
@@ -343,16 +344,16 @@ bool TJSONVisitor::Enter(TState& state) {
         return fresh;
     }
 
-#if !defined (NEW_UID_IMPL)
-    fresh |= !currData.HasUsualEntry;
-    if (!state.HasIncomingDep() || *state.IncomingDep() != EDT_OutTogether) {
-        currData.HasUsualEntry = true;
+    if (!NewUids) {
+        fresh |= !currData.HasUsualEntry;
+        if (!state.HasIncomingDep() || *state.IncomingDep() != EDT_OutTogether) {
+            currData.HasUsualEntry = true;
+        }
     }
-#endif
 
     if (fresh) {
         if (!currState.Hash) {
-            currState.Hash = new TJsonMd5(TNodeDebugOnly{graph, node.Id()}, graph.ToString(node), graph.Names());
+            currState.Hash = new TJsonMd5Old(TNodeDebugOnly{graph, node.Id()}, graph.ToString(node), graph.Names());
         }
 
         if (IsModuleType(nodeType)) {
@@ -361,15 +362,15 @@ bool TJSONVisitor::Enter(TState& state) {
             currData.Fake = currState.Module->IsFakeModule();
         }
 
-        if (!currDone && IsModuleType(nodeType)) {
+        if (!currDone && !NewUids && IsModuleType(nodeType)) {
             if (currData.Fake) {
                 YDIAG(V) << "Module node marked as fake: " << currState.Module->GetName() << Endl;
             } else {
                 const auto* mod = currState.Module;
                 const auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
                 TString props = SerializeTargetProperties(mod, renderModuleType, /* isGlobalNode */ false);
-                currState.Hash->ContextMd5Update(props.data(), props.size());
-                currState.Hash->RenderMd5Update(props.data(), props.size());
+                currState.Hash->Old()->ContextMd5Update(props.data(), props.size());
+                currState.Hash->Old()->RenderMd5Update(props.data(), props.size());
             }
         }
 
@@ -445,9 +446,11 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 bool addToOuts = hasModule && moduleState->Module->IsExtraOut(currNode->ElemId);
                 if (!moduleDone && NeedAddToOuts(state, *currNode) && !currData.Fake) {
                     AddTo(currNode.Id(), moduleData->ExtraOuts);
-                    moduleState->Hash->ContextMd5Update(Name.data(), Name.size()); // only once, because we set Node2Module once.
-                    moduleState->Hash->RenderMd5Update(Name.data(), Name.size());
-                    moduleState->Hash->SelfContextMd5Update(Name.data(), Name.size());
+                    if (!NewUids) {
+                        moduleState->Hash->Old()->ContextMd5Update(Name.data(), Name.size()); // only once, because we set Node2Module once.
+                        moduleState->Hash->Old()->RenderMd5Update(Name.data(), Name.size());
+                        moduleState->Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+                    }
                     if (outTogetherDependencyId) {
                         AddTo(outTogetherDependencyId, moduleData->NodeDeps);
                     } else if (addToOuts) {
@@ -456,15 +459,15 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 }
 
                 // Update context md5 for files here if module provides special info for global vars
-                if (hasModule && currData.UsedReservedVars) {
+                if (hasModule && currData.UsedReservedVars && !NewUids) {
                     if (!currDone) {
                         for (const auto& varStr : RestoreContext.Modules.GetGlobalVars(moduleState->Module->GetId()).GetVars()) {
                             if (currData.UsedReservedVars->contains(varStr.first)) {
                                 for (const auto& varItem : varStr.second) {
                                     TString value = FormatProperty(varStr.first, varItem.Name);
-                                    currState.Hash->ContextMd5Update(value.data(), value.size());
-                                    currState.Hash->RenderMd5Update(value.data(), value.size());
-                                    currState.Hash->SelfContextMd5Update(value.data(), value.size());
+                                    currState.Hash->Old()->ContextMd5Update(value.data(), value.size());
+                                    currState.Hash->Old()->RenderMd5Update(value.data(), value.size());
+                                    currState.Hash->Old()->SelfContextMd5Update(value.data(), value.size());
                                 }
                             }
                         }
@@ -482,9 +485,9 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                                     if (includesIt != includesMap.end()) {
                                         for (const auto& dir : includesIt->second.Get()) {
                                             TStringBuf dirStr = dir.GetTargetStr();
-                                            currState.Hash->ContextMd5Update(dirStr.data(), dirStr.size());
-                                            currState.Hash->RenderMd5Update(dirStr.data(), dirStr.size());
-                                            currState.Hash->SelfContextMd5Update(dirStr.data(), dirStr.size());
+                                            currState.Hash->Old()->ContextMd5Update(dirStr.data(), dirStr.size());
+                                            currState.Hash->Old()->RenderMd5Update(dirStr.data(), dirStr.size());
+                                            currState.Hash->Old()->SelfContextMd5Update(dirStr.data(), dirStr.size());
                                         }
                                     }
                                 }
@@ -509,15 +512,15 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
         } else {
             if (!prntDone) {
-#if defined(NEW_UID_IMPL)
-                if (state.Parent()->CurDep().Value() != EDT_OutTogether) {
-                    AddTo(currData.IncludedDeps, prntDestSet);
+                if (NewUids) {
+                    if (state.Parent()->CurDep().Value() != EDT_OutTogether) {
+                        AddTo(currData.IncludedDeps, prntDestSet);
+                    } else {
+                        AddTo(currNode.Id(), prntDestSet);
+                    }
                 } else {
-                    AddTo(currNode.Id(), prntDestSet);
+                    AddTo(currData.IncludedDeps, prntDestSet);
                 }
-#else
-                AddTo(currData.IncludedDeps, prntDestSet);
-#endif
                 if (IsDirectPeerdirDep(incDep) && prntState->Module->PassPeers()) {
                     AddTo(currData.IncludedDeps, prntData->IncludedDeps);
                 }
@@ -576,7 +579,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 GetOrInit(prntData->UsedReservedVars).insert(usedVars->begin(), usedVars->end());
             }
 
-            if (!currDone && currData.WasFresh && IsBuildCommandDep(state.IncomingDep()) && IsModule(*prntState)) {
+            if (!currDone && !NewUids && currData.WasFresh && IsBuildCommandDep(state.IncomingDep()) && IsModule(*prntState)) {
                 const auto mod = prntState->Module;
                 if (mod->IsDependencyManagementApplied()) {
                     const auto& lists = RestoreContext.Modules.GetNodeListStore();
@@ -589,11 +592,11 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                         for (TNodeId peer : lists.GetList(managedPeers)) {
                             const auto peerNode = RestoreContext.Graph.Get(peer);
                             const auto name = RestoreContext.Graph.GetNameFast(peerNode);
-                            currState.Hash->IncludesMd5Update(name.data(), name.size());
+                            currState.Hash->Old()->IncludesMd5Update(name.data(), name.size());
                             currData.IncludesMd5Started = true;
-                            currState.Hash->ContextMd5Update(name.data(), name.size());
-                            currState.Hash->SelfContextMd5Update(name.data(), name.size());
-                            currState.Hash->RenderMd5Update(name.data(), name.size());
+                            currState.Hash->Old()->ContextMd5Update(name.data(), name.size());
+                            currState.Hash->Old()->SelfContextMd5Update(name.data(), name.size());
+                            currState.Hash->Old()->RenderMd5Update(name.data(), name.size());
                         }
                     }
                 }
@@ -603,12 +606,12 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
     if (currData.WasFresh) {
         currData.WasFresh = false;
-        if (!currDone && currData.HasBuildCmd) {
-            currState.Hash->ContextMd5Update(Name.data(), Name.size());
-            currData.SetContextSign(currState.Hash->GetContextMd5(), currState.Hash->GetId(), RestoreContext.Conf.GetUidsSalt());
-            currState.Hash->RenderMd5Update(Name.data(), Name.size());
-            currState.Hash->SelfContextMd5Update(Name.data(), Name.size());
-            currData.SetSelfContextSign(currState.Hash->GetSelfContextMd5(), currState.Hash->GetId(), RestoreContext.Conf.GetUidsSalt());
+        if (!currDone && !NewUids && currData.HasBuildCmd) {
+            currState.Hash->Old()->ContextMd5Update(Name.data(), Name.size());
+            currData.OldUids()->SetContextSign(currState.Hash->Old()->GetContextMd5(), currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
+            currState.Hash->Old()->RenderMd5Update(Name.data(), Name.size());
+            currState.Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+            currData.OldUids()->SetSelfContextSign(currState.Hash->Old()->GetSelfContextMd5(), currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
         }
 
         if (currData.LoopId) {
@@ -636,51 +639,51 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 }
             }
         } else {
-            if (!currDone) {
+            if (!currDone && !NewUids) {
                 if (currData.IncludesMd5Started) {
-                    currData.SetIncludedContextSign(currState.Hash->GetIncludesMd5());
-                    currData.SetIncludedSelfContextSign(currState.Hash->GetIncludesSelfContextMd5());
+                    currData.OldUids()->SetIncludedContextSign(currState.Hash->Old()->GetIncludesMd5());
+                    currData.OldUids()->SetIncludedSelfContextSign(currState.Hash->Old()->GetIncludesSelfContextMd5());
                 } else {
-                    currData.SetIncludedContextSign(currData.GetContextSign());
+                    currData.OldUids()->SetIncludedContextSign(currData.OldUids()->GetContextSign());
                     if (!IsOutputType(currNode->NodeType)) {
-                        currData.SetIncludedSelfContextSign(currData.GetSelfContextSign());
+                        currData.OldUids()->SetIncludedSelfContextSign(currData.OldUids()->GetSelfContextSign());
                     } else {
-                        currState.Hash->SelfContextMd5Update(Name.data(), Name.size());
-                        currData.SetIncludedSelfContextSign(currState.Hash->GetIncludesSelfContextMd5());
+                        currState.Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+                        currData.OldUids()->SetIncludedSelfContextSign(currState.Hash->Old()->GetIncludesSelfContextMd5());
                     }
                 }
             }
         }
 
-        if (!currDone && IsModuleType(currNode->NodeType)) {
+        if (!currDone && !NewUids && IsModuleType(currNode->NodeType)) {
             auto tag = currState.Module->GetTag();
             if (tag) {
-                currState.Hash->RenderMd5Update(tag.data(), tag.size());
+                currState.Hash->Old()->RenderMd5Update(tag.data(), tag.size());
                 if (currState.Module->IsFromMultimodule()) {
                     // In fact tag is only emitted into node for multimodules, so make distinction
-                    currState.Hash->RenderMd5Update("mm", 2);
+                    currState.Hash->Old()->RenderMd5Update("mm", 2);
                 }
             }
         }
 
-        if (!currDone) {
-            currData.SetRenderId(currState.Hash->GetRenderMd5(), currState.Hash->GetId());
+        if (!currDone && !NewUids) {
+            currData.OldUids()->SetRenderId(currState.Hash->Old()->GetRenderMd5(), currState.Hash->Old()->GetId());
         }
     }
 
-    if (state.HasIncomingDep()) {
+    if (state.HasIncomingDep() && !NewUids) {
         const auto incDep = prntState->CurDep();
 
         if (!prntDone && IsModule(*prntState) && IsGlobalSrcDep(incDep)) {
-            prntState->Hash->IncludesMd5Update(currData.GetContextSign(), Name);
-            prntState->Hash->ContextMd5Update(currData.GetContextSign(), Name);
-            prntState->Hash->RenderMd5Update(Name.data(), Name.size());
+            prntState->Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), Name);
+            prntState->Hash->Old()->ContextMd5Update(currData.OldUids()->GetContextSign(), Name);
+            prntState->Hash->Old()->RenderMd5Update(Name.data(), Name.size());
             if (!IsOutputType(currNode->NodeType)) {
-                prntState->Hash->SelfContextMd5Update(currData.GetSelfContextSign(), Name);
-                prntState->Hash->IncludesSelfContextMd5Update(currData.GetSelfContextSign(), Name);
+                prntState->Hash->Old()->SelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), Name);
+                prntState->Hash->Old()->IncludesSelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), Name);
             } else {
-                prntState->Hash->SelfContextMd5Update(Name.data(), Name.size());
-                prntState->Hash->IncludesSelfContextMd5Update(Name.data(), Name.size());
+                prntState->Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+                prntState->Hash->Old()->IncludesSelfContextMd5Update(Name.data(), Name.size());
             }
         }
     }
@@ -693,14 +696,14 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 }
 
 void TJSONVisitor::Leave(TState& state) {
-#if defined(NEW_UID_IMPL)
-    if (CurEnt->EnterDepth == 1 && !CurEnt->Stored) {
-        CurEnt->Stored = true;
-        CurEnt->WasFresh = true;
-    } else {
-        CurEnt->WasFresh = false;
+    if (NewUids) {
+        if (CurEnt->NewUids()->EnterDepth == 1 && !CurEnt->NewUids()->Stored) {
+            CurEnt->NewUids()->Stored = true;
+            CurEnt->WasFresh = true;
+        } else {
+            CurEnt->WasFresh = false;
+        }
     }
-#endif
 
     if (CurEnt->WasFresh && !CurEnt->Fake && CurEnt->HasBuildCmd) {
         SortedNodesForRendering.push_back(state.TopNode().Id());
@@ -725,41 +728,41 @@ void TJSONVisitor::Left(TState& state) {
     const TString depName = graph.ToString(dep.To());
     YDIAG(Dev) << "JSON: Left from " << depName << " to " << currState.Print() << Endl;
     if (!currDone && currData.WasFresh) {
-        const TMd5SigValue& dependencySign = chldData->LoopId ? LoopCnt[chldData->LoopId].Sign : *dep == EDT_OutTogether ? chldData->GetContextSign() : chldData->GetIncludedContextSign();
-        const TMd5SigValue& selfDependencySign = chldData->LoopId ? LoopCnt[chldData->LoopId].SelfSign : *dep == EDT_OutTogether ? chldData->GetSelfContextSign() : chldData->GetIncludedSelfContextSign();
+        const TMd5SigValue& dependencySign = chldData->LoopId ? LoopCnt[chldData->LoopId].Sign : *dep == EDT_OutTogether ? chldData->OldUids()->GetContextSign() : chldData->OldUids()->GetIncludedContextSign();
+        const TMd5SigValue& selfDependencySign = chldData->LoopId ? LoopCnt[chldData->LoopId].SelfSign : *dep == EDT_OutTogether ? chldData->OldUids()->GetSelfContextSign() : chldData->OldUids()->GetIncludedSelfContextSign();
         bool isALiftedVariable = currData.StructCmdDetected && *dep == EDT_Include && dep.To()->NodeType == EMNT_BuildCommand;
-        if (currData.IsFile && (*dep == EDT_BuildFrom || *dep == EDT_BuildCommand || isALiftedVariable)) {
+        if (!NewUids && currData.IsFile && (*dep == EDT_BuildFrom || *dep == EDT_BuildCommand || isALiftedVariable)) {
             if (!chldData->LoopId && *dep == EDT_BuildFrom) {
-                currState.Hash->ContextMd5Update(chldData->GetContextSign(), depName);
-                currState.Hash->ContextMd5Update(chldData->GetIncludedContextSign(), depName);
+                currState.Hash->Old()->ContextMd5Update(chldData->OldUids()->GetContextSign(), depName);
+                currState.Hash->Old()->ContextMd5Update(chldData->OldUids()->GetIncludedContextSign(), depName);
                 if (!IsOutputType(dep.To()->NodeType)) {
-                    currState.Hash->SelfContextMd5Update(chldData->GetSelfContextSign(), depName);
-                    currState.Hash->SelfContextMd5Update(chldData->GetIncludedSelfContextSign(), depName);
+                    currState.Hash->Old()->SelfContextMd5Update(chldData->OldUids()->GetSelfContextSign(), depName);
+                    currState.Hash->Old()->SelfContextMd5Update(chldData->OldUids()->GetIncludedSelfContextSign(), depName);
                 } else {
-                    currState.Hash->SelfContextMd5Update(depName.data(), depName.size());
-                    currState.Hash->SelfContextMd5Update(chldData->GetIncludedSelfContextSign(), depName);
+                    currState.Hash->Old()->SelfContextMd5Update(depName.data(), depName.size());
+                    currState.Hash->Old()->SelfContextMd5Update(chldData->OldUids()->GetIncludedSelfContextSign(), depName);
                 }
             } else {
                 if (chldData->LoopId) {
-                    currState.Hash->ContextMd5Update(dependencySign,
+                    currState.Hash->Old()->ContextMd5Update(dependencySign,
                                                         NUidDebug::LoopNodeName(chldData->LoopId));
-                    currState.Hash->SelfContextMd5Update(selfDependencySign,
+                    currState.Hash->Old()->SelfContextMd5Update(selfDependencySign,
                                                             NUidDebug::LoopNodeName(chldData->LoopId));
                 } else {
-                    currState.Hash->ContextMd5Update(dependencySign, depName);
+                    currState.Hash->Old()->ContextMd5Update(dependencySign, depName);
                     if (!IsOutputType(dep.To()->NodeType)) {
-                        currState.Hash->SelfContextMd5Update(selfDependencySign, depName);
+                        currState.Hash->Old()->SelfContextMd5Update(selfDependencySign, depName);
                     } else {
-                        currState.Hash->SelfContextMd5Update(depName.data(), depName.size());
+                        currState.Hash->Old()->SelfContextMd5Update(depName.data(), depName.size());
                     }
                 }
             }
 
-            currState.Hash->RenderMd5Update(chldData->GetRenderId(), depName);
+            currState.Hash->Old()->RenderMd5Update(chldData->OldUids()->GetRenderId(), depName);
         }
 
-        if (IsInnerCommandDep(dep)) {
-            currState.Hash->RenderMd5Update(chldData->GetRenderId(), depName);
+        if (!NewUids && IsInnerCommandDep(dep)) {
+            currState.Hash->Old()->RenderMd5Update(chldData->OldUids()->GetRenderId(), depName);
         }
 
         if (currData.LoopId) {
@@ -768,28 +771,30 @@ void TJSONVisitor::Left(TState& state) {
                 Loops[currData.LoopId].Deps.push_back(chldNode);
             }
         } else {
-            // When we have no children (IncludesMd5Started) we'll just use original file's md5 value
-            if (!currData.IncludesMd5Started) {
-                currState.Hash->IncludesMd5Update(currData.GetContextSign(), currState.Hash->GetName());
-                if (!IsOutputType(currState.Node()->NodeType)) {
-                    currState.Hash->IncludesSelfContextMd5Update(currData.GetSelfContextSign(), currState.Hash->GetName());
-                } else {
-                    currState.Hash->IncludesSelfContextMd5Update(currState.Hash->GetName().data(), currState.Hash->GetName().size());
+            if (!NewUids) {
+                // When we have no children (IncludesMd5Started) we'll just use original file's md5 value
+                if (!currData.IncludesMd5Started) {
+                    currState.Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), currState.Hash->Old()->GetName());
+                    if (!IsOutputType(currState.Node()->NodeType)) {
+                        currState.Hash->Old()->IncludesSelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), currState.Hash->Old()->GetName());
+                    } else {
+                        currState.Hash->Old()->IncludesSelfContextMd5Update(currState.Hash->Old()->GetName().data(), currState.Hash->Old()->GetName().size());
+                    }
+                    currData.IncludesMd5Started = true;
                 }
-                currData.IncludesMd5Started = true;
-            }
-            // Unlike loops case, we don't need to bother about order and uniq'ness of children,
-            // because when set of children changes, even their order, our own md5 changes, too.
-            if (chldData->LoopId) {
-                currState.Hash->IncludesMd5Update(dependencySign,
-                                                     NUidDebug::LoopNodeName(chldData->LoopId));
-            } else {
-                currState.Hash->IncludesMd5Update(dependencySign, depName);
-            }
-            if (!IsOutputType(currState.Node()->NodeType) || (*dep != EDT_BuildFrom && *dep != EDT_BuildCommand && *dep != EDT_OutTogether)) {
-                currState.Hash->IncludesSelfContextMd5Update(selfDependencySign, depName);
-            } else if (*dep == EDT_OutTogether) {
-                currState.Hash->IncludesSelfContextMd5Update(depName.data(), depName.size());
+                // Unlike loops case, we don't need to bother about order and uniq'ness of children,
+                // because when set of children changes, even their order, our own md5 changes, too.
+                if (chldData->LoopId) {
+                    currState.Hash->Old()->IncludesMd5Update(dependencySign,
+                                                        NUidDebug::LoopNodeName(chldData->LoopId));
+                } else {
+                    currState.Hash->Old()->IncludesMd5Update(dependencySign, depName);
+                }
+                if (!IsOutputType(currState.Node()->NodeType) || (*dep != EDT_BuildFrom && *dep != EDT_BuildCommand && *dep != EDT_OutTogether)) {
+                    currState.Hash->Old()->IncludesSelfContextMd5Update(selfDependencySign, depName);
+                } else if (*dep == EDT_OutTogether) {
+                    currState.Hash->Old()->IncludesSelfContextMd5Update(depName.data(), depName.size());
+                }
             }
         }
     }
@@ -816,12 +821,12 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     }
 
     if (*dep == EDT_OutTogetherBack) {
-#if defined (NEW_UID_IMPL)
-        if (!currDone) {
-            TString additionalOutputName = graph.ToString(dep.To());
-            currState.Hash->StructureMd5Update(additionalOutputName, additionalOutputName);
+        if (NewUids) {
+            if (!currDone) {
+                TString additionalOutputName = graph.ToString(dep.To());
+                currState.Hash->New()->StructureMd5Update(additionalOutputName, additionalOutputName);
+            }
         }
-#endif
         return false;
     }
 
@@ -874,9 +879,10 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     if (*dep == EDT_OutTogether) {
         currData.OutTogetherDependency = chldNode.Id();
 
-#if defined (NEW_UID_IMPL)
-        return true;
-#else
+        if (NewUids) {
+            return true;
+        }
+
         if (!currDone) {
             const auto dependencyDataIt = Nodes.find(chldNode.Id());
             if (dependencyDataIt != Nodes.end()) {
@@ -886,11 +892,11 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                     AssertEx(resIt != state.end(), "InStack was true but not found in stack! " << graph.GetFileName(chldNode));
 
                     TMd5SigValue mainDepSig{TNodeDebugOnly{resIt->Node()}, "TJSONVisitor::AcceptDep::<mainDepSig>"sv};
-                    TMd5Value mainDepCopy = resIt->Hash->GetContextMd5(); //BuildFrom and BuildCommand for main dep were already processed by design
+                    TMd5Value mainDepCopy = resIt->Hash->Old()->GetContextMd5(); //BuildFrom and BuildCommand for main dep were already processed by design
                     // Btw let's check it:
                     Y_ASSERT(dependencyDataIt->second.HasBuildCmd && dependencyDataIt->second.HasBuildFrom);
                     mainDepSig.MoveFrom(std::move(mainDepCopy));
-                    currState.Hash->IncludesMd5Update(mainDepSig, resIt->Hash->GetName());
+                    currState.Hash->Old()->IncludesMd5Update(mainDepSig, resIt->Hash->Old()->GetName());
                     if (!CurEnt->IncludesMd5Started) {
                         CurEnt->IncludesMd5Started = true; // Don't miss Includes hash
                     }
@@ -898,7 +904,6 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                 }
             }
         }
-#endif
     }
 
     if (!state.HasIncomingDep() && IsDirToModuleDep(dep)) {
@@ -951,9 +956,9 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
             selfLoopMd5.AddSign(LoopCnt[dependencyData.LoopId].SelfSign, NUidDebug::LoopNodeName(dependencyData.LoopId), false);
         } else {
             TString nodeName = graph.ToString(graph.Get(dependency));
-            loopMd5.AddSign(dependencyData.GetIncludedContextSign(), nodeName, false);
+            loopMd5.AddSign(dependencyData.OldUids()->GetIncludedContextSign(), nodeName, false);
             if (!IsOutputType(graph.Get(dependency)->NodeType)) {
-                selfLoopMd5.AddSign(dependencyData.GetIncludedSelfContextSign(), nodeName, false);
+                selfLoopMd5.AddSign(dependencyData.OldUids()->GetIncludedSelfContextSign(), nodeName, false);
             } else {
                 TMd5SigValue mainDepSig{"TJSONVisitor::CalcLoopSig::<mainDepSig>"sv};
                 TMd5Value mainDepCopy{"TJSONVisitor::CalcLoopSig::<mainDepCopy>"sv};
@@ -974,8 +979,8 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
 
         const TJSONEntryStats& nodeData = nodeDataIt->second;
         TString nodeName = graph.ToString(graph.Get(nodeId));
-        loopMd5.AddSign(nodeData.GetContextSign(), nodeName, true);
-        selfLoopMd5.AddSign(nodeData.GetSelfContextSign(), nodeName, true);
+        loopMd5.AddSign(nodeData.OldUids()->GetContextSign(), nodeName, true);
+        selfLoopMd5.AddSign(nodeData.OldUids()->GetSelfContextSign(), nodeName, true);
     }
 
     loopMd5.CalcFinalSign(loopHash.Sign);
@@ -989,11 +994,11 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
         }
         TJSONEntryStats& nodeData = nodeDataIt->second;
         TNodeDebugOnly nodeDebug{graph, node};
-        const TMd5SigValue nodeOldMd5Sig = nodeData.GetContextSign();
+        const TMd5SigValue nodeOldMd5Sig = nodeData.OldUids()->GetContextSign();
         TMd5Value nodeNewMd5{nodeDebug, "TJSONVisitor::CalcLoopSig::<newNodeMd5>"sv};
         nodeNewMd5.Update(nodeOldMd5Sig, "TJSONVisitor::CalcLoopSig::<nodeOldMd5Sig>"sv);
         nodeNewMd5.Update(loopHash.Sign, "TJSONVisitor::CalcLoopSig::<loopHash.Sign>"sv);
-        const TMd5SigValue nodeOldSelfMd5Sig = nodeData.GetSelfContextSign();
+        const TMd5SigValue nodeOldSelfMd5Sig = nodeData.OldUids()->GetSelfContextSign();
         TMd5Value nodeNewSelfMd5{nodeDebug, "TJSONVisitor::CalcLoopSig::<newNodeSelfMd5>"sv};
         nodeNewSelfMd5.Update(nodeOldSelfMd5Sig, "TJSONVisitor::CalcLoopSig::<nodeOldSelfMd5Sig>"sv);
         nodeNewSelfMd5.Update(loopHash.SelfSign, "TJSONVisitor::CalcLoopSig::<loopHash.SelfSign>"sv);
@@ -1001,12 +1006,12 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
         graph.GetFileName(graph.Get(node)).GetStr(nodeName);
         const auto nodeDebugId = NUidDebug::GetNodeId(nodeName, graph.Names());
         NUidDebug::LogDependency(nodeDebugId, loopMd5.GetLoopNodeId());
-        nodeData.SetContextSign(nodeNewMd5, nodeDebugId, RestoreContext.Conf.GetUidsSalt());
-        nodeData.SetSelfContextSign(nodeNewSelfMd5, nodeDebugId, RestoreContext.Conf.GetUidsSalt());
+        nodeData.OldUids()->SetContextSign(nodeNewMd5, nodeDebugId, RestoreContext.Conf.GetUidsSalt());
+        nodeData.OldUids()->SetSelfContextSign(nodeNewSelfMd5, nodeDebugId, RestoreContext.Conf.GetUidsSalt());
         YDIAG(Dev)
             << "Update ContextMd5, " << nodeName << " += " << loopHash.Sign.ToBase64()
             << " (was " << nodeOldMd5Sig.ToBase64()
-            << ", become " << nodeData.GetContextSign().ToBase64() << ")" << Endl;
+            << ", become " << nodeData.OldUids()->GetContextSign().ToBase64() << ")" << Endl;
     }
 }
 

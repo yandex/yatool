@@ -96,42 +96,22 @@ TString NUidDebug::LoopNodeName(TNodeId loopId) {
     return "LOOP" + ToString(loopId);
 }
 
-TJsonMd5::TJsonMd5(TNodeDebugOnly nodeDebug, const TString& name, const TSymbols& symbols)
-    : TJsonMD5NewUID(nodeDebug)
-    , IncludesMd5(nodeDebug, "TJsonMd5::IncludesMd5"sv)
-    , ContextMd5(nodeDebug, "TJsonMd5::ContextMd5"sv)
-    , IncludesSelfContextMd5(nodeDebug, "TJsonMd5::IncludesSelfContextMd5"sv)
-    , SelfContextMd5(nodeDebug, "TJsonMd5::SelfContextMd5"sv)
-    , RenderMd5(nodeDebug, "TJsonMd5::RenderMd5"sv)
-    , NodeName(name)
+TJsonMd5Base::~TJsonMd5Base() noexcept {
+}
+
+TJsonMd5Old::TJsonMd5Old(TNodeDebugOnly nodeDebug, const TString& name, const TSymbols& symbols)
+    : NodeName(name)
     , NodeId(NUidDebug::LogNodeDeclaration(ResolveCommandPrefix(name, symbols)))
     , SymbolsTable(symbols)
+    , ContextMd5(nodeDebug, "TJsonMd5::ContextMd5"sv)
+    , IncludesMd5(nodeDebug, "TJsonMd5::IncludesMd5"sv)
+    , SelfContextMd5(nodeDebug, "TJsonMd5::SelfContextMd5"sv)
+    , IncludesSelfContextMd5(nodeDebug, "TJsonMd5::IncludesSelfContextMd5"sv)
+    , RenderMd5(nodeDebug, "TJsonMd5::RenderMd5"sv)
 {
 }
 
-void TJsonMd5::IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
-    const TMd5Value oldMd5 = IncludesMd5;
-    IncludesMd5.Update(md5Sig, "TJsonMd5::IncludesMd5Update::md5Sig"sv);
-    YDIAG(Dev)
-        << "Update IncludesMd5, " << NodeName << " += " << md5Sig.ToBase64() << " (was " << oldMd5.ToBase64()
-        << ", become " << IncludesMd5.ToBase64() << ")" << Endl;
-    if (NUidDebug::Enabled()) {
-        LogIncludedChange(IncludesMd5, NUidDebug::GetNodeId(reasonOfUpdateName, SymbolsTable));
-    }
-}
-
-void TJsonMd5::IncludesMd5Update(const char* data, size_t len) {
-    const TMd5Value oldMd5 = IncludesMd5;
-    IncludesMd5.Update(data, len, "TJsonMd5::IncludesMd5Update::<data,len>"sv);
-    YDIAG(Dev) << "Update IncludesMd5, " << NodeName << " += \"" << TrimData({data, len}) << "\" (len:" << len << ")"
-                    << " (was " << oldMd5.ToBase64() << ", become " << IncludesMd5.ToBase64() << ")" << Endl;
-    if (NUidDebug::Enabled()) {
-        LogIncludedChange(IncludesMd5,
-                      NUidDebug::LogNodeDeclaration(ResolveCommandPrefix(TString(data, len) + " (UID by name)",SymbolsTable)));
-    }
-}
-
-void TJsonMd5::ContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
+void TJsonMd5Old::ContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
     const TMd5Value oldMd5 = ContextMd5;
     ContextMd5.Update(md5Sig, "TJsonMd5::ContextMd5Update::<md5Sig>"sv);
     YDIAG(Dev)
@@ -142,7 +122,7 @@ void TJsonMd5::ContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfU
     }
 }
 
-void TJsonMd5::ContextMd5Update(const char* data, size_t len) {
+void TJsonMd5Old::ContextMd5Update(const char* data, size_t len) {
     const TMd5Value oldMd5 = ContextMd5;
     ContextMd5.Update(data, len, "TJsonMd5::ContextMd5Update::<data,len>"sv);
     YDIAG(Dev) << "Update ContextMd5, " << NodeName << " += \"" << TrimData({data, len}) << "\" (len:" << len << ")"
@@ -153,7 +133,29 @@ void TJsonMd5::ContextMd5Update(const char* data, size_t len) {
     }
 }
 
-void TJsonMd5::SelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
+void TJsonMd5Old::IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
+    const TMd5Value oldMd5 = IncludesMd5;
+    IncludesMd5.Update(md5Sig, "TJsonMd5::IncludesMd5Update::md5Sig"sv);
+    YDIAG(Dev)
+        << "Update IncludesMd5, " << NodeName << " += " << md5Sig.ToBase64() << " (was " << oldMd5.ToBase64()
+        << ", become " << IncludesMd5.ToBase64() << ")" << Endl;
+    if (NUidDebug::Enabled()) {
+        LogIncludedChange(IncludesMd5, NUidDebug::GetNodeId(reasonOfUpdateName, SymbolsTable));
+    }
+}
+
+void TJsonMd5Old::IncludesMd5Update(const char* data, size_t len) {
+    const TMd5Value oldMd5 = IncludesMd5;
+    IncludesMd5.Update(data, len, "TJsonMd5::IncludesMd5Update::<data,len>"sv);
+    YDIAG(Dev) << "Update IncludesMd5, " << NodeName << " += \"" << TrimData({data, len}) << "\" (len:" << len << ")"
+                    << " (was " << oldMd5.ToBase64() << ", become " << IncludesMd5.ToBase64() << ")" << Endl;
+    if (NUidDebug::Enabled()) {
+        LogIncludedChange(IncludesMd5,
+                      NUidDebug::LogNodeDeclaration(ResolveCommandPrefix(TString(data, len) + " (UID by name)",SymbolsTable)));
+    }
+}
+
+void TJsonMd5Old::SelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
     const TMd5Value oldMd5 = SelfContextMd5;
     SelfContextMd5.Update(md5Sig, "TJsonMd5::SelfContextMd5Update::<md5Sig>"sv);
     YDIAG(Dev)
@@ -164,7 +166,7 @@ void TJsonMd5::SelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reaso
     }
 }
 
-void TJsonMd5::SelfContextMd5Update(const char* data, size_t len) {
+void TJsonMd5Old::SelfContextMd5Update(const char* data, size_t len) {
     const TMd5Value oldMd5 = SelfContextMd5;
     SelfContextMd5.Update(data, len, "TJsonMd5::SelfContextMd5Update::<data,len>"sv);
     YDIAG(Dev) << "Update SelfContextMd5, " << NodeName << " += \"" << TrimData({data, len}) << "\" (len:" << len << ")"
@@ -175,7 +177,7 @@ void TJsonMd5::SelfContextMd5Update(const char* data, size_t len) {
     }
 }
 
-void TJsonMd5::IncludesSelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
+void TJsonMd5Old::IncludesSelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
     const TMd5Value oldMd5 = IncludesSelfContextMd5;
     IncludesSelfContextMd5.Update(md5Sig, "TJsonMd5::IncludesSelfContextMd5Update::<md5Sig>"sv);
     YDIAG(Dev)
@@ -186,7 +188,7 @@ void TJsonMd5::IncludesSelfContextMd5Update(const TMd5SigValue& md5Sig, TStringB
     }
 }
 
-void TJsonMd5::IncludesSelfContextMd5Update(const char* data, size_t len) {
+void TJsonMd5Old::IncludesSelfContextMd5Update(const char* data, size_t len) {
     const TMd5Value oldMd5 = IncludesSelfContextMd5;
     IncludesSelfContextMd5.Update(data, len, "TJsonMd5::IncludesSelfContextMd5Update::<data,len>"sv);
     YDIAG(Dev) << "Update SelfIncludesMd5, " << NodeName << " += \"" << TrimData({data, len}) << "\" (len:" << len << ")"
@@ -197,15 +199,15 @@ void TJsonMd5::IncludesSelfContextMd5Update(const char* data, size_t len) {
     }
 }
 
-void TJsonMd5::RenderMd5Update(const TMd5SigValue& md5Sig, TStringBuf) {
+void TJsonMd5Old::RenderMd5Update(const TMd5SigValue& md5Sig, TStringBuf) {
     RenderMd5.Update(md5Sig, "TJsonMd5::RenderMd5Update::<md5Sig>"sv);
 }
 
-void TJsonMd5::RenderMd5Update(const char* data, size_t len) {
+void TJsonMd5Old::RenderMd5Update(const char* data, size_t len) {
     RenderMd5.Update(data, len, "TJsonMd5::RenderMd5Update::<data,len>"sv);
 }
 
-void TJsonMd5::LogContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const {
+void TJsonMd5Old::LogContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const {
     if(!NUidDebug::Enabled()){
         return;
     }
@@ -213,7 +215,7 @@ void TJsonMd5::LogContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId dep
     NUidDebug::LogContextMd5Assign(NodeId, ContextMd5.ToBase64());
 }
 
-void TJsonMd5::LogIncludedChange(const TMd5Value& IncludesMd5, TUidDebugNodeId depNodeId) const {
+void TJsonMd5Old::LogIncludedChange(const TMd5Value& IncludesMd5, TUidDebugNodeId depNodeId) const {
     if(!NUidDebug::Enabled()){
         return;
     }
@@ -221,7 +223,7 @@ void TJsonMd5::LogIncludedChange(const TMd5Value& IncludesMd5, TUidDebugNodeId d
     NUidDebug::LogIncludedMd5Assign(NodeId, IncludesMd5.ToBase64());
 }
 
-void TJsonMd5::LogSelfContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const {
+void TJsonMd5Old::LogSelfContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const {
     if(!NUidDebug::Enabled()){
         return;
     }
@@ -229,12 +231,20 @@ void TJsonMd5::LogSelfContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId
     NUidDebug::LogSelfContextMd5Assign(NodeId, ContextMd5.ToBase64());
 }
 
-void TJsonMd5::LogSelfIncludedChange(const TMd5Value& IncludesMd5, TUidDebugNodeId depNodeId) const {
+void TJsonMd5Old::LogSelfIncludedChange(const TMd5Value& IncludesMd5, TUidDebugNodeId depNodeId) const {
     if(!NUidDebug::Enabled()){
         return;
     }
     NUidDebug::LogSelfDependency(NodeId, depNodeId);
     NUidDebug::LogSelfIncludedMd5Assign(NodeId, IncludesMd5.ToBase64());
+}
+
+TJsonMd5New::TJsonMd5New(TNodeDebugOnly nodeDebug)
+    : StructureMd5(nodeDebug, "TJsonMd5::StructureMd5"sv)
+    , IncludeStructureMd5(nodeDebug, "TJsonMd5::IncludeStructureMd5"sv)
+    , ContentMd5(nodeDebug, "TJsonMd5::ContentMd5"sv)
+    , IncludeContentMd5(nodeDebug, "TJsonMd5::IncludeContentMd5"sv)
+{
 }
 
 TJsonMultiMd5::TJsonMultiMd5(TNodeId loopId, const TSymbols& symbols, size_t expectedSize)
