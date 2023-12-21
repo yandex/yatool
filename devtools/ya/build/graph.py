@@ -2071,6 +2071,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
 
     graph_handles = []
     tool_targets_queue = _ToolTargetsQueue()
+    enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):
@@ -2084,7 +2085,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
             targets or opts.abs_targets,
             debug_id=debug_id,
             extra_conf=opts.extra_conf,
-            enabled_events=EVENTS_WITH_PROGRESS,
+            enabled_events=enabled_events,
             tool_targets_queue=tool_targets_queue,
         )
         graph_handles.append(target_graph)

@@ -6,3 +6,4 @@ class YmakeEvents(enum.Enum):
     ALL = 'a'
     PROGRESS = 'G'
     TOOLS = 'T'
+    PREFETCH = 'H'
