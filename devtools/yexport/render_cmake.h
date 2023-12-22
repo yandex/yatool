@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sem_graph.h"
+#include "std_helpers.h"
 
 #include <util/generic/vector.h>
 #include <util/generic/hash.h>
@@ -8,8 +9,6 @@
 #include <filesystem>
 
 namespace NYexport {
-
-namespace fs = std::filesystem;
 
 class TCMakeGenerator;
 

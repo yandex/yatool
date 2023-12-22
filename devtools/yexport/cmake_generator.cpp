@@ -1,6 +1,6 @@
 #include "cmake_generator.h"
 #include "generator_spec.h"
-#include "path_hash.h"
+#include "std_helpers.h"
 #include "read_sem_graph.h"
 #include "render_cmake.h"
 #include "generator_spec.h"
@@ -104,6 +104,11 @@ TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaR
     // TODO(YMAKE-91) Use info exported from ymake
 }
 
+void TCMakeGenerator::SetArcadiaRoot(const fs::path& arcadiaRoot) {
+    ArcadiaRoot = arcadiaRoot;
+    Conf.ArcadiaRoot = arcadiaRoot;
+}
+
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
     const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
     const auto generatorFile = generatorDir / GENERATOR_FILE;
@@ -112,9 +117,9 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     }
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
-    result->Conf.ArcadiaRoot = arcadiaRoot;
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
     result->GeneratorDir = generatorDir;
+    result->SetArcadiaRoot(arcadiaRoot);
 
     result->ReadYexportSpec(configDir);
     return result;

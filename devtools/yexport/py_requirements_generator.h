@@ -25,7 +25,7 @@ using TCoordExtractor = std::function<TContribCoords(std::string_view graphModPa
 
 class TDefaultContribExtractor {
 public:
-    TDefaultContribExtractor(const std::filesystem::path& arcadiaRoot, EPyVer pyVer)
+    TDefaultContribExtractor(const fs::path& arcadiaRoot, EPyVer pyVer)
         : ArcadiaRoot_{arcadiaRoot}
         , PyVer_{pyVer}
     {
@@ -33,13 +33,13 @@ public:
 
     TContribCoords operator()(std::string_view graphModPath) const;
 
-    std::filesystem::path GetYaMakePath(std::string_view graphModPath) const;
-    std::filesystem::path GetYaMakePath(std::string_view graphModPath, EPyVer pyVer) const;
+    fs::path GetYaMakePath(std::string_view graphModPath) const;
+    fs::path GetYaMakePath(std::string_view graphModPath, EPyVer pyVer) const;
     std::string GetPipName(std::string_view graphModPath) const;
-    std::string ExtractVersion(const std::filesystem::path& mkPath, IInputStream& mkContent) const;
+    std::string ExtractVersion(const fs::path& mkPath, IInputStream& mkContent) const;
 
 private:
-    std::filesystem::path ArcadiaRoot_;
+    fs::path ArcadiaRoot_;
     EPyVer PyVer_;
 };
 
@@ -49,7 +49,7 @@ public:
         : ExtractContribCoords_{std::move(contribCoordsExtractor)}
     {}
 
-    static THolder<TPyRequirementsGenerator> Load(const std::filesystem::path& arcadiaRoot, EPyVer pyVer);
+    static THolder<TPyRequirementsGenerator> Load(const fs::path& arcadiaRoot, EPyVer pyVer);
 
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
     void SetProjectName(const std::string& projectName) override;
@@ -62,7 +62,7 @@ private:
 
 
     TCoordExtractor ExtractContribCoords_;
-    std::filesystem::path PyDepsDumpPath_;
+    fs::path PyDepsDumpPath_;
 };
 
 }

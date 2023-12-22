@@ -63,12 +63,12 @@ TContribCoords TDefaultContribExtractor::operator()(std::string_view graphModPat
     return {.Name = GetPipName(graphModPath), .Version = ver};
 }
 
-std::filesystem::path TDefaultContribExtractor::GetYaMakePath(std::string_view graphModPath) const {
+fs::path TDefaultContribExtractor::GetYaMakePath(std::string_view graphModPath) const {
     const std::string_view moddir = GetModdir(graphModPath);
     return ArcadiaRoot_ / moddir / "ya.make";
 }
 
-std::filesystem::path TDefaultContribExtractor::GetYaMakePath(std::string_view graphModPath, EPyVer pyVer) const {
+fs::path TDefaultContribExtractor::GetYaMakePath(std::string_view graphModPath, EPyVer pyVer) const {
     const std::string_view moddir = GetModdir(graphModPath);
     std::string_view pyver;
     switch (pyVer) {
@@ -86,7 +86,7 @@ std::string TDefaultContribExtractor::GetPipName(std::string_view graphModPath) 
     return std::string{NPath::Basename(GetModdir(graphModPath))};
 }
 
-std::string TDefaultContribExtractor::ExtractVersion(const std::filesystem::path& mkPath, IInputStream& mkContent) const {
+std::string TDefaultContribExtractor::ExtractVersion(const fs::path& mkPath, IInputStream& mkContent) const {
     struct: ISimpleMakeListVisitor {
         void Statement(const TStringBuf& command, TVector<TStringBuf>& args, const TVisitorCtx& ctx, const TSourceRange&) final {
             if (command == "VERSION") {
@@ -109,7 +109,7 @@ std::string TDefaultContribExtractor::ExtractVersion(const std::filesystem::path
     return versionExtractor.Version;
 }
 
-THolder<TPyRequirementsGenerator> TPyRequirementsGenerator::Load(const std::filesystem::path& arcadiaRoot, EPyVer pyVer) {
+THolder<TPyRequirementsGenerator> TPyRequirementsGenerator::Load(const fs::path& arcadiaRoot, EPyVer pyVer) {
     return MakeHolder<TPyRequirementsGenerator>(TDefaultContribExtractor{arcadiaRoot, pyVer});
 }
 

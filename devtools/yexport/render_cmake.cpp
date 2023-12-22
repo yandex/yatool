@@ -1,6 +1,7 @@
 #include "render_cmake.h"
 #include "cmake_generator.h"
 #include "builder.h"
+#include "std_helpers.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
@@ -18,7 +19,6 @@
 
 namespace NYexport {
 
-namespace fs = std::filesystem;
 using namespace std::literals;
 
 namespace {

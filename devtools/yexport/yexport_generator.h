@@ -11,8 +11,6 @@
 
 namespace NYexport {
 
-namespace fs = std::filesystem;
-
 enum class ECleanIgnored {
     Enabled,
     Disabled

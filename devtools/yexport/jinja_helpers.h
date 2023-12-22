@@ -10,7 +10,6 @@
 #include <util/generic/hash_set.h>
 
 namespace NYexport {
-    namespace fs = std::filesystem;
 
     class TTargetAttributes {
     public:

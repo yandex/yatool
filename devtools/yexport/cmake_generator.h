@@ -18,8 +18,6 @@
 
 namespace NYexport {
 
-namespace fs = std::filesystem;
-
 namespace NCMake {
     constexpr std::string_view CMakeListsFile = "CMakeLists.txt";
     constexpr std::string_view GeneratedDisclamer =
@@ -122,6 +120,7 @@ private:
     void CopyArcadiaScripts() const;
     void RenderConanRequirements() const;
 
+    void SetArcadiaRoot(const fs::path& arcadiaRoot);
     void RenderPlatform(TPlatform& platform);
 
     virtual void Render(ECleanIgnored cleanIgnored) override;

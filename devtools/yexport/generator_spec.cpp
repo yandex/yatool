@@ -12,7 +12,6 @@
 
 namespace NYexport {
 
-
 namespace NKeys {
     constexpr const char* Root = "root";
     constexpr const char* Template = "template";
@@ -29,21 +28,38 @@ namespace NKeys {
     constexpr const char* Rules = "rules";
     constexpr const char* AddValues = "add_values";
     constexpr const char* Values = "values";
-}
 
-#define VERIFY_GENSPEC(CONDITION, VALUE, ERROR, COMMENT) YEXPORT_VERIFY(CONDITION, TBadGeneratorSpec(), toml::format_error(ERROR, VALUE, COMMENT))
+    static const THashMap<std::string, ECopyLocation> StringToCopyLocation = {
+        {"source_root", ECopyLocation::SourceRoot},
+        {"generator_root", ECopyLocation::GeneratorRoot},
+    };
 
-
-TGeneratorSpec::TRuleSet TGeneratorSpec::GetRules(const std::string attr) const {
-    if (auto it = AttrToRuleId.find(attr); it != AttrToRuleId.end()) {
-        TRuleSet result;
-        for (const auto& id : it->second) {
-            result.insert(&Rules.at(id));
+    THashSet<std::string> CopyLocationSet() {
+        THashSet<std::string> result;
+        for (const auto& [key, _] : StringToCopyLocation) {
+            result.insert(key);
         }
         return result;
     }
-    return {};
+
+    std::string GetCopyLocationList() {
+        std::string res = "[";
+        bool first = true;
+        for (const auto& [key, _] : StringToCopyLocation) {
+            if (first) {
+                first = false;
+            } else {
+                res.append(", ");
+            }
+            res.append(key);
+        }
+        res.append("]");
+        return res;
+    }
+
 }
+
+#define VERIFY_GENSPEC(CONDITION, VALUE, ERROR, COMMENT) YEXPORT_VERIFY(CONDITION, TBadGeneratorSpec(), toml::format_error(ERROR, VALUE, COMMENT))
 
 namespace {
     //Following functions take pointer to a value in order to prevent implicit construction of new value from vector/unordered_map and following segfault
@@ -72,20 +88,55 @@ namespace {
         }
         return nullptr;
     }
-    THashSet<fs::path> ExtractPathes(const toml::value* value) {
-        THashSet<fs::path> result;
-        const auto& arr = AsArray(value);
-        for (const auto& file : arr) {
-            result.insert(fs::path(AsString(&file)));
+
+    void VerifyFields(const toml::value& value, const THashSet<std::string>& requiredFields, const THashSet<std::string>& optionalFields = {}) {
+        if (!value.is_table()) {
+            return;
+        }
+        const auto& table = AsTable(&value);
+        for (const auto& fieldName : requiredFields) {
+            VERIFY_GENSPEC(table.contains(fieldName), value, NGeneratorSpecError::MissingField, "Should contain field: " + fieldName);
+        }
+        for (const auto& [key, _] : table) {
+            if (!requiredFields.contains(key) && !optionalFields.contains(key)) {
+                auto warningMsg = toml::format_error(NGeneratorSpecError::UnknownField, value, "Unknown field [" + key + "] will be ignored: " + key);
+                warningMsg = warningMsg.substr(8); // To cut off toml error prefix "[error] "
+                spdlog::warn("{}", warningMsg);
+            }
+        }
+    }
+
+    ECopyLocation ParseCopyLocation(const std::string& value, const toml::value& files) {
+        auto locationIt = NKeys::StringToCopyLocation.find(value);
+        VERIFY_GENSPEC(locationIt != NKeys::StringToCopyLocation.end(), files, NGeneratorSpecError::SpecificationError,
+                       "Unknown copy location [" + value + "]. Copy location should be one of the following " + NKeys::GetCopyLocationList());
+        return locationIt->second;
+    }
+
+    TCopySpec ParseCopySpec(const toml::value& value) {
+        VERIFY_GENSPEC(value.is_array() || value.is_table(), value, NGeneratorSpecError::WrongFieldType, "Copy specification should be an array or a table");
+
+        TCopySpec result;
+        if (value.is_array()) {
+            const auto& arr = AsArray(&value);
+            for (const auto& file : arr) {
+                result.Items[ECopyLocation::GeneratorRoot].insert(fs::path(AsString(&file)));
+            }
+        } else if (value.is_table()) {
+            for (const auto& [from, files] : AsTable(&value)) {
+                auto location = ParseCopyLocation(from, files);
+                for (const auto& file : AsArray(&files)) {
+                    result.Items[location].insert(fs::path(AsString(&file)));
+                }
+            }
         }
         return result;
     }
 
-    void ParseOneTemplate(TTargetSpec& targetSpec, const toml::value& tmpl) {
+    TTemplate ParseOneTemplate(const toml::value& tmpl) {
         if (tmpl.is_string()) {
             TTemplate templateResult;
-
-            templateResult.Template = toml::get<std::string>(tmpl);
+            templateResult.Template = AsString(&tmpl);
 
             if (templateResult.Template.extension() != ".jinja") {
                 throw TBadGeneratorSpec{
@@ -99,12 +150,13 @@ namespace {
             }
 
             templateResult.ResultName = templateResult.Template.filename().replace_extension().string();
-            targetSpec.Templates.push_back(templateResult);
+            return templateResult;
         } else if (tmpl.is_table()) {
-            targetSpec.Templates.push_back({
-                    .Template = toml::find<std::string>(tmpl, NKeys::Path),
-                    .ResultName = toml::find<std::string>(tmpl, NKeys::Dest)
-                });
+            VerifyFields(tmpl, {NKeys::Path, NKeys::Dest});
+            return {
+                    .Template = AsString(&At(&tmpl, NKeys::Path)),
+                    .ResultName = AsString(&At(&tmpl, NKeys::Dest)),
+                };
         } else {
             throw TBadGeneratorSpec{
                 toml::format_error("[error] invalid template value", tmpl,
@@ -113,10 +165,11 @@ namespace {
         }
     }
 
-    void ParseManyTemplates(TTargetSpec& targetSpec, const toml::value& tmplArray) {
+    TVector<TTemplate> ParseManyTemplates(const toml::value& tmplArray) {
+        TVector<TTemplate> result;
         if (tmplArray.is_array()) {
-            for (const toml::value& tmpl : toml::get<std::vector<toml::value>>(tmplArray)) {
-                ParseOneTemplate(targetSpec, tmpl);
+            for (const auto& tmpl : AsArray(&tmplArray)) {
+                result.push_back(ParseOneTemplate(tmpl));
             }
         } else {
             throw TBadGeneratorSpec{
@@ -124,9 +177,10 @@ namespace {
                                 "must be array of templates: either path with '.jinja' extension or table "
                                 "{path='...', dest='...'} expected")};
         }
+        return result;
     }
 
-    void ParseTemplates(TTargetSpec& targetSpec, const toml::value& target) {
+    TVector<TTemplate> ParseTemplates(const toml::value& target) {
         bool containsOne = target.contains(NKeys::Template);
         bool containsMany = target.contains(NKeys::ManyTemplates);
 
@@ -137,54 +191,69 @@ namespace {
                     target,
                     "must contains template = {path='...', dest='...'} "
                     "or "
-                    "templates = [{path='...', dest='...'}, {path='...', dest='...'}] "
-                    "but not together"
+                    "templates = [{path='...', dest='...'}, {path='...', dest='...'}]"
+                    + std::string((containsOne & containsMany ? " but not together" : ""))
                 )
             };
         }
 
         if (containsMany) {
-            ParseManyTemplates(targetSpec, toml::find(target, NKeys::ManyTemplates));
+            return ParseManyTemplates(At(&target, NKeys::ManyTemplates));
         } else {
-            ParseOneTemplate(targetSpec, toml::find(target, NKeys::Template));
+            return {ParseOneTemplate(At(&target, NKeys::Template))};
         }
     }
 
     TTargetSpec ParseTargetSpec(const toml::value& target, ESpecFeatures features) {
+        VERIFY_GENSPEC(target.is_table(), target, NGeneratorSpecError::WrongFieldType, "Should be a table");
+        VerifyFields(target, {}, {NKeys::Template, NKeys::ManyTemplates, NKeys::Copy});
+
         TTargetSpec targetSpec;
         if (features != CopyFilesOnly) {
-            ParseTemplates(targetSpec, target);
+            targetSpec.Templates = ParseTemplates(target);
         }
-        const auto* copy = Find(&target, NKeys::Copy);
-        if (copy) {
-            const auto files = ExtractPathes(copy);
-            targetSpec.Copy.insert(files.begin(), files.end());
+        if (target.contains(NKeys::Copy)) {
+            targetSpec.Copy = ParseCopySpec(At(&target, NKeys::Copy));
         }
         return targetSpec;
     }
 
-    std::tuple<std::string, const toml::array*> GetAttrTypeCopy(const toml::value& attrDesc) {
-        std::string attrType;
-        const toml::array* copy;
+    std::tuple<std::string, std::optional<TCopySpec>> GetAttrTypeCopy(const toml::value& attrDesc) {
+        std::tuple<std::string, std::optional<TCopySpec>> result;
+        auto& attrType = std::get<0>(result);
+        auto& copySpec = std::get<1>(result);
         if (attrDesc.is_table()) {
             const auto& attrTable = attrDesc.as_table();
             const auto typeIt = attrTable.find(NKeys::Type);
             attrType = typeIt != attrTable.end() ? typeIt->second.as_string() : "";
-            const auto copyIt = attrTable.find(NKeys::Copy);
-            copy = copyIt != attrTable.end() ? &copyIt->second.as_array() : nullptr;
+            if (const auto* valuePtr = Find(&attrDesc, NKeys::Copy)) {
+                copySpec = ParseCopySpec(*valuePtr);
+            }
         } else {
-            attrType = attrDesc.as_string();
-            copy = nullptr;
+            attrType = AsString(&attrDesc);
         }
-        return { attrType, copy };
+        return result;
     }
 
-    void ParseAttr(TAttrsSpec& attrsSpec, const std::string& attrName, const toml::value& attrDesc) {
+    void AddRule(TGeneratorSpec& spec, const TGeneratorRule& rule) {
+        if (rule.Useless()) {
+            return;
+        }
+        auto& rules = spec.Rules;
+        const auto& ruleId = rules.emplace(rules.size(), rule).first->first;
+
+        for(const auto& attr : rule.Attributes) {
+            spec.AttrToRuleId[attr].push_back(ruleId);
+        }
+    }
+
+    void ParseAttr(TAttrsSpec& attrsSpec, const std::string& attrName, const toml::value& attrDesc, TGeneratorSpec& spec) {
         auto [attrType, copy] = GetAttrTypeCopy(attrDesc);
         EAttrTypes eattrType = EAttrTypes::Unknown;
         std::string curAttrName = attrName;
         std::string_view curAttrType = attrType;
-        do {
+        TFlatAttribute flatAttribute(attrName);
+        for (const auto& curAttrName : flatAttribute.BottomUpRange()) {
             if (!attrsSpec.Items.contains(curAttrName)) { // don't overwrite already defined attributes
                 if (TryFromString(curAttrType, eattrType)) {
                     attrsSpec.Items[curAttrName].Type = eattrType;
@@ -197,50 +266,41 @@ namespace {
             } else if (curAttrName.size() != attrName.size() // upper attribute
                         && attrsSpec.Items[curAttrName].Type != EAttrTypes::Dict) { // must be dict
                 throw TBadGeneratorSpec(
-                    toml::format_error("[error] invalid upper attr " + curAttrName + " type", attrDesc, " upper attr type must be dict")
+                    toml::format_error("[error] invalid upper attr " + std::string(curAttrName) + " type", attrDesc, " upper attr type must be dict")
                 );
             }
-            if (copy) { // append copy values to current attribute spec
-                auto& attrCopy = attrsSpec.Items[curAttrName].Copy;
-                for (const auto& copyItem : *copy) {
-                    if (copyItem.is_string()) {
-                        attrCopy.insert(fs::path{std::string(copyItem.as_string())});
-                    } else {
-                        throw TBadGeneratorSpec(
-                            toml::format_error("[error] invalid copy item value", copyItem, " each copy item must be string")
-                        );
-                    }
-                }
-            }
-            // Search attribute divider in attribute name
-            if (auto divPos = curAttrName.rfind(ATTR_DIVIDER); divPos == std::string::npos) {
-                break;
-            } else {
-                curAttrName = curAttrName.substr(0, divPos);
-                curAttrType = "dict"; // all upper attributes are dicts (if not predefined another)
-            }
-        } while (true);
+            curAttrType = "dict"; // all upper attributes are dicts (if not predefined another)
+        }
+
+        if (copy) {
+            TGeneratorRule rule;
+            rule.Attributes.insert(attrName);
+            rule.Copy = *copy;
+            AddRule(spec, rule);
+        }
     }
 
-    TAttrsSpec ParseAttrsSpec(const toml::value& attrs) {
+    TAttrsSpec ParseAttrsSpec(const toml::value& attrs, TGeneratorSpec& spec) {
         TAttrsSpec attrsSpec;
         for (const auto& item : attrs.as_table()) {
-            ParseAttr(attrsSpec, item.first, item.second);
+            ParseAttr(attrsSpec, item.first, item.second, spec);
         }
         return attrsSpec;
     }
 
     TGeneratorRule ParseRule(const toml::value& value) {
+        VerifyFields(value, {NKeys::Attrs}, {NKeys::Copy, NKeys::AddValues});
+
         const auto& attrs = At(&value, NKeys::Attrs);
         const auto& attrArray = AsArray(&attrs);
-        VERIFY_GENSPEC(!attrArray.empty(), value, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
+        VERIFY_GENSPEC(!attrArray.empty(), attrs, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
 
         TGeneratorRule rule;
         for(const auto& attr : attrArray){
             rule.Attributes.insert(AsString(&attr));
         }
-        if (const auto* copy = Find(&value, NKeys::Copy); copy){
-            rule.Copy = ExtractPathes(copy);
+        if (const auto* copy = Find(&value, NKeys::Copy)){
+            rule.Copy = ParseCopySpec(*copy);
         }
         if (const auto* add_values= Find(&value, NKeys::AddValues); add_values){
             for(const auto& add_value : AsArray(add_values)) {
@@ -254,27 +314,27 @@ namespace {
             }
         }
 
-        VERIFY_GENSPEC(!rule.Copy.empty() || !rule.AddValues.empty(), value, NGeneratorSpecError::SpecificationError, "Module should have non empty field [copy] or [add_values]");
+        VERIFY_GENSPEC(!rule.Copy.Useless() || !rule.AddValues.empty(), value, NGeneratorSpecError::SpecificationError, "Module should have non empty field [copy] or [add_values]");
         return rule;
     }
 
-    std::vector<std::filesystem::path> ParseMergeSpec(const toml::value& value) {
-        std::vector<std::filesystem::path> ans;
-        for (const auto& item : value.as_array()) {
-            ans.push_back(toml::get<std::string>(item));
+    TVector<fs::path> ParseMergeSpec(const toml::value& value) {
+        TVector<fs::path> ans;
+        for (const auto& item : AsArray(&value)) {
+            ans.push_back(AsString(&item));
         }
         return ans;
     }
 }
 
-TGeneratorSpec ReadGeneratorSpec(const std::filesystem::path& path, ESpecFeatures features) {
+TGeneratorSpec ReadGeneratorSpec(const fs::path& path, ESpecFeatures features) {
     std::ifstream input{path};
     if (!input)
         throw std::system_error{errno, std::system_category(), "failed to open " + path.string()};
     return ReadGeneratorSpec(input, path, features);
 }
 
-TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::path& path, ESpecFeatures features) {
+TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpecFeatures features) {
     try {
         const auto doc = toml::parse(input, path.string());
         const auto& root = toml::find(doc, NKeys::Root);
@@ -288,7 +348,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
 
         auto& attrs = genspec.Attrs;
         for (const auto& [name, attspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
-            attrs[name] = ParseAttrsSpec(attspec);
+            attrs[name] = ParseAttrsSpec(attspec, genspec);
         }
 
         const auto inducedIt = attrs.find(ATTRGROUP_INDUCED);
@@ -326,13 +386,6 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
                         spdlog::error("induced attribute item {} type {}, overwritten to {}", targetAttrItem, (int)curTargetAttrItemSpec.Type, (int)targetAttrItemSpec.Type);
                         curTargetAttrItemSpec.Type = targetAttrItemSpec.Type;
                     }
-                    if (curTargetAttrItemSpec.Copy.empty()) {
-                        curTargetAttrItemSpec.Copy = targetAttrItemSpec.Copy;
-                    } else if (!targetAttrItemSpec.Copy.empty()) { // merge sets
-                        for (const auto& copyItem : targetAttrItemSpec.Copy) {
-                            curTargetAttrItemSpec.Copy.emplace(copyItem);
-                        }
-                    }
                 }
             }
         }
@@ -342,12 +395,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
         }
 
         for (const auto& value : find_or<toml::array>(doc, NKeys::Rules, toml::array{})) {
-            auto& rules = genspec.Rules;
-            const auto& [ruleId, rule] = *rules.emplace(rules.size(), ParseRule(value)).first;
-
-            for(const auto& attr : rule.Attributes) {
-                genspec.AttrToRuleId[attr].push_back(ruleId);
-            }
+            AddRule(genspec, ParseRule(value));
         }
 
         genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
@@ -357,6 +405,50 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const std::filesystem::pat
     } catch (const std::out_of_range& err) {
         throw TBadGeneratorSpec{err.what()};
     }
+}
+
+
+
+bool TCopySpec::Useless() const {
+    for (const auto& [_, files] : Items) {
+        if (!files.empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void TCopySpec::Append(const TCopySpec& copySpec) {
+    for (const auto& [location, files] : copySpec.Items) {
+        Items[location].insert(files.begin(), files.end());
+    }
+}
+
+bool TGeneratorRule::Useless() const {
+    if (Attributes.empty()) {
+        return true;
+    }
+    if (!Copy.Useless()) {
+        return false;
+    }
+    for (const auto& [_, values] : AddValues) {
+        if (!values.empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetRules(std::string_view attr) const {
+    if (auto it = AttrToRuleId.find(attr); it != AttrToRuleId.end()) {
+        TRuleSet result;
+        for (const auto& id : it->second) {
+            result.insert(&Rules.at(id));
+        }
+        return result;
+    }
+    return {};
 }
 
 }

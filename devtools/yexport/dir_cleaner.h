@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sem_graph.h"
-#include "path_hash.h"
+#include "std_helpers.h"
 #include "export_file_manager.h"
 
 #include <util/generic/hash_set.h>
@@ -16,8 +16,8 @@ public:
     void Clean(TExportFileManager& exportFileManager) const;
 
 private:
-    THashSet<std::filesystem::path> DirsToRemove;
-    THashSet<std::filesystem::path> SubdirsToKeep;
+    THashSet<fs::path> DirsToRemove;
+    THashSet<fs::path> SubdirsToKeep;
 };
 
 }

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "../std_helpers.h"
+
 #include <util/generic/vector.h>
 #include <filesystem>
-
-namespace fs = std::filesystem;
 
 struct TGeneratorArgs;
 

@@ -3,9 +3,9 @@
 #include "generator_spec.h"
 #include "sem_graph.h"
 #include "spec_based_generator.h"
+#include "std_helpers.h"
 #include "yexport_generator.h"
 
-#include <devtools/yexport/path_hash.h>
 #include <devtools/ymake/dependency_management.h>
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/filesystem_handler.h>
@@ -19,8 +19,6 @@
 #include <filesystem>
 
 namespace NYexport {
-
-namespace fs = std::filesystem;
 
 struct TJinjaTarget {
     std::string Macro;
@@ -71,7 +69,6 @@ private:
     static void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0);
 
     std::string ProjectName;
-    fs::path ArcadiaRoot;
 
     std::shared_ptr<jinja2::RealFileSystem> TemplateFs = std::make_shared<jinja2::RealFileSystem>();
     std::unique_ptr<jinja2::TemplateEnv> JinjaEnv = std::make_unique<jinja2::TemplateEnv>();

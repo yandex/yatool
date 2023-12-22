@@ -14,9 +14,12 @@ const fs::path& TSpecBasedGenerator::GetGeneratorDir() const {
 }
 
 void TSpecBasedGenerator::OnAttribute(const std::string& attribute) {
-    UsedAttributes.insert(attribute);
-    auto rules = GeneratorSpec.GetRules(attribute);
-    UsedRules.insert(rules.begin(), rules.end());
+    TFlatAttribute flatAttribute(attribute);
+    for (const auto& attr : flatAttribute.BottomUpRange()) {
+        UsedAttributes.emplace(attr);
+        auto rules = GeneratorSpec.GetRules(std::string(attr));
+        UsedRules.insert(rules.begin(), rules.end());
+    }
 }
 
 void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {
@@ -36,29 +39,33 @@ void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     }
 }
 
-THashSet<fs::path> TSpecBasedGenerator::CollectFilesToCopy() const {
-    THashSet<fs::path> result;
+fs::path TSpecBasedGenerator::PathByCopyLocation(ECopyLocation location) const {
+    switch (location) {
+        case ECopyLocation::GeneratorRoot:
+            return GeneratorDir;
+        case ECopyLocation::SourceRoot:
+            return ArcadiaRoot;
+        default:
+            YEXPORT_THROW("Unknown copy location");
+    }
+}
+
+TCopySpec TSpecBasedGenerator::CollectFilesToCopy() const {
+    TCopySpec result;
 
     for (auto rule : UsedRules) {
-        result.insert(rule->Copy.begin(), rule->Copy.end());
+        result.Append(rule->Copy);
     }
-
-    result.insert(GeneratorSpec.Root.Copy.begin(), GeneratorSpec.Root.Copy.end());
-    for (const auto& [key, value] : GeneratorSpec.Attrs) {
-        for (const auto& [attrName, item] : value.Items) {
-            if (UsedAttributes.contains(attrName)) {
-                result.insert(item.Copy.begin(), item.Copy.end());
-            }
-        }
-    }
-
+    result.Append(GeneratorSpec.Root.Copy);
     return result;
 }
 
 void TSpecBasedGenerator::CopyFilesAndResources() {
-    for (const auto& path : CollectFilesToCopy()) {
-        ExportFileManager->Copy(GeneratorDir / path, path);
+    for (const auto& [location, files] : CollectFilesToCopy().Items) {
+        auto dir = PathByCopyLocation(location);
+        for (const auto& file : files) {
+            ExportFileManager->Copy(dir / file, file);
+        }
     }
 }
-
 }

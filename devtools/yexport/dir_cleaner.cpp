@@ -10,8 +10,6 @@
 
 namespace NYexport {
 
-namespace fs = std::filesystem;
-
 using TNoReentryConstVisitor = TNoReentryVisitorBase<
     TVisitorStateItemBase,
     TGraphIteratorStateItemBase<true, TSemGraph>,

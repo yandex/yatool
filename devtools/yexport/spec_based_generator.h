@@ -2,7 +2,7 @@
 
 #include "generator_spec.h"
 #include "yexport_generator.h"
-#include "path_hash.h"
+#include "std_helpers.h"
 #include "target_replacements.h"
 #include "jinja_helpers.h"
 
@@ -33,6 +33,7 @@ protected:
     void CopyFilesAndResources();
 
     fs::path GeneratorDir;
+    fs::path ArcadiaRoot;
     TGeneratorSpec GeneratorSpec;
     THashSet<std::string> UsedAttributes;
     THashSet<const TGeneratorRule*> UsedRules;
@@ -41,8 +42,8 @@ protected:
     void ReadYexportSpec(fs::path configDir = "");
 
 private:
-    THashSet<fs::path> CollectResourcesToCopy() const;
-    THashSet<fs::path> CollectFilesToCopy() const;
+    fs::path PathByCopyLocation(ECopyLocation location) const;
+    TCopySpec CollectFilesToCopy() const;
 };
 
 }
