@@ -13,7 +13,9 @@ import app_config
 from devtools.ya.yalibrary.yandex.sandbox.misc import fix_logging
 
 if app_config.in_house:
-    from devtools.ya.test.dependency import sandbox_storage, mds_storage
+    from devtools.ya.test.dependency import sandbox_storage
+
+from devtools.ya.test.dependency import mds_storage
 
 import exts.archive
 
