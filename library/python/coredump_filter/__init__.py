@@ -1184,8 +1184,8 @@ class StackDumperBase(object):
         sorted_stacks = sorted(self.stacks, key=lambda x: (x.important, x.fingerprint()), reverse=True)
 
         prev_hash = None
-        all_hash_stacks = []
-        cur_hash_stacks = []
+        all_hash_stacks = []  # type: list[list[Stack]]
+        cur_hash_stacks = []  # type: list[Stack]
         for stack in sorted_stacks:
             if stack.hash() == 0:
                 continue
@@ -1219,7 +1219,7 @@ class StackDumperBase(object):
             raw_hash_stacks = [
                 [stack.raw() for stack in common_hash_stacks]
                 for common_hash_stacks in all_hash_stacks
-            ]
+            ]  # type: list[list[str]]
             return all_hash_stacks, raw_hash_stacks, self.signal
 
     def _collect_stacks(self):
