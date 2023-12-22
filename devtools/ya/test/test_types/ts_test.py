@@ -210,10 +210,7 @@ class EslintTestSuite(common_types.AbstractTestSuite):
         )
 
         self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
-        self._eslint_resource = self.dart_info.get(
-            self.dart_info.get("ESLINT-ROOT-VAR-NAME") or "ESLINT_RESOURCE_GLOBAL"
-        )
-        logger.debug("NODEJS_RESOURCE: '{}' ESLINT_RESOURCE: '{}'".format(self._nodejs_resource, self._eslint_resource))
+        logger.debug("NODEJS_RESOURCE: '{}'".format(self._nodejs_resource))
 
         self._files = sorted(self.dart_info.get('TEST-FILES', []))
         self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
