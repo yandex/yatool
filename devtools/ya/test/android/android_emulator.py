@@ -107,7 +107,6 @@ class AndroidEmulator(object):
         def get_emulator_state():
             return process.execute(
                 self._get_adb_cmd(device_id) + ['get-state'],
-                check_exit_code=True,
                 env=self.env,
             ).stdout
 
