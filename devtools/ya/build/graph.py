@@ -2010,7 +2010,10 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
                 target['platform_name'],
                 target.get('c_compiler', opts.c_compiler),
                 target.get('cxx_compiler', opts.cxx_compiler),
-                opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes',
+                (
+                    target.get('flags', {}).get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
+                    or opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
+                ),
             )
         )
         return target
