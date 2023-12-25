@@ -1981,7 +1981,9 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
     if len(target_platforms) > 1 and opts.canonize_tests:
         raise core.yarg.ArgsBindingException('Canonization is not supported for more than one target platform')
 
-    host_tc = bg.gen_tc(host, opts.c_compiler, opts.cxx_compiler)
+    host_tc = bg.gen_tc(
+        host, opts.c_compiler, opts.cxx_compiler, opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
+    )
     host_tc['build_type'] = opts.host_build_type
     host_tc['flags'] = {
         'NO_DEBUGINFO': 'yes',

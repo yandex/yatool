@@ -147,8 +147,8 @@ def host_for_target_platform_name(host_name, target_name):
     )
 
 
-def gen_tc(platform_name, c_compiler=None, cxx_compiler=None):
-    return _resolve_cxx(platform_name, platform_name, c_compiler, cxx_compiler)
+def gen_tc(platform_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False):
+    return _resolve_cxx(platform_name, platform_name, c_compiler, cxx_compiler, ignore_mismatched_xcode_version)
 
 
 def gen_cross_tc(host_name, target_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False):
