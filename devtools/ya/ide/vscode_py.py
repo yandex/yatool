@@ -282,7 +282,7 @@ class PyProject(object):
                         os.path.join(self.params.arc_root, "build/config/tests/py_style/config.toml"),
                     ],
                 ),
-                ("black-formatter.path", black_binary_path),
+                ("black-formatter.path", [black_binary_path]),
             )
         )
 
