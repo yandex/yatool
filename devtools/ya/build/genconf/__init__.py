@@ -103,6 +103,12 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
                     '\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.'
                 )
                 raise Exception('Unsupported Xcode version, installed = {}'.format(version))
+
+        parsed_oses = [
+            pm.parse_platform(host)['os'],
+            pm.parse_platform(target)['os'],
+        ]
+
         res['params']['c_compiler'] = get_output('xcrun', '--find', 'clang')
         res['params']['cxx_compiler'] = get_output('xcrun', '--find', 'clang++')
         res['params']['actool'] = get_output('xcrun', '--find', 'actool')
@@ -114,7 +120,8 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
         )
         res['params']['ar'] = get_output('xcrun', '--find', 'libtool')
         res['params']['strip'] = get_output('xcrun', '--find', 'strip')
-        res['params']['dwarf_tool'] = {'DARWIN': get_output('xcrun', '--find', 'dsymutil') + ' -flat'}
+        dwarf_tool = get_output('xcrun', '--find', 'dsymutil') + ' -flat'
+        res['params']['dwarf_tool'] = {parsed_os: dwarf_tool for parsed_os in parsed_oses}
     # res is referencing to the cached dict
     return res.copy()
 
