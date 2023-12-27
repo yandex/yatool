@@ -40,6 +40,9 @@ class YaBaseOptions(BaseOptions):
 
         self.ya_py_version = self._pop("ya_py_version")
 
+        self.cache_size = self._pop("cache_size")
+        self.tools_cache_size = self._pop("tools_cache_size")
+
     def generate(self):  # type: () -> tp.Tuple[tp.List[str], tp.Dict[str, str]]
         self._check_parameters()
         ya_bin_cmd = self.ya_bin
@@ -93,6 +96,11 @@ class YaBaseOptions(BaseOptions):
 
         if self.custom_fetcher:
             env['YA_CUSTOM_FETCHER'] = self.custom_fetcher
+
+        if self.cache_size:
+            env['YA_CACHE_SIZE'] = str(self.cache_size)
+        if self.tools_cache_size:
+            env['YA_TOOLS_CACHE_SIZE'] = str(self.tools_cache_size)
 
         return env
 
