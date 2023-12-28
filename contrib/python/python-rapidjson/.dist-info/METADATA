@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: python-rapidjson
-Version: 1.13
+Version: 1.14
 Summary: Python wrapper around rapidjson
 Home-page: https://github.com/python-rapidjson/python-rapidjson
 Author: Ken Robbins
@@ -154,6 +154,14 @@ __ https://python-rapidjson.readthedocs.io/en/latest/quickstart.html#incompatibi
 
 Changes
 -------
+
+1.14 (2023-12-14)
+~~~~~~~~~~~~~~~~~
+
+* Produce binary wheels for macOS/arm64, thanks to timothyjlaurent (`PR #195`__)
+
+  __ https://github.com/python-rapidjson/python-rapidjson/pull/170
+
 
 1.13 (2023-10-29)
 ~~~~~~~~~~~~~~~~~
