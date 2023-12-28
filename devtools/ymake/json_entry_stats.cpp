@@ -116,6 +116,12 @@ void TJsonStatsNew::SetFullUid(const TMd5Value& oldMd5) {
     YDIAG(Dev) << "Set FullUID, value is " << FullUID.ToBase64() << Endl;
 }
 
+void TJsonStatsNew::SetFullUid(const TMd5SigValue& oldMd5) {
+    FullUID = oldMd5;
+    IsFullUIDCompleted = true;
+    YDIAG(Dev) << "Set FullUID, value is " << FullUID.ToBase64() << Endl;
+}
+
 void TJsonStatsNew::SetSelfUid(const TMd5Value& oldMd5) {
     SelfUID.CopyFrom(oldMd5);
     IsSelfUIDCompleted = true;

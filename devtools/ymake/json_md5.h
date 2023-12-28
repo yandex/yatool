@@ -164,7 +164,7 @@ inline TJsonMd5Old* TJsonMd5Base::Old() noexcept {
 }
 
 inline TJsonMd5New* TJsonMd5Base::New() noexcept {
-    Y_ASSERT(dynamic_cast<TJsonMd5Old*>(this) != nullptr);
+    Y_ASSERT(dynamic_cast<TJsonMd5New*>(this) != nullptr);
     return static_cast<TJsonMd5New*>(this);
 }
 

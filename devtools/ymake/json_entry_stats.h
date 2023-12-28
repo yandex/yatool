@@ -113,6 +113,7 @@ public:
     void SetIncludeContentUid(const TMd5Value& oldMd5);
 
     void SetFullUid(const TMd5Value& oldMd5);
+    void SetFullUid(const TMd5SigValue& oldMd5);
     void SetSelfUid(const TMd5Value& oldMd5);
 
     TString GetNodeUid() const {

@@ -465,12 +465,13 @@ namespace {
         if (nodeInfo.NewUids()->IsFullUidCompleted()) {
             return;
         }
-        // self uid ноды
-        TMd5Value md5{"ComputeFullUID::<md5>"sv};
-        md5.Update(nodeInfo.NewUids()->GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
 
         // full uids of dependencies
         if (nodeInfo.NodeDeps) {
+            // self uid ноды
+            TMd5Value md5{"ComputeFullUID::<md5>"sv};
+            md5.Update(nodeInfo.NewUids()->GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
+
             for (const auto& dep : *nodeInfo.NodeDeps.Get()) {
                 const auto depIt = cmdBuilder.Nodes.find(dep);
                 Y_ASSERT(depIt != cmdBuilder.Nodes.end());
@@ -483,8 +484,13 @@ namespace {
                 const TMd5SigValue& depFullUid = depData.NewUids()->GetFullUid();
                 md5.Update(depFullUid, "ComputeFullUID::<depFullUid>"sv);
             }
+
+            nodeInfo.NewUids()->SetFullUid(md5);
+
+        } else {
+            nodeInfo.NewUids()->SetFullUid(nodeInfo.NewUids()->GetSelfUid());
         }
-        nodeInfo.NewUids()->SetFullUid(md5);
+
     }
 
     void ComputeSelfUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
