@@ -1243,7 +1243,6 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
 
         if (IsGlobalReservedVar(tokenName)) {
             GetAddCtx(var)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, tokenName));
-            continue;
         }
 
         if (token.Flags.Get(EMF_Tool) && !token.IsOwnArg) {
