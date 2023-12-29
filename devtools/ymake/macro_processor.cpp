@@ -1243,7 +1243,6 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
 
         if (IsGlobalReservedVar(tokenName)) {
             GetAddCtx(var)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, tokenName));
-            continue;
         }
 
         if (token.Flags.Get(EMF_Tool) && !token.IsOwnArg) {
@@ -1279,7 +1278,9 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " not found\n";
             YConfWarn(UndefVar) << "> HERE: " << Get1(&var) << Endl;
             //YConfWarn(Dev) << "cmdId = " << cmdId << ", vars id = " << module->Vars.Id << Endl;
-            GetAddCtx(var)->AddDep(EDT_Include, EMNT_UnknownCommand, tokenName);
+            if (!IsGlobalReservedVar(tokenName)) {
+                GetAddCtx(var)->AddDep(EDT_Include, EMNT_UnknownCommand, tokenName);
+            }
         } else {
             const TStringBuf cmdStr = Get1(cmd);
             const ui64 cmdElemId = InitCmdNode(*cmd);
