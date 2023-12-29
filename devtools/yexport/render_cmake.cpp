@@ -1,7 +1,7 @@
 #include "render_cmake.h"
 #include "cmake_generator.h"
-#include "builder.h"
 #include "std_helpers.h"
+#include "project.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
@@ -86,10 +86,7 @@ namespace {
         TVector<std::string> Priv;
     };
 
-    struct TCMakeTarget {
-        std::string Macro;
-        std::string Name;
-        TVector<std::string> MacroArgs;
+    struct TCMakeTarget : TProjectTarget {
         TMap<std::string, TAttrValues> Attributes;
         TMap<std::string, TVector<std::string>> Properties;
         TMultiMap<std::string, TVector<std::string>> Macros;
@@ -102,27 +99,27 @@ namespace {
 
     using TInducedCmakePackages = TMap<std::string, TSet<std::string>>;
 
-    struct TCMakeList {
+    struct TCMakeList : TProjectSubdir {
         TInducedCmakePackages Packages;
         TVector<std::string> Includes;
         TVector<std::pair<std::string, TVector<std::string>>> Macros;
-        TVector<TCMakeTarget*> Targets;
-        TSet<fs::path> Subdirectories;
-        bool IsTopLevel = false;
+        TSet<fs::path> SubdirectoriesToAdd;
     };
 
     using TSubdirsTable = THashMap<fs::path, TCMakeList>;
     using TSubdirsTableElem = THashMap<fs::path, TCMakeList>::value_type;
 
-    class TCMakeProject {
+    class TCMakeProject : public TProject {
     public:
         class TBuilder;
 
         TCMakeProject(const TProjectConf& projectConf, TPlatform& platform, TExportFileManager* exportFileManager)
-        : ProjectConf(projectConf)
+        : TProject()
+        , ProjectConf(projectConf)
         , Platform(platform)
         , ExportFileManager(exportFileManager)
         {
+            SetFactoryTypes<TCMakeList, TCMakeTarget>();
         }
 
         void Save() {
@@ -134,13 +131,13 @@ namespace {
 
             fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
 
-            for (const auto* subdir: SubdirsOrder) {
+            for (auto subdir: SubdirsOrder_) {
                 Y_ASSERT(subdir);
-                Platform.SubDirs.insert(subdir->first);
-                if (subdir->second.IsTopLevel) {
-                    fmt::format_to(bufIt, "add_subdirectory({})\n", subdir->first.c_str());
+                Platform.SubDirs.insert(subdir->Path);
+                if (subdir->IsTopLevel()) {
+                    fmt::format_to(bufIt, "add_subdirectory({})\n", subdir->Path.c_str());
                 }
-                SaveSubdirCMake(subdir->first, subdir->second);
+                SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>());
             }
 
             out.Write(buf.data(), buf.size());
@@ -148,8 +145,8 @@ namespace {
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
             THashMap<fs::path, TSet<fs::path>> result;
-            for (const auto* subdir: SubdirsOrder) {
-                result.insert({subdir->first, subdir->second.Subdirectories});
+            for (auto subdir: SubdirsOrder_) {
+                result.insert({subdir->Path, subdir.As<TCMakeList>()->SubdirectoriesToAdd});
             }
             return result;
         }
@@ -188,18 +185,19 @@ namespace {
             }
 
             // add subdirectories that contain targets inside (possibly several levels lower)
-            for (const auto& addSubdir: data.Subdirectories) {
+            for (const auto& addSubdir: data.SubdirectoriesToAdd) {
                 fmt::format_to(bufIt, "add_subdirectory({})\n", addSubdir.c_str());
             }
 
             PrintDirLevelMacros(bufIt, data.Macros);
 
-            for (const auto& tgt: data.Targets) {
+            for (auto tgt: data.Targets) {
+                const auto& cmakeTarget = *tgt.As<TCMakeTarget>();
                 if (buf.size() != 0) {
                     fmt::format_to(bufIt, "\n");
                 }
                 // Target definition
-                if (tgt->InterfaceTarget) {
+                if (cmakeTarget.InterfaceTarget) {
                     fmt::format_to(bufIt, "{}({} INTERFACE", tgt->Macro, tgt->Name);
                 } else {
                     fmt::format_to(bufIt, "{}({}", tgt->Macro, tgt->Name);
@@ -212,14 +210,14 @@ namespace {
                     fmt::format_to(bufIt, " {})\n", fmt::join(tgt->MacroArgs, " "));
                 }
                 // Target properties
-                for (const auto& [name, values]: tgt->Properties) {
+                for (const auto& [name, values]: cmakeTarget.Properties) {
                     if (values.empty()) {
                         continue;
                     }
                     fmt::format_to(bufIt, "set_property(TARGET {} PROPERTY\n  {} {}\n)\n", tgt->Name, name, fmt::join(values, " "));
                 }
                 // Target attributes
-                for (const auto& [macro, values]: tgt->Attributes) {
+                for (const auto& [macro, values]: cmakeTarget.Attributes) {
                     if (!values.Iface.empty()) {
                         fmt::format_to(bufIt, "{}({} INTERFACE\n  {}\n)\n", macro, tgt->Name, fmt::join(values.Iface, "\n  "));
                     }
@@ -232,10 +230,10 @@ namespace {
                 }
 
                 // Print target-related dir level macros
-                PrintDirLevelMacros(bufIt, tgt->DirMacros);
+                PrintDirLevelMacros(bufIt, cmakeTarget.DirMacros);
 
                 // Target level macros
-                for (const auto& [macro, values]: tgt->Macros) {
+                for (const auto& [macro, values]: cmakeTarget.Macros) {
                     if (values.empty()) {
                         fmt::format_to(bufIt, "{}({})\n", macro, tgt->Name);
                     } else {
@@ -244,12 +242,12 @@ namespace {
                 }
 
                 // Dependencies
-                if (!tgt->HostToolExecutableTargetDependencies.empty()) {
+                if (!cmakeTarget.HostToolExecutableTargetDependencies.empty()) {
                     fmt::format_to(
                         bufIt,
                         "if(NOT CMAKE_CROSSCOMPILING)\n  add_dependencies({}\n    {}\n)\nendif()\n",
                         tgt->Name,
-                        fmt::join(tgt->HostToolExecutableTargetDependencies, "\n    ")
+                        fmt::join(cmakeTarget.HostToolExecutableTargetDependencies, "\n    ")
                     );
                 }
             }
@@ -277,56 +275,60 @@ namespace {
         static constexpr std::string_view CMakePrologueFile = "prologue.cmake";
 
     private:
-        TDeque<TCMakeTarget> Targets;
-        TSubdirsTable Subdirs;
-        TVector<TSubdirsTableElem*> SubdirsOrder;
         const TProjectConf& ProjectConf;
         TPlatform& Platform;
         TExportFileManager* ExportFileManager;
     };
+    using TCMakeProjectPtr = TSimpleSharedPtr<TCMakeProject>;
 
-    class TCMakeProject::TBuilder: public TGeneratorBuilder<TSubdirsTableElem, TCMakeTarget> {
+    class TCMakeProject::TBuilder: public TProject::TBuilder {
     public:
 
         TBuilder(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
-        : Project(projectConf, platform, cmakeGenerator->GetExportFileManager())
+        : TProject::TBuilder()
         , Platform(platform)
         , GlobalProperties(globalProperties)
         , CMakeGenerator(cmakeGenerator)
-        {}
+        {
+            Project_ = MakeSimpleShared<TCMakeProject>(projectConf, platform, cmakeGenerator->GetExportFileManager());
+        }
 
-        TCMakeProject Finalize() { return std::move(Project);}
+        void Finalize() override {
+            for (auto subdir : Project_->GetSubdirs()) {
+                auto& cmakeList = *subdir.As<TCMakeList>();
+                for (const auto& child : cmakeList.Subdirectories) {
+                    cmakeList.SubdirectoriesToAdd.insert(child->Path.filename());
+                }
+            }
+        }
 
         void SetCurrentTools(TMap<std::string_view, std::string_view> tools) noexcept {
             Tools = std::move(tools);
         }
 
-        TTargetHolder CreateTarget(const std::string& targetMacro, const fs::path& targetDir, const std::string name, std::span<const std::string> macroArgs);
-
-        void AddSubdirectories(const fs::path& targetDir);
-
         void AddTargetAttr(const std::string& attrMacro, ECMakeAttrScope scope, std::span<const std::string> vals) {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::info("attempt to add target attribute '{}' while there is no active target", attrMacro);
                 return;
             }
+            auto& curCmakeTarget = *CurTarget_.As<TCMakeTarget>();
             if (vals.empty()) {
                 return;
             }
-            if (CurTarget->InterfaceTarget && attrMacro == "target_sources") {
+            if (curCmakeTarget.InterfaceTarget && attrMacro == "target_sources") {
                 scope = ECMakeAttrScope::Interface;
             }
 
             TVector<std::string>* dest;
             switch(scope) {
             case ECMakeAttrScope::Interface:
-                dest = &CurTarget->Attributes[attrMacro].Iface;
+                dest = &curCmakeTarget.Attributes[attrMacro].Iface;
             break;
             case ECMakeAttrScope::Public:
-                dest = CurTarget->InterfaceTarget ? &CurTarget->Attributes[attrMacro].Iface : &CurTarget->Attributes[attrMacro].Pub;
+                dest = curCmakeTarget.InterfaceTarget ? &curCmakeTarget.Attributes[attrMacro].Iface : &curCmakeTarget.Attributes[attrMacro].Pub;
             break;
             case ECMakeAttrScope::Private:
-                dest = CurTarget->InterfaceTarget ? nullptr : &CurTarget->Attributes[attrMacro].Priv;
+                dest = curCmakeTarget.InterfaceTarget ? nullptr : &curCmakeTarget.Attributes[attrMacro].Priv;
             break;
             }
 
@@ -338,73 +340,75 @@ namespace {
         }
 
         void SetTargetMacroArgs(TVector<std::string> args) {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::error("attempt to set target macro args while there is no active target");
                 return;
             }
-            CurTarget->MacroArgs = std::move(args);
+            CurTarget_->MacroArgs = std::move(args);
         }
 
         void AddTargetAttrs(const std::string& attrMacro, const TAttrValues& values) {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::error("attempt to add target attribute '{}' while there is no active target", attrMacro);
                 return;
             }
-            auto& destAttrs = CurTarget->Attributes[attrMacro];
+            auto& curCmakeTarget = *CurTarget_.As<TCMakeTarget>();
+            auto& destAttrs = curCmakeTarget.Attributes[attrMacro];
             Copy(values.Iface.begin(), values.Iface.end(), std::back_inserter(destAttrs.Iface));
-            Copy(values.Pub.begin(), values.Pub.end(), std::back_inserter(CurTarget->InterfaceTarget ? destAttrs.Iface : destAttrs.Pub));
-            if (CurTarget->InterfaceTarget) {
+            Copy(values.Pub.begin(), values.Pub.end(), std::back_inserter(curCmakeTarget.InterfaceTarget ? destAttrs.Iface : destAttrs.Pub));
+            if (curCmakeTarget.InterfaceTarget) {
                 Copy(values.Priv.begin(), values.Priv.end(), std::back_inserter(destAttrs.Priv));
             }
         }
 
         void AddDirMacro(const std::string& name, std::span<const std::string> args) {
-            if (!CurList) {
+            if (!CurSubdir_) {
                 spdlog::error("attempt to add macro '{}' while there is no active CMakeLists.txt", name);
                 return;
             }
-            CurList->second.Macros.push_back({name, ConvertMacroArgs(args)});
+            CurSubdir_.As<TCMakeList>()->Macros.push_back({name, ConvertMacroArgs(args)});
         }
 
         void AddTargetMacro(const std::string& name, std::span<const std::string> args, EMacroMergePolicy mergePolicy) {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::error("attempt to add target attribute '{}' while there is no active target", name);
                 return;
             }
+            auto& curCmakeTarget = *CurTarget_.As<TCMakeTarget>();
             switch (mergePolicy) {
                 case EMacroMergePolicy::ConcatArgs: {
-                    auto pos = CurTarget->Macros.find(name);
-                    if (pos == CurTarget->Macros.end())
-                        pos = CurTarget->Macros.insert({name, {}});
+                    auto pos = curCmakeTarget.Macros.find(name);
+                    if (pos == curCmakeTarget.Macros.end())
+                        pos = curCmakeTarget.Macros.insert({name, {}});
                     Copy(args.begin(), args.end(), std::back_inserter(pos->second));
                     break;
                 }
                 case EMacroMergePolicy::FirstCall:
-                    if (CurTarget->Macros.contains(name))
+                    if (curCmakeTarget.Macros.contains(name))
                         break;
                     [[fallthrough]];
                 case EMacroMergePolicy::MultipleCalls:
-                    CurTarget->Macros.emplace(name, ConvertMacroArgs(args)); break;
+                    curCmakeTarget.Macros.emplace(name, ConvertMacroArgs(args)); break;
             }
         }
 
         // at directory level but should logically be grouped with the current target
         void AddTargetDirMacro(const std::string& name, std::span<const std::string> args) {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::error("attempt to add target directory macro '{}' while there is no active target", name);
                 return;
             }
-            CurTarget->DirMacros.push_back({name, ConvertMacroArgs(args)});
+            CurTarget_.As<TCMakeTarget>()->DirMacros.push_back({name, ConvertMacroArgs(args)});
         }
 
         bool SupportsAllocator() const {
-            if (!CurTarget) {
+            if (!CurTarget_) {
                 spdlog::error("attempt to check support allocator while there is no active target");
                 return false;
             }
             // Ugly hack here. In Jinja generator world PROGRAM and DLL target should use their own templates
             // and handle allocators in a different way then other target types
-            return CurTarget->Macro == "add_executable"sv || (CurTarget->Macro == "add_library" && !CurTarget->MacroArgs.empty() && CurTarget->MacroArgs[0] == "SHARED"sv);
+            return CurTarget_->Macro == "add_executable"sv || (CurTarget_->Macro == "add_library" && !CurTarget_->MacroArgs.empty() && CurTarget_->MacroArgs[0] == "SHARED"sv);
         }
 
         void AddGlobalVar(const std::string& name, std::span<const std::string> args) {
@@ -441,14 +445,14 @@ namespace {
         }
 
         void AppendTargetProperty(const std::string& name, std::span<const std::string> values) {
-            auto& prop = CurTarget->Properties[name];
+            auto& prop = CurTarget_.As<TCMakeTarget>()->Properties[name];
             for (const auto& val: values) {
                 prop.push_back(val);
             }
         }
 
         void SetTargetProperty(const std::string& name, std::span<const std::string> values) {
-            auto& prop = CurTarget->Properties[name];
+            auto& prop = CurTarget_.As<TCMakeTarget>()->Properties[name];
             prop.clear();
             for (const auto& val: values) {
                 prop.push_back(val);
@@ -467,24 +471,24 @@ namespace {
         }
 
         void FindPackage(const std::string& name, TSet<std::string> components) {
-            if (!CurList) {
+            if (!CurSubdir_) {
                 spdlog::error("attempt to add find_package macro while there is no active CMakeLists.txt");
                 return;
             }
-            CurList->second.Packages[name].insert(components.begin(), components.end());
+            CurSubdir_.As<TCMakeList>()->Packages[name].insert(components.begin(), components.end());
         }
 
         void Include(const std::string& mod) {
-            if (!CurList) {
+            if (!CurSubdir_) {
                 spdlog::error("attempt to add find_package macro while there is no active CMakeLists.txt");
                 return;
             }
-            CurList->second.Includes.push_back(mod);
+            CurSubdir_.As<TCMakeList>()->Includes.push_back(mod);
         }
 
         void SetFakeFlag(bool isFake) {
-            if (CurTarget) {
-                CurTarget->InterfaceTarget = isFake;
+            if (CurTarget_) {
+                CurTarget_.As<TCMakeTarget>()->InterfaceTarget = isFake;
             }
         }
 
@@ -540,7 +544,7 @@ namespace {
                                 arcadiaPath
                             );
                         } else {
-                            CurTarget->HostToolExecutableTargetDependencies.insert(TString(toolName));
+                            CurTarget_.As<TCMakeTarget>()->HostToolExecutableTargetDependencies.insert(TString(toolName));
                             return fmt::format("${{{}}}", GetToolBinVariable(toolName));
                         }
                     }
@@ -550,7 +554,6 @@ namespace {
         }
 
     private:
-        TCMakeProject Project;
         TPlatform& Platform;
         TGlobalProperties& GlobalProperties;
         TCMakeGenerator* CMakeGenerator;
@@ -559,32 +562,8 @@ namespace {
         TMap<std::string_view, std::string_view> Tools;
     };
 
-    TCMakeProject::TBuilder::TTargetHolder TCMakeProject::TBuilder::CreateTarget(const std::string& targetMacro, const fs::path& targetDir, const std::string name, std::span<const std::string> macroArgs) {
-        const auto [pos, inserted] = Project.Subdirs.insert({targetDir, {}});
-        if (inserted) {
-            Project.SubdirsOrder.push_back(&*pos);
-            AddSubdirectories(targetDir);
-        }
-        Project.Targets.push_back({.Macro = targetMacro, .Name = name, .MacroArgs = {macroArgs.begin(), macroArgs.end()}});
-        pos->second.Targets.push_back(&Project.Targets.back());
-        return {*this, *pos, Project.Targets.back()};
-    }
-
-    void TCMakeProject::TBuilder::AddSubdirectories(const fs::path& targetDir) {
-        auto dir = targetDir;
-        while(dir.has_parent_path()) {
-            const auto [pos, inserted] = Project.Subdirs.insert({dir.parent_path(), {}});
-            if (inserted) {
-                Project.SubdirsOrder.push_back(&*pos);
-            }
-            pos->second.Subdirectories.insert(dir.filename());
-            dir = dir.parent_path();
-        }
-        Project.Subdirs.at(dir).IsTopLevel = true;
-    }
-
     struct TExtraStackData {
-        TCMakeProject::TBuilder::TTargetHolder CurTargetHolder;
+        TProject::TBuilder::TTargetHolder CurTargetHolder;
         bool FreshNode = false;
     };
 
@@ -642,7 +621,13 @@ namespace {
                     if (!CheckArgs(semName, semArgs, AtLeast(2)))
                         continue;
 
-                    state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(semName, semArgs[0].c_str(), semArgs[1], semArgs.subspan(2));
+                    auto macroArgs = semArgs.subspan(2);
+                    state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(semArgs[0].c_str());
+                    auto* curTarget = ProjectBuilder.CurrentTarget();
+                    curTarget->Name = semArgs[1];
+                    curTarget->Macro = semName;
+                    curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+
                     Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder.CurrentTarget());
                     // TODO(svidyuk) populate target props on post order part of the traversal and keep track locally used tools only instead of global dict
                     TargetsDict.emplace(NPath::CutType(data.Path), ProjectBuilder.CurrentTarget());
@@ -805,8 +790,9 @@ namespace {
                     // Note: There is assumption here that all PEERDIR nodes are traversed before GlobalSrcDeps
                     const auto fres = Mod2Target.find(dep.From().Id());
                     Y_ASSERT(fres != Mod2Target.end());
-                    const auto linkLibs = fres->second->Attributes.find("target_link_libraries");
-                    if (linkLibs != fres->second->Attributes.end()) {
+                    const auto& cmakeTarget = *dynamic_cast<const TCMakeTarget*>(fres->second);
+                    const auto linkLibs = cmakeTarget.Attributes.find("target_link_libraries");
+                    if (linkLibs != cmakeTarget.Attributes.end()) {
                         TAttrValues libs;
                         Copy(linkLibs->second.Iface.begin(), linkLibs->second.Iface.end(), std::back_inserter(libs.Pub));
                         Copy(linkLibs->second.Pub.begin(), linkLibs->second.Pub.end(), std::back_inserter(libs.Pub));
@@ -838,9 +824,11 @@ namespace {
                         ProjectBuilder.AddTargetMacro("target_allocator", allocIt->second, EMacroMergePolicy::ConcatArgs);
                     } else {
                         const auto* curTarget = ProjectBuilder.CurrentTarget();
+                        const auto& cmakeTarget = *dynamic_cast<const TCMakeTarget*>(curTarget);
+
                         ProjectBuilder.AddTargetAttr(
                             "target_link_libraries",
-                            curTarget && curTarget->InterfaceTarget ? ECMakeAttrScope::Interface : ECMakeAttrScope::Public,
+                            curTarget && cmakeTarget.InterfaceTarget ? ECMakeAttrScope::Interface : ECMakeAttrScope::Public,
                             allocIt->second
                         );
                     }
@@ -849,8 +837,8 @@ namespace {
             TBase::Left(state);
         }
 
-        TCMakeProject TakeFinalizedProject() {
-            return ProjectBuilder.Finalize();
+        TProjectPtr TakeFinalizedProject() {
+            return ProjectBuilder.FinishProject();
         }
 
         bool HasErrors() const noexcept {return FoundErrors;}
@@ -930,11 +918,11 @@ namespace {
                 break;
             }
             if (!passed) {
-                const auto* list = ProjectBuilder.CurrentList();
+                const auto* subdir = ProjectBuilder.CurrentSubdir();
                 const auto* tgt = ProjectBuilder.CurrentTarget();
                 spdlog::error(
                     "{}@{}: semantic {} requires {} {} arguments. Provided arguments count {}.\n\tProvided arguments are: {}",
-                    list ? list->first.c_str() : "CMakeLists.txt",
+                    subdir ? subdir->Path.c_str() : "CMakeLists.txt",
                     tgt ? tgt->Name : "GLOBAL_SCOPE",
                     sem,
                     requirement,
@@ -953,8 +941,8 @@ namespace {
         THashMap<TNodeId, TAttrValues> InducedLinkLibs;
         THashMap<TNodeId, TVector<std::string>> InducedAllocator;
 
-        THashMap<TStringBuf, const TCMakeTarget*> TargetsDict;
-        THashMap<TNodeId, const TCMakeTarget*> Mod2Target;
+        THashMap<TStringBuf, const TProjectTarget*> TargetsDict;
+        THashMap<TNodeId, const TProjectTarget*> Mod2Target;
 
         THashSet<TStringBuf> KnownTargets = {
             "add_executable",
@@ -1022,19 +1010,21 @@ namespace {
 
 }
 
-bool RenderCmake(const TVector<TNodeId>& startDirs, const TSemGraph& graph, const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+bool RenderCmake(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
 {
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
-    IterateAll(graph, startDirs, visitor);
-    visitor.TakeFinalizedProject().Save();
+    IterateAll(*platform.Graph, platform.StartDirs, visitor);
+    auto project = visitor.TakeFinalizedProject();
+    project.As<TCMakeProject>()->Save();
     return !visitor.HasErrors();
 }
 
-THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TVector<TNodeId>& startDirs, const TSemGraph& graph, const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
 {
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
-    IterateAll(graph, startDirs, visitor);
-    return visitor.TakeFinalizedProject().GetSubdirsTable();
+    IterateAll(*platform.Graph, platform.StartDirs, visitor);
+    auto project = visitor.TakeFinalizedProject();
+    return project.As<TCMakeProject>()->GetSubdirsTable();
 }
 
 }

@@ -1,6 +1,5 @@
 #include "jinja_generator.h"
 #include "read_sem_graph.h"
-#include "builder.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
@@ -18,304 +17,252 @@
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template.h>
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template_env.h>
 
-#include <spdlog/spdlog.h>
-
 #include <fstream>
-#include <span>
 
 namespace NYexport {
 
-template<typename Values>
-concept IterableValues = std::ranges::range<Values>;
+TJinjaProject::TJinjaProject() {
+    SetFactoryTypes<TProjectSubdir, TJinjaTarget>();
+}
 
-class TJinjaGenerator::TBuilder: public TGeneratorBuilder<TSubdirsTableElem, TJinjaTarget> {
-public:
+TJinjaProject::TBuilder::TBuilder(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs)
+    : RootAttrs(rootAttrs)
+    , Generator(generator)
+{
+    Project_ = MakeSimpleShared<TJinjaProject>();
+}
 
-    TBuilder(TJinjaGenerator* generator)
-        : Project(generator)
-    {}
+static std::string Indent(int depth) {
+    return std::string(depth * 4, ' ');
+}
 
-    TTargetHolder CreateTarget(const std::string& targetMacro, const fs::path& targetDir, const std::string name, std::span<const std::string> macroArgs);
-
-    template<IterableValues Values>
-    bool SetRootAttr(const std::string& attrMacro, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(Project->JinjaAttrs, ATTRGROUP_ROOT, attrMacro, values, nodePath);
-    }
-
-    template<IterableValues Values>
-    bool SetTargetAttr(const std::string& attrMacro, const Values& values, const std::string& nodePath) {
-        if (!CurTarget) {
-            spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrMacro, nodePath);
-            return false;
-        }
-        return SetAttrValue(CurTarget->JinjaAttrs, ATTRGROUP_TARGET, attrMacro, values, nodePath);
-    }
-
-    template<IterableValues Values>
-    bool SetInducedAttr(jinja2::ValuesMap& attrs,const std::string& attrMacro, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(attrs, ATTRGROUP_INDUCED, attrMacro, values, nodePath);
-    }
-
-    bool AddToTargetInducedAttr(const std::string& attrMacro, const jinja2::Value& value, const std::string& nodePath) {
-        if (!CurTarget) {
-            spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrMacro, nodePath);
-            return false;
-        }
-        auto [listAttrIt, _] = CurTarget->JinjaAttrs.emplace(attrMacro, jinja2::ValuesList{});
-        auto& list = listAttrIt->second.asList();
-        if (ValueInList(list, value)) {
-            return true; // skip adding fully duplicate induced attributes
-        }
-        return AddValueToJinjaList(list, value);
-    }
-
-    static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& value) {
-        if (value.isList()) {
-            // Never create list of lists, if value also list, concat all lists to one big list
-            for (const auto& v: value.asList()) {
-                list.emplace_back(v);
+static void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0) {
+    if (value.isMap()) {
+        out << "{\n";
+        const auto& map = value.asMap();
+        if (!map.empty()) {
+            // Sort map keys before dumping
+            TVector<std::string> keys;
+            keys.reserve(map.size());
+            for (const auto& [key, _] : map) {
+                keys.emplace_back(key);
             }
-        } else {
-            list.emplace_back(value);
-        }
-        return true;
-    }
-
-    void OnAttribute(const std::string& attribute) {
-        Project->OnAttribute(attribute);
-    }
-
-    bool IsExcluded(TStringBuf path, std::span<const std::string> excludes) const noexcept {
-        return AnyOf(excludes.begin(), excludes.end(), [path](TStringBuf exclude) { return NPath::IsPrefixOf(exclude, path); });
-    };
-
-    void SetIsTest(bool isTestTarget) {
-        CurTarget->isTest = isTestTarget;
-    }
-
-    const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
-        return Project->ApplyReplacement(path, inputSem);
-    }
-
-    std::tuple<std::string, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs) {
-        auto upperAttrName = attrNameWithDividers.substr(0, lastDivPos); // current attr for tree
-        // Parse upperAttrName for all tree levels
-        while ((lastDivPos = upperAttrName.rfind(ATTR_DIVIDER)) != std::string::npos) {
-            jinja2::ValuesMap upJinjaAttrs;
-            upJinjaAttrs.emplace(upperAttrName.substr(lastDivPos + 1), std::move(treeJinjaAttrs));
-            treeJinjaAttrs = std::move(upJinjaAttrs);
-            upperAttrName = upperAttrName.substr(0, lastDivPos);
-        }
-        return {upperAttrName, treeJinjaAttrs};
-    }
-
-    template<IterableValues Values>
-    bool SetAttrValue(jinja2::ValuesMap& jinjaAttrs, const std::string& attrGroup, const std::string& attrMacro, const Values& values, const std::string& nodePath) {
-        jinja2::ValuesList jvalues;
-        const jinja2::ValuesList* valuesPtr;
-        if constexpr(std::same_as<Values, jinja2::ValuesList>) {
-            valuesPtr = &values;
-        } else {
-            Copy(values.begin(), values.end(), std::back_inserter(jvalues));
-            valuesPtr = &jvalues;
-        }
-        auto attrType = Project->GetAttrType(attrGroup, attrMacro);
-        Y_ASSERT(attrType != EAttrTypes::Unknown);
-        // If attrName has attribute divider use temp treeJinjaAttrs for set attr
-        auto lastDivPos = attrMacro.rfind(ATTR_DIVIDER);
-        jinja2::ValuesMap tempJinjaAttrs;
-        std::string treeAttrName;
-        jinja2::ValuesMap& setJinjaAttrs = lastDivPos == std::string::npos ? jinjaAttrs : tempJinjaAttrs;
-        const std::string& setAttrName = lastDivPos == std::string::npos ? attrMacro : attrMacro.substr(lastDivPos + 1);
-        bool r = false;
-        switch (attrType) {
-            case EAttrTypes::Str:
-                r = SetStrAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Bool:
-                r = SetBoolAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Flag:
-                r = SetFlagAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::List:
-                r = AppendToListAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Set:
-                r = AppendToSetAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::SortedSet:
-                r = AppendToSortedSetAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Dict:
-                r = AppendToDictAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            default:
-                spdlog::error("Unknown attribute {} type at node {}", attrMacro, nodePath);
-        }
-        if (!r || lastDivPos == std::string::npos) {
-            return r;
-        }
-
-        // Convert attrName with dividers to upperAttrName and tree of attributes base on ValuesMap
-        auto [upperAttrName, treeJinjaAttrs] = MakeTreeJinjaAttrs(attrMacro, lastDivPos, std::move(tempJinjaAttrs));
-        // Merge result tree attrubutes to jinjaAttrs
-        MergeTreeToAttr(jinjaAttrs, upperAttrName, treeJinjaAttrs);
-        return true;
-    }
-
-private:
-    TJinjaGenerator* Project;
-
-    bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        if (values.size() > 1) {
-            spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrMacro, nodePath);
-            r = false;
-        }
-        attrs.insert_or_assign(attrMacro, values.empty() ? std::string{} : values[0].asString());
-        return r;
-    }
-
-    bool SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        if (values.size() > 1) {
-            spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrMacro, nodePath);
-            r = false;
-        }
-        attrs.insert_or_assign(attrMacro, values.empty() ? false : IsTrue(values[0].asString()));
-        return r;
-    }
-
-    bool SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        if (values.size() > 0) {
-            spdlog::error("trying to add {} elements to 'flag' type attribute {} at node {}, type 'flag' should have only 0 element", values.size(), attrMacro, nodePath);
-            r = false;
-        }
-        attrs.insert_or_assign(attrMacro, true);
-        return r;
-    }
-
-    bool AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
-        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
-        auto& attr = attrIt->second.asList();
-        for (const auto& value : values) {
-            attr.emplace_back(value);
-        }
-        return true;
-    }
-
-    bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
-        auto& attr = attrIt->second.asList();
-        for (const auto& value : values) {
-            if (value.isMap() || value.isList()) {
-                spdlog::error("trying to add invalid type (map or list) element to set {} at {}", attrMacro, nodePath);
-                r = false;
-                continue;
-            }
-            bool exists = false;
-            for (const auto& v: attr) {
-                if (exists |= v.asString() == value.asString()) {
-                    break;
-                }
-            }
-            if (!exists) { // add to list only if not exists
-                attr.emplace_back(value);
+            Sort(keys);
+            for (const auto& key : keys) {
+                out << Indent(depth + 1) << key << ": ";
+                const auto it = map.find(key);
+                Dump(out, it->second, depth + 1);
             }
         }
-        return r;
+        out << Indent(depth) << "}";
+    } else if (value.isList()) {
+        out << "[\n";
+        for (const auto& val : value.asList()) {
+            out << Indent(depth + 1);
+            Dump(out, val, depth + 1);
+        }
+        out << Indent(depth) << "]";
+    }  else if (value.isString()) {
+        out << '"' << value.asString() << '"';
+    } else if (value.isEmpty()) {
+        out << "EMPTY";
+    } else {
+        out << (value.get<bool>() ? "true" : "false");
     }
+    out << ",\n";
+}
 
-    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
-        auto& attr = attrIt->second.asList();
-        std::set<std::string> set;
-        if (!attr.empty()) {
-            for (const auto& value : attr) {
-                set.emplace(value.asString());
-            }
+static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& value) {
+    if (value.isList()) {
+        // Never create list of lists, if value also list, concat all lists to one big list
+        for (const auto& v: value.asList()) {
+            list.emplace_back(v);
         }
-        for (const auto& value : values) {
-            if (value.isMap() || value.isList()) {
-                spdlog::error("trying to add invalid type (map or list) element to sorted set {} at {}", attrMacro, nodePath);
-                r = false;
-                continue;
-            }
-            set.emplace(value.asString());
-        }
-        attr = jinja2::ValuesList(set.begin(), set.end()); // replace by new list constructed from set
-        return r;
+    } else {
+        list.emplace_back(value);
     }
+    return true;
+}
 
-    bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
-        bool r = true;
-        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
-        auto& attr = attrIt->second.asMap();
-        for (const auto& value : values) {
-            auto keyval = std::string_view(value.asString());
-            if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
-                spdlog::error("trying to add invalid element {} to 'dict' type attribute {} at node {}, each element must be in key=value format without spaces around =", keyval, attrMacro, nodePath);
-                r = false;
-            } else {
-                attr.emplace(keyval.substr(0, pos), keyval.substr(pos + 1));
-            }
-        }
-        return r;
-    }
-
-    void MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesMap& tree) {
-        auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
-        MergeTree(attrIt->second.asMap(), tree);
-    }
-
-    void MergeTree(jinja2::ValuesMap& attr, const jinja2::ValuesMap& tree) {
-        for (auto& [attrName, attrValue]: tree) {
-            if (attrValue.isMap()) {
-                auto [attrIt, _] = attr.emplace(attrName, jinja2::ValuesMap{});
-                MergeTree(attrIt->second.asMap(), attrValue.asMap());
-            } else {
-                if (attr.contains(attrName)) {
-                    spdlog::error("overwrite dict element {}", attrName);
-                }
-                attr[attrName] = attrValue;
-            }
-        }
-    }
-
-    bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val) {
-        if (list.empty()) {
-            return false;
-        }
-        TStringBuilder valStr;
-        TStringBuilder listStr;
-        Dump(valStr.Out, val);
-        for (const auto& listVal : list) {
-            listStr.clear();
-            Dump(listStr.Out, listVal);
-            if (valStr == listStr) {
-                return true;
-            }
-        }
+bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val) {
+    if (list.empty()) {
         return false;
     }
+    TStringBuilder valStr;
+    TStringBuilder listStr;
+    Dump(valStr.Out, val);
+    for (const auto& listVal : list) {
+        listStr.clear();
+        Dump(listStr.Out, listVal);
+        if (valStr == listStr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool TJinjaProject::TBuilder::AddToTargetInducedAttr(const std::string& attrMacro, const jinja2::Value& value, const std::string& nodePath) {
+    if (!CurTarget_) {
+        spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrMacro, nodePath);
+        return false;
+    }
+    auto [listAttrIt, _] = CurTarget_->Attrs.emplace(attrMacro, jinja2::ValuesList{});
+    auto& list = listAttrIt->second.asList();
+    if (ValueInList(list, value)) {
+        return true; // skip adding fully duplicate induced attributes
+    }
+    return AddValueToJinjaList(list, value);
+}
+
+void TJinjaProject::TBuilder::OnAttribute(const std::string& attribute) {
+    Generator->OnAttribute(attribute);
+}
+
+bool TJinjaProject::TBuilder::IsExcluded(TStringBuf path, std::span<const std::string> excludes) const noexcept {
+    return AnyOf(excludes.begin(), excludes.end(), [path](TStringBuf exclude) { return NPath::IsPrefixOf(exclude, path); });
 };
 
-TJinjaGenerator::TBuilder::TTargetHolder TJinjaGenerator::TBuilder::CreateTarget(const std::string& targetMacro, const fs::path& targetDir, const std::string name, std::span<const std::string> macroArgs) {
-    const auto [pos, inserted] = Project->Subdirs.emplace(targetDir, TJinjaList{});
-    if (inserted) {
-        Project->SubdirsOrder.push_back(&*pos);
+void TJinjaProject::TBuilder::SetIsTest(bool isTestTarget) {
+    CurTarget_.As<TJinjaTarget>()->isTest = isTestTarget;
+}
+
+const TNodeSemantics& TJinjaProject::TBuilder::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
+    return Generator->ApplyReplacement(path, inputSem);
+}
+
+std::tuple<std::string, jinja2::ValuesMap> TJinjaProject::TBuilder::MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs) {
+    auto upperAttrName = attrNameWithDividers.substr(0, lastDivPos); // current attr for tree
+    // Parse upperAttrName for all tree levels
+    while ((lastDivPos = upperAttrName.rfind(ATTR_DIVIDER)) != std::string::npos) {
+        jinja2::ValuesMap upJinjaAttrs;
+        upJinjaAttrs.emplace(upperAttrName.substr(lastDivPos + 1), std::move(treeJinjaAttrs));
+        treeJinjaAttrs = std::move(upJinjaAttrs);
+        upperAttrName = upperAttrName.substr(0, lastDivPos);
     }
-    Project->Targets.push_back({.Macro = targetMacro, .Name = name, .MacroArgs = {macroArgs.begin(), macroArgs.end()}});
-    pos->second.Targets.push_back(&Project->Targets.back());
-    return {*this, *pos, Project->Targets.back()};
+    return {upperAttrName, treeJinjaAttrs};
+}
+
+bool TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    if (values.size() > 1) {
+        spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrMacro, nodePath);
+        r = false;
+    }
+    attrs.insert_or_assign(attrMacro, values.empty() ? std::string{} : values[0].asString());
+    return r;
+}
+
+bool TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    if (values.size() > 1) {
+        spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrMacro, nodePath);
+        r = false;
+    }
+    attrs.insert_or_assign(attrMacro, values.empty() ? false : IsTrue(values[0].asString()));
+    return r;
+}
+
+bool TJinjaProject::TBuilder::SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    if (values.size() > 0) {
+        spdlog::error("trying to add {} elements to 'flag' type attribute {} at node {}, type 'flag' should have only 0 element", values.size(), attrMacro, nodePath);
+        r = false;
+    }
+    attrs.insert_or_assign(attrMacro, true);
+    return r;
+}
+
+bool TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string&) {
+    auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+    auto& attr = attrIt->second.asList();
+    for (const auto& value : values) {
+        attr.emplace_back(value);
+    }
+    return true;
+}
+
+bool TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+    auto& attr = attrIt->second.asList();
+    for (const auto& value : values) {
+        if (value.isMap() || value.isList()) {
+            spdlog::error("trying to add invalid type (map or list) element to set {} at {}", attrMacro, nodePath);
+            r = false;
+            continue;
+        }
+        bool exists = false;
+        for (const auto& v: attr) {
+            if (exists |= v.asString() == value.asString()) {
+                break;
+            }
+        }
+        if (!exists) { // add to list only if not exists
+            attr.emplace_back(value);
+        }
+    }
+    return r;
+}
+
+bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesList{});
+    auto& attr = attrIt->second.asList();
+    std::set<std::string> set;
+    if (!attr.empty()) {
+        for (const auto& value : attr) {
+            set.emplace(value.asString());
+        }
+    }
+    for (const auto& value : values) {
+        if (value.isMap() || value.isList()) {
+            spdlog::error("trying to add invalid type (map or list) element to sorted set {} at {}", attrMacro, nodePath);
+            r = false;
+            continue;
+        }
+        set.emplace(value.asString());
+    }
+    attr = jinja2::ValuesList(set.begin(), set.end()); // replace by new list constructed from set
+    return r;
+}
+
+bool TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesList& values, const std::string& nodePath) {
+    bool r = true;
+    auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
+    auto& attr = attrIt->second.asMap();
+    for (const auto& value : values) {
+        auto keyval = std::string_view(value.asString());
+        if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
+            spdlog::error("trying to add invalid element {} to 'dict' type attribute {} at node {}, each element must be in key=value format without spaces around =", keyval, attrMacro, nodePath);
+            r = false;
+        } else {
+            attr.emplace(keyval.substr(0, pos), keyval.substr(pos + 1));
+        }
+    }
+    return r;
+}
+
+void TJinjaProject::TBuilder::MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrMacro, const jinja2::ValuesMap& tree) {
+    auto [attrIt, _] = attrs.emplace(attrMacro, jinja2::ValuesMap{});
+    MergeTree(attrIt->second.asMap(), tree);
+}
+
+void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attr, const jinja2::ValuesMap& tree) {
+    for (auto& [attrName, attrValue]: tree) {
+        if (attrValue.isMap()) {
+            auto [attrIt, _] = attr.emplace(attrName, jinja2::ValuesMap{});
+            MergeTree(attrIt->second.asMap(), attrValue.asMap());
+        } else {
+            if (attr.contains(attrName)) {
+                spdlog::error("overwrite dict element {}", attrName);
+            }
+            attr[attrName] = attrValue;
+        }
+    }
 }
 
 struct TExtraStackData {
-    TJinjaGenerator::TBuilder::TTargetHolder CurTargetHolder;
+    TProject::TBuilder::TTargetHolder CurTargetHolder;
     bool FreshNode = false;
 };
 
@@ -340,8 +287,8 @@ public:
         ESNT_Ignored,      // Must ignore this target for generator
     };
 
-    TJinjaGeneratorVisitor(TJinjaGenerator* generator, const TGeneratorSpec& generatorSpec)
-        : ProjectBuilder(generator)
+    TJinjaGeneratorVisitor(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs, const TGeneratorSpec& generatorSpec)
+        : ProjectBuilder(generator, rootAttrs)
     {
         for (const auto& item: generatorSpec.Targets) {
             SemName2Type_.emplace(item.first, ESNT_Target);
@@ -402,9 +349,16 @@ public:
                     break;
                 }
             }
-            state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(semName, modDir, semArgs[1], semArgs.subspan(2));
+            auto macroArgs = semArgs.subspan(2);
+            state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(modDir);
+            auto* curTarget = ProjectBuilder.CurrentTarget();
+            curTarget->Name = semArgs[1];
+            curTarget->Macro = semName;
+            curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+
+            const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(ProjectBuilder.CurrentTarget());
             ProjectBuilder.SetIsTest(isTestTarget);
-            Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder.CurrentTarget());
+            Mod2Target.emplace(state.TopNode().Id(), jinjaTarget);
         }
 
         return !isTargetIgnored;
@@ -446,10 +400,10 @@ public:
         if (IsDirectPeerdirDep(dep)) {
             //Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
             bool isSameDir = false;
-            const auto toTarget = Mod2Target[dep.To().Id()];
-            if (auto* curList = ProjectBuilder.CurrentList(); curList) {
-                for (const auto target: curList->second.Targets) {
-                    if (target == toTarget) {
+            const auto* toTarget = Mod2Target[dep.To().Id()];
+            if (auto* curSubdir = ProjectBuilder.CurrentSubdir(); curSubdir) {
+                for (const auto& target: curSubdir->Targets) {
+                    if (target.Get() == toTarget) {
                         isSameDir = true;
                         break;
                     }
@@ -514,7 +468,7 @@ public:
                                 // Put all induced attrs of excluded library to lists by induced attribute name
                                 for (const auto& [attrMacro, value]: excludeIt->second) {
                                     auto [listIt, _] = excludes.emplace(attrMacro, jinja2::ValuesList{});
-                                    ProjectBuilder.AddValueToJinjaList(listIt->second.asList(), value);
+                                    AddValueToJinjaList(listIt->second.asList(), value);
                                 }
                             } else {
                                 spdlog::debug("Not found induced for excluded node id {} at {}", excludeNodeId, data.Path);
@@ -537,12 +491,16 @@ public:
         TBase::Left(state);
     }
 
+    TProjectPtr TakeFinalizedProject() {
+        return ProjectBuilder.FinishProject();
+    }
+
 private:
     THashMap<TNodeId, const TJinjaTarget*> Mod2Target;
 
     THashMap<TNodeId, jinja2::ValuesMap> InducedAttrs_;
 
-    TJinjaGenerator::TBuilder ProjectBuilder;
+    TJinjaProject::TBuilder ProjectBuilder;
     TVector<std::string> TestSubdirs;
     THashMap<std::string_view, ESemNameType> SemName2Type_;
 
@@ -643,8 +601,9 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 }
 
 void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TJinjaGeneratorVisitor visitor(this, GeneratorSpec);
+    TJinjaGeneratorVisitor visitor(this, &JinjaAttrs, GeneratorSpec);
     IterateAll(graph, startDirs, visitor);
+    Project = visitor.TakeFinalizedProject();
 }
 
 void TJinjaGenerator::LoadSemGraph(const std::string&, const fs::path& semGraph) {
@@ -663,16 +622,19 @@ EAttrTypes TJinjaGenerator::GetAttrType(const std::string& attrGroup, const std:
 
 /// Get dump of attributes tree with values for testing
 void TJinjaGenerator::Dump(IOutputStream& out) {
-    Dump(out, FinalizeAllAttrs());
+    ::NYexport::Dump(out, FinalizeAllAttrs());
 }
 
 void TJinjaGenerator::Render(ECleanIgnored) {
+    YEXPORT_VERIFY(Project, "Cannot render because project was not yet loaded");
     CopyFilesAndResources();
 
     auto subdirsAttrs = FinalizeSubdirsAttrs();
-    for (const auto* subdirItem: SubdirsOrder) {
-        const auto& subdir = subdirItem->first;
-        RenderSubdir(subdir, subdirsAttrs[subdir.c_str()].asMap());
+    for (const auto& subdir: Project->GetSubdirs()) {
+        if (subdir->Targets.empty()) {
+            continue;
+        }
+        RenderSubdir(subdir->Path, subdirsAttrs[subdir->Path.c_str()].asMap());
     }
 
     const auto& rootAttrs = FinalizeRootAttrs();
@@ -722,11 +684,12 @@ void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const jinja2::ValuesM
 }
 
 THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() const {
+    YEXPORT_VERIFY(Project, "Cannot get subdirs table because project was not yet loaded");
     THashMap<fs::path, TVector<TJinjaTarget>> res;
-    for (const auto* subdir: SubdirsOrder) {
+    for (const auto& subdir: Project->GetSubdirs()) {
         TVector<TJinjaTarget> targets;
-        Transform(subdir->second.Targets.begin(), subdir->second.Targets.end(), std::back_inserter(targets), [&](TJinjaTarget* target) { return *target; });
-        res.emplace(subdir->first, targets);
+        Transform(subdir->Targets.begin(), subdir->Targets.end(), std::back_inserter(targets), [&](TProjectTargetPtr target) { return *target.As<TJinjaTarget>(); });
+        res.emplace(subdir->Path, targets);
     }
     return res;
 }
@@ -739,12 +702,16 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeAllAttrs() {
 }
 
 const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
+    YEXPORT_VERIFY(Project, "Cannot finalize root attrs because project was not yet loaded");
     if (JinjaAttrs.contains("projectName")) { // already finilized
         return JinjaAttrs;
     }
     auto [subdirsIt, subdirsInserted] = JinjaAttrs.emplace("subdirs", jinja2::ValuesList{});
-    for (const auto* subdir: SubdirsOrder) {
-        subdirsIt->second.asList().emplace_back(subdir->first.c_str());
+    for (const auto& subdir: Project->GetSubdirs()) {
+        if (subdir->Targets.empty()) {
+            continue;
+        }
+        subdirsIt->second.asList().emplace_back(subdir->Path.c_str());
     }
     JinjaAttrs.emplace("arcadiaRoot", ArcadiaRoot);
     if (ExportFileManager) {
@@ -755,17 +722,19 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
 }
 
 jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
+    YEXPORT_VERIFY(Project, "Cannot finalize subdirs attrs because project was not yet loaded");
     jinja2::ValuesMap subdirsAttrs;
-    for (const auto* subdirItem: SubdirsOrder) {
-        const auto& subdir = subdirItem->first;
-        auto& subdirData = subdirItem->second;
-        auto [subdirIt, _] = subdirsAttrs.emplace(subdir.c_str(), jinja2::ValuesMap{});
+    for (const auto& subdir: Project->GetSubdirs()) {
+        if (subdir->Targets.empty()) {
+            continue;
+        }
+        auto [subdirIt, _] = subdirsAttrs.emplace(subdir->Path.c_str(), jinja2::ValuesMap{});
         jinja2::ValuesMap& subdirAttrs = subdirIt->second.asMap();
-        for (auto* target: subdirData.Targets) {
-            auto& targetAttrs = target->JinjaAttrs;
+        for (auto target: subdir->Targets) {
+            auto& targetAttrs = target->Attrs;
             targetAttrs.emplace("name", target->Name);
             targetAttrs.emplace("macro", target->Macro);
-            targetAttrs.emplace("isTest", target->isTest);
+            targetAttrs.emplace("isTest", target.As<TJinjaTarget>()->isTest);
             targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
 
             auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
@@ -780,53 +749,13 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                 targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetParams)).first;
             }
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
-            if (target->isTest) {
+            if (target.As<TJinjaTarget>()->isTest) {
                 targetNameAttrs.insert_or_assign("hasTest", true);
             }
             targetNameAttrs["targets"].asList().emplace_back(targetAttrs);
         }
     }
     return subdirsAttrs;
-}
-
-static std::string Indent(int depth) {
-    return std::string(depth * 4, ' ');
-}
-
-void TJinjaGenerator::Dump(IOutputStream& out, const jinja2::Value& value, int depth) {
-    if (value.isMap()) {
-        out << "{\n";
-        const auto& map = value.asMap();
-        if (!map.empty()) {
-            // Sort map keys before dumping
-            TVector<std::string> keys;
-            keys.reserve(map.size());
-            for (const auto& [key, _] : map) {
-                keys.emplace_back(key);
-            }
-            Sort(keys);
-            for (const auto& key : keys) {
-                out << Indent(depth + 1) << key << ": ";
-                const auto it = map.find(key);
-                Dump(out, it->second, depth + 1);
-            }
-        }
-        out << Indent(depth) << "}";
-    } else if (value.isList()) {
-        out << "[\n";
-        for (const auto& val : value.asList()) {
-            out << Indent(depth + 1);
-            Dump(out, val, depth + 1);
-        }
-        out << Indent(depth) << "]";
-    }  else if (value.isString()) {
-        out << '"' << value.asString() << '"';
-    } else if (value.isEmpty()) {
-        out << "EMPTY";
-    } else {
-        out << (value.get<bool>() ? "true" : "false");
-    }
-    out << ",\n";
 }
 
 }

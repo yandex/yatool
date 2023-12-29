@@ -51,24 +51,6 @@ enum class EPlatform {
 };
 
 struct TProjectConf {
-    static constexpr std::string_view ConanSetupSection =
-        R"(
-if (CMAKE_CROSSCOMPILING)
-  include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
-else()
-  conan_cmake_autodetect(settings)
-  conan_cmake_install(
-    PATH_OR_REFERENCE ${CMAKE_SOURCE_DIR}
-    INSTALL_FOLDER ${CMAKE_BINARY_DIR}
-    BUILD missing
-    REMOTE conancenter
-    SETTINGS ${settings}
-      ENV "CONAN_CMAKE_GENERATOR=${CMAKE_GENERATOR}"
-      CONF "tools.cmake.cmaketoolchain:generator=${CMAKE_GENERATOR}"
-  )
-endif()
-
-)";
     std::string ProjectName;
     fs::path ArcadiaRoot;
     ECleanIgnored CleanIgnored = ECleanIgnored::Disabled;
@@ -113,7 +95,6 @@ private:
     TVector<TPlatform> Platforms;
     TGlobalProperties GlobalProperties;
 
-    bool GenerateCMakeLists(const TVector<fs::path>& semGraphs, const TVector<std::string>& platforms);
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
     void RenderRootCMakeList() const;
@@ -133,10 +114,6 @@ public:
 
     void SetProjectName(const std::string& projectName) override;
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
-
-    const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
-        return TargetReplacements_.ApplyReplacement(path, inputSem);
-    }
 
     void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
 };

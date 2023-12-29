@@ -8,6 +8,7 @@ SRCS(
     generator_spec.cpp
     jinja_generator.cpp
     jinja_helpers.cpp
+    project.cpp
     py_requirements_generator.cpp
     read_sem_graph.cpp
     render_cmake.cpp

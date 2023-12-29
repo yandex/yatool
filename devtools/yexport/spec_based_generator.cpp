@@ -30,6 +30,11 @@ void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {
     }
 }
 
+const TNodeSemantics& TSpecBasedGenerator::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
+    return TargetReplacements_.ApplyReplacement(path, inputSem);
+}
+
+
 void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     if (!configDir.empty()) {
         auto yexportToml = configDir / YEXPORT_FILE;

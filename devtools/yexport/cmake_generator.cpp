@@ -140,7 +140,7 @@ void TCMakeGenerator::RenderPlatform(TPlatform& platform) {
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.CollectDirs(*platform.Graph, platform.StartDirs);
     }
-    if (!RenderCmake(platform.StartDirs, *platform.Graph, Conf, platform, GlobalProperties, this)) {
+    if (!RenderCmake(Conf, platform, GlobalProperties, this)) {
         yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform.Name);
     }
 }
