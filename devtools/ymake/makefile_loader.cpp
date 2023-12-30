@@ -848,9 +848,7 @@ void TDirParser::CheckModuleEnd() {
     if (Y_UNLIKELY(Module)) {
         ReportModuleNoEnd(Module->GetModuleConf().Name, Makefile);
         YConfInfo(Syntax) << "Automatically add END macro" << Endl;
-        while (Module) {
-            UserStatement("END", TVector<TStringBuf>());
-        }
+        UserStatement("END", TVector<TStringBuf>());
     }
 }
 
