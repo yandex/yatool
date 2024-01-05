@@ -19,7 +19,7 @@ PEERDIR(
     library/python/cores
 )
 
-IF (NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE AND NOT NEBIUS)
     PEERDIR(
         build/internal/plugins/_lib/nots
     )
