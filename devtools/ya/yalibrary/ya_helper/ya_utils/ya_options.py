@@ -40,9 +40,6 @@ class YaBaseOptions(BaseOptions):
 
         self.ya_py_version = self._pop("ya_py_version")
 
-        self.cache_size = self._pop("cache_size")
-        self.tools_cache_size = self._pop("tools_cache_size")
-
     def generate(self):  # type: () -> tp.Tuple[tp.List[str], tp.Dict[str, str]]
         self._check_parameters()
         ya_bin_cmd = self.ya_bin
@@ -96,11 +93,6 @@ class YaBaseOptions(BaseOptions):
 
         if self.custom_fetcher:
             env['YA_CUSTOM_FETCHER'] = self.custom_fetcher
-
-        if self.cache_size:
-            env['YA_CACHE_SIZE'] = str(self.cache_size)
-        if self.tools_cache_size:
-            env['YA_TOOLS_CACHE_SIZE'] = str(self.tools_cache_size)
 
         return env
 
@@ -297,6 +289,9 @@ class YaMakeOptions(YaBaseOptions):
 
         # yt_store
         self.no_yt_store = self._pop('no_yt_store')
+        self.yt_proxy = self._pop('yt_proxy')
+        self.yt_dir = self._pop('yt_dir')
+        self.yt_token_path = self._pop('yt_token_path')
 
         # env
         self.no_gen_renamed_results = self._pop('no_gen_renamed_results')
@@ -334,6 +329,9 @@ class YaMakeOptions(YaBaseOptions):
         self.ya_ac = self._pop('ya_ac')
         self.evlog_node_stat = self._pop('evlog_node_stat')
         self.compress_ymake_output = self._pop('compress_ymake_output')
+
+        self.cache_size = self._pop("cache_size")
+        self.tools_cache_size = self._pop("tools_cache_size")
 
     def _generate_post_handler(self):
         result = []
@@ -526,6 +524,12 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.no_yt_store:
             result += ['--no-yt-store']
+        if self.yt_proxy:
+            result += ['--yt-proxy', self.yt_proxy]
+        if self.yt_dir:
+            result += ['--yt-dir', self.yt_dir]
+        if self.yt_token_path:
+            result += ['--yt-token-path', self.yt_token_path]
 
         return result
 
@@ -728,6 +732,11 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.ci_use_ydb_topic_client:
             env['YA_CI_USE_YDB_TOPIC_CLIENT'] = '1'
+
+        if self.cache_size:
+            env['YA_CACHE_SIZE'] = str(self.cache_size)
+        if self.tools_cache_size:
+            env['YA_TOOLS_CACHE_SIZE'] = str(self.tools_cache_size)
 
         return env
 
