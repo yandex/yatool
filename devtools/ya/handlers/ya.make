@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/handlers/make
     devtools/ya/handlers/maven_import
     devtools/ya/handlers/package
+    devtools/ya/handlers/style
     devtools/ya/handlers/test
     devtools/ya/handlers/tool
     # devtools/ya/handlers/analyze_make
@@ -43,7 +44,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/shell
         devtools/ya/handlers/shelve
         devtools/ya/handlers/stat
-        devtools/ya/handlers/style
         devtools/ya/handlers/svn
         devtools/ya/handlers/unshelve
         devtools/ya/handlers/upload
