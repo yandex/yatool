@@ -5,9 +5,9 @@ SPLIT_DWARF()
 IF (OS_LINUX)
     IF (MUSL)
         ALLOCATOR(J)
-    ELSE ()
+    ELSE()
         ALLOCATOR(SYSTEM)
-    ENDIF ()
+    ENDIF()
 ENDIF()
 
 PY_MAIN(entry.main)
@@ -18,7 +18,7 @@ PEERDIR(
     devtools/ya/handlers
 )
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         library/python/svn_version
     )

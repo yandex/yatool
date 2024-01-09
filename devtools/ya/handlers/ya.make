@@ -52,7 +52,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
         devtools/ya/handlers/yav
-
         devtools/ya/handlers/py23migration/_ya0bin2
         devtools/ya/handlers/py23migration/_ya0bin3
         devtools/ya/handlers/py23migration/_ya2bin0
@@ -77,6 +76,7 @@ IF (NOT YA_OPENSOURCE)
         )
     ENDIF()
 ENDIF()
+
 END()
 
 RECURSE(

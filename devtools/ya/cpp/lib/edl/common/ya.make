@@ -6,9 +6,6 @@ SRCS(
     members.cpp
 )
 
-PEERDIR(
-)
-
 END()
 
 RECURSE_FOR_TESTS(

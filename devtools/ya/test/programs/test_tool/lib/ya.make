@@ -19,28 +19,30 @@ IF (NOT YA_OPENSOURCE)
         )
     ENDIF()
 ENDIF()
+
 PEERDIR(
     devtools/ya/test/programs/test_tool/build_python_coverage_report
     devtools/ya/test/programs/test_tool/resolve_python_coverage
 )
+
 IF (PYTHON3)
     IF (NOT YA_OPENSOURCE)
         PEERDIR(
-                devtools/ya/test/programs/test_tool/build_sancov_coverage_report
-                devtools/ya/test/programs/test_tool/check_external
-                devtools/ya/test/programs/test_tool/check_mds
-                devtools/ya/test/programs/test_tool/check_resource
-                devtools/ya/test/programs/test_tool/checkout
-                devtools/ya/test/programs/test_tool/cov_merge_vfs
-                devtools/ya/test/programs/test_tool/download
-                devtools/ya/test/programs/test_tool/minimize_fuzz_corpus
-                devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
-                devtools/ya/test/programs/test_tool/resolve_sancov_coverage
-                devtools/ya/test/programs/test_tool/run_clang_tidy
-                devtools/ya/test/programs/test_tool/run_eslint
-                devtools/ya/test/programs/test_tool/run_hermione
-                devtools/ya/test/programs/test_tool/run_jest
-                devtools/ya/test/programs/test_tool/sandbox_run_test
+            devtools/ya/test/programs/test_tool/build_sancov_coverage_report
+            devtools/ya/test/programs/test_tool/check_external
+            devtools/ya/test/programs/test_tool/check_mds
+            devtools/ya/test/programs/test_tool/check_resource
+            devtools/ya/test/programs/test_tool/checkout
+            devtools/ya/test/programs/test_tool/cov_merge_vfs
+            devtools/ya/test/programs/test_tool/download
+            devtools/ya/test/programs/test_tool/minimize_fuzz_corpus
+            devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
+            devtools/ya/test/programs/test_tool/resolve_sancov_coverage
+            devtools/ya/test/programs/test_tool/run_clang_tidy
+            devtools/ya/test/programs/test_tool/run_eslint
+            devtools/ya/test/programs/test_tool/run_hermione
+            devtools/ya/test/programs/test_tool/run_jest
+            devtools/ya/test/programs/test_tool/sandbox_run_test
         )
     ENDIF()
     PEERDIR(
