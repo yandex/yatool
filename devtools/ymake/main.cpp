@@ -412,6 +412,20 @@ void TYMake::AddRecursesToStartTargets() {
         }
     }
 
+    if (Conf.ShouldAddPeerdirsGenTests()) {
+        for (const auto& node : UpdIter->RecurseQueue.GetAllNodes()) {
+            const auto deps = UpdIter->RecurseQueue.GetDeps(node);
+            if (!deps) {
+                continue;
+            }
+            for (const auto& [depNode, depType] : *deps) {
+                if (IsDependsDep(node.NodeType, depType, depNode.NodeType)) {
+                    depends.Push(depNode);
+                }
+            }
+        }
+    }
+
     const auto iterateAllGraph = Diag()->ShowAllBadRecurses;
     TModulesInfo modulesInfo(Graph, Modules);
     const auto& nodes = iterateAllGraph ? UpdIter->RecurseQueue.GetAllNodes() : UpdIter->RecurseQueue.GetReachableNodes();
