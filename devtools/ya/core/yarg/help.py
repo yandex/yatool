@@ -25,7 +25,7 @@ def format_usage(opt):
     result = ['[OPTION]...']
     parts = get_consumer(opt).parts
     free_parts = [x for x in parts if x.free]
-    result.extend(['[{0}]...'.format(x.help.upper()) for x in free_parts])
+    result.extend(['[{0}]...'.format(x.help) for x in free_parts])
     return ' '.join(result)
 
 
