@@ -149,11 +149,13 @@ private:
     bool CheckDependsInDart = false;
     bool NeedDirHints = false;
     bool ReportMissingAddincls = true;
-    bool UseNewUids = false;
+    bool UseNewUids = UseNewUidsDefault;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
     THashMap<TString, TString> DefaultRequirements;
+
+    static bool UseNewUidsDefault;
 };
 
 TBuildConfiguration* GlobalConf();

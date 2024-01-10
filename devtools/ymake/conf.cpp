@@ -301,6 +301,12 @@ bool TBuildConfiguration::IsRequiredBuildAndSrcRoots(const TStringBuf& lang) con
     return Find(LangsRequireBuildAndSrcRoots, lang) != LangsRequireBuildAndSrcRoots.end();
 }
 
+#if defined(NEW_UIDS_BY_DEFAULT)
+bool TBuildConfiguration::UseNewUidsDefault = true;
+#else
+bool TBuildConfiguration::UseNewUidsDefault = false;
+#endif
+
 namespace {
     //temp
     struct TBuildConfHandler {
