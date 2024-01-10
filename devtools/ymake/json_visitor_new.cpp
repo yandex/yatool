@@ -10,6 +10,7 @@ TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommand
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
 {
+    YDebug() << "Using " << (newUids ? "new" : "old") << " UIDs implementation" << Endl;
     Loops.FindLoops(RestoreContext.Graph, startDirs, false);
 }
 
