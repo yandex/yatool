@@ -33,6 +33,10 @@ class ReportTypes(object):
     PARAMETERS = 'parameters'
     YT_CACHE_ERROR = 'yt_cache_error'
     GRAPH_STATISTICS = 'graph_statistics'
+    DISTBUILD_START_SCHEDULE_BUILD = 'distbuild_start_schedule_build'
+    DISTBUILD_FINISH_SCHEDULE_BUILD = 'distbuild_finish_schedule_build'
+    DISTBUILD_FINISH_BUILD = 'distbuild_finish_build'
+    DISTBUILD_FINISH_DOWNLOAD_RESULTS = 'distbuild_finish_download_results'
 
 
 @func.lazy

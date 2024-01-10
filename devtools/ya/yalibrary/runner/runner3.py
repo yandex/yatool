@@ -680,7 +680,14 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         runq.add(task_context.clean_symres_task)
         runq.add(task_context.prepare_all_nodes_task)
         runq.add(task_context.compact_cache_task, deps=[task_context.prepare_all_nodes_task])
-        process_queue()
+
+        if opts.use_distbuild:
+            from yalibrary.runner.tasks import distbuild
+
+            wrapped_process_queue = distbuild.wrap_sending_telemetry_for(process_queue)
+            wrapped_process_queue()
+        else:
+            process_queue()
 
         runq.add(task_context.clean_build_task, deps=[])
         process_queue()
