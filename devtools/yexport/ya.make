@@ -6,6 +6,7 @@ SRCS(
     export_file_manager.cpp
     flat_attribute.cpp
     generator_spec.cpp
+    graph_visitor.cpp
     jinja_generator.cpp
     jinja_helpers.cpp
     project.cpp

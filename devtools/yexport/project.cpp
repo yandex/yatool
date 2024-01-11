@@ -21,9 +21,13 @@ namespace NYexport {
         SubdirsOrder_.clear();
     }
 
-    TProjectPtr TProject::TBuilder::FinishProject() {
+    TProject::TBuilder::TBuilder(TSpecBasedGenerator* generator) : Generator_(generator) {
+        YEXPORT_VERIFY(Generator_, "Invalid generator in project builder");
+    }
+
+    TProjectPtr TProject::TBuilder::Finalize() {
         YEXPORT_VERIFY(Project_, "No active project to finish");
-        Finalize();
+        CustomFinalize();
         auto project = Project_;
         Project_ = nullptr;
         CurSubdir_ = nullptr;
@@ -38,6 +42,10 @@ namespace NYexport {
         Project_->Targets_.push_back(target);
         dir->Targets.push_back(target);
         return {*this, dir, target};
+    }
+    void TProject::TBuilder::OnAttribute(const std::string& attribute) {
+        Generator_->OnAttribute(attribute);
+        CustomOnAttribute(attribute);
     }
 
     TProjectSubdirPtr TProject::TBuilder::CreateDirectories(const fs::path& dir) {

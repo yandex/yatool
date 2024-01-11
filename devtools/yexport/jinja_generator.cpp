@@ -1,5 +1,6 @@
 #include "jinja_generator.h"
 #include "read_sem_graph.h"
+#include "graph_visitor.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
@@ -26,7 +27,8 @@ TJinjaProject::TJinjaProject() {
 }
 
 TJinjaProject::TBuilder::TBuilder(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs)
-    : RootAttrs(rootAttrs)
+    : TProject::TBuilder(generator)
+    , RootAttrs(rootAttrs)
     , Generator(generator)
 {
     Project_ = MakeSimpleShared<TJinjaProject>();
@@ -148,7 +150,10 @@ bool TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::st
         spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrMacro, nodePath);
         r = false;
     }
-    attrs.insert_or_assign(attrMacro, values.empty() ? std::string{} : values[0].asString());
+    bool inserted = attrs.insert_or_assign(attrMacro, values.empty() ? std::string{} : values[0].asString()).second;
+    if (!inserted) {
+        spdlog::error("trying to set string value of attribute {} at node {}, but it already has value. Attribute value will be overwritten", attrMacro, nodePath);
+    };
     return r;
 }
 
@@ -158,7 +163,10 @@ bool TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::s
         spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrMacro, nodePath);
         r = false;
     }
-    attrs.insert_or_assign(attrMacro, values.empty() ? false : IsTrue(values[0].asString()));
+    bool inserted = attrs.insert_or_assign(attrMacro, values.empty() ? false : IsTrue(values[0].asString())).second;
+    if (!inserted) {
+        spdlog::error("trying to set bool value of attribute {} at node {}, but it already has value. Attribute value will be overwritten", attrMacro, nodePath);
+    }
     return r;
 }
 
@@ -261,147 +269,63 @@ void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attr, const jinja2::V
     }
 }
 
-struct TExtraStackData {
-    TProject::TBuilder::TTargetHolder CurTargetHolder;
-    bool FreshNode = false;
-};
-
-class TJinjaGeneratorVisitor
-    : public TNoReentryVisitorBase<
-          TVisitorStateItemBase,
-          TSemGraphIteratorStateItem<TExtraStackData>,
-          TGraphIteratorStateBase<TSemGraphIteratorStateItem<TExtraStackData>>> {
+class TNewJinjaGeneratorVisitor: public TGraphVisitor {
 public:
-    using TBase = TNoReentryVisitorBase<
-        TVisitorStateItemBase,
-        TSemGraphIteratorStateItem<TExtraStackData>,
-        TGraphIteratorStateBase<TSemGraphIteratorStateItem<TExtraStackData>>>;
-    using TState = typename TBase::TState;
-
-    enum ESemNameType {
-        ESNT_Unknown = 0,  // Semantic name not found in table
-        ESNT_Target,       // Target for generator
-        ESNT_RootAttr,     // Root of all targets attribute
-        ESNT_TargetAttr,   // Target for generator attribute
-        ESNT_InducedAttr,  // Target for generator induced attribute (add to list for parent node in graph)
-        ESNT_Ignored,      // Must ignore this target for generator
-    };
-
-    TJinjaGeneratorVisitor(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs, const TGeneratorSpec& generatorSpec)
-        : ProjectBuilder(generator, rootAttrs)
+    TNewJinjaGeneratorVisitor(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs, const TGeneratorSpec& generatorSpec)
+        : TGraphVisitor(generator)
     {
-        for (const auto& item: generatorSpec.Targets) {
-            SemName2Type_.emplace(item.first, ESNT_Target);
-        }
-        Attrs2SemNameType(generatorSpec, ATTRGROUP_ROOT, ESNT_RootAttr);
-        Attrs2SemNameType(generatorSpec, ATTRGROUP_TARGET, ESNT_TargetAttr);
-        Attrs2SemNameType(generatorSpec, ATTRGROUP_INDUCED, ESNT_InducedAttr);
+        JinjaProjectBuilder_ = MakeSimpleShared<TJinjaProject::TBuilder>(generator, rootAttrs);
+        ProjectBuilder_ = JinjaProjectBuilder_;
+
         if (const auto* tests = generatorSpec.Merge.FindPtr("test")) {
-            for (const auto& item: *tests) {
-                TestSubdirs.push_back(item.c_str());
+            for (const auto& item : *tests) {
+                TestSubdirs_.push_back(item.c_str());
             }
         }
-        SemName2Type_.emplace("IGNORED", ESNT_Ignored);
     }
 
-    bool Enter(TState& state) {
-        state.Top().FreshNode = TBase::Enter(state);
-        if (!state.Top().FreshNode) {
-            return false;
+    void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) override {
+        bool isTestTarget = false;
+        std::string modDir = semArgs[0].c_str();
+        for (const auto& testSubdir: TestSubdirs_) {
+            if (modDir != testSubdir && modDir.ends_with(testSubdir)) {
+                modDir.resize(modDir.size() - testSubdir.size());
+                isTestTarget = true;
+                break;
+            }
         }
+        auto macroArgs = semArgs.subspan(2);
+        state.Top().CurTargetHolder = ProjectBuilder_->CreateTarget(modDir);
+        auto* curTarget = ProjectBuilder_->CurrentTarget();
+        curTarget->Name = semArgs[1];
+        curTarget->Macro = semName;
+        curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+
+        const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(ProjectBuilder_->CurrentTarget());
+        JinjaProjectBuilder_->SetIsTest(isTestTarget);
+        Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
+    }
+
+    void OnNodeSemanticPostOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs) override {
         const TSemNodeData& data = state.TopNode().Value();
-        if (data.Sem.empty() || data.Sem.front().empty()) {
-            return true;
+        if (semNameType == ESNT_RootAttr) {
+            JinjaProjectBuilder_->SetRootAttr(semName, semArgs, data.Path);
+        } else if (semNameType == ESNT_TargetAttr) {
+            JinjaProjectBuilder_->SetTargetAttr(semName, semArgs, data.Path);
+        } else if (semNameType == ESNT_InducedAttr) {
+            StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
+        } else if (semNameType == ESNT_Unknown) {
+            spdlog::error("Skip unknown semantic '{}' for file '{}'", semName, data.Path);
         }
-
-        auto isTargetIgnored = false;
-        const TNodeSemantic* targetSem = nullptr;
-        for (const auto& sem: ProjectBuilder.ApplyReplacement(data.Path, data.Sem)) {
-            if (sem.empty()) {
-                throw yexception() << "Empty semantic item on node '" << data.Path << "'";
-            }
-            const auto& semName = sem[0];
-            const auto semNameIt = SemName2Type_.find(semName);
-            const auto semNameType = semNameIt == SemName2Type_.end() ? ESNT_Unknown : semNameIt->second;
-
-            ProjectBuilder.OnAttribute(semName);
-
-            if (semNameType == ESNT_Ignored) {
-                isTargetIgnored = true;
-            } else if (semNameType == ESNT_Target) {
-                targetSem = &sem;
-            } else if (semNameType == ESNT_Unknown) {
-                spdlog::error("Skip unknown semantic '{}' for file '{}'", semName, data.Path);
-            }
-        }
-
-        if (!isTargetIgnored && targetSem) {
-            const auto& sem = *targetSem;
-            const auto& semName = sem[0];
-            const auto semArgs = std::span{sem}.subspan(1);
-            Y_ASSERT(semArgs.size() >= 2);
-            bool isTestTarget = false;
-            std::string modDir = semArgs[0].c_str();
-            for (const auto& testSubdir: TestSubdirs) {
-                if (modDir != testSubdir && modDir.ends_with(testSubdir)) {
-                    modDir.resize(modDir.size() - testSubdir.size());
-                    isTestTarget = true;
-                    break;
-                }
-            }
-            auto macroArgs = semArgs.subspan(2);
-            state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(modDir);
-            auto* curTarget = ProjectBuilder.CurrentTarget();
-            curTarget->Name = semArgs[1];
-            curTarget->Macro = semName;
-            curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
-
-            const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(ProjectBuilder.CurrentTarget());
-            ProjectBuilder.SetIsTest(isTestTarget);
-            Mod2Target.emplace(state.TopNode().Id(), jinjaTarget);
-        }
-
-        return !isTargetIgnored;
     }
 
-    void Leave(TState& state) {
-        if (!state.Top().FreshNode) {
-            TBase::Leave(state);
-            return;
-        }
-        const TSemNodeData& data = state.TopNode().Value();
-        if (data.Sem.empty() || data.Sem.front().empty()) {
-            TBase::Leave(state);
-            return;
-        }
-
-        for (const auto& sem: ProjectBuilder.ApplyReplacement(data.Path, data.Sem)) {
-            const auto& semName = sem[0];
-            const auto semNameIt = SemName2Type_.find(semName);
-            const auto semNameType = semNameIt == SemName2Type_.end() ? ESNT_Unknown : semNameIt->second;
-            const auto semArgs = std::span{sem}.subspan(1);
-
-            if (semNameType == ESNT_Unknown || semNameType == ESNT_Target || semNameType == ESNT_Ignored) {
-                // Unknown semantic error reported at Enter()
-                continue;
-            } else if (semNameType == ESNT_RootAttr) {
-                ProjectBuilder.SetRootAttr(semName, semArgs, data.Path);
-            } else if (semNameType == ESNT_TargetAttr) {
-                ProjectBuilder.SetTargetAttr(semName, semArgs, data.Path);
-            } else if (semNameType == ESNT_InducedAttr) {
-                StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
-            }
-        }
-        TBase::Leave(state);
-    }
-
-    void Left(TState& state) {
+    void OnLeft(TState& state) override {
         const auto& dep = state.Top().CurDep();
         if (IsDirectPeerdirDep(dep)) {
             //Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
             bool isSameDir = false;
-            const auto* toTarget = Mod2Target[dep.To().Id()];
-            if (auto* curSubdir = ProjectBuilder.CurrentSubdir(); curSubdir) {
+            const auto* toTarget = Mod2Target_[dep.To().Id()];
+            if (auto* curSubdir = ProjectBuilder_->CurrentSubdir(); curSubdir) {
                 for (const auto& target: curSubdir->Targets) {
                     if (target.Get() == toTarget) {
                         isSameDir = true;
@@ -481,50 +405,27 @@ public:
                         // For each induced attribute in map format add submap with excludes
                         jinja2::ValuesMap valueWithExcludes = value.asMap();
                         valueWithExcludes.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
-                        ProjectBuilder.AddToTargetInducedAttr(attrMacro, valueWithExcludes, data.Path);
+                        JinjaProjectBuilder_->AddToTargetInducedAttr(attrMacro, valueWithExcludes, data.Path);
                     } else {
-                        ProjectBuilder.AddToTargetInducedAttr(attrMacro, value, data.Path);
+                        JinjaProjectBuilder_->AddToTargetInducedAttr(attrMacro, value, data.Path);
                     }
                 }
             }
         }
-        TBase::Left(state);
-    }
-
-    TProjectPtr TakeFinalizedProject() {
-        return ProjectBuilder.FinishProject();
     }
 
 private:
-    THashMap<TNodeId, const TJinjaTarget*> Mod2Target;
-
-    THashMap<TNodeId, jinja2::ValuesMap> InducedAttrs_;
-
-    TJinjaProject::TBuilder ProjectBuilder;
-    TVector<std::string> TestSubdirs;
-    THashMap<std::string_view, ESemNameType> SemName2Type_;
-
-    void Attrs2SemNameType(const TGeneratorSpec& generatorSpec, const std::string& attrGroup, ESemNameType semNameType) {
-        if (const auto* attrs = generatorSpec.Attrs.FindPtr(attrGroup)) {
-            TAttrsSpec const* inducedSpec = nullptr;
-            if (attrGroup == ATTRGROUP_TARGET) {
-                // We must skip duplicating induced attributes in target attr groups
-                inducedSpec = generatorSpec.Attrs.FindPtr(ATTRGROUP_INDUCED);
-            }
-            for (const auto& item: attrs->Items) {
-                if (inducedSpec && inducedSpec->Items.contains(item.first)) {
-                    continue; // skip duplicating induced attributes in target attr group
-                }
-                SemName2Type_.emplace(item.first, semNameType);
-            }
-        }
-    }
-
     template<IterableValues Values>
     void StoreInducedAttrValues(TNodeId nodeId, const std::string& attrMacro, const Values& values, const std::string& nodePath) {
         auto [nodeIt, _] = InducedAttrs_.emplace(nodeId, jinja2::ValuesMap{});
-        ProjectBuilder.SetInducedAttr(nodeIt->second, attrMacro, values, nodePath);
+        JinjaProjectBuilder_->SetInducedAttr(nodeIt->second, attrMacro, values, nodePath);
     }
+
+    TSimpleSharedPtr<TJinjaProject::TBuilder> JinjaProjectBuilder_;
+
+    THashMap<TNodeId, const TJinjaTarget*> Mod2Target_;
+    THashMap<TNodeId, jinja2::ValuesMap> InducedAttrs_;
+    TVector<std::string> TestSubdirs_;
 };
 
 THolder<TJinjaGenerator> TJinjaGenerator::Load(
@@ -601,7 +502,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 }
 
 void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TJinjaGeneratorVisitor visitor(this, &JinjaAttrs, GeneratorSpec);
+    TNewJinjaGeneratorVisitor visitor(this, &JinjaAttrs, GeneratorSpec);
     IterateAll(graph, startDirs, visitor);
     Project = visitor.TakeFinalizedProject();
 }

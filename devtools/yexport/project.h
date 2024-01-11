@@ -1,6 +1,7 @@
 #pragma once
 
 #include "std_helpers.h"
+#include "spec_based_generator.h"
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
 
@@ -12,8 +13,6 @@
 #include <filesystem>
 
 namespace NYexport {
-
-    namespace fs = std::filesystem;
 
     class TProjectTarget;
     class TProjectSubdir;
@@ -95,12 +94,12 @@ namespace NYexport {
     public:
         class TTargetHolder;
 
-        TBuilder() = default;
+        TBuilder(TSpecBasedGenerator* generator);
         virtual ~TBuilder() = default;
 
-        TProjectPtr FinishProject();
-
+        TProjectPtr Finalize();
         TTargetHolder CreateTarget(const fs::path& targetDir);
+        void OnAttribute(const std::string& attribute);
 
         const TProjectTarget* CurrentTarget() const noexcept;
         const TProjectSubdir* CurrentSubdir() const noexcept;
@@ -108,14 +107,17 @@ namespace NYexport {
         TProjectSubdir* CurrentSubdir() noexcept;
 
     protected:
-        virtual void Finalize() {};
+        virtual void CustomFinalize() {};
+        virtual void CustomOnAttribute(const std::string&) {}
 
         TProjectSubdirPtr CreateDirectories(const fs::path& dir);
 
+        TSpecBasedGenerator* Generator_ = nullptr;
         TProjectPtr Project_ = nullptr;
         TProjectTargetPtr CurTarget_ = nullptr;
         TProjectSubdirPtr CurSubdir_ = nullptr;
     };
+    using TProjectBuilderPtr = TSimpleSharedPtr<TProject::TBuilder>;
 
     class TProject::TBuilder::TTargetHolder {
     public:

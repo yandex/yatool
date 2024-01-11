@@ -2,6 +2,7 @@
 #include "cmake_generator.h"
 #include "std_helpers.h"
 #include "project.h"
+#include "graph_visitor.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
@@ -49,35 +50,6 @@ namespace {
 
     std::string GetToolBinVariable(TStringBuf toolName) {
         return fmt::format("TOOL_{}_bin", toolName);
-    }
-
-    enum class EConstraintType {
-        AtLeast,
-        MoreThan,
-        Exact
-    };
-    struct TArgsConstraint {
-        EConstraintType Type;
-        size_t Count;
-    };
-
-    TArgsConstraint AtLeast(size_t count) {
-        return {
-            .Type = EConstraintType::AtLeast,
-            .Count = count
-        };
-    }
-    TArgsConstraint MoreThan(size_t count) {
-        return {
-            .Type = EConstraintType::MoreThan,
-            .Count = count
-        };
-    }
-    TArgsConstraint Exact(size_t count) {
-        return {
-            .Type = EConstraintType::Exact,
-            .Count = count
-        };
     }
 
     struct TAttrValues {
@@ -285,7 +257,7 @@ namespace {
     public:
 
         TBuilder(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
-        : TProject::TBuilder()
+        : TProject::TBuilder(cmakeGenerator)
         , Platform(platform)
         , GlobalProperties(globalProperties)
         , CMakeGenerator(cmakeGenerator)
@@ -293,11 +265,22 @@ namespace {
             Project_ = MakeSimpleShared<TCMakeProject>(projectConf, platform, cmakeGenerator->GetExportFileManager());
         }
 
-        void Finalize() override {
+        void CustomFinalize() override {
             for (auto subdir : Project_->GetSubdirs()) {
                 auto& cmakeList = *subdir.As<TCMakeList>();
                 for (const auto& child : cmakeList.Subdirectories) {
                     cmakeList.SubdirectoriesToAdd.insert(child->Path.filename());
+                }
+            }
+        }
+
+        void CustomOnAttribute(const std::string& semantica) override {
+            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetRules(semantica)) {
+                const auto& addValues = rulePtr->AddValues;
+                if (auto valuesIt = addValues.find("includes"); valuesIt != addValues.end()) {
+                    for (const auto& value : valuesIt->second) {
+                        GlobalProperties.GlobalModules.emplace(value);
+                    }
                 }
             }
         }
@@ -492,18 +475,6 @@ namespace {
             }
         }
 
-        void AddSemantics(const std::string& semantica) {
-            CMakeGenerator->OnAttribute(semantica);
-            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetRules(semantica)) {
-                const auto& addValues = rulePtr->AddValues;
-                if (auto valuesIt = addValues.find("includes"); valuesIt != addValues.end()) {
-                    for (const auto& value : valuesIt->second) {
-                        GlobalProperties.GlobalModules.emplace(value);
-                    }
-                }
-            }
-        }
-
         const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
             return CMakeGenerator->ApplyReplacement(path, inputSem);
         }
@@ -567,131 +538,127 @@ namespace {
         bool FreshNode = false;
     };
 
-    class TCmakeRenderingVisitor
-        : public TNoReentryVisitorBase<
-              TVisitorStateItemBase,
-              TSemGraphIteratorStateItem<TExtraStackData>,
-              TGraphIteratorStateBase<TSemGraphIteratorStateItem<TExtraStackData>>> {
+    class TCmakeRenderingVisitor : public TGraphVisitor {
     public:
-        using TBase = TNoReentryVisitorBase<
-            TVisitorStateItemBase,
-            TSemGraphIteratorStateItem<TExtraStackData>,
-            TGraphIteratorStateBase<TSemGraphIteratorStateItem<TExtraStackData>>>;
-        using TState = typename TBase::TState;
-
         TCmakeRenderingVisitor(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
-        : ProjectBuilder(projectConf, platform, globalProperties, cmakeGenerator)
-        {}
-
-        bool Enter(TState& state) {
-            state.Top().FreshNode = TBase::Enter(state);
-            if (!state.Top().FreshNode) {
-                return false;
+            : TGraphVisitor(cmakeGenerator)
+        {
+            CMakeProjectBuilder_ = MakeSimpleShared<TCMakeProject::TBuilder>(projectConf, platform, globalProperties, cmakeGenerator);
+            ProjectBuilder_ = CMakeProjectBuilder_;
+            for (const auto& targetSemantic : KnownTargets) {
+                AddSemanticMapping(targetSemantic, ESNT_Target);
             }
+        }
 
+    protected:
+        std::optional<bool> OnEnter(TState& state) override {
             if (state.TopNode()->NodeType == EMNT_File) {
                 const auto rootrel = NPath::CutAllTypes(state.TopNode().Value().Path);
                 if (NPath::IsPrefixOf(ArcadiaScriptsRoot, rootrel)) {
-                    ProjectBuilder.AddArcadiaScript(fs::path::string_type{rootrel});
+                    CMakeProjectBuilder_->AddArcadiaScript(fs::path::string_type{rootrel});
                     return true;
                 }
             }
-
-            const TSemNodeData& data = state.TopNode().Value();
-            if (data.Sem.empty() || data.Sem.front().empty()) {
-                return true;
-            }
-
             MineToolPaths(state.TopNode());
+            return {};
+        }
 
-            bool traverseFurther = true;
-            for (const auto& sem: ProjectBuilder.ApplyReplacement(data.Path, data.Sem)) {
-                if (sem.empty()) {
-                    throw yexception() << "Empty semantic item on node '" << data.Path << "'";
+        void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) override {
+            const TSemNodeData& data = state.TopNode().Value();
+            state.Top().CurTargetHolder = ProjectBuilder_->CreateTarget(semArgs[0].c_str());
+            auto* curTarget = ProjectBuilder_->CurrentTarget();
+            auto macroArgs = semArgs.subspan(2);
+            curTarget->Name = semArgs[1];
+            curTarget->Macro = semName;
+            curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+
+            Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder_->CurrentTarget());
+            // TODO(svidyuk) populate target props on post order part of the traversal and keep track locally used tools only instead of global dict
+            TargetsDict.emplace(NPath::CutType(data.Path), ProjectBuilder_->CurrentTarget());
+        }
+
+        void OnNodeSemanticPreOrder(TState& state, const std::string& semName, ESemNameType, const std::span<const std::string>& semArgs) override {
+            const TSemNodeData& data = state.TopNode().Value();
+            if (KnownAttrs.contains(semName)) {
+                if (!semArgs.empty()) {
+                    CMakeProjectBuilder_->AddTargetAttr(semName, ParseCMakeScope(semArgs[0]), semArgs.subspan(1));
+                } else {
+                    spdlog::error("attribute {} requires arguments SCOPE and VALUES..., provided arguments: '{}'. File '{}'", semName, fmt::join(semArgs, " "), data.Path);
                 }
-                // TODO(svidyuk): turn asserts bellow into normal error handling
-                const auto& semName = sem[0];
-                const auto semArgs = std::span{sem}.subspan(1);
+            }
+            else if (KnownTargetMacro.contains(semName)) {
+                CMakeProjectBuilder_->AddTargetMacro(semName, semArgs, EMacroMergePolicy::MultipleCalls);
+            }
+            else if (KnownUniqueTargetMacro.contains(semName)) {
+                CMakeProjectBuilder_->AddTargetMacro(semName, semArgs, EMacroMergePolicy::FirstCall);
+            }
+            else if (KnownDirMacro.contains(semName)) {
+                CMakeProjectBuilder_->AddTargetDirMacro(semName, semArgs);
+            }
+            else if (semName == "conan_require") {
+                if (!CheckArgs(semName, semArgs, Exact(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->RequireConanPackage(semArgs[0]);
+            }
+            else if (semName == "conan_require_tool") {
+                if (!CheckArgs(semName, semArgs, Exact(1), data.Path)){
+                    return;
+                }
+                CMakeProjectBuilder_->RequireConanToolPackage(semArgs[0]);
+            }
+            else if (semName == "conan_import") {
+                if (!CheckArgs(semName, semArgs, Exact(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->ImportConanArtefact(semArgs[0]);
+            }
+            else if (semName == "conan_options") {
+                for (const auto& arg : semArgs) {
+                    CMakeProjectBuilder_->AddConanOption(arg);
+                }
+            }
+            else if (semName == "append_target_property") {
+                if (!CheckArgs(semName, semArgs, MoreThan(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->AppendTargetProperty(semArgs[0], semArgs.subspan(1));
+            }
+            else if (semName == "set_target_property") {
+                if (!CheckArgs(semName, semArgs, MoreThan(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->SetTargetProperty(semArgs[0], semArgs.subspan(1));
+            }
+            else if (semName == "include") {
+                if (!CheckArgs(semName, semArgs, Exact(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->Include(semArgs[0]);
+            }
+            else if (semName == "find_package") {
+                if (semArgs.size() != 1 && !(semArgs.size() > 2 && semArgs[1] == "COMPONENTS")) {
+                    spdlog::error("wrong find_package arguments: {}\n\tPosible signatures:\n\t\t* find_package(<name>)\n\t\t* find_package(<name> COMPONENTS <component>+)", fmt::join(semArgs, ", "));
+                    OnError();
+                    return;
+                }
 
-                ProjectBuilder.AddSemantics(semName);
-
-                if (semName == "IGNORED") {
-                    traverseFurther = false;
-                } else if (KnownTargets.contains(semName)) {
-                    if (!CheckArgs(semName, semArgs, AtLeast(2)))
-                        continue;
-
-                    auto macroArgs = semArgs.subspan(2);
-                    state.Top().CurTargetHolder = ProjectBuilder.CreateTarget(semArgs[0].c_str());
-                    auto* curTarget = ProjectBuilder.CurrentTarget();
-                    curTarget->Name = semArgs[1];
-                    curTarget->Macro = semName;
-                    curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
-
-                    Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder.CurrentTarget());
-                    // TODO(svidyuk) populate target props on post order part of the traversal and keep track locally used tools only instead of global dict
-                    TargetsDict.emplace(NPath::CutType(data.Path), ProjectBuilder.CurrentTarget());
-                } else if (KnownAttrs.contains(semName)) {
-                    if (!semArgs.empty()) {
-                        ProjectBuilder.AddTargetAttr(semName, ParseCMakeScope(semArgs[0]), semArgs.subspan(1));
-                    } else {
-                        spdlog::error("attribute {} requires arguments SCOPE and VALUES..., provided arguments: '{}'. File '{}'", semName, fmt::join(semArgs, " "), data.Path);
-                    }
-                } else if (KnownTargetMacro.contains(semName)) {
-                    ProjectBuilder.AddTargetMacro(semName, semArgs, EMacroMergePolicy::MultipleCalls);
-                } else if (KnownUniqueTargetMacro.contains(semName)) {
-                    ProjectBuilder.AddTargetMacro(semName, semArgs, EMacroMergePolicy::FirstCall);
-                } else if (KnownDirMacro.contains(semName)) {
-                    ProjectBuilder.AddTargetDirMacro(semName, semArgs);
-                } else if (semName == "conan_require") {
-                    if (!CheckArgs(semName, semArgs, Exact(1)))
-                        continue;
-                    ProjectBuilder.RequireConanPackage(semArgs[0]);
-                } else if (semName == "conan_require_tool") {
-                    if (!CheckArgs(semName, semArgs, Exact(1)))
-                        continue;
-                    ProjectBuilder.RequireConanToolPackage(semArgs[0]);
-                } else if (semName == "conan_import") {
-                    if (!CheckArgs(semName, semArgs, Exact(1)))
-                        continue;
-                    ProjectBuilder.ImportConanArtefact(semArgs[0]);
-                } else if (semName == "conan_options") {
-                    for (const auto& arg: semArgs) {
-                        ProjectBuilder.AddConanOption(arg);
-                    }
-                } else if (semName == "append_target_property") {
-                    if (!CheckArgs(semName, semArgs, MoreThan(1)))
-                        continue;
-                    ProjectBuilder.AppendTargetProperty(semArgs[0], semArgs.subspan(1));
-                } else if (semName == "set_target_property") {
-                    if (!CheckArgs(semName, semArgs, MoreThan(1)))
-                        continue;
-                    ProjectBuilder.SetTargetProperty(semArgs[0], semArgs.subspan(1));
-                } else if (semName == "include") {
-                    if (!CheckArgs(semName, semArgs, Exact(1)))
-                        continue;
-                    ProjectBuilder.Include(semArgs[0]);
-                } else if (semName == "find_package") {
-                    if (semArgs.size() != 1 && !(semArgs.size() > 2 && semArgs[1] == "COMPONENTS")) {
-                        spdlog::error("wrong find_package arguments: {}\n\tPosible signatures:\n\t\t* find_package(<name>)\n\t\t* find_package(<name> COMPONENTS <component>+)", fmt::join(semArgs, ", "));
-                        FoundErrors = true;
-                        continue;
-                    }
-
-                    const auto& pkg = semArgs[0];
-                    const auto components = semArgs.size() > 1 ? semArgs.subspan(2) : std::span<std::string>{};
-                    if (IsModule(state.Top())) {
-                        InducedCmakePackages[state.TopNode().Id()].insert({pkg, {components.begin(), components.end()}});
-                    } else {
-                        ProjectBuilder.FindPackage(pkg, {components.begin(), components.end()});
-                    }
-                    if (BundledFindModules.contains(pkg)) {
-                        ProjectBuilder.UseGlobalFindModule(pkg);
-                    }
-                } else if (semName == "consumer_link_library") {
-                    if (!CheckArgs(semName, semArgs, AtLeast(2)))
-                        continue;
-                    switch(ParseCMakeScope(semArgs.front())) {
+                const auto& pkg = semArgs[0];
+                const auto components = semArgs.size() > 1 ? semArgs.subspan(2) : std::span<std::string>{};
+                if (IsModule(state.Top())) {
+                    InducedCmakePackages[state.TopNode().Id()].insert({pkg, {components.begin(), components.end()}});
+                } else {
+                    CMakeProjectBuilder_->FindPackage(pkg, {components.begin(), components.end()});
+                }
+                if (BundledFindModules.contains(pkg)) {
+                    CMakeProjectBuilder_->UseGlobalFindModule(pkg);
+                }
+            }
+            else if (semName == "consumer_link_library") {
+                if (!CheckArgs(semName, semArgs, AtLeast(2), data.Path)) {
+                    return;
+                }
+                switch (ParseCMakeScope(semArgs.front())) {
                     case ECMakeAttrScope::Interface:
                         Copy(std::next(semArgs.begin()), semArgs.end(), std::back_inserter(InducedLinkLibs[state.TopNode().Id()].Iface));
                         break;
@@ -701,89 +668,101 @@ namespace {
                     case ECMakeAttrScope::Private:
                         Copy(std::next(semArgs.begin()), semArgs.end(), std::back_inserter(InducedLinkLibs[state.TopNode().Id()].Priv));
                         break;
-                    }
-                } else if (semName == "target_allocator") {
-                    if (!CheckArgs(semName, semArgs, AtLeast(2)))
-                        continue;
-                    // Skip scope for allocator since it's always PRIVATE dep of executable
-                    Copy(std::next(semArgs.begin()), semArgs.end(), std::back_inserter(InducedAllocator[state.TopNode().Id()]));
-                } else if (semName == "set_global_flags") {
-                    if (semArgs.size() > 1) {
-                        ProjectBuilder.AddGlobalVar(semArgs[0], semArgs.subspan(1));
-                    }
-                } else if (semName == "library_fake_marker") {
-                    if (!GetFakeModuleFlag(semName, semArgs)) {
-                        ProjectBuilder.SetFakeFlag(false);
-                        continue;
-                    }
-                    if (AnyOf(state.TopNode().Edges(), [](const auto& dep){ return IsModuleOwnNodeDep(dep) && !IsGlobalSrcDep(dep); })) {
-                        std::string linkerLangs[] = {"CXX"};
-                        ProjectBuilder.AppendTargetProperty("LINKER_LANGUAGE", linkerLangs);
-                        ProjectBuilder.SetTargetMacroArgs({"STATIC"});
-                    } else {
-                        ProjectBuilder.SetFakeFlag(true);
-                    }
-                } else if (semName == "target_proto_plugin") {
-                    // The code in this branch is plain disaster and more transparent and generic way of turining tool reference to target name
-                    // is required.
-                    if (!CheckArgs(semName, semArgs, Exact(2)))
-                        continue;
-                    // Ensure tools are traversed and added to Targets dict.
-                    for (const auto& dep: state.TopNode().Edges()) {
-                        if (IsBuildCommandDep(dep) && dep.To()->Path == TOOL_NODES_FAKE_PATH) {
-                            IterateAll(state, dep.To(), *this);
-                        }
-                    }
-                    // ${tool;rootrel:...} is broken :(
-                    const auto fres = TargetsDict.find(std::string_view(semArgs[1]).substr("${CMAKE_BINARY_DIR}/"sv.size()));
-                    if (fres == TargetsDict.end()) {
-                        const auto* curTarget = ProjectBuilder.CurrentTarget();
-                        spdlog::error("No proto plugin tool found '{}' for target '{}'", semArgs[1], curTarget ? curTarget->Name : "NO_TARGET");
-                        return false;
-                    }
-                    const std::string patchedArgs[] = {semArgs[0], fres->second->Name};
-                    ProjectBuilder.AddTargetMacro(semName, patchedArgs, EMacroMergePolicy::MultipleCalls);
-                } else if (semName == "curdir_masm_flags") {
-                    if (semArgs.empty())
-                        continue;
-                    ProjectBuilder.AddDirMacro("curdir_masm_flags", semArgs);
-                } else if (semName == "set_vars") {
-                    for (std::string_view arg: semArgs) {
-                        const auto pos = arg.find("=");
-                        if (pos >= arg.size())
-                            throw yexception() << "Bad var def: " << arg;
-                        std::string setArgs[] = {std::string{arg.substr(0, pos)}, std::string{arg.substr(pos+1)}};
-                        ProjectBuilder.AddDirMacro("set", setArgs);
-                    }
-                } else if (semName == "add_language") {
-                    if (!CheckArgs(semName, semArgs, Exact(1)))
-                        continue;
-                    ProjectBuilder.AddLanguage(semArgs[0]);
-                } else if (semName == "add_requirements" || semName == "add_ytest_requirements" || semName == "add_test_requirements") {
-                    const auto set_prop = semName == "add_test_requirements" ? "set_property"s : "set_yunittest_property"s;
-                    // add_requirements $REALPRJNAME $DEFAULT_REQUIREMENTS $TEST_REQUIREMENTS_VALUE
-                    if (!CheckArgs(semName, semArgs, AtLeast(2)))
-                        continue;
-                    std::string nproc;
-                    for (std::string_view arg: semArgs.subspan(1)) {
-                        const auto pos = arg.find("cpu:");
-                        if (pos == 0 && arg.size() > 4) {
-                            nproc = arg.substr(4);
-                        }
-                    }
-                    if (!nproc.empty()) {
-                        std::string setArgs[] = {"TEST", semArgs[0], "PROPERTY", "PROCESSORS", nproc};
-                        ProjectBuilder.AddTargetDirMacro(set_prop, setArgs);
-                    }
-                } else {
-                    spdlog::error("Unknown semantic '{}' for file '{}'", semName, data.Path);
-                    return false;
                 }
             }
-            return traverseFurther;
+            else if (semName == "target_allocator") {
+                if (!CheckArgs(semName, semArgs, AtLeast(2), data.Path)) {
+                    return;
+                }
+                // Skip scope for allocator since it's always PRIVATE dep of executable
+                Copy(std::next(semArgs.begin()), semArgs.end(), std::back_inserter(InducedAllocator[state.TopNode().Id()]));
+            }
+            else if (semName == "set_global_flags") {
+                if (semArgs.size() > 1) {
+                    CMakeProjectBuilder_->AddGlobalVar(semArgs[0], semArgs.subspan(1));
+                }
+            }
+            else if (semName == "library_fake_marker") {
+                if (!GetFakeModuleFlag(semName, semArgs)) {
+                    CMakeProjectBuilder_->SetFakeFlag(false);
+                    return;
+                }
+                if (AnyOf(state.TopNode().Edges(), [](const auto& dep) { return IsModuleOwnNodeDep(dep) && !IsGlobalSrcDep(dep); })) {
+                    std::string linkerLangs[] = {"CXX"};
+                    CMakeProjectBuilder_->AppendTargetProperty("LINKER_LANGUAGE", linkerLangs);
+                    CMakeProjectBuilder_->SetTargetMacroArgs({"STATIC"});
+                } else {
+                    CMakeProjectBuilder_->SetFakeFlag(true);
+                }
+            }
+            else if (semName == "target_proto_plugin") {
+                // The code in this branch is plain disaster and more transparent and generic way of turining tool reference to target name
+                // is required.
+                if (!CheckArgs(semName, semArgs, Exact(2), data.Path)){
+                    return;
+                }
+                // Ensure tools are traversed and added to Targets dict.
+                for (const auto& dep : state.TopNode().Edges()) {
+                    if (IsBuildCommandDep(dep) && dep.To()->Path == TOOL_NODES_FAKE_PATH) {
+                        IterateAll(state, dep.To(), *this);
+                    }
+                }
+                // ${tool;rootrel:...} is broken :(
+                const auto fres = TargetsDict.find(std::string_view(semArgs[1]).substr("${CMAKE_BINARY_DIR}/"sv.size()));
+                if (fres == TargetsDict.end()) {
+                    const auto* curTarget = ProjectBuilder_->CurrentTarget();
+                    spdlog::error("No proto plugin tool found '{}' for target '{}'", semArgs[1], curTarget ? curTarget->Name : "NO_TARGET");
+                    return;
+                }
+                const std::string patchedArgs[] = {semArgs[0], fres->second->Name};
+                CMakeProjectBuilder_->AddTargetMacro(semName, patchedArgs, EMacroMergePolicy::MultipleCalls);
+            }
+            else if (semName == "curdir_masm_flags") {
+                if (semArgs.empty()) {
+                    return;
+                }
+                CMakeProjectBuilder_->AddDirMacro("curdir_masm_flags", semArgs);
+            }
+            else if (semName == "set_vars") {
+                for (std::string_view arg : semArgs) {
+                    const auto pos = arg.find("=");
+                    if (pos >= arg.size())
+                        throw yexception() << "Bad var def: " << arg;
+                    std::string setArgs[] = {std::string{arg.substr(0, pos)}, std::string{arg.substr(pos + 1)}};
+                    CMakeProjectBuilder_->AddDirMacro("set", setArgs);
+                }
+            }
+            else if (semName == "add_language") {
+                if (!CheckArgs(semName, semArgs, Exact(1), data.Path)) {
+                    return;
+                }
+                CMakeProjectBuilder_->AddLanguage(semArgs[0]);
+            }
+            else if (semName == "add_requirements" || semName == "add_ytest_requirements" || semName == "add_test_requirements") {
+                const auto set_prop = semName == "add_test_requirements" ? "set_property"s : "set_yunittest_property"s;
+                // add_requirements $REALPRJNAME $DEFAULT_REQUIREMENTS $TEST_REQUIREMENTS_VALUE
+                if (!CheckArgs(semName, semArgs, AtLeast(2), data.Path)) {
+                    return;
+                }
+                std::string nproc;
+                for (std::string_view arg : semArgs.subspan(1)) {
+                    const auto pos = arg.find("cpu:");
+                    if (pos == 0 && arg.size() > 4) {
+                        nproc = arg.substr(4);
+                    }
+                }
+                if (!nproc.empty()) {
+                    std::string setArgs[] = {"TEST", semArgs[0], "PROPERTY", "PROCESSORS", nproc};
+                    CMakeProjectBuilder_->AddTargetDirMacro(set_prop, setArgs);
+                }
+            }
+            else {
+                spdlog::error("Unknown semantic '{}' for file '{}'", semName, data.Path);
+            }
+            return;
         }
 
-        void Leave(TState& state) {
+        void OnLeave(TState& state) override {
             if (state.Top().FreshNode && state.HasIncomingDep()) {
                 const auto dep = state.IncomingDep();
                 if (IsGlobalSrcDep(dep)) {
@@ -796,37 +775,36 @@ namespace {
                         TAttrValues libs;
                         Copy(linkLibs->second.Iface.begin(), linkLibs->second.Iface.end(), std::back_inserter(libs.Pub));
                         Copy(linkLibs->second.Pub.begin(), linkLibs->second.Pub.end(), std::back_inserter(libs.Pub));
-                        ProjectBuilder.AddTargetAttrs("target_link_libraries", libs);
+                        CMakeProjectBuilder_->AddTargetAttrs("target_link_libraries", libs);
                     }
                 }
             }
-            TBase::Leave(state);
         }
 
-        void Left(TState& state) {
+        void OnLeft(TState& state) override {
             const auto& dep = state.Top().CurDep();
             // NODE(svidyuk): IsGlobalSrcDep check here assumes GLOBAL_CMD is used rather than individual object files propagation.
             if (IsDirectPeerdirDep(dep) || IsGlobalSrcDep(dep)) {
                 const auto pkgIt = InducedCmakePackages.find(dep.To().Id());
                 if (pkgIt != InducedCmakePackages.end()) {
                     for (const auto& [pkg, components]: pkgIt->second) {
-                        ProjectBuilder.FindPackage(pkg, components);
+                        CMakeProjectBuilder_->FindPackage(pkg, components);
                     }
                 }
 
                 const auto libIt = InducedLinkLibs.find(dep.To().Id());
                 if (libIt != InducedLinkLibs.end()) {
-                    ProjectBuilder.AddTargetAttrs("target_link_libraries", libIt->second);
+                    CMakeProjectBuilder_->AddTargetAttrs("target_link_libraries", libIt->second);
                 }
                 const auto allocIt = InducedAllocator.find(dep.To().Id());
                 if (allocIt != InducedAllocator.end()) {
-                    if (ProjectBuilder.SupportsAllocator()) {
-                        ProjectBuilder.AddTargetMacro("target_allocator", allocIt->second, EMacroMergePolicy::ConcatArgs);
+                    if (CMakeProjectBuilder_->SupportsAllocator()) {
+                        CMakeProjectBuilder_->AddTargetMacro("target_allocator", allocIt->second, EMacroMergePolicy::ConcatArgs);
                     } else {
-                        const auto* curTarget = ProjectBuilder.CurrentTarget();
+                        const auto* curTarget = CMakeProjectBuilder_->CurrentTarget();
                         const auto& cmakeTarget = *dynamic_cast<const TCMakeTarget*>(curTarget);
 
-                        ProjectBuilder.AddTargetAttr(
+                        CMakeProjectBuilder_->AddTargetAttr(
                             "target_link_libraries",
                             curTarget && cmakeTarget.InterfaceTarget ? ECMakeAttrScope::Interface : ECMakeAttrScope::Public,
                             allocIt->second
@@ -834,14 +812,7 @@ namespace {
                     }
                 }
             }
-            TBase::Left(state);
         }
-
-        TProjectPtr TakeFinalizedProject() {
-            return ProjectBuilder.FinishProject();
-        }
-
-        bool HasErrors() const noexcept {return FoundErrors;}
 
     private:
         bool GetFakeModuleFlag(const std::string& name, std::span<const std::string> args) {
@@ -861,15 +832,13 @@ namespace {
             spdlog::error("invalid value for FAKE_MODULE argument: {}", args[1]);
             return false;
         }
-
         void AddTool(TStringBuf arcadiaPath, TStringBuf toolName) {
             std::string args[] = {
                 GetToolBinVariable(toolName),
                 fmt::format("TOOL_{}_dependency", toolName),
                 std::string(arcadiaPath),
-                std::string(toolName)
-            };
-            ProjectBuilder.AddDirMacro(
+                std::string(toolName)};
+            CMakeProjectBuilder_->AddDirMacro(
                 "get_built_tool_path",
                 args
             );
@@ -895,48 +864,11 @@ namespace {
                     tools.emplace(toolName, arcadiaPath);
                 }
             }
-            ProjectBuilder.SetCurrentTools(std::move(tools));
+            CMakeProjectBuilder_->SetCurrentTools(std::move(tools));
         }
 
-        bool CheckArgs(std::string_view sem, std::span<const std::string> args, TArgsConstraint constraint) {
-            bool passed = true;
-            std::string_view requirement;
-            switch (constraint.Type) {
-                case EConstraintType::Exact:
-                    passed = args.size() == constraint.Count;
-                    requirement = "exactly"sv;
-                break;
+        TSimpleSharedPtr<TCMakeProject::TBuilder> CMakeProjectBuilder_;
 
-                case EConstraintType::AtLeast:
-                    passed = args.size() >= constraint.Count;
-                    requirement = "at least"sv;
-                break;
-
-                case EConstraintType::MoreThan:
-                    passed = args.size() > constraint.Count;
-                    requirement = "more than"sv;
-                break;
-            }
-            if (!passed) {
-                const auto* subdir = ProjectBuilder.CurrentSubdir();
-                const auto* tgt = ProjectBuilder.CurrentTarget();
-                spdlog::error(
-                    "{}@{}: semantic {} requires {} {} arguments. Provided arguments count {}.\n\tProvided arguments are: {}",
-                    subdir ? subdir->Path.c_str() : "CMakeLists.txt",
-                    tgt ? tgt->Name : "GLOBAL_SCOPE",
-                    sem,
-                    requirement,
-                    constraint.Count,
-                    args.size(),
-                    fmt::join(args, ", ")
-                );
-                FoundErrors = true;
-                return false;
-            }
-            return true;
-        }
-
-    private:
         THashMap<TNodeId, TInducedCmakePackages> InducedCmakePackages;
         THashMap<TNodeId, TAttrValues> InducedLinkLibs;
         THashMap<TNodeId, TVector<std::string>> InducedAllocator;
@@ -944,7 +876,7 @@ namespace {
         THashMap<TStringBuf, const TProjectTarget*> TargetsDict;
         THashMap<TNodeId, const TProjectTarget*> Mod2Target;
 
-        THashSet<TStringBuf> KnownTargets = {
+        THashSet<std::string> KnownTargets = {
             "add_executable",
             "add_global_library_for",
             "add_library",
@@ -1004,10 +936,7 @@ namespace {
             "add_jar"
         };
         THashSet<TString> BundledFindModules = {"AIO", "IDN", "JNITarget"};
-        TCMakeProject::TBuilder ProjectBuilder;
-        bool FoundErrors = false;
     };
-
 }
 
 bool RenderCmake(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
