@@ -25,7 +25,7 @@ import devtools.ya.test.test_node.cmdline as cmdline
 import devtools.ya.test.test_node.coverage as coverage
 import devtools.ya.test.test_node.fuzzing as fuzzing
 
-if app_config.in_house:
+if app_config.have_sandbox_fetcher:
     import devtools.ya.test.test_node.sandbox as sandbox_node
 
 import exts.fs
@@ -654,7 +654,7 @@ def create_test_node(
         for resource in testdeps.get_test_mds_resources(suite):
             deps.extend(suite.mds_resource_deps)
 
-    if app_config.in_house:
+    if app_config.have_sandbox_fetcher:
         for resource in testdeps.get_test_sandbox_resources(suite):
             add_sandbox_resource_dep(resource)
 
@@ -684,7 +684,7 @@ def create_test_node(
             if nparts > test.const.MAX_CORPUS_RESOURCES_ALLOWED * 2:
                 suite.corpus_parts_limit_exceeded = nparts
 
-            if app_config.in_house:
+            if app_config.have_sandbox_fetcher:
                 for field in corpus_data.keys():
                     for n, resource_id in enumerate(corpus_data[field]):
                         target_path = "{}/{}".format(field, n)

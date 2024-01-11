@@ -32,10 +32,10 @@ PEERDIR(
     devtools/ya/yalibrary/upload/consts
 )
 
-IF (NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE OR NEBIUS)
     PEERDIR(
-        devtools/ya/test/test_node/sandbox
         devtools/ya/test/dependency/sandbox_storage
+        devtools/ya/test/test_node/sandbox
     )
 ENDIF()
 

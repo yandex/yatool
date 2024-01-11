@@ -45,6 +45,11 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/sandbox_run_test
         )
     ENDIF()
+    IF (NEBIUS)
+        PEERDIR(
+            devtools/ya/test/programs/test_tool/download_nebius
+        )
+    ENDIF()
     PEERDIR(
         devtools/ya/test/programs/test_tool/build_clang_coverage_report
         devtools/ya/test/programs/test_tool/build_go_coverage_report

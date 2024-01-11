@@ -34,7 +34,7 @@ PEERDIR(
     library/python/testing/yatest_common
 )
 
-IF (NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE OR NEBIUS)
     PEERDIR(
         devtools/ya/test/dependency/sandbox_storage
     )

@@ -50,7 +50,7 @@ import app_config
 
 from devtools.ya.test.dependency import mds_storage
 
-if app_config.in_house:
+if app_config.have_sandbox_fetcher:
     from devtools.ya.test.dependency import sandbox_storage
 
 import exts.archive
@@ -1350,7 +1350,7 @@ def main():
         # - it should be cached (otherwise every run_test run would download data every time it runs)
         # - downloading would steal time from tests
         # - network might be not available (if no network:full requirement is specified)
-        if app_config.in_house:
+        if app_config.have_sandbox_fetcher:
             cached_storage = sandbox_storage.SandboxStorage(
                 resources_root,
                 use_cached_only=True,
