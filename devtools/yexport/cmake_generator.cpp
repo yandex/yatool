@@ -29,10 +29,6 @@ namespace {
         }
         fmt::format_to(bufIt, "endif()\n");
     }
-
-    void SaveConanProfile(TExportFileManager& exportFileManager, const std::string_view& profile) {
-        exportFileManager.CopyResource( fs::path("cmake") / "conan-profiles" / profile);
-    }
 }
 
 TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored)
@@ -107,6 +103,11 @@ TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaR
 void TCMakeGenerator::SetArcadiaRoot(const fs::path& arcadiaRoot) {
     ArcadiaRoot = arcadiaRoot;
     Conf.ArcadiaRoot = arcadiaRoot;
+}
+
+void TCMakeGenerator::SaveConanProfile(const std::string_view& profile) const {
+    auto path = fs::path("cmake") / "conan-profiles" / profile;
+    ExportFileManager->Copy( GeneratorDir / path, path);
 }
 
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
@@ -305,20 +306,20 @@ void TCMakeGenerator::RenderConanRequirements() const {
             case EPlatform::EP_Windows_x86_64_Cuda:
             case EPlatform::EP_Other:
                 break;
-            case EPlatform::EP_Android_Arm: SaveConanProfile(*ExportFileManager, "android.armv7.profile"); break;
-            case EPlatform::EP_Android_Arm64: SaveConanProfile(*ExportFileManager, "android.arm64.profile"); break;
-            case EPlatform::EP_Android_x86: SaveConanProfile(*ExportFileManager, "android.x86.profile"); break;
-            case EPlatform::EP_Android_x86_64: SaveConanProfile(*ExportFileManager, "android.x86_64.profile"); break;
+            case EPlatform::EP_Android_Arm: SaveConanProfile("android.armv7.profile"); break;
+            case EPlatform::EP_Android_Arm64: SaveConanProfile("android.arm64.profile"); break;
+            case EPlatform::EP_Android_x86: SaveConanProfile("android.x86.profile"); break;
+            case EPlatform::EP_Android_x86_64: SaveConanProfile("android.x86_64.profile"); break;
             case EPlatform::EP_Linux_Aarch64:
             case EPlatform::EP_Linux_Aarch64_Cuda:
-                SaveConanProfile(*ExportFileManager, "linux.aarch64.profile");
+                SaveConanProfile("linux.aarch64.profile");
                 break;
             case EPlatform::EP_Linux_Ppc64LE:
             case EPlatform::EP_Linux_Ppc64LE_Cuda:
-                SaveConanProfile(*ExportFileManager, "linux.ppc64le.profile");
+                SaveConanProfile("linux.ppc64le.profile");
                 break;
             case EPlatform::EP_MacOs_Arm64:
-                SaveConanProfile(*ExportFileManager, "macos.arm64.profile");
+                SaveConanProfile("macos.arm64.profile");
                 break;
         }
     }

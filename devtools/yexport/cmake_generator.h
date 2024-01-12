@@ -100,6 +100,7 @@ private:
     void RenderRootCMakeList() const;
     void CopyArcadiaScripts() const;
     void RenderConanRequirements() const;
+    void SaveConanProfile(const std::string_view& profile) const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
     void RenderPlatform(TPlatform& platform);

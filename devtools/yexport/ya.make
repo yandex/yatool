@@ -21,16 +21,6 @@ SRCS(
     yexport_spec.cpp
 )
 
-RESOURCE(
-    cmake/android.armv7.profile android.armv7.profile
-    cmake/android.arm64.profile android.arm64.profile
-    cmake/android.x86.profile android.x86.profile
-    cmake/android.x86_64.profile android.x86_64.profile
-    cmake/linux.aarch64.profile linux.aarch64.profile
-    cmake/linux.ppc64le.profile linux.ppc64le.profile
-    cmake/macos.arm64.profile macos.arm64.profile
-)
-
 PEERDIR(
     contrib/libs/fmt
     contrib/libs/jinja2cpp

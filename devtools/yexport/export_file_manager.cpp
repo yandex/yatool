@@ -49,23 +49,6 @@ bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelati
 bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError) {
     return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot, logError);
 }
-bool TExportFileManager::CopyResource(const fs::path& relativeToRoot, bool logError) {
-    std::string resource = relativeToRoot.filename();
-    try {
-        const auto content = NResource::Find(resource);
-        auto out = Open(relativeToRoot);
-        out.Write(content.data(), content.size());
-        spdlog::debug("[TExportFileManager] Copied resource: {}", relativeToRoot.c_str());
-        return true;
-    } catch (const std::exception& ex) {
-        if (logError) {
-            spdlog::error("[TExportFileManager] Failed to copy resource {} due: {}", relativeToRoot.c_str(), ex.what());
-        } else {
-            spdlog::debug("[TExportFileManager] Failed to copy resource {} due: {}", relativeToRoot.c_str(), ex.what());
-        }
-        return false;
-    }
-}
 bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
     return fs::exists(ExportRoot_ / relativeToRoot);
 }
