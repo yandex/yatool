@@ -856,6 +856,19 @@ namespace {
                 SetProxyProp();
                 return;
             } else if (name == NOptions::STRUCT_CMD) {
+                if (Conf.RenderSemantics)
+                    return;
+                if (value == "yes") {
+                    BlockStack.back().BlockData().StructCmd = true;
+                } else if (value == "no") {
+                    BlockStack.back().BlockData().StructCmd = false;
+                } else {
+                    ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
+                }
+                return;
+            } else if (name == NOptions::STRUCT_SEM) {
+                if (!Conf.RenderSemantics)
+                    return;
                 if (value == "yes") {
                     BlockStack.back().BlockData().StructCmd = true;
                 } else if (value == "no") {
@@ -926,6 +939,7 @@ namespace {
                        name == NOptions::INCLUDE_TAG ||
                        name == NOptions::PROXY ||
                        name == NOptions::STRUCT_CMD ||
+                       name == NOptions::STRUCT_SEM ||
                        name == NOptions::USE_INJECTED_DATA ||
                        name == NOptions::USE_PEERS_LATE_OUTS)
             {

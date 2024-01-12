@@ -11,6 +11,7 @@ constexpr TStringBuf ALL_INS_TO_OUT = "ALL_INS_TO_OUT";
 constexpr TStringBuf ARGS_PARSER = "ARGS_PARSER";
 constexpr TStringBuf CMD = "CMD";
 constexpr TStringBuf STRUCT_CMD = "STRUCT_CMD"; // Stuctured cmd represenation DEVTOOLS-8280
+constexpr TStringBuf STRUCT_SEM = "STRUCT_SEM";
 constexpr TStringBuf DEFAULT_NAME_GENERATOR = "DEFAULT_NAME_GENERATOR";
 constexpr TStringBuf EPILOGUE = "EPILOGUE";
 constexpr TStringBuf EXTS = "EXTS";

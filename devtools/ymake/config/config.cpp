@@ -163,6 +163,7 @@ bool TModuleConf::IsOption(const TStringBuf name) {
         NOptions::ALLOWED,
         NOptions::CMD,
         NOptions::STRUCT_CMD,
+        NOptions::STRUCT_SEM,
         NOptions::DEFAULT_NAME_GENERATOR,
         NOptions::ARGS_PARSER,
         NOptions::GLOBAL,
@@ -439,7 +440,11 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
     } else if (name == NOptions::USE_PEERS_LATE_OUTS) {
         ApplyBoolProperty(UsePeersLateOuts, key, name, value);
     } else if (name == NOptions::STRUCT_CMD) {
-        ApplyBoolProperty(StructCmd, key, name, value);
+        if (!renderSemantics)
+            ApplyBoolProperty(StructCmd, key, name, value);
+    } else if (name == NOptions::STRUCT_SEM) {
+        if (renderSemantics)
+            ApplyBoolProperty(StructCmd, key, name, value);
     } else if (name == NOptions::INCLUDE_TAG) {
         ApplyBoolProperty(IncludeTag, key, name, value);
     } else if (name == NOptions::FINAL_TARGET) {
