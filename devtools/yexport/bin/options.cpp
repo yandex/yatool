@@ -23,7 +23,7 @@ TOpts TOpts::Parse(int argc, char** argv) {
     opts.AddLongOption('p', "platforms", "Platforms to merge: linux, darwin, win").AppendTo(&ret.Platforms);
     opts.AddLongOption('C', "clean-ignored", "Remove subdirs with project ignored by the export").StoreTrue(&ret.CleanIgnored);
     opts.AddLongOption('l', "list", "Show a list of available generators").StoreTrue(&ret.List);
-    opts.AddLongOption('G', "generator", "Generator to use [experimental not yet implemented feature]")
+    opts.AddLongOption('G', "generator", "Generator to use")
         .StoreResult(&ret.Generator)
         .DefaultValue(NGenerators::HARDCODED_CMAKE_GENERATOR);
     opts.AddLongOption('P', "py-deps-dump", "Path to the result of `ya dump dep-graph --flat-json-files --no-legacy-deps` result (for python-requirements generator only)")
