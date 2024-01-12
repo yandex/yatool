@@ -34,46 +34,6 @@ TJinjaProject::TBuilder::TBuilder(TJinjaGenerator* generator, jinja2::ValuesMap*
     Project_ = MakeSimpleShared<TJinjaProject>();
 }
 
-static std::string Indent(int depth) {
-    return std::string(depth * 4, ' ');
-}
-
-static void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0) {
-    if (value.isMap()) {
-        out << "{\n";
-        const auto& map = value.asMap();
-        if (!map.empty()) {
-            // Sort map keys before dumping
-            TVector<std::string> keys;
-            keys.reserve(map.size());
-            for (const auto& [key, _] : map) {
-                keys.emplace_back(key);
-            }
-            Sort(keys);
-            for (const auto& key : keys) {
-                out << Indent(depth + 1) << key << ": ";
-                const auto it = map.find(key);
-                Dump(out, it->second, depth + 1);
-            }
-        }
-        out << Indent(depth) << "}";
-    } else if (value.isList()) {
-        out << "[\n";
-        for (const auto& val : value.asList()) {
-            out << Indent(depth + 1);
-            Dump(out, val, depth + 1);
-        }
-        out << Indent(depth) << "]";
-    }  else if (value.isString()) {
-        out << '"' << value.asString() << '"';
-    } else if (value.isEmpty()) {
-        out << "EMPTY";
-    } else {
-        out << (value.get<bool>() ? "true" : "false");
-    }
-    out << ",\n";
-}
-
 static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& value) {
     if (value.isList()) {
         // Never create list of lists, if value also list, concat all lists to one big list
@@ -86,17 +46,17 @@ static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& v
     return true;
 }
 
-bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val) {
+bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const jinja2::Value& value) {
     if (list.empty()) {
         return false;
     }
-    TStringBuilder valStr;
-    TStringBuilder listStr;
-    Dump(valStr.Out, val);
-    for (const auto& listVal : list) {
-        listStr.clear();
-        Dump(listStr.Out, listVal);
-        if (valStr == listStr) {
+    TStringBuilder valueStr;
+    TStringBuilder listValueStr;
+    Dump(valueStr.Out, value);
+    for (const auto& listValue : list) {
+        listValueStr.clear();
+        Dump(listValueStr.Out, listValue);
+        if (valueStr == listValueStr) {
             return true;
         }
     }
@@ -120,12 +80,8 @@ void TJinjaProject::TBuilder::OnAttribute(const std::string& attribute) {
     Generator->OnAttribute(attribute);
 }
 
-bool TJinjaProject::TBuilder::IsExcluded(TStringBuf path, std::span<const std::string> excludes) const noexcept {
-    return AnyOf(excludes.begin(), excludes.end(), [path](TStringBuf exclude) { return NPath::IsPrefixOf(exclude, path); });
-};
-
-void TJinjaProject::TBuilder::SetIsTest(bool isTestTarget) {
-    CurTarget_.As<TJinjaTarget>()->isTest = isTestTarget;
+void TJinjaProject::TBuilder::SetTestModDir(const std::string& testModDir) {
+    CurTarget_.As<TJinjaTarget>()->TestModDir = testModDir;
 }
 
 const TNodeSemantics& TJinjaProject::TBuilder::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
@@ -260,12 +216,10 @@ void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attr, const jinja2::V
         if (attrValue.isMap()) {
             auto [attrIt, _] = attr.emplace(attrName, jinja2::ValuesMap{});
             MergeTree(attrIt->second.asMap(), attrValue.asMap());
-        } else {
-            if (attr.contains(attrName)) {
-                spdlog::error("overwrite dict element {}", attrName);
-            }
-            attr[attrName] = attrValue;
+        } else if (attr.contains(attrName)) {
+            spdlog::error("overwrite dict element {}", attrName);
         }
+        attr[attrName] = attrValue;
     }
 }
 
@@ -296,13 +250,14 @@ public:
         }
         auto macroArgs = semArgs.subspan(2);
         state.Top().CurTargetHolder = ProjectBuilder_->CreateTarget(modDir);
+        if (isTestTarget) {
+            JinjaProjectBuilder_->SetTestModDir(modDir);
+        }
         auto* curTarget = ProjectBuilder_->CurrentTarget();
         curTarget->Name = semArgs[1];
         curTarget->Macro = semName;
         curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
-
-        const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(ProjectBuilder_->CurrentTarget());
-        JinjaProjectBuilder_->SetIsTest(isTestTarget);
+        const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(JinjaProjectBuilder_->CurrentTarget());
         Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
     }
 
@@ -334,7 +289,7 @@ public:
                 }
             }
             const auto libIt = InducedAttrs_.find(dep.To().Id());
-            if (!isSameDir && libIt != InducedAttrs_.end() && (!toTarget || !toTarget->isTest)) {
+            if (!isSameDir && libIt != InducedAttrs_.end()) {
                 const TSemNodeData& data = dep.To().Value();
 /*
     Generating induced attributes and excludes< for example, project is
@@ -400,12 +355,19 @@ public:
                         }
                     }
                 }
+                const auto fromTarget = Mod2Target_[dep.From().Id()];
+                bool test2test = fromTarget && fromTarget->IsTest() && toTarget && toTarget->IsTest();
                 for (const auto& [attrMacro, value]: libIt->second) {
-                    if (value.isMap() && !excludes.empty()) {
+                    if (value.isMap() && (!excludes.empty() || test2test)) {
                         // For each induced attribute in map format add submap with excludes
-                        jinja2::ValuesMap valueWithExcludes = value.asMap();
-                        valueWithExcludes.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
-                        JinjaProjectBuilder_->AddToTargetInducedAttr(attrMacro, valueWithExcludes, data.Path);
+                        jinja2::ValuesMap valueWithDepAttrs = value.asMap();
+                        if (!excludes.empty()) {
+                            valueWithDepAttrs.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
+                        }
+                        if (test2test) {
+                            valueWithDepAttrs.emplace(TJinjaGenerator::TEST2TEST_ATTR, toTarget->TestModDir);
+                        }
+                        JinjaProjectBuilder_->AddToTargetInducedAttr(attrMacro, valueWithDepAttrs, data.Path);
                     } else {
                         JinjaProjectBuilder_->AddToTargetInducedAttr(attrMacro, value, data.Path);
                     }
@@ -441,8 +403,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     THolder<TJinjaGenerator> result = MakeHolder<TJinjaGenerator>();
 
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
-
-    result->ReadYexportSpec(configDir);
+    result->YexportSpec = result->ReadYexportSpec(configDir);
 
     auto setUpTemplates = [&result, &generatorDir](const std::vector<TTemplate>& sources, std::vector<jinja2::Template>& targets){
         targets.reserve(sources.size());
@@ -508,7 +469,7 @@ void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const T
 }
 
 void TJinjaGenerator::LoadSemGraph(const std::string&, const fs::path& semGraph) {
-    const auto [graph, startDirs] = ReadSemGraph(semGraph);
+    const auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
     AnalizeSemGraph(startDirs, *graph);
 }
 
@@ -529,7 +490,7 @@ void TJinjaGenerator::Dump(IOutputStream& out) {
 void TJinjaGenerator::Render(ECleanIgnored) {
     YEXPORT_VERIFY(Project, "Cannot render because project was not yet loaded");
     CopyFilesAndResources();
-
+    DoDump = true;
     auto subdirsAttrs = FinalizeSubdirsAttrs();
     for (const auto& subdir: Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
@@ -597,6 +558,7 @@ THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() c
 
 jinja2::ValuesMap TJinjaGenerator::FinalizeAllAttrs() {
     jinja2::ValuesMap allAttrs;
+    DoDump = false;
     allAttrs.emplace("root", FinalizeRootAttrs());
     allAttrs.emplace("subdirs", FinalizeSubdirsAttrs());
     return allAttrs;
@@ -619,6 +581,12 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
         JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
     }
     JinjaAttrs.emplace("projectName", ProjectName);
+    if (!YexportSpec.Handler.empty()) {
+        JinjaAttrs.emplace("handler", YexportSpec.Handler);
+    }
+    if (DoDump) {
+        JinjaAttrs.emplace("dump", ::NYexport::Dump(JinjaAttrs, 0, "// "));
+    }
     return JinjaAttrs;
 }
 
@@ -635,8 +603,12 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             auto& targetAttrs = target->Attrs;
             targetAttrs.emplace("name", target->Name);
             targetAttrs.emplace("macro", target->Macro);
-            targetAttrs.emplace("isTest", target.As<TJinjaTarget>()->isTest);
+            auto isTest = target.As<TJinjaTarget>()->IsTest();
+            targetAttrs.emplace("isTest", isTest);
             targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
+            if (!YexportSpec.Handler.empty()) {
+                targetAttrs.emplace("handler", YexportSpec.Handler);
+            }
 
             auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
             if (targetNameAttrsIt == subdirAttrs.end()) {
@@ -650,10 +622,20 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                 targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetParams)).first;
             }
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
-            if (target.As<TJinjaTarget>()->isTest) {
+            if (isTest) {
                 targetNameAttrs.insert_or_assign("hasTest", true);
             }
-            targetNameAttrs["targets"].asList().emplace_back(targetAttrs);
+            auto& targets = targetNameAttrs["targets"].asList();
+            if (isTest || targets.empty()) {
+                targets.emplace_back(targetAttrs);
+            } else { // non-test targets always put to begin of targets
+                targets.insert(targets.begin(), targetAttrs);
+            }
+        }
+        if (DoDump) {
+            for (auto& [targetName, targetNameAttrs] : subdirAttrs) {
+                targetNameAttrs.asMap().emplace("dump", ::NYexport::Dump(targetNameAttrs, 0, "// "));
+            }
         }
     }
     return subdirsAttrs;

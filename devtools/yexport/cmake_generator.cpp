@@ -122,7 +122,7 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     result->GeneratorDir = generatorDir;
     result->SetArcadiaRoot(arcadiaRoot);
 
-    result->ReadYexportSpec(configDir);
+    result->YexportSpec = result->ReadYexportSpec(configDir);
     return result;
 }
 
@@ -131,7 +131,7 @@ void TCMakeGenerator::SetProjectName(const std::string& projectName) {
 }
 
 void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& semGraph) {
-        auto [graph, startDirs] = ReadSemGraph(semGraph);
+        auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
         Platforms.emplace_back(TPlatform(platform));
         graph.Swap(Platforms.back().Graph);
         Platforms.back().StartDirs = std::move(startDirs);

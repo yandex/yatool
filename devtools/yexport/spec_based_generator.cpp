@@ -34,14 +34,15 @@ const TNodeSemantics& TSpecBasedGenerator::ApplyReplacement(TPathView path, cons
     return TargetReplacements_.ApplyReplacement(path, inputSem);
 }
 
-
-void TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
+TYexportSpec TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     if (!configDir.empty()) {
         auto yexportToml = configDir / YEXPORT_FILE;
         if (fs::exists(yexportToml)) {
             LoadTargetReplacements(yexportToml, TargetReplacements_);
+            return ::NYexport::ReadYexportSpec(yexportToml);
         }
     }
+    return {};
 }
 
 fs::path TSpecBasedGenerator::PathByCopyLocation(ECopyLocation location) const {

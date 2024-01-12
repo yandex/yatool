@@ -77,12 +77,12 @@ namespace {
         }
         bool OnCloseMap() override {
             if (IsElemPath()) {
-                const auto curElem = std::exchange(CurElem, {});
+                auto curElem = std::exchange(CurElem, {});
                 switch (curElem.DataType) {
                     case ECurElem::Unspecified:
                         return false;
                     case ECurElem::Dep: {
-                        if (!curElem.FromId || !curElem.ToId || !curElem.DepType) {
+                        if (!curElem.FromId.Defined() || !curElem.DepType.Defined() || !curElem.ToId.Defined()) {
                             return false;
                         }
                         TDepInfo dep{
@@ -91,7 +91,6 @@ namespace {
                             .Type = curElem.DepType.GetRef(),
                             .Data = std::move(curElem.DepData),
                         };
-
                         if (!Link(dep))
                             PostponedDeps_.push_back(dep);
                         break;
@@ -274,14 +273,14 @@ namespace {
             jinja2::ValuesMap::const_iterator excludesIt;
             bool hasExcludes = false;
             if (!UseManagedPeersClosure_ && depHasData) {
-                const auto& depAttrs = *dep.Data.Get();
+                const auto& depAttrs = dep.Data.GetRef();
                 const auto isClosureIt = depAttrs.find(DEPATTR_IS_CLOSURE);
                 if (isClosureIt != depAttrs.end() && isClosureIt->second.get<bool>()) {
                     return true; // skip closure deps in direct peers mode
                 }
             }
             if (depHasData) {
-                const auto& depAttrs = *dep.Data.Get();
+                const auto& depAttrs = dep.Data.GetRef();
                 excludesIt = depAttrs.find(DEPATTR_EXCLUDES);
                 if (excludesIt != depAttrs.end()) {
                     Y_ASSERT(excludesIt->second.isList());

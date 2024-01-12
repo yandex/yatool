@@ -30,7 +30,11 @@ template<typename Values>
 concept IterableValues = std::ranges::range<Values>;
 
 struct TJinjaTarget : TProjectTarget {
-    bool isTest;
+    std::string TestModDir; ///< If target is test, here directory of module with this test inside
+
+    bool IsTest() const {
+        return !TestModDir.empty();
+    }
 };
 
 class TJinjaProject : public TProject {
@@ -43,7 +47,9 @@ using TJinjaProjectPtr = TSimpleSharedPtr<TJinjaProject>;
 
 class TJinjaGenerator : public TSpecBasedGenerator {
 public:
-    static constexpr std::string_view EXCLUDES_ATTR = "excludes";
+    class TBuilder;
+    static constexpr std::string_view EXCLUDES_ATTR = "excludes";   // Lists of excludes induced attributes
+    static constexpr std::string_view TEST2TEST_ATTR = "test2test"; // Flag of dependency test to test
 
     static THolder<TJinjaGenerator> Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir = "");
 
@@ -55,6 +61,7 @@ public:
     void SetSpec(const TGeneratorSpec& spec) { GeneratorSpec = spec; };
 
     void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
+
 private:
     void Render(ECleanIgnored cleanIgnored) override;
 
@@ -78,6 +85,7 @@ private:
 
     TProjectPtr Project;
     jinja2::ValuesMap JinjaAttrs; // TODO: use attr storage from jinja_helpers
+    bool DoDump{false};
 };
 
 class TJinjaProject::TBuilder : public TProject::TBuilder {
@@ -105,9 +113,7 @@ public:
 
     bool AddToTargetInducedAttr(const std::string& attrMacro, const jinja2::Value& value, const std::string& nodePath);
     void OnAttribute(const std::string& attribute);
-    bool IsExcluded(TStringBuf path, std::span<const std::string> excludes) const noexcept;
-
-    void SetIsTest(bool isTestTarget);
+    void SetTestModDir(const std::string& testModDir);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
 
     std::tuple<std::string, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs);

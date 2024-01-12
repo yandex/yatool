@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <util/generic/set.h>
+#include <util/string/builder.h>
 
 #include <fstream>
 
@@ -285,4 +286,75 @@ namespace NYexport {
     void TJinjaTemplate::SetValueMap(TTargetAttributesPtr valueMap) {
         ValueMap = valueMap;
     }
+
+    void Dump(IOutputStream& out, const jinja2::Value& value, int depth, const std::string& prefix) {
+        auto Indent = [&prefix](int depth) {
+            return prefix + std::string(depth * 4, ' ');
+        };
+        if (value.isMap()) {
+            if (!depth) out << Indent(depth);
+            out << "{\n";
+            const auto& map = value.asMap();
+            if (!map.empty()) {
+                // Sort map keys before dumping
+                TVector<std::string> keys;
+                keys.reserve(map.size());
+                for (const auto& [key, _] : map) {
+                    keys.emplace_back(key);
+                }
+                Sort(keys);
+                for (const auto& key : keys) {
+                    out << Indent(depth + 1) << key << ": ";
+                    const auto it = map.find(key);
+                    Dump(out, it->second, depth + 1, prefix);
+                }
+            }
+            out << Indent(depth) << "}";
+        } else if (value.isList()) {
+            out << "[\n";
+            for (const auto& val : value.asList()) {
+                out << Indent(depth + 1);
+                Dump(out, val, depth + 1, prefix);
+            }
+            out << Indent(depth) << "]";
+        }  else if (value.isString()) {
+            out << '"' << value.asString() << '"';
+        } else if (value.isEmpty()) {
+            out << "EMPTY";
+        } else {
+            auto dumped = false;
+            if (!dumped) {
+                try {
+                    out << (value.get<bool>() ? "true" : "false");
+                    dumped = true;
+                } catch (std::exception e) {};
+            };
+            if (!dumped) {
+                try {
+                    out << value.get<int64_t>();
+                    dumped = true;
+                } catch (std::exception e) {};
+            };
+            if (!dumped) {
+                try {
+                    out << value.get<double>();
+                    dumped = true;
+                } catch (std::exception e) {};
+            };
+            if (!dumped) {
+                out << "???";
+            }
+        }
+        out << ",\n";
+    }
+
+    std::string Dump(const jinja2::Value& value, int depth, const std::string& prefix) {
+        TStringBuilder strBuilder;
+        Dump(strBuilder.Out, value, depth, prefix);
+        if (strBuilder.empty()) {
+            return {};
+        }
+        return strBuilder;
+    }
+
 }

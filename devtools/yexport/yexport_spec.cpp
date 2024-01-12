@@ -188,6 +188,49 @@ namespace {
         }
         return spec;
     }
+
+    jinja2::ValuesList ParseArray(const toml::array& array);
+    jinja2::ValuesMap ParseTable(const toml::table& table);
+
+    jinja2::Value ParseValue(const toml::value& value) {
+        if (value.is_table()) {
+            return ParseTable(value.as_table());
+        } else if (value.is_array()) {
+            return ParseArray(value.as_array());
+        } else if (value.is_string()) {
+            return value.as_string();
+        } else if (value.is_floating()) {
+            return value.as_floating();
+        } else if (value.is_integer()) {
+            return value.as_integer();
+        } else if (value.is_boolean()) {
+            return value.as_boolean();
+        } else if (value.is_local_date() || value.is_local_datetime() || value.is_offset_datetime()) {
+            return value.as_string();
+        } else {
+            return {};
+        }
+    }
+
+    jinja2::ValuesMap ParseTable(const toml::table& table) {
+        jinja2::ValuesMap map;
+        for (const auto& [key, value] : table) {
+            map.emplace(key, ParseValue(value));
+        }
+        return map;
+    }
+
+    jinja2::ValuesList ParseArray(const toml::array& array) {
+        jinja2::ValuesList list;
+        for (const auto& value : array) {
+            list.emplace_back(ParseValue(value));
+        }
+        return list;
+    }
+
+    jinja2::ValuesMap ParseSection(const toml::value& section) {
+        return ParseTable(section.as_table());
+    }
 }
 
 /// Parse toml and load step by step it (after validation) to targetReplacements
@@ -220,6 +263,39 @@ void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetRe
     } catch (const std::out_of_range& err) {
         throw TBadYexportSpec{err.what()};
     }
+}
+
+TYexportSpec ReadYexportSpec(const std::filesystem::path& path) {
+    std::ifstream input{path};
+    if (!input)
+        throw std::system_error{errno, std::system_category(), "failed to open " + path.string()};
+    return ReadYexportSpec(input, path);
+}
+
+TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& path) {
+    try {
+        const auto doc = toml::parse(input, path.string());
+        TYexportSpec spec;
+        const auto& handlerSection = find_or<toml::value>(doc, YEXPORT_HANDLER, toml::table{});
+        spec.Handler = ParseSection(handlerSection);
+        return spec;
+    } catch (const toml::exception& err) {
+        throw TBadYexportSpec{err.what()};
+    } catch (const std::out_of_range& err) {
+        throw TBadYexportSpec{err.what()};
+    }
+}
+
+void TYexportSpec::Dump(IOutputStream& out) const {
+    jinja2::ValuesMap map;
+    map.emplace(YEXPORT_HANDLER, Handler);
+    ::NYexport::Dump(out, map);
+}
+
+std::string TYexportSpec::Dump() const {
+    TStringBuilder dump;
+    Dump(dump.Out);
+    return dump;
 }
 
 }

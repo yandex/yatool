@@ -37,11 +37,12 @@ protected:
     fs::path GeneratorDir;
     fs::path ArcadiaRoot;
     TGeneratorSpec GeneratorSpec;
+    TYexportSpec YexportSpec;
     THashSet<std::string> UsedAttributes;
     THashSet<const TGeneratorRule*> UsedRules;
     TTargetReplacements TargetReplacements_;
 
-    void ReadYexportSpec(fs::path configDir = "");
+    TYexportSpec ReadYexportSpec(fs::path configDir = "");
 
 private:
     fs::path PathByCopyLocation(ECopyLocation location) const;
