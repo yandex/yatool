@@ -40,7 +40,7 @@ DEFAULT_MSVS_VERSION = '2019'
 SUBST_VAR_MAP = {
     # name in subst  VAR for subst   tool for default resolution
     'python2': ('BUILD_PYTHON_BIN', 'ymake_python2'),
-    'python3': ('BUILD_PYTHON3_BIN', 'ymake_python3'),
+    'python3': ('BUILD_PYTHON3_BIN', 'python3'),
 }
 
 
