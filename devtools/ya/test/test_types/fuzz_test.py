@@ -150,3 +150,7 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
         return ["SIGUSR2"]
+
+    @property
+    def supports_coverage(self):
+        return True

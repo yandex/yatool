@@ -883,6 +883,9 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def supports_coverage(self):
+        """
+        Inject coverage resolve nodes if a suite supports coverage
+        """
         return False
 
     @property
