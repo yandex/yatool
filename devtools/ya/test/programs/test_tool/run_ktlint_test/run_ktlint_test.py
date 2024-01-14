@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("--output-dir", help="Path to source root ")
     parser.add_argument("--tests-filter", help="Path to source root ")
     parser.add_argument("--test-list", help="Is test required for listing only", action="store_true")
+    parser.add_argument("--editorconfig", help="Use editorconfig ktlint folder name")
 
     args = parser.parse_args()
     return args
@@ -66,7 +67,10 @@ def get_test_list(args):
 def run_ktlint(suite, tests_to_run, args):
     ktlint_stderr = os.path.join(args.output_dir, "ktlint.err")
     ktlint_stdout = os.path.join(args.output_dir, "ktlint.out")
-    cmd = [args.binary, "--relative"] + list(tests_to_run.keys())
+
+    # I expected to have arcadia root in args.source_root but it contains path to build_root somehow...
+    cmd = [args.binary, "--editorconfig=" + args.editorconfig, "--relative"]
+    cmd += list(tests_to_run.keys())
     os.chdir(args.source_root)
     shared.tee_execute(cmd, ktlint_stdout, ktlint_stderr, strip_ansi_codes=True)
     errors = {}

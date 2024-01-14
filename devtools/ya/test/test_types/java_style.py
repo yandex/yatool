@@ -14,6 +14,7 @@ from test.system import process
 from test.test_types.py_test import LintTestSuite
 
 import yalibrary.graph.base as graph_base
+from yalibrary.graph.const import BUILD_ROOT, SOURCE_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
                 self.config_xml = f
         self.my_index_files = []
         if not self.config_xml.startswith('/'):
-            self.config_xml = graph_base.hacked_path_join('$(SOURCE_ROOT)', self.project_path, self.config_xml)
+            self.config_xml = graph_base.hacked_path_join(SOURCE_ROOT, self.project_path, self.config_xml)
         self.jdk_resource = None
         self.jstyle_runner_path = None
 
@@ -75,7 +76,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         work_dir = test.common.get_test_suite_work_dir(
-            '$(BUILD_ROOT)',
+            BUILD_ROOT,
             self.project_path,
             self.name,
             retry=retry,
@@ -89,7 +90,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
             opts, 'run_javastyle', self.global_resources, wrapper=True, run_on_target_platform=False
         ) + [
             '--source-root',
-            '$(SOURCE_ROOT)',
+            SOURCE_ROOT,
             '--trace-path',
             os.path.join(work_dir, test.const.TRACE_FILE_NAME),
             '--out-path',
@@ -110,7 +111,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
             cmd += ["--use-jstyle-server"]
 
         if not (opts and getattr(opts, 'disable_jstyle_migrations')):
-            cmd += ["--jstyle-migrations", os.path.join("$(SOURCE_ROOT)", self.JSTYLE_MIGRATIONS_FILE)]
+            cmd += ["--jstyle-migrations", os.path.join(SOURCE_ROOT, self.JSTYLE_MIGRATIONS_FILE)]
 
         for f in opts.tests_filters + self._additional_filters:
             cmd += ["--tests-filters", f]
@@ -121,7 +122,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         return (
             super(JavaStyleTestSuite, self).get_run_cmd_inputs(opts)
             + self.my_index_files
-            + ([self.config_xml] if self.config_xml.startswith('$(SOURCE_ROOT)') else [])
+            + ([self.config_xml] if self.config_xml.startswith(SOURCE_ROOT) else [])
         )
 
     def get_list_cmd_inputs(self, opts):
@@ -155,7 +156,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         res = super(JavaStyleTestSuite, self)._get_all_test_data(data_type)
         my_dirs = list(map(graph_base.hacked_normpath, [j.split('::', 2)[1] for j in self.my_sources if '::' in j]))
         if data_type == 'file':
-            return res + [i.replace('$(SOURCE_ROOT)', 'arcadia') for i in my_dirs if i.startswith('$(SOURCE_ROOT)')]
+            return res + [i.replace(SOURCE_ROOT, 'arcadia') for i in my_dirs if i.startswith(SOURCE_ROOT)]
         return res
 
     def get_test_related_paths(self, arc_root, opts):
@@ -192,17 +193,25 @@ class KtlintTestSuite(LintTestSuite):
         # suite is considered to be steady and cached by default
         return True
 
+    def get_arcadia_test_data(self):
+        arcadia_data = super(KtlintTestSuite, self)._get_all_test_data("arcadia")
+        srcs_data = super(KtlintTestSuite, self).get_arcadia_test_data()
+        return srcs_data + arcadia_data
+
     def get_test_related_paths(self, arc_root, opts):
         return [self._source_folder_path(arc_root), os.path.join(arc_root, ".editorconfig")]
 
+    def _ktlint_folder_name(self):
+        if "USE_KTLINT_OLD" in self.dart_info and self.dart_info['USE_KTLINT_OLD'] == 'yes':
+            return "ktlint_old"
+        return "ktlint"
+
     def get_resource_tools(self):
-        if "KTLINT_OLD" in self.dart_info["KTLINT_BINARY"]:
-            return ("ktlint_old",)
-        return ("ktlint",)
+        return (self._ktlint_folder_name(),)
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         work_dir = test_common.get_test_suite_work_dir(
-            '$(BUILD_ROOT)',
+            BUILD_ROOT,
             self.project_path,
             self.name,
             retry,
@@ -210,6 +219,7 @@ class KtlintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
+        editorconfig = os.path.join(SOURCE_ROOT, "build/platform/java", self._ktlint_folder_name(), ".editorconfig")
         cmd = test.util.tools.get_test_tool_cmd(
             opts, 'run_ktlint_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
@@ -220,11 +230,13 @@ class KtlintTestSuite(LintTestSuite):
             "--trace-path",
             os.path.join(work_dir, test.const.TRACE_FILE_NAME),
             "--source-root",
-            "$(SOURCE_ROOT)",
+            SOURCE_ROOT,
             "--project-path",
             self.project_path,
             "--output-dir",
             os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            "--editorconfig",
+            editorconfig,
         ]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
