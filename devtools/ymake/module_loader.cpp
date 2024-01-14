@@ -130,8 +130,9 @@ void TModuleDef::ProcessMakelistStatement(const TStringBuf& name, const TVector<
             TString dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, TStringBuf(), ConstrYDirDiag);
             if (!dir.empty()) {
                 MakelistPeers.Push(dir);
-                if (Conf.ShouldEmitNeedDirHints() && !NPath::IsExternalPath(dir)) {
-                    FORCE_TRACE(H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
+                if (!NPath::IsExternalPath(dir)) {
+                    TFileView dirEnt = Names.FileConf.GetStoredName(dir);
+                    FORCE_UNIQ_CONFIGURE_TRACE(dirEnt, H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
                 }
             }
         }

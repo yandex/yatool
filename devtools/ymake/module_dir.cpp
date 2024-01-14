@@ -57,6 +57,7 @@ void TModuleDirBuilder::AddDepends(const TVector<TStringBuf>& args) {
         }
         dirProps.push_back(MakeDepFileCacheId(Graph.Names().FileConf.Add(dirName)));
         Module.Vars.SetAppend("TEST_DEPENDS_VALUE", NPath::CutType(dirName));
+        FORCE_UNIQ_CONFIGURE_TRACE(Graph.Names().FileConf.GetStoredName(dirName), H, NEvent::TNeedDirHint(TString{NPath::CutType(dirName)}));
     }
     TPropertySourceDebugOnly sourceDebug{EPropertyAdditionType::Created};
     TPropertyType dependsPropertyType{Graph.Names(), EVI_GetModules, NProps::DEPENDS};
@@ -84,9 +85,7 @@ void TModuleDirBuilder::AddSrcdir(const TStringBuf& dir) {
     }
     TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);
     Module.SrcDirs.Push(dirEnt);
-    if (auto conf = GlobalConf(); conf && conf->ShouldEmitNeedDirHints()) {
-        FORCE_TRACE(H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
-    }
+    FORCE_UNIQ_CONFIGURE_TRACE(dirEnt, H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
 }
 
 void TModuleDirBuilder::AddDataPath(TStringBuf path) {
@@ -115,9 +114,7 @@ void TModuleDirBuilder::AddIncdir(const TStringBuf& dir, EIncDirScope scope, boo
 
     TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);
     Module.IncDirs.Add(dirEnt, scope, langId);
-    if (auto conf = GlobalConf(); conf && conf->ShouldEmitNeedDirHints()) {
-        FORCE_TRACE(H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
-    }
+    FORCE_UNIQ_CONFIGURE_TRACE(dirEnt, H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
 }
 
 void TModuleDirBuilder::AddPeerdir(const TStringBuf& dir, TFlags<EPeerOption> addFlags) {
@@ -151,7 +148,5 @@ void TModuleDirBuilder::AddPeerdir(const TStringBuf& dir, TFlags<EPeerOption> ad
         AddIncdir(dirEnt.GetTargetStr(), EIncDirScope::Local, false);
     }
     Node.AddUniqueDep(Module.GetPeerdirType() == EPT_BuildFrom ? EDT_BuildFrom : EDT_Include, EMNT_Directory, dirEnt.GetElemId());
-    if (auto conf = GlobalConf(); conf && conf->ShouldEmitNeedDirHints()) {
-        FORCE_TRACE(H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
-    }
+    FORCE_UNIQ_CONFIGURE_TRACE(dirEnt, H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
 }

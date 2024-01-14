@@ -5,13 +5,13 @@
 enum class ETraceEvent: ui64 {
     L = 0x001,
     U = 0x002,
-    H = 0x004,
     E = 0x008,
     D = 0x010,
     S = 0x020,
     P = 0x040,
-    d = L | U | H | E | D | S | P,
+    d = L | U | E | D | S | P,
 
+    H = 0x004,
     G = 0x080,
     T = 0x100,
 

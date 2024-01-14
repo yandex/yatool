@@ -1163,6 +1163,10 @@ inline bool TUpdIter::Enter(TState& state) {
             }
         }
 
+        if (st.Node.NodeType == EMNT_Directory) {
+            FORCE_UNIQ_CONFIGURE_TRACE(Graph.GetFileName(st.Node.ElemId), H, NEvent::TNeedDirHint(TString(Graph.GetFileName(st.Node.ElemId).CutType())));
+        }
+
         st.StartEdit(YMake, *this);
         // StartEdit may insert to Nodes new elements.
         // Depending on Nodes type it may also invalidate existing iterators. Then uncomment the following:

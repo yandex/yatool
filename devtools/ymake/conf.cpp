@@ -257,7 +257,6 @@ void TBuildConfiguration::FillMiscValues() {
     AddDataPaths = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_DATA"));
     ForceListDirInResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_FORCE_LISTDIR"));
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
-    NeedDirHints = NYMake::IsTrue(CommandConf.EvalValue("EMIT_NEEDDIR_HINTS"));
 
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
         ReportMissingAddincls = !NYMake::IsTrue(val);

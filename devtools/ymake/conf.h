@@ -102,10 +102,6 @@ public:
         return CheckDependsInDart;
     }
 
-    bool ShouldEmitNeedDirHints() const {
-        return NeedDirHints;
-    }
-
     bool ShouldReportMissingAddincls() const noexcept {
         return ReportMissingAddincls;
     }
@@ -147,7 +143,6 @@ private:
     bool AddDataPaths = false;
     bool ForceListDirInResolving = false;
     bool CheckDependsInDart = false;
-    bool NeedDirHints = false;
     bool ReportMissingAddincls = true;
     bool UseNewUids = UseNewUidsDefault;
 

@@ -775,11 +775,6 @@ void TDirParser::DependsStatement(const TStringBuf& name, const TVector<TStringB
             Conf.IsolatedProjects.CheckStatementPath(name, Makefile, path);
         }
     }
-    if (Conf.ShouldEmitNeedDirHints()) {
-        for (const auto& path : args) {
-             FORCE_TRACE(H, NEvent::TNeedDirHint(TString{path}));
-        }
-    }
 }
 
 void TDirParser::AddSubdir(const TStringBuf& dir, const TStringBuf& name) {
