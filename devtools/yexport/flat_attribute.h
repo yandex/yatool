@@ -6,7 +6,7 @@
 namespace NYexport {
 
     inline const char ATTR_DIVIDER = '-'; // Divider char for tree of attributes
-    inline const std::string LIST_ITEM_TYPE = std::string(1, ATTR_DIVIDER) + "ITEM"; // Magic suffix for set list item type
+    inline const std::string ITEM_TYPE = std::string(1, ATTR_DIVIDER) + "ITEM"; // Magic suffix for set list item type
 
     class TFlatAttribute {
     public:
