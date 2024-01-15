@@ -32,9 +32,12 @@ void LoadTargetReplacements(const fs::path& path, TTargetReplacements& targetRep
 /// Parse toml and load step by step it (after validation) to targetReplacements
 void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetReplacements& targetReplacements);
 
-inline const std::string YEXPORT_HANDLER = "handler"; ///< Section in yexport.toml for direct transit to generator
+inline const std::string YEXPORT_ADD_ATTRS = "add_attrs"; ///< Section in yexport.toml for direct transit attributes to generator
+inline const std::string YEXPORT_ADDATTRS_DIR = "dir"; ///< Direct transit attributes for directories
+inline const std::string YEXPORT_ADDATTRS_TARGET = "target"; ///< Direct transit attributes for targets
 struct TYexportSpec {
-    jinja2::ValuesMap Handler; ///< Attributes from handler for direct transit to generator
+    jinja2::ValuesMap AddAttrsDir; ///< Attributes from yexport.toml for direct transit to directory
+    jinja2::ValuesMap AddAttrsTarget; ///< Attributes from yexport.toml for direct transit to target
 
     void Dump(IOutputStream& out) const;
     std::string Dump() const;

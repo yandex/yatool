@@ -227,10 +227,6 @@ namespace {
         }
         return list;
     }
-
-    jinja2::ValuesMap ParseSection(const toml::value& section) {
-        return ParseTable(section.as_table());
-    }
 }
 
 /// Parse toml and load step by step it (after validation) to targetReplacements
@@ -276,8 +272,20 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
     try {
         const auto doc = toml::parse(input, path.string());
         TYexportSpec spec;
-        const auto& handlerSection = find_or<toml::value>(doc, YEXPORT_HANDLER, toml::table{});
-        spec.Handler = ParseSection(handlerSection);
+        const auto& addattrsSection = find_or<toml::value>(doc, YEXPORT_ADD_ATTRS, toml::table{});
+        if (!addattrsSection.is_table()) {
+            throw TBadYexportSpec({
+                toml::format_error(
+                    "[error] Invalid format of " + std::string(YEXPORT_ADD_ATTRS),
+                    addattrsSection,
+                    std::string(YEXPORT_ADD_ATTRS) + " must be table with optional " + std::string(YEXPORT_ADDATTRS_DIR) + " and " + std::string(YEXPORT_ADDATTRS_TARGET) + " values"
+                )
+            });
+        }
+        const auto& addattrsDir = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_DIR, toml::table{});
+        spec.AddAttrsDir = ParseTable(addattrsDir.as_table());
+        const auto& addattrsTarget = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_TARGET, toml::table{});
+        spec.AddAttrsTarget = ParseTable(addattrsTarget.as_table());
         return spec;
     } catch (const toml::exception& err) {
         throw TBadYexportSpec{err.what()};
@@ -288,7 +296,8 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
 
 void TYexportSpec::Dump(IOutputStream& out) const {
     jinja2::ValuesMap map;
-    map.emplace(YEXPORT_HANDLER, Handler);
+    map.emplace(YEXPORT_ADD_ATTRS + "." + YEXPORT_ADDATTRS_DIR, AddAttrsDir);
+    map.emplace(YEXPORT_ADD_ATTRS + "." + YEXPORT_ADDATTRS_TARGET, AddAttrsTarget);
     ::NYexport::Dump(out, map);
 }
 

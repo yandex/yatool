@@ -590,8 +590,8 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
         JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
     }
     JinjaAttrs.emplace("projectName", ProjectName);
-    if (!YexportSpec.Handler.empty()) {
-        JinjaAttrs.emplace("handler", YexportSpec.Handler);
+    if (!YexportSpec.AddAttrsDir.empty()) {
+        JinjaAttrs.emplace("add_attrs", YexportSpec.AddAttrsDir);
     }
     if (DoDump) {
         JinjaAttrs.emplace("dump", ::NYexport::Dump(JinjaAttrs, 0, "// "));
@@ -608,6 +608,11 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
         }
         auto [subdirIt, _] = subdirsAttrs.emplace(subdir->Path.c_str(), jinja2::ValuesMap{});
         jinja2::ValuesMap& subdirAttrs = subdirIt->second.asMap();
+        if (!YexportSpec.AddAttrsDir.empty()) {
+            for (const auto& [k, v]: YexportSpec.AddAttrsDir) {
+                subdirAttrs.emplace(k, v);
+            }
+        }
         for (auto target: subdir->Targets) {
             auto& targetAttrs = target->Attrs;
             targetAttrs.emplace("name", target->Name);
@@ -615,8 +620,10 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             auto isTest = target.As<TJinjaTarget>()->IsTest();
             targetAttrs.emplace("isTest", isTest);
             targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
-            if (!YexportSpec.Handler.empty()) {
-                targetAttrs.emplace("handler", YexportSpec.Handler);
+            if (!YexportSpec.AddAttrsTarget.empty()) {
+                for (const auto& [k, v]: YexportSpec.AddAttrsTarget) {
+                    targetAttrs.emplace(k, v);
+                }
             }
 
             auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
