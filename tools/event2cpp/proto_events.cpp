@@ -444,13 +444,10 @@ namespace NInternal {
 
                 {
                     size_t intFieldCount = 0;
-                    size_t mapFieldCount = 0;
                     size_t nonMapFieldCount = 0;
                     for (int i = 0; i < Descriptor_->field_count(); ++i) {
                         const FieldDescriptor* field = Descriptor_->field(i);
-                        if (field->is_map()) {
-                            ++mapFieldCount;
-                        } else {
+                        if (!field->is_map()) {
                             ++nonMapFieldCount;
                         }
                         switch (field->cpp_type()) {
