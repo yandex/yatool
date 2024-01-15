@@ -201,6 +201,8 @@ public:
         return true;
     }
 
+    static void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
+
 private:
     bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);
     bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
@@ -212,7 +214,6 @@ private:
     bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
     bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
     void MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesMap& tree);
-    void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
 
     jinja2::ValuesMap* RootAttrs;
     TJinjaGenerator* Generator;

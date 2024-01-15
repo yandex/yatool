@@ -591,7 +591,10 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
     }
     JinjaAttrs.emplace("projectName", ProjectName);
     if (!YexportSpec.AddAttrsDir.empty()) {
-        JinjaAttrs.emplace("add_attrs", YexportSpec.AddAttrsDir);
+        JinjaAttrs.emplace("add_attrs_dir", YexportSpec.AddAttrsDir);
+    }
+    if (!YexportSpec.AddAttrsTarget.empty()) {
+        JinjaAttrs.emplace("add_attrs_target", YexportSpec.AddAttrsTarget);
     }
     if (DoDump) {
         JinjaAttrs.emplace("dump", ::NYexport::Dump(JinjaAttrs, 0, "// "));
@@ -608,11 +611,6 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
         }
         auto [subdirIt, _] = subdirsAttrs.emplace(subdir->Path.c_str(), jinja2::ValuesMap{});
         jinja2::ValuesMap& subdirAttrs = subdirIt->second.asMap();
-        if (!YexportSpec.AddAttrsDir.empty()) {
-            for (const auto& [k, v]: YexportSpec.AddAttrsDir) {
-                subdirAttrs.emplace(k, v);
-            }
-        }
         for (auto target: subdir->Targets) {
             auto& targetAttrs = target->Attrs;
             targetAttrs.emplace("name", target->Name);
@@ -621,21 +619,22 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             targetAttrs.emplace("isTest", isTest);
             targetAttrs.emplace("macroArgs", jinja2::ValuesList(target->MacroArgs.begin(), target->MacroArgs.end()));
             if (!YexportSpec.AddAttrsTarget.empty()) {
-                for (const auto& [k, v]: YexportSpec.AddAttrsTarget) {
-                    targetAttrs.emplace(k, v);
-                }
+                TJinjaProject::TBuilder::MergeTree(targetAttrs, YexportSpec.AddAttrsTarget);
             }
 
             auto targetNameAttrsIt = subdirAttrs.find(target->Macro);
             if (targetNameAttrsIt == subdirAttrs.end()) {
-                jinja2::ValuesMap defaultTargetParams;
-                defaultTargetParams.emplace("arcadiaRoot", ArcadiaRoot);
+                jinja2::ValuesMap defaultTargetNameAttrs;
+                defaultTargetNameAttrs.emplace("arcadiaRoot", ArcadiaRoot);
                 if (ExportFileManager) {
-                    defaultTargetParams.emplace("exportRoot", ExportFileManager->GetExportRoot());
+                    defaultTargetNameAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
                 }
-                defaultTargetParams.emplace("hasTest", false);
-                defaultTargetParams.emplace("targets", jinja2::ValuesList{});
-                targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetParams)).first;
+                defaultTargetNameAttrs.emplace("hasTest", false);
+                defaultTargetNameAttrs.emplace("targets", jinja2::ValuesList{});
+                if (!YexportSpec.AddAttrsDir.empty()) {
+                    TJinjaProject::TBuilder::MergeTree(defaultTargetNameAttrs, YexportSpec.AddAttrsDir);
+                }
+                targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetNameAttrs)).first;
             }
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
             if (isTest) {
