@@ -52,10 +52,9 @@ namespace NYexport {
     class TJinjaTemplate {
     public:
         TJinjaTemplate() = default;
-        TJinjaTemplate(const fs::path& templatePath);
 
         void SetValueMap(TTargetAttributesPtr valueMap);
-        bool Load(const fs::path& templatePath);
+        bool Load(const fs::path& templatePath, jinja2::TemplateEnv* env);
         bool RenderTo(TExportFileManager& exportFileManager, const fs::path& relativeToExportRoot);
 
         TTargetAttributes& GetValueMap();

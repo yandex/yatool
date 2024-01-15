@@ -250,13 +250,13 @@ namespace NYexport {
         return true;
     }
 
-    bool TJinjaTemplate::Load(const fs::path& path) {
+    bool TJinjaTemplate::Load(const fs::path& path, jinja2::TemplateEnv* env) {
         Template = {};
 
         std::ifstream file(path);
         YEXPORT_VERIFY(file.good(), "Failed to open jinja template file: " << path.c_str());
 
-        jinja2::Template tmpl;
+        jinja2::Template tmpl(env);
         auto res = tmpl.Load(file, path.c_str());
         if (!res.has_value()) {
             spdlog::error("Failed to load jinja template due: {}", res.error().ToString());

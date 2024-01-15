@@ -78,8 +78,6 @@ private:
 
     std::string ProjectName;
 
-    std::shared_ptr<jinja2::RealFileSystem> TemplateFs = std::make_shared<jinja2::RealFileSystem>();
-    std::unique_ptr<jinja2::TemplateEnv> JinjaEnv = std::make_unique<jinja2::TemplateEnv>();
     std::vector<jinja2::Template> Templates;
     THashMap<std::string, std::vector<jinja2::Template>> TargetTemplates;
 

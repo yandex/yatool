@@ -24,18 +24,26 @@ public:
     const fs::path& GetGeneratorDir() const;
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
     void ApplyRules(TTargetAttributes& map) const;
+    jinja2::TemplateEnv* GetJinjaEnv() const;
+    void SetCurrentDirectory(const fs::path& dir) const;
 
+    void SetupJinjaEnv();
     void OnAttribute(const std::string& attribute);
 
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";
+    static constexpr const char* GENERATOR_TEMPLATES_PREFIX = "[generator]/";
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
 
 protected:
     void CopyFilesAndResources();
 
+    using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
+    using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;
+
     fs::path GeneratorDir;
     fs::path ArcadiaRoot;
+
     TGeneratorSpec GeneratorSpec;
     TYexportSpec YexportSpec;
     THashSet<std::string> UsedAttributes;
@@ -45,6 +53,9 @@ protected:
     TYexportSpec ReadYexportSpec(fs::path configDir = "");
 
 private:
+    TJinjaFileSystemPtr SourceTemplateFs;
+    TJinjaEnvPtr JinjaEnv;
+
     fs::path PathByCopyLocation(ECopyLocation location) const;
     TCopySpec CollectFilesToCopy() const;
 };

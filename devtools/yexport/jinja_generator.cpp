@@ -404,8 +404,8 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     const std::string& generator,
     const fs::path& configDir
 ) {
-    const auto generatorDir = arcadiaRoot/GENERATORS_ROOT/generator;
-    const auto generatorFile = generatorDir/GENERATOR_FILE;
+    const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
+    const auto generatorFile = generatorDir / GENERATOR_FILE;
     if (!fs::exists(generatorFile)) {
         YEXPORT_THROW(fmt::format("Failed to load generator {}. No {} file found", generator, generatorFile.c_str()));
     }
@@ -413,14 +413,17 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
     result->YexportSpec = result->ReadYexportSpec(configDir);
+    result->GeneratorDir = generatorDir;
+    result->ArcadiaRoot = arcadiaRoot;
+    result->SetupJinjaEnv();
 
-    auto setUpTemplates = [&result, &generatorDir](const std::vector<TTemplate>& sources, std::vector<jinja2::Template>& targets){
+    auto setUpTemplates = [&result](const std::vector<TTemplate>& sources, std::vector<jinja2::Template>& targets){
         targets.reserve(sources.size());
 
         for (const auto& source : sources) {
-            targets.push_back(jinja2::Template(result->JinjaEnv.get()));
+            targets.push_back(jinja2::Template(result->GetJinjaEnv()));
 
-            auto path = generatorDir / source.Template;
+            auto path = result->GeneratorDir / source.Template;
             std::ifstream file(path);
             if (!file.good()) {
                 YEXPORT_THROW("Failed to open jinja template: " << path.c_str());
@@ -432,12 +435,8 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
         }
     };
 
-    setUpTemplates(result->GeneratorSpec.Root.Templates, result->Templates);
-
-    result->ArcadiaRoot = arcadiaRoot;
-    result->JinjaEnv->AddFilesystemHandler({}, result->TemplateFs);
-    result->JinjaEnv->GetSettings().cacheSize = 0;
-    result->JinjaEnv->AddGlobal("split", jinja2::UserCallable{
+    result->GetJinjaEnv()->GetSettings().cacheSize = 0;
+    result->GetJinjaEnv()->AddGlobal("split", jinja2::UserCallable{
         .callable = [](const jinja2::UserCallableParams& params) -> jinja2::Value {
             auto str = params["str"].asString();
             auto delimeter = params["delimeter"].asString();
@@ -453,7 +452,8 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
         },
         .argsInfo = { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
     });
-    result->GeneratorDir = generatorDir;
+
+    setUpTemplates(result->GeneratorSpec.Root.Templates, result->Templates);
 
     if (result->GeneratorSpec.Targets.empty()) {
         std::string message = "[error] No targets exist in the generator file: ";
@@ -529,7 +529,7 @@ void TJinjaGenerator::Render(ECleanIgnored) {
 }
 
 void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs) {
-    TemplateFs->SetRootFolder((ArcadiaRoot/subdir).string());
+    SetCurrentDirectory(ArcadiaRoot/subdir);
     const auto& tmpls = GeneratorSpec.Targets.begin()->second.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++){
         const auto& tmpl = tmpls[templateIndex];

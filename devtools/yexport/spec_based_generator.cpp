@@ -5,6 +5,46 @@
 
 namespace NYexport {
 
+namespace {
+
+    class TPrefixedFileSystem: public jinja2::IFilesystemHandler {
+    public:
+        TPrefixedFileSystem(const std::string& prefix)
+            : Prefix_(prefix)
+        {
+        }
+
+        jinja2::CharFileStreamPtr OpenStream(const std::string& name) const override {
+            std::string realName(CutPrefix(name));
+            return Filesystem_.OpenStream(realName);
+        };
+        jinja2::WCharFileStreamPtr OpenWStream(const std::string& name) const override {
+            std::string realName(CutPrefix(name));
+            return Filesystem_.OpenWStream(realName);
+        };
+        std::optional<std::chrono::system_clock::time_point> GetLastModificationDate(const std::string& name) const override {
+            std::string realName(CutPrefix(name));
+            return Filesystem_.GetLastModificationDate(realName);
+        };
+
+        void SetRootFolder(const fs::path& path) {
+            Filesystem_.SetRootFolder(path);
+        }
+
+    private:
+        std::string_view CutPrefix(const std::string& name) const {
+            std::string_view sv = name;
+            if (sv.find(Prefix_) == 0) {
+                sv.remove_prefix(Prefix_.size());
+            }
+            return sv;
+        }
+
+        jinja2::RealFileSystem Filesystem_;
+        const std::string Prefix_;
+    };
+}
+
 const TGeneratorSpec& TSpecBasedGenerator::GetGeneratorSpec() const {
     return GeneratorSpec;
 }
@@ -29,6 +69,27 @@ void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {
         }
     }
 }
+
+jinja2::TemplateEnv* TSpecBasedGenerator::GetJinjaEnv() const {
+    return JinjaEnv.get();
+}
+
+void TSpecBasedGenerator::SetupJinjaEnv() {
+    JinjaEnv = std::make_unique<jinja2::TemplateEnv>();
+    SourceTemplateFs = std::make_shared<jinja2::RealFileSystem>();
+    auto GeneratorTemplateFs = std::make_shared<TPrefixedFileSystem>(GENERATOR_TEMPLATES_PREFIX);
+    GeneratorTemplateFs->SetRootFolder(GeneratorDir);
+    SourceTemplateFs->SetRootFolder(ArcadiaRoot);
+
+    // Order matters. Jinja should search files with generator/ prefix in generator directory, and only if there is no such file fallback to source directory
+    JinjaEnv->AddFilesystemHandler(GENERATOR_TEMPLATES_PREFIX, GeneratorTemplateFs);
+    JinjaEnv->AddFilesystemHandler({}, SourceTemplateFs);
+}
+void TSpecBasedGenerator::SetCurrentDirectory(const fs::path& dir) const {
+    YEXPORT_VERIFY(JinjaEnv, "Cannot set current directory to " << dir << " before setting up jinja enviroment");
+    SourceTemplateFs->SetRootFolder(dir.c_str());
+}
+
 
 const TNodeSemantics& TSpecBasedGenerator::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
     return TargetReplacements_.ApplyReplacement(path, inputSem);

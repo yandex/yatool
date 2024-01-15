@@ -121,6 +121,7 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
     result->GeneratorDir = generatorDir;
     result->SetArcadiaRoot(arcadiaRoot);
+    result->SetupJinjaEnv();
 
     result->YexportSpec = result->ReadYexportSpec(configDir);
     return result;
@@ -271,11 +272,13 @@ void TCMakeGenerator::RenderRootCMakeList() const {
         ApplyRules(*rootValueMap);
     }
 
+    SetCurrentDirectory(ExportFileManager->GetExportRoot());
+
     // Render all root templates
     {
         for (const auto& tmpl : rootTemplates) {
             TJinjaTemplate rootTempate;
-            auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template);
+            auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv());
             if (!loaded) {
                 continue;
             }
