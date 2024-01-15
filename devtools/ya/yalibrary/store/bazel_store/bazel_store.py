@@ -14,6 +14,7 @@ from six.moves.urllib import parse
 from exts.func import memoize
 from exts import hashing
 from yalibrary.store.dist_store import DistStore
+import zstandard as zstd
 
 DOWNLOAD_CHUNK_SIZE = 1 << 15
 META_VERSION = '1'
@@ -46,8 +47,52 @@ def uid_to_uri(uid):
     return pseudo_hash
 
 
+class StreamWrapper:
+    def __init__(self, file_name):
+        self._fo = open(file_name, 'wb')
+        self._hasher = hashlib.sha256()
+
+    def write(self, data):
+        self._fo.write(data)
+        self._hasher.update(data)
+
+    def close(self):
+        self._fo.close()
+
+    def get_hexdigest(self):
+        return self._hasher.hexdigest()
+
+
+class StreamWriter:
+    def __init__(self, file_name, codec=None):
+        self.file_name = file_name
+        self._codec = codec
+        self._inner_writer = None
+        self._output_writer = None
+
+    def __enter__(self):
+        self._inner_writer = StreamWrapper(self.file_name)
+        if self._codec is None:
+            self._output_writer = self._inner_writer
+        elif self._codec == "zstd":
+            dctx = zstd.ZstdDecompressor()
+            self._output_writer = dctx.stream_writer(self._inner_writer)
+        else:
+            raise ValueError("Unknown codec: {}".format(self._codec))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._output_writer.close()
+
+    def write(self, data):
+        self._output_writer.write(data)
+
+    def get_hexdigest(self):
+        return self._inner_writer.get_hexdigest()
+
+
 class BazelStoreClient(object):
-    def __init__(self, base_uri, username=None, password=None, max_connections=48):
+    def __init__(self, base_uri, username=None, password=None, max_connections=48, client_decompress=False):
         self.base_uri = base_uri
         self.session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
@@ -55,6 +100,7 @@ class BazelStoreClient(object):
         self.session.mount('https://', adapter)
         if username and password:
             self.session.auth = requests.auth.HTTPBasicAuth(username, password)
+        self.client_decompress = client_decompress
 
     def _ac_url(self, uid):
         return parse.urljoin(self.base_uri, '/ac/' + uid_to_uri(uid))
@@ -62,17 +108,25 @@ class BazelStoreClient(object):
     def _cas_url(self, hex_digest):
         return parse.urljoin(self.base_uri, '/cas/' + hex_digest)
 
+    def get_codec(self):
+        if self.client_decompress:
+            return "zstd"
+        else:
+            return None
+
     def get_blob(self, hash, file_path):
-        hasher = hashlib.sha256()
         cas_url = self._cas_url(hash)
         dirname = os_path.dirname(file_path)
         if not os_path.exists(dirname):
             os.makedirs(dirname)
-        with open(file_path, 'wb') as f, self.session.get(cas_url) as get:
+        headers = None
+        codec = self.get_codec()
+        if codec == "zstd":
+            headers = {'Accept-Encoding': 'zstd'}
+        with StreamWriter(file_path, codec=codec) as writer, self.session.get(cas_url, headers=headers) as get:
             for chunk in get.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                f.write(chunk)
-                hasher.update(chunk)
-        digest_got = hasher.hexdigest()
+                writer.write(chunk)
+            digest_got = writer.get_hexdigest()
         if digest_got != hash:
             raise BazelStoreException(
                 'Digest mismatch got: %s expected: %s',

@@ -9,6 +9,7 @@ PEERDIR(
     devtools/ya/core/report
     devtools/ya/exts
     devtools/ya/yalibrary/store
+    contrib/python/zstandard
 )
 
 STYLE_PYTHON()

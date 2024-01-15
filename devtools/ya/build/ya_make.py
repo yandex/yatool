@@ -412,6 +412,7 @@ def init_bazel_remote_cache(opts):
                 readonly=getattr(opts, 'bazel_remote_readonly', True),
                 max_connections=getattr(opts, 'dist_store_threads', 24),
                 fits_filter=fits_filter,
+                client_decompress=getattr(opts, 'bazel_remote_client_decompress', False),
             )
 
 
