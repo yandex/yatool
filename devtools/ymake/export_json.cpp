@@ -275,8 +275,7 @@ namespace {
             const auto& nodeInputs = CmdBuilder.GetNodeInputs(NodeId);
             if (nodeInputs && !nodeInputs->empty()) {
                 for (const auto& input : *nodeInputs.Get()) {
-                    TFileView name = Graph.GetFileName(Graph.Get(input));
-                    DumpInfo.Inputs.push_back(TString{name.GetTargetStr()}); // FIXME(spreis): This is really big hammer
+                    DumpInfo.Inputs.push_back(Conf.RealPath(Graph.GetFileName(Graph.Get(input)))); // FIXME(spreis): This is really big hammer
                 }
             }
         }
