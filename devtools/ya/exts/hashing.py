@@ -38,10 +38,11 @@ def git_like_hash_str_with_size(s):
     """
     Calculate git like hash for string
     """
+    s_bytes = six.ensure_binary(s, errors='backslashreplace')
     sha = hashlib.sha1()
-    sha.update(s)
-    sha.update('\0')
-    sha.update(str(len(s)))
+    sha.update(s_bytes)
+    sha.update(b'\0')
+    sha.update(six.esure_binary(str(len(s))))
 
     return sha.hexdigest(), len(s)
 
