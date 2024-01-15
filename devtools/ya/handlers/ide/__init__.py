@@ -650,11 +650,11 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=(pm.my_platform() != 'win32'),
         )
         self['vscode-ts'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_py.gen_vscode_workspace),
+            action=app.execute(ide.vscode_ts.gen_vscode_workspace),
             description=get_description('Generate VSCode TypeScript project.', ref_name='typescript'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
-                ide.vscode_py.VSCodePyOptions(),
+                ide.vscode_ts.VSCodeTypeScriptOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
