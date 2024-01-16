@@ -322,26 +322,13 @@ namespace NYexport {
         } else if (value.isEmpty()) {
             out << "EMPTY";
         } else {
-            auto dumped = false;
-            if (!dumped) {
-                try {
-                    out << (value.get<bool>() ? "true" : "false");
-                    dumped = true;
-                } catch (std::exception e) {};
-            };
-            if (!dumped) {
-                try {
-                    out << value.get<int64_t>();
-                    dumped = true;
-                } catch (std::exception e) {};
-            };
-            if (!dumped) {
-                try {
-                    out << value.get<double>();
-                    dumped = true;
-                } catch (std::exception e) {};
-            };
-            if (!dumped) {
+            if (std::holds_alternative<bool>(value.data())) {
+                out << (value.get<bool>() ? "true" : "false");
+            } else if (std::holds_alternative<int64_t>(value.data())) {
+                out << value.get<int64_t>();
+            } else if (std::holds_alternative<double>(value.data())) {
+                out << value.get<double>();
+            } else {
                 out << "???";
             }
         }

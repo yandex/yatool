@@ -106,10 +106,12 @@ bool TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::st
         spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrName, nodePath);
         r = false;
     }
-    bool inserted = attrs.insert_or_assign(attrName, values.empty() ? std::string{} : values[0].asString()).second;
-    if (!inserted) {
-        spdlog::error("trying to set string value of attribute {} at node {}, but it already has value. Attribute value will be overwritten", attrName, nodePath);
-    };
+    auto v = values.empty() ? std::string{} : values[0].asString();
+    const auto [attrIt, inserted] = attrs.emplace(attrName, v);
+    if (!inserted && attrIt->second.asString() == v) {
+        spdlog::error("Set string value '{}' of attribute {} at node {}, but it already has value '{}', overwritten", v, attrName, nodePath, attrIt->second.asString());
+        attrIt->second = v;
+    }
     return r;
 }
 
@@ -119,9 +121,11 @@ bool TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::s
         spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrName, nodePath);
         r = false;
     }
-    bool inserted = attrs.insert_or_assign(attrName, values.empty() ? false : IsTrue(values[0].asString())).second;
-    if (!inserted) {
-        spdlog::error("trying to set bool value of attribute {} at node {}, but it already has value. Attribute value will be overwritten", attrName, nodePath);
+    auto v = values.empty() ? false : IsTrue(values[0].asString());
+    const auto [attrIt, inserted] = attrs.emplace(attrName, v);
+    if (!inserted && attrIt->second.get<bool>() == v) {
+        spdlog::error("Set bool value {} of attribute {} at node {}, but it already has value {}, overwritten", v ? "True" : "False", attrName, nodePath, attrIt->second.get<bool>() ? "True" : "False");
+        attrIt->second = v;
     }
     return r;
 }
@@ -347,10 +351,22 @@ public:
                 // Extract excludes node ids from current dependence
                 if (const TSemDepData* depData = reinterpret_cast<const TSemGraph&>(dep.Graph()).GetDepData(dep); depData) {
                     if (const auto excludesIt = depData->find(DEPATTR_EXCLUDES); excludesIt != depData->end()) {
+                        TVector<TNodeId> excludeNodeIds;
+                        TVector<TNodeId> excludeNodeIdsWOInduced;
                         Y_ASSERT(excludesIt->second.isList());
-                        // for each excluded node id get all it induced attrs
+                        // Collect all excluded node ids and collect ids without induced attributes
                         for (const auto& excludeNodeVal : excludesIt->second.asList()) {
                             const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
+                            excludeNodeIds.emplace_back(excludeNodeId);
+                            if (!InducedAttrs_.contains(excludeNodeId)) {
+                                excludeNodeIdsWOInduced.emplace_back(excludeNodeId);
+                            }
+                        }
+                        if (!excludeNodeIdsWOInduced.empty()) { // visit all not visited exclude nodes for make induced attributes
+                            IterateAll(reinterpret_cast<const TSemGraph&>(dep.Graph()), excludeNodeIdsWOInduced, *this);
+                        }
+                        // for each excluded node id get all it induced attrs
+                        for (auto excludeNodeId : excludeNodeIds) {
                             const auto excludeIt = InducedAttrs_.find(excludeNodeId);
                             if (excludeIt != InducedAttrs_.end()) {
                                 // Put all induced attrs of excluded library to lists by induced attribute name
@@ -359,7 +375,7 @@ public:
                                     AddValueToJinjaList(listIt->second.asList(), value);
                                 }
                             } else {
-                                spdlog::debug("Not found induced for excluded node id {} at {}", excludeNodeId, data.Path);
+                                spdlog::error("Not found induced for excluded node id {} at {}", excludeNodeId, data.Path);
                             }
                         }
                     }
