@@ -5,6 +5,7 @@ import json.decoder as json_decoder
 import logging
 import os
 import os.path as os_path
+import library.python.retry as retry
 
 import requests
 import requests.adapters
@@ -31,6 +32,34 @@ def always_false(x, y):
 
 class BazelStoreException(Exception):
     pass
+
+
+class BazelStoreBrokenException(Exception):
+    pass
+
+
+class BazelStoreRetryPolicy:
+    _READ_RETRIES_COUNT = 3  # 0.25, 1, 4
+    _WRITE_RETRIES_COUNT = 4  # 0.25, 1, 4, 16
+
+    def __init__(self):
+        def retry_handler(error, n, raised_after):
+            logger.debug("error: {}, iteration num: {}, raised after: {}".format(error, n, raised_after))
+
+        self._default_retry_conf = retry.RetryConf(
+            handle_error=retry_handler,
+        ).waiting(delay=0.25, backoff=4)
+        self.read_retry_conf = self._default_retry_conf.upto_retries(BazelStoreRetryPolicy._READ_RETRIES_COUNT)
+        self.write_retry_conf = self._default_retry_conf.upto_retries(BazelStoreRetryPolicy._WRITE_RETRIES_COUNT)
+
+    def get_read_conf(self):
+        return self.read_retry_conf
+
+    def get_write_conf(self):
+        return self.write_retry_conf
+
+
+BAZEL_RETRY_POLICY = BazelStoreRetryPolicy()
 
 
 # Byte interpretation:
@@ -102,11 +131,26 @@ class BazelStoreClient(object):
             self.session.auth = requests.auth.HTTPBasicAuth(username, password)
         self.client_decompress = client_decompress
 
+    def _retry_func(self, func, f_args=(), f_kwargs=None, conf=retry.DEFAULT_CONF):
+        if f_kwargs is None:
+            f_kwargs = {}
+
+        try:
+            return retry.retry_call(func, f_args, f_kwargs, conf)
+        except Exception:
+            raise BazelStoreBrokenException()
+
     def _ac_url(self, uid):
         return parse.urljoin(self.base_uri, '/ac/' + uid_to_uri(uid))
 
     def _cas_url(self, hex_digest):
         return parse.urljoin(self.base_uri, '/cas/' + hex_digest)
+
+    def install_data(self, file_path, cas_url, codec, headers):
+        with StreamWriter(file_path, codec=codec) as writer, self.session.get(cas_url, headers=headers) as get:
+            for chunk in get.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                writer.write(chunk)
+            return writer.get_hexdigest()
 
     def get_codec(self):
         if self.client_decompress:
@@ -123,10 +167,9 @@ class BazelStoreClient(object):
         codec = self.get_codec()
         if codec == "zstd":
             headers = {'Accept-Encoding': 'zstd'}
-        with StreamWriter(file_path, codec=codec) as writer, self.session.get(cas_url, headers=headers) as get:
-            for chunk in get.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                writer.write(chunk)
-            digest_got = writer.get_hexdigest()
+        digest_got = self._retry_func(
+            self.install_data, f_args=(file_path, cas_url, codec, headers), conf=BAZEL_RETRY_POLICY.get_read_conf()
+        )
         if digest_got != hash:
             raise BazelStoreException(
                 'Digest mismatch got: %s expected: %s',
@@ -159,7 +202,7 @@ class BazelStoreClient(object):
 
     def get_meta(self, uid):
         ac_url = self._ac_url(uid)
-        response = self.session.get(ac_url)
+        response = self._retry_func(self.session.get, f_args=(ac_url,), conf=BAZEL_RETRY_POLICY.get_read_conf())
         if response.status_code != 200:
             raise BazelStoreException('No metadata for UID `%s`', uid)
         try:
@@ -176,13 +219,14 @@ class BazelStoreClient(object):
 
             stat = os.stat(file)
             result['files'][os_path.relpath(file, root_dir)] = {
-                'hash': self.put_blob(os_path.abspath(file)),
+                'hash': self._retry_func(
+                    self.put_blob, f_args=(os_path.abspath(file),), conf=BAZEL_RETRY_POLICY.get_write_conf()
+                ),
                 'executable': os.access(file, os.X_OK),
                 'mode': stat.st_mode,
                 'size': stat.st_size,
             }
-
-        self.put_meta(uid, result)
+        self._retry_func(self.put_meta, f_args=(uid, result), conf=BAZEL_RETRY_POLICY.get_write_conf())
         return result
 
     def download_file(self, file_path, file_data):
@@ -202,7 +246,7 @@ class BazelStoreClient(object):
 
     def exists(self, uid):
         ac_url = self._ac_url(uid)
-        response = self.session.head(ac_url)
+        response = self._retry_func(self.session.head, f_args=(ac_url,), conf=BAZEL_RETRY_POLICY.get_read_conf())
         if response.status_code == 200:
             return True
         return False
@@ -218,6 +262,7 @@ class BazelStore(DistStore):
             fits_filter=kwargs.pop('fits_filter', None),
         )
         self._client = BazelStoreClient(*args, **kwargs)
+        self._disabled = False
 
     def _get_data_size(self, meta_info):
         return sum(x.get('size', 0) for x in meta_info['files'].values())
@@ -226,6 +271,10 @@ class BazelStore(DistStore):
         self._cache_hit['requested'] += 1
         if found:
             self._cache_hit['found'] += 1
+
+    def _disable_store(self):
+        logger.error("Disabling bazel store")
+        self._disabled = True
 
     def fits(self, node):
         if isinstance(node, dict):
@@ -259,26 +308,37 @@ class BazelStore(DistStore):
 
     @memoize(thread_safe=False)
     def _do_has(self, uid):
-        found = self._client.exists(uid)
+        if self._disabled:
+            return False
 
+        try:
+            found = self._client.exists(uid)
+        except BazelStoreBrokenException:
+            found = False
+            self._disable_store()
         logger.debug('Bazel-remote Probing %s => %s', uid, found)
         self._inc_cache_hit(found)
         return found
 
     def _do_put(self, uid, root_dir, files, codec=None):
+        if self._disabled:
+            return False
+
         name = files[0][len(root_dir) + 1 :] if len(files) else 'none'
         logger.debug('Put %s(%s) to Bazel-remote', name, uid)
         if uid in self._meta or self.readonly():
             # should never happen
             logger.debug('Put %s(%s) to Bazel-remote completed(no-op)', name, uid)
             return True
-
         try:
             meta = self._client.put_data(files, root_dir, uid, name)
             self._meta[uid] = meta
         except BazelStoreException as e:
             logger.debug('Put %s(%s) to Bazel-remote failed: %s', name, uid, e)
             self._count_failure('put')
+            return False
+        except BazelStoreBrokenException:
+            self._disable_store()
             return False
 
         data_size = self._get_data_size(meta)
@@ -287,10 +347,16 @@ class BazelStore(DistStore):
         return True
 
     def _do_try_restore(self, uid, into_dir, filter_func=None):
+        if self._disabled:
+            return False
+
         try:
             meta = self._client.get_data(into_dir, uid, filter_func)
         except BazelStoreException:
             self._count_failure('get')
+            return False
+        except BazelStoreBrokenException:
+            self._disable_store()
             return False
 
         data_size = self._get_data_size(meta)
