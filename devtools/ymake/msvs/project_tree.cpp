@@ -142,12 +142,10 @@ namespace NYMake {
             Y_ASSERT(!NPath::IsTypedPath(path));
             size_t node = 0;
             size_t bpos = 0;
-            size_t len = 1;
             TStringBuf name;
             for (size_t pos = path.find(NPath::PATH_SEP); pos != TStringBuf::npos; pos = path.find(NPath::PATH_SEP, bpos)) {
                 name = path.SubStr(bpos, pos - bpos);
                 AddChild(Pool, node, name, path.Head(pos));
-                ++len;
                 bpos = pos + 1;
             }
             name = path.Tail(bpos);
