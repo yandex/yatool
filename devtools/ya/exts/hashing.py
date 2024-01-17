@@ -42,7 +42,7 @@ def git_like_hash_str_with_size(s):
     sha = hashlib.sha1()
     sha.update(s_bytes)
     sha.update(b'\0')
-    sha.update(six.esure_binary(str(len(s))))
+    sha.update(six.ensure_binary(str(len(s))))
 
     return sha.hexdigest(), len(s)
 
