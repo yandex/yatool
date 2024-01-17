@@ -108,7 +108,7 @@ bool TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::st
     }
     auto v = values.empty() ? std::string{} : values[0].asString();
     const auto [attrIt, inserted] = attrs.emplace(attrName, v);
-    if (!inserted && attrIt->second.asString() == v) {
+    if (!inserted && attrIt->second.asString() != v) {
         spdlog::error("Set string value '{}' of attribute {} at node {}, but it already has value '{}', overwritten", v, attrName, nodePath, attrIt->second.asString());
         attrIt->second = v;
     }
@@ -123,7 +123,7 @@ bool TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::s
     }
     auto v = values.empty() ? false : IsTrue(values[0].asString());
     const auto [attrIt, inserted] = attrs.emplace(attrName, v);
-    if (!inserted && attrIt->second.get<bool>() == v) {
+    if (!inserted && attrIt->second.get<bool>() != v) {
         spdlog::error("Set bool value {} of attribute {} at node {}, but it already has value {}, overwritten", v ? "True" : "False", attrName, nodePath, attrIt->second.get<bool>() ? "True" : "False");
         attrIt->second = v;
     }
