@@ -2519,10 +2519,15 @@ def _gen_upload_node(opts, nd):
     yndex_file = _find_yndex_file(nd)
     output_file = yndex_file + '.yt'
     cmd = ['$(YTYNDEXER)/ytyndexer', 'upload', '-y', '$(BUILD_ROOT)', '-r', opts.yt_root, '-c', opts.yt_cluster]
+    node_tag = 'yt_upload'
     if opts.yt_codenav_extra_opts is None:
         cmd += ['--create-yt-root-with-ttl']
-    elif opts.yt_codenav_extra_opts.strip() and opts.yt_codenav_extra_opts.strip().lower() != 'no':
-        cmd += [i for i in opts.yt_codenav_extra_opts.strip().split(' ') if i]
+    else:
+        yt_codenav_extra_opts = list(filter(None, opts.yt_codenav_extra_opts.split(' ')))
+        if yt_codenav_extra_opts != ['no']:
+            cmd.extend(yt_codenav_extra_opts)
+        if '--use-yt-dynamic-tables' in yt_codenav_extra_opts:
+            node_tag = 'yt_upload_dynamic'
     uid = 'yy-upload-{}'.format(hashing.md5_value(nd['uid'] + '##' + ' '.join(cmd)))
     if not opts.yt_readonly:
         cmd += ['-u', uid]
@@ -2545,7 +2550,7 @@ def _gen_upload_node(opts, nd):
             '$(SOURCE_ROOT)/build/scripts/write_file_size.py',
         ],
         'deps': [nd['uid']],
-        'tag': 'yt_upload',
+        'tag': node_tag,
         'cache': False,
         'requirements': {'network': 'full'},
         'secrets': ['YT_YNDEXER_YT_TOKEN'],
