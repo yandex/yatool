@@ -1052,7 +1052,6 @@ class TestsOverYtOptions(core.yarg.Options):
         self.ytexec_bin = None
         self.ytexec_wrapper_m_cpu = 250
         self.vanilla_execute_yt_token_path = None
-        self.ytexec_title_suffix = None
 
     def consumer(self):
         return [
@@ -1085,13 +1084,6 @@ class TestsOverYtOptions(core.yarg.Options):
                 visible=help_level.HelpLevel.INTERNAL,
             ),
             core.yarg.ConfigConsumer('ytexec_wrapper_m_cpu'),
-            TestArgConsumer(
-                ['--ytexec-title-suffix'],
-                help='pass additional information to operation title',
-                hook=core.yarg.SetValueHook('ytexec_title_suffix'),
-                subgroup=TESTS_OVER_YT_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
             TestArgConsumer(
                 ['--vanilla-execute-yt-token-path'],
                 help='YT token path, which will be used to run tests with ya:yt TAG',

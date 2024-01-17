@@ -12,6 +12,7 @@ import time
 import app_config
 import build.gen_plan as gen_plan
 import core.error
+import core.gsid
 import core.imprint.imprint as imprint
 import core.yarg
 import core.profiler
@@ -917,8 +918,8 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
         description = ytexec_desc.format(
             project_path=suite.project_path, test_type=suite.get_type(), split_index=split_index, uid=node["uid"]
         )
-        if opts.ytexec_title_suffix:
-            description += " - {}".format(opts.ytexec_title_suffix)
+        if core.gsid.flat_session_id():
+            description += " - GSID: {}".format(core.gsid.flat_session_id())
         wrapper_cmd = util_tools.get_test_tool_cmd(opts, "ytexec_run_test", suite.global_resources) + [
             '--output-tar',
             output_tar,
