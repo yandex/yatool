@@ -73,10 +73,18 @@ def execute_early(action):
         modules.extend(
             [
                 ('file_in_memory_log', configure_in_memory_log(ctx, logging.DEBUG)),
-                ('exit', configure_exit_interceptor(error_file)),
-                ('lifecycle_ts', configure_lifecycle_timestamps()),
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
+            ]
+        )
+
+        if not no_report and not is_sensitive(args):
+            modules.append(('report', configure_report_interceptor(ctx)))
+
+        modules.extend(
+            [
+                ('exit', configure_exit_interceptor(error_file)),
+                ('lifecycle_ts', configure_lifecycle_timestamps()),
                 ('env_checker', configure_environment_checker()),
                 # Need for ya nile {udf.so} handler
                 ('fetchers_storage', configure_fetchers_storage(ctx)),
@@ -85,9 +93,6 @@ def execute_early(action):
 
         if not no_tmp_dir:
             modules.append(('tmp_dir', configure_tmp_dir_interceptor(keep_tmp_dir or diag)))
-
-        if not no_report and not is_sensitive(args):
-            modules.append(('report', configure_report_interceptor(ctx)))
 
         if diag:
             modules.append(('diag', configure_diag_interceptor()))
