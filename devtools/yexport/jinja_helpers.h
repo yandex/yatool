@@ -13,8 +13,8 @@ namespace NYexport {
 
     class TTargetAttributes {
     public:
-        static TSimpleSharedPtr<TTargetAttributes> Create(const TAttrsSpec& attrSpec, const std::string& target);
-        TTargetAttributes(const TAttrsSpec& attrSpec, const std::string& name);
+        static TSimpleSharedPtr<TTargetAttributes> Create(const TAttributeGroup& attrGroup, const std::string& target);
+        TTargetAttributes(const TAttributeGroup& attrGroup, const std::string& name);
 
         template <typename T>
         bool SetAttrValue(const std::string& attr, const T& value) {
@@ -43,7 +43,7 @@ namespace NYexport {
 
         bool ValidateAttrOperation(const std::string& attr, const jinja2::Value& value);
 
-        THashMap<std::string, EAttrTypes> AttrTypes;
+        TAttributeGroup AttrGroup;
         jinja2::ValuesMap ValueMap;
         std::string Target;
     };

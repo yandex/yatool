@@ -8,7 +8,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <fstream>
+#include <format>
 
 namespace NYexport {
 
@@ -34,6 +36,13 @@ namespace NKeys {
         {"generator_root", ECopyLocation::GeneratorRoot},
     };
 
+    static const THashMap<std::string, EAttributeGroup> StringToAttributeGroup = {
+        {"root", EAttributeGroup::Root},
+        {"target", EAttributeGroup::Target},
+        {"induced", EAttributeGroup::Induced},
+        {"dir", EAttributeGroup::Directory},
+    };
+
     THashSet<std::string> CopyLocationSet() {
         THashSet<std::string> result;
         for (const auto& [key, _] : StringToCopyLocation) {
@@ -46,6 +55,21 @@ namespace NKeys {
         std::string res = "[";
         bool first = true;
         for (const auto& [key, _] : StringToCopyLocation) {
+            if (first) {
+                first = false;
+            } else {
+                res.append(", ");
+            }
+            res.append(key);
+        }
+        res.append("]");
+        return res;
+    }
+
+    std::string GetAttributeGroupList() {
+        std::string res = "[";
+        bool first = true;
+        for (const auto& [key, _] : StringToAttributeGroup) {
             if (first) {
                 first = false;
             } else {
@@ -247,16 +271,16 @@ namespace {
         }
     }
 
-    void ParseAttr(TAttrsSpec& attrsSpec, const std::string& attrName, const toml::value& attrDesc, TGeneratorSpec& spec) {
+    void ParseAttribute(const std::string& attrName, TAttributeGroup& attrGroup, const toml::value& attrDesc, TGeneratorSpec& spec) {
         auto [attrType, copy] = GetAttrTypeCopy(attrDesc);
         EAttrTypes eattrType = EAttrTypes::Unknown;
-        std::string curAttrName = attrName;
         std::string_view curAttrType = attrType;
-        TFlatAttribute flatAttribute(attrName);
-        for (const auto& curAttrName : flatAttribute.BottomUpRange()) {
-            if (!attrsSpec.Items.contains(curAttrName)) { // don't overwrite already defined attributes
+        TAttribute attribute(attrName);
+        for (i32 i = (i32)attribute.Size() - 1; i >= 0; --i) {
+            std::string curAttrName(attribute.GetFirstParts(i));
+            if (!attrGroup.contains(curAttrName)) { // don't overwrite already defined attributes
                 if (TryFromString(curAttrType, eattrType)) {
-                    attrsSpec.Items[curAttrName].Type = eattrType;
+                    attrGroup[curAttrName] = eattrType;
                 }
                 if (eattrType == EAttrTypes::Unknown) {
                     throw TBadGeneratorSpec(
@@ -264,17 +288,16 @@ namespace {
                     );
                 }
             } else if (curAttrName.size() != attrName.size()) { // upper attribute
-                std::string curAttrNameItem;
-                std::string_view mustDictAttrName;
-                if (attrsSpec.Items[curAttrName].Type == EAttrTypes::List) { // may be list
-                    mustDictAttrName = curAttrNameItem = std::string{curAttrName} + ITEM_TYPE; // then item must be dict
-                    if (!attrsSpec.Items.contains(curAttrNameItem)) {
-                        attrsSpec.Items[curAttrNameItem].Type = EAttrTypes::Dict;
+                std::string mustDictAttrName;
+                if (attrGroup[curAttrName] == EAttrTypes::List) { // may be list
+                    mustDictAttrName = std::string{curAttrName} + ITEM_SUFFIX; // then item must be dict
+                    if (!attrGroup.contains(mustDictAttrName)) {
+                        attrGroup[mustDictAttrName] = EAttrTypes::Dict;
                     }
                 } else{
                     mustDictAttrName = curAttrName; // or parent must be dict
                 }
-                auto upperAttrType = attrsSpec.Items[mustDictAttrName].Type;
+                auto upperAttrType = attrGroup[mustDictAttrName];
                 if (upperAttrType != EAttrTypes::Dict) { // must be dict
                     throw TBadGeneratorSpec(
                         toml::format_error("[error] invalid upper attr " + std::string{mustDictAttrName} + " type '" + ToString<EAttrTypes>(upperAttrType) + "'", attrDesc, " upper attr type must be dict or list")
@@ -292,22 +315,21 @@ namespace {
         }
     }
 
-    TAttrsSpec ParseAttrsSpec(const toml::value& attrs, TGeneratorSpec& spec) {
-        TAttrsSpec attrsSpec;
-        for (const auto& item : attrs.as_table()) {
-            ParseAttr(attrsSpec, item.first, item.second, spec);
+    TAttributeGroup ParseAttributeGroup(const toml::value& attrs, TGeneratorSpec& spec) {
+        TAttributeGroup attrsGroup;
+        for (const auto& [attribute, description] : attrs.as_table()) {
+            ParseAttribute(attribute, attrsGroup, description, spec);
         }
         // By default all list/set/sorted_set items are strings
-        for (const auto& [attrName, attrSpec]: attrsSpec.Items) {
-            auto type = attrSpec.Type;
-            if (type != EAttrTypes::List && type != EAttrTypes::Set && type != EAttrTypes::SortedSet) {
+        for (const auto& [attrName, attrType]: attrsGroup) {
+            if (attrType != EAttrTypes::List && attrType != EAttrTypes::Set && attrType != EAttrTypes::SortedSet) {
                 continue;
             }
-            auto attrNameItem = attrName + ITEM_TYPE;
-            if (!attrsSpec.Items.contains(attrNameItem)){
-                attrsSpec.Items.emplace(attrNameItem, TAttrsSpecValue{.Type = EAttrTypes::Str});
-            } else if (type == EAttrTypes::Set || type == EAttrTypes::SortedSet) {
-                auto curType = attrsSpec.Items[attrNameItem].Type;
+            auto attrNameItem = attrName.str() + ITEM_SUFFIX;
+            if (!attrsGroup.contains(attrNameItem)){
+                attrsGroup.emplace(attrNameItem, EAttrTypes::Str);
+            } else if (attrType == EAttrTypes::Set || attrType == EAttrTypes::SortedSet) {
+                auto curType = attrsGroup[attrNameItem];
                 if (curType != EAttrTypes::Str) {
                     throw TBadGeneratorSpec(
                         toml::format_error("[error] invalid item type " + ToString<EAttrTypes>(curType) + " of " + attrName + " in attrs section", attrs, " now set and sotred_set supports only string items")
@@ -315,7 +337,7 @@ namespace {
                 }
             }
         }
-        return attrsSpec;
+        return attrsGroup;
     }
 
     TGeneratorRule ParseRule(const toml::value& value) {
@@ -376,48 +398,44 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
             genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
         }
 
-        auto& attrs = genspec.Attrs;
-        for (const auto& [name, attspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
-            attrs[name] = ParseAttrsSpec(attspec, genspec);
+        auto& attrs = genspec.AttrGroups;
+        for (const auto& [name, attrspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
+            auto attrGroupIt = NKeys::StringToAttributeGroup.find(name);
+            VERIFY_GENSPEC(attrGroupIt != NKeys::StringToAttributeGroup.end(), attrspec, NGeneratorSpecError::SpecificationError,
+                    "Unknown attribute group [" + name + "]. Attribute group should be one of the following " + NKeys::GetAttributeGroupList());
+            attrs[attrGroupIt->second] = ParseAttributeGroup(attrspec, genspec);
         }
 
-        const auto inducedIt = attrs.find(ATTRGROUP_INDUCED);
+        const auto inducedIt = attrs.find(EAttributeGroup::Induced);
         if (inducedIt != attrs.end()) {
-            auto [targetIt, targetInserted] = attrs.emplace(ATTRGROUP_TARGET, TAttrsSpec{});
-            auto& targetItems = targetIt->second.Items;
-            for (const auto& [attrName, attrSpec]: inducedIt->second.Items) {
-                if (attrName.rfind(ITEM_TYPE) == attrName.size() - ITEM_TYPE.size()) {
+            auto [targetIt, targetInserted] = attrs.emplace(EAttributeGroup::Target, TAttributeGroup{});
+            auto& targetItems = targetIt->second;
+            for (const auto& [attrName, attrType]: inducedIt->second) {
+                if (attrName.IsItem()) {
                     continue; // skip item descriptions in inducing attributes
                 }
-                std::string upperAttrName;
-                auto firstDivPos = attrName.find(ATTR_DIVIDER);
-                const auto& targetAttrName = firstDivPos != std::string::npos ? (upperAttrName = attrName.substr(0, firstDivPos)) : attrName;
+                const std::string targetAttrName(attrName.GetPart(0));
                 auto targetAttrNameIt = targetItems.find(targetAttrName);
                 if (targetAttrNameIt == targetItems.end()) {
-                    targetItems[targetAttrName] = TAttrsSpecValue{ .Type = EAttrTypes::List }; // induced attributes are always list in target attributes
+                    targetItems[targetAttrName] = EAttrTypes::List; // induced attributes are always list in target attributes
                 } else {
-                    auto& targetAttrSpec = targetAttrNameIt->second;
-                    if (targetAttrSpec.Type != EAttrTypes::List) {
-                        spdlog::error("non-list induced attribute found {} of type {}, set to list", targetAttrName, ToString<EAttrTypes>(targetAttrSpec.Type));
-                        targetAttrSpec.Type = EAttrTypes::List;
+                    auto& targetAttrType = targetAttrNameIt->second;
+                    if (targetAttrType != EAttrTypes::List) {
+                        spdlog::error("non-list induced attribute found {} of type {}, set to list", targetAttrName, ToString<EAttrTypes>(targetAttrType));
+                        targetAttrType = EAttrTypes::List;
                     }
                 }
 
-                TAttrsSpecValue upperAttrSpec;
-                if (firstDivPos != std::string::npos) {
-                    upperAttrSpec = attrSpec;
-                    upperAttrSpec.Type = EAttrTypes::Dict;
-                }
-                const auto& targetAttrItemSpec = firstDivPos != std::string::npos ? upperAttrSpec : attrSpec;
-                auto targetAttrItem = targetAttrName + ITEM_TYPE;
+                EAttrTypes targetAttrItemType = attrName.Size() > 1 ? EAttrTypes::Dict : attrType;
+                auto targetAttrItem = targetAttrName + ITEM_SUFFIX;
                 auto targetAttrItemIt = targetItems.find(targetAttrItem);
                 if (targetAttrItemIt == targetItems.end()) {
-                    targetItems[targetAttrItem] = targetAttrItemSpec; // type of list item
+                    targetItems[targetAttrItem] = targetAttrItemType; // type of list item
                 } else {
-                    auto& curTargetAttrItemSpec = targetAttrItemIt->second;
-                    if (curTargetAttrItemSpec.Type != targetAttrItemSpec.Type) {
-                        spdlog::error("induced attribute item {} type {}, overwritten to {}", targetAttrItem, ToString<EAttrTypes>(curTargetAttrItemSpec.Type), ToString<EAttrTypes>(targetAttrItemSpec.Type));
-                        curTargetAttrItemSpec.Type = targetAttrItemSpec.Type;
+                    auto& curTargetAttrItemType = targetAttrItemIt->second;
+                    if (curTargetAttrItemType != targetAttrItemType) {
+                        spdlog::error("induced attribute item {} type {}, overwritten to {}", targetAttrItem, ToString<EAttrTypes>(curTargetAttrItemType), ToString<EAttrTypes>(targetAttrItemType));
+                        curTargetAttrItemType = targetAttrItemType;
                     }
                 }
             }

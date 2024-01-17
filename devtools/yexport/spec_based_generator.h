@@ -28,7 +28,7 @@ public:
     void SetCurrentDirectory(const fs::path& dir) const;
 
     void SetupJinjaEnv();
-    void OnAttribute(const std::string& attribute);
+    void OnAttribute(const TAttribute& attribute);
 
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";

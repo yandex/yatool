@@ -5,10 +5,10 @@
 
 namespace NYexport {
 
-    static const THashMap<std::string, TGraphVisitor::ESemNameType> UsedAttrGroups = {
-        {ATTRGROUP_INDUCED, TGraphVisitor::ESNT_InducedAttr},
-        {ATTRGROUP_TARGET, TGraphVisitor::ESNT_TargetAttr},
-        {ATTRGROUP_ROOT, TGraphVisitor::ESNT_RootAttr},
+    static const THashMap<EAttributeGroup, TGraphVisitor::ESemNameType> UsedAttrGroups = {
+        {EAttributeGroup::Induced, TGraphVisitor::ESNT_InducedAttr},
+        {EAttributeGroup::Target, TGraphVisitor::ESNT_TargetAttr},
+        {EAttributeGroup::Root, TGraphVisitor::ESNT_RootAttr},
     };
 
     TArgsConstraint AtLeast(size_t count) {
@@ -165,14 +165,14 @@ namespace NYexport {
     void TGraphVisitor::SetupSemanticMapping(const TGeneratorSpec& genspec) {
         SemNameToType_.emplace("IGNORED", ESNT_Ignored);
         for (const auto& [attrGroup, semNameType] : UsedAttrGroups) {
-            if (const auto* attrs = genspec.Attrs.FindPtr(attrGroup)) {
-                TAttrsSpec const* inducedSpec = nullptr;
-                if (attrGroup == ATTRGROUP_TARGET) {
+            if (const auto* attrs = genspec.AttrGroups.FindPtr(attrGroup)) {
+                const TAttributeGroup* inducedSpec = nullptr;
+                if (attrGroup == EAttributeGroup::Target) {
                     // We must skip duplicating induced attributes in target attr groups
-                    inducedSpec = genspec.Attrs.FindPtr(ATTRGROUP_INDUCED);
+                    inducedSpec = genspec.AttrGroups.FindPtr(EAttributeGroup::Induced);
                 }
-                for (const auto& item : attrs->Items) {
-                    if (inducedSpec && inducedSpec->Items.contains(item.first)) {
+                for (const auto& item : *attrs) {
+                    if (inducedSpec && inducedSpec->contains(item.first)) {
                         continue; // skip duplicating induced attributes in target attr group
                     }
                     SemNameToType_.emplace(item.first, semNameType);

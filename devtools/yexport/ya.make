@@ -1,10 +1,10 @@
 LIBRARY()
 
 SRCS(
+    attribute.cpp
     cmake_generator.cpp
     dir_cleaner.cpp
     export_file_manager.cpp
-    flat_attribute.cpp
     generator_spec.cpp
     graph_visitor.cpp
     jinja_generator.cpp

@@ -140,14 +140,14 @@ bool TJinjaProject::TBuilder::SetFlagAttr(jinja2::ValuesMap& attrs, const std::s
     return r;
 }
 
-jinja2::Value TJinjaProject::TBuilder::GetItemValue(const std::string& attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath) {
+jinja2::Value TJinjaProject::TBuilder::GetItemValue(EAttributeGroup attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath) {
     jinja2::ValuesMap tempAttrs;
-    auto attrNameItem = attrName + ITEM_TYPE;
+    auto attrNameItem = attrName + ITEM_SUFFIX;
     SetAttrValue(tempAttrs, attrGroup, attrNameItem, jinja2::ValuesList{value}, nodePath, true);
     return tempAttrs[attrNameItem];
 }
 
-bool TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
+bool TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
     auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
     auto& attr = attrIt->second.asList();
     for (const auto& value : values) {
@@ -156,7 +156,7 @@ bool TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesMap& attrs, const s
     return true;
 }
 
-bool TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
+bool TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
     bool r = true;
     auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
     auto& attr = attrIt->second.asList();
@@ -180,7 +180,7 @@ bool TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesMap& attrs, const st
     return r;
 }
 
-bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
+bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
     bool r = true;
     auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
     auto& attr = attrIt->second.asList();
@@ -201,7 +201,7 @@ bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, co
     return r;
 }
 
-bool TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
+bool TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
     bool r = true;
     auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
     auto& attr = attrIt->second.asMap();
@@ -498,10 +498,10 @@ void TJinjaGenerator::LoadSemGraph(const std::string&, const fs::path& semGraph)
     AnalizeSemGraph(startDirs, *graph);
 }
 
-EAttrTypes TJinjaGenerator::GetAttrType(const std::string& attrGroup, const std::string& attrName) const {
-    if (const auto* attrs = GeneratorSpec.Attrs.FindPtr(attrGroup)) {
-        if (const auto it = attrs->Items.find(attrName); it != attrs->Items.end()) {
-            return it->second.Type;
+EAttrTypes TJinjaGenerator::GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const {
+    if (const auto* attrs = GeneratorSpec.AttrGroups.FindPtr(attrGroup)) {
+        if (const auto it = attrs->find(attrName); it != attrs->end()) {
+            return it->second;
         }
     }
     return EAttrTypes::Unknown;

@@ -53,11 +53,11 @@ const fs::path& TSpecBasedGenerator::GetGeneratorDir() const {
     return GeneratorDir;
 }
 
-void TSpecBasedGenerator::OnAttribute(const std::string& attribute) {
-    TFlatAttribute flatAttribute(attribute);
-    for (const auto& attr : flatAttribute.BottomUpRange()) {
+void TSpecBasedGenerator::OnAttribute(const TAttribute& attribute) {
+    for (size_t i = 0; i < attribute.Size(); ++i) {
+        std::string attr(attribute.GetFirstParts(i));
         UsedAttributes.emplace(attr);
-        auto rules = GeneratorSpec.GetRules(std::string(attr));
+        auto rules = GeneratorSpec.GetRules(attr);
         UsedRules.insert(rules.begin(), rules.end());
     }
 }

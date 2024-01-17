@@ -239,8 +239,8 @@ TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
 
 void TCMakeGenerator::RenderRootCMakeList() const {
     const auto& rootTemplates = GeneratorSpec.Root.Templates;
-    auto attrSpecIt = GeneratorSpec.Attrs.find(ATTRGROUP_ROOT);
-    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.Attrs.end(), "No attribute specification for root");
+    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
+    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for root");
 
     TTargetAttributesPtr rootValueMap = TTargetAttributes::Create(attrSpecIt->second, "root");
     // Fill value map

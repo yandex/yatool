@@ -1,6 +1,6 @@
 #pragma once
 
-#include "flat_attribute.h"
+#include "attribute.h"
 #include "std_helpers.h"
 #include "diag/exception.h"
 
@@ -17,11 +17,6 @@
 #include <iosfwd>
 
 namespace NYexport {
-
-enum class ECopyLocation {
-    GeneratorRoot = 0,
-    SourceRoot,
-};
 
 struct TCopySpec {
     THashMap<ECopyLocation, THashSet<fs::path>> Items;
@@ -47,18 +42,6 @@ struct TTargetSpec {
     bool operator==(const TTargetSpec&) const noexcept = default;
 };
 
-struct TAttrsSpecValue {
-    EAttrTypes Type;
-
-    bool operator== (const TAttrsSpecValue&) const noexcept = default;
-};
-
-struct TAttrsSpec {
-    THashMap<std::string, TAttrsSpecValue> Items;
-
-    bool operator== (const TAttrsSpec&) const noexcept = default;
-};
-
 struct TGeneratorRule {
     TCopySpec Copy;
     THashSet<std::string> Attributes;
@@ -68,17 +51,15 @@ struct TGeneratorRule {
     bool operator== (const TGeneratorRule&) const noexcept = default;
 };
 
-
-inline const std::string ATTRGROUP_ROOT = "root";       // Root of all targets attribute
-inline const std::string ATTRGROUP_TARGET = "target";   // Target for generator attribute
-inline const std::string ATTRGROUP_INDUCED = "induced"; // Target for generator induced attribute (add to list for parent node in graph)
+using TAttributeGroup = THashMap<TAttribute, EAttrTypes>;
+using TAttributeSpecification = THashMap<EAttributeGroup, TAttributeGroup>;
 
 struct TGeneratorSpec {
     using TRuleSet = THashSet<const TGeneratorRule*>;
 
     TTargetSpec Root;
     THashMap<std::string, TTargetSpec> Targets;
-    THashMap<std::string, TAttrsSpec> Attrs;
+    TAttributeSpecification AttrGroups;
     THashMap<std::string, TVector<uint32_t>> AttrToRuleId;
     THashMap<std::string, TVector<fs::path>> Merge;
     THashMap<uint32_t, TGeneratorRule> Rules;
@@ -104,10 +85,6 @@ namespace NGeneratorSpecError {
     constexpr const char* UnknownField = "Unknown field";
 }
 
-enum class ESpecFeatures {
-    All,
-    CopyFilesOnly
-};
 using enum ESpecFeatures;
 
 TGeneratorSpec ReadGeneratorSpec(const fs::path& path, ESpecFeatures features = All);

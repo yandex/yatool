@@ -144,16 +144,16 @@ namespace {
 
 namespace NYexport {
 
-    TSimpleSharedPtr<TTargetAttributes> TTargetAttributes::Create(const TAttrsSpec& attrSpec, const std::string& name) {
-        return MakeSimpleShared<TTargetAttributes>(attrSpec, name);
+    TSimpleSharedPtr<TTargetAttributes> TTargetAttributes::Create(const TAttributeGroup& attrGroup, const std::string& name) {
+        return MakeSimpleShared<TTargetAttributes>(attrGroup, name);
     }
 
-    TTargetAttributes::TTargetAttributes(const TAttrsSpec& attrSpec, const std::string& name) : Target(name) {
-        for (const auto& [attr, spec] : attrSpec.Items) {
-            AttrTypes[attr] = spec.Type;
-            auto typeIndex = IndexByAttrType(spec.Type);
+    TTargetAttributes::TTargetAttributes(const TAttributeGroup& attrGroup, const std::string& name) : AttrGroup(attrGroup), Target(name) {
+        for (const auto& [attr, type] : AttrGroup) {
+            AttrGroup[attr] = type;
+            auto typeIndex = IndexByAttrType(type);
             if (typeIndex == VariantIndex<JinjaVariant, JinjaEmpty>()) {
-                spdlog::error("Attribute [{}] has no type and will not be created", attr);
+                spdlog::error("Attribute [{}] has no type and will not be created", attr.str());
             }
             switch (typeIndex) {
                 case VariantIndex<JinjaVariant, bool>():
@@ -169,7 +169,7 @@ namespace NYexport {
                     ValueMap[attr] = JinjaDict();
                     break;
                 default:
-                    YEXPORT_THROW(TBadGeneratorSpec(), "Unsupported attribute type: " << spec.Type);
+                    YEXPORT_THROW(TBadGeneratorSpec(), "Unsupported attribute type: " << type);
             }
         }
     }
@@ -184,7 +184,7 @@ namespace NYexport {
         if (!ValidateAttrOperation(attr, value)) {
             return false;
         }
-        auto type = AttrTypes.at(attr);
+        auto type = AttrGroup.at(attr);
         auto valueIndex = IndexByAttrType(type);
         switch (valueIndex) {
             case VariantIndex<JinjaVariant, bool>():
@@ -207,7 +207,7 @@ namespace NYexport {
         if (!ValidateAttrOperation(attr, value)) {
             return false;
         }
-        auto type = AttrTypes.at(attr);
+        auto type = AttrGroup.at(attr);
         auto valueIndex = IndexByAttrType(type);
         switch (valueIndex) {
             case VariantIndex<JinjaVariant, bool>():
@@ -231,8 +231,8 @@ namespace NYexport {
     }
 
     bool TTargetAttributes::ValidateAttrOperation(const std::string& attr, const jinja2::Value& value) {
-        auto typeIt = AttrTypes.find(attr);
-        if (typeIt == AttrTypes.end()) {
+        auto typeIt = AttrGroup.find(attr);
+        if (typeIt == AttrGroup.end()) {
             spdlog::error("Trying to perform operation on unknown attribute [{}] in valueMap [{}]", attr, Target);
             return false;
         }

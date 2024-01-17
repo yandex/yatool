@@ -65,7 +65,7 @@ public:
 private:
     void Render(ECleanIgnored cleanIgnored) override;
 
-    EAttrTypes GetAttrType(const std::string& attrGroup, const std::string& attrName) const;
+    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const;
 
 private:
     friend class TJinjaProject::TBuilder;
@@ -92,7 +92,7 @@ public:
 
     template<IterableValues Values>
     bool SetRootAttr(const std::string& attrName, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(*RootAttrs, ATTRGROUP_ROOT, attrName, values, nodePath);
+        return SetAttrValue(*RootAttrs, EAttributeGroup::Root, attrName, values, nodePath);
     }
 
     template<IterableValues Values>
@@ -101,12 +101,12 @@ public:
             spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
             return false;
         }
-        return SetAttrValue(CurTarget_->Attrs, ATTRGROUP_TARGET, attrName, values, nodePath);
+        return SetAttrValue(CurTarget_->Attrs, EAttributeGroup::Target, attrName, values, nodePath);
     }
 
     template<IterableValues Values>
     bool SetInducedAttr(jinja2::ValuesMap& attrs,const std::string& attrName, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(attrs, ATTRGROUP_INDUCED, attrName, values, nodePath);
+        return SetAttrValue(attrs, EAttributeGroup::Induced, attrName, values, nodePath);
     }
 
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
@@ -117,7 +117,8 @@ public:
     std::tuple<std::string, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs);
 
     template<IterableValues Values>
-    bool SetAttrValue(jinja2::ValuesMap& jinjaAttrs, const std::string& attrGroup, const std::string& attrName, const Values& values, const std::string& nodePath, bool itemMode = false) {
+    bool SetAttrValue(jinja2::ValuesMap& jinjaAttrs, EAttributeGroup attrGroup, const std::string& attrName, const Values& values, const std::string& nodePath, bool itemMode = false) {
+        TAttribute attribute(attrName);
         jinja2::ValuesList jvalues;
         const jinja2::ValuesList* valuesPtr;
         if constexpr(std::same_as<Values, jinja2::ValuesList>) {
@@ -128,8 +129,8 @@ public:
         }
         auto attrType = Generator->GetAttrType(attrGroup, attrName);
         Y_ASSERT(attrType != EAttrTypes::Unknown);
-        if (!itemMode && attrName.rfind(ITEM_TYPE) == attrName.size() - ITEM_TYPE.size()) { // attr with -ITEM tail not in item mode
-            auto parentAttrName = attrName.substr(0, attrName.size() - ITEM_TYPE.size());
+        if (!itemMode && attribute.IsItem()) { // attr with -ITEM tail not in item mode
+            std::string parentAttrName(attribute.GetFirstParts(attribute.Size() - 2));
             if (attrType == EAttrTypes::Dict && Generator->GetAttrType(attrGroup, parentAttrName) == EAttrTypes::List) { // item is dist and parent is list
                 auto [attrIt, _] = jinjaAttrs.emplace(parentAttrName, jinja2::ValuesList{});
                 attrIt->second.asList().emplace_back(jinja2::ValuesMap{});
@@ -208,11 +209,11 @@ private:
     bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
     bool SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
     bool SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    jinja2::Value GetItemValue(const std::string& attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
-    bool AppendToListAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
-    bool AppendToSetAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
-    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    bool AppendToDictAttr(jinja2::ValuesMap& attrs, const std::string& attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
+    jinja2::Value GetItemValue(EAttributeGroup attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
+    bool AppendToListAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
+    bool AppendToSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
+    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
+    bool AppendToDictAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
     void MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesMap& tree);
 
     jinja2::ValuesMap* RootAttrs;
