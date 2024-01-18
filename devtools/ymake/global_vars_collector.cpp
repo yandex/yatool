@@ -36,8 +36,14 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
             MineVariables(RestoreContext.Conf, dep.To(), commandInfo.ToolPaths, commandInfo.ResultPaths, commandInfoVars, lateOuts, RestoreContext.Modules);
             TString objd = commandInfo.SubstMacro(nullptr, depName, ESM_DoSubst, commandInfoVars, ECF_Unset, true);
             auto& var = vars[varName];
-            var.push_back(TVarStr(objd));
-            var.back().StructCmd = parentData->StructCmdDetected;
+            if (varName.EndsWith("_RESOURCE_GLOBAL") && !var.empty()) {
+                if (objd != var.back().Name) {
+                    YConfErr(Misconfiguration) << "Resource [[alt1]]" << varName << "[[rst]] is declared several times with different definition";
+                }
+            } else {
+                var.push_back(TVarStr(objd));
+                var.back().StructCmd = parentData->StructCmdDetected;
+            }
         }
     }
     parentVars.SetVarsComplete();
