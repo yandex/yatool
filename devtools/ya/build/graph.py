@@ -2605,6 +2605,8 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
                 '$(BUILD_ROOT)',
                 '-y',
                 '$(SOURCE_ROOT)/build/plugins',
+                '-y',
+                '$(SOURCE_ROOT)/build/internal/plugins',
                 '-c',
                 '$(BUILD_ROOT)/ymake.conf',
                 '-Y',
