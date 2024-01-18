@@ -187,6 +187,9 @@ namespace {
                 Subst2Json.FakeFinish(MakeCommand.CmdInfo);
             } else {
                 ReplaceNodeDeps(node);
+                if (Conf.DumpInputsInJSON) {
+                    ReplaceNodeInputs();
+                }
                 node.Uid = DumpInfo.UID;
                 node.SelfUid = DumpInfo.SelfUID;
             }
@@ -247,6 +250,14 @@ namespace {
                 depsIt++;
             }
             Y_ASSERT(depsIt == node.ToolDeps.end());
+        }
+
+        void ReplaceNodeInputs() {
+            Y_ASSERT(Conf.DumpInputsInJSON);
+            FillInputs();
+            FillDepsAndExtraInputs();
+
+            Subst2Json.UpdateInputs(MakeCommand.CmdInfo);
         }
 
         TMd5Value CalculateDepsId() {

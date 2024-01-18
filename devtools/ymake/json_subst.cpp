@@ -271,6 +271,15 @@ void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, con
     }
 }
 
+void TSubst2Json::UpdateInputs(TCommandInfo& cmdInfo) {
+    TVars vars;
+    TMakeNode& makeNode = *MakeNode;
+
+    auto inputs = StrVector2JsonList(DumpInfo.Inputs);
+    XXXConcatJsonLists(GenerateVecParam(&DumpInfo.ExtraInput, "EXTRA_INPUT", cmdInfo, vars), inputs);
+    makeNode.Inputs.swap(inputs);
+}
+
 void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
     TMakeNode& makeNode = *MakeNode;
 

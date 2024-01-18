@@ -69,6 +69,8 @@ public:
     void FakeFinish(TCommandInfo& cmdInfo);
     void CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars);
 
+    void UpdateInputs(TCommandInfo& cmdInfo);
+
 private:
     // TJsonCmdAcceptor implementation.
     void OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) override;
