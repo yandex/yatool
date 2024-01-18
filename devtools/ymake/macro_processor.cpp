@@ -1275,10 +1275,9 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
         //YDIAG(Dev) << "cur = " << cur << " " << token.RawString << ", " << token.IsOwnArg << ", " << token.IsTool << "\n";
 
         if (!cmd) {
-            YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " not found\n";
-            YConfWarn(UndefVar) << "> HERE: " << Get1(&var) << Endl;
-            //YConfWarn(Dev) << "cmdId = " << cmdId << ", vars id = " << module->Vars.Id << Endl;
             if (!IsGlobalReservedVar(tokenName)) {
+                YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " not found\n";
+                YConfWarn(UndefVar) << "> HERE: " << Get1(&var) << Endl;
                 GetAddCtx(var)->AddDep(EDT_Include, EMNT_UnknownCommand, tokenName);
             }
         } else {
