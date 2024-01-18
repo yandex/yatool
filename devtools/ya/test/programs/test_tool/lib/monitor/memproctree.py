@@ -19,14 +19,13 @@ class ProcInfo(object):
 
 
 class MemProcessTreeMonitor(pollmon.PollMonitor):
-    def __init__(self, target_pid, precise_limit=0, delay=1, caption="", cmdline_limit=200):
+    def __init__(self, target_pid, precise_limit=0, delay=1, caption="", cmdline_limit=None):
         super(MemProcessTreeMonitor, self).__init__(delay)
         self.process = psutil.Process(target_pid)
         self.precise_limit = precise_limit
         self.maxrss = 0
         self.max_used = 0
         self.caption = caption
-        assert cmdline_limit > 0, cmdline_limit
         self.cmdline_limit = cmdline_limit
         self.precise_tree = False
         self.proc_tree = {}
@@ -38,7 +37,8 @@ class MemProcessTreeMonitor(pollmon.PollMonitor):
 
     def _create_proc_info(self, proc):
         cmd_line = " ".join([os.path.basename(proc.exe())] + proc.cmdline()[1:])
-        cmd_line = cmd_line[: self.cmdline_limit].strip()
+        if self.cmdline_limit:
+            cmd_line = cmd_line[: self.cmdline_limit].strip()
         return ProcInfo(
             pid=proc.pid,
             command=cmd_line,
@@ -128,7 +128,8 @@ class MemProcessTreeMonitor(pollmon.PollMonitor):
                 proc_info_prefix = prefix.format(pid, fmt_rss(pi.rss))
 
             proc_info_prefix = proc_info_prefix + ("" if first_proc else "└─ " if last_entry else "├─ ")
-            lines.append(proc_info_prefix + pi.command[: self.cmdline_limit - len(proc_info_prefix)])
+            command = pi.command[: self.cmdline_limit - len(proc_info_prefix)] if self.cmdline_limit else pi.command
+            lines.append(proc_info_prefix + command)
             if self.proc_tree[pid]:
                 dump(pid, False, prefix + ("   " if last_entry else "│  "))
 

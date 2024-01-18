@@ -69,6 +69,7 @@ RECIPE_ERROR_MESSAGE_LIMIT = 1024
 SMOOTH_SHUTDOWN_TIMEOUT = 30
 TESTS_FAILED_EXIT_CODE = 66
 TIMEOUT_KILL_SIGNAL = 3  # signal.SIGQUIT
+PSTREE_CMDLINE_LIMIT = 200
 
 
 class TestError(Exception):
@@ -1165,6 +1166,10 @@ def use_arg_file_if_possible(cmd, out_dir):
         return cmd
 
 
+def pstree_cmdline_limit(options):
+    return None if const.YaTestTags.NoPstreeTrim in options.test_tags else PSTREE_CMDLINE_LIMIT
+
+
 def main():
     subreaper_set_error = become_subreaper()
     is_subreaper_set = not bool(subreaper_set_error)
@@ -1336,7 +1341,9 @@ def main():
             if options.local_ram_drive_size:
                 precise_limit -= options.local_ram_drive_size * 1024**3
             precise_limit = max([0, precise_limit])
-            mem_monitor = monitor.MemProcessTreeMonitor(target_pid, precise_limit=precise_limit, delay=2)
+            mem_monitor = monitor.MemProcessTreeMonitor(
+                target_pid, precise_limit=precise_limit, delay=2, cmdline_limit=pstree_cmdline_limit(options)
+            )
             mem_monitor.start()
 
         if private_ram_drive and monitor.is_stat_tmpfs_supported():
@@ -1541,7 +1548,7 @@ def main():
                 stages.stage("timeout_processing")
                 logger.warning("Wrapper execution timed out")
 
-                mon = monitor.MemProcessTreeMonitor(exec_obj.process.pid)
+                mon = monitor.MemProcessTreeMonitor(exec_obj.process.pid, cmdline_limit=pstree_cmdline_limit(options))
                 proc_tree_str = mon.poll().dumps_process_tree().strip()
                 logger.warning(
                     "Wrapper has overrun %s secs timeout. Process tree before termination:\n%s", timeout, proc_tree_str
