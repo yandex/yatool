@@ -144,6 +144,15 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
                 const auto depNode = RestoreContext.Graph.Get(nodeId);
                 const auto name = RestoreContext.Graph.GetNameFast(depNode);
                 UpdateCurrent(state, name, "Include managed peer name to structure hash");
+
+                const TNodeData* chldState = Nodes.FindPtr(nodeId);
+                Y_ASSERT(chldState);
+                if (chldState) {
+                    CurrState->Hash->New()->IncludeStructureMd5Update(
+                        chldState->NewUids()->GetIncludeStructureUid(),
+                        "Pass IncludeStructure for managed peer"
+                    );
+                }
             }
         }
     }
@@ -216,12 +225,12 @@ void TJSONVisitorNew::PassToParent(TState& state) {
                 isDMModules = CurrState->Module->GetAttrs().RequireDepManagement && PrntState->Module->GetAttrs().RequireDepManagement;
             }
             if (!isDMModules) {
-                PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass structure for consumer by EDT_Include");
+                PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass IncludeStructure by EDT_Include");
             }
         }
 
         if (*Edge == EDT_BuildFrom) {
-            PrntState->Hash->New()->StructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass structure for consumer by EDT_BuildFrom");
+            PrntState->Hash->New()->StructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass IncludeStructre by EDT_BuildFrom");
         }
     }
 
