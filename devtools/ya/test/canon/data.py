@@ -304,22 +304,24 @@ class CanonicalData(object):
 
         def fix_paths(value, _):
             if external.is_external(value):
-                if external.is_external(value):
-                    external_data = external.ExternalDataInfo(value)
-                    if external_data.is_file:
-                        path = external_data.path
-                        if os.path.exists(os.path.join(test_canon_dir, path)):
-                            src = os.path.join(test_canon_dir, path)
-                        elif os.path.exists(os.path.join(suite_canon_dir, path)):
-                            src = os.path.join(suite_canon_dir, path)
-                        else:
-                            logging.warning("Found missing external file: {}".format(path))
-                            return value
-                        dst = os.path.join(dest_test_canoni_dir, os.path.basename(src))
-                        exts.fs.ensure_dir(dest_test_canoni_dir)
+                external_data = external.ExternalDataInfo(value)
+                if external_data.is_file:
+                    path = external_data.path
+                    if os.path.exists(os.path.join(test_canon_dir, path)):
+                        src = os.path.join(test_canon_dir, path)
+                    elif os.path.exists(os.path.join(suite_canon_dir, path)):
+                        src = os.path.join(suite_canon_dir, path)
+                    else:
+                        logging.warning("Found missing external file: {}".format(path))
+                        return value
+                    dst = os.path.join(dest_test_canoni_dir, os.path.basename(src))
+                    exts.fs.ensure_dir(dest_test_canoni_dir)
+                    if os.path.isdir(src):
+                        exts.fs.copytree3(src, dst, dirs_exist_ok=True)
+                    else:
                         exts.fs.copy_file(src, dst)
-                        return dict(external.ExternalDataInfo.serialize_file(dst, external_data.checksum))
-                    return value
+                    return dict(external.ExternalDataInfo.serialize_file(dst, external_data.checksum))
+                return value
             return value
 
         res = external.apply(fix_paths, res)
