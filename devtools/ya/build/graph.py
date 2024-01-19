@@ -2585,6 +2585,11 @@ def _gen_merge_node(nodes):
 def _gen_ymake_yndex_node(opts, ymake_bin):
     tc = bg.gen_host_tc(getattr(opts, 'c_compiler', None), getattr(opts, 'cxx_compiler', None))
     tc_params = six.ensure_str(base64.b64encode(six.ensure_binary(json.dumps(tc, sort_keys=True))))
+    conf_flags = []
+    for f in ('RECURSE_PARTITIONS_COUNT', 'RECURSE_PARTITION_INDEX'):
+        val = opts.flags.get(f)
+        if val is not None:
+            conf_flags += ['-D', '{}={}'.format(f, val)]
     cmds = [
         {
             'cmd_args': [
@@ -2595,7 +2600,8 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
                 'no',
                 '--toolchain-params',
                 tc_params,
-            ],
+            ]
+            + conf_flags,
             'stdout': '$(BUILD_ROOT)/ymake.conf',
         },
         {
