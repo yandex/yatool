@@ -46,12 +46,8 @@ from yalibrary import term, formatter
 from yalibrary.display import strip_markup
 from yatest.common import cores
 
-import app_config
-
 from devtools.ya.test.dependency import mds_storage
-
-if app_config.have_sandbox_fetcher:
-    from devtools.ya.test.dependency import sandbox_storage
+from devtools.ya.test.dependency import sandbox_storage
 
 import exts.archive
 import exts.fs
@@ -1357,17 +1353,12 @@ def main():
         # - it should be cached (otherwise every run_test run would download data every time it runs)
         # - downloading would steal time from tests
         # - network might be not available (if no network:full requirement is specified)
-        if app_config.have_sandbox_fetcher:
-            cached_storage = sandbox_storage.SandboxStorage(
-                resources_root,
-                use_cached_only=True,
-                update_last_usage=False,
-            )
-            mds_canon_storage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
-        else:
-            # In opensource we need MdsStorage to get info about canonical data
-            cached_storage = None
-            mds_canon_storage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
+        cached_storage = sandbox_storage.SandboxStorage(
+            resources_root,
+            use_cached_only=True,
+            update_last_usage=False,
+        )
+        mds_canon_storage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
 
         if options.create_clean_environment:
             new_source_root, _, new_data_root = testroot.create_environment(

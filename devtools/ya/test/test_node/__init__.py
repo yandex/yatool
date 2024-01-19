@@ -25,8 +25,7 @@ import devtools.ya.test.test_node.cmdline as cmdline
 import devtools.ya.test.test_node.coverage as coverage
 import devtools.ya.test.test_node.fuzzing as fuzzing
 
-if app_config.have_sandbox_fetcher:
-    import devtools.ya.test.test_node.sandbox as sandbox_node
+import devtools.ya.test.test_node.sandbox as sandbox_node
 
 import exts.fs
 import exts.func
@@ -654,12 +653,11 @@ def create_test_node(
         for resource in testdeps.get_test_mds_resources(suite):
             deps.extend(suite.mds_resource_deps)
 
-    if app_config.have_sandbox_fetcher:
-        for resource in testdeps.get_test_sandbox_resources(suite):
-            add_sandbox_resource_dep(resource)
+    for resource in testdeps.get_test_sandbox_resources(suite):
+        add_sandbox_resource_dep(resource)
 
-        for resource in testdeps.get_test_ext_sbr_resources(suite, arc_root):
-            add_sandbox_resource_dep(resource)
+    for resource in testdeps.get_test_ext_sbr_resources(suite, arc_root):
+        add_sandbox_resource_dep(resource)
 
     for file_path in testdeps.get_test_ext_file_resources(suite, arc_root):
         abs_path = os.path.join(arc_root, file_path)

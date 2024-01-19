@@ -34,7 +34,6 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/check_resource
             devtools/ya/test/programs/test_tool/checkout
             devtools/ya/test/programs/test_tool/cov_merge_vfs
-            devtools/ya/test/programs/test_tool/download
             devtools/ya/test/programs/test_tool/minimize_fuzz_corpus
             devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
             devtools/ya/test/programs/test_tool/resolve_sancov_coverage
@@ -57,6 +56,7 @@ IF (PYTHON3)
         devtools/ya/test/programs/test_tool/canonization_result_node
         devtools/ya/test/programs/test_tool/canonize
         devtools/ya/test/programs/test_tool/create_allure_report
+        devtools/ya/test/programs/test_tool/download
         devtools/ya/test/programs/test_tool/lib/coverage
         devtools/ya/test/programs/test_tool/lib/migrations_config
         devtools/ya/test/programs/test_tool/lib/monitor

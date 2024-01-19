@@ -21,22 +21,17 @@ PEERDIR(
     devtools/ya/test/common
     devtools/ya/test/const
     devtools/ya/test/dependency
+    devtools/ya/test/dependency/sandbox_storage
     devtools/ya/test/error
     devtools/ya/test/facility
     devtools/ya/test/filter
     devtools/ya/test/system
     devtools/ya/test/test_node/coverage
+    devtools/ya/test/test_node/sandbox
     devtools/ya/test/test_types
     devtools/ya/test/util
     devtools/ya/yalibrary/last_failed
     devtools/ya/yalibrary/upload/consts
 )
-
-IF (NOT YA_OPENSOURCE OR NEBIUS)
-    PEERDIR(
-        devtools/ya/test/dependency/sandbox_storage
-        devtools/ya/test/test_node/sandbox
-    )
-ENDIF()
 
 END()

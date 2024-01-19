@@ -14,6 +14,7 @@ PEERDIR(
     devtools/ya/test/common
     devtools/ya/test/dartfile
     devtools/ya/test/dependency
+    devtools/ya/test/dependency/sandbox_storage
     devtools/ya/test/programs/test_tool/lib/coverage
     devtools/ya/test/programs/test_tool/lib/monitor
     devtools/ya/test/programs/test_tool/lib/report
@@ -33,12 +34,6 @@ PEERDIR(
     library/python/testing/system_info
     library/python/testing/yatest_common
 )
-
-IF (NOT YA_OPENSOURCE OR NEBIUS)
-    PEERDIR(
-        devtools/ya/test/dependency/sandbox_storage
-    )
-ENDIF()
 
 STYLE_PYTHON()
 
