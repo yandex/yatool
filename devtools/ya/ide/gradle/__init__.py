@@ -10,11 +10,12 @@ from packaging import version
 from build.ymake2 import run_ymake
 import build.graph as bg
 import core.yarg
+import core.profiler as cp
+import core.stages_profiler as csp
 import build.build_opts as bo
 import yalibrary.tools
 from build import build_facade, ya_make
 import yalibrary.platform_matcher as pm
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,10 @@ def build_target(target, params):
 
 @bootstrap
 def do_gradle(params):
-    start_time = time.time()
+    stage = 'do_gradle'
+    cp.profile_step_started(stage)
+    csp.stage_started(stage)
+
     if pm.my_platform() == 'win32':
         logger.error("Win is not supported in ya ide gradle")
         return
@@ -394,6 +398,6 @@ def do_gradle(params):
 
     # чистим все после генерации
     delete_useless_folders(os.path.join(params.arc_root, params.rel_targets[0]))
-    finish_time = time.time()
-    logger.info('Taken time:')
-    logger.info(finish_time - start_time)
+
+    csp.stage_finished(stage)
+    cp.profile_step_finished(stage)

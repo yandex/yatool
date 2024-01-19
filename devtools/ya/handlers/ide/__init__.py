@@ -39,6 +39,7 @@ from core.yarg.help_level import HelpLevel
 
 if six.PY3:
     import ide.gradle
+    import ide.yegradle
 
 
 class TidyOptions(core.yarg.Options):
@@ -416,6 +417,51 @@ class GradleOptions(core.yarg.Options):
         ]
 
 
+class YeGradleOptions(core.yarg.Options):
+    YEGRADLE_OPT_GROUP = core.yarg.Group('Yexport gradle project options', 0)
+
+    def __init__(self):
+        self.gradle_name = None
+        self.gradle_project_root = None
+        self.yexport_bin = None
+        self.build_contribs = False
+
+    @staticmethod
+    def consumer():
+        return [
+            core.yarg.ArgConsumer(
+                ['--gradle-name'],
+                help='Set project name manually',
+                hook=core.yarg.SetValueHook('gradle_name'),
+                group=YeGradleOptions.YEGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--project-root', '-P'],
+                help='Root directory for a Gradle project',
+                hook=core.yarg.SetValueHook('gradle_project_root'),
+                group=YeGradleOptions.YEGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--yexport-bin'],
+                help='Full path to yexport binary',
+                hook=core.yarg.SetValueHook('yexport_bin'),
+                group=YeGradleOptions.YEGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--build-contribs'],
+                help='Build all contribs from arcadia to jar files',
+                hook=core.yarg.SetConstValueHook('build_contribs', True),
+                group=YeGradleOptions.YEGRADLE_OPT_GROUP,
+            ),
+        ]
+
+    def postprocess(self):
+        if self.yexport_bin is not None and not os.path.exists(self.yexport_bin):
+            raise core.yarg.ArgsValidatingException(
+                'Not found yexport binary(--yexport-bin) {}.'.format(self.yexport_bin)
+            )
+
+
 class PycharmOptions(core.yarg.Options):
     PYCHARM_OPT_GROUP = core.yarg.Group('Pycharm project options', 0)
     PYTHON_WRAPPER_NAME = 'pycharm_python_wrapper'
@@ -541,38 +587,48 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             ],
             unknown_args_as_free=True,
         )
-        ide_gradle_opts = ide.ide_common.ide_minimal_opts(targets_free=True) + [
-            ide.ide_common.YaExtraArgsOptions(),
-            GradleOptions(),
-            core.yarg.ShowHelpOptions(),
-            build.build_opts.FlagsOptions(),
-            build.build_opts.CustomFetcherOptions(),
-            build.build_opts.SandboxAuthOptions(),
-            core.common_opts.CrossCompilationOptions(),
-            build.build_opts.ToolsOptions(),
-            build.build_opts.BuildTypeOptions('release'),
-            build.build_opts.JavaSpecificOptions(),
-        ]
-        if six.PY2:
-            self['gradle'] = core.yarg.OptsHandler(
-                action=app.execute(
-                    lambda *a, **k: None,
-                    handler_python_major_version=3,
-                ),
-                description='Generate gradle for project',
-                opts=ide_gradle_opts,
-                visible=False,
-            )
-        if six.PY3:
-            self['gradle'] = core.yarg.OptsHandler(
-                action=app.execute(
-                    ide.gradle.do_gradle,
-                    handler_python_major_version=3,
-                ),
-                description='Generate gradle for project',
-                opts=ide_gradle_opts,
-                visible=False,
-            )
+        self['gradle'] = core.yarg.OptsHandler(
+            action=app.execute(
+                ide.gradle.do_gradle if six.PY3 else (lambda *a, **k: None),
+                handler_python_major_version=3,
+            ),
+            description='Generate gradle for project',
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
+                ide.ide_common.YaExtraArgsOptions(),
+                GradleOptions(),
+                core.yarg.ShowHelpOptions(),
+                build.build_opts.FlagsOptions(),
+                build.build_opts.CustomFetcherOptions(),
+                build.build_opts.SandboxAuthOptions(),
+                core.common_opts.CrossCompilationOptions(),
+                build.build_opts.ToolsOptions(),
+                build.build_opts.BuildTypeOptions('release'),
+                build.build_opts.JavaSpecificOptions(),
+            ],
+            visible=False,
+        )
+        self['yegradle'] = core.yarg.OptsHandler(
+            action=app.execute(
+                ide.yegradle.do_yegradle if six.PY3 else (lambda *a, **k: None),
+                handler_python_major_version=3,
+            ),
+            description='Generate gradle for project by yexport',
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            + [
+                ide.ide_common.YaExtraArgsOptions(),
+                YeGradleOptions(),
+                build.build_opts.YMakeBinOptions(),
+                build.build_opts.FlagsOptions(),
+                build.build_opts.CustomFetcherOptions(),
+                build.build_opts.SandboxAuthOptions(),
+                core.common_opts.CrossCompilationOptions(),
+                build.build_opts.ToolsOptions(),
+                build.build_opts.BuildTypeOptions('release'),
+                build.build_opts.JavaSpecificOptions(),
+            ],
+            visible=False,
+        )
         self['qt'] = core.yarg.OptsHandler(
             action=app.execute(self._choose_qt_handler),
             description='[[imp]]ya ide qt[[rst]] is deprecated, please use clangd-based tooling instead',
