@@ -358,7 +358,7 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
         TCommandInfo cmd(&Conf, &Graph, &UpdIter);
         const TString res = [&]() {
             if (structCmd) {
-                auto compiled = Commands.Compile(cmdValue, Vars, Vars);
+                auto compiled = Commands.Compile(cmdValue, Vars, Vars, false);
                 const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
                 auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
                 return FormatCmd(id, cmdName, value);
@@ -404,7 +404,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     }
 
     if (GetModuleConf().StructCmd && cmdKind == EModuleCmdKind::Default) {
-        auto compiled = Commands.Compile(command, Vars, Vars, EOutputAccountingMode::Module);
+        auto compiled = Commands.Compile(command, Vars, Vars, true, EOutputAccountingMode::Module);
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);

@@ -6,6 +6,8 @@
 
 namespace NCommands {
 
+    TTermValue RenderArgs(std::span<const TTermValue> args);
+    TTermValue RenderTerms(std::span<const TTermValue> args);
     TTermValue RenderClear(std::span<const TTermValue> args);
     TTermValue RenderPre(std::span<const TTermValue> args);
     TTermValue RenderSuf(std::span<const TTermValue> args);

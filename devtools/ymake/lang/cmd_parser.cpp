@@ -92,12 +92,12 @@ namespace {
         }
 
         std::any visitSubBodyIdentifier(CmdParser::SubBodyIdentifierContext *ctx) override {
-            GetCurrentSubst().Body = Values.InsertVar(ctx->getText());
+            GetCurrentSubst().Body = {{Values.InsertVar(ctx->getText())}};
             return visitChildren(ctx);
         }
 
         std::any visitSubBodyString(CmdParser::SubBodyStringContext *ctx) override {
-            GetCurrentSubst().Body = Values.InsertStr(UnquoteDouble(ctx->getText()));
+            GetCurrentSubst().Body = {{Values.InsertStr(UnquoteDouble(ctx->getText()))}};
             return visitChildren(ctx);
         }
 
@@ -202,16 +202,49 @@ TSyntax NCommands::Parse(TMacroValues& values, TStringBuf src) {
 
 }
 
-NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s) {
+namespace {
 
-    NPolexpr::TExpression result;
+    EMacroFunctions CompileFnName(TStringBuf key) {
+        if (key == "hide") {
+            return EMacroFunctions::Hide;
+        } else if (key == "clear") {
+            return EMacroFunctions::Clear;
+        } else if (key == "input") {
+            return EMacroFunctions::Input;
+        } else if (key == "output") {
+            return EMacroFunctions::Output;
+        } else if (key == "tool") {
+            return EMacroFunctions::Tool;
+        } else if (key == "pre") {
+            return EMacroFunctions::Pre;
+        } else if (key == "suf") {
+            return EMacroFunctions::Suf;
+        } else if (key == "quo") {
+            return EMacroFunctions::Quo;
+        } else if (key == "noext") {
+            return EMacroFunctions::CutExt;
+        } else if (key == "lastext") {
+            return EMacroFunctions::LastExt;
+        } else if (key == "ext") {
+            return EMacroFunctions::ExtFilter;
+        } else if (key == "env") {
+            return EMacroFunctions::SetEnv;
+        } else if (key == "kv") {
+            return EMacroFunctions::KeyValue;
+        } else if (key == "msvs_source") {
+            return EMacroFunctions::MsvsSource;
+        } else if (key == "noauto") {
+            return EMacroFunctions::NoAutoSrc;
+        } else {
+            throw yexception() << "unknown modifier " << key;
+        }
+    }
 
-    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, values.Func2Id(EMacroFunctions::Cmds));
-    for (size_t cmd = 0; cmd != s.Commands.size(); ++cmd) {
+    void CompileArgs(TMacroValues& values, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
         NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, values.Func2Id(EMacroFunctions::Args));
-        for (size_t arg = 0; arg != s.Commands[cmd].size(); ++arg) {
+        for (size_t arg = 0; arg != cmd.size(); ++arg) {
             NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, values.Func2Id(EMacroFunctions::Terms));
-            for (size_t term = 0; term != s.Commands[cmd][arg].size(); ++term) {
+            for (size_t term = 0; term != cmd[arg].size(); ++term) {
                 std::visit(TOverloaded{
                     [&](NPolexpr::TConstId s) {
                         termsBuilder.Append(s);
@@ -221,44 +254,10 @@ NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s)
                     },
                     [&](const TSyntax::TSubstitution& s) {
                         for (auto&& m : s.Mods) {
-                            auto& key = m.Name;
-                            EMacroFunctions func;
-                            if (key == "hide") {
-                                func = EMacroFunctions::Hide;
-                            } else if (key == "clear") {
-                                func = EMacroFunctions::Clear;
-                            } else if (key == "input") {
-                                func = EMacroFunctions::Input;
-                            } else if (key == "output") {
-                                func = EMacroFunctions::Output;
-                            } else if (key == "tool") {
-                                func = EMacroFunctions::Tool;
-                            } else if (key == "pre") {
-                                func = EMacroFunctions::Pre;
-                            } else if (key == "suf") {
-                                func = EMacroFunctions::Suf;
-                            } else if (key == "quo") {
-                                func = EMacroFunctions::Quo;
-                            } else if (key == "noext") {
-                                func = EMacroFunctions::CutExt;
-                            } else if (key == "lastext") {
-                                func = EMacroFunctions::LastExt;
-                            } else if (key == "ext") {
-                                func = EMacroFunctions::ExtFilter;
-                            } else if (key == "env") {
-                                func = EMacroFunctions::SetEnv;
-                            } else if (key == "kv") {
-                                func = EMacroFunctions::KeyValue;
-                            } else if (key == "msvs_source") {
-                                func = EMacroFunctions::MsvsSource;
-                            } else if (key == "noauto") {
-                                func = EMacroFunctions::NoAutoSrc;
-                            } else {
-                                throw yexception() << "unknown modifier " << key;
-                            }
+                            auto func = CompileFnName(m.Name);
                             if (values.FuncArity(func) != m.Values.size() + 1)
                                 throw yexception()
-                                    << "bad modifier argument count for " << key
+                                    << "bad modifier argument count for " << m.Name
                                     << " (expected " << values.FuncArity(func) - 1
                                     << ", given " << m.Values.size()
                                     << ")";
@@ -289,23 +288,34 @@ NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s)
                                 }
                             }
                         }
-                        std::visit(TOverloaded{
-                            [&](NPolexpr::TConstId s) {
-                                termsBuilder.Append(s);
-                            },
-                            [&](NPolexpr::EVarId v) {
-                                termsBuilder.Append(v);
-                            }
-                        }, s.Body);
+                        if (
+                            s.Body.size() == 1 && s.Body.front().size() == 1 &&
+                            std::holds_alternative<NPolexpr::EVarId>(s.Body.front().front())
+                        ) {
+                            // this special case is here mostly to reinforce the notion
+                            // that `${VAR}` should be equivalent to `$VAR`;
+                            // we use it with `${mods:VAR}`, as well,
+                            // to cut down on `Args(Terms(...))` wrappers;
+                            // conceptually, with proper typing support,
+                            // this should not be required
+                            termsBuilder.Append(std::get<NPolexpr::EVarId>(s.Body.front().front()));
+                        } else {
+                            CompileArgs(values, s.Body, termsBuilder);
+                        }
                     }
-                }, s.Commands[cmd][arg][term]);
+                }, cmd[arg][term]);
             }
             termsBuilder.Build();
         }
         argsBuilder.Build();
     }
+}
+
+NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s) {
+    NPolexpr::TExpression result;
+    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, values.Func2Id(EMacroFunctions::Cmds));
+    for (size_t cmd = 0; cmd != s.Commands.size(); ++cmd)
+        CompileArgs(values, s.Commands[cmd], cmdsBuilder);
     cmdsBuilder.Build();
-
     return result;
-
 }

@@ -9,6 +9,12 @@ namespace NCommands {
 
         // in variants, EVarId goes first to enable default ctors
 
+        struct TSubstitution;
+        using TTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId, TSubstitution>;
+        using TArgument = std::vector<TTerm>;
+        using TCommand = std::vector<TArgument>;
+        using TCommands = std::vector<TCommand>;
+
         struct TSubstitution {
             struct TModifier {
                 using TValueTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId>;
@@ -18,13 +24,8 @@ namespace NCommands {
                 TValues Values;
             };
             TVector<TModifier> Mods;
-            std::variant<NPolexpr::EVarId, NPolexpr::TConstId> Body;
+            TCommand Body;
         };
-
-        using TTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId, TSubstitution>;
-        using TArgument = std::vector<TTerm>;
-        using TCommand = std::vector<TArgument>;
-        using TCommands = std::vector<TCommand>;
 
         TCommands Commands;
 

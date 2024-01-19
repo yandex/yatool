@@ -100,7 +100,7 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
                 return TInput {.Coord = idx};
             auto result = TInputs();
             auto encoded = Strings.GetName<TCmdView>(idx & COORD_MASK).GetStr();
-            for (auto coord : StringSplitter(encoded).Split(' '))
+            for (auto coord : StringSplitter(encoded).Split(' ').SkipEmpty())
                 result.Coords.push_back(FromString<ui32>(coord.Token()));
             return result;
         }

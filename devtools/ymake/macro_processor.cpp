@@ -268,7 +268,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     if (blockData && blockData->StructCmd) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
-        auto compiled = CommandSink->Compile(command, Module->Vars, ownVars);
+        auto compiled = CommandSink->Compile(command, Module->Vars, ownVars, true);
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
@@ -404,7 +404,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
                 continue; // the expected cause is `TModuleBuilder::AddGlobalVarDep` putting stuff into `ExternalVars`
             auto& dst = it->second;
             auto val = EvalAll(var);
-            auto compiled = commands.Compile(val, vars, vars);
+            auto compiled = commands.Compile(val, Module->Vars, vars, false);
             const ui32 cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
             auto value = Graph->Names().CmdNameById(cmdElemId).GetStr();
             dst.SetSingleVal(cmdVar, value, 0);

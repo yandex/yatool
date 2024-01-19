@@ -14,6 +14,7 @@
 #include <fmt/format.h>
 #include <fmt/args.h>
 #include <util/generic/overloaded.h>
+#include <util/string/escape.h>
 
 namespace {
 
@@ -55,6 +56,8 @@ namespace {
             auto fnIdx = static_cast<EMacroFunctions>(id.GetIdx());
 
             if (
+                fnIdx == EMacroFunctions::Args ||
+                fnIdx == EMacroFunctions::Terms ||
                 fnIdx == EMacroFunctions::Tool ||
                 fnIdx == EMacroFunctions::Input ||
                 fnIdx == EMacroFunctions::Output ||
@@ -71,12 +74,40 @@ namespace {
                 if (unwrappedArgs.size() < 1)
                     throw std::runtime_error{"Invalid number of arguments"};
 
+                // TODO: get rid of escaping in Args followed by unescaping in Input/Output
+
                 switch (fnIdx) {
+                    case EMacroFunctions::Args: {
+                        auto result = TString();
+                        bool first = true;
+                        for (auto& arg : unwrappedArgs) {
+                            if (!first)
+                                result += " ";
+                            result += "\"";
+                            EscapeC(std::get<std::string_view>(arg), result);
+                            result += "\"";
+                            first = false;
+                        }
+                        return Values.GetValue(Values.InsertStr(result));
+                    }
+                    case EMacroFunctions::Terms: {
+                        auto result = TString();
+                        for (auto& arg : unwrappedArgs)
+                            result += std::get<std::string_view>(arg);
+                        return Values.GetValue(Values.InsertStr(result));
+                    }
                     case EMacroFunctions::Tool: {
                         if (unwrappedArgs.size() != 1)
                             throw std::runtime_error{"Invalid number of arguments"};
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return TMacroValues::TTool {.Data = arg0};
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() == 1) {
+                            // one does not simply reuse the original argument,
+                            // for it might have been transformed (e.g., dequoted)
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
+                            return TMacroValues::TTool {.Data = pooledName};
+                        }
+                        throw std::runtime_error{"Tool arrays are not supported"};
                     }
                     case EMacroFunctions::Input: {
                         if (unwrappedArgs.size() != 1)
@@ -85,7 +116,7 @@ namespace {
                         auto names = SplitArgs(TString(arg0));
                         if (names.size() == 1) {
                             // one does not simply reuse the original argument,
-                            // since it might have been transformed (e.g., dequoted)
+                            // for it might have been transformed (e.g., dequoted)
                             auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
                             return TMacroValues::TInput {.Coord = CollectCoord(pooledName, Inputs)};
                         }
@@ -100,7 +131,14 @@ namespace {
                         if (unwrappedArgs.size() != 1)
                             throw std::runtime_error{"Invalid number of arguments"};
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return TMacroValues::TOutput {.Coord = CollectCoord(arg0, Outputs)};
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() == 1) {
+                            // one does not simply reuse the original argument,
+                            // for it might have been transformed (e.g., dequoted)
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
+                            return TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Outputs)};
+                        }
+                        throw std::runtime_error{"Output arrays are not supported"};
                     }
                     case EMacroFunctions::Suf: {
                         if (unwrappedArgs.size() != 2)
@@ -262,8 +300,10 @@ void TCommands::Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, 
                                     for (auto& term : val)
                                         if (auto var = std::get_if<NPolexpr::EVarId>(&term); var)
                                             processVar(*var);
-                            if (auto var = std::get_if<NPolexpr::EVarId>(&sub.Body); var)
-                                processVar(*var);
+                            for (auto& subArg : sub.Body)
+                                for (auto& subTerm : subArg)
+                                    if (auto var = std::get_if<NPolexpr::EVarId>(&subTerm); var)
+                                        processVar(*var);
                         },
                     },
                     term
@@ -344,11 +384,11 @@ void TCommands::InlineScalarTerms(
             [&](NPolexpr::TConstId id) {
                 writer.WriteTerm(id);
             },
-            [&](NPolexpr::EVarId id) {
-                auto name = Values.GetVarName(id);
+            [&](NPolexpr::EVarId var) {
+                auto name = Values.GetVarName(var);
                 auto thatVar = vars.find(name);
                 if (thatVar == vars.end()) {
-                    writer.WriteTerm(id);
+                    writer.WriteTerm(var);
                     return;
                 }
                 auto depth = VarRecursionDepth.try_emplace(name, 0).first;
@@ -362,7 +402,7 @@ void TCommands::InlineScalarTerms(
                 if (thatDef.Commands[0].size() != 1) {
                     if (depth->second == 0) {
                         // leave it for the actual evaluation to expand
-                        writer.WriteTerm(id);
+                        writer.WriteTerm(var);
                         return;
                     }
                     ythrow TError() << "unexpected multiargument substitution";
@@ -385,7 +425,27 @@ void TCommands::InlineScalarTerms(
                         }
                     }
                 }
-                newSub.Body = sub.Body; // TODO expand; what do we allow here, anyway?
+                bool bodyInlined = [&](){
+                    if (sub.Body.size() == 1 && sub.Body.front().size() == 1) {
+                        if (auto var = std::get_if<NPolexpr::EVarId>(&sub.Body.front().front()); var) {
+                            auto name = Values.GetVarName(*var);
+                            auto thatVar = vars.find(name);
+                            if (thatVar == vars.end())
+                                return false;
+                            auto depth = VarRecursionDepth.try_emplace(name, 0).first;
+                            auto& thatDef = thatVar->second[depth->second];
+                            if (thatDef.Commands.size() == 0)
+                                return false;
+                            if (thatDef.Commands.size() != 1)
+                                ythrow TError() << "unexpected multicommand in a substitution";
+                            newSub.Body = thatDef.Commands[0]; // CAVEAT: no deep substitution, including recursion for SET_APPEND
+                            return true;
+                        }
+                    }
+                    return false;
+                }();
+                if (!bodyInlined)
+                    newSub.Body = sub.Body;
                 writer.WriteTerm(std::move(newSub));
             },
         }, term);
@@ -419,9 +479,10 @@ void TCommands::InlineArguments(
                     continue;
             if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&arg[0]); sub)
                 if (sub->Mods.empty())
-                    if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body); var)
-                        if (doAVariable(*var))
-                            continue;
+                    if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
+                        if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()); var)
+                            if (doAVariable(*var))
+                                continue;
         }
         writer.BeginArgument();
         InlineScalarTerms(arg, vars, writer);
@@ -452,9 +513,10 @@ void TCommands::InlineCommands(
                     continue;
             if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&cmd[0][0]); sub)
                 if (sub->Mods.empty())
-                    if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body); var)
-                        if (doAVariable(*var))
-                            continue;
+                    if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
+                        if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()); var)
+                            if (doAVariable(*var))
+                                continue;
         }
         writer.BeginCommand();
         InlineArguments(cmd, vars, writer);
@@ -469,7 +531,7 @@ NCommands::TSyntax TCommands::Inline(const NCommands::TSyntax& ast, const TMined
     return result;
 }
 
-TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, EOutputAccountingMode oam) {
+TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam) {
     auto checkRecursionStuff = [&]() {
 #ifndef NDEBUG
         for (auto& [k, v] : VarRecursionDepth)
@@ -484,7 +546,10 @@ TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inli
     checkRecursionStuff();
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     auto expr = NCommands::Compile(Values, ast);
-    return Preevaluate(expr, allVars, oam);
+    if (preevaluate)
+        return Preevaluate(expr, allVars, oam);
+    else
+        return TCompiledCommand{.Expression = std::move(expr)};
 }
 
 ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {

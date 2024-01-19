@@ -217,6 +217,8 @@ TTermValue TScriptEvaluator::EvalFn(
     ICommandSequenceWriter* writer
 ) {
     switch (Commands->Values.Id2Func(id)) {
+        case EMacroFunctions::Args: return RenderArgs(args);
+        case EMacroFunctions::Terms: return RenderTerms(args);
         case EMacroFunctions::Hide: return std::monostate();
         case EMacroFunctions::Clear: return RenderClear(args);
         case EMacroFunctions::Pre: return RenderPre(args);

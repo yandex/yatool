@@ -9,6 +9,45 @@
 
 using namespace NCommands;
 
+TTermValue NCommands::RenderArgs(std::span<const TTermValue> args) {
+    TVector<TString> result;
+    for (auto& arg : args)
+        result.push_back(std::visit(TOverloaded{
+            [](std::monostate) -> TString {
+                throw TNotImplemented();
+            },
+            [&](const TString& s) -> TString {
+                return s;
+            },
+            [&](const TVector<TString>&) -> TString {
+                throw TNotImplemented();
+            }
+        }, arg));
+    return result;
+}
+
+TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
+    TString result;
+    for (auto& arg : args)
+        result += std::visit(TOverloaded{
+            [](std::monostate) -> TString {
+                throw TNotImplemented();
+            },
+            [&](const TString& s) -> TString {
+                return s;
+            },
+            [&](const TVector<TString>& v) -> TString {
+                if (v.empty())
+                    return {};
+                else if (v.size() == 1)
+                    return v.front();
+                else
+                    throw yexception() << "Nested terms should not have multiple items";
+            }
+        }, arg);
+    return result;
+}
+
 TTermValue NCommands::RenderClear(std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "Clear requires 1 argument";
@@ -134,8 +173,13 @@ void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, s
         [&](const TString& s) {
             writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
         },
-        [&](const TVector<TString>&) {
-            throw TNotImplemented();
+        [&](const TVector<TString>& v) {
+            if (v.empty())
+                return;
+            else if (v.size() == 1)
+                writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
+            else
+                throw yexception() << "Env does not support arrays";
         }
     }, args[0]);
 }
@@ -161,8 +205,13 @@ void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> 
                 GetOrInit(ctx.CmdInfo.KV)[name] = "yes";
             }
         },
-        [&](const TVector<TString>&) {
-            throw TNotImplemented();
+        [&](const TVector<TString>& v) {
+            if (v.size() == 2)
+                GetOrInit(ctx.CmdInfo.KV)[v[0]] = v[1];
+            else if (v.size() == 1)
+                GetOrInit(ctx.CmdInfo.KV)[v[0]] = "yes";
+            else
+                throw TNotImplemented();
         }
     }, args[0]);
 }
@@ -230,7 +279,7 @@ TTermValue NCommands::RenderLastExt(std::span<const TTermValue> args) {
 
 TTermValue NCommands::RenderExtFilter(std::span<const TTermValue> args) {
     if (args.size() != 2) {
-        throw yexception() << "Ext requires 2 argument";
+        throw yexception() << "Ext requires 2 arguments";
     }
     auto ext = std::get<TString>(args[0]);
     return std::visit(TOverloaded{

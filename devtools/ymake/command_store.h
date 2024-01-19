@@ -114,7 +114,7 @@ public:
         }
         return &Commands[static_cast<ui32>(fres->second)];
     }
-    TCompiledCommand Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, EOutputAccountingMode oam = EOutputAccountingMode::Default);
+    TCompiledCommand Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam = EOutputAccountingMode::Default);
     ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr) const;
