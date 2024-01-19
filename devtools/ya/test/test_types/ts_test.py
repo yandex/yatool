@@ -150,8 +150,6 @@ class HermioneTestSuite(BaseTestSuite):
             + [
                 "--config",
                 self.dart_info.get("CONFIG-PATH"),
-                "--hermione",
-                self.dart_info.get(self.dart_info.get("HERMIONE-ROOT-VAR-NAME") or "HERMIONE_RESOURCE_GLOBAL"),
             ]
         )
 
