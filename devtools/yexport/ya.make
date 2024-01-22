@@ -43,7 +43,7 @@ END()
 RECURSE(
     bin
     diag
-    docs
+    docs/public
     it
     ut
 )
