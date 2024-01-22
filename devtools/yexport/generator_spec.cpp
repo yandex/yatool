@@ -317,8 +317,20 @@ namespace {
 
     TAttributeGroup ParseAttributeGroup(const toml::value& attrs, TGeneratorSpec& spec) {
         TAttributeGroup attrsGroup;
-        for (const auto& [attribute, description] : attrs.as_table()) {
-            ParseAttribute(attribute, attrsGroup, description, spec);
+        const auto& attrsTable = attrs.as_table();
+        // We must parse attributes from small length to long length
+        // for apply parent attribute type before children
+        std::vector<const std::string*> attrNames;
+        attrNames.reserve(attrsTable.size());
+        for (const auto& [attribute, _] : attrsTable) {
+            attrNames.emplace_back(&attribute);
+        }
+        // Sort attributes aphabeticaly for parsing
+        Sort(attrNames, [](const std::string* l, const std::string* r) {
+            return *l < *r;
+        });
+        for (auto attrName : attrNames) {
+            ParseAttribute(*attrName, attrsGroup, attrsTable.at(*attrName), spec);
         }
         // By default all list/set/sorted_set items are strings
         for (const auto& [attrName, attrType]: attrsGroup) {
