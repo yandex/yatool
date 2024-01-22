@@ -1360,10 +1360,6 @@ class ArcPrefetchOptions(Options):
             ConfigConsumer('prefetch'),
         ]
 
-    def postprocess2(self, params):
-        if self.prefetch:
-            params.flags['EMIT_NEEDDIR_HINTS'] = 'yes'
-
 
 class YMakeBinOptions(Options):
     def __init__(self):
