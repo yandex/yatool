@@ -44,6 +44,7 @@ class BaseOptions(LoggerCounter):
 
     @classmethod
     def _choose_class(cls, other_class):
+        """Returns superior class in inheritance tree"""
         if issubclass(cls, other_class):
             return cls
 
@@ -53,7 +54,7 @@ class BaseOptions(LoggerCounter):
         raise TypeError("{} and {} is not subclasses of each other".format(cls, other_class))
 
     def merge_with(self, options):
-        # type: (tp.Optional[BaseOptions], tp.Optional[tp.Type[BaseOptions]]) -> BaseOptions
+        # type: (BaseOptions, tp.Optional[tp.Type[BaseOptions]]) -> BaseOptions
 
         if options is None:
             return self
