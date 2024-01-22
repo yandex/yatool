@@ -66,12 +66,20 @@ public:
         return TraverseRecurses;
     }
 
+    void SetTraverseRecurses(bool value) {
+        TraverseRecurses = value;
+    }
+
     bool ShouldTraverseDepsTests() const {
         return TraverseDepsTests;
     }
 
     bool ShouldTraverseAllRecurses() const {
         return TraverseAllRecurses;
+    }
+
+    void SetTraverseAllRecurses(bool value) {
+        TraverseAllRecurses = value;
     }
 
     bool ShouldFailOnRecurse() const {

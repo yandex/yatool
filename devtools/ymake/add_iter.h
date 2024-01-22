@@ -696,6 +696,7 @@ class TUpdIter: public TDepthDGIter<TDGIterAddable> {
 public:
     TYMake& YMake;
     TNodesQueue RecurseQueue;
+    TNodesQueue DependsQueue;
     TDelayedSearchDirDeps DelayedSearchDirDeps;
 
     THashMap<ui32, ui32> MainOutputId;

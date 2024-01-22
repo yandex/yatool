@@ -967,7 +967,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
             }
 
             if (ymake.Conf.ShouldTraverseDepends()) {
-                AddIntoQueue(ymake.UpdIter->RecurseQueue, props, TPropertyType{symbols, EVI_GetModules, NProps::DEPENDS}, Node, EDT_BuildFrom, EMNT_Directory);
+                AddIntoQueue(ymake.UpdIter->DependsQueue, props, TPropertyType{symbols, EVI_GetModules, NProps::DEPENDS}, Node, EDT_BuildFrom, EMNT_Directory);
             }
 
             break;

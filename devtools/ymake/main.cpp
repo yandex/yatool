@@ -220,6 +220,36 @@ void TYMake::BuildDepGraph() {
         }
     }
 
+    bool prevTraverseAllRecurses = Conf.ShouldTraverseAllRecurses();
+    bool prevTraverseRecurses = Conf.ShouldTraverseRecurses();
+    Conf.SetTraverseAllRecurses(false);
+    Conf.SetTraverseRecurses(false);
+
+    for (size_t idx = 0; idx < UpdIter->DependsQueue.GetAllNodes().size(); ++idx) {
+        auto node = UpdIter->DependsQueue.GetAllNodes()[idx];
+        const auto* deps = UpdIter->DependsQueue.GetDeps(node);
+        if (!deps) {
+            continue;
+        }
+        for (const auto& [to, dep] : *deps) {
+            if (IsDependsDep(node.NodeType, dep, to.NodeType)) {
+                UpdIter->RecursiveAddStartTarget(to.NodeType, Graph.GetFileName(to.ElemId).GetTargetStr(), &rootModule);
+            }
+        }
+    }
+
+    for (auto dependsNode : UpdIter->DependsQueue.GetAllNodes()) {
+        auto deps = UpdIter->DependsQueue.GetDeps(dependsNode);
+        if (deps) {
+            for (const auto& [to, dep] : *deps) {
+                UpdIter->RecurseQueue.AddEdge(dependsNode, to, dep);
+            }
+        }
+    }
+
+    Conf.SetTraverseAllRecurses(prevTraverseAllRecurses);
+    Conf.SetTraverseRecurses(prevTraverseRecurses);
+
     UpdIter->DelayedSearchDirDeps.Flush(*Parser, Graph);
     Graph.RelocateNodes(Parser->RelocatedNodes);
 
@@ -406,6 +436,20 @@ void TYMake::AddRecursesToStartTargets() {
         if (deps) {
             for (const auto& [depNode, depType] : *deps) {
                 if (pureRecursesQueue.IsReachable(node) && IsDependsDep(node.NodeType, depType, depNode.NodeType)) {
+                    depends.Push(depNode);
+                }
+            }
+        }
+    }
+
+    if (Conf.ShouldAddPeerdirsGenTests()) {
+        for (const auto& node : UpdIter->RecurseQueue.GetAllNodes()) {
+            const auto deps = UpdIter->RecurseQueue.GetDeps(node);
+            if (!deps) {
+                continue;
+            }
+            for (const auto& [depNode, depType] : *deps) {
+                if (IsDependsDep(node.NodeType, depType, depNode.NodeType)) {
                     depends.Push(depNode);
                 }
             }
