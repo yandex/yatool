@@ -121,7 +121,7 @@ class StreamWriter:
 
 
 class BazelStoreClient(object):
-    def __init__(self, base_uri, username=None, password=None, max_connections=48, client_decompress=False):
+    def __init__(self, base_uri, username=None, password=None, max_connections=48):
         self.base_uri = base_uri
         self.session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
@@ -129,7 +129,6 @@ class BazelStoreClient(object):
         self.session.mount('https://', adapter)
         if username and password:
             self.session.auth = requests.auth.HTTPBasicAuth(username, password)
-        self.client_decompress = client_decompress
 
     def _retry_func(self, func, f_args=(), f_kwargs=None, conf=retry.DEFAULT_CONF):
         if f_kwargs is None:
@@ -153,20 +152,15 @@ class BazelStoreClient(object):
             return writer.get_hexdigest()
 
     def get_codec(self):
-        if self.client_decompress:
-            return "zstd"
-        else:
-            return None
+        return "zstd"
 
     def get_blob(self, hash, file_path):
         cas_url = self._cas_url(hash)
         dirname = os_path.dirname(file_path)
         if not os_path.exists(dirname):
             os.makedirs(dirname)
-        headers = None
         codec = self.get_codec()
-        if codec == "zstd":
-            headers = {'Accept-Encoding': 'zstd'}
+        headers = {'Accept-Encoding': codec}
         digest_got = self._retry_func(
             self.install_data, f_args=(file_path, cas_url, codec, headers), conf=BAZEL_RETRY_POLICY.get_read_conf()
         )

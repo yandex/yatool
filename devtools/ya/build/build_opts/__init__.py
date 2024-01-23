@@ -2492,7 +2492,6 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.bazel_remote_password = None
         self.bazel_remote_password_file = None
         self.bazel_remote_readonly = True
-        self.bazel_remote_client_decompress = False
 
     @staticmethod
     def consumer():
@@ -2522,14 +2521,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
                 ),
-                ArgConsumer(
-                    ['--bazel-remote-client-decompress'],
-                    help='Decompress cache data on client side instead of decompressing on server side',
-                    hook=SetConstValueHook('bazel_remote_client_decompress', True),
-                    group=YT_CACHE_CONTROL_GROUP,
-                    visible=HelpLevel.ADVANCED,
-                ),
-                ConfigConsumer('bazel_remote_client_decompress'),
                 ArgConsumer(
                     ['--bazel-remote-store'],
                     help='Use Bazel-remote storage',
