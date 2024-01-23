@@ -557,6 +557,10 @@ class CanonizationOptions(core.yarg.Options):
             ),
         ]
 
+    def postprocess2(self, params):
+        if params.custom_canondata_path:
+            params.flags["CUSTOM_CANONDATA_PATH"] = params.custom_canondata_path
+
 
 class DebuggingOptions(core.yarg.Options):
     def __init__(self):
