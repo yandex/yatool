@@ -394,7 +394,9 @@ class Source(object):
                 # XXX: Check YA-762 for more details
                 logger.warning("Exception caught from chmod: `%s`", e)
                 new_mode = "a{}".format(mode)
-                logger.info("Try to modificate permission mask with adding `who` modificator: `%s` -> `%s`")
+                logger.info(
+                    "Try to modificate permission mask with adding `who` modificator: `%s` -> `%s`", mode, new_mode
+                )
 
                 return p.chmod(new_mode)
 
