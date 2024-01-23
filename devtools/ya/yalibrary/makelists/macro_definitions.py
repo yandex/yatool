@@ -1876,6 +1876,10 @@ class AddTestValue(Value):
         self.tags = tags or []
         self._make_value()
 
+    def _write(self):
+        self._make_value()
+        return super(AddTestValue, self)._write()
+
     def _make_value(self):
         value = [self.type]
         if self.rel_paths:
@@ -2040,6 +2044,10 @@ class FromSandboxValue(Value):
         self.rename_files = []
         self._out_token = ''
         self._make_value()
+
+    def _write(self):
+        self._make_value()
+        return super(FromSandboxValue, self)._write()
 
     def _make_value(self):
         parts = []
