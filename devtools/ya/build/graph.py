@@ -2520,15 +2520,16 @@ def _gen_upload_node(opts, nd):
     output_file = yndex_file + '.yt'
     cmd = ['$(YTYNDEXER)/ytyndexer', 'upload', '-y', '$(BUILD_ROOT)', '-r', opts.yt_root, '-c', opts.yt_cluster]
     node_tag = 'yt_upload'
-    if opts.yt_codenav_extra_opts is None:
-        cmd += ['--create-yt-root-with-ttl']
-    else:
+    opts_that_do_not_affect_uid = []
+    if opts.yt_codenav_extra_opts is not None:
         yt_codenav_extra_opts = list(filter(None, opts.yt_codenav_extra_opts.split(' ')))
         if yt_codenav_extra_opts != ['no']:
-            cmd.extend(yt_codenav_extra_opts)
+            # Note: it is assumed that the upload options do not affect the uid
+            opts_that_do_not_affect_uid.extend(yt_codenav_extra_opts)
         if '--use-yt-dynamic-tables' in yt_codenav_extra_opts:
             node_tag = 'yt_upload_dynamic'
     uid = 'yy-upload-{}'.format(hashing.md5_value(nd['uid'] + '##' + ' '.join(cmd)))
+    cmd.extend(opts_that_do_not_affect_uid)
     if not opts.yt_readonly:
         cmd += ['-u', uid]
     node = {
