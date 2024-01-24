@@ -671,7 +671,7 @@ class YaMakeOptions(YaBaseOptions):
         if self.merge_split_tests is not None:
             env['YA_MERGE_SPLIT_TESTS'] = self._bool_to_env(self.merge_split_tests)
         if self.test_disable_flake8_migrations is not None:
-            env['YA_TEST_DISABLE_FLAKE8_MIGRATIONS'] = self._bool_to_env(self.merge_split_tests)
+            env['YA_TEST_DISABLE_FLAKE8_MIGRATIONS'] = self._bool_to_env(self.test_disable_flake8_migrations)
         if self.content_uids is not None:
             env['YA_USE_CONTENT_UIDS'] = self._bool_to_env(self.content_uids)
 
