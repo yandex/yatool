@@ -90,11 +90,25 @@ def set_suppression_filter(suppressions):
 
 
 class CompositeTelemetry:
-    def __init__(self, backends={}):
-        self.backends = backends
+    def __init__(self, backends=None):
+        self._backends = backends or {}
+
+    @property
+    def no_backends(self):
+        return len(self._backends) == 0
+
+    def iter_backends(self):
+        for name in self._backends:
+            yield (name, self.get_backend_module(name))
+
+    def get_backend_module(self, name):
+        entry = self._backends.get(name)
+        if hasattr(entry, '__call__'):
+            entry = self._backends[name] = entry()
+        return entry
 
     def report(self, key, value, namespace=default_namespace()):
-        if not self.backends:
+        if self.no_backends:
             return
 
         def __filter(s):
@@ -112,7 +126,7 @@ class CompositeTelemetry:
             svalue = 'Unable to filter report value: {}'.format(e)
 
         logger.debug('Report %s: %s', key, svalue)
-        for telemetry in self.backends.values():
+        for _, telemetry in self.iter_backends():
             telemetry.push(
                 {
                     '_id': uuid.uuid4().hex,
@@ -129,30 +143,34 @@ class CompositeTelemetry:
         logger.debug('Reporting done')
 
     def init_reporter(self, shard='report', suppressions=None):
-        if not self.backends:
+        if self.no_backends:
             return
 
-        for telemetry_name, telemetry in self.backends.items():
+        for telemetry_name, telemetry in self.iter_backends():
             telemetry.init(os.path.join(config.misc_root(), telemetry_name), shard)
         global SUPPRESSIONS
         SUPPRESSIONS = suppressions
 
     def request(self, tail, data, backend='snowden'):
-        telemetry = self.backends.get(backend, None)
+        telemetry = self.get_backend_module(backend)
         if telemetry:
             return telemetry.request(tail, data)
         return "{}"
 
 
 def gen_reporter():
+    import app_config
+
     backends = {}
 
-    try:
-        from yalibrary import snowden
+    if app_config.in_house:
 
-        backends['snowden'] = snowden
-    except ImportError:
-        pass
+        def load_snowden():
+            from yalibrary import snowden
+
+            return snowden
+
+        backends['snowden'] = load_snowden
 
     return CompositeTelemetry(backends)
 
