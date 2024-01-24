@@ -107,15 +107,12 @@ class PackageFileNotFoundException(YaPackageException):
 
 
 def _get_package_file(arcadia_root, package_file):
-    def norm_path(p):
-        return os.path.realpath(p)
-
     if os.path.exists(exts.path2.abspath(package_file)):
-        return exts.path2.abspath(norm_path(package_file))
+        return exts.path2.abspath(package_file)
 
     abs_path = os.path.join(arcadia_root, package_file)
     if os.path.exists(abs_path):
-        return norm_path(abs_path)
+        return os.path.normpath(abs_path)
 
     raise PackageFileNotFoundException('Package path {} cannot be found'.format(package_file), path=package_file)
 
@@ -591,7 +588,7 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
         result_dir = os.getcwd()
 
     package_path = debug_package_path = None
-    package_rel_root = os.path.relpath(package_root, os.path.realpath(arcadia_root))
+    package_rel_root = os.path.relpath(package_root, arcadia_root)
     meta = {}
 
     # package format: command line -> default format fixed in json -> general default format is tar
@@ -1058,6 +1055,7 @@ def load_package(arcadia_root, package_file, included=None):
             include_package_root = include_package.get("targets_root")
         else:
             include_package_path, include_package_root = include_package, None
+
         parsed_package = merge_package_with_included(
             parsed_package,
             package_file,
@@ -1231,7 +1229,7 @@ def do_package(params):
                 formatters = {
                     "sandbox_task_id": params.sandbox_task_id,
                     "package_name": parsed_package['meta']['name'],
-                    "package_root": os.path.relpath(package_root, os.path.realpath(arcadia_root)),
+                    "package_root": os.path.relpath(package_root, arcadia_root),
                 }
 
                 if "userdata" in parsed_package:
@@ -1249,7 +1247,7 @@ def do_package(params):
                 if params.change_log:
                     params.change_log = six.ensure_str(params.change_log)
 
-                package_rel_root = os.path.relpath(package_root, os.path.realpath(arcadia_root))
+                package_rel_root = os.path.relpath(package_root, arcadia_root)
 
                 branch = package.vcs.Branch(arcadia_root)
                 formatters.update(
@@ -1294,11 +1292,8 @@ def do_package(params):
                         if params.build_debian_scripts:
                             if 'targets' not in build_info:
                                 build_info['targets'] = []
-                            # build_info['targets'].append(os.path.relpath(os.path.dirname(package_file), arcadia_root))
                             # dirty hack, fix it
-                            build_info['targets'].append(
-                                os.path.relpath(os.path.dirname(package_file), os.path.realpath(arcadia_root))
-                            )
+                            build_info['targets'].append(os.path.relpath(os.path.dirname(package_file), arcadia_root))
                         if build_info.get("targets"):
                             stage_started("build_targets")
                             _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters)
@@ -1351,7 +1346,7 @@ def do_package(params):
                     package.display.emit_message('Build temp directory: [[imp]]{}'.format(build_temp))
 
         if params.output_root:
-            package_path = os.path.relpath(os.path.realpath(package_file), os.path.realpath(arcadia_root))
+            package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
             is_package_skipped = build_package(package_params, os.path.join(params.output_root, package_path))
         else:
             with exts.tmp.temp_dir() as output_root:
@@ -1485,10 +1480,8 @@ def do_dump_input(params, arcadia_root, output):
             if not arcadia_root:
                 arcadia_root = exts.path2.abspath(core.config.find_root())
             logger.info("Find new arcadia root %s", arcadia_root)
-        package_relpath = (
-            package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file
-        )
-        package_root = os.path.dirname(package_relpath)
+        package_relpath = os.path.relpath(package_file, arcadia_root)
+        package_rel_root = os.path.dirname(package_relpath)
 
         build_section = collections.defaultdict(set)
         arcadia_section = set()
@@ -1501,7 +1494,7 @@ def do_dump_input(params, arcadia_root, output):
         formatters = {
             "{package_name}": package_data.get("meta", {}).get("name", None)
             or package_data.get("name", "{package_name}"),
-            "{package_root}": package_root,
+            "{package_root}": package_rel_root,
             "{revision}": package.vcs.Revision(arcadia_root)(),
             "{svn_revision}": str(package.vcs.SvnRevision(arcadia_root)()),
             "{branch}": package.vcs.Branch(arcadia_root)(),
@@ -1539,7 +1532,7 @@ def do_dump_input(params, arcadia_root, output):
                     arcadia_section.add(safe_format(path, formatters))
             if data.get("source", {}).get("type") == 'RELATIVE':
                 for path in _do_dump_input_arcadia(
-                    arcadia_root, package_root, data["source"].get("path"), data["source"].get("files")
+                    arcadia_root, package_rel_root, data["source"].get("path"), data["source"].get("files")
                 ):
                     arcadia_section.add(safe_format(path, formatters))
             if data.get("source", {}).get("type") == 'SANDBOX_RESOURCE':

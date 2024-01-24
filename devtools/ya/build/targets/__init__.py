@@ -45,15 +45,14 @@ def resolve(source_root, targets, cwd=None, root_detector=None):
         root_detector = yalibrary.find_root.detect_root
 
     if source_root is not None:
-        # XXX: source_root = exts.path2.abspath(source_root, cwd)
-        source_root = os.path.realpath(os.path.join(cwd, source_root))
+        source_root = os.path.normpath(os.path.join(cwd, source_root))
 
     if source_root is not None and root_detector(source_root) != source_root:
         raise InvalidTargetSpecification('Source root {} is invalid'.format(source_root))
 
-    # XXX: targets = [exts.path2.abspath(x, source_root or cwd) for x in targets]
-    targets = [os.path.realpath(os.path.join(source_root or cwd, x)) for x in targets]
+    targets = [os.path.join(source_root or cwd, x) for x in targets]
     targets = [fix_makelist_target(p) for p in targets]
+    targets = [os.path.normpath(p) for p in targets]
 
     targets_root = None
     if targets:

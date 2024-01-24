@@ -13,7 +13,7 @@ def detect(paths=None, cwd=None, check_tar=None):
     cwd = cwd or os.getcwd()
     logger.debug('detecting vcs from %s for paths: %s', cwd, paths)
     if paths:
-        leafs = [os.path.realpath(os.path.join(cwd, path)) for path in paths]
+        leafs = [os.path.join(cwd, path) for path in paths]
         common_root = lcp(leafs)
     else:
         common_root = cwd

@@ -25,8 +25,7 @@ def detect_root_or_raise(path, detector=is_root):
 
 
 def _find_path(starts_from, check):
-    # XXX: realpath -> exts.path2.abspath
-    p = os.path.realpath(starts_from)
+    p = starts_from
     while True:
         if check(p):
             return p

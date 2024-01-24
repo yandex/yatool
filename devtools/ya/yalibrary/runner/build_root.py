@@ -340,7 +340,7 @@ class BuildRootSet(object):
             cur_name = os.path.join(self._store_path, uniq_id.gen4())
             try:
                 os.mkdir(cur_name)
-                return os.path.realpath(cur_name)
+                return cur_name
             except OSError:
                 pass
 

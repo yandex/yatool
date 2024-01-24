@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 
+
 try:
     import six as six_  # noqa
 except ImportError:
@@ -100,8 +101,7 @@ def detect_root(path, detector=None):
         )
 
     def _find_path(starts_from, check):
-        # XXX: realpath -> exts.path2.abspath
-        p = os.path.realpath(starts_from)
+        p = os.path.normpath(starts_from)
         while True:
             if check(p):
                 return p
@@ -171,7 +171,7 @@ def detect(paths=[], cwd=None, check_tar=None):
     cwd = cwd or os.getcwd()
     logger.debug('detecting vcs from %s for paths: %s', cwd, paths)
     if paths:
-        leafs = [os.path.realpath(os.path.join(cwd, path)) for path in paths]
+        leafs = [os.path.join(cwd, path) for path in paths]
         common_root = leafs[0]
     else:
         common_root = cwd
