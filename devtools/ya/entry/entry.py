@@ -9,6 +9,8 @@ import core.config
 import logging
 import argparse
 
+import app_config
+
 import core.error
 import core.respawn
 import core.sig_handler
@@ -121,13 +123,7 @@ def main(args):
 
     setup_faulthandler()
 
-    try:
-        import app_config
-
-        use_opensource_config = not app_config.in_house
-    except ImportError:
-        use_opensource_config = False
-    no_report = use_opensource_config
+    opensource = not app_config.in_house
     p = ArgParse(prog='ya', add_help=False)
 
     # Do not forget add arguments with value to `skippable_flags` into /ya script
@@ -140,11 +136,12 @@ def main(args):
     p.add_argument(
         '--no-logs', action='store_const', const=True, default=True if os.environ.get('YA_NO_LOGS') else False
     )
+    # Disable reports for opensource by default
     p.add_argument(
         '--no-report',
         action='store_const',
         const=True,
-        default=True if os.environ.get('YA_NO_REPORT') in ("1", "yes") else no_report,
+        default=True if os.environ.get('YA_NO_REPORT') in ("1", "yes") else opensource is True,
     )
     p.add_argument(
         '--no-tmp-dir',
@@ -162,7 +159,7 @@ def main(args):
         const=logging.DEBUG,
         default=logging.DEBUG if os.environ.get('YA_VERBOSE') else logging.INFO,
     )
-    if use_opensource_config:
+    if not opensource:
         p.add_argument('--diag', action='store_const', const=True, default=False)
 
     a, args = p.parse_max(args[1:])
@@ -172,9 +169,8 @@ def main(args):
 
         print("\n".join(svn_version.svn_version().split("\n")[:-2]))
         INDENT = "    "
+        print(INDENT + "Origin: {}".format("Github" if opensource else "Arcadia"))
         print(INDENT + "Python version: {}".format(sys.version).replace("\n", ""))
-        print()
-        print()
 
         sys.exit(0)
 
