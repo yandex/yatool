@@ -562,7 +562,7 @@ def format_package_meta(meta_value, formatters):
     try:
         meta_value = meta_value.format(**formatters)
     except KeyError as e:
-        raise Exception("Can not substitute {}".format(e))
+        raise Exception("Can not substitute `{}`".format(e))
     return meta_value
 
 

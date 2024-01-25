@@ -22,6 +22,9 @@ class VcsInfo(object):
     def __str__(self):
         return str(self())
 
+    def __format__(self, spec):
+        return format(str(self), spec)
+
     @exts.func.memoize()
     def __call__(self):
         return self.calc(_get_vcs_info(self._arcadia_root))
