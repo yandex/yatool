@@ -541,7 +541,10 @@ def check_and_respawn_if_possible(handler_python_major_version=None):
 
 
 def _resources_report():
-    import resource
+    try:
+        import resource
+    except ImportError:
+        return {}
 
     return {
         'max_rss': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
