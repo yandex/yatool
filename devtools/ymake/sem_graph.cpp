@@ -59,18 +59,13 @@ namespace {
 
             vars.SetValue("FAKE_MODULE", mod->IsFakeModule() ? "yes" : "no");
 
-            for (size_t pos = 0; pos < mod->IncDirs.GetAllUsed().size(); ++pos) {
-                const auto lang = static_cast<TLangId>(pos);
-                auto& ownedAddincls = vars[mod->IncDirs.GetIncludeVarName(lang) + "_OWNED"];
-                auto& globalAddincls = vars[mod->IncDirs.GetIncludeVarName(lang) + "_GLOBAL"];
-                for (const auto& dir: mod->IncDirs.GetOwned(lang)) {
-                    ownedAddincls.push_back({dir.GetTargetStr(), false, true});
-                }
-                for (const auto& dir: mod->IncDirs.GetGlobal(lang)) {
-                    globalAddincls.push_back({dir.GetTargetStr(), false, true});
-                }
-            }
+            SetAdincls(vars, *mod);
+            SetGlobalVars(vars);
+            SetSrcHeaders(vars);
+        }
 
+    private:
+        void SetGlobalVars(TVars& vars) const {
             for (const auto& dep: Node.Edges()) {
                 if (!IsBuildCmdInclusion(dep)) {
                     continue;
@@ -80,6 +75,35 @@ namespace {
                 const TStringBuf varval = GetCmdValue(varStr);
                 vars[varname + TString("_RAW")].push_back(varval);
             }
+        }
+
+        void SetAdincls(TVars& vars, const TModule& mod) const {
+            for (size_t pos = 0; pos < mod.IncDirs.GetAllUsed().size(); ++pos) {
+                const auto lang = static_cast<TLangId>(pos);
+                auto& ownedAddincls = vars[mod.IncDirs.GetIncludeVarName(lang) + "_OWNED"];
+                auto& globalAddincls = vars[mod.IncDirs.GetIncludeVarName(lang) + "_GLOBAL"];
+                for (const auto& dir: mod.IncDirs.GetOwned(lang)) {
+                    ownedAddincls.push_back({dir.GetTargetStr(), false, true});
+                }
+                for (const auto& dir: mod.IncDirs.GetGlobal(lang)) {
+                    globalAddincls.push_back({dir.GetTargetStr(), false, true});
+                }
+            }
+        }
+
+        void SetSrcHeaders(TVars& vars) const {
+            auto &var = vars["MODULE_EXPLICIT_HEADERS"];
+            for (const auto& dep: Node.Edges()) {
+                if (!IsModeHeaderAlikeSrcDep(dep))
+                    continue;
+
+                var.push_back({TDepGraph::GetFileName(dep.To()).GetTargetStr(), false, true});
+            }
+        }
+
+        static bool IsModeHeaderAlikeSrcDep(TConstDepRef dep) {
+            const auto toNoreType = dep.To()->NodeType;
+            return IsModuleType(dep.From()->NodeType) && dep.Value() == EDT_Search && (toNoreType == EMNT_File || toNoreType == EMNT_NonParsedFile);
         }
 
     private:
