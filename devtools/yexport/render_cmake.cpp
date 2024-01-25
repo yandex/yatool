@@ -52,6 +52,29 @@ namespace {
         return fmt::format("TOOL_{}_bin", toolName);
     }
 
+    std::string QuoteAndEscapeValues(const std::span<const std::string> values, char divider = ';') {
+        size_t valuesSize = 0;
+        for (const auto& value: values) {
+            valuesSize += value.size();
+        }
+        std::string escaped;
+        escaped.reserve(2/*quotes*/ + values.size() - 1/*dividers*/ + valuesSize);
+        escaped += '"';
+        for (const auto& value: values) {
+            for (const auto c: value) {
+                if (c == '"' || c == '\\' || c == divider) {
+                    escaped += '\\';
+                }
+                escaped += c;
+            }
+            if (value != values.back()) {
+                escaped += divider;
+            }
+        }
+        escaped += '"';
+        return escaped;
+    }
+
     struct TAttrValues {
         TVector<std::string> Iface;
         TVector<std::string> Pub;
@@ -538,6 +561,8 @@ namespace {
         bool FreshNode = false;
     };
 
+    static const std::string PROPERTY{"PROPERTY"};
+
     class TCmakeRenderingVisitor : public TGraphVisitor {
     public:
         TCmakeRenderingVisitor(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
@@ -752,7 +777,22 @@ namespace {
                     }
                 }
                 if (!nproc.empty()) {
-                    std::string setArgs[] = {"TEST", semArgs[0], "PROPERTY", "PROCESSORS", nproc};
+                    std::string setArgs[] = {"TEST", semArgs[0], PROPERTY, "PROCESSORS", nproc};
+                    CMakeProjectBuilder_->AddTargetDirMacro(set_prop, setArgs);
+                }
+            }
+            else if (semName == "set_property_escaped" || semName == "set_yunittest_property_escaped") {
+                const auto set_prop = semName == "set_property_escaped" ? "set_property"s : "set_yunittest_property"s;
+                if (!CheckArgs(semName, semArgs, AtLeast(2), data.Path)) {
+                    return;
+                }
+                auto it = std::find(semArgs.begin(), semArgs.end(), PROPERTY);
+                if (it == semArgs.end() || (it + 3) >= semArgs.end()) {
+                    spdlog::error("Can't find {} or values in '{}' semantic at node {}, set unescaped", PROPERTY, semName, data.Path);
+                    CMakeProjectBuilder_->AddTargetDirMacro(set_prop, semArgs);
+                } else {
+                    std::vector<std::string> setArgs(semArgs.begin(), it + 2);
+                    setArgs.emplace_back(QuoteAndEscapeValues(semArgs.subspan(it - semArgs.begin() + 2)));
                     CMakeProjectBuilder_->AddTargetDirMacro(set_prop, setArgs);
                 }
             }
