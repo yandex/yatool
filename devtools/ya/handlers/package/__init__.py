@@ -62,7 +62,7 @@ For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package"""
                 core.common_opts.HtmlDisplayOptions(),
                 core.common_opts.CommonUploadOptions(),
                 build.build_opts.SandboxUploadOptions(ssh_key_option_name="--ssh-key", visible=HelpLevel.BASIC),
-                build.build_opts.MDSUploadOptions(visible=HelpLevel.BASIC),
+                build.build_opts.MDSUploadOptions(),
                 core.common_opts.TransportOptions(),
                 build.build_opts.CustomFetcherOptions(),
                 build.build_opts.DistCacheOptions(),
