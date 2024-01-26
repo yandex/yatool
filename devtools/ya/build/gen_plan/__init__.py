@@ -53,7 +53,6 @@ def _make_repositories_config(
     root,
     revision,
     arcadia_svn_path,
-    with_diff,
     patch,
     need_tests_data,
     repository_type,
@@ -74,11 +73,6 @@ def _make_repositories_config(
     if patch:
         trs, data = patch_tools.convert_patch_spec(patch)
         pf, p = patch_tools.combine_transformations(trs), data
-    elif with_diff and not arc_url:
-        import yalibrary.svn as svn
-
-        path = svn.generate_zipatch(config.find_root())
-        pf, p = patch_tools.generate_universal_spec(path, separate_transformations=True)
 
     # prepare arc repo
     if arc_url:
@@ -151,7 +145,6 @@ def _gen_extra_dict(
     revision,
     arcadia_svn_path,
     priority,
-    with_diff,
     patch,
     cluster,
     coordinators_filter,
@@ -172,7 +165,6 @@ def _gen_extra_dict(
         root,
         revision,
         arcadia_svn_path,
-        with_diff,
         patch,
         need_tests_data,
         repository_type,
@@ -223,7 +215,6 @@ def gen_extra_dict_by_opts(
         getattr(opts, 'revision_for_check', None),
         getattr(opts, 'svn_url_for_check', None),
         priority or getattr(opts, 'dist_priority', 0),
-        getattr(opts, 'with_diff', False),
         getattr(opts, 'distbuild_patch', None),
         cluster or getattr(opts, 'distbuild_cluster', None),
         coordinators_filter or getattr(opts, 'coordinators_filter', None),
