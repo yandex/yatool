@@ -24,6 +24,7 @@ class VSCodeTypeScriptOptions(core.yarg.Options):
         self.project_output = None
         self.workspace_name = None
         self.build_enabled = False
+        self.install_deps = False
 
     @classmethod
     def consumer(cls):
@@ -38,6 +39,12 @@ class VSCodeTypeScriptOptions(core.yarg.Options):
                 ['-W', '--workspace-name'],
                 help='Custom IDE workspace name',
                 hook=core.yarg.SetValueHook('workspace_name'),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--install-deps'],
+                help='Install project dependencies',
+                hook=core.yarg.SetConstValueHook('install_deps', True),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
@@ -62,19 +69,29 @@ FINISH_HELP = (
 )
 
 
+def run_nots(params, *args):
+    nots = yalibrary.tools.tool('nots')
+    target_dir = params.abs_targets[0]
+    process = subprocess.Popen([nots] + list(args), cwd=target_dir, stdout=sys.stdout, stderr=sys.stderr)
+    return process.wait()
+
+
+def do_install_deps(params):
+    ide_common.emit_message('Installing dependencies')
+    if run_nots(params, 'install') != 0:
+        ide_common.emit_message(termcolor.colored('Build failed. Terminating', 'red'))
+        sys.exit(1)
+
+
 def do_build(params):
     ide_common.emit_message('Running build')
-
-    nots = yalibrary.tools.tool('nots')
-    process = subprocess.Popen([nots, 'build'])
-    returncode = process.wait()
-
-    if returncode != 0:
+    if run_nots(params, 'build') != 0:
         ide_common.emit_message(termcolor.colored('Build failed. Terminating', 'red'))
         sys.exit(1)
 
 
 def get_workspace_template(params, YA_PATH):
+    target_dir = params.abs_targets[0]
     template = OrderedDict(
         (
             ('folders', []),
@@ -99,8 +116,9 @@ def get_workspace_template(params, YA_PATH):
                 'settings',
                 OrderedDict(
                     (
+                        ("C_Cpp.intelliSenseEngine", "disabled"),
+                        ("go.useLanguageServer", False),
                         ('editor.defaultFormatter', 'esbenp.prettier-vscode'),
-                        ('eslint.packageManager', 'pnpm'),
                         ('git.mergeEditor', False),
                         ('jest.autoRun', OrderedDict((('watch', False),))),
                         ('npm.autoDetect', 'off'),
@@ -169,15 +187,16 @@ def get_workspace_template(params, YA_PATH):
                 'tasks',
                 OrderedDict(
                     (
-                        ('versions', '2.0.0'),
+                        ('version', '2.0.0'),
                         (
                             'tasks',
                             [
                                 OrderedDict(
                                     (
-                                        ('label', 'Build'),
+                                        ('label', 'nots: Build'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots build'),
+                                        ('command', YA_PATH + ' tool nots build'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
@@ -191,15 +210,16 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
-                                        ('label', 'Update lockfile'),
+                                        ('label', 'nots: Install dependencies'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots update-lockfile'),
+                                        ('command', YA_PATH + ' tool nots install'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
                                                 (
                                                     ('kind', 'build'),
-                                                    ('isDefault', True),
+                                                    ('isDefault', False),
                                                 )
                                             ),
                                         ),
@@ -207,9 +227,27 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
-                                        ('label', 'Test'),
+                                        ('label', 'nots: Update lockfile'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots test'),
+                                        ('command', YA_PATH + ' tool nots update-lockfile'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
+                                        (
+                                            'group',
+                                            OrderedDict(
+                                                (
+                                                    ('kind', 'build'),
+                                                    ('isDefault', False),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                OrderedDict(
+                                    (
+                                        ('label', 'nots: Test'),
+                                        ('type', 'shell'),
+                                        ('command', YA_PATH + ' tool nots test'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
@@ -223,15 +261,16 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
-                                        ('label', 'Lint'),
+                                        ('label', 'nots: Lint'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots lint'),
+                                        ('command', YA_PATH + ' tool nots lint'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
                                                 (
                                                     ('kind', 'test'),
-                                                    ('isDefault', True),
+                                                    ('isDefault', False),
                                                 )
                                             ),
                                         ),
@@ -239,15 +278,16 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
-                                        ('label', 'Code reformat'),
+                                        ('label', 'nots: Code reformat'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots fmt'),
+                                        ('command', YA_PATH + ' tool nots fmt'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
                                                 (
                                                     ('kind', 'test'),
-                                                    ('isDefault', True),
+                                                    ('isDefault', False),
                                                 )
                                             ),
                                         ),
@@ -255,15 +295,16 @@ def get_workspace_template(params, YA_PATH):
                                 ),
                                 OrderedDict(
                                     (
-                                        ('label', 'Check deps'),
+                                        ('label', 'nots: Check dependencies'),
                                         ('type', 'shell'),
-                                        ('command', 'ya tool nots check-deps'),
+                                        ('command', YA_PATH + ' tool nots check-deps'),
+                                        ('options', OrderedDict((('cwd', target_dir),))),
                                         (
                                             'group',
                                             OrderedDict(
                                                 (
                                                     ('kind', 'test'),
-                                                    ('isDefault', True),
+                                                    ('isDefault', False),
                                                 )
                                             ),
                                         ),
@@ -328,6 +369,12 @@ def get_workspace_template(params, YA_PATH):
 
 
 def gen_vscode_workspace(params):
+    if len(params.abs_targets) == 0:
+        ide_common.emit_message('[[bad]]Project target not found[[rst]]')
+        return
+    if len(params.abs_targets) > 1:
+        ide_common.emit_message('[[bad]]Multiple targets are not supported at this moment[[rst]]')
+        return
     if params.project_output:
         project_root = os.path.abspath(os.path.expanduser(params.project_output))
         if not os.path.exists(project_root):
@@ -335,6 +382,9 @@ def gen_vscode_workspace(params):
             os.makedirs(project_root)
     else:
         project_root = os.path.abspath(os.curdir)
+
+    if params.install_deps:
+        do_install_deps(params)
 
     if params.build_enabled:
         do_build(params)
@@ -347,10 +397,10 @@ def gen_vscode_workspace(params):
         OrderedDict(
             (
                 ('name', target),
-                ('path', os.path.join(params.arc_root, target)),
+                ('path', target),
             )
         )
-        for target in params.rel_targets
+        for target in params.abs_targets
     ]
 
     workspace_path = vscode.workspace.pick_workspace_path(project_root, params.workspace_name)
@@ -366,3 +416,6 @@ def gen_vscode_workspace(params):
     if os.getenv('SSH_CONNECTION'):
         remote_ide_link = 'vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'
         ide_common.emit_message(remote_ide_link.format(hostname=platform.node(), workspace_path=workspace_path))
+    else:
+        local_ide_link = 'vscode://file/{workspace_path}?windowId=_blank'
+        ide_common.emit_message(local_ide_link.format(workspace_path=workspace_path))
