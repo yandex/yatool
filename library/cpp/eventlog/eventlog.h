@@ -232,7 +232,7 @@ class IWriteFrameCallback : public TAtomicRefCount<IWriteFrameCallback> {
 public:
     virtual ~IWriteFrameCallback() = default;
 
-    virtual void OnAfterCompress(const TBuffer& compressedFrame, TEventTimestamp startTimestamp, TEventTimestamp endTimestamp) = 0;
+    virtual void OnAfterCompress(const TBuffer& compressedFrame, TEventTimestamp startTimestamp, TEventTimestamp endTimestamp, const TLogRecord::TMetaFlags& metaFlags = {}) = 0;
 };
 
 using TWriteFrameCallbackPtr = TIntrusivePtr<IWriteFrameCallback>;
@@ -431,10 +431,10 @@ public:
 
     virtual bool HasNullBackend() const = 0;
 
-    virtual void WriteFrame(TBuffer& buffer, 
-                            TEventTimestamp startTimestamp, 
-                            TEventTimestamp endTimestamp, 
-                            TWriteFrameCallbackPtr writeFrameCallback = nullptr, 
+    virtual void WriteFrame(TBuffer& buffer,
+                            TEventTimestamp startTimestamp,
+                            TEventTimestamp endTimestamp,
+                            TWriteFrameCallbackPtr writeFrameCallback = nullptr,
                             TLogRecord::TMetaFlags metaFlags = {}) = 0;
 };
 
@@ -479,10 +479,10 @@ public:
         return HasNullBackend_;
     }
 
-    void WriteFrame(TBuffer& buffer, 
-                    TEventTimestamp startTimestamp, 
+    void WriteFrame(TBuffer& buffer,
+                    TEventTimestamp startTimestamp,
                     TEventTimestamp endTimestamp,
-                    TWriteFrameCallbackPtr writeFrameCallback = nullptr, 
+                    TWriteFrameCallbackPtr writeFrameCallback = nullptr,
                     TLogRecord::TMetaFlags metaFlags = {}) override;
 
 private:
@@ -533,9 +533,9 @@ public:
         return Slave().HasNullBackend();
     }
 
-    void WriteFrame(TBuffer& buffer, 
-                    TEventTimestamp startTimestamp, 
-                    TEventTimestamp endTimestamp, 
+    void WriteFrame(TBuffer& buffer,
+                    TEventTimestamp startTimestamp,
+                    TEventTimestamp endTimestamp,
                     TWriteFrameCallbackPtr writeFrameCallback = nullptr,
                     TLogRecord::TMetaFlags metaFlags = {}) override {
         Slave().WriteFrame(buffer, startTimestamp, endTimestamp, writeFrameCallback, std::move(metaFlags));

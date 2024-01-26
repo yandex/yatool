@@ -471,7 +471,7 @@ void TEventLog::WriteFrame(TBuffer& buffer,
     });
 
     if (writeFrameCallback) {
-        writeFrameCallback->OnAfterCompress(frameData, startTimestamp, endTimestamp);
+        writeFrameCallback->OnAfterCompress(frameData, startTimestamp, endTimestamp, metaFlags);
     }
 
     Log_.Write(frameData.Data(), frameData.Size(), std::move(metaFlags));
