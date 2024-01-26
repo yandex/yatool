@@ -31,3 +31,7 @@ IF (NOT YA_OPENSOURCE)
 ENDIF()
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

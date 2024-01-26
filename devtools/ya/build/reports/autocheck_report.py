@@ -851,7 +851,7 @@ class AggregatingStreamingReport(object):
         self._lock = threading.RLock()
         self._closed_tests_streams = set()
         self._closed_streams = set()
-        self._last_flush_time = 0
+        self._last_flush_time = time.time()
         self._items_queue = []
         self._closed = False
         self._ci_progress = None
