@@ -170,6 +170,8 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                     test_results_path = os.path.join(
                         arc_root, module["module_path"], "test-results", os.path.basename(name)
                     )
+                elif module_type == "FUZZ":
+                    test_results_path = os.path.join(arc_root, module["module_path"], "test-results", "fuzz")
                 else:
                     continue
                 configuration["cwd"] = module.get("TEST_CWD", test_results_path)

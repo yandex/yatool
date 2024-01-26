@@ -36,6 +36,7 @@ TEST_MODULE_TYPES = (
     "G_BENCHMARK",
     "BOOSTTEST",
     "BOOSTTEST_WITH_MAIN",
+    "FUZZ",
 )
 
 RUN_WRAPPER_TEMPLATE = """#!/bin/sh

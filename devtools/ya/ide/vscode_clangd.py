@@ -313,6 +313,8 @@ def gen_run_configurations(params, modules, args, YA_PATH):
                     test_results_path = os.path.join(params.arc_root, module['module_path'], 'test-results', 'gtest')
                 elif mangle_module_type in ('BOOSTTEST', 'BOOSTTEST_WITH_MAIN', 'G_BENCHMARK'):
                     test_results_path = os.path.join(params.arc_root, module['module_path'], 'test-results', short_name)
+                elif mangle_module_type == "FUZZ":
+                    test_results_path = os.path.join(params.arc_root, module["module_path"], "test-results", "fuzz")
                 else:
                     continue
                 configuration["cwd"] = module.get('TEST_CWD', test_results_path)
