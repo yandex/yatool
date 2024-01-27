@@ -64,7 +64,7 @@ private:
     NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 
 public:
-    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids);
+    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids);
 
     using TBase::Nodes;
 

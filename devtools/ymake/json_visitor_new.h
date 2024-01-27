@@ -15,9 +15,13 @@ private:
     using TNodeData = TJSONEntryStats;
 
     TCommands& Commands;
+
+protected:
+    const TCmdConf& CmdConf;
+
 public:
 
-    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids);
+    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids);
 
     bool AcceptDep(TState& state);
     bool Enter(TState& state);

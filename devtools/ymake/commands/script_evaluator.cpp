@@ -193,14 +193,7 @@ size_t TScriptEvaluator::DoTerm(
 }
 
 const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TStringBuf& val) {
-    Y_DEBUG_ABORT_UNLESS(CmdConf);
-    Y_ABORT_UNLESS(val.StartsWith("S:"));
-    const auto cmdId = static_cast<ECmdId>(
-        FromString<std::underlying_type_t<ECmdId>>(
-            val.substr(2)));
-    const auto* subExpr = Commands->Get(cmdId);
-    Y_DEBUG_ABORT_UNLESS(subExpr == Commands->GetByElemId(CmdConf->GetId(val)));
-    return subExpr;
+    return Commands->Get(val, CmdConf);
 }
 
 const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TYVar* var) {

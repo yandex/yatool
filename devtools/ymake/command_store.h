@@ -99,6 +99,8 @@ public:
         return &Commands[uId];
     }
 
+    const NPolexpr::TExpression* Get(TStringBuf name, const TCmdConf *conf) const;
+
     ECmdId IdByElemId(ui32 elemId) const {
         const auto fres = Elem2Cmd.find(elemId);
         if (fres == Elem2Cmd.end()) {

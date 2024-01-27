@@ -3,9 +3,10 @@
 #include "module_restorer.h"
 #include "parser_manager.h"
 
-TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids)
+TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf &cmdConf, const TVector<TTarget>& startDirs, bool newUids)
     : TBase{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Commands(commands)
+    , CmdConf(cmdConf)
     , NewUids(newUids)
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
@@ -82,7 +83,8 @@ void TJSONVisitorNew::PrepareCurrent(TState& state) {
 void TJSONVisitorNew::FinishCurrent(TState& state) {
     if (CurrNode->NodeType == EMNT_BuildCommand) {
         auto name = CurrState->GetCmdName();
-        if (!name.IsNewFormat()) {
+        if (!PrntData->StructCmdDetected) {
+            Y_ASSERT(!name.IsNewFormat());
             auto str = name.GetStr();
             TStringBuf val = GetCmdValue(str);
             TStringBuf cmdName = GetCmdName(str);
@@ -92,11 +94,30 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
                 UpdateCurrent(state, val, "Include command value to structure uid");
             }
         } else {
-            auto expr = Commands.Get(Commands.IdByElemId(name.GetElemId()));
-            Y_ASSERT(expr);
-            Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
-                CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
-            });
+            const NPolexpr::TExpression *expr = nullptr;
+            if (name.IsNewFormat()) {
+                // (presumably) this is a build command (expression reference, "S:123")
+                expr = Commands.Get(Commands.IdByElemId(CurrState->GetCmdName().GetElemId()));
+                Y_ASSERT(expr);
+            } else {
+                // (presumably) this is a context variable ("0:SOME_NONINLINED_VAR=S:234")
+                auto str = name.GetStr();
+                TStringBuf val = GetCmdValue(str);
+                TStringBuf cmdName = GetCmdName(str);
+                if (cmdName.EndsWith("__NO_UID__")) {
+                    YDIAG(V)
+                        << "Variable not accounted for in uid: " << cmdName
+                        << ", value: " << Commands.PrintCmd(*Commands.Get(val, &CmdConf))
+                        << Endl;
+                } else {
+                    expr = Commands.Get(val, &CmdConf);
+                    Y_ASSERT(expr);
+                }
+            }
+            if (expr)
+                Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
+                    CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
+                });
         }
         CurrState->Hash->New()->StructureMd5Update(RestoreContext.Conf.GetUidsSalt(), "FAKEID");
     }

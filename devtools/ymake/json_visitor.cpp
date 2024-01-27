@@ -57,8 +57,8 @@ inline bool NeedToPassInputs(const TConstDepRef& dep) {
     return true;
 }
 
-TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TVector<TTarget>& startDirs, bool newUids)
-    : TBase{restoreContext, commands, startDirs, newUids}
+TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids)
+    : TBase{restoreContext, commands, cmdConf, startDirs, newUids}
     , Commands{commands}
     , GlobalVarsCollector(restoreContext)
 {
@@ -237,6 +237,12 @@ bool TJSONVisitor::Enter(TState& state) {
         prntData = VisitorEntry(*prntState);
     }
 
+    if (nodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
+        if (currState.GetCmdName().IsNewFormat()) {
+            prntData->StructCmdDetected = true;
+        }
+    }
+
     if (fresh) {
         TNodeDebugOnly nodeDebug{graph, node.Id()};
         if (!currState.Hash) {
@@ -299,9 +305,10 @@ bool TJSONVisitor::Enter(TState& state) {
         if (!currDone && !NewUids && nodeType == EMNT_BuildCommand && (!state.HasIncomingDep() || !IsIndirectSrcDep(state.IncomingDep()))) {
             TMd5Value md5{nodeDebug, "TJSONVisitor::Enter::<md5#2>"sv};
             auto name = currState.GetCmdName();
-
-            if (!name.IsNewFormat()) {
                 auto str = name.GetStr();
+
+            if (!prntData->StructCmdDetected) {
+                Y_ASSERT(!name.IsNewFormat());
                 TStringBuf val = GetCmdValue(str);
                 TStringBuf cmdName = GetCmdName(str);
                 if (cmdName.EndsWith("__NO_UID__")) {
@@ -311,12 +318,31 @@ bool TJSONVisitor::Enter(TState& state) {
                 }
                 currState.Hash->Old()->RenderMd5Update(val.data(), val.size());
             } else {
-                auto expr = Commands.Get(Commands.IdByElemId(currState.GetCmdName().GetElemId()));
-                Y_ASSERT(expr);
-                Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
-                    md5.Update(data, size, "TJSONVisitor::Enter::<StreamCmdRepr>"sv);
-                    currState.Hash->Old()->RenderMd5Update(data, size);
-                });
+                const NPolexpr::TExpression *expr = nullptr;
+                if (name.IsNewFormat()) {
+                    // (presumably) this is a build command (expression reference, "S:123")
+                    expr = Commands.Get(Commands.IdByElemId(currState.GetCmdName().GetElemId()));
+                    Y_ASSERT(expr);
+                } else {
+                    // (presumably) this is a context variable ("0:SOME_NONINLINED_VAR=S:234")
+                    auto str = name.GetStr();
+                    TStringBuf val = GetCmdValue(str);
+                    TStringBuf cmdName = GetCmdName(str);
+                    if (cmdName.EndsWith("__NO_UID__")) {
+                        YDIAG(V)
+                            << "Variable not accounted for in uid: " << cmdName
+                            << ", value: " << Commands.PrintCmd(*Commands.Get(val, &CmdConf))
+                            << Endl;
+                    } else {
+                        expr = Commands.Get(val, &CmdConf);
+                        Y_ASSERT(expr);
+                    }
+                }
+                if (expr)
+                    Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
+                        md5.Update(data, size, "TJSONVisitor::Enter::<StreamCmdRepr>"sv);
+                        currState.Hash->Old()->RenderMd5Update(data, size);
+                    });
             }
             currData.OldUids()->SetContextSign(md5, currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
             currData.OldUids()->SetSelfContextSign(md5, currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
@@ -376,12 +402,6 @@ bool TJSONVisitor::Enter(TState& state) {
 
         if (const auto it = Loops.Node2Loop.find(node.Id())) {
             currData.LoopId = it->second;
-        }
-    }
-
-    if (nodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
-        if (currState.GetCmdName().IsNewFormat()) {
-            prntData->StructCmdDetected = true;
         }
     }
 

@@ -216,6 +216,18 @@ static inline ui64 GoodHash(const NPolexpr::TExpression& expr) noexcept {
     return CityHash64(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 }
 
+const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *conf) const {
+    Y_DEBUG_ABORT_UNLESS(conf);
+    Y_ABORT_UNLESS(name.StartsWith("S:"));
+    const auto cmdId =
+        static_cast<ECmdId>(
+            FromString<std::underlying_type_t<ECmdId>>(
+                name.substr(2)));
+    const auto* subExpr = Get(cmdId);
+    Y_DEBUG_ABORT_UNLESS(subExpr == GetByElemId(conf->GetId(name)));
+    return subExpr;
+}
+
 const NCommands::TSyntax& TCommands::Parse(TMacroValues& values, TString src) {
     auto result = ParserCache.find(src);
     if (result == ParserCache.end())
@@ -228,7 +240,7 @@ void TCommands::Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, 
     auto processVar = [&](NPolexpr::EVarId id) {
 
         auto name = Values.GetVarName(id);
-        if (name.starts_with("__NOINLINE__"))
+        if (name.ends_with("__NOINLINE__") || name.ends_with("__NO_UID__"))
             return;
         auto buildConf = GlobalConf();
         auto blockData = buildConf->BlockData.find(name);
