@@ -105,4 +105,4 @@ class CustomLintTestSuite(LintTestSuite):
         return data + self._configs
 
     def get_test_dependencies(self):
-        return list(set([x for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ')]))
+        return list(set([x for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ') if x]))
