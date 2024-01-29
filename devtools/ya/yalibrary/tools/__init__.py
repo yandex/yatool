@@ -128,7 +128,7 @@ class _ToolChain(object):
         for tc, value in six.iteritems(core.config.config()['toolchain']):
             for pl in value['platforms']:
                 if pl.get('default', False):
-                    current_os = yalibrary.platform_matcher.current_platform()['os']
+                    current_os = yalibrary.platform_matcher.current_os()
                     if pl['host']['os'] == current_os:
                         if pl.get('target', {}).get('os', current_os) == current_os:
                             native_with_target_tc.append(tc)
@@ -193,7 +193,7 @@ class _ToolChain(object):
         return params.get(param)
 
     def system_libs(self, tool_name, for_platform):
-        platf = for_platform.upper() if for_platform else pm.current_platform()['os']
+        platf = for_platform.upper() if for_platform else pm.current_os()
 
         params = self.__find_toolchain(tool_name)[1].get('params', {})
         sys_libs = params.get('sys_lib', {}).get(platf, [])

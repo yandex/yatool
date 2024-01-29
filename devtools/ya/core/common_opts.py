@@ -45,7 +45,7 @@ import test.const
 import core.config as cc
 
 import yalibrary.upload.consts
-from yalibrary.platform_matcher import is_darwin_arm64
+from yalibrary.platform_matcher import is_darwin_rosetta
 
 
 class BuildTypeConsumer(ArgConsumer):
@@ -931,7 +931,7 @@ class CrossCompilationOptions(Options):
                 help='Hide MacOS arm64 host warning',
                 hook=SetConstValueHook('hide_arm64_host_warning', True),
                 group=ADVANCED_OPT_GROUP,
-                visible=is_darwin_arm64(),
+                visible=is_darwin_rosetta(),
             ),
             EnvConsumer('YA_TOOL_HIDE_ARM64_HOST_WARNING', hook=SetConstValueHook('hide_arm64_host_warning', True)),
             ConfigConsumer('hide_arm64_host_warning'),

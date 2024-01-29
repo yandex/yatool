@@ -93,26 +93,32 @@ cdef TCanonizedPlatform _canonized_platform_from_str(s: str):
     return TCanonizedPlatform(b)
 
 
-def _compute_platform_suffix(full_platform):
-    for arch in ('aarch64', 'ppc64le', 'arm64'):
-        if arch in full_platform:
-            return '-{}'.format(arch)
-    return ''
-
-
 def canonize_platform(platform_):
     return _canonized_platform_to_str(CanonizePlatform(six.ensure_binary(platform_)))
 
 
 def canonize_full_platform(full_platform):
-    prefix_len = len(re.match(r'^[a-zA-Z]+', full_platform).group(0))
-    platform_ = full_platform[:prefix_len]
-    return canonize_platform(platform_ + _compute_platform_suffix(full_platform))
+    full_platform = full_platform.lower()
+
+    platform_ = re.match(r'^[a-z]+', full_platform).group(0)
+
+    platform_suffix = ''
+    for arch in ('aarch64', 'ppc64le', 'arm64'):
+        if arch in full_platform:
+            platform_suffix = _PLATFORM_SEP + arch
+            break
+
+    return canonize_platform(platform_ + platform_suffix)
 
 
 @exts.func.lazy
 def is_darwin_arm64():
     return IsDarwinArm64()
+
+
+@exts.func.lazy
+def is_darwin_rosetta():
+    return my_platform() == 'darwin' and is_darwin_arm64()
 
 
 @exts.func.lazy

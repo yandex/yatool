@@ -28,7 +28,7 @@ from core.yarg.groups import PRINT_CONTROL_GROUP
 from core.yarg.help_level import HelpLevel
 from yalibrary.tools import environ, param, resource_id, task_id, tool, tools, toolchain_root, toolchain_sys_libs
 from yalibrary.toolscache import lock_resource
-from yalibrary.platform_matcher import is_darwin_arm64
+from yalibrary.platform_matcher import is_darwin_rosetta
 import core.config
 import core.respawn
 import exts.process
@@ -138,7 +138,7 @@ class ToolOptions(Options):
                 help='Hide MacOS arm64 host warning',
                 hook=SetConstValueHook('hide_arm64_host_warning', True),
                 group=PRINT_CONTROL_GROUP,
-                visible=HelpLevel.EXPERT if is_darwin_arm64() else False,
+                visible=HelpLevel.EXPERT if is_darwin_rosetta() else False,
             ),
             EnvConsumer('YA_TOOL_HIDE_ARM64_HOST_WARNING', hook=SetConstValueHook('hide_arm64_host_warning', True)),
             ConfigConsumer('hide_arm64_host_warning'),
@@ -183,15 +183,13 @@ def do_tool(params):
     else:
         target_platform = None
 
-    if is_darwin_arm64() and not host_platform:
-        host_platform = 'darwin'
-        if not params.hide_arm64_host_warning:
-            try:
-                import app_ctx
+    if is_darwin_rosetta() and not host_platform and not params.hide_arm64_host_warning:
+        try:
+            import app_ctx
 
-                app_ctx.display.emit_message("You use x86_64 version of selected tool.")
-            except Exception as e:
-                logger.error("Can't print arm64 warning message: {}".format(e))
+            app_ctx.display.emit_message("You use x86_64 version of selected tool.")
+        except Exception:
+            logger.exception("Can't print arm64 warning message")
 
     tool_path = tool(
         tool_name,

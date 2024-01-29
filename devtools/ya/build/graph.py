@@ -1945,7 +1945,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
         if not target_platforms:
             target_platforms = [{'platform_name': bg.host_platform_name()}]
     else:
-        if pm.is_darwin_arm64() and not opts.hide_arm64_host_warning and not host and not target_platforms:
+        if pm.is_darwin_rosetta() and not opts.hide_arm64_host_warning and not host and not target_platforms:
             try:
                 import app_ctx
 
