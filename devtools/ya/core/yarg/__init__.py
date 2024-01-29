@@ -32,6 +32,7 @@ from core.yarg.hooks import (  # noqa: F401
     SetAppendHook,
     ExtendHook,  # noqa: F401
     DictPutHook,
+    DictUpdateHook,
     SetConstAppendHook,
     UpdateValueHook,
 )

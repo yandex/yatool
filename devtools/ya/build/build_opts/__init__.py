@@ -68,6 +68,7 @@ from core.yarg import (
     ExtendHook,
     SetConstAppendHook,
     DictPutHook,
+    DictUpdateHook,
     JAVA_BUILD_OPT_GROUP,
     ArgsValidatingException,
     AUTH_OPT_GROUP,
@@ -1702,6 +1703,7 @@ class FlagsOptions(Options):
             ),
             ConfigConsumer(
                 'flags',
+                hook=DictUpdateHook('flags'),
             ),
         ]
 
