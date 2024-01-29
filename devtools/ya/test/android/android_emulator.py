@@ -112,9 +112,9 @@ class AndroidEmulator(object):
             )
 
         emulator_state = get_emulator_state()
-        while emulator_state.stdout != 'device':
-            logger.info('Emulator state stdout {}'.format(emulator_state.stdout))
-            logger.info('Emulator state stderr {}'.format(emulator_state.stderr))
+        while emulator_state.stdout != 'device\n':
+            logger.info('Emulator state stdout: {}'.format(emulator_state.stdout))
+            logger.info('Emulator state stderr: {}'.format(emulator_state.stderr))
             time.sleep(1)
             emulator_state = get_emulator_state()
 
