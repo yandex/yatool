@@ -1060,6 +1060,8 @@ class YaMakeOptions(Options):
             ConfigConsumer('add_result_extend', hook=ExtendHook('add_result')),
             ConfigConsumer('add_host_result'),
             ConfigConsumer('all_outputs_to_result'),
+            ConfigConsumer('show_timings'),
+            ConfigConsumer('show_extra_progress', hook=SetValueHook('ext_progress')),
             ArgConsumer(
                 ['--show-timings'],
                 help='Print execution time for commands',
