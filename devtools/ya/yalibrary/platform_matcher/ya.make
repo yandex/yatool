@@ -5,12 +5,13 @@ STYLE_PYTHON()
 PY_SRCS(
     NAMESPACE yalibrary.platform_matcher
     __init__.py
-    matcher.py
+    matcher.pyx
     platform_params.py
 )
 
 PEERDIR(
     contrib/python/PyYAML
+    devtools/libs/yaplatform
     devtools/ya/exts
     devtools/ya/test/const
     library/python/resource

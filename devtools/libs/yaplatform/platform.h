@@ -18,24 +18,41 @@ namespace NYa {
         constexpr static TStringBuf DEFAULT_ARCH = "x86_64";
         constexpr static TStringBuf PLATFORM_SEP = "-";
 
-        explicit TCanonizedPlatform(const TString& canonizedString);
-        TCanonizedPlatform(const TString& os, const TString& arch);
+        TCanonizedPlatform();
+        explicit TCanonizedPlatform(TStringBuf canonizedString);
+        TCanonizedPlatform(TStringBuf os, TStringBuf arch);
         TCanonizedPlatform(const TCanonizedPlatform& other) = default;
         TCanonizedPlatform(TCanonizedPlatform&& other) = default;
 
+        TCanonizedPlatform& operator=(const TCanonizedPlatform& other) = default;
+        TCanonizedPlatform& operator=(TCanonizedPlatform&& other) noexcept = default;
+
         bool operator==(const TCanonizedPlatform& other) const = default;
+
         inline size_t Hash() const noexcept {
             return CombineHashes(THash<TString>{}(Os_), THash<TString>{}(Arch_));
         }
 
         TString AsString() const;
-        inline TString Os() {return Os_;}
-        inline TString Arch() {return Arch_;}
+        inline TString Os() const {return Os_;}
+        inline TString Arch() const {return Arch_;}
     private:
         void Check() const;
 
         TString Os_;
         TString Arch_;
+    };
+
+    class TUnsupportedPlatformError: public yexception {
+    public:
+        TUnsupportedPlatformError(TStringBuf platform) {
+            *this << "'" << platform << "' is not supported";
+        }
+    };
+
+    class TPlatformSpecificationError: public yexception {
+    public:
+        using yexception::yexception;
     };
 }
 
@@ -49,6 +66,8 @@ struct THash<NYa::TCanonizedPlatform> {
 namespace NYa {
     using TPlatformReplacements = THashMap<TCanonizedPlatform, TVector<TCanonizedPlatform>>;
 
+    const TPlatformReplacements& DefaultPlatformReplacements();
+
     TString CurrentOs();
     TString CurrentArchitecture();
     TLegacyPlatform CurrentPlatform();
@@ -59,7 +78,7 @@ namespace NYa {
 
     // Note: If platformReplacements is null default PLATFORM_REPLACEMENTS will be used. To disable platform replacements pass empty hash
     TString MatchPlatform(
-        TCanonizedPlatform expect,
+        const TCanonizedPlatform& expect,
         const TVector<TString>& platforms,
         const TPlatformReplacements* platformReplacements = nullptr);
 }

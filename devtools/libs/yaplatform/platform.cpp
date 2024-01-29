@@ -10,20 +10,35 @@
 #endif
 
 namespace NYa {
-    TCanonizedPlatform::TCanonizedPlatform(const TString& canonizedString) {
+    namespace {
+        TString ToLower(TStringBuf s) {
+            TString res{s};
+            res.to_lower();
+            return res;
+        }
+    }
+
+    TCanonizedPlatform::TCanonizedPlatform()
+        : TCanonizedPlatform{TCanonizedPlatform::ANY_PLATFORM}
+    {
+
+    }
+
+    TCanonizedPlatform::TCanonizedPlatform(TStringBuf canonizedString) {
+        TString lCanonized = ToLower(canonizedString);
         TMaybe<TStringBuf> arch{};
         try {
-            Split(to_lower(canonizedString), PLATFORM_SEP, Os_, arch);
+            Split(lCanonized, PLATFORM_SEP, Os_, arch);
         } catch (const yexception& e) {
-            throw yexception() << "Wrong platform string: " << canonizedString;
+            throw TPlatformSpecificationError() << "Wrong platform string: " << canonizedString;
         }
         Arch_ = arch.GetOrElse(DEFAULT_ARCH);
         Check();
     }
 
-    TCanonizedPlatform::TCanonizedPlatform(const TString& os, const TString& arch)
-        : Os_{to_lower(os)}
-        , Arch_{Os_ == ANY_PLATFORM ? DEFAULT_ARCH : to_lower(arch)}
+    TCanonizedPlatform::TCanonizedPlatform(TStringBuf os, TStringBuf arch)
+        : Os_{ToLower(os)}
+        , Arch_{Os_ == ANY_PLATFORM ? DEFAULT_ARCH : ToLower(arch)}
     {
         Check();
     }
@@ -140,15 +155,15 @@ namespace NYa {
         } else if (platform.StartsWith("win")) {
             return TCanonizedPlatform{"win32"};
         }
-        throw yexception() << "Unsupported platform: '" << platform << "'";
+        throw TUnsupportedPlatformError(platform);
     }
 
-    TString MatchPlatform(TCanonizedPlatform expect, const TVector<TString>& platforms, const TPlatformReplacements* platformReplacements) {
+    TString MatchPlatform(const TCanonizedPlatform& expect, const TVector<TString>& platforms, const TPlatformReplacements* platformReplacements) {
         THashMap<TCanonizedPlatform, TString> canonizedPlatformMap;
         for (const TString& platform : platforms) {
             TCanonizedPlatform canonized = CanonizePlatform(platform);
             if (canonizedPlatformMap.contains(canonized)) {
-                throw yexception() << "Platform '" << platform << "' and '" << canonizedPlatformMap[canonized]
+                throw TPlatformSpecificationError() << "Platform '" << platform << "' and '" << canonizedPlatformMap[canonized]
                     << "' have the same canonized form '" << canonized.AsString() << "'";
             }
             canonizedPlatformMap.emplace(canonized, platform);
