@@ -119,6 +119,7 @@ def get_workspace_template(params, YA_PATH):
                         ("C_Cpp.intelliSenseEngine", "disabled"),
                         ("go.useLanguageServer", False),
                         ('editor.defaultFormatter', 'esbenp.prettier-vscode'),
+                        ("forbeslindesay-taskrunner.separator", ": "),
                         ('git.mergeEditor', False),
                         ('jest.autoRun', OrderedDict((('watch', False),))),
                         ('npm.autoDetect', 'off'),
@@ -180,6 +181,16 @@ def get_workspace_template(params, YA_PATH):
                             'typescript.updateImportsOnFileMove.enabled',
                             'never',
                         ),  # TS Language Server don't support aliases
+                        ("yandex.arcRoot", params.arc_root),
+                        (
+                            "yandex.codenv",
+                            {
+                                "languages": ["TS"],
+                                "targets": params.rel_targets,
+                                "arguments": [],
+                                "autolaunch": False,
+                            },
+                        ),
                     )
                 ),
             ),
@@ -316,7 +327,7 @@ def get_workspace_template(params, YA_PATH):
                                         ('type', 'shell'),
                                         (
                                             'command',
-                                            YA_PATH + ' ' + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
+                                            YA_PATH + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
                                         ),
                                         ('options', OrderedDict((('cwd', os.path.abspath(os.curdir)),))),
                                     )
@@ -397,10 +408,10 @@ def gen_vscode_workspace(params):
         OrderedDict(
             (
                 ('name', target),
-                ('path', target),
+                ('path', os.path.join(params.arc_root, target)),
             )
         )
-        for target in params.abs_targets
+        for target in params.rel_targets
     ]
 
     workspace_path = vscode.workspace.pick_workspace_path(project_root, params.workspace_name)
