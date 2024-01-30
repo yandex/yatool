@@ -90,6 +90,7 @@ static void PrintAllFiles(const TYMake& ymake) {
     YInfo() << "All Files:" << Endl;
     const TDepGraph& graph = ymake.Graph;
 
+    // This format of dump used in devtools/ya/test/tests/lib/clone, on change, please, fix it too
     for (auto node : graph.Nodes()) {
         if (IsFileType(node->NodeType)) {
             TString nameWithCtx;
@@ -103,6 +104,7 @@ static void PrintAllDirs(const TYMake& ymake) {
     YInfo() << "All Directories:" << Endl;
     const TDepGraph& graph = ymake.Graph;
 
+    // This format of dump used in devtools/ya/test/tests/lib/clone, on change, please, fix it too
     for (auto node : graph.Nodes()) {
         if (UseFileId(node->NodeType) && !IsFileType(node->NodeType)) {
             TStringBuf name = graph.GetFileName(node).GetTargetStr();
