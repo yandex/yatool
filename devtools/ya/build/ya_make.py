@@ -46,9 +46,10 @@ from yalibrary.toolscache import (
 from yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.ya_helper.ya_utils import CacheKind
 
+from build.reports import configure_error as ce
+from build.reports import results_report
 import build.reports.autocheck_report as ar
 import build.reports.results_listener as pr
-from build.reports import configure_error as ce
 
 import core.config as core_config
 import core.yarg
@@ -1436,6 +1437,7 @@ class YaMake(object):
 
         if all(
             [
+                self.opts.json_line_report_file is None,
                 self.opts.build_results_report_file is None,
                 self.opts.streaming_report_id is None
                 or (self.opts.streaming_report_url is None and not self.opts.report_to_ci),
@@ -1444,14 +1446,14 @@ class YaMake(object):
             if self.opts.print_test_console_report:
                 self._build_results_listener.add(test_node_listener)
             return
+
         results_dir = self.opts.misc_build_info_dir or self.opts.testenv_report_dir or tempfile.mkdtemp()
         self._output_root = self.opts.output_root or tempfile.mkdtemp()
 
         tests = (
             [t for t in self.ctx.tests if t.is_skipped()] if self.opts.report_skipped_suites_only else self.ctx.tests
         )
-
-        self._report = ar.StoredReport()
+        self._report = results_report.StoredReport()
         report_list = [self._report]
         if self.opts.streaming_report_url or self.opts.report_to_ci:
             # streaming_client is not available in OSS version of the ya
@@ -1479,7 +1481,7 @@ class YaMake(object):
                     self.opts.streaming_task_id,
                 )
             report_list.append(
-                ar.AggregatingStreamingReport(
+                results_report.AggregatingStreamingReport(
                     self.targets,
                     sc.StreamingClient(adapter, self.opts.streaming_task_id),
                     self.opts.report_config_path,
@@ -1487,6 +1489,9 @@ class YaMake(object):
                     self.opts.report_only_stages,
                 )
             )
+
+        if self.opts.json_line_report_file:
+            report_list.append(results_report.JsonLineReport(self.opts.json_line_report_file))
 
         self._reports_generator = ar.ReportGenerator(
             self.opts,

@@ -200,6 +200,7 @@ class DumpReportOptions(Options):
         self.use_links_in_report = False
         self.report_config_path = None
         self.dump_raw_results = False
+        self.json_line_report_file = None
 
     @staticmethod
     def consumer():
@@ -283,6 +284,13 @@ class DumpReportOptions(Options):
                 hook=SetConstValueHook('build_results_report_tests_only', True),
             ),
             EnvConsumer('YA_DUMP_RAW_RESULTS', hook=SetConstValueHook('dump_raw_results', True)),
+            ArgConsumer(
+                ['--jsonl-report'],
+                help='Dump build results when they are ready to the specified file in jsonl format',
+                hook=SetValueHook('json_line_report_file'),
+                group=AUTOCHECK_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
         ]
 
 

@@ -4,10 +4,11 @@ STYLE_PYTHON()
 
 PY_SRCS(
     NAMESPACE build.reports
-    build_reports.py
     autocheck_report.py
-    results_listener.py
+    build_reports.py
     configure_error.py
+    results_listener.py
+    results_report.py
 )
 
 PEERDIR(

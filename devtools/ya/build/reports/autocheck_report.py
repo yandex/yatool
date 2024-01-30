@@ -2,10 +2,8 @@
 
 import os
 import copy
-import time
 import exts.yjson as json
 import logging
-import traceback
 import threading
 
 from collections import defaultdict
@@ -13,7 +11,6 @@ from itertools import chain
 
 import six
 
-from six.moves import urllib
 import core.error
 import test.common as test_common
 import yalibrary.term.console as term_console
@@ -27,6 +24,8 @@ import test.reports.report_prototype as rp
 import test.util.tools as tut
 from yalibrary import formatter
 from yalibrary import platform_matcher
+
+from . import results_report
 
 logger = logging.getLogger(__name__)
 
@@ -122,33 +121,6 @@ def log_restrained_investigation(entry, logsdir, output_dir, work_dir, tar_dirs)
             logger.debug("Target dir %s content: %s", path, os.listdir(path) if os.path.exists(path) else 'None')
 
 
-# XXX FOR DEBUG PURPOSE ONLY - will be removed soon
-def log_restrained_investigation2(entry, path, filename, output_dir, work_dir):
-    ncalls = getattr(log_restrained_investigation2, 'ncalls', 0)
-
-    if ncalls > 5:
-        pass
-    else:
-        setattr(log_restrained_investigation2, 'ncalls', ncalls + 1)
-
-        def format_path(path):
-            return "{}(exist:{})".format(path, os.path.exists(path))
-
-        logger.debug(
-            "Unable to find link file for %s. Test entry: %s",
-            format_path(path),
-            json.dumps(entry, indent=4, sort_keys=True),
-        )
-        logger.debug(
-            "Extracted path:%s output_dir:%s: work_dir:%s",
-            format_path(filename),
-            format_path(output_dir),
-            format_path(work_dir),
-        )
-        for path in [output_dir, work_dir]:
-            logger.debug("Target dir %s content: %s", path, os.listdir(path) if os.path.exists(path) else 'None')
-
-
 def _replace_logs_with_links(entry, output_dir, work_dir):
     def _any_path():
         for log_type, paths in entry.get("links", {}).items():
@@ -218,22 +190,6 @@ def fix_links(report, result_root, build_root='build-release'):
     return report
 
 
-def transform_toolchain(report_config, toolchain):
-    return report_config.get('toolchain_transforms', {}).get(toolchain, toolchain)
-
-
-def is_toolchain_ignored(report_config, toolchain):
-    return toolchain in report_config.get('ignored_toolchains', [])
-
-
-def _read_report_config(path):
-    if path:
-        with open(path) as fp:
-            return json.load(fp)
-    else:
-        return {}
-
-
 def parse_error_message(error, target_name):
     if not isinstance(error, ce.ConfigureError):
         error = ce.ConfigureError(str(error), 0, 0)
@@ -280,8 +236,10 @@ def make_target_entry(
 
     errors = sorted(errors or [])
 
-    toolchain = transform_toolchain(report_config or {}, target_platform or platform_matcher.my_platform())
-    if is_toolchain_ignored(report_config, toolchain):
+    toolchain = results_report.transform_toolchain(
+        report_config or {}, target_platform or platform_matcher.my_platform()
+    )
+    if results_report.is_toolchain_ignored(report_config, toolchain):
         return None
 
     entry = rp.get_blank_record()
@@ -409,7 +367,7 @@ class ReportGenerator(object):
     ):
         self._opts = opts
         self._distbuild_graph = distbuild_graph
-        self._report_config = _read_report_config(self._opts.report_config_path)
+        self._report_config = results_report.safe_read_report_config(self._opts.report_config_path)
         self._targets = targets
         self._owners_list = owners_list
         self._make_files = make_files
@@ -426,7 +384,7 @@ class ReportGenerator(object):
         logger.debug("Got %d tests to report", len(tests))
         for test in tests:
             toolchain = test.target_platform_descriptor
-            transformed_toolchain = transform_toolchain(self._report_config, toolchain)
+            transformed_toolchain = results_report.transform_toolchain(self._report_config, toolchain)
             should_report = (
                 test.is_skipped() and (self._opts.report_skipped_suites_only or self._opts.report_skipped_suites)
             ) or (not test.is_skipped() and not self._opts.report_skipped_suites_only)
@@ -449,7 +407,7 @@ class ReportGenerator(object):
         totals_build = defaultdict(int)
         for uid, target in six.iteritems(self._targets):
             _, target_platform, _, _, _ = target
-            transformed_toolchain = transform_toolchain(self._report_config, target_platform)
+            transformed_toolchain = results_report.transform_toolchain(self._report_config, target_platform)
             totals_build[transformed_toolchain] += 1 * (not self._opts.report_skipped_suites_only)
 
         self.ya_make_progress = YaMakeProgress(totals_build, style_tests_count, tests_count)
@@ -737,7 +695,7 @@ class ReportGenerator(object):
             entry.update(
                 {
                     "owners": ow.find_path_owners(self._owners_list, entry["path"]),
-                    "toolchain": transform_toolchain(
+                    "toolchain": results_report.transform_toolchain(
                         self._report_config,
                         entry_prototype["target_platform_descriptor"] or platform_matcher.my_platform(),
                     ),
@@ -829,240 +787,8 @@ class ReportGenerator(object):
             report.trace_stage(build_stage)
 
 
-class AggregatingStreamingReport(object):
-    FLUSHING_DELAY = 20
-
-    _logger = logging.getLogger('AggregatingStreamingReport')
-
-    def __init__(self, targets, client, report_config_path, keep_alive_streams, report_only_stages):
-        self._report_config = _read_report_config(report_config_path)
-        self._target_results = defaultdict(dict)
-        self._targets = defaultdict(set)
-        self._targets_list = set()
-        self._keep_alive_streams = keep_alive_streams
-        self._report_only_stages = report_only_stages
-        for uid, target in six.iteritems(targets):
-            target_name, target_platform, _, target_tag, _ = target
-            target_platform = transform_toolchain(self._report_config, target_platform)
-            target_key = (target_name, target_platform, target_tag)
-            self._targets[target_platform].add(target_key)
-            self._targets_list.add(target_key)
-        self._client = client
-        self._lock = threading.RLock()
-        self._closed_tests_streams = set()
-        self._closed_streams = set()
-        self._last_flush_time = time.time()
-        self._items_queue = []
-        self._closed = False
-        self._ci_progress = None
-        self._run_flushing_loop()
-
-    def _run_flushing_loop(self):
-        thread = threading.Thread(target=self._flushing_loop)
-        thread.daemon = True
-        thread.start()
-
-    def _flushing_loop(self):
-        while not self._closed:
-            self._flush_items()
-            time.sleep(self.FLUSHING_DELAY)
-
-    def _add_entry_into_queue(self, entry):
-        with self._lock:
-            self._items_queue.append(entry)
-
-    def _flush_items(self, force_flush=False):
-        with self._lock:
-            now = time.time()
-            if self._items_queue and (force_flush or self._last_flush_time + self.FLUSHING_DELAY <= now):
-                if self._report_only_stages:
-                    self._logger.debug(
-                        'Skip sending chunk of %s entries due to report_only_stages option', len(self._items_queue)
-                    )
-                else:
-                    self._client.send_chunk(self._items_queue, self._ci_progress)
-                self._last_flush_time = now
-                self._items_queue = []
-
-    def _add_target_result(self, entry):
-        target_path, target_platform, target_name = entry['path'], entry['toolchain'], entry.get('name')
-        target_key = (target_path, target_platform, target_name)
-
-        if target_platform not in self._targets:
-            self._logger.warn('Target result %s has unknown platform %s', entry, target_platform)
-            return
-
-        if target_key not in self._targets[target_platform]:
-            self._logger.warn('Target result %s has unknown target key %s', entry, target_key)
-            return
-
-        if target_key in self._target_results[target_platform]:
-            self._logger.warn('Target result %s was already added', entry)
-            return
-
-        if len(self._targets_list) == 0:
-            self._logger.warn('Add targets have been already added, incoming target is %s', entry)
-            return
-
-        self._target_results[target_platform][target_key] = entry
-        self._targets_list.discard(target_key)
-        self._add_entry_into_queue(entry)
-        if len(self._targets_list) == 0:
-            self._logger.debug('All targets have been added')
-            self.finish_build_report()
-
-    def __call__(self, entries, ci_progress):
-        with self._lock:
-            self._ci_progress = ci_progress
-        types = defaultdict(int)
-        for entry in entries:
-            tp = entry['type']
-            types[tp] += 1
-            if tp in self._closed_streams:
-                self._logger.warn('Stream %s has been already closed, ignore entry %s', tp, entry)
-            elif tp in ('configure', 'test', 'style'):
-                self._add_entry_into_queue(entry)
-            elif tp == 'build':
-                self._add_target_result(entry)
-            else:
-                self._logger.warn('Result %s has unknown type %s', entry, tp)
-        self._flush_items()
-
-    def trace_stage(self, build_stage):
-        with self._lock:
-            self._client.trace_stage(build_stage)
-
-    def _finish_report(self, tp):
-        if self._report_only_stages:
-            self._logger.debug('Skip finishing %s report due to report_only_stages option', tp)
-            return
-        self._logger.debug('Try to finish %s report', tp)
-        if tp not in self._closed_streams:
-            self._flush_items(force_flush=True)
-            self._logger.debug('Finish %s report', tp)
-            if tp in self._keep_alive_streams:
-                self._logger.debug('Keeping stream %s alive', tp)
-            else:
-                self._client.close_stream(tp)
-            self._closed_streams.add(tp)
-
-    def finish_style_report(self):
-        self._finish_report('style')
-
-    def finish_configure_report(self):
-        self._finish_report('configure')
-
-    def finish_build_report(self):
-        self._finish_report('build')
-
-    def finish_tests_report(self):
-        self._finish_report('test')
-
-    def finish_tests_report_by_size(self, size):
-        if self._report_only_stages:
-            self._logger.debug('Skip finishing test report by size %s due to report_only_stages option', size)
-            return
-        self._logger.debug('Try to finish test report by size %s', size)
-        if size not in self._closed_tests_streams:
-            self._flush_items(force_flush=True)
-            self._logger.debug('Finish tests report by size %s', size)
-            if size in self._keep_alive_streams:
-                self._logger.debug('Keeping stream test for %s tests alive', size)
-            else:
-                self._client.close_stream_by_size('test', size)
-            self._closed_tests_streams.add(size)
-
-    def finish(self):
-        self.finish_style_report()
-        self.finish_configure_report()
-        self.finish_build_report()
-        self.finish_tests_report()
-        if self._keep_alive_streams:
-            self._logger.debug('Keeping stream alive')
-            self._client.release()
-        elif self._report_only_stages:
-            self._logger.debug('Skip finishing report due to report_only_stages option')
-        else:
-            self._client.close()
-        self._closed = True
-
-
-class StreamingReport(object):
-    def __init__(self, url):
-        self._url = url
-
-    def trace_stage(self, build_stage):
-        pass
-
-    def finish_style_report(self):
-        pass
-
-    def finish_configure_report(self):
-        pass
-
-    def finish_build_report(self):
-        pass
-
-    def finish_tests_report(self):
-        pass
-
-    def finish_tests_report_by_size(self, size):
-        pass
-
-    def finish(self):
-        pass
-
-    def __call__(self, entries, ci_progress):
-        try:
-            message = json.dumps({'results': entries, 'progress': ci_progress})
-            logger.debug('Start to send report to %s, length is %s', self._url, len(message))
-            response = json.load(urllib.request.urlopen(self._url, data=message))
-            logger.debug('Report is sent to %s, response is %s', self._url, response)
-        except Exception:
-            logger.warning('Unable to send report because of %s', traceback.format_exc())
-
-
-class StoredReport(object):
-    _logger = logging.getLogger('StoredReport')
-
-    def __init__(self):
-        self._results = []
-        self._ci_progress = {}
-
-    def log_progress(self, ya_make_progress):
-        self._logger.debug('Progress: {}'.format(ya_make_progress.progress))
-
-    def trace_stage(self, build_stage):
-        self._logger.debug('Trace build stage %s', build_stage)
-
-    def finish_style_report(self):
-        self._logger.debug('Finish style report')
-
-    def finish_configure_report(self):
-        self._logger.debug('Finish configure report')
-
-    def finish_build_report(self):
-        self._logger.debug('Finish build report')
-
-    def finish_tests_report(self):
-        self._logger.debug('Finish tests report')
-
-    def finish_tests_report_by_size(self, size):
-        self._logger.debug('Finish tests report by size %s', size)
-
-    def finish(self):
-        self._logger.debug('Finish report')
-
-    def __call__(self, entries, ci_progress):
-        self._ci_progress = ci_progress
-        self._results.extend(entries)
-
-    def make_report(self):
-        return {'results': self._results, 'static_values': {}, 'progress': self._ci_progress}
-
-
 def prepare_results(test_results, report_prototype, builder, owners_list, configure_errors, results_dir, build_root):
-    report = StoredReport()
+    report = results_report.StoredReport()
     generator = ReportGenerator(
         builder.opts,
         builder.distbuild_graph,
