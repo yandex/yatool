@@ -2518,7 +2518,18 @@ def _make_yndexing_graph(graph, opts, ymake_bin, host_tool_resolver):
 def _gen_upload_node(opts, nd):
     yndex_file = _find_yndex_file(nd)
     output_file = yndex_file + '.yt'
-    cmd = ['$(YTYNDEXER)/ytyndexer', 'upload', '-y', '$(BUILD_ROOT)', '-r', opts.yt_root, '-c', opts.yt_cluster]
+    cmd = [
+        '$(YTYNDEXER)/ytyndexer',
+        'upload',
+        '-y',
+        '$(BUILD_ROOT)',
+        '-r',
+        opts.yt_root,
+        '-c',
+        opts.yt_cluster,
+        '--dump-statistics',
+        output_file,
+    ]
     node_tag = 'yt_upload'
     opts_that_do_not_affect_uid = []
     if opts.yt_codenav_extra_opts is not None:
@@ -2533,23 +2544,10 @@ def _gen_upload_node(opts, nd):
     if not opts.yt_readonly:
         cmd += ['-u', uid]
     node = {
-        'cmds': [
-            {'cmd_args': cmd},
-            {
-                'cmd_args': [
-                    '$(PYTHON)/python',
-                    '$(SOURCE_ROOT)/build/scripts/write_file_size.py',
-                    output_file,
-                    yndex_file,
-                ]
-            },
-        ],
+        'cmds': [{'cmd_args': cmd}],
         'kv': {'p': 'YU', 'pc': 'magenta'},
         'outputs': [output_file],
-        'inputs': [
-            yndex_file,
-            '$(SOURCE_ROOT)/build/scripts/write_file_size.py',
-        ],
+        'inputs': [yndex_file],
         'deps': [nd['uid']],
         'tag': node_tag,
         'cache': False,
