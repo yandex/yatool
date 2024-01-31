@@ -10,13 +10,8 @@ namespace NYexport {
     const TVector<TProjectSubdirPtr>& TProject::GetSubdirs() const {
         return SubdirsOrder_;
     }
-    const TVector<TProjectTargetPtr>& TProject::GetTargets() const {
-        return Targets_;
-    }
-
     void TProject::Reset() {
         Factory_ = nullptr;
-        Targets_.clear();
         SubdirsByPath_.clear();
         SubdirsOrder_.clear();
     }
@@ -37,9 +32,8 @@ namespace NYexport {
 
     TProject::TBuilder::TTargetHolder TProject::TBuilder::CreateTarget(const fs::path& targetDir) {
         YEXPORT_VERIFY(Project_->Factory_, "Creating project target without factory");
-        auto target = Project_->Factory_->CreateTarget();
         auto dir = CreateDirectories(targetDir);
-        Project_->Targets_.push_back(target);
+        auto target = Project_->Factory_->CreateTarget();
         dir->Targets.push_back(target);
         return {*this, dir, target};
     }

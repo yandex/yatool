@@ -647,6 +647,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                 }
                 defaultTargetNameAttrs.emplace("hasTest", false);
                 defaultTargetNameAttrs.emplace("targets", jinja2::ValuesList{});
+                defaultTargetNameAttrs.emplace("extra_targets", jinja2::ValuesList{});
                 if (!YexportSpec.AddAttrsDir.empty()) {
                     TJinjaProject::TBuilder::MergeTree(defaultTargetNameAttrs, YexportSpec.AddAttrsDir);
                 }
@@ -661,6 +662,15 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                 targets.emplace_back(targetAttrs);
             } else { // non-test targets always put to begin of targets
                 targets.insert(targets.begin(), targetAttrs);
+            }
+            if (isTest) {
+                auto& extra_targets = targetNameAttrs["extra_targets"].asList();
+                extra_targets.emplace_back(targetAttrs);
+            } else {
+                auto [targetIt, inserted] = targetNameAttrs.insert_or_assign("target", targetAttrs);
+                if (!inserted) {
+                    spdlog::error("Main target {} overwrote by {}", targetIt->second.asMap()["name"].asString(), targetAttrs["name"].asString());
+                }
             }
         }
         if (DoDump) {

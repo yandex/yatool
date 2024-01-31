@@ -54,7 +54,6 @@ namespace NYexport {
         virtual ~TProject() = default;
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
-        const TVector<TProjectTargetPtr>& GetTargets() const;
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>
@@ -66,7 +65,6 @@ namespace NYexport {
 
         THashMap<fs::path, TProjectSubdirPtr> SubdirsByPath_;
         TVector<TProjectSubdirPtr> SubdirsOrder_;
-        TVector<TProjectTargetPtr> Targets_;
 
     private:
         class TFactory {
