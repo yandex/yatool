@@ -11,7 +11,6 @@ PY_SRCS(
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/test/programs/test_tool/run_diff_test
-        devtools/ya/test/programs/test_tool/upload
     )
     IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
         PEERDIR(
@@ -42,6 +41,7 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/run_hermione
             devtools/ya/test/programs/test_tool/run_jest
             devtools/ya/test/programs/test_tool/sandbox_run_test
+            devtools/ya/test/programs/test_tool/upload
         )
     ENDIF()
     IF (NEBIUS)

@@ -1868,7 +1868,7 @@ def create_upload_frepkage_node(filename, global_resources, opts):
     hostname = socket.getfqdn()
     username = getpass.getuser()
 
-    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", global_resources, python="py2") + [
+    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", global_resources) + [
         "--target",
         filename,
         "--output",

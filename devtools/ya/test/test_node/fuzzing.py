@@ -67,7 +67,7 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
     node_log_path = suite.work_dir("fuzz_upload.log")
     node_output = suite.work_dir("sandbox_fuzz_resource.json")
 
-    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", suite.global_resources, python="py2") + [
+    node_cmd = util_tools.get_test_tool_cmd(opts, "upload", suite.global_resources) + [
         "--target",
         input_path,
         "--output",
