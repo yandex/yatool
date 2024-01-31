@@ -130,7 +130,12 @@ def create_debian_package(
                 if not sign:
                     args.extend(['-i', '-us', '-uc'])
 
-                package.process.run_process(DEBUILD_COMMAND, args)
+                package.process.run_process(
+                    DEBUILD_COMMAND,
+                    args,
+                    add_line_timestamps=True,
+                    tee=True,
+                )
 
                 if publish_to_list:
                     upload_opts = core.yarg.merge_opts([])

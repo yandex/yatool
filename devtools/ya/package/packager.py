@@ -897,7 +897,9 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
             else:
                 raise YaPackageException("Unknown packaging format '{}'".format(package_format))
             package.display.emit_message(
-                'Duration of package creation: {:.2f}s'.format(time.time() - timestamp_started)
+                'Package [[good]]successfully[[rst]] packed in [[imp]]{:.2f}s[[rst]]'.format(
+                    time.time() - timestamp_started
+                )
             )
         finally:
             if not params.cleanup and os.path.exists(temp_work_dir):
