@@ -599,16 +599,17 @@ def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Faile
 class BuildContext(object):
     @classmethod
     def load(cls, params, app_ctx, data):
+        kwargs = {'encoding': 'utf-8'} if six.PY3 else {}
         builder = YaMake(
             params,
             app_ctx,
             graph=data.get('graph'),
             tests=[
-                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'))
+                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), **kwargs)
                 for pickled_test in data['tests'].values()
             ],
             stripped_tests=[
-                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'))
+                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), **kwargs)
                 for pickled_test in data.get('stripped_tests', {}).values()
             ],
             configure_errors=data['configure_errors'],
