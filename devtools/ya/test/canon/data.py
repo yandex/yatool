@@ -560,7 +560,7 @@ class CanonicalData(object):
                     yatest_logger.warning("Skip applying changes to canodata - no src changes were requested")
                     return res
 
-                with open(os.path.join(results_root, const.CANON_RESULT_FILE_NAME), "w") as result_file:
+                with open(os.path.join(results_root, const.CANON_RESULT_FILE_NAME), "w", newline='\n') as result_file:
                     json.dump(
                         suite_result, result_file, indent=4, ensure_ascii=False, separators=(',', ': '), sort_keys=True
                     )
