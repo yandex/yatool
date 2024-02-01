@@ -8,7 +8,9 @@ import test.const
 
 def inject_python_coverage_nodes(graph, suites, resolvers_map, opts, platform_descriptor):
     py_suite_with_deps = []
-    for suite in [s for s in suites if s.get_type() in ["pytest", "py3test"]]:
+    # XXX temporary fix - for more info YA-1527
+    allowed_python_modules = ["py3test"]
+    for suite in [s for s in suites if s.get_type() in allowed_python_modules]:
         py2, py3 = [], []
         for uid, output in rigel.get_suite_binary_deps(suite, graph):
             if graph.is_target_python2(uid):
