@@ -646,7 +646,6 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                     defaultTargetNameAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
                 }
                 defaultTargetNameAttrs.emplace("hasTest", false);
-                defaultTargetNameAttrs.emplace("targets", jinja2::ValuesList{});
                 defaultTargetNameAttrs.emplace("extra_targets", jinja2::ValuesList{});
                 if (!YexportSpec.AddAttrsDir.empty()) {
                     TJinjaProject::TBuilder::MergeTree(defaultTargetNameAttrs, YexportSpec.AddAttrsDir);
@@ -656,12 +655,6 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
             if (isTest) {
                 targetNameAttrs.insert_or_assign("hasTest", true);
-            }
-            auto& targets = targetNameAttrs["targets"].asList();
-            if (isTest || targets.empty()) {
-                targets.emplace_back(targetAttrs);
-            } else { // non-test targets always put to begin of targets
-                targets.insert(targets.begin(), targetAttrs);
             }
             if (isTest) {
                 auto& extra_targets = targetNameAttrs["extra_targets"].asList();
