@@ -3,10 +3,9 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
+import tempfile
 
-import pygtrie
-
-from packaging import version
 from build.ymake2 import run_ymake
 import build.graph as bg
 import core.yarg
@@ -18,265 +17,147 @@ from build import build_facade, ya_make
 import yalibrary.platform_matcher as pm
 
 logger = logging.getLogger(__name__)
-
-IDE_YMAKE_BUILD_TYPE = 'nobuild'
-GRADLE_DIR = os.path.join(os.path.expanduser('~'), '.ya', 'build', 'hic_sunt_dracones')
-CACHE_DIR = os.path.join(GRADLE_DIR, 'cache')
-targets_to_build = set()
-cached_libs = dict()
-lib_versions = dict()
-
-project_modules = set()
-project_test_modules = set()
-
-tree = pygtrie.StringTrie()
+requires_props = [
+    'bucketUsername',
+    'bucketPassword',
+    'systemProp.gradle.wrapperUser',
+    'systemProp.gradle' '.wrapperPassword',
+]
+user_root = os.path.expanduser("~")
+gradle_props = os.path.join(user_root, '.gradle', 'gradle.properties')
 
 
-def delete_all_gradle(root, params, flag):
-    if os.path.exists(root):
-        os.remove(root)
+def in_rel_targets(rel_target, rel_targets_with_slash):
+    for rel_target_with_slash in rel_targets_with_slash:
+        if rel_target[: len(rel_target_with_slash)] == rel_target_with_slash:
+            return True
+    return False
 
 
-def delete_useless_folders(root):
-    for dirpath, dirnames, filenames in os.walk(root, topdown=False):
-        for dirname in dirnames:
-            full_path = os.path.join(dirpath, dirname)
-            list_dir = os.listdir(full_path)
-            if not list_dir or (len(list_dir) == 1 and list_dir[0] == 'build.gradle.kts'):
-                shutil.rmtree(full_path)
+def save_bucket_creds(login, token):
+    props = {}
+    if os.path.isfile(gradle_props):
+        with open(gradle_props) as f:
+            lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, value = line.split('=')
+                props[key.strip()] = value.strip()
+    for idx, prop in enumerate(requires_props):
+        if idx % 2 == 0 and login is not None:
+            props[prop] = login
+        elif token is not None:
+            props[prop] = token
+        if prop not in props:
+            return False
+    with open(gradle_props, 'w') as f:
+        for k, v in props.items():
+            f.write('{}={}\n'.format(k, v))
+    return True
 
 
-def find_all_modules(sem_json, project_prefix):
-    with open(sem_json) as f:
-        templates = json.load(f)
-    for node in templates['data']:
-        if 'NodeType' in node and node['NodeType'] == 'Directory' and 'Tag' in node and node['Tag'] == 'StartDir':
-            name = node['Name'].replace('$S/', '')
-            if project_prefix in name and project_prefix != name:
-                if len(list(tree.prefixes(name))) == 0:
-                    project_modules.add(name)
-                    tree[name] = 'foo'
-                elif 'src' not in name:
-                    project_test_modules.add(name)
+def check_bucket_creds():
+    if not os.path.isfile(gradle_props):
+        return False, 'file gradle.properties does not exist'
+    with open(gradle_props) as f:
+        props = f.readlines()
+    for p in requires_props:
+        if p not in props:
+            return False, 'property {} is not defined in gradle.properties file'.format(p)
+    return True, ''
 
 
-def find_module_for_test(test_module):
-    prefs = list(tree.prefixes(test_module))
-    if len(prefs) > 0:
-        return prefs[0].key.split(os.sep)[-1]
+def is_subpath_of(path, root_path):
+    return os.path.realpath(path).startswith(os.path.realpath(root_path) + os.sep)
 
 
-def bootstrap(func):
-    def inner(*args, **kwargs):
-        params = args[0]
-        if not os.path.isdir(GRADLE_DIR):
-            os.mkdir(GRADLE_DIR)
+def apply_graph(params, sem_graph, gradle_project_root):
+    with open(sem_graph) as f:
+        graph = json.load(f)
+        f.close()
 
-        if not os.path.isdir(CACHE_DIR):
-            os.mkdir(CACHE_DIR)
-        gradle_names = ('build.gradle.kts', 'settings.gradle.kts', 'build.gradle', 'settings.gradle')
+    rel_targets_with_slash = []  # Relative targets for export as source to gradle project with slash at end
+    for rel_target in params.rel_targets:
+        if '/' == rel_target[-1:]:
+            rel_targets_with_slash.append(rel_target)
+        else:
+            rel_targets_with_slash.append(rel_target + '/')
 
-        for gradle_name in gradle_names:
-            go_through_gradle(
-                os.path.join(params.arc_root, params.rel_targets[0]),
-                delete_all_gradle,
-                params,
-                gradle_name,
-                'bootstrap',
-            )
-        func(*args, **kwargs)
-
-    return inner
-
-
-def resolve_transitives(line):
-    def check_dep(found_lib_sep):
-        lib_name = found_lib_sep[0] + ':' + found_lib_sep[1]
-        lib_ver = found_lib_sep[2]
-
-        if lib_name not in lib_versions:
-            lib_versions[lib_name] = lib_ver
-        elif version.parse(lib_versions[lib_name]) < version.parse(lib_ver):
-            lib_versions[lib_name] = lib_ver
-        lib_versions['com.squareup.okhttp3:okhttp'] = '3.14.9'
-
-    if 'api("' in line:
-        found_lib = line[line.find('api("') + 5 : len(line) - 3].split(':')
-        lib_name = found_lib[0] + ':' + found_lib[1]
-        check_dep(found_lib)
-        return '    api("' + lib_name + ':' + lib_versions[lib_name] + '")\n'
-    if 'testImplementation("' in line:
-        found_lib = line[line.find('testImplementation("') + 20 : len(line) - 3].split(':')
-        lib_name = found_lib[0] + ':' + found_lib[1]
-        check_dep(found_lib)
-        return '    testImplementation("' + lib_name + ':' + lib_versions[lib_name] + '")\n'
-    return ''
-
-
-def resolve_non_contrib_peerdir(root, params, only_build):
-    bld_gradle = os.path.join(root, 'build.gradle.kts')
-    with open(bld_gradle, 'r') as f:
-        data = f.readlines()
-    file = open(bld_gradle, 'w+')
-    new_data = list()
-
-    for line in data:
-        resolved_line = resolve_transitives(line)
-        if resolved_line != '':
-            new_data.append(resolved_line)
+    arcadia_root = params.arc_root
+    project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
+    build_rel_targets = []  # Relative paths to targets for build
+    for node in graph['data']:
+        if node.get('NodeType', None) != 'Bundle' or 'semantics' not in node:
             continue
-        # переделать на регулярки
-        if 'api(project(' in line:
-            found_lib = line[line.find('api(project(') + 14 : len(line) - 4].replace(':', os.sep)
-            logger.info(found_lib)
-
-            if only_build:
-                new_data.append(line)
-                if found_lib not in project_modules and found_lib not in project_test_modules:
-                    if found_lib == 'arc/api/grpc':
-                        targets_to_build.add('arc/api/proto')
-                    targets_to_build.add(found_lib)
-                continue
-
-            # временный хак для arc api
-            if found_lib == 'arc/api/grpc':
-                build_lib = build_target('arc/api/proto', params)
-                new_data.append('    api(files("' + os.path.join(CACHE_DIR, build_lib) + '"))\n')
-
-            if found_lib not in project_modules:
-                build_lib = build_target(found_lib, params)
-                new_data.append('    api(files("' + os.path.join(CACHE_DIR, build_lib) + '"))\n')
-            else:
-                new_data.append('    api(project(":' + found_lib.split(os.sep)[-1] + '"))\n')
-                new_data.append(
-                    '    api(project(path=":' + found_lib.split(os.sep)[-1] + '", configuration' '="testOutput"))\n'
-                )
-        elif 'testImplementation(project(' in line:
-            found_lib = line[line.find('testImplementation(project(') + 29 : len(line) - 4].replace(':', os.sep)
-            logger.info(found_lib)
-
-            if only_build:
-                new_data.append(line)
-                if found_lib not in project_modules and found_lib not in project_test_modules:
-                    # хак для Арка
-                    if found_lib == 'arc/api/grpc':
-                        targets_to_build.add('arc/api/proto')
-                    targets_to_build.add(found_lib)
-                continue
-
-            if found_lib in project_test_modules:
-                module_for_test = find_module_for_test(found_lib)
-                new_data.append('    testImplementation(project(":' + module_for_test + '"))\n')
-                new_data.append(
-                    '    testImplementation(project(path=":' + module_for_test + '", configuration' '="testOutput"))\n'
-                )
-                continue
-
-            if found_lib not in project_modules:
-                build_lib = build_target(found_lib, params)
-                logger.info('trying to get ' + found_lib)
-                new_data.append('    testImplementation(files("' + os.path.join(CACHE_DIR, build_lib) + '"))\n')
-            else:
-                new_data.append('    testImplementation(project(":' + found_lib.split(os.sep)[-1] + '"))\n')
+        rel_target = node['Name'].replace('$B/', '').replace('$S/', '')  # Relative target - some *.jar
+        if in_rel_targets(rel_target, rel_targets_with_slash):
+            if project_outside_arcadia:
+                # Target for export as sources, make symlinks to all sources in export folder
+                rel_target_srcs = [os.path.join(os.path.dirname(rel_target), 'src')]
+                # TODO Add other non-standard sources from jar_source_set semantic to rel_target_srcs
+                for rel_target_src in rel_target_srcs:
+                    arc_target_src = os.path.join(arcadia_root, rel_target_src)
+                    if os.path.exists(arc_target_src):
+                        exp_target_src = os.path.join(gradle_project_root, rel_target_src)
+                        if not os.path.exists(exp_target_src):
+                            os.makedirs(os.path.dirname(exp_target_src), exist_ok=True)
+                            os.symlink(os.path.relpath(arc_target_src, os.path.dirname(exp_target_src)), exp_target_src)
+        elif params.build_contribs:
+            build_rel_targets.append(rel_target)
         else:
-            new_data.append(line)
+            contrib = False
+            for semantic in node['semantics']:
+                if (
+                    'sem' in semantic
+                    and len(semantic['sem']) >= 2
+                    and semantic['sem'][0] == 'consumer-type'
+                    and semantic['sem'][1] == 'contrib'
+                ):
+                    contrib = True
+                    break
+            if not contrib:
+                build_rel_targets.append(rel_target)
 
-    for line in new_data:
-        file.write(line)
-    file.close()
+    if len(build_rel_targets):  # Has something to build
+        import app_ctx
 
-    module_for_root = root.replace(params.abs_targets[0] + os.sep, '')
-    if module_for_root in project_modules or root == os.path.join(
-        params.arc_root, params.rel_targets[0], params.rel_targets[0]
-    ):
-        shutil.move(
-            bld_gradle,
-            os.path.join(params.arc_root, bld_gradle[len(params.arc_root) + len(params.rel_targets[0]) + 2 :]),
-        )
+        ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
+        opts = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra))
 
+        opts.bld_dir = params.bld_dir
+        opts.arc_root = arcadia_root
+        opts.bld_root = params.bld_root
 
-def fix_settings_gradle(params):
-    settings_gradle = os.path.join(params.abs_targets[0], 'settings.gradle.kts')
-    with open(settings_gradle, 'r') as f:
-        data = f.readlines()
-    file = open(settings_gradle, 'w+')
-    new_data = list()
+        opts.rel_targets = list()
+        opts.abs_targets = list()
+        for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
+            rel_dir = os.path.dirname(build_rel_target)
+            opts.rel_targets.append(rel_dir)
+            opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
 
-    for line in data:
-        if 'include(' in line:
-            found_module = line[len('include("') : len(line) - 3].replace(':', os.sep)
-            if found_module in project_modules:
-                module = found_module.split(os.sep)[-1]
-                new_data.append('include("' + module + '")\n')
-        else:
-            new_data.append(line)
+        listeners = []
+        ev_listener = ya_make.compose_listeners(*listeners)
+        graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, ev_listener=ev_listener, display=app_ctx.display)
+        builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
+        exit_code = builder.go()
+        if exit_code != 0:
+            sys.exit(exit_code)
 
-    for line in new_data:
-        file.write(line)
-    file.close()
-
-
-def go_through_gradle(root, func, params, gradle_name, flag):
-    for item in os.listdir(root):
-        abs_path = os.path.join(root, item)
-        if item == gradle_name:
-            logger.info('build gradle found: ' + abs_path)
-            if flag == 'bootstrap':
-                func(os.path.join(root, gradle_name), params, flag)
-            else:
-                func(root, params, flag)
-        if os.path.isdir(abs_path):
-            go_through_gradle(abs_path, func, params, gradle_name, flag)
-
-
-def build_target(target, params):
-    import app_ctx
-
-    logger.info('trying to build ' + target)
-    if target in cached_libs:
-        return cached_libs[target]
-    ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
-    jopts = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra))
-
-    jopts.bld_dir = params.bld_dir
-    jopts.arc_root = params.arc_root
-    jopts.bld_root = params.bld_root
-
-    jopts.rel_targets = list()
-    jopts.abs_targets = list()
-
-    for trg in targets_to_build:
-        jopts.rel_targets.append(trg)
-        jopts.abs_targets.append(os.path.join(params.arc_root, trg))
-
-    logger.info(jopts.rel_targets)
-    logger.info(jopts.abs_targets)
-    # потом поправить и сделать красивый лог сборки
-    listeners = []
-    ev_listener = ya_make.compose_listeners(*listeners)
-    graph, _, _, ctx, _ = bg.build_graph_and_tests(jopts, check=True, ev_listener=ev_listener, display=app_ctx.display)
-    logger.info('graph built')
-    builder = ya_make.YaMake(jopts, app_ctx, graph=graph, tests=[])
-    builder.go()
-
-    def get_built_name(target_root):
-        for path in os.listdir(target_root):
-            if 'jar' in path and 'source' not in path:
-                return path
-
-    for trg in targets_to_build:
-        target_with_root = os.path.join(params.arc_root, trg)
-        built_name = get_built_name(target_with_root)
-        dest_built_name = os.path.join(CACHE_DIR, built_name)
-        if os.path.exists(dest_built_name):
-            os.remove(dest_built_name)
-        shutil.copy(os.path.join(target_with_root, built_name), dest_built_name)
-        cached_libs[trg] = built_name
+        if project_outside_arcadia:
+            # Make symlinks to all built targets
+            for build_rel_target in build_rel_targets:
+                dst = os.path.join(gradle_project_root, build_rel_target)
+                if os.path.exists(dst):
+                    os.unlink(dst)
+                src = os.path.join(arcadia_root, build_rel_target)
+                if os.path.exists(src):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    os.symlink(src, dst)
 
 
-@bootstrap
 def do_gradle(params):
-    stage = 'do_gradle'
+    stage = 'do_yegradle'
     cp.profile_step_started(stage)
     csp.stage_started(stage)
 
@@ -284,120 +165,153 @@ def do_gradle(params):
         logger.error("Win is not supported in ya ide gradle")
         return
 
-    project_prefix = params.rel_targets[0]
-    project_modules.add(project_prefix)
-    target = params.abs_targets[0]
+    check, err = check_bucket_creds()
+    if not check:
+        logger.error(
+            'Bucket credentials error: {}\n'
+            'Please, read more about work with Bucket https://docs.yandex-team.ru/bucket/gradle#autentifikaciya\n'
+            'Token can be taken from here '
+            'https://oauth.yandex-team.ru/authorize?response_type=token&client_id=bf8b6a8a109242daaf62bce9d6609b3b'.format(
+                err
+            )
+        )
+        return
+
+    arcadia_root = params.arc_root
+
+    # If not defined any target use current directory as target
+    if len(params.abs_targets) == 0:
+        abs_target = os.path.realpath(os.getcwd())
+        params.abs_targets.append(abs_target)
+        params.rel_targets.append(os.path.relpath(abs_target, arcadia_root))
+
+    gradle_project_root = params.gradle_project_root
+    if gradle_project_root is None:
+        if len(params.abs_targets) > 1:
+            logger.error("Must be defined --project-root when used few targets")
+            return
+        # For single target use it as project_root, when not defined
+        gradle_project_root = os.path.realpath(params.abs_targets[0])
+
+    logger.info("Project root: " + gradle_project_root)
+
+    project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
+    tmp = None
+    if project_outside_arcadia:
+        # Save handler files to project root
+        handler_root = gradle_project_root
+    else:
+        # Save handler files to tmp
+        tmp = tempfile.mkdtemp()
+        handler_root = tmp
+        logger.info("Handler root: " + handler_root)
+
     flags = {
-        'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': target,
-        'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': GRADLE_DIR,
+        'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': arcadia_root,
+        'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': gradle_project_root,
         'EXPORT_GRADLE': 'yes',
         'TRAVERSE_RECURSE': 'yes',
         'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
         'BUILD_LANGUAGES': 'JAVA',  # KOTLIN == JAVA
         'USE_PREBUILT_TOOLS': 'no',
-        'OPENSOURCE': 'yes',
     }
-
     params.flags.update(flags)
+
     conf = build_facade.gen_conf(
-        build_root=GRADLE_DIR,
-        build_type=IDE_YMAKE_BUILD_TYPE,
+        build_root=handler_root,
+        build_type='nobuild',
         build_targets=params.abs_targets,
         flags=params.flags,
         ymake_bin=getattr(params, 'ymake_bin', None),
         host_platform=params.host_platform,
         target_platforms=params.target_platforms,
+        arc_root=arcadia_root,
     )
 
-    yexport = yalibrary.tools.tool('yexport')
-    ymake = yalibrary.tools.tool('ymake')
+    yexport = yalibrary.tools.tool('yexport') if params.yexport_bin is None else params.yexport_bin
+    ymake = yalibrary.tools.tool('ymake') if params.ymake_bin is None else params.ymake_bin
 
-    sem_graph_path = os.path.join(GRADLE_DIR, 'sem.json')
-    sem_graph = open(sem_graph_path, 'w')
-
-    ymake_args = (
+    ymake_args = [
         '-k',
         '--build-root',
-        GRADLE_DIR,
+        gradle_project_root,
         '--config',
         conf,
         '--plugins-root',
-        os.path.join(params.arc_root, 'build/plugins'),
+        os.path.join(arcadia_root, 'build/plugins'),
         '--xs',
         '--sem-graph',
-        os.path.join(params.arc_root, params.rel_targets[0]),
-    )
+    ] + params.abs_targets
 
     def listener(event):
         logger.info(event)
 
-    exit_code, stdout, stderr = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
+    logger.info("Generate sem-graph command:\n" + ' '.join([ymake] + ymake_args) + "\n")
 
-    sem_graph.write(stdout)
-    sem_graph.close()
+    _, stdout, _ = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
 
-    # debug info
-    logger.info(
-        'Doing gradle\n'
-        + params.__str__()
-        + '\n'
-        + yexport
-        + '\n'
-        + ymake
-        + '\n'
-        + conf
-        + '\ngradle_dir '
-        + GRADLE_DIR
-        + '\n'
-        + sem_graph_path
-    )
-
-    project_name = target.split(os.sep)[-1]
+    shutil.copy(
+        conf, os.path.join(handler_root, 'ymake.conf')
+    )  # TODO Remove For debugonly, required for retry to make sem.json
+    sem_graph = os.path.join(handler_root, 'sem.json')
+    with open(sem_graph, 'w') as f:
+        f.write(stdout)
+        f.close()
 
     if params.gradle_name:
         project_name = params.gradle_name
+    else:
+        project_name = params.abs_targets[0].split(os.sep)[-1]
 
-    yexport_args = (
+    logger.info("Path prefixes for skip in yexport:\n" + ' '.join(params.rel_targets) + "\n")
+
+    yexport_toml = os.path.join(handler_root, 'yexport.toml')
+    with open(yexport_toml, 'w') as f:
+        f.write(
+            '[add_attrs.dir]\n'
+            + 'build_contribs = '
+            + ('true' if params.build_contribs else 'false')
+            + '\n'
+            + '[[target_replacements]]\n'
+            + 'skip_path_prefixes = [ "'
+            + '", "'.join(params.rel_targets)
+            + '" ]\n'
+            + '\n'
+            + '[[target_replacements.addition]]\n'
+            + 'name = "consumer-prebuilt"\n'
+            + 'args = []\n'
+            + '[[target_replacements.addition]]\n'
+            + 'name = "IGNORED"\n'
+            + 'args = []\n'
+        )
+        f.close()
+
+    yexport_args = [
         yexport,
         '--arcadia-root',
-        params.arc_root,
+        arcadia_root,
         '--export-root',
-        os.path.join(params.arc_root, params.rel_targets[0]),
-        '-s',
-        sem_graph_path,
-        '-G',
+        gradle_project_root,
+        '--configuration',
+        handler_root,
+        '--semantic-graph',
+        sem_graph,
+        '--generator',
         'ide-gradle',
-        '-t',
+        '--target',
         project_name,
-    )
+    ]
+
+    logger.info("Generate by yexport command:\n" + ' '.join(yexport_args) + "\n")
 
     subprocess.call(yexport_args)
 
-    find_all_modules(sem_graph_path, project_prefix)
+    apply_graph(params, sem_graph, gradle_project_root)
 
-    # бежим по всем .gradle, компилим некотрибные зависимости и подставляем их в скомпиленном виде
-    go_through_gradle(
-        os.path.join(params.arc_root, params.rel_targets[0]),
-        resolve_non_contrib_peerdir,
-        params,
-        'build.gradle.kts',
-        True,
-    )
-
-    build_target('foo', params)
-
-    go_through_gradle(
-        os.path.join(params.arc_root, params.rel_targets[0]),
-        resolve_non_contrib_peerdir,
-        params,
-        'build.gradle.kts',
-        False,
-    )
-
-    fix_settings_gradle(params)
-
-    # чистим все после генерации
-    delete_useless_folders(os.path.join(params.arc_root, params.rel_targets[0]))
+    # TODO remove ymake.conf, sem.json, yexport.toml
 
     csp.stage_finished(stage)
     cp.profile_step_finished(stage)
+
+    if tmp:
+        shutil.rmtree(tmp)
