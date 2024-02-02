@@ -24,7 +24,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/addremove
         devtools/ya/handlers/analyze_make
         devtools/ya/handlers/buf
-        # devtools/ya/handlers/check
         devtools/ya/handlers/clang_tidy
         devtools/ya/handlers/clone
         devtools/ya/handlers/completion
@@ -85,7 +84,6 @@ RECURSE(
     analyze_make
     autocheck
     buf
-    check
     clang_tidy
     clone
     completion
