@@ -43,6 +43,14 @@ namespace {
         }
     }
 
+    void ProcessNeverCacheModules(TNodeAddCtx& node, std::span<const TModuleDef* const> modules) {
+        const bool hasNevercacheMods = std::ranges::any_of(modules, [](const TModuleDef* mod) {return mod->IsNeverCache();});
+        if (hasNevercacheMods) {
+            const auto elem = node.UpdIter.Graph.Names().AddName(EMNT_Property, NEVERCACHE_PROP);
+            node.AddUniqueDep(EDT_Property, EMNT_Property, elem);
+        }
+    }
+
     bool IsGlobMatchDep(const TDepTreeNode& prev, EDepType dep, const TNodeAddCtx& node) {
         if (prev.NodeType != EMNT_BuildCommand || dep != EDT_Property || node.NodeType != EMNT_File) {
             return false;
@@ -446,6 +454,7 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
 
     ProcessMakefileIncludes(node, parser.GetModules(), parser.GetIncludes());
     ProcessMakefileGlobs(node, parser.GetModules());
+    ProcessNeverCacheModules(node, parser.GetModules());
 }
 
 void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAddIterStack& stack) {

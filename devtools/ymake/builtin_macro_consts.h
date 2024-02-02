@@ -16,6 +16,7 @@ constexpr TStringBuf ENABLE = "ENABLE";
 constexpr TStringBuf DISABLE = "DISABLE";
 constexpr TStringBuf _GLOB = "_GLOB";
 constexpr TStringBuf _LATE_GLOB = "_LATE_GLOB";
+constexpr TStringBuf _NEVERCACHE = "_NEVERCACHE";
 
 }
 

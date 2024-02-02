@@ -701,6 +701,7 @@ public:
 
     THashMap<ui32, ui32> MainOutputId;
     THashMap<ui32, THashSet<TPropertyType>> PropsToUse;
+    ui32 NeverCachePropId;
 
     mutable NStats::TUpdIterStats Stats{"UpdIter stats"};
     mutable NStats::TResolveStats ResolveStats{"Resolving stats"};

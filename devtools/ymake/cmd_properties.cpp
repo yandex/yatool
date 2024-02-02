@@ -60,5 +60,6 @@ bool TUnitProperty::IsBaseMacroCall(const TStringBuf& name) {
         || name == NMacro::ENABLE
         || name == NMacro::DISABLE
         || name == NMacro::_GLOB
-        || name == NMacro::_LATE_GLOB;
+        || name == NMacro::_LATE_GLOB
+        || name == NMacro::_NEVERCACHE;
 }

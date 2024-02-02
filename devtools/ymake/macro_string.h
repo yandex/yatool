@@ -12,6 +12,7 @@ struct TVars;
 // Prededined properties
 const TStringBuf MULTIMODULE_PROP_NAME = TStringBuf("MULTIMODULE");
 const TStringBuf VAR_MODULE_TAG = TStringBuf("MODULE_TAG");
+const TStringBuf NEVERCACHE_PROP = TStringBuf("NEVER=CACHE");
 
 // id:name=value ("id" is usually a module id, sometimes a node's ElemId, see FormatCmd invocations)
 TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value);

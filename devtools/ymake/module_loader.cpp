@@ -116,6 +116,10 @@ bool TModuleDef::ProcessBaseMacro(const TStringBuf& macroName, const TVector<TSt
     if (TDirParser::MessageStatement(macroName, args, Vars, Conf)) {
         return true;
     }
+    if (macroName == NMacro::_NEVERCACHE) {
+        NeverCache = true;
+        return true;
+    }
     return false;
 }
 

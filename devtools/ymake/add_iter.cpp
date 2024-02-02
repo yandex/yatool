@@ -27,6 +27,11 @@
 #include <util/string/split.h>
 
 namespace {
+    ui32 GetNeverCachePropElem(const TDepGraph& graph) {
+        auto node = graph.GetCommandNode(NEVERCACHE_PROP);
+        return node.IsValid() ? node->ElemId : 0;
+    }
+
     struct GlobNodeInfo {
         TStringBuf GlobHash;
         TUniqVector<ui32> WatchDirs;
@@ -997,6 +1002,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
 TUpdIter::TUpdIter(TYMake& yMake)
     : TDepthDGIter<TDGIterAddable>(yMake.Graph, 0)
     , YMake(yMake)
+    , NeverCachePropId(GetNeverCachePropElem(yMake.Graph))
     , Nodes(yMake.Graph)
 {
 }
@@ -1352,6 +1358,14 @@ inline void TUpdIter::Leave(TState& state) {
                     }
                 }
             }
+        } else if (
+            st.Node.ElemId == NeverCachePropId &&
+            !prev.Entry().HasChanges &&
+            (IsMakeFileType(prev.Node.NodeType) || IsModuleType(prev.Node.NodeType)) && IsPropertyDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType)
+        ) {
+            prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
+            st.Entry().OnceEntered = false;
+            st.ForceReassemble();
         }
     }
 
