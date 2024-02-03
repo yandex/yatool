@@ -76,16 +76,23 @@ namespace {
         }
     }
 
-    TString FormatBuildCommandName(const TStringBuf& name, const TCommands& commands) {
-        if (Y_UNLIKELY(!name.StartsWith("S:"))) {
-            return static_cast<TString>(name);
+    TString FormatBuildCommandName(const TCmdView& name, const TCommands& commands, const TCmdConf& cmdConf, bool structCmd) {
+        if (Y_UNLIKELY(!structCmd)) {
+            return static_cast<TString>(name.GetStr());
         }
-        const auto id = FromString<ui64>(name.substr(2));
-        const auto* elem = commands.Get(static_cast<ECmdId>(id));
-        if (elem) {
-            return commands.PrintCmd(*elem);
+        if (name.IsNewFormat()) {
+            auto expr = commands.Get(commands.IdByElemId(name.GetElemId()));
+            Y_ASSERT(expr);
+            return commands.PrintCmd(*expr);
+        } else {
+            ui64 varId;
+            TStringBuf varName;
+            TStringBuf varValue;
+            ParseCommandLikeVariable(name.GetStr(), varId, varName, varValue);
+            auto expr = commands.Get(varValue, &cmdConf);
+            Y_ASSERT(expr);
+            return FormatCmd(varId, varName, commands.PrintCmd(*expr));
         }
-        return static_cast<TString>(name);
     }
 }
 
@@ -480,17 +487,25 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
     }
     Formatter().BeginNode();
 
+    if (nodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
+        if (state.Top().GetCmdName().IsNewFormat()) {
+            VisitorEntry(*state.Parent())->StructCmdDetected = true;
+        }
+    }
+
     auto parent = state.Parent();
     TString name = st.Print();
     TString parentName;
     ui32 parentId = 0;
+    bool parentStructCmdDetected = false;
     EMakeNodeType parentType = EMakeNodeType::EMNT_Last;
-    if (TFormatter::NeedParentName) {
-        if (parent != state.end()) {
+    if (parent != state.end()) {
+        if (TFormatter::NeedParentName) {
             parentName = parent->Print();
             parentId = parent->Node()->ElemId;
             parentType = parent->Node()->NodeType;
         }
+        parentStructCmdDetected = VisitorEntry(*parent)->StructCmdDetected;
     }
     if (Pad.size() < state.Size()) {
         Pad.append(state.Size() - Pad.size(), ' ');
@@ -584,8 +599,8 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             }
             if (fresh && (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(nodeType))) {
-                if (nodeType == EMNT_BuildCommand && Names.CmdNameById(st.Node()->ElemId).IsNewFormat()) {
-                    Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(name, Commands));
+                if (nodeType == EMNT_BuildCommand && parentStructCmdDetected) {
+                    Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
                 } else {
                     Formatter().EmitNode(nodeType, st.Node()->ElemId, parentName, (nodeType == EMNT_BuildCommand ? SkipId(name) : name));
                 }
@@ -605,8 +620,8 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitPos(incDep.IsValid() ? parent->DepIndex() + 1 : 0, incDep.IsValid() ? parent->NumDeps() : 0);
             }
             Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
-            if (nodeType == EMNT_BuildCommand && Names.CmdNameById(st.Node()->ElemId).IsNewFormat()) {
-                Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(name, Commands));
+            if (nodeType == EMNT_BuildCommand && parentStructCmdDetected) {
+                Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
             } else {
                 Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(st.Node()).GetTargetId() : st.Node()->ElemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
             }
@@ -748,6 +763,20 @@ public:
             return false;
         }
         return DepFilter(dep, !state.HasIncomingDep());
+    }
+    bool Enter(TState& state) {
+        bool fresh = TBase::Enter(state);
+        if (state.Top().Node()->NodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
+            if (state.Top().GetCmdName().IsNewFormat()) {
+                VisitorEntry(*state.Parent())->StructCmdDetected = true;
+            }
+        }
+        return fresh;
+    }
+
+public:
+    bool StructCmdDetected(const TStateItem& stateItem) {
+        return VisitorEntry(stateItem)->StructCmdDetected;
     }
 };
 
@@ -1059,6 +1088,7 @@ namespace {
         EDepType DepType;
         ui32 ElemId;
         TString NodeName;
+        bool StructCmdDetected;
     };
 
     TVector<TRelationItem> GetPath(const TVector<TNodeId>& startTargets, const TRestoreContext& restoreContext, const TDebugOptions& cf, const TDestinationData& destData) {
@@ -1092,7 +1122,13 @@ namespace {
                     using TStateItem = decltype(state)::TItem;
                     TMaybe<TStateItem> prev;
                     for (const auto& st : state.Stack()) { // We need raw collection access to print from bottom of stack
-                        path.push_back({.NodeType=st.Node()->NodeType, .DepType=(!prev ? EDepType::EDT_Include : *prev->CurDep()), .ElemId=st.Node()->ElemId, .NodeName=st.Print()});
+                        path.push_back({
+                            .NodeType=st.Node()->NodeType,
+                            .DepType=(!prev ? EDepType::EDT_Include : *prev->CurDep()),
+                            .ElemId=st.Node()->ElemId,
+                            .NodeName=st.Print(),
+                            .StructCmdDetected=!prev ? false : filter.StructCmdDetected(*prev)
+                        });
                         prev = st;
                     }
                     isFound = true;
@@ -1123,7 +1159,13 @@ namespace {
                         if (st.Node()->ElemId == node->ElemId) {
                             break;
                         }
-                        path.push_back({.NodeType=st.Node()->NodeType, .DepType=(!prev ? EDepType::EDT_Last : *prev->CurDep()), .ElemId=st.Node()->ElemId, .NodeName=st.Print()});
+                        path.push_back({
+                            .NodeType=st.Node()->NodeType,
+                            .DepType=(!prev ? EDepType::EDT_Last : *prev->CurDep()),
+                            .ElemId=st.Node()->ElemId,
+                            .NodeName=st.Print(),
+                            .StructCmdDetected=false // we do not expect commands in recurse graphs, so whatever is fine
+                        });
                         prev = st;
                     }
                     isFound = true;
@@ -1152,7 +1194,12 @@ void DumpFirstRelation(const TRestoreContext& restoreContext, const TTraverseSta
         for (auto it = p.begin(); it != p.end(); it++) {
             auto name = it->NodeName;
             if (it->NodeType == EMNT_BuildCommand) {
-                name = FormatBuildCommandName(name, yMake.Commands);
+                name = FormatBuildCommandName(
+                    yMake.Graph.GetCmdName(it->ElemId),
+                    yMake.Commands,
+                    yMake.Graph.Names().CommandConf,
+                    it->StructCmdDetected
+                );
             }
             if (isFirst) {
                 cf.Cmsg() << it->NodeType << " (Start): " << name;
