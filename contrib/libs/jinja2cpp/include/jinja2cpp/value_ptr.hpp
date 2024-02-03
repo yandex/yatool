@@ -208,7 +208,7 @@
 #if nsvp_HAVE_TYPE_TRAITS
 # include <type_traits>
 #elif nsvp_HAVE_TR1_TYPE_TRAITS
-# include <tr1/type_traits>
+# error #include <tr1/type_traits>
 #endif
 
 // static assert:
