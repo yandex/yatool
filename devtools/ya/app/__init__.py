@@ -297,7 +297,7 @@ def configure_debug(app_ctx):
         except Exception as e:
             AppEvLogStore.logger.debug("While store exit_code: %s", e)
         raise
-    finally:
+    else:
         try:
             dump_store_obj['exit_code'] = 0
         except Exception as e:
