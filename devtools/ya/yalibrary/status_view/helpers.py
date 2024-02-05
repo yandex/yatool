@@ -1,7 +1,10 @@
 import os
+import logging
 import string
 
 import test.const
+
+logger = logging.getLogger(__name__)
 
 
 class NodeView(object):
@@ -124,7 +127,11 @@ def format_paths(inputs, outputs, kv):
 
         return inputs if cp(inputs) > cp(outputs) else outputs
 
-    return join_paths(select_paths())
+    try:
+        return join_paths(select_paths())
+    except Exception as e:
+        logger.exception('Failed to format paths for node (%s, %s): %s', inputs, outputs, e)
+        return '<build node>'
 
 
 def fmt_node(inputs, outputs, kv, tags=None, status=None):
