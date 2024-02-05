@@ -398,9 +398,15 @@ TString TMakePlanCache::GetStatistics() const {
 
     TStringBuilder builder;
     builder << "JSON cache report: ";
-    if (!SaveToCache) {
+    if (!SaveToCache && !LoadFromCache) {
         builder << "disabled";
         return builder;
+    } else if (!SaveToCache) {
+        builder << "read-only, ";
+    } else if (!LoadFromCache) {
+        builder << "write-only, ";
+    } else {
+        builder << "read-write, ";
     }
 
     size_t updated = Stats.Get(NStats::EJsonCacheStats::LoadedItems) - Stats.Get(NStats::EJsonCacheStats::OldItemsSaved);
