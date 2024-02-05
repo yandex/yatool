@@ -130,3 +130,15 @@ message TForeignPlatformTarget {
 message TAllForeignPlatformsReported {
     option (message_id) = 32;
 };
+
+// Monitoring statistics events
+message TMonitoringStat {
+    option (message_id) = 33;
+    required string Name = 1; // name of event
+    required string Type = 2; // type of value, one of: int, double, bool
+    oneof Value {// value by Type
+        sint64 IntValue = 3;
+        double DoubleValue = 4;
+        bool BoolValue = 5;
+    };
+};
