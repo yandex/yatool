@@ -41,10 +41,8 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/remote_gdb
         devtools/ya/handlers/repo_check
         devtools/ya/handlers/shell
-        devtools/ya/handlers/shelve
         devtools/ya/handlers/stat
         devtools/ya/handlers/svn
-        devtools/ya/handlers/unshelve
         devtools/ya/handlers/upload
         devtools/ya/handlers/vmctl
         devtools/ya/handlers/webide
@@ -118,13 +116,11 @@ RECURSE(
     repo_check
     sed
     shell
-    shelve
     stat
     style
     svn
     test
     tool
-    unshelve
     upload
     vim
     vmctl
