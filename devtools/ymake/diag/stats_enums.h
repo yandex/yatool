@@ -70,6 +70,7 @@ namespace NStats {
     };
 
     enum class EFileConfSubStats {
+        BucketId /* "bucket id" */,
         LoadedSize /* "loaded size" */,
         LoadTime /* "load time" */,
         LoadedCount /* "loaded count" */,

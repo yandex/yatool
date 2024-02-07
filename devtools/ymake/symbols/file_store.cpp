@@ -629,6 +629,7 @@ void TFileConf::RecordStats(ui64 size, TInstant start, bool mapped) {
         auto bucket = cnt / bucketSize;
         if (SubStats == nullptr) {
             SubStats = MakeHolder<NStats::TFileConfSubStats>(TString("Bucket #") + ToString(bucket));
+            SubStats->Set(NStats::EFileConfSubStats::BucketId, bucket);
         }
         SubStats->Inc(NStats::EFileConfSubStats::LoadTime, duration);
         SubStats->SetMax(NStats::EFileConfSubStats::MaxLoadTime, duration);

@@ -131,9 +131,150 @@ message TAllForeignPlatformsReported {
     option (message_id) = 32;
 };
 
+message TModulesStats {
+    option (message_id) = 33;
+    required uint32 Accessed = 1;
+    required uint32 Loaded = 2;
+    required uint32 Outdated = 3;
+    required uint32 Parsed = 4;
+    required uint32 Total = 5;
+};
+
+message TMakeCommandStats {
+    option (message_id) = 34;
+    required uint32 InitModuleEnvCalls = 1;
+    required uint32 InitModuleEnv = 2;
+};
+
+message TUpdIterStats {
+    option (message_id) = 35;
+    required uint32 NukedDir = 1;
+};
+
+message TGeneralParserStats {
+    option (message_id) = 36;
+    required uint32 Count = 1;
+    required uint32 Includes = 2;
+    required uint32 UniqueCount = 3;
+    required uint32 Size = 4;
+    required uint32 UniqueSize = 5;
+};
+
+message TIncParserManagerStats {
+    option (message_id) = 37;
+    required uint32 ParseTime = 1;
+    required uint32 ParsedFilesCount = 2;
+    required uint32 ParsedFilesSize = 3;
+    required uint32 ParsedFilesRecovered = 4;
+    required uint32 InFilesCount = 5;
+    required uint32 InFilesSize = 6;
+};
+
+message TFileConfStats {
+    option (message_id) = 38;
+    optional uint32 LoadedSize = 1;
+    optional uint64 LoadTime = 2;
+    optional uint64 LoadedMD5Time = 3;
+    optional uint64 MaxLoadedMD5Time = 4;
+    optional uint32 LoadedCount = 5;
+    optional uint64 MaxLoadTime = 6;
+    optional uint32 MappedSize = 7;
+    optional uint64 MappedMD5Time = 8;
+    optional uint64 MaxMappedMD5Time = 9;
+    optional uint32 MappedCount = 10;
+    optional uint64 MapTime = 11;
+    optional uint32 FromPatchCount = 12;
+    optional uint32 FromPatchSize = 13;
+    optional uint32 FileStatCount = 14;
+    optional uint32 LstatCount = 15;
+    optional uint64 LstatSumUs = 16;
+    optional uint64 LstatMinUs = 17;
+    optional uint64 LstatAvrUs = 18;
+    optional uint64 LstatMaxUs = 19;
+    optional uint32 OpendirCount = 20;
+    optional uint64 OpendirSumUs = 21;
+    optional uint64 OpendirMinUs = 22;
+    optional uint64 OpendirAvrUs = 23;
+    optional uint64 OpendirMaxUs = 24;
+    optional uint32 ReaddirCount = 25;
+    optional uint64 ReaddirSumUs = 26;
+    optional uint64 ReaddirMinUs = 27;
+    optional uint64 ReaddirAvrUs = 28;
+    optional uint64 ReaddirMaxUs = 29;
+    optional uint64 ListDirSumUs = 30;
+    optional uint64 LstatListDirSumUs = 31;
+};
+
+message TFileConfSubStats {
+    option (message_id) = 39;
+    optional uint32 BucketId = 1;
+    optional uint32 LoadedSize = 2;
+    optional uint64 LoadTime = 3;
+    optional uint32 LoadedCount = 4;
+    optional uint64 MaxLoadTime = 5;
+};
+
+message TDepGraphStats {
+    option (message_id) = 40;
+    required uint32 NodesCount = 1;
+    required uint32 EdgesCount = 2;
+    required uint32 FilesCount = 3;
+    required uint32 CommandsCount = 4;
+};
+
+message TInternalCacheSaverStats {
+    option (message_id) = 41;
+    required uint32 TotalCacheSize = 1;
+    required uint32 DiagnosticsCacheSize = 2;
+    required uint32 GraphCacheSize = 3;
+    required uint32 ParsersCacheSize = 4;
+    required uint32 ModulesTableSize = 5;
+    required uint32 TimesTableSize = 6;
+    required uint32 NamesTableSize = 7;
+    required uint32 CommandsSize = 8;
+};
+
+message TJsonCacheStats {
+    option (message_id) = 42;
+    required uint32 LoadedItems = 1;
+    required uint32 AddedItems = 2;
+    required uint32 OldItemsSaved = 3;
+    required uint32 NewItemsSaved = 4;
+    required uint32 TotalItemsSaved = 5;
+    required uint32 FullMatchLoadedItems = 6;
+    required uint32 FullMatchRequests = 7;
+    required uint32 FullMatchSuccess = 8;
+    required uint32 PartialMatchLoadedItems = 9;
+    required uint32 PartialMatchRequests = 10;
+    required uint32 PartialMatchSuccess = 11;
+    required uint32 FullyRendered = 12;
+    required uint32 PartiallyRendered = 13;
+    required uint32 NoRendered = 14;
+};
+
+message TResolveStats {
+    option (message_id) = 43;
+    required uint32 IncludesAttempted = 1;
+    required uint32 IncludesFromCache = 2;
+    required uint32 ResolveAsKnownTotal = 3;
+    required uint32 ResolveAsKnownFromCache = 4;
+};
+
+message TUidsCacheStats {
+    option (message_id) = 44;
+    required uint32 LoadedNodes = 1;
+    required uint32 SkippedNodes = 2;
+    required uint32 DiscardedNodes = 3;
+    required uint32 LoadedLoops = 4;
+    required uint32 SkippedLoops = 5;
+    required uint32 DiscardedLoops = 6;
+    required uint32 SavedNodes = 7;
+    required uint32 SavedLoops = 8;
+};
+
 // Monitoring statistics events
 message TMonitoringStat {
-    option (message_id) = 33;
+    option (message_id) = 45;
     required string Name = 1; // name of event
     required string Type = 2; // type of value, one of: int, double, bool
     oneof Value {// value by Type

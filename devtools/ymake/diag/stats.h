@@ -12,7 +12,7 @@
 
 namespace NStats {
     class TStatsBase {
-    public:
+    protected:
         void Report() const;
 
     protected:
@@ -75,6 +75,8 @@ namespace NStats {
                 TStatsBase::Set(i, 0);
             }
         }
+
+        void Report() const;
 
     protected:
         TString NameByIndex(size_t index) const override {
