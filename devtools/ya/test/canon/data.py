@@ -775,7 +775,7 @@ class CanonicalData(object):
 
     def _extract(self, extract_dir, canonical_dir, value, value_path, current_result, delayed_upload_args):
         extracted_path = common.get_unique_file_path(extract_dir, "extracted")
-        with open(extracted_path, "w") as extracted:
+        with open(extracted_path, "w", newline='\n') as extracted:
             extracted.write(value)
         save_locally = self._should_be_saved_locally(value, extracted_path)
         return self._save_path(
