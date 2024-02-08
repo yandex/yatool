@@ -133,8 +133,6 @@ class CacheKind(str, Enum):
         return CacheKind._ymake_option_by_kind[kind]
 
     def get_ya_make_option(self):
-        if self == CacheKind.parser:
-            return '-xF'  # TODO: Temporary for compatibility, will be removed soon
         return '-x' + CacheKind.get_ymake_option(self)
 
 
