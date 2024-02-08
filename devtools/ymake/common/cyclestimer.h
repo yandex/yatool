@@ -7,6 +7,7 @@ public:
     TCyclesTimer();
     void Restart();
     size_t GetUs() const;
+    double GetSeconds() const;
 private:
     ui64 Start_;
 };

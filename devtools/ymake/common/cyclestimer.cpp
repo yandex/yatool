@@ -15,6 +15,10 @@ size_t TCyclesTimer::GetUs() const {
     return ((::GetCycleCount() - Start_) * 1000000ull) / NHPTimer::GetCyclesPerSecond();
 }
 
+double TCyclesTimer::GetSeconds() const {
+    return GetUs() / 1000000.0;// 10^6
+}
+
 TCyclesTimerRestarter::TCyclesTimerRestarter(TCyclesTimer& cyclesTimer)
     : CyclesTimer_(cyclesTimer)
 {}

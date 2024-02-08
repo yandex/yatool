@@ -38,6 +38,11 @@ namespace NStats {
     private:
         TDataType Data;
         TString Name;
+
+    public:
+        static void MonEvent(const TString& indexName, ui64 value);
+        static void MonEvent(const TString& indexName, double value);
+        static void MonEvent(const TString& indexName, bool value);
     };
 
     template<class TIndex>
@@ -78,11 +83,22 @@ namespace NStats {
 
         void Report() const;
 
+        void IntMonEvent(TIndex index, const TString& indexName) const {
+            TStatsBase::MonEvent(indexName, Get(index));
+        }
+
+        void BoolMonEvent(TIndex index, const TString& indexName) const {
+            TStatsBase::MonEvent(indexName, static_cast<bool>(Get(index)));
+        }
+
     protected:
         TString NameByIndex(size_t index) const override {
             return ToString(static_cast<TIndex>(index));
         }
     };
+
+    #define INT_MON_EVENT(index) IntMonEvent(index, #index)
+    #define BOOL_MON_EVENT(index) BoolMonEvent(index, #index)
 
     using TModulesStats = TStats<EModulesStats>;
     using TMakeCommandStats = TStats<EMakeCommandStats>;

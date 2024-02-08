@@ -47,6 +47,30 @@ namespace NStats {
         return Data.size();
     }
 
+    void TStatsBase::MonEvent(const TString& indexName, ui64 value) {
+        NEvent::TMonitoringStat event;
+        event.SetName(indexName);
+        event.SetType("int");
+        event.SetIntValue(value);
+        FORCE_TRACE(U, event);
+    }
+
+    void TStatsBase::MonEvent(const TString& indexName, double value) {
+        NEvent::TMonitoringStat event;
+        event.SetName(indexName);
+        event.SetType("double");
+        event.SetDoubleValue(value);
+        FORCE_TRACE(U, event);
+    }
+
+    void TStatsBase::MonEvent(const TString& indexName, bool value) {
+        NEvent::TMonitoringStat event;
+        event.SetName(indexName);
+        event.SetType("bool");
+        event.SetBoolValue(value);
+        FORCE_TRACE(U, event);
+    }
+
     template<>
     void TStats<EModulesStats>::Report() const {
         TStatsBase::Report();
@@ -58,6 +82,11 @@ namespace NStats {
         event.SetParsed(Get(EModulesStats::Parsed));
         event.SetTotal(Get(EModulesStats::Total));
         FORCE_TRACE(U, event);
+
+        INT_MON_EVENT(EModulesStats::Accessed);
+        INT_MON_EVENT(EModulesStats::Loaded);
+        INT_MON_EVENT(EModulesStats::Outdated);
+        INT_MON_EVENT(EModulesStats::Parsed);
     }
 
     template<>
@@ -155,6 +184,14 @@ namespace NStats {
         event.SetListDirSumUs(Get(EFileConfStats::ListDirSumUs));
         event.SetLstatListDirSumUs(Get(EFileConfStats::LstatListDirSumUs));
         FORCE_TRACE(U, event);
+
+        INT_MON_EVENT(EFileConfStats::LoadedSize);
+        INT_MON_EVENT(EFileConfStats::LoadTime);
+        INT_MON_EVENT(EFileConfStats::LoadedCount);
+        INT_MON_EVENT(EFileConfStats::MappedSize);
+        INT_MON_EVENT(EFileConfStats::MapTime);
+        INT_MON_EVENT(EFileConfStats::MappedCount);
+        MonEvent("EFileConfStats::Count", Get(EFileConfStats::LoadedCount) + Get(EFileConfStats::MappedCount));
     }
 
     template<>

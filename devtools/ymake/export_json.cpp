@@ -673,17 +673,21 @@ void ExportJSON(TYMake& yMake) {
     conf.EnableRealPathCache(&yMake.Names.FileConf);
 
     {
+        TCyclesTimer writeTimer;
         FORCE_TRACE(U, NEvent::TStageStarted("Write JSON"));
 
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
         NJson::TJsonWriter jsonWriter(output.Get(), false);
         TMakePlan plan(jsonWriter);
 
+        TCyclesTimer renderTimer;
         FORCE_TRACE(U, NEvent::TStageStarted("Render JSON"));
         RenderJSONGraph(yMake, plan);
         FORCE_TRACE(U, NEvent::TStageFinished("Render JSON"));
+        NStats::TStatsBase::MonEvent("EYmakeStats::RenderJSONTime", renderTimer.GetSeconds());
 
         FORCE_TRACE(U, NEvent::TStageFinished("Write JSON"));
+        NStats::TStatsBase::MonEvent("EYmakeStats::WriteJSONTime", writeTimer.GetSeconds());
     }
 
     conf.EnableRealPathCache(nullptr);

@@ -7,6 +7,7 @@
 #include "trace_start.h"
 
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/diag/stats.h>
 
 #include <library/cpp/sighandler/async_signals_handler.h>
 #include <library/cpp/getopt/small/last_getopt.h>
@@ -81,6 +82,9 @@ int YMakeMain(int argc, char** argv) {
     const auto ret_code = main_real(conf);
     FORCE_TRACE(U, NEvent::TStageFinished("ymake main"));
     FORCE_TRACE(U, NEvent::TStageFinished("ymake run"));
+    if (conf.RunTimer) {
+        NStats::TStatsBase::MonEvent("EYmakeStats::RunTime", conf.RunTimer->GetSeconds());
+    }
 
     return ret_code;
 }

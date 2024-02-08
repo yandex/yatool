@@ -9,6 +9,8 @@
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 
+#include <devtools/ymake/common/cyclestimer.h>
+
 #include <devtools/ymake/options/commandline_options.h>
 #include <devtools/ymake/options/startup_options.h>
 #include <devtools/ymake/options/static_options.h>
@@ -54,6 +56,7 @@ public:
     TBlackList BlackList;
     TIsolatedProjects IsolatedProjects;
     THashSet<TString> ExcludedPeerdirs;
+    THolder<TCyclesTimer> RunTimer;
 
 public:
     void AddOptions(NLastGetopt::TOpts& opts);
