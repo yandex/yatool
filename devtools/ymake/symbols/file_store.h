@@ -40,24 +40,31 @@ struct TFileData {
     };
 
     /// Consistently fill data as not found in current (by `curStamp`) session
-    const TFileData& MarkNotFound(ui8 curStamp) {
+    ///
+    /// temporary means that error happened during status chech and so status
+    /// should be uncacheable (via CantRead)
+    const TFileData& MarkNotFound(ui8 curStamp, bool temporary = false) {
         CheckContent = false;
         Size = 0;
         ModTime = 0;
         HashSum = {};
-        return FinalizeStatusUpdate(false, curStamp);
+        return FinalizeStatusUpdate(false, curStamp, temporary);
     }
 
     /// Consistently fill status data fields to `found` state in current (by `curStamp`) session
-    const TFileData& FinalizeStatusUpdate(bool found, ui8 curStamp) {
+    ///
+    /// temporary means that error happened during status chech and so status
+    /// should be uncacheable (via CantRead)
+    const TFileData& FinalizeStatusUpdate(bool found, ui8 curStamp, bool temporary = false) {
         bool fileStatusChanged = (NotFound == found);
         NotFound = !found;
         Changed = CheckContent || fileStatusChanged;
-        if (fileStatusChanged) {
+        if (fileStatusChanged && !found) {
+            // File lost, record the time of detection
             RealModStamp = curStamp;
         }
         LastCheckedStamp = curStamp;
-        CantRead = false; // Always try to read
+        CantRead = temporary && !found;
         return *this;
     }
 
@@ -408,6 +415,9 @@ private:
     void AvrUsStat(NStats::EFileConfStats countStat, NStats::EFileConfStats sumUsStat, NStats::EFileConfStats avrUsStat) const;
     void RecordMD5Stats(TInstant start, bool mapped);
 
+    /// Returns system error code upon failure, 0 on success
+    int FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind, TFileStat& result) const;
+
     void ReadContent(TStringBuf fileName, TFileContentHolder& contentHolder);
     void ReadContent(ui32 id, TFileContentHolder& contentHolder);
     void ReadContent(TFileView view, TString&& realPath, TFileContentHolder& contentHolder);
@@ -506,7 +516,6 @@ public:
     std::tuple<bool, TStringBuf, IChanges::EFileKind> GetFileChanges(TStringBuf name) const;
     /// Return <found, removedOrInvalidKind> from Changes, if content supported in Changes
     std::tuple<bool, bool> FindFileInChangesNoFS(TStringBuf name, bool allowFile, bool allowDir) const;
-    TFileStat FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind) const;
 
     // ATTN! Will invalidate any other TFileData refs and pointers
     void ListDir(ui32 dirElemId, bool forceList = false, bool forceStat = false);

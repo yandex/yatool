@@ -20,9 +20,38 @@
 #include <util/folder/iterator.h>
 #include <util/string/builder.h>
 #include <util/string/vector.h>
-#include <util/system/yassert.h>
 #include <util/system/datetime.h>
+#include <util/system/error.h>
 #include <util/system/hp_timer.h>
+#include <util/system/yassert.h>
+
+namespace {
+    /// Can we treat negative result from FileStat as actual file absence
+    /// or just something gone wrong
+    bool CanTrustStatError(int err) {
+        Y_ASSERT(err);
+
+        // Do not reorder: codes are listed from most probable to optimize fast path
+#ifdef _win_
+        return err == ERROR_FILE_NOT_FOUND ||
+               err == ERROR_PATH_NOT_FOUND ||
+               err == ERROR_BAD_NETPATH ||
+               err == ERROR_INVALID_NAME ||
+               err == WSAENAMETOOLONG ||
+               err == ERROR_ACCESS_DENIED ||
+               err == ERROR_NOACCESS ||
+               err == ERROR_INVALID_ACCESS ||
+               err == WSAEACCES;
+#else
+        return err == ENOENT ||
+               err == ENOTDIR ||
+               err == ENAMETOOLONG ||
+               err == EACCES ||
+               err == EPERM;
+#endif
+    }
+}
+
 
 ELinkType ELinkTypeHelper::Name2Type(TStringBuf name) {
     if (name.empty()) { // fast way for no link
@@ -97,13 +126,12 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
     }
 
     if (DebugOptions.CompletelyTrustFSCache) {
-        if (data.LastCheckedStamp != TTimeStamps::Never) {
+        if (data.LastCheckedStamp != TTimeStamps::Never && !data.CantRead) {
             // for each file from changelist/patch we call TFileConf::MarkFileAsChanged with data.LastCheckedStamp = TTimeStamps::Never
-            // so for this files we not return cached data here
+            // so for this files we not return cached data here except CantRead case which we should re-stat
             //
             // also we need emulate update(reset) 'Changed' property (like after real checking filestat)
             // or else we has unwanted read file content in TFileContentHolder::CheckForChanges
-            data.CheckContent |= data.CantRead;
             data.Changed = data.CheckContent;
             data.LastCheckedStamp = curStamp;
             return data;
@@ -134,11 +162,21 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
     TFileStat stats_;
 
     if (!fileStat) {
-        stats_ = FileStat(targetPath, content, kind);
-        if (stats_.IsNull()) {
+        int err = FileStat(targetPath, content, kind, stats_);
+        if (!err) {
+            fileStat = &stats_;
+        } else if (CanTrustStatError(err)) {
             return data.MarkNotFound(curStamp);
         } else {
-            fileStat = &stats_;
+            NEvent::TInvalidFile event;
+            event.SetFile(TString(targetPath));
+            event.SetReason("Stat failed: " + TString{LastSystemErrorText(err)});
+            TRACE(P, event);
+
+            TScopedContext context(0, targetPath, false); // We should try to re-stat such file every time
+            YConfErr(BadFile) << "Cannot stat source file " << targetPath << ": " << LastSystemErrorText(err)  << " (" << err << ")"<< Endl;
+
+            return data.MarkNotFound(curStamp, true /* temporary */);
         }
     }
     Y_ASSERT(fileStat && fileStat->Mode && (fileStat->MTime || UseExternalChangesSource));
@@ -148,6 +186,12 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
         YDIAG(Dev) << "File " << nameView << " is symlink. No follow." << Endl;
         return data.MarkNotFound(curStamp);
     } else {
+        // CantRead in data means 2 things:
+        // 1. CantRead && NotFound -> stat failed
+        // 2. CantRead && !NotFound -> read failed
+        // In both cases we treat stat uncacheable. In 2nd case here we reach with successfull `stat()`.
+        // But as with other `data` fields below these are OLD values and this ensures CantRead from
+        // cache will be converted to `CheckContent` before it is cleared on data update from this session.
         auto updated = UseExternalChangesSource ? ExternalChanges.contains(elemId) : (data.ModTime != fileStat->MTime || data.Size != fileStat->Size);
         data.CheckContent |= updated || data.NotFound || data.LastCheckedStamp == TTimeStamps::Never || data.CantRead;
     }
@@ -296,7 +340,7 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
     } catch (TFileError& e) {
         NEvent::TInvalidFile event;
         event.SetFile(TString(view.GetTargetStr()));
-        event.SetReason(TString{LastSystemErrorText(e.Status())});
+        event.SetReason("Read failed: " + TString{LastSystemErrorText(e.Status())});
         TRACE(P, event);
 
         TScopedContext context(0, view.GetTargetStr(), false); // We should try to reread such file every time
@@ -416,29 +460,33 @@ std::tuple<bool, bool> TFileConf::FindFileInChangesNoFS(TStringBuf name, bool al
     return { IChanges::EFK_NotFound != kind, removedOrInvalidKind };
 }
 
-TFileStat TFileConf::FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind) const {
+int TFileConf::FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind, TFileStat& result) const {
     Y_ASSERT(NPath::IsType(name, NPath::Source));
     if (kind != IChanges::EFK_NotFound) {
-        TFileStat stat;
+        result = {};
         if (kind == IChanges::EFK_File) {
             // regular file
-            stat.Mode = S_IFREG;
-            stat.Size = content.size();
+            result.Mode = S_IFREG;
+            result.Size = content.size();
         } else {
             Y_ASSERT(kind == IChanges::EFK_Dir);
             // directory
-            stat.Mode = S_IFDIR;
-            stat.Size = 4096;
+            result.Mode = S_IFDIR;
+            result.Size = 4096;
         }
-        return stat;
+        return 0;
     }
 
     TString realPath = Configuration.RealPath(name);
     TCyclesTimer timer;
-    auto r = TFileStat(realPath, true);  // nofollow = true
+
+    ClearLastSystemError();
+    result = TFileStat(realPath, true);  // nofollow = true
+    int err = LastSystemError();         // run back-to-back with above to avoid error owerwite
     auto us = timer.GetUs();
     SumUsStat(us, NStats::EFileConfStats::LstatCount, NStats::EFileConfStats::LstatSumUs, NStats::EFileConfStats::LstatMinUs, NStats::EFileConfStats::LstatMaxUs);
-    return r;
+
+    return result.IsNull() ? err : 0;
 }
 
 void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
