@@ -6,9 +6,11 @@ PY_SRCS(
     tools.py
     CYTHONIZE_PY
     path.py
+    ts_utils.py
 )
 
 PEERDIR(
+    build/plugins/lib/nots
     devtools/ya/test/const
     devtools/ya/test/system/process
     devtools/ya/yalibrary/formatter
@@ -18,16 +20,6 @@ PEERDIR(
     library/python/coredump_filter
     library/python/cores
 )
-
-IF (NOT YA_OPENSOURCE AND NOT NEBIUS)
-    PEERDIR(
-        build/internal/plugins/_lib/nots
-    )
-    PY_SRCS(
-        NAMESPACE test.util
-        ts_utils.py
-    )
-ENDIF()
 
 STYLE_PYTHON()
 
