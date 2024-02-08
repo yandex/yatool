@@ -40,7 +40,6 @@ ENDIF()
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
-        devtools/ya/app/modules/distbs_priority
         devtools/ya/yalibrary/oauth
         devtools/ya/yalibrary/yandex/sandbox
         devtools/ya/yalibrary/diagnostics
