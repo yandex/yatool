@@ -24,19 +24,24 @@ class _SuiteCtx:
             raise
 
     def add_error(self, exc):
+        if core.config.is_test_mode():
+            log_func = logger.exception
+        else:
+            log_func = logger.warning
+
         if self._stack:
             func, suite = self._stack[-1]
             msg = "[[unimp]]<{}>[[rst]] {}".format(suite, exc)
             if func:
                 func(msg=msg, path=suite.project_path, sub='SuiteConf')
             else:
-                logger.warning("Broken suite: %s", msg)
+                log_func("Broken suite: %s", msg)
         else:
             msg = "Failed to register suite error outside of suite context: {}".format(exc)
             if core.config.is_test_mode():
                 raise RuntimeError(msg)
             else:
-                logger.warning(msg)
+                log_func(msg)
 
 
 SuiteCtx = _SuiteCtx()

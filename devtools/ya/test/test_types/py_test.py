@@ -280,69 +280,6 @@ class PyTestSuite(common.PythonTestSuite):
         return ["SIGUSR2"]
 
 
-class PyTestScriptSuite(PyTestSuite):
-    def _script_path(self, root):
-        return os.path.join(root, "contrib", "python", "pytest", "pytest.py")
-
-    def get_run_cmd_inputs(self, opts):
-        inputs = super(PyTestScriptSuite, self).get_run_cmd_inputs(opts)
-        return inputs + [self._script_path('$(SOURCE_ROOT)'), self.binary_path('$(SOURCE_ROOT)')]
-
-    def get_run_cmd(self, opts, retry=None, for_dist_build=False):
-        cmd = (
-            test_common.get_python_cmd(opts=opts, suite=self)
-            + [
-                "-B",  # prevent from creating pytest cache
-                self._script_path('$(SOURCE_ROOT)'),
-                self.binary_path('$(SOURCE_ROOT)'),
-                "-p",
-                "ya",
-            ]
-            + self.get_run_cmd_args(opts, retry, for_dist_build)
-        )
-
-        if self._use_arcadia_python:
-            cmd.insert(1, "-S")
-            cmd.insert(1, "-s")
-
-        return cmd
-
-    def get_test_related_paths(self, arc_root, opts):
-        paths = super(PyTestScriptSuite, self).get_test_related_paths(arc_root, opts)
-        for path in [
-            ("library", "python", "testing", "yatest_common"),
-            ("library", "python", "testing"),
-            # pytest facility
-            ("library", "python", "pytest"),
-            ("library", "python", "pytest", "plugins"),
-            ("contrib", "python", "atomicwrites"),
-            ("contrib", "python", "attrs"),
-            ("contrib", "python", "funcsigs"),
-            ("contrib", "python", "more-itertools"),
-            ("contrib", "python", "pathlib2"),
-            ("contrib", "python", "pluggy"),
-            ("contrib", "python", "py"),
-            ("contrib", "python", "pytest"),
-            ("contrib", "python", "scandir"),
-        ]:
-            paths.insert(0, os.path.join(arc_root, *path))
-        return paths
-
-    def get_type(self):
-        return "pytest_script"
-
-    @property
-    def salt(self):
-        return self.name
-
-    @property
-    def supports_allure(self):
-        return True
-
-    def support_retries(self):
-        return False
-
-
 class PyTestBinSuite(PyTestSuite):
     def __init__(self, dart_info, *args, **kwargs):
         super(PyTestBinSuite, self).__init__(dart_info, *args, **kwargs)

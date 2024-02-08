@@ -51,7 +51,6 @@ SUITE_MAP = {
     'junit5.test': junit.Junit5TestSuite,
     'ktlint': java_style.KtlintTestSuite,
     'py.imports': py_test.CheckImportsTestSuite,
-    'py.test': py_test.PyTestScriptSuite,
     'py3test.bin': py_test.Py3TestBinSuite,
     'pytest.bin': py_test.PyTestBinSuite,
     'unittest.py': library_ut.UnitTestSuite,
