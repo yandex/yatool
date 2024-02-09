@@ -1801,7 +1801,7 @@ class _GraphMaker(object):
         def event_listener_debug_id_wrapper(event):
             if (
                 event['_typename'] in ("NEvent.TStageStarted", "NEvent.TStageFinished")
-                and event["StageName"] == "ymake main"
+                and event["StageName"] == "ymake run"
             ):
                 event["debug_id"] = debug_id
             event_listener_invalid_recurses_wrapper_func(event)

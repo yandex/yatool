@@ -142,7 +142,7 @@ class ModulesFilesStatistic:
         with self._lock:
             self._update_stats(event, delta_done, delta_total, delta_files, delta_rendered, delta_rendered_total)
 
-            if typename == "NEvent.TStageStarted" and event["StageName"] == "ymake main":
+            if typename == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
                 self._current_ymake_processing += 1
 
                 if self._mode == Mode.NOT_STARTED:
@@ -193,7 +193,7 @@ class ModulesFilesStatistic:
                     if self._next_timestamp_update <= timestamp:
                         self._try_print_message(timestamp)
 
-            if typename == "NEvent.TStageFinished" and event["StageName"] == "ymake main":
+            if typename == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
                 self._current_ymake_processing -= 1
                 self._try_print_message(timestamp)
 
@@ -304,13 +304,13 @@ class YmakeTimeStatistic:
 
     def get_ymake_listener(self):
         def ymake_listener(event):
-            if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake main":
+            if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
                 thread_name = threading.current_thread().name
                 self.current_open_threads[thread_name] = event['_timestamp']
                 if self.min_timestamp_ms is None:
                     self.min_timestamp_ms = event["_timestamp"] / 1000
 
-            elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake main":
+            elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
                 thread_name = threading.current_thread().getName()
                 self.max_timestamp_ms = event["_timestamp"] / 1000
                 self.threads_time.append(

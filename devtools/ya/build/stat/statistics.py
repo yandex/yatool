@@ -780,6 +780,22 @@ def get_detailed_timings(tasks):
     return result
 
 
+def _ymake_wall_time(ymake_stats):
+    Interval = collections.namedtuple('Interval', ('start', 'end'))
+    wall_time = 0.0
+    if ymake_stats and ymake_stats.threads_time:
+        intervals = sorted(Interval(t.start_time, t.end_time) for t in ymake_stats.threads_time)
+        merged = intervals[:1]
+        for ti in intervals[1:]:
+            last_ti = merged[-1]
+            if last_ti.end >= ti.start:
+                merged[-1] = Interval(min(ti.start, last_ti.start), max(ti.end, last_ti.end))
+            else:
+                merged.append(ti)
+        wall_time = sum((ti.end - ti.start) / 1e6 for ti in merged)
+    return wall_time
+
+
 def print_graph_statistics(graph, directory, event_log, display, task_stats=None, ctx_stages=None, ymake_stats=None):
     if directory is not None:
         exts.fs.create_dirs(directory)
@@ -808,6 +824,7 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     print_stages(event_log, display)
     if ctx_stages:
         stats['context_stages'] = print_context_stages(ctx_stages, display)
+    stats['ymake_wall_time'] = _ymake_wall_time(ymake_stats)
 
     return stats
 
