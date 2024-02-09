@@ -206,6 +206,11 @@ class KtlintTestSuite(LintTestSuite):
             return "ktlint_old"
         return "ktlint"
 
+    def _ktlint_baseline_path(self):
+        if "KTLINT_BASELINE_FILE" in self.dart_info:
+            return os.path.join(SOURCE_ROOT, self.project_path, self.dart_info['KTLINT_BASELINE_FILE'])
+        return None
+
     def get_resource_tools(self):
         return (self._ktlint_folder_name(),)
 
@@ -238,6 +243,10 @@ class KtlintTestSuite(LintTestSuite):
             "--editorconfig",
             editorconfig,
         ]
+
+        baseline = self._ktlint_baseline_path()
+        if baseline:
+            cmd += ["--baseline", baseline]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:
