@@ -73,9 +73,11 @@ void TDirCleaner::Clean(TExportFileManager& exportFileManager) const {
 
     for (const auto& remove: DirsToRemove) {
         if (SubdirsToKeep.contains(remove)) {
+            spdlog::debug("Keep dir from removal '{}'. It's required in target buildsystem", remove.string());
             continue;
         }
         if (!exportFileManager.Exists(remove)) {
+            spdlog::warn("Can't remove '{}'. No such file or directory", remove.string());
             continue;
         }
 
@@ -103,6 +105,7 @@ void TDirCleaner::Clean(TExportFileManager& exportFileManager) const {
             for (; top.Tail != fs::directory_iterator{}; ++top.Tail) {
                 if (top.Tail->is_directory()) {
                     if (SubdirsToKeep.contains(top.RelativeTo(exportFileManager.GetExportRoot()))) {
+                        spdlog::debug("Keep dir from removal '{}'. It's subdir is required in target buildsystem", top.Tail->path().string());
                         top.Keep = true;
                     } else {
                         stack.push({.Tail = fs::directory_iterator{top.Tail->path()}, .Keep = false});
