@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/common/cyclestimer.h>
 
 #include <google/protobuf/message.h>
 
@@ -36,8 +37,23 @@ namespace NYMake {
         ~TTraceStage() {
             FORCE_TRACE(U, NEvent::TStageFinished(Stage_));
         }
-
     private:
-        TString Stage_;
+        const TString Stage_;
+    };
+
+    class TTraceStageWithTimer : public TTraceStage {
+    public:
+        TTraceStageWithTimer(const TString& stage, const TString& monName)
+            : TTraceStage(stage)
+            , MonName_(monName)
+            , Timer_()
+        {}
+
+        ~TTraceStageWithTimer() {
+            NStats::TStatsBase::MonEvent(MonName_, Timer_.GetSeconds());
+        }
+    private:
+        const TString MonName_;
+        TCyclesTimer Timer_;
     };
 }

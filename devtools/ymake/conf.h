@@ -18,6 +18,7 @@
 #include <devtools/ymake/options/roots_options.h>
 
 #include <devtools/ymake/config/config.h>
+#include <devtools/ymake/diag/trace.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
 #include <library/cpp/digest/md5/md5.h>
@@ -56,7 +57,7 @@ public:
     TBlackList BlackList;
     TIsolatedProjects IsolatedProjects;
     THashSet<TString> ExcludedPeerdirs;
-    THolder<TCyclesTimer> RunTimer;
+    THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
 
 public:
     void AddOptions(NLastGetopt::TOpts& opts);

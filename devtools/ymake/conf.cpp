@@ -90,8 +90,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         InitTraceSubsystem(Events);
     }
 
-    RunTimer = MakeHolder<TCyclesTimer>();
-    FORCE_TRACE(U, NEvent::TStageStarted("ymake run"));
+    RunStageWithTimer = MakeHolder<TTraceStageWithTimer>("ymake run", MON_NAME(EYmakeStats::RunTime));
 
     Diag()->Init(WarnFlags);
 

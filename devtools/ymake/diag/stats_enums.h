@@ -132,4 +132,16 @@ namespace NStats {
         SavedNodes /* "Saved nodes" */,
         SavedLoops /* "Saved loops" */,
     };
+
+    enum class EYMakeStats {
+        WriteJSONTime /* "Write JSON time, sec" */,
+        RenderJSONTime /* "Render JSON time, sec" */,
+        RunTime /* "Run time, sec" */,
+        ConfigureGraphTime /* "Configure graph time, sec" */,
+        ConfigureReadonlyGraphTime /* "Configure readonly graph time, sec" */,
+        UsedFSCache /* "Used FS cache, bool" */,
+        UsedDepsCache /* "Used Deps cache, bool" */,
+        UsedJSONCache /* "Used JSON cache, bool" */,
+        UsedUidsCache /* "Used Uids cache, bool" */,
+    };
 }

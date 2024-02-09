@@ -99,6 +99,7 @@ namespace NStats {
 
     #define INT_MON_EVENT(index) IntMonEvent(index, #index)
     #define BOOL_MON_EVENT(index) BoolMonEvent(index, #index)
+    #define MON_NAME(index) #index
 
     using TModulesStats = TStats<EModulesStats>;
     using TMakeCommandStats = TStats<EMakeCommandStats>;

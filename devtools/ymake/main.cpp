@@ -151,8 +151,7 @@ namespace {
 }
 
 static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
-    TCyclesTimer runTimer;
-    FORCE_TRACE(U, NEvent::TStageStarted("Configure graph"));
+    NYMake::TTraceStageWithTimer("Configure graph", MON_NAME(EYmakeStats::ConfigureGraphTime));
     try {
         yMake->BuildDepGraph();
     } catch (const TNotImplemented& e) {
@@ -168,14 +167,11 @@ static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
         YErr() << error.what() << Endl;
         return TMaybe<EBuildResult>(BR_FATAL_ERROR);
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Configure graph"));
-    NStats::TStatsBase::MonEvent("EYmakeStats::ConfigureGraphTime", runTimer.GetSeconds());
     return TMaybe<EBuildResult>();
 }
 
 static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
-    TCyclesTimer runTimer;
-    FORCE_TRACE(U, NEvent::TStageStarted("Configure readonly graph"));
+    NYMake::TTraceStageWithTimer("Configure readonly graph", MON_NAME(EYmakeStats::ConfigureReadonlyGraphTime));
     TBuildConfiguration& conf = yMake->Conf;
     for (size_t i = 0; i < conf.StartDirs.size(); ++i) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(conf.StartDirs[i]), NPath::Source);
@@ -186,8 +182,6 @@ static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
         if (offs)
             yMake->StartTargets.push_back(offs);
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Configure readonly graph"));
-    NStats::TStatsBase::MonEvent("EYmakeStats::ConfigureReadonlyGraphTime", runTimer.GetSeconds());
     return yMake->StartTargets.size() ? TMaybe<EBuildResult>() : TMaybe<EBuildResult>(BR_CONFIGURE_FAILED);
 }
 

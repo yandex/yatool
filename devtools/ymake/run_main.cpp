@@ -81,10 +81,6 @@ int YMakeMain(int argc, char** argv) {
     FORCE_TRACE(U, NEvent::TStageStarted("ymake main"));
     const auto ret_code = main_real(conf);
     FORCE_TRACE(U, NEvent::TStageFinished("ymake main"));
-    FORCE_TRACE(U, NEvent::TStageFinished("ymake run"));
-    if (conf.RunTimer) {
-        NStats::TStatsBase::MonEvent("EYmakeStats::RunTime", conf.RunTimer->GetSeconds());
-    }
 
     return ret_code;
 }

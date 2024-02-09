@@ -542,6 +542,9 @@ namespace {
             yMake.LoadUids(cmdbuilderHolder.Get());
         } catch (const std::exception& e) {
             YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
+            if (conf.ReadUidsCache) {
+                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), false); // enabled, but not loaded
+            }
             // JSON visitor can be left in an incorrect state
             // after an unsuccessful cache loading.
             cmdBuilderReset();
@@ -673,21 +676,14 @@ void ExportJSON(TYMake& yMake) {
     conf.EnableRealPathCache(&yMake.Names.FileConf);
 
     {
-        TCyclesTimer writeTimer;
-        FORCE_TRACE(U, NEvent::TStageStarted("Write JSON"));
+        NYMake::TTraceStageWithTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
         NJson::TJsonWriter jsonWriter(output.Get(), false);
         TMakePlan plan(jsonWriter);
 
-        TCyclesTimer renderTimer;
-        FORCE_TRACE(U, NEvent::TStageStarted("Render JSON"));
+        NYMake::TTraceStageWithTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
         RenderJSONGraph(yMake, plan);
-        FORCE_TRACE(U, NEvent::TStageFinished("Render JSON"));
-        NStats::TStatsBase::MonEvent("EYmakeStats::RenderJSONTime", renderTimer.GetSeconds());
-
-        FORCE_TRACE(U, NEvent::TStageFinished("Write JSON"));
-        NStats::TStatsBase::MonEvent("EYmakeStats::WriteJSONTime", writeTimer.GetSeconds());
     }
 
     conf.EnableRealPathCache(nullptr);
