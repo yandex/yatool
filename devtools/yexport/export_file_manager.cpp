@@ -54,7 +54,9 @@ bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
 }
 void TExportFileManager::Remove(const fs::path& relativeToRoot) {
     CreatedFiles_.erase(relativeToRoot);
-    fs::remove(ExportRoot_ / relativeToRoot);
+    const auto path = ExportRoot_ / relativeToRoot;
+    NYexport::TracePathRemoved(path);
+    fs::remove(path);
 }
 TString TExportFileManager::MD5(const fs::path& relativeToRoot) {
     if (!CreatedFiles_.contains(relativeToRoot)) {

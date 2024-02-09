@@ -9,4 +9,8 @@ void TraceFileExported(const fs::path& path) {
     NYMake::Trace(NEvent::TFileExported(path.c_str()));
 }
 
+void TracePathRemoved(const fs::path& path) {
+    NYMake::Trace(NEvent::TPathRemoved(path.c_str()));
+}
+
 }

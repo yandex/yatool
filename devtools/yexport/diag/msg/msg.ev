@@ -8,3 +8,8 @@ message TFileExported {
     option (message_id) = 33;
     required string FilePath = 1;
 }
+
+message TPathRemoved {
+    option (message_id) = 34;
+    required string FilePath = 1;
+}

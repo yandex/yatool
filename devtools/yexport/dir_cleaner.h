@@ -1,7 +1,6 @@
 #pragma once
 
 #include "sem_graph.h"
-#include "std_helpers.h"
 #include "export_file_manager.h"
 
 #include <util/generic/hash_set.h>
