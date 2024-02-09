@@ -16,28 +16,33 @@ namespace NCommandFile {
 
     TVector<TString> TCommandArgsPacker::Pack(const TVector<TString>& commandArgs) {
         TVector<TString> args;
-        size_t i = 0;
-        args.reserve(commandArgs.size());
-        while (i < commandArgs.size()) {
+        for(size_t i = 0; i < commandArgs.size(); i++) {
             if (commandArgs[i] == StartMarker) {
-                TFsPath commandFilePath = BuildRoot / TString::Join("ya_command_file_", ToString(Counter), ".args");
-                TFileOutput out(commandFilePath);
-                i += 1;
-                while (i < commandArgs.size()) {
-                    if (commandArgs[i] == EndMarker) {
-                        break;
-                    }
-                    out.Write(commandArgs[i]);
-                    out.Write("\n");
-                    i += 1;
-                }
-                args.push_back("@" + commandFilePath.GetPath());
-                Counter += 1;
+                const auto& arg = ConsumeCommandFileArgs(commandArgs, ++i); // move i to skip marker
+                args.push_back(arg);
             } else {
                 args.push_back(commandArgs[i]);
             }
-            i += 1;
         }
         return args;
+    }
+
+    TString TCommandArgsPacker::ConsumeCommandFileArgs(const TVector<TString>& commandArgs, size_t& pos) {
+        TFsPath commandFilePath = BuildRoot / TString::Join("ya_command_file_", ToString(Counter++), ".args");
+        TFileOutput out(commandFilePath);
+
+        for (; pos < commandArgs.size(); pos++) {
+            if (commandArgs[pos] == StartMarker) {
+               const auto arg = ConsumeCommandFileArgs(commandArgs, ++pos); // move pos to skip marker
+               out.Write(arg);
+            } else if (commandArgs[pos] == EndMarker) {
+                break;
+            } else {
+                out.Write(commandArgs[pos]);
+            }
+            out.Write("\n");
+        }
+
+        return "@" + commandFilePath.GetPath();
     }
 } // namespace NCommandFile

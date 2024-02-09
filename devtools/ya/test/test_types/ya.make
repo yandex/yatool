@@ -35,6 +35,7 @@ PEERDIR(
     devtools/ya/test/facility
     devtools/ya/test/system/env
     devtools/ya/test/system/process # TODO get rid off
+    devtools/ya/test/test_node/cmdline
     devtools/ya/test/tracefile
     devtools/ya/test/util
     devtools/ya/yalibrary/graph

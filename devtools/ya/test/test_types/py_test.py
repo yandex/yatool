@@ -16,6 +16,7 @@ from test.test_types import common
 import test.const
 import test.util.shared
 import test.util.tools
+import devtools.ya.test.test_node.cmdline as cmdline
 
 logger = logging.getLogger(__name__)
 
@@ -737,7 +738,7 @@ class ClasspathClashTestSuite(PyLintTestSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
         cmd = super(ClasspathClashTestSuite, self).get_run_cmd(opts, retry, for_dist_build)
         cmd.append(consts.BUILD_ROOT)
-        cmd += [x[len(consts.BUILD_ROOT) + 1 :] for x in self.classpath]
+        cmd += cmdline.wrap_with_cmd_file_markers([x[len(consts.BUILD_ROOT) + 1 :] for x in self.classpath])
         cmd += self.ignored
         if for_dist_build or self.strict:
             cmd.append('--')

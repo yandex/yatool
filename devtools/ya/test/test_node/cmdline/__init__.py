@@ -2,6 +2,9 @@ import devtools.ya.test.dependency.testdeps as testdeps
 
 import test.const
 
+CMD_FILE_START_MARKER = "--ya-start-command-file"
+CMD_FILE_END_MARKER = "--ya-end-command-file"
+
 
 def get_base_environment_relative_options(suite):
     return [
@@ -50,5 +53,11 @@ def wrap_test_tool_cmd(cmd, handler):
         counter += 1
         if item == handler:
             break
-    cmd.insert(counter, "--ya-start-command-file")
-    cmd.append("--ya-end-command-file")
+    cmd.insert(counter, CMD_FILE_START_MARKER)
+    cmd.append(CMD_FILE_END_MARKER)
+
+
+def wrap_with_cmd_file_markers(args):
+    if not args:
+        return args
+    return [CMD_FILE_START_MARKER] + args + [CMD_FILE_END_MARKER]

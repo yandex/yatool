@@ -9,7 +9,9 @@ namespace NCommandFile {
         explicit TCommandArgsPacker(const TString& buildRoot);
         TVector<TString> Pack(const TVector<TString>& commandArgs);
     private:
-        int Counter;
+        TString ConsumeCommandFileArgs(const TVector<TString>& commandArgs, size_t& pos);
+
+        size_t Counter;
         TFsPath BuildRoot;
     };
 } // namespace NCommandFile

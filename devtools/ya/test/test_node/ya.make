@@ -8,7 +8,6 @@ PY_SRCS(
 )
 
 PY_SRCS(
-    cmdline.py
     fuzzing.py
 )
 
@@ -26,6 +25,7 @@ PEERDIR(
     devtools/ya/test/facility
     devtools/ya/test/filter
     devtools/ya/test/system
+    devtools/ya/test/test_node/cmdline
     devtools/ya/test/test_node/coverage
     devtools/ya/test/test_node/sandbox
     devtools/ya/test/test_types
