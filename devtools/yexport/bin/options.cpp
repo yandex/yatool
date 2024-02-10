@@ -22,6 +22,7 @@ TOpts TOpts::Parse(int argc, char** argv) {
     opts.AddLongOption('s', "semantic-graph", "Path to the semantic graph dump").AppendTo(&ret.SemGraphs);
     opts.AddLongOption('p', "platforms", "Platforms to merge: linux, darwin, win").AppendTo(&ret.Platforms);
     opts.AddLongOption('C', "clean-ignored", "Remove subdirs with project ignored by the export").StoreTrue(&ret.CleanIgnored);
+    opts.AddLongOption('I', "report-ignored", "Report subdirs with project ignored by the export as evlog events (noop of events rerting is turned off)").StoreTrue(&ret.ReportIgnored);
     opts.AddLongOption('l', "list", "Show a list of available generators").StoreTrue(&ret.List);
     opts.AddLongOption('G', "generator", "Generator to use")
         .StoreResult(&ret.Generator)

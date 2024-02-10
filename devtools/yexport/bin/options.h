@@ -22,6 +22,7 @@ struct TOpts {
     TVector<std::string> Platforms;
     std::string Generator;
     bool CleanIgnored = false;
+    bool ReportIgnored = false;
 
     TLoggingOpts LoggingOpts;
 
