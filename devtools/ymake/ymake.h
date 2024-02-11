@@ -72,6 +72,7 @@ private:
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
+    bool TryLoadUids(TUidsCachable* uidsCachable);
 
 public:
     explicit TYMake(TBuildConfiguration& conf);

@@ -653,39 +653,36 @@ void TYMake::LoadUids(TUidsCachable* cachable) {
     if (!Conf.ReadUidsCache) {
         return;
     }
-    auto loadFailed = []() {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), false); // enabled, but not loaded
-    };
-    if (PrevDepsFingerprint.Empty() || !Conf.YmakeUidsCache.Exists()) {
-        return loadFailed();
+    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), TryLoadUids(cachable));
+}
+
+bool TYMake::TryLoadUids(TUidsCachable* cachable) {
+    if (!PrevDepsFingerprint.Empty() && Conf.YmakeUidsCache.Exists()) {
+        NYMake::TTraceStage loadUidsStage{"Load Uids cache"};
+
+        TFileInput input(TFile{Conf.YmakeUidsCache, OpenExisting | RdOnly | Seq | NoReuse}, 1_MB);
+
+        ui32 size;
+        if (input.Load(&size, sizeof(size)) != sizeof(size))
+            return false;
+
+        TString depsFingerprint;
+        depsFingerprint.ReserveAndResize(size);
+        if (input.Load(depsFingerprint.Detach(), size) != size)
+            return false;
+
+        if (depsFingerprint != PrevDepsFingerprint) {
+            YDebug() << "Uids cache fingerprint mismatch: "
+                << depsFingerprint << " != " << PrevDepsFingerprint << Endl;
+            return false;
+        }
+
+        cachable->LoadCache(&input, Graph);
+
+        YDebug() << "Uids cache has been loaded..." << Endl;
+        return true;
     }
-
-    FORCE_TRACE(U, NEvent::TStageStarted("Load Uids cache"));
-    Y_DEFER {
-        FORCE_TRACE(U, NEvent::TStageFinished("Load Uids cache"));
-    };
-
-    TFileInput input(TFile{Conf.YmakeUidsCache, OpenExisting | RdOnly | Seq | NoReuse}, 1_MB);
-
-    ui32 size;
-    if (input.Load(&size, sizeof(size)) != sizeof(size))
-        return loadFailed();
-
-    TString depsFingerprint;
-    depsFingerprint.ReserveAndResize(size);
-    if (input.Load(depsFingerprint.Detach(), size) != size)
-        return loadFailed();
-
-    if (depsFingerprint != PrevDepsFingerprint) {
-        YDebug() << "Uids cache fingerprint mismatch: "
-            << depsFingerprint << " != " << PrevDepsFingerprint << Endl;
-        return loadFailed();
-    }
-
-    cachable->LoadCache(&input, Graph);
-
-    YDebug() << "Uids cache has been loaded..." << Endl;
-    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), true);
+    return false;
 }
 
 TVector<ui32> TYMake::PreserveStartTargets() const {
