@@ -17,6 +17,7 @@ class StyleOptions(core.yarg.Options):
         self.stdin_filename = 'source.cpp'
         self.py2 = False
         self.force = False
+        self.use_ruff = False
 
     @staticmethod
     def consumer():
@@ -51,6 +52,12 @@ class StyleOptions(core.yarg.Options):
                 help="Don't skip files",
                 hook=core.yarg.SetConstValueHook('force', True),
                 group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--ruff'],
+                help="Use ruff format, instead black for python files",
+                hook=core.yarg.SetConstValueHook('use_ruff', True),
+                group=core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 

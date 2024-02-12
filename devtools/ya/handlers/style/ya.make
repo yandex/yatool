@@ -3,6 +3,7 @@ PY23_LIBRARY()
 PEERDIR(
     build/config/tests/cpp_style
     build/config/tests/py_style
+    build/config/tests/ruff
     contrib/python/PyYAML
     contrib/python/coloredlogs
     contrib/python/six
@@ -28,6 +29,7 @@ PY_SRCS(
     golang_style.py
     python_style.py
     state_helper.py
+    ruff_config.py
 )
 
 END()

@@ -20,7 +20,7 @@ import yalibrary.makelists
 from .state_helper import check_cancel_state
 from handlers.style.cpp_style import fix_clang_format
 from handlers.style.golang_style import fix_golang_style
-from handlers.style.python_style import fix_python_with_black, python_config
+from handlers.style.python_style import fix_python_with_black, fix_python_with_ruff, python_config
 from library.python.fs import replace_file
 from library.python.testing.style import rules
 
@@ -35,10 +35,12 @@ YAMAKE_EXTS = ('ya.make', 'ya.make.inc')
 
 
 def check_file(path, exts):
+    # type(str, Tuple[str, ...]) -> bool:
     return path.endswith(exts)
 
 
 def colorize(text, *args, **kwargs):
+    # type(str, Any, Any) -> str
     if sys.stdout.isatty():
         return colored(text, *args, **kwargs)
 
@@ -46,6 +48,7 @@ def colorize(text, *args, **kwargs):
 
 
 def apply_style(path, data, new_data, args):
+    # type(str, str, str, StyleOptions) -> None:
     if new_data != data:
         if args and args.dry_run:
             if args.full_output:
@@ -70,29 +73,38 @@ def apply_style(path, data, new_data, args):
             os.chmod(path, path_st_mode)
 
 
-def fix_yamake(p, data, args):
+def fix_yamake(path, data, args):
+    # type(str, str, StyleOptions) -> str:
     yamake = yalibrary.makelists.from_str(data)
     return yamake.dump()
 
 
-def fix_python(p, data, args):
+def fix_python(path, data, args):
+    # type(str, str, StyleOptions) -> str:
     try:
-        return fix_python_with_black(data, p, False, args)
+        return fix_python_with_black(data, path, False, args)
     except RuntimeError as e:
         if "Black produced different code on the second pass of the formatter" in e.message:  # https://st.yandex-team.ru/DEVTOOLS-7642
             for i in range(0, 2):
-                data = fix_python_with_black(data, p, True, args)
+                data = fix_python_with_black(data, path, True, args)
 
             return data
         else:
             raise
 
 
-def fix_golang(p, data, args):
-    return fix_golang_style(data, p)
+def fix_python_ruff(path, data, args):
+    # type(str, str, StyleOptions) -> str:
+    return fix_python_with_ruff(data, path)
 
 
-def fix_common(p, data, args):
+def fix_golang(path, data, args):
+    # type(str, str, StyleOptions) -> str:
+    return fix_golang_style(data, path)
+
+
+def fix_common(path, data, args):
+    # type(str, str, StyleOptions) -> str:
     if data and data[-1] != '\n':
         return data + '\n'
     return data
@@ -114,7 +126,8 @@ def wrap_format(func, loader, args):
     return f
 
 
-def choose_styler(filename):
+def choose_styler(filename, args):
+    # type(str, StyleOptions) -> Tuple[str, Callable, bool]:
     if check_file(filename, YAMAKE_EXTS):
         return ('yamake', fix_yamake, False)
 
@@ -122,6 +135,8 @@ def choose_styler(filename):
         return ('cpp', fix_clang_format, True)
 
     if check_file(filename, PY_EXTS):
+        if args.use_ruff:
+            return ('py', fix_python_ruff, True)
         return ('py', fix_python, True)
 
     if check_file(filename, GO_EXTS):
@@ -132,10 +147,12 @@ def choose_styler(filename):
 
 
 def stdin_loader(filename):
+    # type(str) -> Tuple[str, Callable[[], Tuple[str, str]]]
     return filename, lambda: ('-', sys.stdin.read())
 
 
 def file_loader(filename):
+    # type(str) -> Tuple[str, Callable[[], Tuple[str, str]]]
     def func():
         with open(filename, 'r') as f:
             return filename, f.read()
@@ -144,18 +161,23 @@ def file_loader(filename):
 
 
 def prepare_tools(kinds, args):
+    # type(frozenset, StyleOptions) -> None
     if 'cpp' in kinds:
         # ensure clang-format downloaded
         yalibrary.tools.tool('clang-format')
 
     if 'py' in kinds:
-        # ensure black downloaded
-        yalibrary.tools.tool('black' if not args.py2 else 'black_py2')
+        if args.use_ruff:
+            # ensure ruff downloaded
+            yalibrary.tools.tool('ruff')
+        else:
+            # ensure black downloaded
+            yalibrary.tools.tool('black' if not args.py2 else 'black_py2')
 
-        args.python_config_file = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
-        args.python_config_file.write(python_config())
-        args.python_config_file.flush()  # will be read from other subprocesses
-        # keep file open
+            args.python_config_file = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
+            args.python_config_file.write(python_config())
+            args.python_config_file.flush()  # will be read from other subprocesses
+            # keep file open
 
     if 'go' in kinds:
         # ensure yoimports downloaded
@@ -163,6 +185,7 @@ def prepare_tools(kinds, args):
 
 
 def run_style(args):
+    # type(StyleOptions) -> None
     console_log = logging.StreamHandler()
 
     for h in list(logging.root.handlers):
@@ -206,7 +229,7 @@ def run_style(args):
         file_types = set(args.file_types)
         for filename, loader in iter_files():
             check_cancel_state()
-            descr = choose_styler(filename)
+            descr = choose_styler(filename, args)
 
             if descr:
                 kind, func, enabled = descr
