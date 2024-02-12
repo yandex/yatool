@@ -1,4 +1,5 @@
 import logging
+import time
 
 from core import profiler
 from core import stages_profiler
@@ -9,6 +10,7 @@ from exts.compress import ucopen
 from exts.decompress import udopen
 
 logger = logging.getLogger(__name__)
+stage_begin_time = {}
 
 
 def _dump_results(builder, owners):
@@ -41,12 +43,36 @@ def stage_finished(stage_name):
     profiler.profile_step_finished(stage_name)
 
 
+def monitoring_stage_started(stage_name):
+    stage_started(stage_name)
+    stage_begin_time[stage_name] = time.time()
+
+
+def monitoring_stage_finished(stage_name):
+    stage_finished(stage_name)
+    if stage_name not in stage_begin_time:
+        logger.error("stage_end without stage_begin for '%s'", stage_name)
+    else:
+        import app_ctx  # XXX
+
+        # Event format see TMonitoringStat at devtools/ymake/diag/trace.ev
+        # Name format is string representation of enum items in devtools/ymake/diag/stats_enum.h, here use same strings for generality
+        if getattr(app_ctx, 'evlog', None):
+            app_ctx.evlog.get_writer('ya')(
+                'NEvent.TMonitoringStat',
+                Name='EYaStats::ContextTime',
+                Type='double',
+                DoubleValue=str(time.time() - stage_begin_time[stage_name]),
+            )
+        del stage_begin_time[stage_name]
+
+
 def do_ya_make(params):
     from build import ya_make
 
     import app_ctx  # XXX
 
-    stage_started('ya_make_handler')
+    monitoring_stage_started('ya_make_handler')
     stage_started('context_generating')
 
     if not params.custom_context:
@@ -60,7 +86,7 @@ def do_ya_make(params):
 
         remote_graph_generator.generate(params, app_ctx)
         stage_finished('context_generating')
-        stage_finished('ya_make_handler')
+        monitoring_stage_finished('ya_make_handler')
         return 0
 
     # XXX
@@ -119,6 +145,6 @@ def do_ya_make(params):
 
         stage_finished('save_context')
 
-    stage_finished('ya_make_handler')
+    monitoring_stage_finished('ya_make_handler')
 
     return 0 if params.ignore_nodes_exit_code else exit_code
