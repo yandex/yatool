@@ -653,7 +653,8 @@ void TYMake::LoadUids(TUidsCachable* cachable) {
     if (!Conf.ReadUidsCache) {
         return;
     }
-    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), TryLoadUids(cachable));
+    const bool loaded = TryLoadUids(cachable);
+    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), loaded);
 }
 
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
