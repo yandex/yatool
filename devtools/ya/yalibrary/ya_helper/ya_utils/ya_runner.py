@@ -80,8 +80,8 @@ class Ya(LoggerCounter):
             self.stderr = result.stderr
         except (SubprocessError, CalledProcessError) as e:
             self.returncode = getattr(e, "returncode", "<unknown>")
-            self.stdout = getattr(e, 'output', None)
-            self.stderr = getattr(e, 'stderr', None)
+            self.stdout = six.ensure_str(getattr(e, 'output', "<unknown>"))
+            self.stderr = six.ensure_str(getattr(e, 'stderr', "<unknown>"))
 
             if not self.stderr and self.error_file and os.path.exists(self.error_file):
                 with open(self.error_file, "rt") as f:
