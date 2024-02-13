@@ -19,13 +19,18 @@ from devtools.ya.package import const
 logger = logging.getLogger(__name__)
 PackageInfo = collections.namedtuple('PackageInfo', ['image_tag', 'digest'])
 
+DOCKER_BIN_PATHS = [
+    "/usr/bin/docker",
+    "/usr/local/bin/docker",
+    "/opt/homebrew/bin/docker",
+]
+
 
 def get_docker_binary():
-    try_paths = ["/usr/bin/docker", "/usr/local/bin/docker"]
-    for p in try_paths:
+    for p in DOCKER_BIN_PATHS:
         if os.path.exists(p):
             return p
-    raise Exception("Docker binary not found by {}".format(try_paths))
+    raise Exception("Docker binary not found by {}".format(DOCKER_BIN_PATHS))
 
 
 def get_image_name(registry, repository, package_name, package_version):
