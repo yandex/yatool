@@ -57,6 +57,8 @@ def _build_images(source_root, all_platforms_build):
             path,
             "--tag",
             tag,
+            "--network",
+            "host",
         ]
         _execute_docker_cmd(cmd, source_root)
 
@@ -76,6 +78,8 @@ def execute_image(source_root, result_root, image_tag):
             "run",
             "--name",
             name,
+            "--network",
+            "host",
         ]
         + _get_mount_arg(source_root, "/source_root", True)
         + _get_mount_arg(result_root, "/result", False)

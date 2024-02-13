@@ -16,8 +16,8 @@ from urllib.request import Request
 SOURCE_ROOT = sys.argv[1]
 BUILD_ROOT = sys.argv[2]
 
-URL = "https://devtools-registry.s3.yandex.net/5316269301"
-SHA256 = "ed48695fb5e27afe515a5a4e2eada4201eca1e603506c03d20c536df865c7d30"
+URL = "https://devtools-registry.s3.yandex.net/5820921597"
+SHA256 = "60d361720cc98aace05e98b66716f847b03b0f4e38497f198a45c23993203e5c"
 
 
 _ssl_is_tuned = False
@@ -152,7 +152,7 @@ PATH_SUBSTITUTES = {
     '$(DEFAULT_LINUX_X86_64)/bin/': '',
     '$(PYTHON)/python': 'python3',
     '$(ANTLR4-sbr:1861632725)': BUILD_ROOT,
-    '$(YMAKE_PYTHON3-1415908779)/python3': 'python3',
+    '$(YMAKE_PYTHON3-3499513686)/python3': 'python3',
     '$(BINUTILS_ROOT-sbr:360916612)/bin/': '',
     '$(RESOURCE_ROOT)': BUILD_ROOT,
     '$(SOURCE_ROOT)': SOURCE_ROOT,
