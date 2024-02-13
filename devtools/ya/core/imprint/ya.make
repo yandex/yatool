@@ -15,6 +15,7 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/exts
     devtools/ya/test/error
+    # devtools/ya/yalibrary/monitoring
 )
 
 IF (NOT YA_OPENSOURCE)

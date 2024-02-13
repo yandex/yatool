@@ -50,6 +50,7 @@ PEERDIR(
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/graph
     devtools/ya/yalibrary/last_failed
+    devtools/ya/yalibrary/monitoring
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/runner
     devtools/ya/yalibrary/store

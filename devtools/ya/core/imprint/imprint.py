@@ -7,6 +7,8 @@ from exts import func, os2, hashing
 from core.config import misc_root, find_root
 import devtools.ya.test.error as test_error
 
+# from yalibrary.monitoring import YaMonEvent
+
 from .base import SimpleMapper, BaseCache, BaseFileCache
 from .change_list import ChangeList
 
@@ -345,6 +347,13 @@ class Imprint:
         # Iter files just helper cache
         # self.logger.debug(self._iter_files.stats)
         self.logger.debug(self._dir_cache.stats)
+
+        # for name, stats in {
+        #     'ImprintRelPath': self._rel_path.stats,
+        #     'ImprintContentHash': self._content_hash.stats,
+        #     'ImprintDirCache': self._dir_cache.stats,
+        # }.items():
+        #     YaMonEvent.send('EYaStats::' + name, 100.0 * stats.hit / stats.all if stats.all else 0.0)
 
     def _stats_json(self):
         return (

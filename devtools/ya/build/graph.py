@@ -46,6 +46,7 @@ from yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.toolscache import toolscache_version
 import yalibrary.vcs.vcsversion as vcsversion
 import yalibrary.debug_store
+from yalibrary.monitoring import YaMonEvent
 
 import build.makelist as bml
 import build.gen_plan as gen_plan
@@ -2279,6 +2280,7 @@ def _enable_imprint_fs_cache(stager, opts):
 
             imprint.use_change_list(opts.build_graph_cache_cl, quiet=True)
             logger.debug("imprint fs cache is enabled")
+            YaMonEvent.send('EYaStats::ImprintFSCacheEnabled', True)
         except Exception:
             logger.exception("Something goes wrong while enabling fs cache / changleist")
             imprint.disable_fs()

@@ -8,6 +8,7 @@ import exts.yjdump as yjdump
 import exts.yjson as json
 from exts.compress import ucopen
 from exts.decompress import udopen
+from yalibrary.monitoring import YaMonEvent
 
 logger = logging.getLogger(__name__)
 stage_begin_time = {}
@@ -53,17 +54,7 @@ def monitoring_stage_finished(stage_name):
     if stage_name not in stage_begin_time:
         logger.error("stage_end without stage_begin for '%s'", stage_name)
     else:
-        import app_ctx  # XXX
-
-        # Event format see TMonitoringStat at devtools/ymake/diag/trace.ev
-        # Name format is string representation of enum items in devtools/ymake/diag/stats_enum.h, here use same strings for generality
-        if getattr(app_ctx, 'evlog', None):
-            app_ctx.evlog.get_writer('ya')(
-                'NEvent.TMonitoringStat',
-                Name='EYaStats::ContextTime',
-                Type='double',
-                DoubleValue=str(time.time() - stage_begin_time[stage_name]),
-            )
+        YaMonEvent.send('EYaStats::ContextTime', time.time() - stage_begin_time[stage_name])
         del stage_begin_time[stage_name]
 
 
