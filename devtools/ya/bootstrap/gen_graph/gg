@@ -13,8 +13,8 @@ ya make \
     -DYA_OPENSOURCE=yes \
     -DYMAKE_EXCLUDE_IDL_TOOL=yes \
     --no-ya-bin-resource \
-    --cxx-compiler clang++-14 \
-    --c-compiler clang-14 \
+    --cxx-compiler clang++-16 \
+    --c-compiler clang-16 \
     --ymake-bin $(ya tool ymake --print-path) \
     --no-yt-store \
     -G -j 0 \
