@@ -11,7 +11,6 @@ import yatest.common
 
 import yalibrary.platform_matcher
 
-
 ENV_MARKER = "ENV"
 NAME_MARKER = "NAME"
 STD_IN_MARKER = "STDIN"
@@ -23,6 +22,7 @@ CANONIZE_DIR = "CANONIZE_DIR"
 CANONIZE_DIR_LOCALLY = "CANONIZE_DIR_LOCALLY"
 CWD_DIR = "CWD"
 DIFF_TOOL_MARKER = "DIFF_TOOL"
+DIFF_TOOL_TIMEOUT_MARKER = "DIFF_TOOL_TIMEOUT"
 PYTHON_BIN = "${PYTHON_BIN}"
 TEST_NAMES = []
 
@@ -68,7 +68,15 @@ def strip_markers(command):
     command = shlex.split(command)
     res_command = []
     markers_for_canonize = (CANONIZE_PATH, CANONIZE_FILE_LOCALLY, CANONIZE_DIR, CANONIZE_DIR_LOCALLY)
-    markers_with_values = (NAME_MARKER, STD_IN_MARKER, STD_OUT_MARKER, STD_ERR_MARKER, DIFF_TOOL_MARKER, CWD_DIR)
+    markers_with_values = (
+        NAME_MARKER,
+        STD_IN_MARKER,
+        STD_OUT_MARKER,
+        STD_ERR_MARKER,
+        DIFF_TOOL_MARKER,
+        DIFF_TOOL_TIMEOUT_MARKER,
+        CWD_DIR,
+    )
     markers_with_list_values = (ENV_MARKER,)
 
     while command:
@@ -204,6 +212,9 @@ def run(command):
     if diff_tool:
         diff_tool = diff_tool.split(" ")
         diff_tool[0] = yatest.common.binary_path(diff_tool[0])
+    diff_tool_timeout = None
+    if markers.get(DIFF_TOOL_TIMEOUT_MARKER):
+        diff_tool_timeout = int(markers.get(DIFF_TOOL_TIMEOUT_MARKER))
     with ios[STD_IN_MARKER]() as stdin, ios[STD_OUT_MARKER]() as stdout, ios[STD_ERR_MARKER]() as stderr:
         res = yatest.common.execute(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env, cwd=test_cwd)
 
@@ -222,6 +233,11 @@ def run(command):
 
             if len(markers[CANONIZE_PATH]) == 1:
                 path, local, is_dir = markers[CANONIZE_PATH][0]
-                return canonical_callbacks[is_dir](path, local=local, diff_tool=diff_tool)
+                return canonical_callbacks[is_dir](
+                    path, local=local, diff_tool=diff_tool, diff_tool_timeout=diff_tool_timeout
+                )
 
-            return [canonical_callbacks[d](f, local=a, diff_tool=diff_tool) for f, a, d in markers[CANONIZE_PATH]]
+            return [
+                canonical_callbacks[d](f, local=a, diff_tool=diff_tool, diff_tool_timeout=diff_tool_timeout)
+                for f, a, d in markers[CANONIZE_PATH]
+            ]
