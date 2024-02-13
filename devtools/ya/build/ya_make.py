@@ -31,6 +31,7 @@ import exts.tmp
 import exts.windows
 import exts.yjson as json
 
+from yalibrary.runner import patterns as ptrn
 from yalibrary.runner import uid_store
 from yalibrary.last_failed import last_failed
 from yalibrary.runner import ring_store
@@ -1754,6 +1755,9 @@ class YaMake(object):
 
         display = self.app_ctx.display
 
+        patterns = ptrn.Patterns()
+        patterns['SOURCE_ROOT'] = exts.path2.normpath(self.ctx.src_dir)
+
         if self.opts.ymake_bin and any(
             [self.opts.make_context_on_distbuild, self.opts.make_context_on_distbuild_only, self.opts.make_context_only]
         ):
@@ -1831,6 +1835,7 @@ class YaMake(object):
                         activate_callback,
                         output_replacements=self.ctx.output_replacements,
                         evlog=getattr(self.app_ctx, 'evlog', None),
+                        patterns=patterns,
                     )
                 else:
                     logger.debug("Exit from local runner by exception. No local executor, hence no distbuild started")
@@ -1873,7 +1878,12 @@ class YaMake(object):
                 stderr, links = distbs.extract_stderr(
                     desc, mds_read_account, download_stderr=self.opts.download_failed_nodes_stderr
                 )
-                return (u, six.ensure_str(stderr)), (u, links), (u, desc['status']), (u, desc.get('exit_code', 0))
+                return (
+                    (u, patterns.fix(six.ensure_str(stderr))),
+                    (u, links),
+                    (u, desc['status']),
+                    (u, desc.get('exit_code', 0)),
+                )
 
             default_download_thread_count = self.ctx.threads + (self.ctx.opts.yt_store_threads or 3)
             download_thread_count = self.opts.stderr_download_thread_count or default_download_thread_count

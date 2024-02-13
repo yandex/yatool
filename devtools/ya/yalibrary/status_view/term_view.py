@@ -49,6 +49,7 @@ class TermView(object):
         extra_progress=False,
         distbuild=False,
         output_replacements=None,
+        patterns=None,
     ):
         self._status = status
         self._display = display
@@ -64,7 +65,9 @@ class TermView(object):
             '[[c:yellow]]NO ACTIVE DISTBUILD TASKS[[rst]]' if distbuild else '[[c:yellow]]NO ACTIVE LOCAL TASKS[[rst]]'
         )
         self._last_status = self._default_status_configuration()
+        # TODO get rid of output_replacements and merge it with patterns
         self._output_replacements = output_replacements
+        self._patterns = patterns
 
     @staticmethod
     def _fmt(task):
@@ -96,6 +99,9 @@ class TermView(object):
 
     def _fmt_body(self, body):
         # type: (str) -> str
+        if self._patterns and body:
+            body = self._patterns.fix(body)
+
         if not self._output_replacements or not body:
             return body
 
