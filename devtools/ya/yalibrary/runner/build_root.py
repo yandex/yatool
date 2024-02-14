@@ -2,6 +2,7 @@ import errno
 import json
 import os
 import logging
+import subprocess
 import sys
 import threading
 import time
@@ -411,7 +412,10 @@ class BuildRootSet(object):
                 acquired = self._flock.acquire(blocking=False)
                 if acquired:
                     logger.debug('Removing root %s', self._build_root)
-                    fs.remove_tree_safe(self._build_root)
+                    try:
+                        subprocess.call(["rm", "-rf", fs.fix_path_encoding(self._build_root)])
+                    except OSError:
+                        fs.remove_tree_safe(self._build_root)
                 else:
                     logger.debug('Not removing root %s, lock was not acquired', self._build_root)
             finally:
