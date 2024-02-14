@@ -111,11 +111,22 @@ class AndroidEmulator(object):
                 env=self.env,
             )
 
+        def get_running_devices():
+            return process.execute(
+                self._get_adb_cmd() + ['devices'],
+                check_exit_code=False,
+                env=self.env,
+            )
+
         emulator_state = get_emulator_state()
         while emulator_state.stdout != 'device\n':
             logger.info('Emulator state stdout: {}'.format(emulator_state.stdout))
             logger.info('Emulator state stderr: {}'.format(emulator_state.stderr))
             time.sleep(1)
+            if emulator_state.stderr == "error: device '{}' not found\n".format(device_id):
+                devices = get_running_devices()
+                logger.info('Running devices stdout: {}'.format(devices.stdout))
+                logger.info('Running devices stderr: {}'.format(devices.stderr))
             emulator_state = get_emulator_state()
 
     def install_app(self, device_name, app_path, app_name):
