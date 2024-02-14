@@ -171,12 +171,15 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
             NEvent::TInvalidFile event;
             event.SetFile(TString(targetPath));
             event.SetReason("Stat failed: " + TString{LastSystemErrorText(err)});
-            TRACE(P, event);
+            FORCE_TRACE(P, event);
 
             TScopedContext context(0, targetPath, false); // We should try to re-stat such file every time
             YConfErr(BadFile) << "Cannot stat source file " << targetPath << ": " << LastSystemErrorText(err)  << " (" << err << ")"<< Endl;
 
-            return data.MarkNotFound(curStamp, true /* temporary */);
+            data.MarkNotFound(curStamp, true /* temporary */);
+            throw TNotImplemented() << "Stat errors make graph unreliable";
+            Y_UNREACHABLE();
+            // return data;
         }
     }
     Y_ASSERT(fileStat && fileStat->Mode && (fileStat->MTime || UseExternalChangesSource));
@@ -494,7 +497,7 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
     auto curStamp = TimeStamps.CurStamp();
 
     forceList = forceList && !DirData.contains(dirElemId);
-    if (!dirFData.IsDir || (!dirFData.CheckContent && (dirFData.IsContentUpdated(curStamp) || !forceList))) {
+    if (!dirFData.IsDir || dirFData.NotFound || (!dirFData.CheckContent && (dirFData.IsContentUpdated(curStamp) || !forceList))) {
         return;
     }
 
@@ -521,7 +524,9 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
         YConfErr(BadDir) << "Cannot read source directory " << dirName << ": " << SortedReadDir_.ReadFailedMessage();
 
         GetFileDataById(dirElemId).MarkUnreadable(CalcChecksum(dirName), curStamp);
-        return;
+        throw TNotImplemented() << "Readdir errors make graph unreliable";
+        Y_UNREACHABLE();
+        // return;
     }
 
     const ui32 REMOVED = TFileId::RemovedElemId();// Magic value for mark removed elements in directory items list
