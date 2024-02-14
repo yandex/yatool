@@ -77,7 +77,11 @@ class VSCodeProject(object):
 
         self.tool_platform = None
         if params.host_platform:
-            self.tool_platform = params.host_platform.split("-", 1)[1]
+            platform_parts = params.host_platform.split("-")
+            if len(platform_parts) > 2:
+                self.tool_platform = '-'.join(platform_parts[1:])
+            else:
+                self.tool_platform = params.host_platform
         elif params.darwin_arm64_platform:
             self.tool_platform = "darwin-arm64"
 
@@ -225,14 +229,16 @@ class VSCodeProject(object):
             )
         )
         if self.is_cpp:
-            settings["clangd.arguments"] = [
-                "--background-index",
+            clangd_arguments = [
                 "--compile-commands-dir={}".format(self.project_root),
                 "--header-insertion=never",
                 "--log=info",
                 "--pretty",
                 "-j=%s" % self.params.build_threads,
             ] + self.params.clangd_extra_args
+            if self.params.background_index_enabled:
+                clangd_arguments.insert(0, "--background-index")
+            settings["clangd.arguments"] = clangd_arguments
             settings["clangd.checkUpdates"] = True
 
         if self.is_py3:

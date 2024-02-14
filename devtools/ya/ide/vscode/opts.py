@@ -15,6 +15,7 @@ class VSCodeAllOptions(core.yarg.Options):
         self.write_pyright_config = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
+        self.background_index_enabled = True
         self.use_arcadia_root = False
         self.files_visibility = None
         self.goroot = None
@@ -116,6 +117,12 @@ class VSCodeAllOptions(core.yarg.Options):
                 ["--no-clangd-tidy"],
                 help="Disable clangd-tidy linting",
                 hook=core.yarg.SetConstValueHook("clang_tidy_enabled", False),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--no-background-index"],
+                help="Disable clangd background indexing",
+                hook=core.yarg.SetConstValueHook("background_index_enabled", False),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
