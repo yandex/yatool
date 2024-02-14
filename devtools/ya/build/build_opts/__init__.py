@@ -1209,7 +1209,7 @@ class IgnoreRecursesOptions(Options):
         return [
             ConfigConsumer('ignore_recurses'),
             ArgConsumer(
-                ['--ignore-recurses'],
+                ['--ignore-recurses', '-R'],
                 help='Do not build by RECURSES',
                 hook=SetConstValueHook('ignore_recurses', True),
                 group=OUTPUT_CONTROL_GROUP,

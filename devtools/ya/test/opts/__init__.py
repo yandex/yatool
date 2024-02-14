@@ -1790,7 +1790,7 @@ class JavaOptions(core.yarg.Options):
                 visible=help_level.HelpLevel.INTERNAL,
             ),
             TestArgConsumer(
-                ['--system-property', '-R'],
+                ['--system-property'],
                 help='Set system property (name=val)',
                 hook=core.yarg.DictPutHook('properties'),
                 subgroup=JAVA_SUBGROUP,
