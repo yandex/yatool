@@ -111,7 +111,7 @@
     --profile-test-tool=PROFILE_TEST_TOOL
                         Profile specified test_tool calls
 ```
-### "Расширенные опции" 
+### Расширенные опции 
 ```
     --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://wiki.yandex-team.ru/yatool/build-types (default: release)
     --host-build-type=HOST_BUILD_TYPE
