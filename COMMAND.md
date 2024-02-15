@@ -3,7 +3,8 @@
 Команды сборки интегрированы в универсальную утилиту `ya`.
 
 ## Основные сборочные инструменты
-[Основным сборочным инструментом является команда `ya make`]
+
+Основным сборочным инструментом является команда `ya make`
 
 Чтобы запустить сборку на своём ноутбуке достаточно выполнить команду `ya make <target>`, где `<target>` — директория проекта, который хочется построить.
 Сборка может быть *локальной* или *распределённой*. Бóльшая часть возможностей доступна как локально, так и в распределённой сборке, однако есть ряд особенностей, связанных с тем, как выполняется сборка.
@@ -12,14 +13,14 @@
 
 По умолчанию (без дополнительных опций) команда `ya make` работает в соответствии c
 
-- локальными настройками, описанными в файлах [`ya.conf`](https://docs.yandex-team.ru/yatool/commands/gen_config),
+- локальными настройками, описанными в файлах ya.conf
 - указанными переменными среды,
-- настройками в глобальном [ya.conf](https://a.yandex-team.ru/arc/trunk/arcadia/ya.conf),
 - глобальными умолчаниями
 - умолчаниями для системы, на которой запускается сборка.
 
   ## Опции
-### "Основные опции"
+  
+### Основные опции
 ```
     -d                  Debug build
     -r                  Release build
@@ -57,7 +58,7 @@
     --checkout          Checkout missing dirs
     -q, --quiet         Checkout silently (for svn)
 ```
-### "Опции запуска тестов"
+### Опции запуска тестов
 ```
   Testing options
    Run tests
@@ -141,15 +142,6 @@
                         Don't truncate logs on distbuild
     --test-keep-symlinks
                         Don't delete symlinks from test output
-   Tests over YT
-    --run-tagged-tests-on-yt
-                        Run tests marked with ya:yt tag on the YT
-    --ytexec-bin=YTEXEC_BIN
-                        use local ytexec binary
-    --ytexec-run        Use ytexec tool to run YT vanilla operations (should be used with "--run-tagged-tests-on-yt")
-   Tests over Sandbox
-    --run-tagged-tests-on-sandbox
-                        Run tests marked with ya:force_sandbox tag on the Sandbox
    Coverage
     --coverage (deprecated)
                         Collect coverage information. (deprecated alias for "--gcov --java-coverage --python-coverage --coverage-report")
@@ -203,7 +195,7 @@
     --profile-test-tool=PROFILE_TEST_TOOL
                         Profile specified test_tool handlers
 ```
-### "Расширенные опции"
+### Расширенные опции
 ```
     --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://wiki.yandex-team.ru/yatool/build-types (default: debug)
     -D=FLAGS            Set variables (name[=val], "yes" if val is omitted)
@@ -374,7 +366,7 @@
     -E, --download-artifacts
                         Download build artifacts when using distributed build
 ```
-### "Опции Java-сборки"
+### Опции Java-сборки
 ```
     --sonar             Analyze code with sonar.
     --sonar-project-filter=SONAR_PROJECT_FILTERS
@@ -405,7 +397,7 @@
     -J=JAVAC_FLAGS, --javac-opts=JAVAC_FLAGS
                         Set common javac flags (name=val)
 ```
-### "Опции авторизации"
+### Опции авторизации
 ```
     --key=SSH_KEYS      Path to private ssh key to exchange for OAuth token
     --token=OAUTH_TOKEN oAuth token
@@ -413,13 +405,13 @@
 ```
 ## Популярные рецепты
 
-* `ya make -r` - собрать код c оптимизациями и отладочной информацией ([Release](#build-type))
+* `ya make -r` - собрать код c оптимизациями и отладочной информацией 
 * `ya make -v` - собрать в verbose-режиме. **Обратите внимание:** `ya -v make` и `ya make -v` имеют разный эффект. Первая добавляет вывод утилиты `ya`, вторая — сборки.
 * `ya make -T` - собрать, не перезатирая выполняемые команды в выводе
-* `ya make --dist` - собрать код на кластере [распределённой сборки](dist.md)
+* `ya make --dist` - собрать код на кластере распределённой сборки
 * `ya make --add-result=".h" --add-result=".cpp"` - собрать, добавив в результаты сгенерированные в процессе сборки cpp- и h-файлы.
 * `ya make --add-result=".pb.h" --add-result=".pb.cc" --replace-result`- запустить только кодогенерацию протобуфов.
-* `ya make -t`  - запустить только [быстрые тесты](#tests)
-* `ya make -tL` - вывести список [быстрых тестов](#tests)
-* `ya make -A`  - запустить [все тесты](#tests)
+* `ya make -t`  - запустить только быстрые тесты
+* `ya make -tL` - вывести список быстрых тестов
+* `ya make -A`  - запустить все тесты
 * `ya make -h`  - посмотреть справку по всем опциям
