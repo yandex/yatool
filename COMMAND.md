@@ -19,7 +19,7 @@
 - умолчаниями для системы, на которой запускается сборка.
 
   ## Опции
-{% cut "Основные опции" %}
+### "Основные опции"
 ```
     -d                  Debug build
     -r                  Release build
@@ -57,9 +57,7 @@
     --checkout          Checkout missing dirs
     -q, --quiet         Checkout silently (for svn)
 ```
-{% endcut %}
-
-{% cut "Опции запуска тестов" %}
+### "Опции запуска тестов"
 ```
   Testing options
    Run tests
@@ -205,9 +203,7 @@
     --profile-test-tool=PROFILE_TEST_TOOL
                         Profile specified test_tool handlers
 ```
-{% endcut %}
-
-{% cut "Расширенные опции" %}
+### "Расширенные опции"
 ```
     --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://wiki.yandex-team.ru/yatool/build-types (default: debug)
     -D=FLAGS            Set variables (name[=val], "yes" if val is omitted)
@@ -378,9 +374,7 @@
     -E, --download-artifacts
                         Download build artifacts when using distributed build
 ```
-{% endcut %}
-
-{% cut "Опции Java-сборки" %}
+### "Опции Java-сборки"
 ```
     --sonar             Analyze code with sonar.
     --sonar-project-filter=SONAR_PROJECT_FILTERS
@@ -411,35 +405,12 @@
     -J=JAVAC_FLAGS, --javac-opts=JAVAC_FLAGS
                         Set common javac flags (name=val)
 ```
-{% endcut %}
-
-{% cut "Опции работы с Sandbox и MDS" %}
-```
-    --owner=RESOURCE_OWNER
-                        User name to own data saved to sandbox
-    --sandbox-url=SANDBOX_URL
-                        sandbox url to use for storing canonical file (default: https://sandbox.yandex-team.ru)
-    --task-kill-timeout=TASK_KILL_TIMEOUT
-                        Timeout in seconds for sandbox uploading task
-    --sandbox           Upload to Sandbox
-    --mds               Upload to MDS
-    --mds-host=MDS_HOST MDS Host (default: storage.yandex-team.ru)
-    --mds-port=MDS_PORT MDS Port (default: 80)
-    --mds-namespace=MDS_NAMESPACE
-                        MDS namespace (default: devtools)
-    --mds-token=MDS_TOKEN
-                        MDS Basic Auth token
-```
-{% endcut %}
-
-{% cut "Опции авторизации" %}
+### "Опции авторизации"
 ```
     --key=SSH_KEYS      Path to private ssh key to exchange for OAuth token
     --token=OAUTH_TOKEN oAuth token
     --user=USERNAME     Custom user name for authorization
 ```
-{% endcut %}
-
 ## Популярные рецепты
 
 * `ya make -r` - собрать код c оптимизациями и отладочной информацией ([Release](#build-type))
