@@ -103,6 +103,11 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         Diag()->TextLog = false;
     }
 
+    if (!PatchPath2.Empty()) {
+        PatchPath = PatchPath2;
+        ReadFileContentFromZipatch = ReadFileContentFromZipatch2;
+    }
+
     TCommandLineOptions::PostProcess(freeArgs);
     TStartUpOptions::PostProcess(freeArgs);
     TDebugOptions::PostProcess(freeArgs);

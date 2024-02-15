@@ -230,6 +230,8 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xskip-make-files", "skip make files for dumps").SetFlag(&SkipMakeFilesInDumps).NoArgument();
     opts.AddLongOption("xmark-make-files", "mark make files as makefile for dumps").SetFlag(&MarkMakeFilesInDumps).NoArgument();
     opts.AddLongOption("dump-pretty", "additional formatting in dumps").SetFlag(&DumpPretty).NoArgument();
+    opts.AddLongOption("xpatch-path", "use list of changes from patch (.zipatch) or from arc changelist (.cl)").StoreResult(&PatchPath2);
+    opts.AddLongOption("xapply-zipatch", "read file content from zipatch").SetFlag(&ReadFileContentFromZipatch2).NoArgument();
 
     auto dontWriteInternalCache = [this](){
         DontWriteInternalCache = true;

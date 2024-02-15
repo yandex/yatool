@@ -573,15 +573,6 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         return true;
     };
 
-    auto loadPatch = [&]() {
-        if (Conf.PatchPath) {
-            auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
-            if (changes) {
-                Names.FileConf.UseExternalChanges(std::move(changes));
-            }
-        }
-    };
-
     bool loadFsCache = Conf.ReadFsCache;
     bool loadDepsCache = Conf.ReadDepsCache;
     const char* info = nullptr;
@@ -644,8 +635,20 @@ bool TYMake::LoadImpl(const TFsPath& file) {
 
     TimeStamps.InitSession(Graph.GetFileNodeData());
 
-    loadPatch();
+    return true;
+}
 
+bool TYMake::LoadPatch() {
+    if (!Conf.PatchPath) {
+        return true;
+    }
+    if (TimeStamps.IsNeedNewSession()) { // if cache not loaded by Load() must init session
+        TimeStamps.InitSession(Graph.GetFileNodeData());
+    }
+    auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
+    if (changes) {
+        Names.FileConf.UseExternalChanges(std::move(changes));
+    }
     return true;
 }
 

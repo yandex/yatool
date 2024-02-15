@@ -73,6 +73,7 @@ void TYMake::SortAllEdges() {
 }
 
 void TYMake::PostInit() {
+    LoadPatch();
     IncParserManager.InitManager(Conf.ParserPlugins);
     Names.FileConf.InitAfterCacheLoading();
 }

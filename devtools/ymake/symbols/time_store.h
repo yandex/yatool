@@ -37,6 +37,10 @@ public:
     void Save(TMultiBlobBuilder& builder);
     void Load(TBlob& store);
 
+    bool IsNeedNewSession() const {
+        return NeedNewSession;
+    }
+
 private:
     struct TCntForPos;
     struct TStampMoveDesc;

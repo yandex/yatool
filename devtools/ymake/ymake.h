@@ -123,6 +123,7 @@ public:
 
     bool LoadImpl(const TFsPath& file);
     bool Load(const TFsPath& file);
+    bool LoadPatch();
     void LoadUids(TUidsCachable* uidsCachable);
     void Save(const TFsPath& file, bool delayed);
     void SaveUids(TUidsCachable* uidsCachable);
