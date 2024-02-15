@@ -230,14 +230,13 @@ class VSCodeProject(object):
         )
         if self.is_cpp:
             clangd_arguments = [
+                "--enable-config",
                 "--compile-commands-dir={}".format(self.project_root),
                 "--header-insertion=never",
                 "--log=info",
                 "--pretty",
-                "-j=%s" % self.params.build_threads,
+                "-j=%s" % self.params.clangd_index_threads,
             ] + self.params.clangd_extra_args
-            if self.params.background_index_enabled:
-                clangd_arguments.insert(0, "--background-index")
             settings["clangd.arguments"] = clangd_arguments
             settings["clangd.checkUpdates"] = True
 
@@ -428,6 +427,21 @@ class VSCodeProject(object):
                 workspace["settings"].update(
                     vscode.workspace.gen_clang_format_settings(self.params.arc_root, tool_fetcher)
                 )
+            if self.params.clangd_index_mode != "full":
+                with open(os.path.join(self.params.arc_root, ".clangd"), "w") as f:
+                    f.write(vscode.consts.CLANGD_BG_INDEX_DISABLED)
+                with open(os.path.join(self.codegen_cpp_dir, ".clangd"), "w") as f:
+                    f.write(vscode.consts.CLANGD_BG_INDEX_DISABLED)
+                if self.params.clangd_index_mode == "only-targets":
+                    for target in self.params.rel_targets:
+                        with open(os.path.join(self.params.arc_root, target, ".clangd"), "w") as f:
+                            f.write(vscode.consts.CLANGD_BG_INDEX_ENABLED)
+            else:
+                if os.path.exists(os.path.join(self.params.arc_root, ".clangd")):
+                    os.remove(os.path.join(self.params.arc_root, ".clangd"))
+                if os.path.exists(os.path.join(self.codegen_cpp_dir, ".clangd")):
+                    os.remove(os.path.join(self.codegen_cpp_dir, ".clangd"))
+
         if self.is_py3 and self.params.black_formatter_enabled:
             workspace["settings"].update(
                 vscode.workspace.gen_black_settings(

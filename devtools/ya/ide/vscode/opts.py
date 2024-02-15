@@ -15,7 +15,8 @@ class VSCodeAllOptions(core.yarg.Options):
         self.write_pyright_config = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
-        self.background_index_enabled = True
+        self.clangd_index_mode = "full"
+        self.clangd_index_threads = 0
         self.use_arcadia_root = False
         self.files_visibility = None
         self.goroot = None
@@ -120,9 +121,19 @@ class VSCodeAllOptions(core.yarg.Options):
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
-                ["--no-background-index"],
-                help="Disable clangd background indexing",
-                hook=core.yarg.SetConstValueHook("background_index_enabled", False),
+                ["--clangd-index-mode"],
+                help="Configure clangd background indexing (\"full\", \"only-targets\", \"disabled\")",
+                hook=core.yarg.SetValueHook(
+                    "clangd_index_mode",
+                    values=("full", "only-targets", "disabled"),
+                    default_value=lambda _: "full",
+                ),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--clangd-index-threads"],
+                help="clangd indexing threads count",
+                hook=core.yarg.SetValueHook('clangd_index_threads', int),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
@@ -203,3 +214,7 @@ class VSCodeAllOptions(core.yarg.Options):
             for lang in self.languages:
                 if lang not in ("CPP", "PY3", "GO"):
                     raise core.yarg.ArgsValidatingException("Unsupported language: %s" % lang)
+
+    def postprocess2(self, params):
+        if params.clangd_index_threads == 0:
+            params.clangd_index_threads = max(getattr(params, "build_threads", 1) // 2, 1)

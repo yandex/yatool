@@ -62,3 +62,7 @@ EXTENSIONS_BY_LANG = {
         "golang.go",
     ],
 }
+
+CLANGD_BG_INDEX_DISABLED = "Index:\n  Background: Skip\n"
+
+CLANGD_BG_INDEX_ENABLED = "Index:\n  Background: Build\n"
