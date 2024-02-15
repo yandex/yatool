@@ -376,14 +376,12 @@ def create_test_node(
         runner_cmd += ["--test-stdout"]
     if opts.custom_canondata_path:
         runner_cmd += ["--custom-canondata-path", opts.custom_canondata_path]
+
     # Don't add empty output if such type of python coverage can't be produced by node
-    py2deps, py3deps = False, False
+    pydeps = False
     if opts.python_coverage:
         for u, output in coverage.rigel.get_suite_binary_deps(suite, graph):
-            if graph.is_target_python2(u):
-                py2deps = True
-            elif graph.is_target_python3(u):
-                py3deps = True
+            pydeps |= graph.is_target_python3(u)
 
         if opts.coverage_prefix_filter:
             runner_cmd += ["--coverage-prefix-filter", opts.coverage_prefix_filter]
@@ -394,8 +392,7 @@ def create_test_node(
         for cov_opt, required, extra_args, output_name in [
             ("java_coverage", True, ["--java-coverage-path"], "java.coverage.tar"),
             ("go_coverage", True, ["--go-coverage-path"], "go.coverage.tar"),
-            ("python_coverage", py2deps, ["--python-coverage-path"], "py2.coverage.tar"),
-            ("python_coverage", py3deps, ["--python3-coverage-path"], "py3.coverage.tar"),
+            ("python_coverage", pydeps, ["--python3-coverage-path"], "py3.coverage.tar"),
             ("ts_coverage", True, ["--ts-coverage-path"], "ts.coverage.tar"),
             ("nlg_coverage", True, ["--nlg-coverage-path"], "unified.coverage.tar"),
             ("gcov_coverage", True, ["--gcov-coverage", "--cpp-coverage-path"], "coverage.tar"),
@@ -1324,7 +1321,6 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     }
     should_skip = {
         'coverage.tar': getattr(opts, 'gcov_coverage', False),
-        'py2.coverage.tar': getattr(opts, 'python_coverage', False),
         'py3.coverage.tar': getattr(opts, 'python_coverage', False),
     }
     files_to_skip = set()
@@ -1368,25 +1364,19 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
 
     if getattr(opts, 'python_coverage', False):
         # TODO move to the suite method, get rid of graph
-        py2deps, py3deps = False, False
+        pydeps = False
         if opts.python_coverage:
             for u, output in coverage.rigel.get_suite_binary_deps(suite, graph):
-                if graph.is_target_python2(u):
-                    py2deps = True
-                elif graph.is_target_python3(u):
-                    py3deps = True
+                pydeps |= graph.is_target_python3(u)
 
-        for required, prefix in [
-            (py2deps, "py2"),
-            (py3deps, "py3"),
-        ]:
-            filename = "{}.coverage.tar".format(prefix)
+        if pydeps:
+            filename = "py3.coverage.tar"
             output_path = os.path.join(out_dir, filename)
             cmd = util_tools.get_test_tool_cmd(opts, "merge_python_coverage", suite.global_resources) + [
                 "--output",
                 output_path,
                 "--name-filter",
-                ":{}:cov".format(prefix),
+                ":py3:cov",
             ]
             for dirname in cov_inputs[filename]:
                 cmd += ["--coverage-path", dirname]

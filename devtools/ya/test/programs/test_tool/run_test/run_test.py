@@ -463,7 +463,6 @@ def parse_args(args=None):
     parser.add_argument("--clang-coverage", dest="clang_coverage", action='store_true', default=None)
     parser.add_argument("--go-coverage-path", dest="go_coverage_path", default=None)
     parser.add_argument("--fast-clang-coverage-merge", dest="fast_clang_coverage_merge", action="store")
-    parser.add_argument("--python-coverage-path", dest="python_coverage_path", default=None)
     parser.add_argument("--python3-coverage-path", dest="python3_coverage_path", default=None)
     parser.add_argument("--ts-coverage-path", dest="ts_coverage_path", default=None)
     parser.add_argument("--nlg-coverage-path", dest="nlg_coverage_path", default=None)
@@ -935,7 +934,6 @@ def create_empty_outputs(params, overwrite=True):
         params.go_coverage_path,
         params.java_coverage_path,
         params.nlg_coverage_path,
-        params.python_coverage_path,
         params.python3_coverage_path,
         params.ts_coverage_path,
         params.tar,
@@ -1414,8 +1412,6 @@ def main():
         coverage = {}
         if options.java_coverage_path:
             coverage["java"] = {"output_file": options.java_coverage_path}
-        if options.python_coverage_path:
-            coverage["python"] = {"output_file": options.python_coverage_path}
         if options.python3_coverage_path:
             coverage["python3"] = {"output_file": options.python3_coverage_path}
         if options.ts_coverage_path:
@@ -1439,16 +1435,13 @@ def main():
         if coverage.get("go"):
             env.set_mandatory(const.COVERAGE_GO_ENV_NAME, "%s/cov_{pid}_{time}" % coverage["go"]["output_dir"])
 
-        if coverage.get("python") or coverage.get("python3"):
-            if "python" in coverage:
-                path = coverage["python"]["output_dir"]
-            else:
-                path = coverage["python3"]["output_dir"]
+        if coverage.get("python3"):
+            path = coverage["python3"]["output_dir"]
 
             dirname, basename = os.path.split(path)
-            assert basename.startswith(("py2.", "py3.")), basename
+            assert basename.startswith("py3."), basename
             # Don't mix coverage from different pythons in one directory
-            basename = basename.replace("py2.", "py{python_ver}.").replace("py3.", "py{python_ver}.")
+            basename = basename.replace("py3.", "py{python_ver}.")
             env.set_mandatory(const.COVERAGE_PYTHON_ENV_NAME, "%s/%s/{bin}:py{python_ver}:cov" % (dirname, basename))
             env.set_mandatory(const.PYTHON_COVERAGE_PREFIX_FILTER_ENV_NAME, options.coverage_prefix_filter)
             env.set_mandatory(const.PYTHON_COVERAGE_EXCLUDE_REGEXP_ENV_NAME, options.coverage_exclude_regexp)
