@@ -61,7 +61,7 @@ def check_bucket_creds():
     if not os.path.isfile(gradle_props):
         return False, 'file gradle.properties does not exist'
     with open(gradle_props) as f:
-        props = f.readlines()
+        props = f.read()
     for p in requires_props:
         if p not in props:
             return False, 'property {} is not defined in gradle.properties file'.format(p)
@@ -136,9 +136,10 @@ def apply_graph(params, sem_graph, gradle_project_root):
             opts.rel_targets.append(rel_dir)
             opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
 
-        listeners = []
-        ev_listener = ya_make.compose_listeners(*listeners)
-        graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, ev_listener=ev_listener, display=app_ctx.display)
+        logger.info("Making building graph with opts\n")
+        graph, _, _, _, _ = bg.build_graph_and_tests(
+            opts, check=True, ev_listener=ya_make.get_print_listener(opts, app_ctx.display), display=app_ctx.display
+        )
         builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
         exit_code = builder.go()
         if exit_code != 0:
@@ -216,6 +217,8 @@ def do_gradle(params):
         'USE_PREBUILT_TOOLS': 'no',
     }
     params.flags.update(flags)
+    # to avoid problems with proto
+    params.ya_make_extra.append('-DBUILD_LANGUAGES=JAVA')
 
     conf = build_facade.gen_conf(
         build_root=handler_root,
