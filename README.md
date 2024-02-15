@@ -1,9 +1,8 @@
 # Yatool
 
-Yatool is a cross-platform distribution, building, testing, and debugging toolkit focused on monorepositories.
+Yatool - это кроссплатформенный инструментарий для распространения, сборки, тестирования и отладки, ориентированный на монорепозитарии.
 
-All utilities are available for use through a single entry point `ya`.
-The main handler in `ya` utility is `make`, which is a high-level universal build system.
+Все утилиты доступны для использования через единую точку входа ya. Основным обработчиком в ya утилите является make, которая представляет собой универсальную систему сборки высокого уровня.
 
 ## ya make
 
