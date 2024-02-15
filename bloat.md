@@ -4,7 +4,7 @@
 Проанализировать состав бинарного кода.
 
 ```
-cd arc/path/myexecutable
+cd myrepo/path/myexecutable
 ya make ... -DDUMP_LINKER_MAP
 ya tool bloat -i myexecutable -m myexecutable.map.lld
 # Зайти в браузере на указанный порт
