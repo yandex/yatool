@@ -2553,6 +2553,7 @@ def _gen_upload_node(opts, nd):
         'deps': [nd['uid']],
         'tag': node_tag,
         'cache': False,
+        'backup': True,
         'requirements': {'network': 'full'},
         'secrets': ['YT_YNDEXER_YT_TOKEN'],
         'timeout': 60 * 60,
