@@ -514,16 +514,16 @@ namespace {
 
         std::string ConvertArg(std::string arg) {
             if (arg.starts_with(YMAKE_SOURCE_PREFIX)) {
-                return fmt::format("${{CMAKE_SOURCE_DIR}}/{}", arg.substr(YMAKE_SOURCE_PREFIX.size()));
+                return fmt::format("${{PROJECT_SOURCE_DIR}}/{}", arg.substr(YMAKE_SOURCE_PREFIX.size()));
             } else if (arg.starts_with(YMAKE_BUILD_PREFIX)) {
-                return fmt::format("${{CMAKE_BINARY_DIR}}/{}", arg.substr(YMAKE_BUILD_PREFIX.size()));
+                return fmt::format("${{PROJECT_BINARY_DIR}}/{}", arg.substr(YMAKE_BUILD_PREFIX.size()));
             } else if (arg == "$B") {
-                return "${CMAKE_BINARY_DIR}";
+                return "${PROJECT_BINARY_DIR}";
             } else if (arg == "$S") {
-                return "${CMAKE_SOURCE_DIR}";
+                return "${PROJECT_SOURCE_DIR}";
             } else if (!Tools.empty()) {
                 TStringBuf toolRelPath;
-                if (TStringBuf(arg).AfterPrefix("${CMAKE_BINARY_DIR}/"sv, toolRelPath)) {
+                if (TStringBuf(arg).AfterPrefix("${PROJECT_BINARY_DIR}/"sv, toolRelPath)) {
                     TStringBuf arcadiaPath;
                     TStringBuf toolName;
                     SplitToolPath(TStringBuf(toolRelPath), arcadiaPath, toolName);
@@ -733,7 +733,7 @@ namespace {
                     }
                 }
                 // ${tool;rootrel:...} is broken :(
-                const auto fres = TargetsDict.find(std::string_view(semArgs[1]).substr("${CMAKE_BINARY_DIR}/"sv.size()));
+                const auto fres = TargetsDict.find(std::string_view(semArgs[1]).substr("${PROJECT_BINARY_DIR}/"sv.size()));
                 if (fres == TargetsDict.end()) {
                     const auto* curTarget = ProjectBuilder_->CurrentTarget();
                     spdlog::error("No proto plugin tool found '{}' for target '{}'", semArgs[1], curTarget ? curTarget->Name : "NO_TARGET");
