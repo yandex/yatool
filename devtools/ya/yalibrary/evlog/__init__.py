@@ -5,10 +5,11 @@ import six
 import sys
 import threading
 import time
+import zstandard as zstd
 
 from exts import fs
-from exts import yjson
 from exts import os2
+from exts import yjson
 
 
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
@@ -56,7 +57,10 @@ class Evlog(object):
         self._filename = filename
         fs.create_dirs(os.path.join(evlog_dir, chunk_name))
         self.path = os.path.join(evlog_dir, chunk_name, filename)
-        self._fileobj = open(self.path, 'w')
+        if filename.endswith('.zstd'):
+            self._fileobj = zstd.open(filename, 'w', cctx=zstd.ZstdCompressor(level=1))
+        else:
+            self._fileobj = open(self.path, 'w')
         self._lock = threading.Lock()
 
         self._replacements = []
