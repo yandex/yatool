@@ -1,28 +1,9 @@
 import os
-import tarfile
 import errno
 
 from build.plugins.lib.nots.package_manager.base import PackageJson
 from build.plugins.lib.nots.package_manager.base.utils import build_pj_path
 from build.plugins.lib.nots.typescript import TsConfig, DEFAULT_TS_CONFIG_FILE
-
-
-# TODO: Somehow reuse extract_node_modules from node_modules_bundler after FBP-32.
-def extract_node_modules(build_root, node_modules_path, bundle_path):
-    if not os.path.isfile(bundle_path):
-        return
-
-    with tarfile.open(bundle_path) as tf:
-        tf.extractall(node_modules_path)
-
-    with open(os.path.join(node_modules_path, ".peers", "index")) as f:
-        peers = f.read().split("\n")
-        for p in peers:
-            if not p:
-                continue
-            bundled_nm_path = os.path.join(node_modules_path, ".peers", p, "node_modules")
-            nm_path = os.path.join(build_root, p, "node_modules")
-            os.rename(bundled_nm_path, nm_path)
 
 
 def link_test_data(build_root, source_root, test_for_path, dirs, dirs_rename):

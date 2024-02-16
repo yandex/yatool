@@ -6,11 +6,9 @@ PY_SRCS(
     tools.py
     CYTHONIZE_PY
     path.py
-    ts_utils.py
 )
 
 PEERDIR(
-    build/plugins/lib/nots
     devtools/ya/test/const
     devtools/ya/test/system/process
     devtools/ya/yalibrary/formatter
