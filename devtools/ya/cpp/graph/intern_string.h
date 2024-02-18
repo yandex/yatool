@@ -15,7 +15,7 @@
 namespace NYa::NGraph {
     // Hash with open addressing.
     // Algorithm D from Knuth Vol. 3, Sec. 6.4.
-    // Idea of internal stuctures is got from Python 3 dict implementation (contrib/tools/python3/src/Objects/dictobject.c)
+    // Idea of internal stuctures is got from Python 3 dict implementation (contrib/tools/python3/Objects/dictobject.c)
     class TInternStringStoragePartition {
     public:
         using TIndex = i32;
