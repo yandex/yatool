@@ -28,6 +28,12 @@ class Action(object):
     def __lt__(self, other):
         return self.prio() > other.prio()
 
+    def __str__(self):
+        return "Action({})".format(self._action)
+
+    def __repr__(self):
+        return str(self)
+
     def res(self):
         return self._res
 
