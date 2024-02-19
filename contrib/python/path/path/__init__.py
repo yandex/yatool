@@ -52,6 +52,7 @@ with contextlib.suppress(ImportError):
 from . import matchers
 from . import masks
 from . import classes
+from .compat.py38 import removesuffix
 
 
 __all__ = ['Path', 'TempDir']
@@ -277,11 +278,28 @@ class Path(str):
         base, ext = self.module.splitext(self.name)
         return base
 
+    def with_stem(self, stem):
+        """Return a new path with the stem changed.
+
+        >>> Path('/home/guido/python.tar.gz').with_stem("foo")
+        Path('/home/guido/foo.gz')
+        """
+        return self.with_name(stem + self.suffix)
+
+    @property
+    def suffix(self):
+        """The file extension, for example ``'.py'``."""
+        f, suffix = self.module.splitext(self)
+        return suffix
+
     @property
     def ext(self):
-        """The file extension, for example ``'.py'``."""
-        f, ext = self.module.splitext(self)
-        return ext
+        warnings.warn(
+            ".ext is deprecated; use suffix",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.suffix
 
     def with_suffix(self, suffix):
         """Return a new path with the file suffix changed (or added, if none)
@@ -337,6 +355,14 @@ class Path(str):
         .. seealso:: :meth:`basename`, :func:`os.path.basename`
         """,
     )
+
+    def with_name(self, name):
+        """Return a new path with the name changed.
+
+        >>> Path('/home/guido/python.tar.gz').with_name("foo.zip")
+        Path('/home/guido/foo.zip')
+        """
+        return self._next_class(removesuffix(self, self.name) + name)
 
     def splitpath(self):
         """Return two-tuple of ``.parent``, ``.name``.
