@@ -18,13 +18,6 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-IF (NEBIUS)
-    PEERDIR(
-        devtools/ya/yalibrary/yandex/sandbox
-        devtools/ya/yalibrary/tasklet_resources_fetcher
-    )
-ENDIF()
-
 STYLE_PYTHON()
 
 PY_SRCS(

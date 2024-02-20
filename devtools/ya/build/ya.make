@@ -80,12 +80,6 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-IF (NEBIUS)
-    PEERDIR(
-        devtools/ya/yalibrary/streaming_client
-    )
-ENDIF()
-
 END()
 
 RECURSE(

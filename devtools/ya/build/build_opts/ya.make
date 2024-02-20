@@ -26,11 +26,4 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-IF (NEBIUS)
-    PEERDIR(
-        devtools/ya/build/build_opts/build_graph_cache
-        devtools/ya/build/build_opts/distbs
-    )
-ENDIF()
-
 END()

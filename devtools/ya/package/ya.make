@@ -64,17 +64,6 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-IF (NEBIUS)
-    PY_SRCS(
-        NAMESPACE package
-        sandbox_source.py
-        sandbox_postprocessor.py
-    )
-    PEERDIR(
-        devtools/ya/yalibrary/yandex/sandbox
-    )
-ENDIF()
-
 IF (NOT OS_WINDOWS)
     PEERDIR(
         contrib/python/python-magic

@@ -31,13 +31,6 @@ PEERDIR(
     devtools/ya/yalibrary/showstack
 )
 
-IF (NEBIUS)
-    PEERDIR(
-        devtools/ya/yalibrary/yandex/sandbox
-        devtools/ya/yalibrary/tasklet_resources_fetcher
-    )
-ENDIF()
-
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/oauth

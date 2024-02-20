@@ -12,7 +12,7 @@ PEERDIR(
     devtools/ya/core/config
 )
 
-IF (NOT OPENSOURCE OR NEBIUS)
+IF (NOT OPENSOURCE)
     PEERDIR(devtools/ya/yalibrary/yandex/sandbox)
 ENDIF()
 
