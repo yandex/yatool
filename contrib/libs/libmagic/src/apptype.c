@@ -38,7 +38,7 @@ FILE_RCSID("@(#)$File: apptype.c,v 1.17 2022/12/26 17:31:14 christos Exp $")
 #define INCL_DOSSESMGR
 #define INCL_DOSERRORS
 #define INCL_DOSFILEMGR
-#include <os2.h>
+#error #include <os2.h>
 typedef ULONG   APPTYPE;
 
 file_protected int
