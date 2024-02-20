@@ -412,8 +412,22 @@ class BuildRootSet(object):
                 acquired = self._flock.acquire(blocking=False)
                 if acquired:
                     logger.debug('Removing root %s', self._build_root)
+                    # XXX See DEVTOOLSSUPPORT-41205
                     try:
-                        subprocess.call(["rm", "-rf", fs.fix_path_encoding(self._build_root)])
+                        import signal
+                        from library.python.prctl import prctl
+
+                        def pdeath():
+                            prctl.set_pdeathsig(signal.SIGTERM)
+
+                    except ImportError:
+                        pdeath = None
+
+                    try:
+                        subprocess.call(
+                            ["rm", "-rf", fs.fix_path_encoding(self._build_root)],
+                            preexec_fn=pdeath,
+                        )
                     except OSError:
                         fs.remove_tree_safe(self._build_root)
                 else:

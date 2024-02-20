@@ -37,6 +37,12 @@ PEERDIR(
     library/python/reservoir_sampling
 )
 
+IF (OS_LINUX)
+    PEERDIR(
+        library/python/prctl
+    )
+ENDIF()
+
 IF(NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/runner/tasks/distbuild
