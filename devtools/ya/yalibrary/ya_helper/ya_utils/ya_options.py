@@ -161,6 +161,7 @@ class YaMakeOptions(YaBaseOptions):
         self.keep_build = self._pop('keep_build')
         self.build_root = self._pop('build_root')
         self.output_dir = self._pop('output_dir')
+        self.build_results_report = self._pop('build_result_report')
         self.targets = self._pop('targets')
         self.rebuild = self._pop('rebuild')
 
@@ -464,8 +465,8 @@ class YaMakeOptions(YaBaseOptions):
             result += ['--build-custom-json', self.build_custom_json]
         if self.custom_context:
             result += ['--custom-context', self.custom_context]
-        if not self.streaming_url or not self.streaming_id:
-            result += ['--build-results-report', 'build-results-report.json']
+        if self.build_results_report:
+            result += ['--build-results-report', self.build_results_report]
         if self.add_modules_to_results:
             result += ['--add-modules-to-results']
         if self.do_not_output_stderrs:
