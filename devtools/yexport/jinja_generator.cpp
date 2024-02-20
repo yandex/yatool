@@ -381,16 +381,16 @@ public:
                     }
                 }
                 const auto fromTarget = Mod2Target_[dep.From().Id()];
-                bool test2test = fromTarget && fromTarget->IsTest() && toTarget && toTarget->IsTest();
+                bool isTestDep = fromTarget && toTarget && toTarget->IsTest();
                 for (const auto& [attrName, value]: libIt->second) {
-                    if (value.isMap() && (!excludes.empty() || test2test)) {
+                    if (value.isMap() && (!excludes.empty() || isTestDep)) {
                         // For each induced attribute in map format add submap with excludes
                         jinja2::ValuesMap valueWithDepAttrs = value.asMap();
                         if (!excludes.empty()) {
                             valueWithDepAttrs.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
                         }
-                        if (test2test) {
-                            valueWithDepAttrs.emplace(TJinjaGenerator::TEST2TEST_ATTR, toTarget->TestModDir);
+                        if (isTestDep) {
+                            valueWithDepAttrs.emplace(TJinjaGenerator::TESTDEP_ATTR, toTarget->TestModDir);
                         }
                         JinjaProjectBuilder_->AddToTargetInducedAttr(attrName, valueWithDepAttrs, data.Path);
                     } else {

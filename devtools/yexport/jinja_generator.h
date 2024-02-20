@@ -48,8 +48,8 @@ using TJinjaProjectPtr = TSimpleSharedPtr<TJinjaProject>;
 class TJinjaGenerator : public TSpecBasedGenerator {
 public:
     class TBuilder;
-    static constexpr std::string_view EXCLUDES_ATTR = "excludes";   // Lists of excludes induced attributes
-    static constexpr std::string_view TEST2TEST_ATTR = "test2test"; // Flag of dependency test to test
+    static constexpr std::string_view EXCLUDES_ATTR = "excludes"; // Lists of excludes induced attributes
+    static constexpr std::string_view TESTDEP_ATTR = "testdep";   // Dependency to test, if not empty, attr has path to library with test inside
 
     static THolder<TJinjaGenerator> Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir = "");
 
