@@ -1,9 +1,9 @@
 from __future__ import absolute_import
-import os
 import subprocess
 
 import six
 
+import build.plugins.lib.tests.ruff as ruff_configs
 import core
 import exts
 import yalibrary
@@ -35,18 +35,12 @@ def get_ruff_config(path):
     arc_root = core.config.find_root(fail_on_error=False)
     if arc_root is None:
         raise RuntimeError('Can\'t find arcadia root, so can\'t find config for ruff')
-    relative_path = os.path.relpath(path, arc_root)
     config_paths = get_config_paths()
 
-    # find longest path
-    deepest_path = ''
-    for p in config_paths.keys():
-        if relative_path.startswith(p) and len(p) > len(deepest_path):
-            deepest_path = p
-    if deepest_path:
-        config = config_paths[deepest_path]
-        full_config_path = os.path.join(arc_root, config)
+    full_config_path = ruff_configs.get_ruff_config(path, config_paths, arc_root)
+    if full_config_path:
         return load_ruff_config(full_config_path, None)
+
     return load_ruff_config(None, default_ruff_config())
 
 
