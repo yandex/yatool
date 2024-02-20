@@ -33,7 +33,7 @@ SRC(src/blake2b-ref.c -DSUFFIX=_ref)
 
 SRC(src/blake2s-ref.c -DSUFFIX=_ref)
 
-IF (ARCH_X86_64)
+IF (ARCH_X86_64 OR ARCH_I686)
     SRC_C_AVX(src/blake2b.c -DSUFFIX=_avx)
     SRC_C_SSE2(src/blake2b.c -DSUFFIX=_sse2)
     SRC_C_SSE41(src/blake2b.c -DSUFFIX=_sse41)
