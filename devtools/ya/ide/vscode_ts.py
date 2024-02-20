@@ -121,7 +121,7 @@ def get_workspace_template(params, YA_PATH):
                         ('editor.defaultFormatter', 'esbenp.prettier-vscode'),
                         ("forbeslindesay-taskrunner.separator", ": "),
                         ('git.mergeEditor', False),
-                        ('jest.autoRun', OrderedDict((('watch', False),))),
+                        ('jest.runMode', "on-demand"),
                         ('npm.autoDetect', 'off'),
                         ('npm.packageManager', 'pnpm'),
                         ('remote.autoForwardPorts', True),
