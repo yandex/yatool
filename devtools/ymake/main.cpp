@@ -151,7 +151,7 @@ namespace {
 }
 
 static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
-    NYMake::TTraceStageWithTimer("Configure graph", MON_NAME(EYmakeStats::ConfigureGraphTime));
+    NYMake::TTraceStageWithTimer configureTimer("Configure graph", MON_NAME(EYmakeStats::ConfigureGraphTime));
     try {
         yMake->BuildDepGraph();
     } catch (const TNotImplemented& e) {
@@ -171,7 +171,7 @@ static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
 }
 
 static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
-    NYMake::TTraceStageWithTimer("Configure readonly graph", MON_NAME(EYmakeStats::ConfigureReadonlyGraphTime));
+    NYMake::TTraceStageWithTimer configureTimer("Configure readonly graph", MON_NAME(EYmakeStats::ConfigureReadonlyGraphTime));
     TBuildConfiguration& conf = yMake->Conf;
     for (size_t i = 0; i < conf.StartDirs.size(); ++i) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(conf.StartDirs[i]), NPath::Source);

@@ -676,13 +676,13 @@ void ExportJSON(TYMake& yMake) {
     conf.EnableRealPathCache(&yMake.Names.FileConf);
 
     {
-        NYMake::TTraceStageWithTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
+        NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
         NJson::TJsonWriter jsonWriter(output.Get(), false);
         TMakePlan plan(jsonWriter);
 
-        NYMake::TTraceStageWithTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
+        NYMake::TTraceStageWithTimer renderJsonTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
         RenderJSONGraph(yMake, plan);
     }
 
