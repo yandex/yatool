@@ -27,7 +27,7 @@ namespace NYMake {
     }
 
 namespace NYMake {
-    class TTraceStage {
+    class [[nodiscard]] TTraceStage {
     public:
         TTraceStage(const TString& stage)
             : Stage_(stage)
@@ -41,7 +41,7 @@ namespace NYMake {
         const TString Stage_;
     };
 
-    class TTraceStageWithTimer : public TTraceStage {
+    class [[nodiscard]] TTraceStageWithTimer : public TTraceStage {
     public:
         TTraceStageWithTimer(const TString& stage, const TString& monName)
             : TTraceStage(stage)

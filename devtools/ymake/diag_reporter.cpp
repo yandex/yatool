@@ -127,7 +127,7 @@ bool TRecurseConfigureErrorReporter::Enter(TState& state) {
 }
 
 void TYMake::ReportConfigureEvents() {
-    NYMake::TTraceStage{"Report Configure Events"};
+    NYMake::TTraceStage scopeTracer{"Report Configure Events"};
     TConfigureEventsReporter errorReporter(Names, Modules, Conf.RenderSemantics);
     IterateAll(Graph, StartTargets, errorReporter, [](const TTarget& t) -> bool {
         return t.IsModuleTarget;
