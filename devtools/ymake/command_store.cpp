@@ -48,7 +48,16 @@ namespace {
 
         TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
             // TBD what about vector vars here?
-            return Vars.EvalValue(Values.GetVarName(id));
+            auto name = Values.GetVarName(id);
+            auto var = Vars.Lookup(name);
+            if (!var || var->empty()) {
+                // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
+                // note that the extra braces in the result are significant:
+                // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
+                auto result = TString(fmt::format("${{{}}}", name));
+                return Values.GetValue(Values.InsertStr(result));
+            }
+            return Eval1(var);
         }
 
         TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<NPolexpr::TConstId> args) {
