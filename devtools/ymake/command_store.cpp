@@ -80,9 +80,6 @@ namespace {
                 for(auto&& arg : args)
                     unwrappedArgs.push_back(Values.GetValue(arg));
 
-                if (unwrappedArgs.size() < 1)
-                    throw std::runtime_error{"Invalid number of arguments"};
-
                 // TODO: get rid of escaping in Args followed by unescaping in Input/Output
 
                 switch (fnIdx) {
@@ -456,10 +453,16 @@ void TCommands::InlineScalarTerms(
                             auto depth = VarRecursionDepth.try_emplace(name, 0).first;
                             auto& thatDef = thatVar->second[depth->second];
                             if (thatDef.Commands.size() == 0)
-                                return false;
+                                return true;
                             if (thatDef.Commands.size() != 1)
                                 ythrow TError() << "unexpected multicommand in a substitution";
-                            newSub.Body = thatDef.Commands[0]; // CAVEAT: no deep substitution, including recursion for SET_APPEND
+                            NCommands::TSyntax newBody;
+                            TCmdWriter newWriter(newBody);
+                            auto bump = TCounterBump(depth->second);
+                            InlineCommands(thatDef.Commands, vars, newWriter);
+                            if (newBody.Commands.size() != 1)
+                                ythrow TError() << "totally unexpected multicommand in a substitution";
+                            newSub.Body = std::move(newBody.Commands[0]);
                             return true;
                         }
                     }
@@ -486,7 +489,7 @@ void TCommands::InlineArguments(
         auto depth = VarRecursionDepth.try_emplace(name, 0).first;
         auto& thatDef = thatVar->second[depth->second];
         if (thatDef.Commands.size() == 0)
-            return false;
+            return true;
         if (thatDef.Commands.size() != 1)
             ythrow TError() << "unexpected multicommand substitution";
         auto bump = TCounterBump(depth->second);
