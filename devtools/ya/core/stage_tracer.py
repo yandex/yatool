@@ -25,7 +25,7 @@ class Consumer:
 
     @abstractmethod
     def finish(self, name, start_time, finish_time):
-        # type: (str, float|None, float) -> None
+        # type: (str, float | None, float) -> None
         """finish stage with name started at the start_time and finished at the finish_time"""
         raise NotImplementedError()
 
@@ -36,7 +36,7 @@ class StagesProfilerConsumer(Consumer):
         stages_profiler.stage_started(name, start_time)
 
     def finish(self, name, start_time, finish_time):
-        # type: (str, float|None, float) -> None
+        # type: (str, float | None, float) -> None
         stages_profiler.stage_finished(name, finish_time)
 
 
@@ -46,7 +46,7 @@ class ProfilerConsumer(Consumer):
         profiler.profile_step_started(name, start_time)
 
     def finish(self, name, start_time, finish_time):
-        # type: (str, float|None, float) -> None
+        # type: (str, float | None, float) -> None
         profiler.profile_step_finished(name, finish_time)
 
 
@@ -61,7 +61,7 @@ class EvLogConsumer(Consumer):
         pass
 
     def finish(self, name, start_time, finish_time):
-        # type: (str, float|None, float) -> None
+        # type: (str, float | None, float) -> None
         if start_time and not self.__evlog.closed:
             event = {
                 '_typename': 'stage-finished',
@@ -78,7 +78,7 @@ class StageTracer(object):
 
     class Stat(object):
         def __init__(self, intervals=None, duration=None):
-            # type: (list[tuple[float, float]]|None, float|None) -> None
+            # type: (list[tuple[float, float]] | None, float | None) -> None
             self.intervals = intervals or []  # type: list[(float, float)]
             self.duration = duration or 0.0  # type: float
 
@@ -94,7 +94,7 @@ class StageTracer(object):
             self.__finished = False
 
         def finish(self, finish_time=None):
-            # type: (float|None) -> None
+            # type: (float | None) -> None
             if not self.__finished:
                 self.__stager.finish(self.__name, self.__group, finish_time)
                 self.__finished = True
@@ -180,13 +180,13 @@ class StageTracer(object):
     _FinishEvent = collections.namedtuple("Event", ["name", "group", "time", "start_time"])
 
     def _add_event(self, event):
-        # type: (StageTracer.StartEvent|StageTracer.FinishEvent) -> None
+        # type: (StageTracer.StartEvent | StageTracer.FinishEvent) -> None
         self.__events.append(event)
         self._consume_event(event, self.__consumers)
 
     @staticmethod
     def _consume_event(event, consumers):
-        # type: (StageTracer._StartEvent|StageTracer._FinishEvent, list[Consumer]) -> None
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent, list[Consumer]) -> None
         for consumer in consumers:
             if isinstance(event, StageTracer._StartEvent):
                 consumer.start(event.name, event.time)
