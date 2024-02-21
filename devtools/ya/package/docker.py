@@ -66,6 +66,7 @@ def create_package(
     add_host,
     target,
     docker_secret,
+    labels=None,
 ):
     image_full_name = get_image_name(registry, repository, package_name, package_version)
 
@@ -105,6 +106,10 @@ def create_package(
                 build_command += ["--build-arg", k]
             else:
                 build_command += ["--build-arg", "{}={}".format(k, v)]
+
+    if labels:
+        for k, v in labels.items():
+            build_command += ["--label", "{}={}".format(k, v)]
 
     if buildx_required:
         build_command = ["buildx"] + build_command

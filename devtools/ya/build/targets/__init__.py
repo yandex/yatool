@@ -1,8 +1,12 @@
 import os
+import logging
 
 import yalibrary.find_root
 
 from build import makelist
+
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidTargetSpecification(Exception):
@@ -25,6 +29,7 @@ def resolve(source_root, targets, cwd=None, root_detector=None):
                 'Cannot find common Arcadia root for all targets. Found roots: {}'.format(unique_roots)
             )
         elif len(unique_roots) == 0:
+            logger.debug("Cannot find Arcadia root (%s, %s, %s)", source_root, targets, cwd)
             raise InvalidTargetSpecification('Cannot find Arcadia root. Try to run command in Arcadia directory')
         return unique_roots[0]
 

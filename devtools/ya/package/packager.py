@@ -562,12 +562,18 @@ def format_package_meta(meta_value, formatters):
     try:
         meta_value = meta_value.format(**formatters)
     except KeyError as e:
-        raise Exception("Can not substitute `{}`".format(e))
+        raise Exception("Can not substitute `{}`. val: {} formatters: {}".format(e, meta_value, formatters))
     return meta_value
 
 
 @timeit
-def create_package(arcadia_root, output_root, package_root, parsed_package, builds, params, formatters):
+def create_package(package_context, output_root, builds):
+    arcadia_root = package_context.arcadia_root
+    package_root = package_context.package_root
+    parsed_package = package_context.parsed_package
+    params = package_context.params
+    formatters = package_context.formatters
+
     package_meta = parsed_package['meta']
     package_version = package_meta['version']
     package_name = package_meta['name']
@@ -588,8 +594,7 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
         result_dir = os.getcwd()
 
     package_path = debug_package_path = None
-    package_rel_root = os.path.relpath(package_root, arcadia_root)
-    meta = {}
+    abs_package_root = os.path.join(arcadia_root, package_root)
 
     # package format: command line -> default format fixed in json -> general default format is tar
     def get_format_from_meta():
@@ -625,7 +630,7 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
                 params.custom_tests_data_root,
                 params.custom_data_root,
                 builds,
-                package_root,
+                abs_package_root,
                 formatters,
                 files_comparator,
                 params,
@@ -728,9 +733,9 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
                 )
             elif package_format == const.PackageFormat.DEBIAN:
                 if params.build_debian_scripts:
-                    debian_dir = os.path.join(output_root, package_rel_root, 'debian')
+                    debian_dir = os.path.join(output_root, package_root, 'debian')
                 else:
-                    debian_dir = os.path.join(package_root, 'debian')
+                    debian_dir = os.path.join(abs_package_root, 'debian')
                 debian_dir = package.debian.prepare_debian_folder(temp_work_dir, debian_dir)
 
                 changelog_message = 'Created by ya package'
@@ -841,7 +846,7 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
                     package_meta['description'],
                     package_meta["rpm_license"],
                     data_files,
-                    package_root,
+                    abs_package_root,
                 )
                 gz_file = package.rpm.create_gz_file(
                     package_name, package_version, temp_work_dir, content_dir, threads=params.build_threads
@@ -872,10 +877,11 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
                     params.docker_add_host,
                     params.docker_target,
                     params.docker_secrets,
+                    package_context.context,
                 )
-                meta["docker_image"] = info.image_tag
+                package_context.set_context("docker_image", info.image_tag)
                 if info.digest:
-                    meta["digest"] = info.digest
+                    package_context.set_context("digest", info.digest)
 
             elif package_format == const.PackageFormat.NPM:
                 package_path = package.npm.create_npm_package(
@@ -907,7 +913,7 @@ def create_package(arcadia_root, output_root, package_root, parsed_package, buil
                 exts.fs.copytree3(temp_work_dir, result_temp, symlinks=True)
                 package.display.emit_message('Result temp directory: [[imp]]{}'.format(result_temp))
 
-        return package_name, package_version, package_path, debug_package_path, meta
+        return package_name, package_version, package_path, debug_package_path
 
 
 @timeit
@@ -1115,6 +1121,128 @@ def update_params(parsed_package, package_params, filename):
     return core.yarg.merge_params(package_params, core.yarg.Params(**new_params))
 
 
+class PackageContext:
+    def __init__(self, arcadia_root, package_file, params):
+        self._arcadia_root = arcadia_root
+        self._params = params
+        self._context = {}
+        self._formatters = {}
+        self._spec = {}
+        self._package_root = None
+        self._version = None
+        self._branch = None
+        self._package_name = None
+        self._package_path = None
+
+        self._build_context(package_file)
+
+    def _build_context(self, package_file):
+        if package_file.startswith(self._arcadia_root):
+            self._package_path = os.path.relpath(package_file, self._arcadia_root)
+        else:
+            self._package_path = package_file
+        self._package_root = os.path.dirname(self._package_path)
+
+        self._spec = load_package(self._arcadia_root, self._package_path)
+        self._spec['meta'] = self._spec.get('meta', {})
+
+        self._params = update_params(self._spec, self._params, self._package_path)
+
+        self._branch = str(package.vcs.Branch(self._arcadia_root))
+        self._package_name = self._read_spec_safe('meta', 'name', 'package_name')
+
+        # Setup formatters, which are not part of context
+        change_log = self._params.change_log or os.path.join(
+            self._arcadia_root, self._package_root, 'debian', 'changelog'
+        )
+        self._formatters.update(
+            {
+                "changelog_version": package.debian.ChangeLogVersion(change_log),
+                "package_root": self._package_root,
+                "userdata": self._spec.get("userdata"),
+            }
+        )
+
+        # Setup context
+        self._context.update(
+            {
+                "branch": self._branch,
+                "package_name": self._package_name,
+                "package_path": self._package_path,
+                "package_version": self._version,
+                "revision": str(package.vcs.Revision(self._arcadia_root)),
+                "sandbox_task_id": self._params.sandbox_task_id,
+                "svn_revision": str(package.vcs.SvnRevision(self._arcadia_root)),
+            }
+        )
+
+        self._version = self._calc_version()
+        self._context.update(
+            {
+                "package_full_name": ".".join(x for x in (self._package_name, self._version)),
+                "package_version": self._version,
+            }
+        )
+        self._spec['meta']['version'] = self._version
+
+    def _calc_version(self):
+        if self._params.custom_version:
+            ver = self._params.custom_version
+        else:
+            ver = self._read_spec_safe('meta', 'version', 'package_version')
+        return format_package_meta(ver, self.formatters)
+
+    def _read_spec_safe(self, p1, p2, default=None):
+        return self._spec.get(p1, {}).get(p2, p2 if default is None else default)
+
+    def update_context(self, kv):
+        self._context.update(**kv)
+
+    def set_context(self, k, v):
+        self._context[k] = v
+
+    @property
+    def version(self):
+        return self._version
+
+    @property
+    def branch(self):
+        return self._branch
+
+    @property
+    def parsed_package(self):
+        return self._spec
+
+    @property
+    def params(self):
+        return self._params
+
+    @property
+    def package_root(self):
+        return self._package_root
+
+    @property
+    def package_name(self):
+        return self._package_name
+
+    @property
+    def arcadia_root(self):
+        return self._arcadia_root
+
+    @property
+    def formatters(self):
+        # Context if part of formatters
+        return {k: v for items in itertools.chain((self._formatters.items(), self._context.items())) for k, v in items}
+
+    @property
+    def context(self):
+        return {k: v for k, v in self._context.items()}
+
+    @property
+    def package_path(self):
+        return self._package_path
+
+
 @timeit
 def do_package(params):
     import app_ctx  # XXX: get via args
@@ -1137,7 +1265,8 @@ def do_package(params):
     if not arcadia_root and os.path.exists(params.packages[0]):
         arcadia_root = find_root.detect_root(params.packages[0])
     if not arcadia_root:
-        arcadia_root = exts.path2.abspath(core.config.find_root())
+        arcadia_root = core.config.find_root()
+    arcadia_root = exts.path2.abspath(arcadia_root)
     package.display.emit_message('Source root: [[imp]]{}'.format(arcadia_root))
     if not os.path.exists(arcadia_root):
         raise YaPackageException('Arcadia root {} does not exist'.format(arcadia_root))
@@ -1220,72 +1349,35 @@ def do_package(params):
             logger.debug("Will publish %s to: %s", package_file, package_params.publish_to)
 
         def build_package(params, output_root):
+            # XXX move to postprocess
+            if params.change_log:
+                params.change_log = six.ensure_str(params.change_log)
+
+            try:
+                package_context = PackageContext(arcadia_root, package_file, params)
+            except Exception as e:
+                logger.debug(traceback.format_exc())
+                package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
+                raise YaPackageException("Failed to load package: {}".format(package_file))
+
             try:
                 logger.debug("Creating package: %s", locals())
                 package.display.emit_message('Creating package: [[imp]]{}'.format(package_file))
-
-                parsed_package = load_package(arcadia_root, package_file)
-                params = update_params(parsed_package, params, package_file)
-                package_root = os.path.dirname(package_file)
-
-                formatters = {
-                    "sandbox_task_id": params.sandbox_task_id,
-                    "package_name": parsed_package['meta']['name'],
-                    "package_root": os.path.relpath(package_root, arcadia_root),
-                }
-
-                if "userdata" in parsed_package:
-                    formatters["userdata"] = parsed_package["userdata"]
-
-                def get_package_version():
-                    ver = parsed_package['meta']['version']
-                    change_log = params.change_log or os.path.join(package_root, 'debian', 'changelog')
-                    formatters["changelog_version"] = package.debian.ChangeLogVersion(change_log)
-                    return format_package_meta(ver, formatters)
-
-                package.display.emit_message('Package root: [[imp]]{}'.format(package_root))
-                package_name = parsed_package['meta']['name']
-                package.display.emit_message('Package name: [[imp]]{}'.format(package_name))
-                if params.change_log:
-                    params.change_log = six.ensure_str(params.change_log)
-
-                package_rel_root = os.path.relpath(package_root, arcadia_root)
-
-                branch = package.vcs.Branch(arcadia_root)
-                formatters.update(
-                    {
-                        "revision": package.vcs.Revision(arcadia_root),
-                        "svn_revision": package.vcs.SvnRevision(arcadia_root),
-                        "branch": branch,
-                        "package_root": package_rel_root,
-                    }
-                )
-                package.display.emit_message('Package branch: [[imp]]{}'.format(branch))
-
-                if params.custom_version:
-                    parsed_package['meta']['version'] = params.custom_version
-
-                package_version = get_package_version()
-                formatters.update(
-                    {
-                        "package_version": package_version,
-                        "package_full_name": ".".join([package_name, package_version]),
-                    }
-                )
-
-                parsed_package['meta']['version'] = package_version
+                package.display.emit_message('Package root: [[imp]]{}'.format(package_context.package_root))
+                package.display.emit_message('Package name: [[imp]]{}'.format(package_context.package_name))
+                package.display.emit_message('Package branch: [[imp]]{}'.format(package_context.branch))
 
                 builds = {}
 
-                if 'build' in parsed_package:
-                    if "targets" in parsed_package["build"]:
-                        build_info = parsed_package["build"]
+                if 'build' in package_context.parsed_package:
+                    if "targets" in package_context.parsed_package["build"]:
+                        build_info = package_context.parsed_package["build"]
                         build_info["build_key"] = DEFAULT_BUILD_KEY
                         build_info["output_root"] = output_root
                         builds[DEFAULT_BUILD_KEY] = build_info
                     else:
-                        for build_key in parsed_package["build"]:
-                            build_info = parsed_package["build"][build_key]
+                        for build_key in package_context.parsed_package["build"]:
+                            build_info = package_context.parsed_package["build"][build_key]
                             build_info["build_key"] = build_key
                             build_info["output_root"] = os.path.join(output_root, build_key)
                             builds[build_key] = build_info
@@ -1298,21 +1390,25 @@ def do_package(params):
                             build_info['targets'].append(os.path.relpath(os.path.dirname(package_file), arcadia_root))
                         if build_info.get("targets"):
                             stage_started("build_targets")
-                            _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters)
+                            _do_build(
+                                build_info,
+                                params,
+                                arcadia_root,
+                                app_ctx,
+                                package_context.parsed_package,
+                                package_context.formatters,
+                            )
                             stage_finished("build_targets")
 
                 if not params.build_only:
                     stage_started("create_package")
-                    name, version, path, debug_path, meta = create_package(
-                        arcadia_root, output_root, package_root, parsed_package, builds, params, formatters
-                    )
+                    name, version, path, debug_path = create_package(package_context, output_root, builds)
                     stage_finished("create_package")
 
                     if params.format == const.PackageFormat.DEBIAN and not params.store_debian:
                         return True
 
-                    package_meta = meta
-                    package_meta.update(
+                    package_context.update_context(
                         {
                             'name': name,
                             'version': version,
@@ -1327,23 +1423,23 @@ def do_package(params):
                             package_resource_url, platform_run_resource_url = upload_package_to_mds(
                                 path, package_file, params
                             )
-                            package_meta["package_resource_url"] = package_resource_url
+                            package_context.set_context("package_resource_url", package_resource_url)
                             if platform_run_resource_url:
-                                package_meta["platform_run_resource_url"] = platform_run_resource_url
+                                package_context.set_context("platform_run_resource_url", platform_run_resource_url)
                         else:
                             package_resource_id, platform_run_resource_id = upload_package(path, package_file, params)
-                            package_meta["package_resource_id"] = package_resource_id
+                            package_context.set_context("package_resource_id", package_resource_id)
                             if platform_run_resource_id:
-                                package_meta["platform_run_resource_id"] = platform_run_resource_id
+                                package_context.set_context("platform_run_resource_id", platform_run_resource_id)
                     if params.store_debian:
-                        packages_meta_info.append(package_meta)
+                        packages_meta_info.append(package_context.context)
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
                 raise YaPackageException("Packaging {} failed".format(package_file))
             finally:
                 if not params.cleanup and os.path.exists(output_root):
-                    build_temp = 'build.' + parsed_package['meta']['name'] + '.' + str(random.random())
+                    build_temp = 'build.' + package_context.package_name + '.' + str(random.random())
                     package.fs_util.copy_tree(output_root, build_temp)
                     package.display.emit_message('Build temp directory: [[imp]]{}'.format(build_temp))
 
@@ -1465,51 +1561,28 @@ def do_dump_input(params, arcadia_root, output):
         Fields not presented in formatter dict will be skipped.
         """
         for key, val in formatter.items():
-            string = string.replace(key, val)
+            key = "{%s}" % key
+            if key in string:
+                string = string.replace(key, str(val))
         return string
 
     result = {}
     for package_file in params.packages:
-
-        def get_package_version():
-            ver = package_data.get('meta', {}).get('version', "{package_version}")
-            if params.custom_version:
-                ver = params.custom_version
-            return safe_format(ver, formatters)
-
         if not package_file.startswith(arcadia_root):
             arcadia_root = find_root.detect_root(package_file)
             if not arcadia_root:
                 arcadia_root = exts.path2.abspath(core.config.find_root())
             logger.info("Find new arcadia root %s", arcadia_root)
-        package_relpath = os.path.relpath(package_file, arcadia_root)
-        package_rel_root = os.path.dirname(package_relpath)
+
+        package_context = PackageContext(arcadia_root, package_file, params)
 
         build_section = collections.defaultdict(set)
         arcadia_section = set()
         sandbox_section = set()
-        include_section = set()
         outputs_section = []
+        formatters = package_context.formatters
 
-        package_data = load_package(arcadia_root, package_relpath)
-
-        formatters = {
-            "{package_name}": package_data.get("meta", {}).get("name", None)
-            or package_data.get("name", "{package_name}"),
-            "{package_root}": package_rel_root,
-            "{revision}": package.vcs.Revision(arcadia_root)(),
-            "{svn_revision}": str(package.vcs.SvnRevision(arcadia_root)()),
-            "{branch}": package.vcs.Branch(arcadia_root)(),
-        }
-
-        package_version = get_package_version()
-        formatters.update(
-            {
-                "{package_version}": package_version,
-                "{package_full_name}": ".".join([formatters["{package_name}"], package_version]),
-            }
-        )
-        package_build = package_data.get("build", {})
+        package_build = package_context.parsed_package.get("build", {})
         if "targets" in package_build:
             for build_info in _do_dump_input_build(package_build):
                 build_section[safe_format(build_info[0], formatters)].add(safe_format(build_info[1], formatters))
@@ -1521,7 +1594,7 @@ def do_dump_input(params, arcadia_root, output):
                             safe_format(build_info[1], formatters)
                         )
 
-        for data in package_data.get("data", []):
+        for data in package_context.parsed_package.get("data", []):
             if data.get("source", {}).get("type") == 'BUILD_OUTPUT':
                 item = data.get("source", {})
                 if "path" in item:
@@ -1534,7 +1607,7 @@ def do_dump_input(params, arcadia_root, output):
                     arcadia_section.add(safe_format(path, formatters))
             if data.get("source", {}).get("type") == 'RELATIVE':
                 for path in _do_dump_input_arcadia(
-                    arcadia_root, package_rel_root, data["source"].get("path"), data["source"].get("files")
+                    arcadia_root, package_context.package_root, data["source"].get("path"), data["source"].get("files")
                 ):
                     arcadia_section.add(safe_format(path, formatters))
             if data.get("source", {}).get("type") == 'SANDBOX_RESOURCE':
@@ -1542,9 +1615,9 @@ def do_dump_input(params, arcadia_root, output):
                 if id:
                     sandbox_section.add(sandbox_id)
 
-        include_section = set(_get_all_includes(arcadia_root, package_relpath))
+        include_section = set(_get_all_includes(arcadia_root, package_context.package_path))
 
-        result[package_relpath] = {
+        result[package_context.package_path] = {
             'build': {k: list(sorted(v)) for k, v in build_section.items()},
             'arcadia': list(sorted(arcadia_section)),
             'sandbox': list(sorted(sandbox_section)),
