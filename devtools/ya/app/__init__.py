@@ -15,6 +15,7 @@ import exts.strings
 import exts.windows
 import yalibrary.app_ctx
 import yalibrary.find_root
+from core import stage_tracer
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
 
@@ -135,6 +136,9 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
         modules.append(('dump_debug', configure_debug(ctx)))
 
         with ctx.configure(modules):
+            el = getattr(ctx, "evlog", None)
+            if el:
+                stage_tracer.stage_tracer.add_consumer(stage_tracer.EvLogConsumer(el))
             logger.debug('Run action on %s with params %s', action, params)
             report_params(ctx)
             return action(ctx.params)

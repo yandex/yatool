@@ -17,9 +17,7 @@ import core.report
 
 from humanfriendly import format_size
 
-from core import stages_profiler
-from core.profiler import profile_step
-from core import profiler
+from core import profiler, stage_tracer
 from build.stat.graph import CopyTask, get_critical_path
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log
 from functools import cmp_to_key
@@ -46,6 +44,7 @@ class ExecutionStateEnum(enum.Enum):
 
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("statistics")
 
 NUMBER_OF_TASKS_ELAPSED_TIME_TO_OUTPUT = 50000
 
@@ -825,6 +824,8 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     if ctx_stages:
         stats['context_stages'] = print_context_stages(ctx_stages, display)
     stats['ymake_wall_time'] = _ymake_wall_time(ymake_stats)
+    for name, stat in stage_tracer.get_stat('graph').items():
+        stats.setdefault('gg_stages', {})[name] = stat.duration
 
     return stats
 
@@ -847,8 +848,7 @@ def report_coverage_upload_status(graph, report_file, fail_report_file):
 
 def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, ymake_stats=None):
     start_time = time.time()
-    profile_step('statistics_started')
-    stages_profiler.stage_started('statistics')
+    statistics_stage = stager.start('statistics')
     graph = graph_f()
 
     if opts.print_statistics:
@@ -878,8 +878,7 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
         report_coverage_upload_status(
             graph, opts.coverage_succeed_upload_uids_file, opts.coverage_failed_upload_uids_file
         )
-    stages_profiler.stage_finished('statistics')
-    profile_step('statistics_finished')
+    statistics_stage.finish()
     end_time = time.time()
 
     statistics_overhead = end_time - start_time

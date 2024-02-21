@@ -41,16 +41,12 @@ def _set_value(k, v):
             json.dump(data, open(STAGES_FILE, 'w'), indent=4, sort_keys=True)
 
 
-def stage_started(name):
-    _set_value(name + '_started', time.time())
+def stage_started(name, ts=None):
+    _set_value(name + '_started', ts or time.time())
 
 
-def stage_finished(name):
-    _set_value(name + '_finished', time.time())
-
-
-def stage(name):
-    _set_value(name, time.time())
+def stage_finished(name, ts=None):
+    _set_value(name + '_finished', ts or time.time())
 
 
 def load_stages(stages, prefix=''):

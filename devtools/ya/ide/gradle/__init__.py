@@ -9,14 +9,14 @@ import tempfile
 from build.ymake2 import run_ymake
 import build.graph as bg
 import core.yarg
-import core.profiler as cp
-import core.stages_profiler as csp
+from core import stage_tracer
 import build.build_opts as bo
 import yalibrary.tools
 from build import build_facade, ya_make
 import yalibrary.platform_matcher as pm
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("gradle")
 requires_props = [
     'bucketUsername',
     'bucketPassword',
@@ -158,9 +158,7 @@ def apply_graph(params, sem_graph, gradle_project_root):
 
 
 def do_gradle(params):
-    stage = 'do_yegradle'
-    cp.profile_step_started(stage)
-    csp.stage_started(stage)
+    do_gradle_stage = stager.start('do_gradle')
 
     if pm.my_platform() == 'win32':
         logger.error("Win is not supported in ya ide gradle")
@@ -313,8 +311,7 @@ def do_gradle(params):
 
     # TODO remove ymake.conf, sem.json, yexport.toml
 
-    csp.stage_finished(stage)
-    cp.profile_step_finished(stage)
+    do_gradle_stage.finish()
 
     if tmp:
         shutil.rmtree(tmp)

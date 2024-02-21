@@ -61,8 +61,9 @@ def _set_value(namespace, key, value):
     return _DATA[namespace]
 
 
-def profile_step(step_name):
-    value = time.time() - _CUTOFF
+def profile_step(step_name, step_time=None):
+    step_time = step_time or time.time()
+    value = step_time - _CUTOFF
 
     logger.debug('Profile step {} - {}'.format(step_name, value))
 
@@ -72,12 +73,12 @@ def profile_step(step_name):
     _flush()
 
 
-def profile_step_started(step_name):
-    profile_step(step_name + '_started')
+def profile_step_started(step_name, step_time=None):
+    profile_step(step_name + '_started', step_time)
 
 
-def profile_step_finished(step_name):
-    profile_step(step_name + '_finished')
+def profile_step_finished(step_name, step_time=None):
+    profile_step(step_name + '_finished', step_time)
 
 
 def profile_value(value_name, value):

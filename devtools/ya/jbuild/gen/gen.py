@@ -14,6 +14,7 @@ from .actions import fetch_test_data as fetch_test_data
 from . import makelist_parser2 as mp
 from . import configure
 from . import consts
+from core import stage_tracer
 from yalibrary.vcs import vcsversion
 from yalibrary import platform_matcher
 from exts.strtobool import strtobool
@@ -22,6 +23,7 @@ import yalibrary.graph.node as graph_node
 from six.moves import map
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("jbuild")
 
 
 def with_tests(opts):
@@ -327,22 +329,19 @@ def gen(
     target_tc=None,
     extern_global_resources=None,
 ):
-    from build.graph import stage_started, stage_finished
+    with stager.scope('insert_java-gen_ctx'):
+        ctx = gen_ctx(
+            arc_root,
+            paths,
+            opts,
+            contrib_roots,
+            cpp_graph=cpp_graph,
+            dart=dart,
+            target_tc=target_tc,
+            extern_global_resources=extern_global_resources,
+        )
 
-    stage_started('insert_java-gen_ctx')
-    ctx = gen_ctx(
-        arc_root,
-        paths,
-        opts,
-        contrib_roots,
-        cpp_graph=cpp_graph,
-        dart=dart,
-        target_tc=target_tc,
-        extern_global_resources=extern_global_resources,
-    )
-    stage_finished('insert_java-gen_ctx')
-
-    stage_started('insert_java-detect_unversioned')
+    insert_java_detect_unversioned = stager.start('insert_java-detect_unversioned')
     nodes, ins_unresolved = graph_node.merge(list(iter_nodes(ctx)))
 
     node.resolve_io_dirs(nodes, ctx)
@@ -370,41 +369,39 @@ def gen(
 
     for e in six.itervalues(ctx.errs):
         e.missing_inputs = sorted(set(e.missing_inputs))
-    stage_finished('insert_java-detect_unversioned')
+    insert_java_detect_unversioned.finish()
 
-    stage_started('insert_java-dump_graph')
-    graph = [n.to_serializable(ctx) for n in achievable if n.is_dart_node()]
-    result = [n.uid for n in res]
-    stage_finished('insert_java-dump_graph')
+    with stager.scope('insert_java-dump_graph'):
+        graph = [n.to_serializable(ctx) for n in achievable if n.is_dart_node()]
+        result = [n.uid for n in res]
 
     task = {'graph': graph, 'result': result, 'conf': {}}
     task.pop('conf')
 
-    stage_started('insert_java-report_missing')
-    if ev_listener:
-        from .actions import missing_dirs
+    with stager.scope('insert_java-report_missing'):
+        if ev_listener:
+            from .actions import missing_dirs
 
-        for p in missing_dirs.iter_missing_java_paths(ctx.errs):
-            p = p.replace('$(SOURCE_ROOT)', '$S').replace('$(BUILD_ROOT)', '$B')
-            ev_listener({'_typename': 'JavaMissingDir', 'Dir': p})
+            for p in missing_dirs.iter_missing_java_paths(ctx.errs):
+                p = p.replace('$(SOURCE_ROOT)', '$S').replace('$(BUILD_ROOT)', '$B')
+                ev_listener({'_typename': 'JavaMissingDir', 'Dir': p})
 
-        for path, err in ctx.errs.items():
-            if path in ctx.by_path and ctx.by_path[path].output_jar_name():
-                jname = ctx.by_path[path].output_jar_name()
-                if jname.endswith('.jar'):
-                    path = '/'.join(['$B', path, jname[:-4]])
-            for msg, sub in err.get_colored_errors():
-                ev_listener(
-                    {
-                        'Sub': sub,
-                        'Type': 'Error',
-                        'Message': msg,
-                        '_typename': 'NEvent.TDisplayMessage',
-                        'Where': path,
-                        'Mod': 'bad',
-                    }
-                )
-    stage_finished('insert_java-report_missing')
+            for path, err in ctx.errs.items():
+                if path in ctx.by_path and ctx.by_path[path].output_jar_name():
+                    jname = ctx.by_path[path].output_jar_name()
+                    if jname.endswith('.jar'):
+                        path = '/'.join(['$B', path, jname[:-4]])
+                for msg, sub in err.get_colored_errors():
+                    ev_listener(
+                        {
+                            'Sub': sub,
+                            'Type': 'Error',
+                            'Message': msg,
+                            '_typename': 'NEvent.TDisplayMessage',
+                            'Where': path,
+                            'Mod': 'bad',
+                        }
+                    )
 
     if ctx.errs:
         # s = conf_warning(ctx.errs)

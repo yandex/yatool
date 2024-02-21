@@ -56,8 +56,8 @@ import core.config as core_config
 import core.yarg
 import core.error
 import core.profiler as cp
-import core.stages_profiler as csp
 import core.report
+from core import stage_tracer
 
 import test.common as test_common
 
@@ -86,6 +86,7 @@ ARC_PREFIX = 'arcadia/'
 ATD_PREFIX = 'arcadia_tests_data/'
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("ya_make")
 
 
 class ConfigurationError(Exception):
@@ -770,8 +771,7 @@ class Context(object):
         lite_graph=None,
     ):
         timer = exts.timer.Timer('context_creation')
-        cp.profile_step_started('context_creation')
-        csp.stage_started('context_creation')
+        context_creation_stage = stager.start('context_creation')
 
         self.stage_times = {}
 
@@ -1091,8 +1091,7 @@ class Context(object):
                 + 'Remove --no-src-links option (*nix systems) and/or use -o/--output option, see details in help.'
             )
 
-        csp.stage_finished('context_creation')
-        cp.profile_step_finished('context_creation')
+        context_creation_stage.finish()
         timer.show_step("context_creation finished")
         self.stage_times['context_creation'] = timer.full_duration()
 
@@ -1675,11 +1674,10 @@ class YaMake(object):
                 )
 
                 if self.ctx.cache_test_statuses:
-                    csp.stage_started('cache_test_statuses')
-                    last_failed.cache_test_statuses(
-                        res, self.ctx.tests, self.ctx.garbage_dir, self.opts.last_failed_tests
-                    )
-                    csp.stage_finished('cache_test_statuses')
+                    with stager.scope('cache_test_statuses'):
+                        last_failed.cache_test_statuses(
+                            res, self.ctx.tests, self.ctx.garbage_dir, self.opts.last_failed_tests
+                        )
 
             if self.opts.print_test_console_report:
                 self._test_console_report()
@@ -1738,17 +1736,11 @@ class YaMake(object):
                 )
 
     def _dispatch_build(self, callback):
-        cp.profile_step_started('dispatch_build')
-        csp.stage_started('dispatch_build')
-
-        if self.opts.use_distbuild:
-            rv = self._build_distbs(callback)
-        else:
-            rv = self._build_local(callback)
-
-        csp.stage_finished('dispatch_build')
-        cp.profile_step_finished('dispatch_build')
-        return rv
+        with stager.scope('dispatch_build'):
+            if self.opts.use_distbuild:
+                return self._build_distbs(callback)
+            else:
+                return self._build_local(callback)
 
     def _build_distbs(self, callback):
         from yalibrary.yandex.distbuild import distbs
@@ -1868,8 +1860,7 @@ class YaMake(object):
             return db_result.get('tasks_metrics', {})
 
         def extract_build_errors(db_result):
-            cp.profile_step_started('extract_build_errors')
-            csp.stage_started('extract_build_errors')
+            extract_build_errors_stage = stager.start('extract_build_errors')
 
             import exts.asyncthread
 
@@ -1903,8 +1894,7 @@ class YaMake(object):
 
             stderr_pairs, links_pairs, status_pairs, exit_code_map = fetch_results or ([], [], [], [])
 
-            csp.stage_finished('extract_build_errors')
-            cp.profile_step_finished('extract_build_errors')
+            extract_build_errors_stage.finish()
             return dict(stderr_pairs), dict(links_pairs), dict(status_pairs), dict(exit_code_map)
 
         run_db_async = core_async.future(run_db, daemon=False)

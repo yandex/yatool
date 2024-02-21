@@ -1,8 +1,7 @@
 import logging
 import time
 
-from core import profiler
-from core import stages_profiler
+from core import stage_tracer
 import exts.fs
 import exts.yjdump as yjdump
 import exts.yjson as json
@@ -11,6 +10,7 @@ from exts.decompress import udopen
 from yalibrary.monitoring import YaMonEvent
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("build_handler")
 stage_begin_time = {}
 
 
@@ -34,23 +34,13 @@ def _dump_results(builder, owners):
     _dump_json(builder.misc_build_info_dir, 'results2.json', builder.make_report())
 
 
-def stage_started(stage_name):
-    profiler.profile_step_started(stage_name)
-    stages_profiler.stage_started(stage_name)
-
-
-def stage_finished(stage_name):
-    stages_profiler.stage_finished(stage_name)
-    profiler.profile_step_finished(stage_name)
-
-
 def monitoring_stage_started(stage_name):
-    stage_started(stage_name)
+    stager.start(stage_name)
     stage_begin_time[stage_name] = time.time()
 
 
 def monitoring_stage_finished(stage_name):
-    stage_finished(stage_name)
+    stager.finish(stage_name)
     if stage_name not in stage_begin_time:
         logger.error("stage_end without stage_begin for '%s'", stage_name)
     else:
@@ -64,19 +54,18 @@ def do_ya_make(params):
     import app_ctx  # XXX
 
     monitoring_stage_started('ya_make_handler')
-    stage_started('context_generating')
+    context_generating_stage = stager.start('context_generating')
 
     if not params.custom_context:
-        stage_started("build_graph_cache_configuration")
-        ya_make.configure_build_graph_cache_dir(app_ctx, params)
-        stage_finished("build_graph_cache_configuration")
+        with stager.scope("build_graph_cache_configuration"):
+            ya_make.configure_build_graph_cache_dir(app_ctx, params)
 
     # XXX
     if getattr(params, 'make_context_on_distbuild_only', False) or getattr(params, 'make_context_only', False):
         from devtools.ya.build.remote import remote_graph_generator
 
         remote_graph_generator.generate(params, app_ctx)
-        stage_finished('context_generating')
+        context_generating_stage.finish()
         monitoring_stage_finished('ya_make_handler')
         return 0
 
@@ -107,23 +96,20 @@ def do_ya_make(params):
         builder = ya_make.YaMake(params, app_ctx)
         context = None
 
-    stage_finished('context_generating')
+    context_generating_stage.finish()
 
     exit_code = 0
     if getattr(params, 'save_context_to', None) is None:
-        stage_started('build')
-        exit_code = builder.go()
-        stage_finished('build')
+        with stager.scope('build'):
+            exit_code = builder.go()
         if builder.misc_build_info_dir:
-            stage_started('dump_results')
-            context = context or ya_make.BuildContext(builder)
-            _dump_results(builder, context.owners)
-            stage_finished('dump_results')
+            with stager.scope('dump_results'):
+                context = context or ya_make.BuildContext(builder)
+                _dump_results(builder, context.owners)
     else:
-        stage_started('save_context')
-        stage_started('create_build_context')
-        context = context or ya_make.BuildContext(builder)
-        stage_finished('create_build_context')
+        stager.start('save_context')
+        with stager.scope('create_build_context'):
+            context = context or ya_make.BuildContext(builder)
 
         context_json = context.save()
         graph_json = context_json.pop('graph')
@@ -134,7 +120,7 @@ def do_ya_make(params):
         with ucopen(params.save_graph_to, mode="wb") as graph_file:
             yjdump.dump_graph_as_json(graph_json, graph_file)
 
-        stage_finished('save_context')
+        stager.finish('save_context')
 
     monitoring_stage_finished('ya_make_handler')
 

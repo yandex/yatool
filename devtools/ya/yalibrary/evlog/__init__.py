@@ -142,6 +142,10 @@ class Evlog(object):
     def close(self):
         self._fileobj.close()
 
+    @property
+    def closed(self):
+        return self._fileobj.closed
+
     def __iter__(self):
         for root, dirs, files in os2.fastwalk(self._evlog_dir):
             for f in files:
