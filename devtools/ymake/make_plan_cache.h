@@ -97,7 +97,7 @@ public:
 
     void AddRenderedNode(const TMakeNode& newNode, TStringBuf name, TStringBuf cacheUid, TStringBuf renderId);
 
-    void LoadFromFile();
+    bool LoadFromFile();
     TFsPath SaveToFile();
 
     void LoadFromContext(const TString& context);

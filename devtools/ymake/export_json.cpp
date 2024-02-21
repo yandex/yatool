@@ -542,9 +542,6 @@ namespace {
             yMake.LoadUids(cmdbuilderHolder.Get());
         } catch (const std::exception& e) {
             YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
-            if (conf.ReadUidsCache) {
-                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), false); // enabled, but not loaded
-            }
             // JSON visitor can be left in an incorrect state
             // after an unsuccessful cache loading.
             cmdBuilderReset();
@@ -598,7 +595,7 @@ namespace {
         TFsPath cacheFile;
         {
             TMakePlanCache cache(yMake.Conf);
-            cache.LoadFromFile();
+            yMake.JSONCacheLoaded(cache.LoadFromFile());
 
             for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
                 if (cmdbuilder.ShouldUseNewUids())
@@ -692,4 +689,7 @@ void ExportJSON(TYMake& yMake) {
     conf.NormalizeRealPath = sysNormalize;
 
     FORCE_TRACE(U, NEvent::TStageFinished("Export JSON"));
+
+    yMake.JSONCacheMonEvent();
+    yMake.UidsCacheMonEvent();
 }

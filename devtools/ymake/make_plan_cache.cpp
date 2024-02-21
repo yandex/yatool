@@ -239,21 +239,18 @@ TMakePlanCache::TMakePlanCache(const TBuildConfiguration& conf)
 {
 }
 
-void TMakePlanCache::LoadFromFile() {
+bool TMakePlanCache::LoadFromFile() {
     if (!LoadFromCache) {
-        return;
+        return false;
     }
-    auto loadFailed = []() {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), false); // enabled, but not loaded
-    };
 
     if (!CachePath.Exists()) {
-        return loadFailed();
+        return false;
     }
 
     TCacheFileReader cacheReader(Conf, false, JsonConfHash);
     if (cacheReader.Read(CachePath) != TCacheFileReader::EReadResult::Success) {
-        return loadFailed();
+        return false;
     }
 
     TBlob& names = cacheReader.GetNextBlob();
@@ -261,7 +258,7 @@ void TMakePlanCache::LoadFromFile() {
     Load(names, nodes);
 
     YDebug() << "Json cache has been loaded..." << Endl;
-    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), true);
+    return true;
 }
 
 TFsPath TMakePlanCache::SaveToFile() {

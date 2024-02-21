@@ -815,6 +815,7 @@ int main_real(TBuildConfiguration& conf) {
             yMake.Reset(new TYMake(conf));
         }
     }
+
     // This should be called after Load
     yMake->PostInit();
 

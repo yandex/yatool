@@ -69,6 +69,10 @@ private:
     TFsPath UidsCacheTempFile;      // Name of temporary file with delayed save data
     TString PrevDepsFingerprint;
     TString CurrDepsFingerprint;
+    bool FSCacheLoaded_{false};
+    bool DepsCacheLoaded_{false};
+    bool JSONCacheLoaded_{false};
+    bool UidsCacheLoaded_{false};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
@@ -128,6 +132,11 @@ public:
     void Save(const TFsPath& file, bool delayed);
     void SaveUids(TUidsCachable* uidsCachable);
     void CommitCaches();
+    void JSONCacheLoaded(bool jsonCacheLoaded);
+    void FSCacheMonEvent() const;
+    void DepsCacheMonEvent() const;
+    void JSONCacheMonEvent() const;
+    void UidsCacheMonEvent() const;
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);
     TRestoreContext GetRestoreContext();

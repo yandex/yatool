@@ -76,6 +76,8 @@ void TYMake::PostInit() {
     LoadPatch();
     IncParserManager.InitManager(Conf.ParserPlugins);
     Names.FileConf.InitAfterCacheLoading();
+    FSCacheMonEvent();
+    DepsCacheMonEvent();
 }
 
 static void SafeRemove(const TFsPath& path) {

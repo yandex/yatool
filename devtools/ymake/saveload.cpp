@@ -513,12 +513,6 @@ bool TYMake::Load(const TFsPath& file) {
         return LoadImpl(file);
     } catch (...) {
         YErr() << "can not load cache: " << CurrentExceptionMessage() << Endl;
-        if (Conf.ReadFsCache) {
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), false); // enabled, but not loaded
-        }
-        if (Conf.ReadDepsCache) {
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), false); // enabled, but not loaded
-        }
     }
 
     return false;
@@ -616,9 +610,8 @@ bool TYMake::LoadImpl(const TFsPath& file) {
 
     if (loadFsCache && loadFsCacheFromBlobs()) {
         YDebug() << "FS cache has been loaded..." << Endl;
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), true);
+        FSCacheLoaded_ = true;
     } else {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), false); // enabled, but not loaded
         return false;
     }
 
@@ -626,9 +619,8 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         if (loadDepsCacheFromBlobs()) {
             YDebug() << "Deps cache has been loaded..." << Endl;
             PrevDepsFingerprint = prevDepsFingerprint;
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), true);
+            DepsCacheLoaded_ = true;
         } else {
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), false); // enabled, but not loaded
             return false;
         }
     }
@@ -656,8 +648,7 @@ void TYMake::LoadUids(TUidsCachable* cachable) {
     if (!Conf.ReadUidsCache) {
         return;
     }
-    const bool loaded = TryLoadUids(cachable);
-    NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), loaded);
+    UidsCacheLoaded_ = TryLoadUids(cachable);
 }
 
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
@@ -759,5 +750,42 @@ void TYMake::CommitCaches() {
         }
     } else {
         Y_ASSERT(!UidsCacheTempFile.IsDefined());
+    }
+}
+
+void TYMake::JSONCacheLoaded(bool jsonCacheLoaded) {
+    JSONCacheLoaded_ = jsonCacheLoaded;
+
+}
+
+void TYMake::FSCacheMonEvent() const {
+    if (FSCacheLoaded_) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), true); // loaded OK
+    } else if (Conf.ReadFsCache) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), false); // enabled, but not loaded
+    }
+}
+
+void TYMake::DepsCacheMonEvent() const {
+    if (DepsCacheLoaded_) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), true); // loaded OK
+    } else if (Conf.ReadDepsCache) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), false); // enabled, but not loaded
+    }
+}
+
+void TYMake::JSONCacheMonEvent() const {
+    if (JSONCacheLoaded_) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), true); // loaded OK
+    } else  if (Conf.ReadJsonCache) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), false); // enabled, but not loaded
+    }
+}
+
+void TYMake::UidsCacheMonEvent() const {
+    if (UidsCacheLoaded_) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), true); // loaded OK
+    } else  if (Conf.ReadUidsCache) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), false); // enabled, but not loaded
     }
 }
