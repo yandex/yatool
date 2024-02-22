@@ -2,6 +2,8 @@ import collections
 import psutil
 from functools import wraps
 
+import six
+
 
 def safe(name):
     def decorator_safe(func):
@@ -147,7 +149,7 @@ def _network_conn_str():
     for con in conns:
         list_ip[con.laddr.ip].append(con)
 
-    for name, addrs in ifaces.iteritems():
+    for name, addrs in six.iteritems(ifaces):
         str_items.append("{}:\n".format(name))
 
         for ip in addrs:
@@ -170,7 +172,7 @@ def _network_conn_str():
             del list_ip[ip.address]
 
     str_items.append("***\n")
-    for ip, conns in list_ip.iteritems():
+    for ip, conns in six.iteritems(list_ip):
         str_items.append("   {}\n".format(ip))
 
         for con in conns:
