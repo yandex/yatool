@@ -1890,8 +1890,6 @@ class YaMake(object):
 
             fetch_results = tuple(zip(*exts.asyncthread.par_map(fetch_one, failed_items, download_thread_count)))
 
-            logger.warning("Fetch_results: %s", fetch_results)
-
             stderr_pairs, links_pairs, status_pairs, exit_code_map = fetch_results or ([], [], [], [])
 
             extract_build_errors_stage.finish()
