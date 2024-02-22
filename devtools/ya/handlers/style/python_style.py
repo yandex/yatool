@@ -45,7 +45,7 @@ def get_ruff_config(path):
 
 
 def fix_python_with_black(data, path, fast, args):
-    # type(str, str, bool, StyleOptions) -> None
+    # type(str, str, bool, StyleOptions) -> str
     tool = 'black' if not args.py2 else 'black_py2'
     popen_python_kwargs = {}
     if six.PY3:
@@ -71,16 +71,10 @@ def fix_python_with_black(data, path, fast, args):
     return out
 
 
-def fix_python_with_ruff(data, path):
-    # type(str, str) -> None
-    if not six.PY3:
-        error_msg = 'Ruff couldn\'t be called with python 2!'
-        error_msg += '\nCall \'ya style\' like \'ya -3 style\''
-        raise RuntimeError(error_msg)
+def _launch_ruff(data, path, config_path, cmd_args):
+    # type(str, str, str, list[str]) -> str
 
-    ruff_config = get_ruff_config(path)
-
-    ruff_args = [yalibrary.tools.tool('ruff'), 'format', '--config', ruff_config.path, '-']
+    ruff_args = [yalibrary.tools.tool('ruff')] + cmd_args + ['--config', config_path, '-']
 
     p = subprocess.Popen(
         ruff_args,
@@ -92,7 +86,7 @@ def fix_python_with_ruff(data, path):
         with open('ruff.out', 'w') as fd:
             fd.write('Ruff out: {}'.format(out))
             fd.write('\nRuff err: {}'.format(err))
-        error_msg = 'Something went wrong while running ruff on file "{}"'.format(path)
+        error_msg = 'Something went wrong while running ruff {} on file "{}"'.format(' '.join(cmd_args), path)
         error_msg += '\nCheck file \'ruff.out\' for errors'
         raise RuntimeError(error_msg)
 
@@ -101,6 +95,21 @@ def fix_python_with_ruff(data, path):
         stop()
 
     if p.returncode != 0 and err:
-        raise RuntimeError('error while running ruff on file "{}": {}'.format(path, err.strip()))
+        raise RuntimeError('error while running ruff {} on file "{}": {}'.format(' '.join(cmd_args), path, err.strip()))
 
+    return out
+
+
+def fix_python_with_ruff(data, path):
+    # type(str, str) -> str
+    if not six.PY3:
+        error_msg = 'Ruff couldn\'t be called with python 2!'
+        error_msg += '\nCall \'ya style\' like \'ya -3 style\''
+        raise RuntimeError(error_msg)
+
+    ruff_config = get_ruff_config(path)
+
+    out = _launch_ruff(data, path, ruff_config.path, ['format'])
+    # launch check fix to sort imports
+    out = _launch_ruff(out, path, ruff_config.path, ['check', '--select', 'I', '--fixable', 'I', '--fix'])
     return out
