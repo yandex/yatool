@@ -32,7 +32,7 @@ def inject_gcov_coverage_nodes(graph, suites, resolvers_map, opts, platform_desc
     gcno_node_uid = inject_collect_gcno_node(graph, opts=opts)
     jdk_resource = None
     for s in suites:
-        jdk_resource = getattr(s, 'jdk_resource', False)
+        jdk_resource = getattr(s, 'jdk_resource')
         if jdk_resource:
             break
     if getattr(opts, 'build_coverage_report', False):
