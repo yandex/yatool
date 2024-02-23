@@ -57,8 +57,12 @@ class Evlog(object):
         self._filename = filename
         fs.create_dirs(os.path.join(evlog_dir, chunk_name))
         self.path = os.path.join(evlog_dir, chunk_name, filename)
-        if filename.endswith('.zstd'):
-            self._fileobj = zstd.open(filename, 'w', cctx=zstd.ZstdCompressor(level=1))
+        if filename.endswith(('.zstd', '.zst')):
+            if six.PY3:
+                self._fileobj = zstd.open(filename, 'w', cctx=zstd.ZstdCompressor(level=1))
+            # XXX Remove when YA-261 is done
+            else:
+                self._fileobj = zstd.ZstdCompressor(level=1).stream_writer(open(filename, 'w'))
         else:
             self._fileobj = open(self.path, 'w')
         self._lock = threading.Lock()

@@ -427,7 +427,7 @@ class EventLogFileOptions(Options):
         return [
             ArgConsumer(
                 ['--evlog-file'],
-                help='Dump event log into specified file (file will be compressed using zstd if the file name ends with ".zstd")',
+                help='Dump event log into specified file (file will be compressed using zstd if the file name ends with ".zst" or ".zstd")',
                 hook=SetValueHook('evlog_file'),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.INTERNAL,
