@@ -232,7 +232,6 @@ class _Server(object):
                 cls._bld_dir = os.path.join(params.custom_build_directory, 'cache', '7')
             try:
                 dump_debug['build_cache_root'] = cls._bld_dir
-                dump_debug['build_cache_db_file'] = os.path.join(cls._bld_dir, "acdb.sqlite")
             except Exception as e:
                 logger.debug("(dump_debug) While store build cache info into: %s", e)
 

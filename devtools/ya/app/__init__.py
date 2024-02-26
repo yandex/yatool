@@ -224,7 +224,6 @@ def configure_debug(app_ctx):
         try:
             tools_root = core.config.tool_root(4)
             dump_store_obj['tools_cache_root'] = tools_root
-            dump_store_obj['tools_cache_db_file'] = os.path.join(tools_root, 'tcdb.sqlite')
         except Exception as e:
             AppEvLogStore.logger.debug("While store tools cache: %s", e)
 
