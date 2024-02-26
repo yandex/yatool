@@ -420,7 +420,7 @@ bool TDirParser::KnownStatement(const TStringBuf& name, const TVector<TStringBuf
             YConfErrPrecise(Syntax, GetStatementRow(name), GetStatementColumn(name)) << "Empty " << name << " list is prohibited"  << Endl;
         }
         Owners.insert(args.begin(), args.end());
-    } else if ((name == "VERSION") || (name == "ORIGINAL_SOURCE") || (name == "NEED_REVIEW") || (name == "NEED_CHECK") || (name == "NO_NEED_CHECK")) {
+    } else if ((name == "ORIGINAL_SOURCE") || (name == "NEED_REVIEW") || (name == "NEED_CHECK") || (name == "NO_NEED_CHECK")) {
         // No operations.
     } else if (name == "ONLY_TAGS" || name == "EXCLUDE_TAGS" || name == "INCLUDE_TAGS") {
           if (SubModules.empty()) {
