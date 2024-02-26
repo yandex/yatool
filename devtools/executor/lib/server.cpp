@@ -275,7 +275,7 @@ void RunServer(const TString address, bool cacheStderr, bool debug) {
     builder.RegisterService(&service);
     auto server(builder.BuildAndStart());
     if (debug) {
-        Cout << "Server has started at: " << address << Endl;
+        Cerr << "Server has started at: " << address << Endl;
     }
     SystemThreadFactory()->Run([&]() {
         while (!IsShutdownRequested()) {
