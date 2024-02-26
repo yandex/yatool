@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import logging
 
 import app
+import app_config
 import core.yarg
 import core.common_opts
 import build.ya_make
@@ -18,13 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 class PackageYaHandler(core.yarg.OptsHandler):
-    description = """Build package using json package description in the release build type by default.
-For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package"""
+    description = "Build package using json package description in the release build type by default."
+    in_house_docs = "For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package"
 
     def __init__(self):
         super(PackageYaHandler, self).__init__(
             action=app.execute(package.packager.do_package, respawn=app.RespawnType.OPTIONAL),
-            description=self.description,
+            description=self.description + ("\n" + self.in_house_docs if app_config.in_house else ""),
             examples=[
                 core.yarg.UsageExample(
                     cmd='{prefix} <path to json description>',
