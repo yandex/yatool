@@ -5,8 +5,6 @@ import threading
 import time
 
 import six.moves.queue as Queue
-from six.moves import xrange
-
 from exts import asyncthread
 
 
@@ -120,8 +118,8 @@ class WorkerThreads(object):
 
             self._out_q.put(asyncthread.wrap(execute))
 
-        for i in xrange(threads):
-            exec_thr = threading.Thread(target=exec_target)
+        for i in range(1, threads + 1):
+            exec_thr = threading.Thread(target=exec_target, name="Worker-{:03d}".format(i))
             exec_thr.start()
             self._all_threads.append(exec_thr)
 

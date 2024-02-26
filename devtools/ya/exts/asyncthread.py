@@ -1,6 +1,8 @@
+import functools
+import itertools
+import logging
 import sys
 import threading
-import logging
 
 from six.moves import queue as Queue
 from six import reraise
@@ -56,10 +58,13 @@ class ProperEvent(object):
             return self._v
 
 
+_th_counter = functools.partial(next, itertools.count())
+
+
 def asyncthread(f, daemon=True):
     e = ProperEvent()
 
-    thr = threading.Thread(target=lambda: e.set(wrap(f)))
+    thr = threading.Thread(target=lambda: e.set(wrap(f)), name="Misc-{:02d}".format(_th_counter()))
     thr.daemon = daemon
     thr.start()
 
