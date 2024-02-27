@@ -689,7 +689,14 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
                     }
                 };
 
-                TString dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, {}, diagNoSrc);
+                TString dir;
+
+                if (NLanguages::GetLanguageAddinclsAreNonPaths(nextLangId)) {
+                    dir = NPath::ConstructPath(arg);
+                } else {
+                    dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, {}, diagNoSrc);
+                }
+
                 if (!dir.empty() && ValidateNotRelative(dir, name)) {
                     if (nextLangId == TModuleIncDirs::BAD_LANG) {
                         nextLangId = TModuleIncDirs::C_LANG;

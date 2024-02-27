@@ -135,12 +135,22 @@ namespace {
         return languages_and_extensions;
     }
 
+    const auto& GetLanguagesWithNonPathAddincls() {
+        // List of languagues whose ADDINCLs are non-paths
+        // Can be used when it's necessary to propagate additional data from peers
+        static TSet<TString> languages = {
+        };
+
+        return languages;
+    }
+
     struct TLanguagesManager {
         THashMap<TStringBuf, TLangId> LanguageIdByName;
         THashMap<TStringBuf, TLangId> LanguageIdByExt;
         TVector<TLangId> LanguageIdByParserId;
         TVector<TStringBuf> LanguageNameById;
         TVector<TString> LanguageIncludeNameById;
+        TSet<TLangId> LanguagesWithNonPathAddincls;
 
     public:
         inline TLanguagesManager() {
@@ -161,6 +171,15 @@ namespace {
                     LanguageIdByExt[ext] = it->second;
                 }
                 LanguageIdByParserId.push_back(it->second);
+            }
+
+            for (const auto& name : GetLanguagesWithNonPathAddincls()) {
+                const auto it = LanguageIdByName.find(name);
+                if (it == LanguageIdByName.end()) {
+                    continue;
+                }
+
+                LanguagesWithNonPathAddincls.insert(it->second);
             }
         }
 
@@ -197,6 +216,11 @@ namespace NLanguages {
     const TString& GetLanguageIncludeName(TLangId languageId) {
         const auto& languageIncludeNameById = TLanguagesManager::Instance().LanguageIncludeNameById;
         return languageIncludeNameById.at(static_cast<size_t>(languageId));
+    }
+
+    bool GetLanguageAddinclsAreNonPaths(TLangId languageId) {
+        const auto& languagesWithNonPathAddincls = TLanguagesManager::Instance().LanguagesWithNonPathAddincls;
+        return languagesWithNonPathAddincls.contains(languageId);
     }
 
     TString DumpLanguagesList() {

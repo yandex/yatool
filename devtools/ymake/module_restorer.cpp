@@ -430,9 +430,15 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
     // This code uses cache-accelerated RealPath
 
     for (const auto& [langId, dirs] : Module->IncDirs.GetAll()) {
+        const bool nonPathAddincls = NLanguages::GetLanguageAddinclsAreNonPaths(langId);
+
         auto&& varName = TModuleIncDirs::GetIncludeVarName(langId);
         for (const auto& incl : dirs.Get()) {
-            AddPath(vars[varName], conf.RealPath(incl));
+            if (nonPathAddincls) {
+                AddPath(vars[varName], incl.CutAllTypes());
+            } else {
+                AddPath(vars[varName], conf.RealPath(incl));
+            }
         }
     }
 

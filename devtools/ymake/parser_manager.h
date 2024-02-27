@@ -35,6 +35,8 @@ namespace NLanguages {
 
     const TString& GetLanguageIncludeName(TLangId languageId);
 
+    bool GetLanguageAddinclsAreNonPaths(TLangId languageId);
+
     TString DumpLanguagesList();
 
     size_t ParsersCount();
