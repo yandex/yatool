@@ -161,7 +161,7 @@ class YaMakeOptions(YaBaseOptions):
         self.keep_build = self._pop('keep_build')
         self.build_root = self._pop('build_root')
         self.output_dir = self._pop('output_dir')
-        self.build_results_report = self._pop('build_result_report')
+        self.build_results_report = self._pop('build_results_report')
         self.targets = self._pop('targets')
         self.rebuild = self._pop('rebuild')
 
