@@ -236,7 +236,13 @@ class _SystemInfo:
             host_info = ' '.join(os.uname())
         else:
             host_info = _SystemInfo._system_command_call("VER")  # XXX: check shell from cygwin to call VER this way!
-        return INDENT + INDENT + host_info.strip() + "\n" if host_info else ""
+
+        if not host_info:
+            return ""
+
+        host_info_ = six_.ensure_str(host_info)  # type: str
+
+        return "{}{}{}\n".format(INDENT, INDENT, host_info_.strip())
 
     @staticmethod
     def _system_command_call(command, **kwargs):
