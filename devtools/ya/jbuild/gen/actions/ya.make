@@ -33,6 +33,7 @@ PEERDIR(
     devtools/ya/yalibrary/rglob
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
+    devtools/ya/yalibrary/vcs/arc
 )
 
 IF (NOT YA_OPENSOURCE)
