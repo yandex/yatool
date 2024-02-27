@@ -318,7 +318,7 @@ class YmakeTimeStatistic:
                         start=self.current_open_threads[thread_name],
                         end=event["_timestamp"],
                         thread_name=thread_name,
-                        debug_id=event["debug_id"],
+                        debug_id=event.get("debug_id", 0),
                     )
                 )
                 del self.current_open_threads[thread_name]

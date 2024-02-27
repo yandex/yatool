@@ -6,6 +6,8 @@ import subprocess
 import threading
 import time
 
+import typing as tp
+
 import six.moves.queue as Queue
 
 import six
@@ -23,6 +25,10 @@ from yalibrary import formatter
 import yalibrary.worker_threads as worker_threads
 from exts.fs import create_dirs, ensure_removed, hardlink_tree, remove_tree_with_perm_update
 from yalibrary.runner.build_root import BuildRootError
+
+if tp.TYPE_CHECKING:
+    from yalibrary.runner.build_root import BuildRoot  # noqa
+
 from yalibrary.runner.timeline_store import DetailedTimelineStore, DetailedStages
 
 logger = logging.getLogger(__name__)
@@ -263,7 +269,7 @@ class RunNodeTask(object):
     def __init__(
         self,
         node,
-        build_root,
+        build_root,  # type: BuildRoot
         ctx,
         threads,
         test_threads,

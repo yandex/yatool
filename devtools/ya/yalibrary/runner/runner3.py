@@ -9,6 +9,8 @@ import sys
 import time
 import weakref
 
+import typing as tp  # noqa
+
 import six
 
 import core.config
@@ -110,6 +112,7 @@ def get_link_outputs(res_nodes):
 
 
 def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
+    # type: (tp.Any, tp.Any, tp.Any, contextlib2.ExitStack, tp.Any) -> tp.Tuple[dict[tp.Any, list[tp.Any]], dict[tp.Any, tp.Any], None | int, dict[tp.Any, tp.Any], dict[tp.Any, tp.Any]]
     opts = ctx.opts
     cache = ctx.cache
     dist_cache = ctx.dist_cache
