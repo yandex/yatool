@@ -12,6 +12,8 @@ import six.moves.cPickle as cPickle
 
 import six
 
+import typing as tp  # noqa
+
 import app_config
 from test import const
 
@@ -270,6 +272,7 @@ def _checkout(opts, display=None):
 
 
 def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
+    # type: (tp.Any, tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
     display = getattr(app_ctx, 'display', None)
     _checkout(opts, display)
 
