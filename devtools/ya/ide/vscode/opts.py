@@ -15,7 +15,8 @@ class VSCodeAllOptions(core.yarg.Options):
         self.write_pyright_config = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
-        self.clangd_index_mode = "full"
+        self.clangd_extra_args = []
+        self.clangd_index_mode = "only-targets"
         self.clangd_index_threads = 0
         self.use_arcadia_root = False
         self.files_visibility = None
@@ -25,7 +26,6 @@ class VSCodeAllOptions(core.yarg.Options):
         self.compile_commands_fix = True
         self.allow_project_inside_arc = False
         self.languages = []
-        self.clangd_extra_args = []
         self.add_codegen_folder = False
 
     @classmethod
@@ -126,7 +126,7 @@ class VSCodeAllOptions(core.yarg.Options):
                 hook=core.yarg.SetValueHook(
                     "clangd_index_mode",
                     values=("full", "only-targets", "disabled"),
-                    default_value=lambda _: "full",
+                    default_value=lambda _: "only-targets",
                 ),
                 group=cls.GROUP,
             ),

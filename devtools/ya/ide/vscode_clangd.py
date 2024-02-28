@@ -53,6 +53,9 @@ class VSCodeClangdOptions(core.yarg.Options):
         self.allow_project_inside_arc = False
         self.add_codegen_folder = False
         self.clang_tidy_enabled = True
+        self.clangd_extra_args = []
+        self.clangd_index_mode = "full"
+        self.clangd_index_threads = 0
 
     @classmethod
     def consumer(cls):
@@ -130,6 +133,28 @@ class VSCodeClangdOptions(core.yarg.Options):
                 hook=core.yarg.SetConstValueHook("clang_tidy_enabled", False),
                 group=cls.GROUP,
             ),
+            core.yarg.ArgConsumer(
+                ["--clangd-extra-args"],
+                help="Additional arguments for clangd",
+                hook=core.yarg.SetAppendHook("clangd_extra_args"),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--clangd-index-mode"],
+                help="Configure clangd background indexing (\"full\", \"disabled\")",
+                hook=core.yarg.SetValueHook(
+                    "clangd_index_mode",
+                    values=("full", "disabled"),
+                    default_value=lambda _: "full",
+                ),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--clangd-index-threads"],
+                help="clangd indexing threads count",
+                hook=core.yarg.SetValueHook('clangd_index_threads', int),
+                group=cls.GROUP,
+            ),
         ]
 
     def postprocess(self):
@@ -137,6 +162,10 @@ class VSCodeClangdOptions(core.yarg.Options):
             self.files_visibility = 'targets-and-deps'
         if self.files_visibility and not self.use_arcadia_root:
             self.use_arcadia_root = True
+
+    def postprocess2(self, params):
+        if params.clangd_index_threads == 0:
+            params.clangd_index_threads = max(getattr(params, "build_threads", 1) // 2, 1)
 
 
 def do_codegen(params):
@@ -446,12 +475,11 @@ def gen_vscode_workspace(params):
                         (
                             "clangd.arguments",
                             [
-                                "--background-index",
                                 "--compile-commands-dir={}".format(vscode_path),
                                 "--header-insertion=never",
                                 "--log=info",
                                 "--pretty",
-                                "-j=%s" % params.build_threads,
+                                "-j=%s" % params.clangd_index_threads,
                             ],
                         ),
                         ("clangd.checkUpdates", True),
@@ -637,6 +665,12 @@ def gen_vscode_workspace(params):
     tasks, configurations = gen_run_configurations(params, run_modules, COMMON_ARGS, YA_PATH)
     workspace['tasks']['tasks'].extend(tasks)
     workspace['launch']['configurations'].extend(configurations)
+
+    if params.clangd_index_mode == "disabled":
+        workspace['settings']['clangd.arguments'].append("--background-index=0")
+
+    if params.clangd_extra_args:
+        workspace['settings']['clangd.arguments'].extend(params.clangd_extra_args)
 
     if params.clang_tidy_enabled:
         ide_common.setup_tidy_config(params.arc_root)

@@ -229,7 +229,7 @@ class VSCodeProject(object):
             )
         )
         if self.is_cpp:
-            clangd_arguments = [
+            settings["clangd.arguments"] = [
                 "--enable-config",
                 "--compile-commands-dir={}".format(self.project_root),
                 "--header-insertion=never",
@@ -237,7 +237,8 @@ class VSCodeProject(object):
                 "--pretty",
                 "-j=%s" % self.params.clangd_index_threads,
             ] + self.params.clangd_extra_args
-            settings["clangd.arguments"] = clangd_arguments
+            if self.params.clangd_index_mode == "disabled":
+                settings["clangd.arguments"].append("--background-index=0")
             settings["clangd.checkUpdates"] = True
 
         if self.is_py3:
