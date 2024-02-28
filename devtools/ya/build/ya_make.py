@@ -450,7 +450,7 @@ def init_yt_dist_cache(opts):
     try:
         from yalibrary.store.yt_store import yt_store
     except ImportError as e:
-        logger.warn("YT store is not available: %s", e)
+        logger.warning("YT store is not available: %s", e)
 
     yt_store_class = yt_store.YndexerYtStore if opts.yt_replace_result_yt_upload_only else yt_store.YtStore
     return yt_store_class(
@@ -540,7 +540,7 @@ def configure_build_graph_cache_dir(app_ctx, opts):
                 return
 
             if build_graph_cache.is_cache_provided(opts) and not opts.build_graph_cache_cl and not opts.distbuild_patch:
-                logger.warn(
+                logger.warning(
                     '--build-graph-cache-dir/--build-graph-cache-archive needs change list provided with --build-graph-cache-cl for improved ymake performance'
                 )
                 return
@@ -1043,7 +1043,7 @@ class Context(object):
         if opts.dump_graph:
             if opts.use_lite_graph:
                 graph_to_dump = self.lite_graph
-                logger.warn("Full graph is not downloaded with option -use-lite-graph, dumping lite graph.")
+                logger.warning("Full graph is not downloaded with option -use-lite-graph, dumping lite graph.")
             else:
                 graph_to_dump = self.graph
 
@@ -1089,7 +1089,7 @@ class Context(object):
             and not self.bin_result
             and not self.lib_result
         ):
-            logger.warn(
+            logger.warning(
                 'Persistent storage for results is not specified. '
                 + 'Remove --no-src-links option (*nix systems) and/or use -o/--output option, see details in help.'
             )
@@ -1761,7 +1761,7 @@ class YaMake(object):
             )
 
         if not self.opts.download_artifacts:
-            logger.warn(
+            logger.warning(
                 'Distributed build does not download build and testing artifacts by default. '
                 + 'Use -E/--download-artifacts option, see details in help.'
             )
