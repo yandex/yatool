@@ -135,6 +135,7 @@ class ArcProject(object):
             return macro_definitions.MakeList('root')
 
     def write_makelist(self, makelist, name=None):
+        # type: (macro_definitions.MakeList, str | None) -> None
         makelist_name = name or self.makelist_name
         mklist = os.path.join(self.arc_root, self.path, makelist_name)
         logger.debug("Path: %s", mklist)
