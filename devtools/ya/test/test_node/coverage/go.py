@@ -41,6 +41,10 @@ def inject_create_go_coverage_report_node(graph, suites, coverage_path, opts):
         "$(SOURCE_ROOT)",
         "--verbose",
     ]
+    if opts.coverage_prefix_filter:
+        cmd.extend(['--prefix-filter', opts.coverage_prefix_filter])
+    if opts.coverage_exclude_regexp:
+        cmd.extend(['--exclude-regexp', opts.coverage_exclude_regexp])
 
     for suite in [s for s in suites if s.get_type() == "go_test"]:
         coverage_tar_path = suite.work_dir(coverage_path)
@@ -91,6 +95,11 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar_path, resolved_f
         "--log-path",
         log_path,
     ]
+
+    if opts.coverage_prefix_filter:
+        cmd.extend(['--prefix-filter', opts.coverage_prefix_filter])
+    if opts.coverage_exclude_regexp:
+        cmd.extend(['--exclude-regexp', opts.coverage_exclude_regexp])
 
     node = {
         "cache": True,

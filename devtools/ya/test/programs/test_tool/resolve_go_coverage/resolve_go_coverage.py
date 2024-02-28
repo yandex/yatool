@@ -12,6 +12,7 @@ import exts.archive
 from devtools.ya.test.programs.test_tool.lib import runtime
 from test.util import shared
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
+from library.python.testing import coverage_utils as coverage_utils_library
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,8 @@ def parse_args():
     parser.add_argument('--coverage-path', required=True)
     parser.add_argument('--log-path')
     parser.add_argument('--log-level', default='INFO')
+    parser.add_argument("--exclude-regexp")
+    parser.add_argument("--prefix-filter")
 
     args = parser.parse_args()
     return args
@@ -63,7 +66,8 @@ def extract(cov_filename):
     return [os.path.join(tmpdir, fn) for fn in dir_files]
 
 
-def parse_coverage(coverage_path):
+def parse_coverage(coverage_path, prefix_filter, exclude_regexp):
+    file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
     cov = []  # coverage format: filename start_line start_offset end_line end_offset cover_flag
     regex = re.compile(r"a.yandex-team.ru/(.*?):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)")
     with open(coverage_path, "r") as afile:
@@ -72,8 +76,10 @@ def parse_coverage(coverage_path):
             line = line.strip()
             match = regex.search(line)
             assert match, "bad line\n"
-            filename, spos, sshift, epos, eshift, nstmts, covered = match.groups()
-            cov.append((filename, [int(spos) - 1, int(sshift), int(epos) - 1, int(eshift), int(covered)]))
+            filename, spos, sshift, epos, eshift, _, covered = match.groups()
+            # filtering filenames by prefix and regexp
+            if file_filter(filename):
+                cov.append((filename, [int(spos) - 1, int(sshift), int(epos) - 1, int(eshift), int(covered)]))
     return cov
 
 
@@ -97,8 +103,8 @@ def transform_coverage(go_cov):
     return uni_cov
 
 
-def resolve_covergage(cov_path, output):
-    go_cov = parse_coverage(cov_path)
+def resolve_covergage(cov_path, output, prefix_filter, exclude_regexp):
+    go_cov = parse_coverage(cov_path, prefix_filter, exclude_regexp)
     unified_cov = transform_coverage(go_cov)
     lib_coverage.export.dump_coverage(unified_cov, output)
 
@@ -111,7 +117,7 @@ def main():
     cov_fn = "cov"
     os.mkdir(merge_dir)
     merged_coverage_filename = combine_cov_files(dir_files, merge_dir, cov_fn)
-    resolve_covergage(merged_coverage_filename, args.output)
+    resolve_covergage(merged_coverage_filename, args.output, args.prefix_filter, args.exclude_regexp)
 
     logger.debug('maxrss: %d', runtime.get_maxrss())
     return 0

@@ -10,10 +10,12 @@ import exts.archive
 import exts.tmp
 import re
 from yatest.common import process
+from library.python.testing import coverage_utils as coverage_utils_library
 
 
-def combine_cov_files(cov_files, merge_dir, new_cov_filename):
+def combine_cov_files(cov_files, merge_dir, new_cov_filename, prefix_filter, exclude_regexp):
     """returns merged coverage filename"""
+    file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
     merged_coverage = {}
     for filename in cov_files:
         with open(filename, 'r') as afile:
@@ -23,9 +25,11 @@ def combine_cov_files(cov_files, merge_dir, new_cov_filename):
                 cover_flag = bool(int(line[-1]))
                 segment_info = line[:-1]
                 segment_info = re.split(r'[/]', segment_info, maxsplit=1)[1]
-                if not merged_coverage.get(segment_info):
-                    merged_coverage[segment_info] = False
-                merged_coverage[segment_info] = cover_flag | merged_coverage[segment_info]
+                # filtering filenames by prefix and regexp
+                if file_filter(extract_filename(segment_info)):
+                    if not merged_coverage.get(segment_info):
+                        merged_coverage[segment_info] = False
+                    merged_coverage[segment_info] = cover_flag | merged_coverage[segment_info]
 
     merged_coverage_filename = os.path.join(merge_dir, new_cov_filename)
     with open(merged_coverage_filename, 'w') as afile:
@@ -42,11 +46,17 @@ def get_options():
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--source-root", required=True)
     parser.add_argument('--gotools-path', required=True)
+    parser.add_argument("--exclude-regexp")
+    parser.add_argument("--prefix-filter")
     return parser.parse_args()
 
 
 def get_host_platform():
     return platform.system().lower()
+
+
+def extract_filename(segment_info):
+    return segment_info.split(":")[0]
 
 
 def build_report(params):
@@ -70,7 +80,9 @@ def build_report(params):
         exts.archive.extract_from_tar(cov_tar, tmpdir)
 
     cov_files = [os.path.join(tmpdir, fn) for fn in os.listdir(tmpdir)]
-    merged_coverage_filename = combine_cov_files(cov_files, mergedir, cov_fn)
+    merged_coverage_filename = combine_cov_files(
+        cov_files, mergedir, cov_fn, params.prefix_filter, params.exclude_regexp
+    )
     cmd = [
         os.path.join(params.gotools_path, "pkg/tool/{}_amd64/cover".format(get_host_platform())),
         "-html=" + merged_coverage_filename,
