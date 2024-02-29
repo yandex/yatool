@@ -310,7 +310,7 @@ class PrintStatisticsOptions(Options):
 class KeepTempsOptions(Options):
     def __init__(self):
         self.keep_temps = False
-        self.incremental_build_dirs_cleanup = False
+        self.incremental_build_dirs_cleanup = True
 
     @staticmethod
     def consumer():
