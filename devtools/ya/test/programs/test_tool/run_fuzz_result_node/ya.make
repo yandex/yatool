@@ -9,6 +9,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/exts
     devtools/ya/test/util
+    devtools/ya/yalibrary/vcs/arc
 )
 
 IF (NOT YA_OPENSOURCE)

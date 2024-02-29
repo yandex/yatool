@@ -6,7 +6,10 @@ import logging
 import argparse
 
 import exts.fs
+import yalibrary.vcs as vcs
+
 from test.util import shared, tools
+from devtools.ya.yalibrary.vcs import arc
 
 try:
     import yalibrary.svn as svn
@@ -14,6 +17,7 @@ try:
     svn_available = True
 except ImportError:
     svn_available = False
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,21 @@ def get_options():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     return parser.parse_args()
+
+
+def _vcs_add(source_root, target):
+    vcs_type = vcs.detect_vcs_type(cwd=source_root)
+    if vcs_type == "svn" and svn_available:
+        if not svn.is_under_control(target, svn_choose_policy=SVN_CHOOSE_POLICY):
+            logger.debug("%s is not under svn - going to add", target)
+            svn.svn_add(target, parents=True, svn_choose_policy=SVN_CHOOSE_POLICY)
+            logger.info("Corpus was successfully updated, run 'svn diff %s' to see changes", target)
+    elif vcs_type == "arc":
+        arc_vcs = arc.Arc(source_root)
+        arc_vcs.add(paths=[target])
+        logger.info("Corpus was successfully updated, run 'arc diff HEAD %s' to see changes", target)
+    else:
+        logger.error("%s is not available, corpus was not added to vcs stage", vcs_type)
 
 
 def main():
@@ -95,19 +114,14 @@ def main():
     for entry in updated_projects:
         target = tools.get_corpus_data_path(entry["project_path"])
 
-        if params.write_results_inplace and svn_available:
+        if params.write_results_inplace:
             abs_target = os.path.join(params.source_root, target)
 
             exts.fs.ensure_dir(os.path.dirname(abs_target))
             with open(abs_target, "w") as afile:
                 json.dump(entry["corpus_data"], afile, indent=4, sort_keys=True)
 
-            if not svn.is_under_control(abs_target, svn_choose_policy=SVN_CHOOSE_POLICY):
-                logger.debug("%s is not under svn - going to add", abs_target)
-                svn.svn_add(abs_target, parents=True, svn_choose_policy=SVN_CHOOSE_POLICY)
-            logger.info("Corpus was successfully updated, run 'svn diff %s' to see changes", abs_target)
-        elif not svn_available:
-            logger.info("Svn is not available, corpus is not affected")
+            _vcs_add(params.source_root, abs_target)
 
         # always dump output corpus to the build_root in the name of testability
         filename = os.path.join(params.build_root, target)

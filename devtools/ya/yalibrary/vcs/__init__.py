@@ -42,6 +42,10 @@ def detect(paths=None, cwd=None, check_tar=None):
     return tuple(mem.get('types', [])), vcs_root, common_root
 
 
+def detect_vcs_type(paths=None, cwd=None, check_tar=None):
+    return detect(paths, cwd, check_tar)[0][0]
+
+
 def lcp(paths):
     paths = [tuple(path.split(os.path.sep)) for path in paths]
     if sys.version_info > (3, 0):
