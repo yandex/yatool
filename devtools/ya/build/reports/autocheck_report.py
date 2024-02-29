@@ -656,7 +656,7 @@ class ReportGenerator(object):
         else:
             entry_prototypes = rp.make_suites_results_prototype([suite])
 
-        suite_prototypes = [entry for entry in entry_prototypes if "suite_id" not in entry]
+        suite_prototypes = [entry for entry in entry_prototypes if "suite_hid" not in entry]
         assert len(suite_prototypes) == 1
         suite_prototype = suite_prototypes[0]
 

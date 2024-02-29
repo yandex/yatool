@@ -19,7 +19,6 @@ HASH_LEN = 32
 REPORT_ENTRY_COMPLETED_FIELDS = [
     'chunk',
     'chunk_hid',
-    'chunk_id',
     'duration',
     'error_type',
     'hid',
@@ -35,7 +34,6 @@ REPORT_ENTRY_COMPLETED_FIELDS = [
     'subtest_name',
     'suite',
     'suite_hid',
-    'suite_id',
     'suite_status',
     'tags',
     'type',
@@ -300,7 +298,6 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                     "rich-snippet": build_container_comment(chunk),
                     "status": convert_test_status(chunk.get_status()),
                     "subtest_name": chunk_name,
-                    "suite_id": suite_id,
                     "suite_hid": suite_hid,
                 }
             )
@@ -334,9 +331,7 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                             suite.get_ci_type_name(),
                             suite_id=effective_suite_hid,
                         ),
-                        "suite_id": suite_id,
                         "suite_hid": suite_hid,
-                        "chunk_id": chunk_id,
                         "chunk_hid": chunk_hid,
                         # there may be Y_UNIT_TEST_SUITE() without arguments, but we must not leave 'name' empty
                         "name": test_class_name,
