@@ -1,6 +1,5 @@
 import base64
 import collections
-import contextlib
 import contextlib2
 import copy
 from enum import Enum
@@ -13,7 +12,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import traceback
 
 from itertools import chain
@@ -32,10 +30,9 @@ import app_config
 import yalibrary.fetcher as fetcher
 import yalibrary.tools as tools
 import core.yarg
-import core.profiler as cp
 import core.report
-import core.stages_profiler as csp
 from core.imprint import imprint
+from core import stage_tracer
 import test.const as tconst
 
 import yalibrary.platform_matcher as pm
@@ -46,6 +43,7 @@ from yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.toolscache import toolscache_version
 import yalibrary.vcs.vcsversion as vcsversion
 import yalibrary.debug_store
+from yalibrary.monitoring import YaMonEvent
 
 import build.makelist as bml
 import build.gen_plan as gen_plan
@@ -54,6 +52,7 @@ from build.ymake2.consts import YmakeEvents
 import build.genconf as bg
 from build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
+import devtools.ya.test.test_node.cmdline as cmdline
 
 import devtools.libs.yaplatform.python.platform_map as platform_map
 
@@ -100,6 +99,7 @@ EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value
 
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("graph")
 
 
 class GraphBuildError(Exception):
@@ -123,7 +123,7 @@ class _OptimizableGraph(dict):
         return result
 
     def optimize_resources(self):
-        stage_started('reduce_graph_resources')
+        reduce_graph_resources_stage = stager.start('reduce_graph_resources')
         try:
             resources = self['conf']['resources']
             commands = set()
@@ -145,7 +145,7 @@ class _OptimizableGraph(dict):
         except Exception as err:
             logger.error(err, exc_info=True)
         finally:
-            stage_finished('reduce_graph_resources')
+            reduce_graph_resources_stage.finish()
 
 
 class _NodeGen(object):
@@ -166,10 +166,10 @@ class _NodeGen(object):
     def gen_rename_node(self, node, suffix):
         inputs = node['outputs']
         outputs = [inp + suffix for inp in inputs]
-        import devtools.ya.test.test_node.cmdline as cmdline
 
         tared_outputs = [inp + suffix for inp in node.get('tared_outputs', [])]
         cmd_args = sum([[fr, to] for fr, to in zip(inputs, outputs)], [])
+
         ret = {
             'uid': hashing.md5_value(node['uid'] + '-' + suffix),
             'broadcast': False,
@@ -220,61 +220,6 @@ class _NodeGen(object):
         self.extra_nodes.append(ret)
 
         return ret['uid']
-
-
-class _StageTracer:
-    def __init__(self, ev_listener=None):
-        self._ev_listener = ev_listener
-
-    def start(self, name):
-        return _StageTracer._Stage(name, ev_listener=self._ev_listener)
-
-    @contextlib.contextmanager
-    def scope(self, name):
-        stage = self.start(name)
-        try:
-            yield None
-        finally:
-            stage.finish()
-
-    class _Stage:
-        def __init__(self, name, ev_listener):
-            self._name = name
-            self._ev_listener = ev_listener
-            self._started = None
-            self._start()
-
-        def _start(self):
-            self._started = time.time()
-            stage_started(self._name)
-
-        def finish(self):
-            if not self._started:
-                return
-
-            stage_finished(self._name)
-            if self._ev_listener:
-                ts = (self._started, time.time())
-                self._ev_listener(
-                    {
-                        '_typename': 'stage-finished',
-                        '_timestamp': time.time(),
-                        'name': self._name,
-                        'time': ts,
-                        'tag': self._name,
-                    }
-                )
-            self._started = None
-
-
-def stage_started(stage_name):
-    cp.profile_step_started(stage_name)
-    csp.stage_started(stage_name)
-
-
-def stage_finished(stage_name):
-    csp.stage_finished(stage_name)
-    cp.profile_step_finished(stage_name)
 
 
 def union_inputs(inputs1, inputs2):
@@ -983,7 +928,7 @@ def finalize_graph(graph, opts):
 
 
 def _load_stat(graph_stat_path):
-    stage_started("load_graph_stat")
+    load_graph_stat_stage = stager.start("load_graph_stat")
 
     try:
         with open(graph_stat_path) as f:
@@ -997,11 +942,11 @@ def _load_stat(graph_stat_path):
         except Exception as ee:
             logger.exception("Can not report error: %r", ee)
     finally:
-        stage_finished("load_graph_stat")
+        load_graph_stat_stage.finish()
 
 
 def _add_stat_to_graph(graph, stat, path_filters=None):
-    stage_started("add_stat_to_graph")
+    add_stat_to_graph_stage = stager.start("add_stat_to_graph")
 
     stat_version = (stat or {}).get("version")
     if stat_version != GRAPH_STAT_VERSION:
@@ -1010,7 +955,7 @@ def _add_stat_to_graph(graph, stat, path_filters=None):
             stat_version,
             GRAPH_STAT_VERSION,
         )
-        stage_finished("add_stat_to_graph")
+        add_stat_to_graph_stage.finish()
         return
 
     path_filters = ["$(BUILD_ROOT)/{}".format(pf) for pf in (path_filters or [])]
@@ -1037,7 +982,7 @@ def _add_stat_to_graph(graph, stat, path_filters=None):
 
     graph["conf"]["min_reqs_errors"] = min_reqs_errors
 
-    stage_finished("add_stat_to_graph")
+    add_stat_to_graph_stage.finish()
 
 
 def _get_full_platform_name(platform, tags):
@@ -1270,7 +1215,6 @@ class _GraphMaker(object):
         self,
         opts,
         ya_sem,
-        stager,
         ymake_bin,
         real_ymake_bin,
         src_dir,
@@ -1284,7 +1228,6 @@ class _GraphMaker(object):
     ):
         self._opts = opts
         self._ya_sem = ya_sem
-        self._stager = stager
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
         self._src_dir = src_dir
@@ -1536,7 +1479,7 @@ class _GraphMaker(object):
             cache_subdir = cache_dir if extra_tag is None else os.path.join(cache_dir, extra_tag)
             exts.fs.ensure_dir(cache_subdir)
         tags, platform = _prepare_tags(target_tc, flags, self._opts)
-        with self._ya_sem, self._stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
+        with self._ya_sem, stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
             result = self._gen_graph(
                 flags,
                 target_tc,
@@ -1589,7 +1532,7 @@ class _GraphMaker(object):
             current_ev_listener = _ToolEventListener(self._ev_listener, tool_targets_queue_putter)
             enabled_events += YmakeEvents.TOOLS.value
 
-        with self._stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
+        with stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
             ymake_opts = self._gen_opts(
                 flags,
                 tc,
@@ -1608,11 +1551,11 @@ class _GraphMaker(object):
             )
 
         # return res, tc_tests, java_darts, make_files_map
-        with self._stager.scope("gen-graph-json-{}".format(_shorten_debug_id(debug_id))):
+        with stager.scope("gen-graph-json-{}".format(_shorten_debug_id(debug_id))):
             graph = self._gen_graph_json(ymake_opts, purpose=debug_id)
 
         if should_run_tc_tests:
-            with self._stager.scope("gen-tests-{}".format(_shorten_debug_id(debug_id))):
+            with stager.scope("gen-tests-{}".format(_shorten_debug_id(debug_id))):
                 with open(test_dart_path) as dart:
                     tc_tests = self._gen_tests(dart.read(), tc)
 
@@ -1804,7 +1747,7 @@ class _GraphMaker(object):
         def event_listener_debug_id_wrapper(event):
             if (
                 event['_typename'] in ("NEvent.TStageStarted", "NEvent.TStageFinished")
-                and event["StageName"] == "ymake main"
+                and event["StageName"] == "ymake run"
             ):
                 event["debug_id"] = debug_id
             event_listener_invalid_recurses_wrapper_func(event)
@@ -1873,7 +1816,7 @@ class _GraphMaker(object):
                 diag.save(diag_key, graph=dump.stdout)
 
         try:
-            with self._stager.scope('load-graph-from-json'):
+            with stager.scope('load-graph-from-json'):
                 return ccgraph.Graph(ymake_output=ymake_res.stdout)
         except Exception as e:
             raise GraphMalformedException(e.message)
@@ -1895,8 +1838,6 @@ class _GraphMaker(object):
 
 def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
     import core.config
-
-    stager = _StageTracer(ev_listener)
 
     build_graph_and_tests_stage = stager.start('build_graph_and_tests')
 
@@ -1948,7 +1889,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
         if not target_platforms:
             target_platforms = [{'platform_name': bg.host_platform_name()}]
     else:
-        if pm.is_darwin_arm64() and not opts.hide_arm64_host_warning and not host and not target_platforms:
+        if pm.is_darwin_rosetta() and not opts.hide_arm64_host_warning and not host and not target_platforms:
             try:
                 import app_ctx
 
@@ -2059,12 +2000,11 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
 
     ya_sem = threading.Semaphore(opts.ya_threads) if getattr(opts, 'ya_threads', None) else contextlib2.nullcontext()
 
-    _enable_imprint_fs_cache(stager, opts)
+    _enable_imprint_fs_cache(opts)
 
     graph_maker = _GraphMaker(
         opts,
         ya_sem,
-        stager,
         ymake_bin,
         real_ymake_bin,
         src_dir,
@@ -2099,7 +2039,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
         graph_handles.append(target_graph)
 
     with stager.scope("get-tools"):
-        graph_tools = _get_tools(tool_targets_queue, stager, graph_maker, opts.arc_root, host_tc)
+        graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc)
 
     any_tests = any([_should_run_tests(opts, tc) for tc in target_tcs])
 
@@ -2109,9 +2049,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
     merged_target_graphs = []
     for num, target_graph in enumerate(graph_handles, start=1):
         graph = _merge_target_graphs(
-            stager,
             graph_maker,
-            host_tool_resolver,
             conf_error_reporter,
             opts,
             any_tests,
@@ -2123,7 +2061,6 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
 
     with stager.scope('build-merged-graph'):
         graph, tests, stripped_tests, make_files = _build_merged_graph(
-            stager,
             host_tool_resolver,
             conf_error_reporter,
             opts,
@@ -2268,7 +2205,7 @@ def _should_run_tests(opts, target_tc):
     )
 
 
-def _enable_imprint_fs_cache(stager, opts):
+def _enable_imprint_fs_cache(opts):
     if opts.cache_fs_read or opts.cache_fs_write:
         imprint_enable_fs_cache_stage = stager.start('imprint_enable_fs_cache')
         try:
@@ -2282,6 +2219,7 @@ def _enable_imprint_fs_cache(stager, opts):
 
             imprint.use_change_list(opts.build_graph_cache_cl, quiet=True)
             logger.debug("imprint fs cache is enabled")
+            YaMonEvent.send('EYaStats::ImprintFSCacheEnabled', True)
         except Exception:
             logger.exception("Something goes wrong while enabling fs cache / changleist")
             imprint.disable_fs()
@@ -2521,35 +2459,40 @@ def _make_yndexing_graph(graph, opts, ymake_bin, host_tool_resolver):
 def _gen_upload_node(opts, nd):
     yndex_file = _find_yndex_file(nd)
     output_file = yndex_file + '.yt'
-    cmd = ['$(YTYNDEXER)/ytyndexer', 'upload', '-y', '$(BUILD_ROOT)', '-r', opts.yt_root, '-c', opts.yt_cluster]
-    if opts.yt_codenav_extra_opts is None:
-        cmd += ['--create-yt-root-with-ttl']
-    elif opts.yt_codenav_extra_opts.strip() and opts.yt_codenav_extra_opts.strip().lower() != 'no':
-        cmd += [i for i in opts.yt_codenav_extra_opts.strip().split(' ') if i]
+    cmd = [
+        '$(YTYNDEXER)/ytyndexer',
+        'upload',
+        '-y',
+        '$(BUILD_ROOT)',
+        '-r',
+        opts.yt_root,
+        '-c',
+        opts.yt_cluster,
+        '--dump-statistics',
+        output_file,
+    ]
+    node_tag = 'yt_upload'
+    opts_that_do_not_affect_uid = []
+    if opts.yt_codenav_extra_opts is not None:
+        yt_codenav_extra_opts = list(filter(None, opts.yt_codenav_extra_opts.split(' ')))
+        if yt_codenav_extra_opts != ['no']:
+            # Note: it is assumed that the upload options do not affect the uid
+            opts_that_do_not_affect_uid.extend(yt_codenav_extra_opts)
+        if '--use-yt-dynamic-tables' in yt_codenav_extra_opts:
+            node_tag = 'yt_upload_dynamic'
     uid = 'yy-upload-{}'.format(hashing.md5_value(nd['uid'] + '##' + ' '.join(cmd)))
+    cmd.extend(opts_that_do_not_affect_uid)
     if not opts.yt_readonly:
         cmd += ['-u', uid]
     node = {
-        'cmds': [
-            {'cmd_args': cmd},
-            {
-                'cmd_args': [
-                    '$(PYTHON)/python',
-                    '$(SOURCE_ROOT)/build/scripts/write_file_size.py',
-                    output_file,
-                    yndex_file,
-                ]
-            },
-        ],
+        'cmds': [{'cmd_args': cmd}],
         'kv': {'p': 'YU', 'pc': 'magenta'},
         'outputs': [output_file],
-        'inputs': [
-            yndex_file,
-            '$(SOURCE_ROOT)/build/scripts/write_file_size.py',
-        ],
+        'inputs': [yndex_file],
         'deps': [nd['uid']],
-        'tag': 'yt_upload',
+        'tag': node_tag,
         'cache': False,
+        'backup': True,
         'requirements': {'network': 'full'},
         'secrets': ['YT_YNDEXER_YT_TOKEN'],
         'timeout': 60 * 60,
@@ -2583,6 +2526,11 @@ def _gen_merge_node(nodes):
 def _gen_ymake_yndex_node(opts, ymake_bin):
     tc = bg.gen_host_tc(getattr(opts, 'c_compiler', None), getattr(opts, 'cxx_compiler', None))
     tc_params = six.ensure_str(base64.b64encode(six.ensure_binary(json.dumps(tc, sort_keys=True))))
+    conf_flags = []
+    for f in ('RECURSE_PARTITIONS_COUNT', 'RECURSE_PARTITION_INDEX'):
+        val = opts.flags.get(f)
+        if val is not None:
+            conf_flags += ['-D', '{}={}'.format(f, val)]
     cmds = [
         {
             'cmd_args': [
@@ -2593,7 +2541,8 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
                 'no',
                 '--toolchain-params',
                 tc_params,
-            ],
+            ]
+            + conf_flags,
             'stdout': '$(BUILD_ROOT)/ymake.conf',
         },
         {
@@ -2603,6 +2552,8 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
                 '$(BUILD_ROOT)',
                 '-y',
                 '$(SOURCE_ROOT)/build/plugins',
+                '-y',
+                '$(SOURCE_ROOT)/build/internal/plugins',
                 '-c',
                 '$(BUILD_ROOT)/ymake.conf',
                 '-Y',
@@ -2745,7 +2696,7 @@ def _gen_merge_nodes(nodes):
     return merging_nodes, alone_nodes
 
 
-def _get_tools(tool_targets_queue, stager, graph_maker, arc_root, host_tc):
+def _get_tools(tool_targets_queue, graph_maker, arc_root, host_tc):
     with stager.scope("waiting-tool-targets"):
         tools_targets = tool_targets_queue.get()
     abs_targets = [os.path.join(arc_root, tt) for tt in tools_targets]
@@ -2851,9 +2802,7 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
 
 
 def _merge_target_graphs(
-    stager,
     graph_maker,
-    host_tool_resolver,
     conf_error_reporter,
     opts,
     any_tests,
@@ -2930,7 +2879,6 @@ def _get_tools_from_suites(suites, ytexec_required):
 
 
 def _build_merged_graph(
-    stager,
     host_tool_resolver,
     conf_error_reporter,
     opts,
@@ -2981,7 +2929,7 @@ def _build_merged_graph(
     test_scope = injected_tests + stripped_tests
 
     if any_tests:
-        _inject_tests_result_node(stager, src_dir, merged_graph, test_scope, test_opts)
+        _inject_tests_result_node(src_dir, merged_graph, test_scope, test_opts)
 
         tools_from_suites = _get_tools_from_suites(injected_tests, ytexec_required)
         resources = [host_tool_resolver.resolve(tool, tool.upper()) for tool in tools_from_suites]
@@ -3071,21 +3019,21 @@ def _split_stripped_tests(tests, opts):
     return test.test_node.split_stripped_tests(tests, opts)
 
 
-def _inject_tests_result_node(stager, src_dir, graph, tests, opts):
+def _inject_tests_result_node(src_dir, graph, tests, opts):
     import test.test_node
     import build.build_plan
 
     buildplan = build.build_plan.BuildPlan(graph)
 
     if opts.strip_idle_build_results:
-        _strip_idle_build_results(stager, graph, buildplan, tests)
+        _strip_idle_build_results(graph, buildplan, tests)
     if opts.strip_skipped_test_deps:
-        _strip_skipped_results(stager, graph, buildplan, tests)
+        _strip_skipped_results(graph, buildplan, tests)
 
     test.test_node.inject_tests_result_node(src_dir, buildplan, tests, opts)
 
 
-def _strip_idle_build_results(stager, graph, plan, tests):
+def _strip_idle_build_results(graph, plan, tests):
     # Remove all result nodes (including build nodes) that are not required for tests run
     strip_idle_build_results_stage = stager.start('tests_strip_idle_build_results')
 
@@ -3135,7 +3083,7 @@ def _strip_idle_build_results(stager, graph, plan, tests):
     strip_idle_build_results_stage.finish()
 
 
-def _strip_skipped_results(stager, graph, plan, tests):
+def _strip_skipped_results(graph, plan, tests):
     # remove test binaries from results for stripped test nodes
     # to avoid building targets which wouldn't be used
     tests_strip_skipped_results_stage = stager.start('tests_strip_skipped_results')
