@@ -111,5 +111,5 @@ def fix_python_with_ruff(data, path):
 
     out = _launch_ruff(data, path, ruff_config.path, ['format'])
     # launch check fix to sort imports
-    out = _launch_ruff(out, path, ruff_config.path, ['check', '--select', 'I', '--fixable', 'I', '--fix'])
+    out = _launch_ruff(out, path, ruff_config.path, ['check', '--fix'])
     return out
