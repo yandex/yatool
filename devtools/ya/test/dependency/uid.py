@@ -161,7 +161,6 @@ class TestUidGenerator(object):
         tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
         if tests_paths:
             from core.imprint.atd import ArcadiaTestData
-            import yalibrary.svn as svn
 
             _, path_to_rev = cls._get_atd_revisions(arc_root, use_atd_revs)
             if path_to_rev:
@@ -176,7 +175,7 @@ class TestUidGenerator(object):
                     user = "robot-canons-dloader"
                     user_key_file = get_robot_canons_dloader_key_path(arc_root)
                     branch_url = cls._cut_off_arcadia_from_url(arcadia_tests_data_repo["repository"]).replace(
-                        "svn://", svn.ARCADIA_SVN_HOST.rstrip("/") + "/"
+                        "svn://", "svn+ssh://arcadia.yandex.ru/"
                     )
                     svn_tests_paths = testdeps.get_test_data_svn_paths(test, branch_url)
 
