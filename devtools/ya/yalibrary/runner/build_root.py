@@ -308,12 +308,11 @@ class BuildRoot(object):
 
 
 class BuildRootSet(object):
-    def __init__(self, path, keep, incremental_cleanup, defer, limit_output_size, validate_content=False):
+    def __init__(self, path, keep, defer, limit_output_size, validate_content=False):
         self._store_path = path
         self._lock = threading.Lock()
         self._id = 0
         self._keep = keep
-        self._incremental_cleanup = incremental_cleanup
         self._defer = defer
         self._build_root = self._make_root()
         self._limit_output_size = limit_output_size
@@ -378,7 +377,7 @@ class BuildRootSet(object):
     def new(self, outputs, refcount, dir_outputs=None, compute_hash=True):
         root = BuildRoot(
             os.path.join(self._build_root, self._gen_id()),
-            self._keep or not self._incremental_cleanup,
+            self._keep,
             outputs,
             self._limit_output_size,
             refcount,

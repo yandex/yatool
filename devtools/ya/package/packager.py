@@ -272,7 +272,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "custom_version",
         "executor_address",
         "fetcher_params",
-        "incremental_build_dirs_cleanup",
         "junit_args",
         "link_threads",
         "local_executor",

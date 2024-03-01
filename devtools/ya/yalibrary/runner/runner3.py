@@ -187,7 +187,6 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         build_root.BuildRootSet(
             ctx.opts.bld_root,
             ctx.opts.keep_temps,
-            ctx.opts.incremental_build_dirs_cleanup,
             workers.add,
             ctx.opts.limit_build_root_size,
             validate_content=ctx.opts.validate_build_root_content,
@@ -343,7 +342,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             who_provides[p] = n
     timer.show_step('build who provides, ref count')
 
-    if ctx.opts.incremental_build_dirs_cleanup:
+    def setup_incremental_cleanup():
         if not ctx.opts.use_distbuild:
             for n in nodes:
                 for d in n.consume():
@@ -357,6 +356,8 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             for tuid in suite.result_uids:
                 if tuid in who_provides:
                     who_provides[tuid].refcount += 1
+
+    setup_incremental_cleanup()
 
     timer.show_step('build ref count')
 

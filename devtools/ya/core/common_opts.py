@@ -310,7 +310,6 @@ class PrintStatisticsOptions(Options):
 class KeepTempsOptions(Options):
     def __init__(self):
         self.keep_temps = False
-        self.incremental_build_dirs_cleanup = True
 
     @staticmethod
     def consumer():
@@ -323,14 +322,6 @@ class KeepTempsOptions(Options):
                 visible=HelpLevel.EXPERT,
             ),
             EnvConsumer('YA_KEEP_TEMPS', hook=SetValueHook('keep_temps', return_true_if_enabled)),
-            ArgConsumer(
-                ['--incremental-build-dirs-cleanup'],
-                help="Do not remove temporary data incrementally",
-                hook=SetValueHook('incremental_build_dirs_cleanup', return_true_if_enabled),
-                group=DEVELOPERS_OPT_GROUP,
-                visible=False,
-            ),
-            ConfigConsumer('incremental_build_dirs_cleanup'),
         ]
 
     def postprocess2(self, params):
