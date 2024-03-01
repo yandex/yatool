@@ -482,7 +482,6 @@ def gen_vscode_workspace(params):
                                 "-j=%s" % params.clangd_index_threads,
                             ],
                         ),
-                        ("clangd.checkUpdates", True),
                         ("C_Cpp.intelliSenseEngine", "disabled"),
                         ("go.useLanguageServer", False),
                         ("python.languageServer", "Pylance"),
