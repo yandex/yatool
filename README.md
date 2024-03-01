@@ -4,48 +4,40 @@ Yatool - это кроссплатформенный инструментари�
 
 Все утилиты доступны для использования через единую точку входа ya. Основным обработчиком в ya утилите является make, которая представляет собой универсальную систему сборки высокого уровня.
 
+Создавайте и тестируйте программное обеспечение любого размера быстро и надежно.
+
 ## ya make
 
-`ya make` build system can be described as
+Система сборки `ya make` - это инструмент, который помогает программистам собрать и компилировать код. Она может быть описана как полностью статическая и универсальная. Это значит, что все зависимости анализируются заранее, и изменения фиксируются в графе команд. Каждая команда получает уникальный идентификатор, который помогает системе знать, когда результат команды изменился.
 
-- **Completely static**.
-  All dependencies are analyzed in advance and changes are recorded in the command graph.
-  Based on the analysis, each command receives a unique UID, which fixes its result on a given state of input data and dependencies.
-  The immutability of the UID indicates the immutability of its result and therefore serves as a key in the results cache, and is also used when analyzing changes to exclude a command from execution.
+Эта система сборки работает на высоком уровне и скрывает множество деталей. Она сама определяет, как связаны разные файлы и компоненты, и как их нужно собрать и компилировать. Она также может связывать результаты макросов по именам и управлять ресурсами.
 
-- **Universal and high-level**.
-  The description of the build system is done at the level of modules, macros and dependencies between modules.
-  Our build system hides a lot.
-  It itself builds inter-file dependencies, both direct (`a.cpp` includes `b.h`) and induced by generation (if `x.proto` imports `y.proto`, then `x.pb.h` will include `y.pb.h`), allowing developers to avoid wasting time specifying highly granular file dependencies.
-  These dependencies are internally mapped to commands: the compilation command `a.cpp` will be restarted when `b.h` is changed, and the command change in `y.proto` will entail not only a regeneration for `x.proto`, but also a recompilation of `z.cpp`, which includes `x.pb.h`.
-  It itself builds file processing chains - including the w.proto file in the `GO_LIBRARY()` module will entail the generation of `.pb.go` from it and the further translation of this file as part of the package.
+Система сборки `ya make` - декларативная, но не совсем. Большая часть конструкций описывает свойства модулей и команд, но часть конструкций выполняется последовательно, как в обычном тексте.
 
-- **Declarative**, mostly.
-  In the assembly description, most of the structures record the properties of modules and commands and the connections between them. However, some of the constructions are performed sequentially: setting and calculating local variables, conditional constructions - this is something that depends on the order in which it is written in the `ya.make` file.
+Для работы этой системы сборки нужно соблюдать герметичность, то есть команды не должны зависеть от окружения или результата других команд. Всю информацию о зависимостях система должна знать, чтобы сформировать уникальный идентификатор для каждой команды.
 
-## Warning - bumpy road ahead
+Система сборки `ya make` не гарантирует бинарную воспроизводимость, но она повышает инкрементальность и делает сборку устойчивой к сборочному шуму. Она также масштабируема и может использоваться в локальной работе и распределенной сборке.
 
-`ya make` has been used at Yandex for more than 10 years and successfully meets all challenges within the company, coping with its tasks against the background of the explosive growth of the monorepository and projects in it.
-Developers focus on developing products rather than overcoming complexities in building and testing projects.
-However, such experience is strongly integrated into the internal ecosystem and is difficult to alienate.
-As part of future releases, we want to provide similar experience for the development of open source products.
-At this moment `ya` does not have a stable release and might not provide flawless and integrated experience for external users.
-Work in progress, stay tuned.
+Кэширование и шардирование - это важные свойства системы сборки, которые позволяют ускорить сборку и снизить время анализа зависимостей. В целом, система сборки `ya make` - это мощный инструмент для программистов, который помогает быстро и эффективно собирать и компилировать код.
 
-## License
-Yatool is licensed under the [Apache-2](LICENSE).
+> [!WARNING]  
+> Система  используют `ya make` уже более 10 лет внутри компании "Яндекс", и она успешно справляется с задачами внутри компании, даже при быстром росте монорепозитория и проектов. Разработчики могут сосредоточиться на разработке  продуктов, не боясь столкнуться с проблемами при создании и тестировании проектов. Однако, этот опыт тесно интегрирован во внутреннюю экосистему и его трудно отделить.
+На данный момент, мы хотим поделиться нашим опыт для разработки продуктов с открытым исходным кодом.  Работа над этим продолжается, и разработчикам рекомендуется следить за обновлениями.
 
-## Building
+## Лицензия
+`Yatool` лицензирован в соответствии с [Apache-2](LICENSE).
 
-You can use `ya` to build itself. Get the source codes and just run the command:
+## Сборка
+
+Вы можете использовать `ya` для сборки самого себя. Скачайте исходные коды и просто запустите команду:
 
 ```(bash)
 ./ya make
 ```
 
-You can also build the first generation of build utilities without using `ya` using bootstrap.
-For more details see [bootstrap guide](devtools/ya/bootstrap/README.md).
+Вы также можете создать утилиту сборки с помощью bootstrap.
+Более подробную информацию смотрите в разделе [bootstrap guide](devtools/ya/bootstrap/README.md).
 
-## Contributing
+## Вклад
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions to contribute.
