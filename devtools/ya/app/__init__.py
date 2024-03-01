@@ -9,13 +9,14 @@ import time
 import core.config
 import core.gsid
 import core.sig_handler
+import core.stage_tracer as stage_tracer
+import core.stage_aggregator as stage_aggregator
 import devtools.ya.core.sec as sec
 import exts.os2
 import exts.strings
 import exts.windows
 import yalibrary.app_ctx
 import yalibrary.find_root
-from core import stage_tracer
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
 
@@ -25,6 +26,7 @@ import devtools.ya.app.modules.token_suppressions as token_suppressions
 
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("overall-execution")
 # mlockall is called too early, w/ no logging
 MLOCK_STATUS_MESSAGE = ""
 
@@ -56,6 +58,7 @@ def execute_early(action):
         precise=False,
         **kwargs
     ):
+        modules_initialization_early_stage = stager.start("modules-initialization-early")
         ctx = yalibrary.app_ctx.get_app_ctx()
 
         modules = []
@@ -76,6 +79,7 @@ def execute_early(action):
                 ('file_in_memory_log', configure_in_memory_log(ctx, logging.DEBUG)),
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
+                ('walltime_storage', configure_walltime_storage()),
             ]
         )
 
@@ -99,6 +103,7 @@ def execute_early(action):
             modules.append(('diag', configure_diag_interceptor()))
 
         with ctx.configure(modules):
+            modules_initialization_early_stage.finish()
             return action(args, **kwargs)
 
     return helper
@@ -107,6 +112,8 @@ def execute_early(action):
 def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=None, interruptable=False):
     # noinspection PyStatementEffect
     def helper(parameters):
+        stager.finish("handler-selection")
+        modules_initialization_full_stage = stager.start("modules-initialization-full")
         if handler_python_major_version:
             logger.info("Handler require python major version: %d", handler_python_major_version)
 
@@ -139,9 +146,16 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
             el = getattr(ctx, "evlog", None)
             if el:
                 stage_tracer.stage_tracer.add_consumer(stage_tracer.EvLogConsumer(el))
-            logger.debug('Run action on %s with params %s', action, params)
-            report_params(ctx)
-            return action(ctx.params)
+            try:
+                logger.debug('Run action on %s with params %s', action, params)
+                report_params(ctx)
+                action_name = getattr(action, "__name__", "module")
+                modules_initialization_full_stage.finish()
+
+                with stager.scope("invoke-{}".format(action_name)):
+                    return action(ctx.params)
+            finally:
+                dump_report_stages(ctx)
 
     return helper
 
@@ -152,6 +166,20 @@ def configure_self_info():
     logger.debug("origin: %s", "arcadia" if app_config.in_house else "github")
     logger.debug("python: %s", sys.version_info)
     yield True
+
+
+def configure_walltime_storage():
+    yield dict()
+
+
+def dump_report_stages(app_ctx):
+    try:
+        stages = stage_tracer.get_stat("overall-execution")
+        for aggregator in stage_aggregator.get_aggregators():
+            app_ctx.walltime_storage.update(aggregator.get_walltime(stages))
+
+    except Exception:
+        logger.exception("While aggregating stages")
 
 
 def report_params(app_ctx):
@@ -172,11 +200,8 @@ def report_params(app_ctx):
 
         telemetry.report(ReportTypes.PARAMETERS, values_to_report)
 
-        return True
     except Exception:
         logger.exception("While preparing parameters to report")
-
-    return False
 
 
 def configure_environment_checker():
@@ -610,6 +635,7 @@ def configure_report_interceptor(ctx):
                 exit_code=exit_code,
                 prefix=core.yarg.OptsHandler.latest_handled_prefix(),
                 version=ctx.revision,
+                total_walltimes=ctx.walltime_storage,
                 **_resources_report()
             ),
         )

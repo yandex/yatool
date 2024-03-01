@@ -33,6 +33,7 @@ PY_SRCS(
     plugin_loader.py
     profiler.py
     stages_profiler.py
+    stage_aggregator.py
     stage_tracer.py
 )
 

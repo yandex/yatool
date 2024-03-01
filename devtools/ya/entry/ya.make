@@ -14,6 +14,7 @@ PEERDIR(
     contrib/python/six
     devtools/ya/app
     devtools/ya/core/sig_handler
+    devtools/ya/core
     library/python/mlockall
     library/python/svn_version
 )

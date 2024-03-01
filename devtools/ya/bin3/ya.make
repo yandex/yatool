@@ -14,6 +14,7 @@ PY_MAIN(entry.main)
 
 PEERDIR(
     devtools/ya/cpp/entry
+    devtools/ya/cpp/lib/start_stager
     devtools/ya/entry
     devtools/ya/handlers
 )

@@ -15,6 +15,7 @@ import core.error
 import core.respawn
 import core.sig_handler
 import core.yarg
+import core.stage_tracer as stage_tracer
 
 from core.yarg import LazyCommand, try_load_handler
 from core.logger import init_logger
@@ -22,6 +23,8 @@ from core.plugin_loader import explore_plugins
 from library.python import mlockall
 
 import app
+
+stager = stage_tracer.get_tracer("overall-execution")
 
 
 def _mlockall():
@@ -41,6 +44,7 @@ def do_main(args, extra_help):
     for plugin_name in sorted(plugin_map.names()):
         handler[plugin_name] = LazyCommand(plugin_name, plugin_map.get(plugin_name))
     handler['-'] = core.yarg.FeedbackHandler(handler)
+    stager.start("handler-selection")
     res = handler.handle(handler, args, prefix=['ya'])
     if isinstance(res, six.integer_types):
         sys.exit(res)
@@ -226,6 +230,7 @@ def main(args):
             extra_help='\n'.join(format_help()),
         )
 
+    stager.finish("main-processing")
     if a.profile:
         # Keep profile modules off the critical path
         try:

@@ -23,4 +23,5 @@ RECURSE_FOR_TESTS(
 RECURSE(
     edl
     json_sax
+    start_stager
 )
