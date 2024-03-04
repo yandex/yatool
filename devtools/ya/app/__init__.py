@@ -79,7 +79,7 @@ def execute_early(action):
                 ('file_in_memory_log', configure_in_memory_log(ctx, logging.DEBUG)),
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
-                ('walltime_storage', configure_walltime_storage()),
+                ('aggregated_stages', configure_aggregated_stages()),
             ]
         )
 
@@ -155,7 +155,7 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
                 with stager.scope("invoke-{}".format(action_name)):
                     return action(ctx.params)
             finally:
-                dump_report_stages(ctx)
+                dump_aggregated_stages(ctx)
 
     return helper
 
@@ -168,15 +168,53 @@ def configure_self_info():
     yield True
 
 
-def configure_walltime_storage():
+def _get_bootstrap_intervals():
+    aggregator = stage_aggregator.BootstrapAggregator()
+    start, end = time.time(), 0
+    events = list(aggregator.applicable_events(stage_tracer.get_stat("overall-execution")))
+    if len(events) == 0:
+        return None, None
+
+    for stat in events:
+        start = min(stat[0], start)
+        end = max(stat[1], end)
+
+    # hack to display stage correctly in evlog viewer
+    start -= 1e-4
+    return start, end
+
+
+def _fill_tracer_with_environ_stages():
+    last_environ_stage_tstamp = time.time()
+    stages = os.environ.get('YA_STAGES', '')
+    if stages:
+        prev_stage = None
+        for stage in stages.split(":"):
+            name, tstamp = stage.split("@")
+            tstamp = float(tstamp)
+            if prev_stage is not None:
+                prev_stage.finish(tstamp)
+            prev_stage = stager.start(name, tstamp)
+
+        if prev_stage is not None:
+            prev_stage.finish(last_environ_stage_tstamp)
+
+    start, end = _get_bootstrap_intervals()
+    if start is not None:
+        bootstrap = stager.start("ya-bootstrap", start)
+        bootstrap.finish(end)
+
+
+def configure_aggregated_stages():
+    _fill_tracer_with_environ_stages()
     yield dict()
 
 
-def dump_report_stages(app_ctx):
+def dump_aggregated_stages(app_ctx):
     try:
         stages = stage_tracer.get_stat("overall-execution")
         for aggregator in stage_aggregator.get_aggregators():
-            app_ctx.walltime_storage.update(aggregator.get_walltime(stages))
+            app_ctx.aggregated_stages.update(aggregator.aggregate(stages))
 
     except Exception:
         logger.exception("While aggregating stages")
@@ -559,6 +597,12 @@ def check_and_respawn_if_possible(handler_python_major_version=None):
         core.respawn.check_for_respawn(arcadia_root, handler_python_major_version)
 
 
+def _ya_downloads_report():
+    stages = stage_tracer.get_stat("overall-execution")
+    aggregator = stage_aggregator.YaScriptDownloadsAggregator()
+    return aggregator.aggregate(stages)
+
+
 def _resources_report():
     try:
         import resource
@@ -625,6 +669,8 @@ def configure_report_interceptor(ctx):
     finally:
         duration = time.time() - start
 
+        additional_fields = _resources_report()
+        additional_fields.update(_ya_downloads_report())
         telemetry.report(
             ReportTypes.TIMEIT,
             dict(
@@ -635,8 +681,8 @@ def configure_report_interceptor(ctx):
                 exit_code=exit_code,
                 prefix=core.yarg.OptsHandler.latest_handled_prefix(),
                 version=ctx.revision,
-                total_walltimes=ctx.walltime_storage,
-                **_resources_report()
+                total_walltimes=ctx.aggregated_stages,
+                **additional_fields
             ),
         )
 

@@ -3,20 +3,29 @@ import time
 
 class Aggregator:
     name = 'aggregator'
+    suffix = '-walltime_sec'
 
     def is_event_applicable(self, event_name):
         return event_name.startswith(self.name)
 
     def snowden_entry_name(self):
-        return self.name + "-walltime_sec"
+        return self.name + self.suffix
 
-    def get_walltime(self, stages):
+    def applicable_events(self, stages):
+        """
+        Yields one interval from stage list at a time
+        """
+        for stage_name, stats in stages.items():
+            if self.is_event_applicable(stage_name):
+                for stat in stats.intervals:
+                    yield stat
+
+    def aggregate(self, stages):
         start = time.time()
         end = 0
-        for stage_name, stat in stages.items():
-            if self.is_event_applicable(stage_name):
-                start = min(stat.intervals[0][0], start)
-                end = max(stat.intervals[-1][1], end)
+        for stat in self.applicable_events(stages):
+            start = min(stat[0], start)
+            end = max(stat[1], end)
 
         if end > 0:
             return {self.snowden_entry_name(): end - start}
@@ -59,9 +68,23 @@ class BootstrapAggregator(Aggregator):
     name = 'bootstrap'
 
     def is_event_applicable(self, event_name):
-        # We imply that all events that do not meet this condition
-        # happen before first invokation.
-        return not event_name.startswith('invoke')
+        return event_name.startswith(YaScriptAggregator.name) or event_name.startswith(FakeYaAggregator.name)
+
+
+class YaScriptDownloadsAggregator(Aggregator):
+    name = 'ya-script-downloads'
+    suffix = ''
+
+    def is_event_applicable(self, event_name):
+        return event_name == "ya-script-download"
+
+    def aggregate(self, stages):
+        cnt = len(list(self.applicable_events(stages)))
+
+        if cnt > 0:
+            return {self.snowden_entry_name(): cnt}
+        else:
+            return {}
 
 
 def get_aggregators():
