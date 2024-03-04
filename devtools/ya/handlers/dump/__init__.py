@@ -8,6 +8,7 @@ import os
 import sys
 import enum
 import six
+from handlers.dump.debug import debug_handler
 
 from build.build_facade import (
     gen_all_loops,
@@ -365,9 +366,9 @@ class DumpYaHandler(CompositeHandler):
             description='All recipes used in tests',
             opts=self.common_opts + self.common_build_facade_opts() + [DumpTestListOptions(), DumpRecipesOptions()],
         )
+        self['debug'] = debug_handler
         if app_config.in_house:
             import devtools.ya.handlers.dump.arcadia_specific as arcadia_specific
-            from handlers.dump.debug import debug_handler
 
             self['groups'] = arcadia_specific.GroupsHandler()
             self['atd-revisions'] = OptsHandler(
@@ -376,7 +377,6 @@ class DumpYaHandler(CompositeHandler):
                 opts=self.common_opts
                 + [DumpAtdRevisionOptions(), CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],
             )
-            self['debug'] = debug_handler
 
 
 def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=None, **kwargs):

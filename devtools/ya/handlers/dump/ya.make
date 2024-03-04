@@ -23,6 +23,7 @@ PEERDIR(
     devtools/ya/core/imprint
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/handlers/dump/debug
     devtools/ya/test/dartfile
     devtools/ya/test/explore
     devtools/ya/yalibrary/debug_store
@@ -40,7 +41,6 @@ PEERDIR(
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/handlers/dump/arcadia_specific
-        devtools/ya/handlers/dump/debug
     )
 ENDIF()
 
