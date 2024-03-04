@@ -358,10 +358,11 @@ def gen_conf(
                 'PATH',
                 'PATHEXT',
                 'SYSTEMROOT',
-                'WINDOWSSDKDIR',
-                'WINDOWSSDKVERSION',
+                'USERPROFILE',
                 'VCINSTALLDIR',
                 'VCTOOLSINSTALLDIR',
+                'WINDOWSSDKDIR',
+                'WINDOWSSDKVERSION',
             ],
         )  # XXX: use clear env!
         env['Y_PYTHON_ENTRY_POINT'] = ':main'
