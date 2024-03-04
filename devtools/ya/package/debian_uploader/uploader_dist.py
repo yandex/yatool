@@ -3,6 +3,7 @@ import logging
 import exts.os2
 import package
 from six.moves.urllib.request import urlopen
+import six
 
 DUPLOAD_COMMAND = 'dupload'
 RETRY_SLEEP = 120
@@ -22,7 +23,7 @@ def check_if_package_exists(repo, pkg_name, arch_all, debian_distribution, debia
         debian_distribution,
         "all" if arch_all else debian_arch or "amd64",
     )
-    package_web_index = urlopen(repo_web_url).read()
+    package_web_index = six.ensure_text(urlopen(repo_web_url).read())
     if pkg_name in package_web_index:
         logger.info("%s found in %s" % (pkg_name, repo_web_url))
         return True
