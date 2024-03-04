@@ -97,13 +97,15 @@ private:
 
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
-    void RenderRootCMakeList() const;
     void CopyArcadiaScripts() const;
-    void RenderConanRequirements() const;
     void SaveConanProfile(const std::string_view& profile) const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
     void RenderPlatform(TPlatform& platform);
+
+    void PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const;
+    void PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const;
+    void RenderRootTemplates(TTargetAttributesPtr rootValueMap) const;
 
     virtual void Render(ECleanIgnored cleanIgnored) override;
 

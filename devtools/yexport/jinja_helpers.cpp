@@ -230,6 +230,10 @@ namespace NYexport {
         return ValueMap;
     }
 
+    jinja2::ValuesMap& TTargetAttributes::GetWritableMap() {
+        return ValueMap;
+    }
+
     bool TTargetAttributes::ValidateAttrOperation(const std::string& attr, const jinja2::Value& value) {
         auto typeIt = AttrGroup.find(attr);
         if (typeIt == AttrGroup.end()) {

@@ -31,6 +31,7 @@ namespace NYexport {
         bool AppendAttrValue(const std::string& attr, const jinja2::Value& value);
 
         const jinja2::ValuesMap& GetMap() const;
+        jinja2::ValuesMap& GetWritableMap();
 
     private:
         template <typename T>

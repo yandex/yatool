@@ -162,9 +162,20 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     CopyFilesAndResources();
 
     MergePlatforms();
-    RenderRootCMakeList();
     CopyArcadiaScripts();
-    RenderConanRequirements();
+
+    {
+        auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
+        YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(),
+                       "No attribute specification for root");
+
+        TTargetAttributesPtr rootValueMap = TTargetAttributes::Create(attrSpecIt->second, "root");
+
+        PrepareRootCMakeList(rootValueMap);
+        PrepareConanRequirements(rootValueMap);
+        ApplyRules(*rootValueMap);
+        RenderRootTemplates(rootValueMap);
+    }
 
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.Clean(*ExportFileManager);
@@ -237,57 +248,6 @@ TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
     return languages;
 }
 
-void TCMakeGenerator::RenderRootCMakeList() const {
-    const auto& rootTemplates = GeneratorSpec.Root.Templates;
-    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
-    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for root");
-
-    TTargetAttributesPtr rootValueMap = TTargetAttributes::Create(attrSpecIt->second, "root");
-    // Fill value map
-    {
-        jinja2::ValuesList platform_cmakes, platform_flags;
-        for (auto it = Platforms.begin(); it != Platforms.end(); it++) {
-            platform_cmakes.push_back(it->Conf.CMakeListsFile);
-            platform_flags.push_back(it->Conf.CMakeFlag);
-        }
-        jinja2::ValuesList globalVars;
-        for (const auto& platform : Platforms) {
-            auto varList = jinja2::ValuesList();
-            for (const auto& [flag, args] : platform.GlobalVars) {
-                auto arg_list = jinja2::ValuesList();
-                arg_list.push_back(flag);
-                arg_list.insert(arg_list.end(), args.begin(), args.end());
-                varList.push_back(arg_list);
-            }
-            globalVars.push_back(varList);
-        }
-
-        rootValueMap->SetAttrValue("use_conan", (!GlobalProperties.ConanPackages.empty() || !GlobalProperties.ConanToolPackages.empty()));
-        rootValueMap->SetAttrValue("project_name", Conf.ProjectName);
-        rootValueMap->SetAttrValue("project_language_list", GetAdjustedLanguagesList());
-        rootValueMap->SetAttrValue("platform_cmakelists", platform_cmakes);
-        rootValueMap->SetAttrValue("platform_flags", platform_flags);
-        rootValueMap->SetAttrValue("platform_vars", globalVars);
-
-        ApplyRules(*rootValueMap);
-    }
-
-    SetCurrentDirectory(ExportFileManager->GetExportRoot());
-
-    // Render all root templates
-    {
-        for (const auto& tmpl : rootTemplates) {
-            TJinjaTemplate rootTempate;
-            auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv());
-            if (!loaded) {
-                continue;
-            }
-            rootTempate.SetValueMap(rootValueMap);
-            rootTempate.RenderTo(*ExportFileManager, tmpl.ResultName);
-        }
-    }
-}
-
 void TCMakeGenerator::CopyArcadiaScripts() const {
     auto arcadiaScriptDir = Conf.ArcadiaRoot / ArcadiaScriptsRoot;
     for (const auto& script: GlobalProperties.ArcadiaScripts) {
@@ -295,7 +255,39 @@ void TCMakeGenerator::CopyArcadiaScripts() const {
     }
 }
 
-void TCMakeGenerator::RenderConanRequirements() const {
+void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const {
+    {
+        jinja2::ValuesList platform_cmakes, platform_flags;
+        for (auto it = Platforms.begin(); it != Platforms.end(); it++) {
+            platform_cmakes.push_back(it->Conf.CMakeListsFile);
+            platform_flags.push_back(it->Conf.CMakeFlag);
+        }
+        rootValueMap->SetAttrValue("platform_cmakelists", platform_cmakes);
+        rootValueMap->SetAttrValue("platform_flags", platform_flags);
+    }
+    {
+        jinja2::ValuesList globalVars;
+        for (const auto &platform: Platforms) {
+            auto varList = jinja2::ValuesList();
+            for (const auto &[flag, args]: platform.GlobalVars) {
+                auto arg_list = jinja2::ValuesList();
+                arg_list.push_back(flag);
+                arg_list.insert(arg_list.end(), args.begin(), args.end());
+                varList.push_back(arg_list);
+            }
+            globalVars.push_back(varList);
+        }
+        rootValueMap->SetAttrValue("platform_vars", globalVars);
+    }
+
+    rootValueMap->SetAttrValue("use_conan",
+                               !GlobalProperties.ConanPackages.empty() ||
+                               !GlobalProperties.ConanToolPackages.empty());
+    rootValueMap->SetAttrValue("project_name", Conf.ProjectName);
+    rootValueMap->SetAttrValue("project_language_list", GetAdjustedLanguagesList());
+}
+
+void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const {
     if (GlobalProperties.ConanPackages.empty() && GlobalProperties.ConanToolPackages.empty()) {
         return;
     }
@@ -326,39 +318,47 @@ void TCMakeGenerator::RenderConanRequirements() const {
                 break;
         }
     }
-    auto out = ExportFileManager->Open("conanfile.txt");
-    fmt::memory_buffer buf;
-    auto bufIt = std::back_inserter(buf);
 
-    fmt::format_to(bufIt, "[requires]\n");
-    for (const auto& pkg: GlobalProperties.ConanPackages) {
-        fmt::format_to(bufIt, "{}\n", pkg);
-    }
+    rootValueMap->GetWritableMap().insert_or_assign("conan_packages",
+                                                    jinja2::ValuesList(GlobalProperties.ConanPackages.begin(),
+                                                                       GlobalProperties.ConanPackages.end()));
+    rootValueMap->GetWritableMap().insert_or_assign("conan_tool_packages",
+                                                    jinja2::ValuesList(GlobalProperties.ConanToolPackages.begin(),
+                                                                       GlobalProperties.ConanToolPackages.end()));
+    rootValueMap->GetWritableMap().insert_or_assign("conan_options",
+                                                    jinja2::ValuesList(GlobalProperties.ConanOptions.begin(),
+                                                                       GlobalProperties.ConanOptions.end()));
 
-    fmt::format_to(bufIt, "\n[tool_requires]\n");
-    for (const auto& pkg: GlobalProperties.ConanToolPackages) {
-        fmt::format_to(bufIt, "{}\n", pkg);
-    }
-
-    fmt::format_to(bufIt, "\n[options]\n");
-    for (const auto& opt: GlobalProperties.ConanOptions) {
-        fmt::format_to(bufIt, "{}\n", opt);
-    }
-
-    fmt::format_to(bufIt, "\n[imports]\n");
-    for (std::string_view import: GlobalProperties.ConanImports) {
-        // TODO: find better way to avoid unquoting here. Import spec is quoted since
-        // I don't know any way of adding semantics arg with spaces in core.conf without
-        // quoting it.
-        if (import.starts_with('"') && import.ends_with('"')) {
-            import.remove_prefix(1);
-            import.remove_suffix(1);
+    {
+        auto [conanImportsIt, _] = rootValueMap->GetWritableMap().insert_or_assign(
+                "conan_imports",
+                jinja2::ValuesList(GlobalProperties.ConanOptions.begin(), GlobalProperties.ConanOptions.end()));
+        auto& conanImports = conanImportsIt->second.asList();
+        for (std::string_view import: GlobalProperties.ConanImports) {
+            // TODO: find better way to avoid unquoting here. Import spec is quoted since
+            // I don't know any way of adding semantics arg with spaces in core.conf without
+            // quoting it.
+            if (import.starts_with('"') && import.ends_with('"')) {
+                import.remove_prefix(1);
+                import.remove_suffix(1);
+            }
+            conanImports.push_back(import);
         }
-        fmt::format_to(bufIt, "{}\n", import);
     }
+}
 
-    fmt::format_to(bufIt, "\n[generators]\ncmake_find_package\ncmake_paths\n");
-    out.Write(buf.data(), buf.size());
+void TCMakeGenerator::RenderRootTemplates(TTargetAttributesPtr rootValueMap) const {
+    SetCurrentDirectory(ExportFileManager->GetExportRoot());
+
+    const auto& rootTemplates = GeneratorSpec.Root.Templates;
+    for (const auto& tmpl : rootTemplates) {
+        TJinjaTemplate rootTempate;
+        auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv());
+        YEXPORT_VERIFY(loaded,
+                       fmt::format("Cannot load template: \"{}\"\n", tmpl.Template.string()));
+        rootTempate.SetValueMap(rootValueMap);
+        rootTempate.RenderTo(*ExportFileManager, tmpl.ResultName);
+    }
 }
 
 }
