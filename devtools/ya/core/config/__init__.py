@@ -121,7 +121,7 @@ class MissingConfigError(Exception):
 def find_root(fail_on_error=True):
     # type: (bool) -> str
     if 'YA_SOURCE_ROOT' in os.environ:
-        return os.environ['YA_SOURCE_ROOT']
+        return os.path.abspath(os.environ['YA_SOURCE_ROOT'])
     starts_from_path = os.getcwd() if core.resource.am_i_binary() else __file__
     root = yalibrary.find_root.detect_root(starts_from_path)
     if fail_on_error and root is None:
