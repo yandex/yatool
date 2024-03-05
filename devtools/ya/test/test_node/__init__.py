@@ -1166,7 +1166,7 @@ def get_suite_uid(suite, graph, arc_root, opts, is_for_distbuild, out_dir, has_s
 
         imprint_parts = (
             suite.get_run_cmd(opts, retry=None, for_dist_build=is_for_distbuild)
-            + [uid_gen.TestUidGenerator.get(suite, graph, arc_root, opts.use_atd_revisions_info, opts)]
+            + [uid_gen.TestUidGenerator.get(suite, graph, arc_root, opts)]
             + ["{}={}".format(x, getattr(opts, x)) for x in uid_changing_opts if getattr(opts, x, None)]
         )
         # XXX

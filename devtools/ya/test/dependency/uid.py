@@ -48,15 +48,12 @@ class TestUidGenerator(object):
     ATD_Base_Rev = None
 
     @classmethod
-    def _get_atd_revisions(cls, arc_root, use_atd_revs, base_rev_only=False):
+    def _get_atd_revisions(cls, arc_root, base_rev_only=False):
         if cls.ATD_Base_Rev is not None and cls.Path_To_Rev is not None:
             return cls.ATD_Base_Rev, cls.Path_To_Rev
 
         if not base_rev_only:
             cls.Path_To_Rev = {}
-        if not use_atd_revs:
-            logger.debug("Using SVN access as arcadia_tests_data imprints source")
-            return None, cls.Path_To_Rev
 
         try:
             rev_file = os.path.join(arc_root, "build", "yandex_specific", "atd", "revisions.txt")
@@ -84,7 +81,7 @@ class TestUidGenerator(object):
         return cls.ATD_Base_Rev, cls.Path_To_Rev
 
     @classmethod
-    def get(cls, test, graph, arc_root, use_atd_revs, opts):
+    def get(cls, test, graph, arc_root, opts):
         """
         Get test uid
         :param test: test to get the uid for
@@ -162,7 +159,7 @@ class TestUidGenerator(object):
         if tests_paths:
             from core.imprint.atd import ArcadiaTestData
 
-            _, path_to_rev = cls._get_atd_revisions(arc_root, use_atd_revs)
+            _, path_to_rev = cls._get_atd_revisions(arc_root)
             if path_to_rev:
                 tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
                 for path in tests_paths:

@@ -2065,7 +2065,6 @@ class InternalDebugOptions(core.yarg.Options):
 class ArcadiaTestsDataOptions(core.yarg.Options):
     def __init__(self):
         self.arcadia_tests_data_path = 'arcadia_tests_data'
-        self.use_atd_revisions_info = False
 
     def consumer(self):
         return [
@@ -2081,7 +2080,6 @@ class ArcadiaTestsDataOptions(core.yarg.Options):
                 help='Custom path to arcadia_tests_data',
                 hook=core.yarg.SetValueHook('arcadia_tests_data_path'),
             ),
-            core.yarg.ConfigConsumer('use_atd_revisions_info'),  # FIXME(spreis): Temporary until completely enabled
         ]
 
 
