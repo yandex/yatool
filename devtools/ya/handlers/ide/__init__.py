@@ -11,8 +11,6 @@ import build.build_opts
 import build.compilation_database as bcd
 
 import ide.ide_common
-import ide.msvs
-import ide.msvs_lite
 import ide.clion2016
 import ide.idea
 import ide.qt
@@ -494,14 +492,6 @@ class PycharmOptions(core.yarg.Options):
             )
 
 
-MSVS_OPTS = ide.msvs.MSVS_OPTS + [ide.ide_common.YaExtraArgsOptions(), core.common_opts.YaBin3Options()]
-
-
-def gen_msvs_solution(params):
-    impl = ide.msvs_lite if params.lite else ide.msvs
-    return impl.gen_msvs_solution(params)
-
-
 def get_description(text, ref_name):
     if app_config.in_house:
         ref = {
@@ -521,20 +511,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
 
     def __init__(self):
         core.yarg.CompositeHandler.__init__(self, description=self.description)
-        self['msvs'] = core.yarg.OptsHandler(
-            action=app.execute(gen_msvs_solution),
-            description='[[imp]]ya ide msvs[[rst]] is deprecated, please use clangd-based tooling instead',
-            opts=MSVS_OPTS,
-            examples=[
-                core.yarg.UsageExample(
-                    '{prefix} util/generic util/datetime',
-                    'Generate solution for util/generic, util/datetime and all their dependencies',
-                ),
-                core.yarg.UsageExample('{prefix} -P Output', 'Generate solution in Output directory'),
-                core.yarg.UsageExample('{prefix} -T my_solution', 'Generate solution titled my_solution.sln'),
-            ],
-            visible=(pm.my_platform() == 'win32'),
-        )
         self['clion'] = core.yarg.OptsHandler(
             action=app.execute(ide.clion2016.do_clion),
             description='[[imp]]ya ide clion[[rst]] is deprecated, please use clangd-based tooling instead',

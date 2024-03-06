@@ -4,7 +4,6 @@ PEERDIR(
     contrib/python/six
     contrib/python/termcolor
     contrib/python/pygtrie
-    devtools/msvs
     devtools/ya/build
     devtools/ya/core
     devtools/ya/exts
@@ -37,10 +36,6 @@ PY_SRCS(
     goland.py
     ide_common.py
     idea.py
-    msbuild.py
-    msvs.py
-    msvs_lite.py
-    msvs_lite_utils.py
     pycharm.py
     qt.py
     remote_ide_qt.py
@@ -64,7 +59,6 @@ PY_SRCS(
 )
 
 RESOURCE(
-    msvs_lite_settings.template /msvs/settings/msvs_lite.vssettings
     sync.py.template /clion/sync.py
 )
 
