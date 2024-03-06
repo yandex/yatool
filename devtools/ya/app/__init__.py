@@ -103,8 +103,11 @@ def execute_early(action):
             modules.append(('diag', configure_diag_interceptor()))
 
         with ctx.configure(modules):
-            modules_initialization_early_stage.finish()
-            return action(args, **kwargs)
+            try:
+                modules_initialization_early_stage.finish()
+                return action(args, **kwargs)
+            finally:
+                dump_aggregated_stages(ctx)
 
     return helper
 
@@ -146,16 +149,13 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
             el = getattr(ctx, "evlog", None)
             if el:
                 stage_tracer.stage_tracer.add_consumer(stage_tracer.EvLogConsumer(el))
-            try:
-                logger.debug('Run action on %s with params %s', action, params)
-                report_params(ctx)
-                action_name = getattr(action, "__name__", "module")
-                modules_initialization_full_stage.finish()
+            logger.debug('Run action on %s with params %s', action, params)
+            report_params(ctx)
+            action_name = getattr(action, "__name__", "module")
+            modules_initialization_full_stage.finish()
 
-                with stager.scope("invoke-{}".format(action_name)):
-                    return action(ctx.params)
-            finally:
-                dump_aggregated_stages(ctx)
+            with stager.scope("invoke-{}".format(action_name)):
+                return action(ctx.params)
 
     return helper
 
