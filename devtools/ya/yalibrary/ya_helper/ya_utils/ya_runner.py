@@ -53,6 +53,7 @@ class Ya(LoggerCounter):
         make_folder(self._logs_dir, exist_ok=False)
 
         self.error_file = self.options.error_file
+        self.stderr_path = os.path.join(self._logs_dir, 'stderr.txt')
 
         self._dump_options()
 
@@ -100,7 +101,7 @@ class Ya(LoggerCounter):
                 self.stdout = "<unknown>"
 
             if self.stderr:
-                with open(os.path.join(self._logs_dir, 'stderr.txt'), 'wt') as f:
+                with open(self.stderr_path, 'wt') as f:
                     f.write(str(self.stderr))
             else:
                 self.logger.warning('No stderr')
