@@ -171,7 +171,7 @@ def sets_values(makelist, arc_root):
                 chunks = value.name.split()
                 list_vals.extend(chunks)
                 if list_vals[1:]:
-                    set_dict[list_vals[0]] = list_vals[1:]
+                    set_dict[list_vals[0]] = [v.strip('"') for v in list_vals[1:]]
 
     return set_dict
 
