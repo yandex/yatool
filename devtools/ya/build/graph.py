@@ -8,7 +8,6 @@ import os
 import re2
 import six
 from six.moves import queue
-import subprocess
 import sys
 import tempfile
 import threading
@@ -2937,19 +2936,7 @@ def _build_merged_graph(
 
         merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
         try:
-            try:
-                resolved_tool = host_tool_resolver.resolve('gdbnew', 'GDB')
-                exe = yalibrary.tools.tool(
-                    'gdbnew'
-                )  # XXX --host-platform ignored here. TODO Fetch tool for the specified platform
-                proc = subprocess.Popen([exe, '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                proc.communicate()
-                if proc.returncode:
-                    raise Exception()
-            except Exception:
-                resolved_tool = host_tool_resolver.resolve('gdb', 'GDB')
-            merged_graph['conf']['resources'].append(resolved_tool)
-        # XXX
+            merged_graph['conf']['resources'].append(host_tool_resolver.resolve('gdb', 'GDB'))
         except Exception as e:
             logger.debug("Gdb will not be available for tests: %s", e)
 
