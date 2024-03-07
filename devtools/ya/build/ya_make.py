@@ -302,7 +302,7 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
     ev_listener = CompositeEventListener(
         listeners=[
             PrintProgressListener(modules_files_stats),
-            get_print_listener(opts, app_ctx.display, printed),
+            get_print_listener(opts, display, printed),
             ymake_stats.get_ymake_listener(),
             configure_messages_listener,
         ]
@@ -451,6 +451,7 @@ def init_yt_dist_cache(opts):
         from yalibrary.store.yt_store import yt_store
     except ImportError as e:
         logger.warning("YT store is not available: %s", e)
+        return None
 
     yt_store_class = yt_store.YndexerYtStore if opts.yt_replace_result_yt_upload_only else yt_store.YtStore
     return yt_store_class(
@@ -899,6 +900,8 @@ class Context(object):
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
             logger.debug("Strip graph due bazel_remote_store mode")
             self.graph = lg.strip_graph(self.graph)
+            results = set(self.graph['result'])
+            self.tests = [x for x in self.tests if x.uid in results]
         # XXX see YA-1354
         elif (
             not opts.use_lite_graph and (opts.yt_replace_result or opts.dist_cache_evict_cached) and not opts.add_result
@@ -909,6 +912,8 @@ class Context(object):
             self.graph = lg.strip_graph(self.graph)
             self.yt_cached_results = cached_results
             self.yt_not_cached_results = new_results
+            results = set(self.graph['result'])
+            self.tests = [x for x in self.tests if x.uid in results]
 
         elif opts.frepkage_target_uid:
             assert opts.frepkage_target_uid in graph['result'], (opts.frepkage_target_uid, graph['result'])

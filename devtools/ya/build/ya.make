@@ -44,6 +44,7 @@ PEERDIR(
     devtools/ya/test/const
     devtools/ya/test/dartfile
     devtools/ya/test/dependency
+    devtools/ya/test/explore
     devtools/ya/test/opts
     devtools/ya/test/test_node/coverage
     devtools/ya/yalibrary/debug_store

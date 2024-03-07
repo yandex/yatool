@@ -609,11 +609,12 @@ def _run_ymake(**kwargs):
             )
 
         try:
-            import app_ctx
-
-            app_ctx.dump_debug['ymake_run_{}'.format(_ymake_unique_run_id)] = _debug_info
-            # Store file
-            app_ctx.dump_debug['yamke_run_{}_conf_file'.format(_ymake_unique_run_id)] = kwargs.get('custom_conf', None)
+            if app_ctx:
+                app_ctx.dump_debug['ymake_run_{}'.format(_ymake_unique_run_id)] = _debug_info
+                # Store file
+                app_ctx.dump_debug['ymake_run_{}_conf_file'.format(_ymake_unique_run_id)] = kwargs.get(
+                    'custom_conf', None
+                )
         except Exception:
             logger.exception("While store debug info")
 
