@@ -39,6 +39,10 @@ ENDIF()
 
 END()
 
+RECURSE(
+    testlib
+)
+
 RECURSE_FOR_TESTS(
     tests
 )
