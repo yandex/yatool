@@ -9,6 +9,106 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
+<!-- libc++'s __compressed_pair is an internal type used pervasively for
+      doing the empty base class optimization.
+      __compressed_pair<U,V> derives from __compressed_pair_elem<U,0> and
+      __compressed_pair_elem<V,1>. __compressed_pair_elem<T> is specialized on
+      a 3rd template parameter:
+      * if T is empty and non-final the 3rd param is 1 and it derives from T
+      * else it has a member variable __value_ of type T
+-->
+<Type Name="std::__y1::__compressed_pair_elem&lt;*,*,0&gt;">
+  <DisplayString>{__value_}</DisplayString>
+  <Expand>
+    <ExpandedItem>__value_</ExpandedItem>
+  </Expand>
+</Type>
+
+<Type Name="std::__y1::__compressed_pair_elem&lt;*,*,1&gt;">
+  <DisplayString>{*($T1*)this}</DisplayString>
+  <Expand>
+    <ExpandedItem>*($T1*)this</ExpandedItem>
+  </Expand>
+</Type>
+
+<!--libc++'s short string optimization:
+    A basic_string is 3 size_t words long. In the "alternate string layout"
+    that we use, they are: pointer to data, size, capacity.
+    (In the normal layout, it's capacity, size, data instead.)
+    If a string is short enough that it fits in these three size_ts instead,
+    the string data is stored inline in these 3 words, with the last byte of
+    the storage storing the length of the string.
+    The highest bit of the "capacity" word is set for normal, "long" strings,
+    and that bit needs to be masked out to know the real capacity.
+    If this bit is not set, the string data is stored inline.
+    (In the normal layout, if the lowest bit in the first byte is set,
+    it's a "long" string, requiring a long string to always have even
+    capacity. A short string here stores its length in the first byte
+    and the inline data in the remaining storage.)
+-->
+
+<Type Name="std::__y1::basic_string&lt;char,*&gt;">
+  <Intrinsic Name="is_long"
+          Expression="__r_.__value_.__s.__is_long_" />
+  <Intrinsic Name="s_size"
+      Expression="__r_.__value_.__s.__size_ &amp; ~0x80" />
+  <Intrinsic Name="l_size"
+      Expression="__r_.__value_.__l.__size_" />
+  <DisplayString
+      Condition="is_long()">{__r_.__value_.__l.__data_, [l_size()] }</DisplayString>
+  <DisplayString
+      Condition="!is_long()">{__r_.__value_.__s.__data_, [s_size()] }</DisplayString>
+  <StringView Condition="is_long()">__r_.__value_.__l.__data_</StringView>
+  <StringView Condition="!is_long()">__r_.__value_.__s.__data_</StringView>
+  <Expand>
+    <Item Name="[size]" Condition="is_long()" 
+        ExcludeView="simple">l_size()</Item>
+    <Item Name="[size]" Condition="!is_long()"
+        ExcludeView="simple">s_size()</Item>
+    <Item Name="[capacity]" Condition="is_long()" 
+        ExcludeView="simple">__r_.__value_.__l.__cap_ * __endian_factor - 1</Item>
+    <Item Name="[capacity]" Condition="!is_long()"
+        ExcludeView="simple">22</Item>
+    <ArrayItems>
+      <Size Condition="is_long()">l_size()</Size>
+      <Size Condition="!is_long()">s_size()</Size>
+      <ValuePointer Condition="is_long()">__r_.__value_.__l.__data_</ValuePointer>
+      <ValuePointer Condition="!is_long()">__r_.__value_.__s.__data_</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+
+<Type Name="std::__y1::basic_string&lt;wchar_t,*&gt;">
+  <Intrinsic Name="is_long"
+          Expression="__r_.__value_.__s.__is_long_" />
+  <Intrinsic Name="s_size"
+      Expression="__r_.__value_.__s.__size_ &amp; ~0x80" />
+  <Intrinsic Name="l_size"
+      Expression="__r_.__value_.__l.__size_" />
+  <DisplayString
+      Condition="is_long()">{__r_.__value_.__l.__data_}</DisplayString>
+  <DisplayString
+      Condition="!is_long()">{__r_.__value_.__s.__data_}</DisplayString>
+  <StringView Condition="is_long()">__r_.__value_.__l.__data_</StringView>
+  <StringView Condition="!is_long()">__r_.__value_.__s.__data_</StringView>
+  <Expand>
+    <Item Name="[size]" Condition="is_long()" 
+        ExcludeView="simple">l_size()</Item>
+    <Item Name="[size]" Condition="!is_long()"
+        ExcludeView="simple">s_size()</Item>
+    <Item Name="[capacity]" Condition="is_long()" 
+        ExcludeView="simple">__r_.__value_.__l.__cap_ * __endian_factor - 1</Item>
+    <Item Name="[capacity]" Condition="!is_long()"
+        ExcludeView="simple">10</Item>
+    <ArrayItems>
+      <Size Condition="is_long()">l_size()</Size>
+      <Size Condition="!is_long()">s_size()</Size>
+      <ValuePointer Condition="is_long()">__r_.__value_.__l.__data_</ValuePointer>
+      <ValuePointer Condition="!is_long()">__r_.__value_.__s.__data_</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+
 <!--
     containers
 -->
@@ -177,30 +277,10 @@
 -->
 
 <!-- aka TString -->
-<Type Name="TBasicString&lt;char,*&gt;">
-  <DisplayString>{Data_,[((NDetail::TStringData*)Data_-1)->Length]s8}</DisplayString>
+<Type Name="TBasicString&lt;*,*&gt;">
+  <DisplayString>{S_.T_}</DisplayString>
   <Expand>
-    <Item Name="[size]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->Length</Item>
-    <Item Name="[capacity]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->BufLen</Item>
-    <Item Name="[refcount]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->Refs</Item>
-    <ArrayItems>
-      <Size>((NDetail::TStringData*)Data_ - 1)->Length</Size>
-      <ValuePointer>Data_</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-
-<!-- aka TUtf16String -->
-<Type Name="TBasicString&lt;unsigned short,*&gt;">
-  <DisplayString>{Data_,[((NDetail::TStringData*)Data_-1)->Length]su}</DisplayString>
-  <Expand>
-    <Item Name="[size]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->Length</Item>
-    <Item Name="[capacity]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->BufLen</Item>
-    <Item Name="[refcount]" ExcludeView="simple">((NDetail::TStringData*)Data_ - 1)->Refs</Item>
-    <ArrayItems>
-      <Size>((NDetail::TStringData*)Data_ - 1)->Length</Size>
-      <ValuePointer>(wchar_t*)Data_</ValuePointer>
-    </ArrayItems>
+    <ExpandedItem>S_.T_</ExpandedItem>
   </Expand>
 </Type>
 
