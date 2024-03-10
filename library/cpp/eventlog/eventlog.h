@@ -150,7 +150,7 @@ protected:
 
 class IEventFactory {
 public:
-    virtual TEvent* CreateLogEvent(TEventClass c) = 0;
+    virtual THolder<TEvent> CreateLogEvent(TEventClass c) = 0;
     virtual TEventLogFormat CurrentFormat() = 0;
     virtual TEventClass ClassByName(TStringBuf name) const = 0;
     virtual TEventClass EventClassBegin() const = 0;
@@ -597,7 +597,7 @@ public:
     {
     }
 
-    TEvent* CreateLogEvent(TEventClass c) override;
+    THolder<TEvent> CreateLogEvent(TEventClass c) override;
 
     TEventLogFormat CurrentFormat() override {
         return 0;
