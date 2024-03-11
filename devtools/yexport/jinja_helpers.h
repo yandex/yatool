@@ -66,4 +66,9 @@ namespace NYexport {
 
     void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0, const std::string& prefix = "");
     std::string Dump(const jinja2::Value& value, int depth = 0, const std::string& prefix = "");
+
+
+    jinja2::Value ParseValue(const toml::value& value);
+    jinja2::ValuesMap ParseTable(const toml::table& table);
+    jinja2::ValuesList ParseArray(const toml::array& array);
 }

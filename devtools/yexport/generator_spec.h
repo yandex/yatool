@@ -9,6 +9,7 @@
 #include <util/generic/serialized_enum.h>
 #include <util/string/cast.h>
 #include <contrib/libs/toml11/toml/value.hpp>
+#include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
 #include "generator_spec_enum.h"
 
 #include <filesystem>
@@ -59,6 +60,7 @@ struct TGeneratorSpec {
 
     TTargetSpec Root;
     THashMap<std::string, TTargetSpec> Targets;
+    jinja2::ValuesMap Platforms;
     TAttributeSpecification AttrGroups;
     THashMap<std::string, TVector<uint32_t>> AttrToRuleId;
     THashMap<std::string, TVector<fs::path>> Merge;

@@ -22,6 +22,7 @@ namespace NKeys {
     constexpr const char* Dest = "dest";
     constexpr const char* Copy = "copy";
     constexpr const char* Targets = "targets";
+    constexpr const char* Platforms = "platforms";
     constexpr const char* Attr = "attr";
     constexpr const char* Attrs = "attrs";
     constexpr const char* Merge = "merge";
@@ -242,6 +243,16 @@ namespace {
         return targetSpec;
     }
 
+    jinja2::ValuesMap ParsePlatformsSpec(const toml::value& platforms) {
+        jinja2::ValuesMap platformSpec;
+        for (const auto& [platform, condition] : AsTable(&platforms)) {
+            const auto& conditionStr = AsString(&condition);
+            VERIFY_GENSPEC(!conditionStr.empty(), condition, NGeneratorSpecError::SpecificationError, "Should be not empty");
+            platformSpec.insert_or_assign(platform, conditionStr);
+        }
+        return platformSpec;
+    }
+
     std::tuple<std::string, std::optional<TCopySpec>> GetAttrTypeCopy(const toml::value& attrDesc) {
         std::tuple<std::string, std::optional<TCopySpec>> result;
         auto& attrType = std::get<0>(result);
@@ -409,6 +420,9 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
             genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
         }
+
+        const auto& platforms = find_or<toml::table>(doc, NKeys::Platforms, toml::table{});
+        genspec.Platforms = ParsePlatformsSpec(platforms);
 
         auto& attrs = genspec.AttrGroups;
         for (const auto& [name, attrspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {

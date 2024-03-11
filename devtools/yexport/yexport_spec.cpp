@@ -189,44 +189,6 @@ namespace {
         return spec;
     }
 
-    jinja2::ValuesList ParseArray(const toml::array& array);
-    jinja2::ValuesMap ParseTable(const toml::table& table);
-
-    jinja2::Value ParseValue(const toml::value& value) {
-        if (value.is_table()) {
-            return ParseTable(value.as_table());
-        } else if (value.is_array()) {
-            return ParseArray(value.as_array());
-        } else if (value.is_string()) {
-            return value.as_string();
-        } else if (value.is_floating()) {
-            return value.as_floating();
-        } else if (value.is_integer()) {
-            return value.as_integer();
-        } else if (value.is_boolean()) {
-            return value.as_boolean();
-        } else if (value.is_local_date() || value.is_local_datetime() || value.is_offset_datetime()) {
-            return value.as_string();
-        } else {
-            return {};
-        }
-    }
-
-    jinja2::ValuesMap ParseTable(const toml::table& table) {
-        jinja2::ValuesMap map;
-        for (const auto& [key, value] : table) {
-            map.emplace(key, ParseValue(value));
-        }
-        return map;
-    }
-
-    jinja2::ValuesList ParseArray(const toml::array& array) {
-        jinja2::ValuesList list;
-        for (const auto& value : array) {
-            list.emplace_back(ParseValue(value));
-        }
-        return list;
-    }
 }
 
 /// Parse toml and load step by step it (after validation) to targetReplacements
