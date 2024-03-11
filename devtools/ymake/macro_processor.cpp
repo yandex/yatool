@@ -877,7 +877,34 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         }
     };
 
-    TAddDepAdaptor& node = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
+    const bool hasExtraOuts = GetOutput().size() > startCountOuts;
+    const bool mainOutAsExtra = hasExtraOuts && Conf->MainOutputAsExtra();
+
+    auto makeMainNodes = [&]() {
+        if (mainOutAsExtra) {
+            Y_ASSERT(IsFileType(mainOutType));
+            TString mainOutName;
+            Graph->Names().FileConf.GetName(mainOutId).GetStr(mainOutName);
+
+            // Это пока очень временный способ пометить специальный узел, в котором будут общие свойства команды.
+            static constexpr TStringBuf actionPrefix = "ACTION:"sv;
+            ui32 actionId = Graph->Names().FileConf.Add(actionPrefix + mainOutName);
+
+            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, mainOutType, false);
+            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
+
+            return std::make_pair(std::ref(actionNode), std::ref(mainOutNode));
+        } else {
+
+            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
+            return std::make_pair(std::ref(mainOutNode), std::ref(mainOutNode));
+        }
+    };
+
+    auto [actionNode, mainOutNode] = makeMainNodes();
+
+    TVector<std::pair<std::reference_wrapper<TAddDepAdaptor>, TVarStrEx*>> outs;
+    outs.push_back({mainOutNode, MainOutput});
 
     // 1. Inputs
     const ui64 groupId = Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER);
@@ -907,7 +934,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                     nodeType = inputNode->NodeType;
                 }
             }
-            node.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
+            actionNode.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
         }
         if (TFileConf::IsLink(input.ElemId) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
             UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(input.ElemId));
@@ -919,25 +946,52 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
     // 2. Additional output files (we have to add them after the inputs or Induced deps processing will fail)
     // NOTE: this was previously after BuildCommand!
-    if (GetOutput().size() > startCountOuts) {
+    if (hasExtraOuts) {
         YDIAG(V) << "For " << getNodeName() << " deps.size = " << GetOutput().size() - startCountOuts << "\n";
         for (auto& out : GetOutput()) {
             if (out.ElemId == mainOutId) {
                 continue;
             }
 
-            YDIAG(Star) << "Linking main " << mainOutId << " <-> " << out.ElemId << Endl;
-            TAddDepAdaptor& addCtx = inputNode.AddOutput(out.ElemId, EMNT_NonParsedFile);
-            addCtx.AddDepIface(EDT_OutTogether, mainOutType, mainOutId);
-            const TIndDepsRule* rule = addCtx.SetDepsRuleByName(out.Name);
-            if (rule) {
-                rule->InsertUseActionsTo(inducedDepsToUse);
-            }
-            node.AddDepIface(EDT_OutTogetherBack, EMNT_NonParsedFile, out.ElemId);
-            addOutputIncludes(addCtx);
+            TAddDepAdaptor& extraOutNode = inputNode.AddOutput(out.ElemId, EMNT_NonParsedFile);
+            outs.push_back({extraOutNode, &out});
 
             out.IsGlobal = out.IsGlobal || HasGlobalInput;
         }
+    }
+
+    bool mainOut = true;
+
+    for (auto [outNodeRef, outVar] : outs) {
+        TAddDepAdaptor& outNode = outNodeRef;
+
+        if (mainOutAsExtra || !mainOut) {
+            YDIAG(Star) << "Linking main " << actionNode.ElemId << " <-> " << outNode.ElemId << Endl;
+            outNode.AddDepIface(EDT_OutTogether, actionNode.NodeType, actionNode.ElemId);
+            actionNode.AddDepIface(EDT_OutTogetherBack, outNode.NodeType, outNode.ElemId);
+        }
+
+        // Current implementation sets "pass induced" flags only for main output.
+        // It is considered bug, but correct behaviour should be enabled only after additional testing.
+        static constexpr bool oldPassMode = true;
+        const bool setPassFlags = oldPassMode ? mainOut : true;
+
+        // outVar is nullptr for "finalTargetCmd", which means this is a module target.
+        // And we do not pass induced dependencies through modules.
+        if (outVar) {
+            const TIndDepsRule* rule = outNode.SetDepsRuleByName(outVar->Name);
+            if (rule) {
+                rule->InsertUseActionsTo(inducedDepsToUse);
+            }
+
+            if (setPassFlags) {
+                TNodeData& outNodeData = Graph->GetFileNodeData(outNode.ElemId);
+                outNodeData.PassNoInducedDeps = rule ? rule->PassNoInducedDeps : false;
+                outNodeData.PassInducedIncludesThroughFiles = rule ? rule->PassInducedIncludesThroughFiles : false;
+            }
+        }
+
+        mainOut = false;
     }
 
     if (finalTargetCmd) {
@@ -946,20 +1000,14 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepsCacheId(EMNT_NonParsedFile, id));
             Y_ASSERT(modInfo != nullptr);
             if (modInfo != nullptr && modInfo->AdditionalOutput) {
-                node.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, id);
+                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, id);
             }
         }
     }
 
-    if (!finalTargetCmd) {  // no rules going through for modules for now
-        const TIndDepsRule* rule = node.SetDepsRuleByName(MainOutput->Name);
-        if (rule) {
-            rule->InsertUseActionsTo(inducedDepsToUse);
-        }
-
-        TNodeData& data = Graph->GetFileNodeData(mainOutId);
-        data.PassNoInducedDeps = rule ? rule->PassNoInducedDeps : false;
-        data.PassInducedIncludesThroughFiles = rule ? rule->PassInducedIncludesThroughFiles : false;
+    // OUTPUT_INCLUDES of main output must appear after OutTogetherBack edges
+    for (auto [outNodeRef, _] : outs) {
+        addOutputIncludes(outNodeRef);
     }
 
     for (const auto& out : GetOutput()) {
@@ -969,7 +1017,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
     // 4. The command
     YDIAG(DG) << "Cmd dep: " << curCmdName << " " << Cmd.Id << Endl;
-    node.AddDepIface(EDT_BuildCommand, EMNT_BuildCommand, cmdElemId);
+    actionNode.AddDepIface(EDT_BuildCommand, EMNT_BuildCommand, cmdElemId);
 
     // 5. Imported variables (relevant for "structured" commands only)
 
@@ -986,13 +1034,10 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             auto& var = ExternalVars->at(name);
             auto varElemId = InitCmdNode(var);
             if (var.IsReservedName)
-                node.AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, name));
-            node.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
+                actionNode.AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, name));
+            actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
         }
     }
-
-    // 6. OUTPUT_INCLUDES of main output must appear after OutTogetherBack edges
-    addOutputIncludes(node);
 
     return true;
 }

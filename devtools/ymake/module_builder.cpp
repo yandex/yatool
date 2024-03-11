@@ -120,7 +120,7 @@ void TModuleBuilder::RecursiveAddInputs() {
             continue;
         }
         firstFail = nullptr;
-        if (!cmdInfo->Process(*this, Node)) {
+        if (!cmdInfo->Process(*this, Node, false)) {
             continue;
         }
         TCommandInfo& info = *cmdInfo;

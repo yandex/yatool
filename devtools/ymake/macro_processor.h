@@ -156,7 +156,7 @@ public:
     const TVarStrEx* GetMainOutput() const {
         return MainOutput;
     }
-    bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd = false);
+    bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd);
     bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
     void AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId);
 

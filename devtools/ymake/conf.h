@@ -122,6 +122,10 @@ public:
         return UseNewUids;
     }
 
+    bool MainOutputAsExtra() const noexcept {
+        return MainOutputAsExtra_;
+    }
+
     TStringBuf GetUidsSalt() const {
         return UidsSalt;
     }
@@ -157,6 +161,7 @@ private:
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
     bool UseNewUids = UseNewUidsDefault;
+    bool MainOutputAsExtra_ = false;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
