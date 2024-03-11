@@ -147,6 +147,13 @@ def main(args):
         const=True,
         default=True if os.environ.get('YA_NO_REPORT') in ("1", "yes") else opensource is True,
     )
+    # after all events disabled using --no-report we can still enable one or more events
+    # (using ',' separator for few events)
+    p.add_argument(
+        '--report-events',
+        action='append',
+        default=None if opensource is True else os.environ.get('YA_REPORT_EVENTS'),
+    )
     p.add_argument(
         '--no-tmp-dir',
         action='store_const',
@@ -224,6 +231,7 @@ def main(args):
             diag=getattr(a, "diag", False),
             error_file=a.error_file,
             no_report=a.no_report,
+            report_events=a.report_events,
             no_logs=a.no_logs,
             no_tmp_dir=a.no_tmp_dir,
             precise=a.precise,

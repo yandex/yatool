@@ -46,6 +46,34 @@ class ActiveChunk(object):
             os.umask(old_mask)
 
 
+class UrgentChunk(object):
+    def __init__(self):
+        self._chunk = []  # protected by self._lock
+        self._lock = threading.Lock()
+
+    def cleanup(self):
+        with self._lock:
+            self._chunk = []
+
+    def add(self, dct):
+        with self._lock:
+            self._chunk.append(dct)
+
+    def release(self):
+        with self._lock:
+            chunk = self._chunk
+            self._chunk = []
+        return chunk
+
+    def insert_to_front(self, chunk):
+        with self._lock:
+            self._chunk = chunk + self._chunk
+
+
+class StopConsume(Exception):
+    pass
+
+
 class ChunkedQueue(object):
     def __init__(self, store_dir):
         self._data_dir = os.path.join(store_dir, 'data')
@@ -56,6 +84,7 @@ class ChunkedQueue(object):
         self._active_chunk = ActiveChunk(
             os.path.join(self._data_dir, self._active_tag), os.path.join(self._locks_dir, self._active_tag)
         )
+        self._urgent_chunk = UrgentChunk()
 
     def cleanup(self, max_items=None):
         data_lst = os.listdir(self._data_dir)
@@ -67,9 +96,26 @@ class ChunkedQueue(object):
             for x in sorted(data_lst)[:-max_items]:
                 self._try_remove(os.path.join(self._data_dir, x))
                 self._try_remove(os.path.join(self._locks_dir, x))
+        self._urgent_chunk.cleanup()
 
-    def add(self, dct):
-        self._active_chunk.add(dct)
+    def add(self, dct, urgent=False):
+        if urgent:
+            self._urgent_chunk.add(dct)
+        else:
+            self._active_chunk.add(dct)
+
+    def consume_urgent(self, consumer):
+        urgent_chunk = []
+        try:
+            urgent_chunk = self._urgent_chunk.release()
+            if urgent_chunk:
+                consumer(urgent_chunk)
+        except Exception:
+            # return events to queue
+            self._urgent_chunk.insert_to_front(urgent_chunk)
+            import traceback
+
+            logger.debug(traceback.format_exc())
 
     def consume(self, consumer):
         to_sync = [x for x in os.listdir(self._data_dir) if x != self._active_tag]
@@ -78,6 +124,8 @@ class ChunkedQueue(object):
             path = os.path.join(self._data_dir, name)
             try:
                 consumer([json.loads(x) for x in fs.read_file(path).splitlines()])
+            except StopConsume:
+                return
             except Exception:
                 import traceback
 

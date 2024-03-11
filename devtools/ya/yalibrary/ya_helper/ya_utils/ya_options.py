@@ -26,6 +26,7 @@ class YaBaseOptions(BaseOptions):
         self.with_profile = self._pop('with_profile')
         self.error_file = self._pop('error_file')
         self.no_report = self._pop('no_report')
+        self.report_events = self.parse_events_filter(self._pop('report_events'))
 
         self.cache_dir = self._pop('cache_dir')
         self.cache_dir_tools = self._pop('cache_dir_tools')
@@ -40,18 +41,44 @@ class YaBaseOptions(BaseOptions):
 
         self.ya_py_version = self._pop("ya_py_version")
 
-    def generate(self):  # type: () -> tp.Tuple[tp.List[str], tp.Dict[str, str]]
+    def generate(self, include_new_opts=False):  # type: () -> tp.Tuple[tp.List[str], tp.Dict[str, str]]
         self._check_parameters()
         ya_bin_cmd = self.ya_bin
         if not isinstance(ya_bin_cmd, (list, tuple)):
             ya_bin_cmd = [ya_bin_cmd]
         ya_bin_cmd = list(ya_bin_cmd)
 
-        cmd = ya_bin_cmd + self._generate_pre_handler() + [self._handler] + self._generate_post_handler()
+        cmd = ya_bin_cmd + self._generate_pre_handler(include_new_opts)
+        cmd += [self._handler] + self._generate_post_handler()
+
         env = self._generate_env()
         return list(map(str, cmd)), env
 
-    def _generate_pre_handler(self):
+    @classmethod
+    def parse_events_filter(cls, flt):
+        # events can contain None, string or list(string)
+        # string can contain values separated by ','
+        res = set()
+        if flt is not None:
+            if isinstance(flt, list) or isinstance(flt, tuple):
+                for v in flt:
+                    for ev in cls._split_by_column(v):
+                        res.add(ev)
+            elif isinstance(flt, set):
+                res = flt
+            else:
+                for ev in cls._split_by_column(flt):
+                    res.add(ev)
+        if not res:
+            return None  # avoid clash with ALLOWED_FIELDS check
+
+        return res
+
+    @classmethod
+    def _split_by_column(cls, s):
+        return [t for t in s.split(',') if t]
+
+    def _generate_pre_handler(self, include_new_opts=False):
         result = []
         if self.ya_py_version:
             assert str(self.ya_py_version) in ('2', '3')
@@ -65,6 +92,11 @@ class YaBaseOptions(BaseOptions):
             pass
         if self.no_report:
             result += ['--no-report']
+        if include_new_opts:
+            # new options can be used only after finish support old versions ya-bin without them
+            # report_events added 2024-03
+            if self.report_events:
+                result += ['--report-events', ','.join(sorted(self.report_events))]
         if self.with_profile:
             result += ['--profile']
         if self.error_file:
@@ -93,6 +125,9 @@ class YaBaseOptions(BaseOptions):
 
         if self.custom_fetcher:
             env['YA_CUSTOM_FETCHER'] = self.custom_fetcher
+
+        if self.report_events:
+            env['YA_REPORT_EVENTS'] = ','.join(sorted(self.report_events))
 
         return env
 
