@@ -26,6 +26,9 @@ namespace {
     constexpr std::string_view YMAKE_SOURCE_PREFIX = "$S/";
     constexpr std::string_view YMAKE_BUILD_PREFIX = "$B/";
 
+    // TODO: get template from generator.toml
+    constexpr std::string_view DIR_CMAKELISTS_TEMPLATE = "dir_cmake_lists.jinja";
+
     enum class ECMakeAttrScope {Private, Public, Interface};
     enum class EMacroMergePolicy {MultipleCalls, FirstCall, ConcatArgs};
 
@@ -117,25 +120,34 @@ namespace {
             SetFactoryTypes<TCMakeList, TCMakeTarget>();
         }
 
-        void Save() {
-            // const auto dest
-            THashSet<fs::path> platformDirs;
-            auto out = ExportFileManager->Open(Platform.Conf.CMakeListsFile);
-            fmt::memory_buffer buf;
-            auto bufIt = std::back_inserter(buf);
+        void Save(const TCMakeGenerator* cmakeGenerator) {
+            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
+            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
+            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
 
-            fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
+            TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
 
-            for (auto subdir: SubdirsOrder_) {
-                Y_ASSERT(subdir);
-                Platform.SubDirs.insert(subdir->Path);
-                if (subdir->IsTopLevel()) {
-                    fmt::format_to(bufIt, "add_subdirectory({})\n", subdir->Path.c_str());
+            {
+                auto topLevelSubdirs = jinja2::ValuesList();
+                for (auto subdir: SubdirsOrder_) {
+                    Y_ASSERT(subdir);
+                    Platform.SubDirs.insert(subdir->Path);
+                    if (subdir->IsTopLevel()) {
+                        topLevelSubdirs.emplace_back(subdir->Path.c_str());
+                    }
+                    SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator);
                 }
-                SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>());
+
+                const auto [_, inserted] = dirValueMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
+                Y_ASSERT(inserted);
+                cmakeGenerator->ApplyRules(*dirValueMap);
             }
 
-            out.Write(buf.data(), buf.size());
+            TJinjaTemplate dirTemplate;
+            auto loaded = dirTemplate.Load(cmakeGenerator->GetGeneratorDir() / DIR_CMAKELISTS_TEMPLATE, cmakeGenerator->GetJinjaEnv());
+            YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
+            dirTemplate.SetValueMap(dirValueMap);
+            dirTemplate.RenderTo(*ExportFileManager, Platform.Conf.CMakeListsFile);
         }
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
@@ -147,127 +159,167 @@ namespace {
         }
 
     private:
-        static void PrintDirLevelMacros(auto& bufIt, const TVector<std::pair<std::string, TVector<std::string>>>& macros) {
+
+        template<typename T>
+        static jinja2::ValuesList ConvertParameterizedMacros(
+                const T& macros
+        ) {
+            auto result = jinja2::ValuesList();
+            result.reserve(macros.size());
             for (const auto& [macro, values]: macros) {
-                fmt::format_to(bufIt, "{}(\n  {}\n)\n", macro, fmt::join(values, "\n  "));
+                result.emplace_back(jinja2::ValuesList{macro, jinja2::ValuesList(values.begin(), values.end())});
             }
+            return result;
         }
 
-        void SaveSubdirCMake(const fs::path& subdir, const TCMakeList& data) {
-            auto out = ExportFileManager->Open(subdir / Platform.Conf.CMakeListsFile);
-            fs::path epilogue{ProjectConf.ArcadiaRoot/subdir/CMakeEpilogueFile};
-            fs::path prologue{ProjectConf.ArcadiaRoot/subdir/CMakePrologueFile};
+        static TTargetAttributesPtr MakeTargetAttributes(
+                const TCMakeTarget* tgt,
+                const TCMakeGenerator* cmakeGenerator
+        ) {
+            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
+            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Target);
+            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for target");
 
-            fmt::memory_buffer buf;
-            auto bufIt = std::back_inserter(buf);
-            fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
+            TTargetAttributesPtr targetValueMap = TTargetAttributes::Create(attrSpecIt->second, "target");
+            auto& targetMap = targetValueMap->GetWritableMap();
 
-            for (const auto& [name, components]: data.Packages) {
-                if (components.empty()) {
-                    fmt::format_to(bufIt, "find_package({} REQUIRED)\n", name);
-                } else {
-                    fmt::format_to(bufIt, "find_package({} REQUIRED COMPONENTS {})\n", name, fmt::join(components, " "));
+            // Target definition
+            targetMap.insert_or_assign("macro", tgt->Macro.c_str());
+            targetMap.insert_or_assign("name", tgt->Name.c_str());
+            targetValueMap->SetAttrValue("is_interface", tgt->InterfaceTarget);
+
+            {
+                const auto [_, inserted] = targetMap.emplace("macro_args", jinja2::ValuesList(tgt->MacroArgs.begin(), tgt->MacroArgs.end()));
+                Y_ASSERT(inserted);
+            }
+
+            // Target properties
+            {
+                auto [propertiesIt, inserted] = targetMap.emplace("properties", jinja2::ValuesList());
+                Y_ASSERT(inserted);
+                auto& properties = propertiesIt->second.asList();
+                for (const auto& [name, values]: tgt->Properties) {
+                    if (!values.empty()) {
+                        properties.emplace_back(jinja2::ValuesList{name, jinja2::ValuesList(values.begin(), values.end())});
+                    }
+                }
+            }
+
+            // Target attributes
+            {
+                auto [attributesIt, inserted] = targetMap.emplace("attributes", jinja2::ValuesList());
+                Y_ASSERT(inserted);
+                auto& attributes = attributesIt->second.asList();
+                for (const auto& [name, values]: tgt->Attributes) {
+                    jinja2::ValuesMap valuesMap;
+                    if (!values.Iface.empty()) {
+                        const auto [_, inserted] = valuesMap.emplace("iface", jinja2::ValuesList(values.Iface.begin(), values.Iface.end()));
+                        Y_ASSERT(inserted);
+                    }
+                    if (!values.Pub.empty()) {
+                        const auto [_, inserted] = valuesMap.emplace("pub", jinja2::ValuesList(values.Pub.begin(), values.Pub.end()));
+                        Y_ASSERT(inserted);
+                    }
+                    if (!values.Priv.empty()) {
+                        const auto [_, inserted] = valuesMap.emplace("priv", jinja2::ValuesList(values.Priv.begin(), values.Priv.end()));
+                        Y_ASSERT(inserted);
+                    }
+                    attributes.emplace_back(jinja2::ValuesList{name, valuesMap});
+                }
+            }
+
+            // Target-related dir level macros
+            {
+                const auto [_, inserted] = targetMap.emplace("target_dir_macros", ConvertParameterizedMacros(tgt->DirMacros));
+                Y_ASSERT(inserted);
+            }
+
+            // Target level macros
+            {
+                const auto [_, inserted] = targetMap.emplace("target_macros", ConvertParameterizedMacros(tgt->Macros));
+                Y_ASSERT(inserted);
+            }
+
+            // Dependencies
+            {
+                jinja2::ValuesList dependencies(tgt->HostToolExecutableTargetDependencies.begin(), tgt->HostToolExecutableTargetDependencies.end());
+                const auto [_, inserted] = targetMap.emplace("dependencies", jinja2::ValuesList(tgt->HostToolExecutableTargetDependencies.begin(), tgt->HostToolExecutableTargetDependencies.end()));
+                Y_ASSERT(inserted);
+            }
+
+            return targetValueMap;
+        }
+
+        void SaveSubdirCMake(const fs::path& subdir,
+                             const TCMakeList& data,
+                             const TCMakeGenerator* cmakeGenerator) {
+            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
+            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
+            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
+
+            TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+            auto& dirMap = dirValueMap->GetWritableMap();
+
+            {
+                fs::path arcadiaSubdir{ProjectConf.ArcadiaRoot / subdir};
+                dirValueMap->SetAttrValue("prologue", (arcadiaSubdir / CMakePrologueFile).c_str());
+                dirValueMap->SetAttrValue("epilogue", (arcadiaSubdir / CMakeEpilogueFile).c_str());
+            }
+
+            {
+                auto [packagesIt, inserted] = dirMap.emplace("packages", jinja2::ValuesList());
+                Y_ASSERT(inserted);
+                auto& packages = packagesIt->second.asList();
+                for (const auto& [name, components]: data.Packages) {
+                    packages.emplace_back(jinja2::ValuesList{name, jinja2::ValuesList(components.begin(), components.end())});
                 }
             }
 
             {
-            THashSet<std::string_view> dedup;
-                for (const auto& mod: data.Includes) {
-                    if (dedup.insert(mod).second) {
-                        fmt::format_to(bufIt, "include({})\n", mod);
-                    }
+                THashSet<std::string_view> dedup;
+                for (const auto& include: data.Includes) {
+                    dedup.insert(include);
                 }
+
+                const auto [_, inserted] = dirMap.emplace("includes", jinja2::ValuesList(dedup.begin(), dedup.end()));
+                Y_ASSERT(inserted);
             }
 
             // add subdirectories that contain targets inside (possibly several levels lower)
-            for (const auto& addSubdir: data.SubdirectoriesToAdd) {
-                fmt::format_to(bufIt, "add_subdirectory({})\n", addSubdir.c_str());
-            }
-
-            PrintDirLevelMacros(bufIt, data.Macros);
-
-            for (auto tgt: data.Targets) {
-                const auto& cmakeTarget = *tgt.As<TCMakeTarget>();
-                if (buf.size() != 0) {
-                    fmt::format_to(bufIt, "\n");
-                }
-                // Target definition
-                if (cmakeTarget.InterfaceTarget) {
-                    fmt::format_to(bufIt, "{}({} INTERFACE", tgt->Macro, tgt->Name);
-                } else {
-                    fmt::format_to(bufIt, "{}({}", tgt->Macro, tgt->Name);
-                }
-                if (tgt->MacroArgs.empty()) {
-                    fmt::format_to(bufIt, ")\n");
-                } else if (std::accumulate(tgt->MacroArgs.begin(), tgt->MacroArgs.end(), 0u, [](size_t cnt, auto&& arg) {return cnt + arg.size();}) > 100) {
-                    fmt::format_to(bufIt, "\n  {}\n)\n", fmt::join(tgt->MacroArgs, "\n  "));
-                } else {
-                    fmt::format_to(bufIt, " {})\n", fmt::join(tgt->MacroArgs, " "));
-                }
-                // Target properties
-                for (const auto& [name, values]: cmakeTarget.Properties) {
-                    if (values.empty()) {
-                        continue;
-                    }
-                    fmt::format_to(bufIt, "set_property(TARGET {} PROPERTY\n  {} {}\n)\n", tgt->Name, name, fmt::join(values, " "));
-                }
-                // Target attributes
-                for (const auto& [macro, values]: cmakeTarget.Attributes) {
-                    if (!values.Iface.empty()) {
-                        fmt::format_to(bufIt, "{}({} INTERFACE\n  {}\n)\n", macro, tgt->Name, fmt::join(values.Iface, "\n  "));
-                    }
-                    if (!values.Pub.empty()) {
-                        fmt::format_to(bufIt, "{}({} PUBLIC\n  {}\n)\n", macro, tgt->Name, fmt::join(values.Pub, "\n  "));
-                    }
-                    if (!values.Priv.empty()) {
-                        fmt::format_to(bufIt, "{}({} PRIVATE\n  {}\n)\n", macro, tgt->Name, fmt::join(values.Priv, "\n  "));
-                    }
-                }
-
-                // Print target-related dir level macros
-                PrintDirLevelMacros(bufIt, cmakeTarget.DirMacros);
-
-                // Target level macros
-                for (const auto& [macro, values]: cmakeTarget.Macros) {
-                    if (values.empty()) {
-                        fmt::format_to(bufIt, "{}({})\n", macro, tgt->Name);
-                    } else {
-                        fmt::format_to(bufIt, "{}({}\n  {}\n)\n", macro, tgt->Name, fmt::join(values, "\n  "));
-                    }
-                }
-
-                // Dependencies
-                if (!cmakeTarget.HostToolExecutableTargetDependencies.empty()) {
-                    fmt::format_to(
-                        bufIt,
-                        "if(NOT CMAKE_CROSSCOMPILING)\n  add_dependencies({}\n    {}\n)\nendif()\n",
-                        tgt->Name,
-                        fmt::join(cmakeTarget.HostToolExecutableTargetDependencies, "\n    ")
-                    );
+            {
+                auto [subdirsIt, inserted] = dirMap.emplace("subdirs", jinja2::ValuesList());
+                Y_ASSERT(inserted);
+                auto& subdirs = subdirsIt->second.asList();
+                for (const auto& dir: data.SubdirectoriesToAdd) {
+                    subdirs.emplace_back(dir.string());
                 }
             }
 
-            auto writeToFile = [&out](const fs::path& path) {
-                TFileInput fileInput(TFile{path, RdOnly});
-                TString fileData = fileInput.ReadAll();
-                out.Write(fileData.data(), fileData.size());
-                out.Write("\n", 1);
-            };
+            const auto [_, inserted] = dirMap.emplace("dir_macros", ConvertParameterizedMacros(data.Macros));
+            Y_ASSERT(inserted);
 
-            if (fs::exists(prologue)) {
-                writeToFile(prologue);
+            {
+                auto [targetsIt, inserted] = dirMap.emplace("targets", jinja2::ValuesList());
+                Y_ASSERT(inserted);
+                auto& targets = targetsIt->second.asList();
+                for (auto tgt: data.Targets) {
+                    const auto cmakeTarget = tgt.As<TCMakeTarget>().Get();
+                    targets.emplace_back(MakeTargetAttributes(cmakeTarget, cmakeGenerator)->GetMap());
+                }
             }
 
-            out.Write(buf.data(), buf.size());
-
-            if (fs::exists(epilogue)) {
-                writeToFile(epilogue);
-            }
+            TJinjaTemplate dirTemplate;
+            auto loaded = dirTemplate.Load(
+                    cmakeGenerator->GetGeneratorDir() / DIR_CMAKELISTS_TEMPLATE,
+                    cmakeGenerator->GetJinjaEnv());
+            YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
+            dirTemplate.SetValueMap(dirValueMap);
+            dirTemplate.RenderTo(*ExportFileManager, subdir / Platform.Conf.CMakeListsFile);
         }
 
     private:
-        static constexpr std::string_view CMakeEpilogueFile = "epilogue.cmake";
         static constexpr std::string_view CMakePrologueFile = "prologue.cmake";
+        static constexpr std::string_view CMakeEpilogueFile = "epilogue.cmake";
 
     private:
         const TProjectConf& ProjectConf;
@@ -340,7 +392,7 @@ namespace {
 
             if (dest) {
                 for (const auto& val: vals) {
-                    dest->push_back(ConvertArg(val));
+                    dest->emplace_back(ConvertArg(val));
                 }
             }
         }
@@ -372,7 +424,7 @@ namespace {
                 spdlog::error("attempt to add macro '{}' while there is no active CMakeLists.txt", name);
                 return;
             }
-            CurSubdir_.As<TCMakeList>()->Macros.push_back({name, ConvertMacroArgs(args)});
+            CurSubdir_.As<TCMakeList>()->Macros.emplace_back(name, ConvertMacroArgs(args));
         }
 
         void AddTargetMacro(const std::string& name, std::span<const std::string> args, EMacroMergePolicy mergePolicy) {
@@ -404,7 +456,7 @@ namespace {
                 spdlog::error("attempt to add target directory macro '{}' while there is no active target", name);
                 return;
             }
-            CurTarget_.As<TCMakeTarget>()->DirMacros.push_back({name, ConvertMacroArgs(args)});
+            CurTarget_.As<TCMakeTarget>()->DirMacros.emplace_back(name, ConvertMacroArgs(args));
         }
 
         bool SupportsAllocator() const {
@@ -425,7 +477,7 @@ namespace {
             TVector<std::string> macroArgs;
             macroArgs.reserve(args.size());
             for (const auto& arg : args) {
-                macroArgs.push_back(ConvertArg(arg));
+                macroArgs.emplace_back(ConvertArg(arg));
             }
             platformGlobalVars.emplace(name, macroArgs);
         }
@@ -453,7 +505,7 @@ namespace {
         void AppendTargetProperty(const std::string& name, std::span<const std::string> values) {
             auto& prop = CurTarget_.As<TCMakeTarget>()->Properties[name];
             for (const auto& val: values) {
-                prop.push_back(val);
+                prop.emplace_back(val);
             }
         }
 
@@ -461,7 +513,7 @@ namespace {
             auto& prop = CurTarget_.As<TCMakeTarget>()->Properties[name];
             prop.clear();
             for (const auto& val: values) {
-                prop.push_back(val);
+                prop.emplace_back(val);
             }
         }
 
@@ -489,7 +541,7 @@ namespace {
                 spdlog::error("attempt to add find_package macro while there is no active CMakeLists.txt");
                 return;
             }
-            CurSubdir_.As<TCMakeList>()->Includes.push_back(mod);
+            CurSubdir_.As<TCMakeList>()->Includes.emplace_back(mod);
         }
 
         void SetFakeFlag(bool isFake) {
@@ -507,7 +559,7 @@ namespace {
             TVector<std::string> macroArgs;
             macroArgs.reserve(args.size());
             for (const auto& arg : args) {
-                macroArgs.push_back(ConvertArg(arg));
+                macroArgs.emplace_back(ConvertArg(arg));
             }
             return macroArgs;
         }
@@ -984,7 +1036,7 @@ bool RenderCmake(const TProjectConf& projectConf, TPlatform& platform, TGlobalPr
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
     IterateAll(*platform.Graph, platform.StartDirs, visitor);
     auto project = visitor.TakeFinalizedProject();
-    project.As<TCMakeProject>()->Save();
+    project.As<TCMakeProject>()->Save(cmakeGenerator);
     return !visitor.HasErrors();
 }
 
