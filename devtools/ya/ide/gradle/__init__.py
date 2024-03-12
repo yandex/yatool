@@ -17,6 +17,7 @@ import yalibrary.platform_matcher as pm
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("gradle")
+additional_files_ext = ['.config', '.make', '.yaml']
 requires_props = [
     'bucketUsername',
     'bucketPassword',
@@ -32,6 +33,58 @@ def in_rel_targets(rel_target, rel_targets_with_slash):
         if rel_target[: len(rel_target_with_slash)] == rel_target_with_slash:
             return True
     return False
+
+
+class NodeValidator:
+    def __init__(self, rel_targets_with_slash, arcadia_root):
+        self.validate_funcs = [self._bundle_validator, self._proto_files_validator, self._proto_deps_sources_validator]
+        self.additional_targets = []
+        self.outside_targets = []
+        self.rel_targets_with_slash = rel_targets_with_slash
+        self.arcadia_root = arcadia_root
+
+    def validate(self, node):
+        success = False
+        for func in self.validate_funcs:
+            if func(node):
+                success = True
+        return success, self.additional_targets, self.outside_targets
+
+    @staticmethod
+    def _bundle_validator(node):
+        if node.get('NodeType', None) == 'Bundle' and 'semantics' in node:
+            return True
+        return False
+
+    def _proto_files_validator(self, node):
+        if node.get('NodeType', None) == 'NonParsedFile' and 'semantics' in node:
+            for semantic in node['semantics']:
+                if 'sem' in semantic and len(semantic['sem']) == 2 and semantic['sem'][0] == 'proto_files':
+                    proto_sem = semantic['sem'][1]
+                    if in_rel_targets(proto_sem, self.rel_targets_with_slash):
+                        self.additional_targets.append(semantic['sem'][1])
+                        return True
+
+        return False
+
+    def _proto_deps_sources_validator(self, node):
+        if node.get('NodeType', None) == 'Bundle' and 'semantics' in node:
+            for semantic in node['semantics']:
+                if 'sem' in semantic and len(semantic['sem']) == 3 and semantic['sem'][0] == 'jar_proto':
+                    self.outside_targets.extend(
+                        find_files_by_extension(self.arcadia_root, semantic['sem'][1], [".proto"])
+                    )
+                    return True
+        return False
+
+
+def find_files_by_extension(arcadia_root, start_dir, extensions):
+    result = []
+    for root, dirs, files in os.walk(os.path.join(arcadia_root, start_dir)):
+        for file in files:
+            if any(file.endswith(ext) for ext in extensions):
+                result.append(os.path.join(start_dir, file))
+    return result
 
 
 def save_bucket_creds(login, token):
@@ -72,6 +125,21 @@ def is_subpath_of(path, root_path):
     return os.path.realpath(path).startswith(os.path.realpath(root_path) + os.sep)
 
 
+def recursive_symlinks(arcadia_root, gradle_project_root, target):
+    arc_target_src = os.path.join(arcadia_root, target)
+    exp_target_src = os.path.join(gradle_project_root, target)
+    if not os.path.exists(arc_target_src):
+        return
+    # pay attention to it
+    if not os.path.exists(exp_target_src):
+        os.makedirs(os.path.dirname(exp_target_src), exist_ok=True)
+        os.symlink(os.path.relpath(arc_target_src, os.path.dirname(exp_target_src)), exp_target_src)
+    elif os.path.isdir(arc_target_src):
+        for path in os.listdir(arc_target_src):
+            if os.path.isdir(os.path.join(arc_target_src, path)):
+                recursive_symlinks(arcadia_root, gradle_project_root, os.path.join(target, path))
+
+
 def apply_graph(params, sem_graph, gradle_project_root):
     with open(sem_graph) as f:
         graph = json.load(f)
@@ -88,21 +156,25 @@ def apply_graph(params, sem_graph, gradle_project_root):
     project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
     build_rel_targets = []  # Relative paths to targets for build
     for node in graph['data']:
-        if node.get('NodeType', None) != 'Bundle' or 'semantics' not in node:
+        validated, additional_targets, outside_targets = NodeValidator(rel_targets_with_slash, arcadia_root).validate(
+            node
+        )
+        if not validated:
             continue
+
+        for outside_target in outside_targets:
+            if not in_rel_targets(outside_target, rel_targets_with_slash):
+                recursive_symlinks(arcadia_root, gradle_project_root, outside_target)
+
         rel_target = node['Name'].replace('$B/', '').replace('$S/', '')  # Relative target - some *.jar
         if in_rel_targets(rel_target, rel_targets_with_slash):
             if project_outside_arcadia:
                 # Target for export as sources, make symlinks to all sources in export folder
                 rel_target_srcs = [os.path.join(os.path.dirname(rel_target), 'src')]
+                rel_target_srcs.extend(additional_targets)
                 # TODO Add other non-standard sources from jar_source_set semantic to rel_target_srcs
                 for rel_target_src in rel_target_srcs:
-                    arc_target_src = os.path.join(arcadia_root, rel_target_src)
-                    if os.path.exists(arc_target_src):
-                        exp_target_src = os.path.join(gradle_project_root, rel_target_src)
-                        if not os.path.exists(exp_target_src):
-                            os.makedirs(os.path.dirname(exp_target_src), exist_ok=True)
-                            os.symlink(os.path.relpath(arc_target_src, os.path.dirname(exp_target_src)), exp_target_src)
+                    recursive_symlinks(arcadia_root, gradle_project_root, rel_target_src)
         elif params.build_contribs:
             build_rel_targets.append(rel_target)
         else:
@@ -118,6 +190,11 @@ def apply_graph(params, sem_graph, gradle_project_root):
                     break
             if not contrib:
                 build_rel_targets.append(rel_target)
+
+    # .config, .make, .yaml etc files symlinks addition
+    add_files_targets = find_files_by_extension(arcadia_root, params.rel_targets[0], additional_files_ext)
+    for target in add_files_targets:
+        recursive_symlinks(arcadia_root, gradle_project_root, target)
 
     if len(build_rel_targets):  # Has something to build
         import app_ctx
