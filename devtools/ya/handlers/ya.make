@@ -15,14 +15,18 @@ PEERDIR(
     devtools/ya/handlers/style
     devtools/ya/handlers/test
     devtools/ya/handlers/tool
-    # devtools/ya/handlers/analyze_make
 )
+
+IF (PYTHON3)
+    PEERDIR(
+        devtools/ya/handlers/analyze_make
+    )
+ENDIF()
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/handlers/__trace__
         devtools/ya/handlers/addremove
-        devtools/ya/handlers/analyze_make
         devtools/ya/handlers/buf
         devtools/ya/handlers/clang_tidy
         devtools/ya/handlers/clone
