@@ -512,6 +512,17 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
     }
     TConstDepRef incDep = state.IncomingDep();
     TStringStream ss;
+    auto maybeEmitStructCmd = [&]() {
+        if (!parentStructCmdDetected)
+            return false;
+        auto isStructCommand = incDep.IsValid() && (*incDep == EDT_Include || *incDep == EDT_BuildCommand) && nodeType == EMNT_BuildCommand;
+        auto isStructVariable = incDep.IsValid() && *incDep == EDT_BuildCommand && nodeType == EMNT_BuildVariable;
+        if (isStructCommand || isStructVariable) {
+            Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
+            return true;
+        }
+        return false;
+    };
     switch (Mode) {
         case DM_MakeFiles: {
             bool isIncFile = state.HasIncomingDep() && IsMakeFileIncludeDep(incDep.From()->NodeType, *incDep, incDep.To()->NodeType);
@@ -599,9 +610,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             }
             if (fresh && (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(nodeType))) {
-                if ((nodeType == EMNT_BuildCommand || nodeType == EMNT_BuildVariable) && parentStructCmdDetected) {
-                    Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
-                } else {
+                if (!maybeEmitStructCmd()) {
                     Formatter().EmitNode(nodeType, st.Node()->ElemId, parentName, (nodeType == EMNT_BuildCommand ? SkipId(name) : name));
                 }
             }
@@ -620,10 +629,10 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitPos(incDep.IsValid() ? parent->DepIndex() + 1 : 0, incDep.IsValid() ? parent->NumDeps() : 0);
             }
             Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
-            if ((nodeType == EMNT_BuildCommand || nodeType == EMNT_BuildVariable) && parentStructCmdDetected) {
-                Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
-            } else {
-                Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(st.Node()).GetTargetId() : st.Node()->ElemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
+            {
+                if (!maybeEmitStructCmd()) {
+                    Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(st.Node()).GetTargetId() : st.Node()->ElemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
+                }
             }
             break;
 
