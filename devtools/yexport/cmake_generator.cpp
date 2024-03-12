@@ -16,21 +16,6 @@
 
 namespace NYexport {
 
-namespace {
-    void FormatCommonCMakeText(fmt::memory_buffer& buf, const TVector<TPlatformConf>& platforms) {
-        auto bufIt = std::back_inserter(buf);
-        fmt::format_to(bufIt, "{}", NCMake::GeneratedDisclamer);
-        for (auto it = platforms.begin(); it != platforms.end(); it++) {
-            if (it == platforms.begin()) {
-                fmt::format_to(bufIt, "if ({})\n  include({})\n", it->CMakeFlag, it->CMakeListsFile);
-                continue;
-            }
-            fmt::format_to(bufIt, "elseif ({})\n  include({})\n", it->CMakeFlag, it->CMakeListsFile);
-        }
-        fmt::format_to(bufIt, "endif()\n");
-    }
-}
-
 TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored)
     : ProjectName(name)
     , ArcadiaRoot(arcadiaRoot)
@@ -38,49 +23,37 @@ TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, E
 {
 }
 
-TPlatformConf::TPlatformConf(std::string_view platformName) {
+TPlatformConf::TPlatformConf(std::string_view platformName)
+    : Name(platformName)
+{
     if (platformName == "linux" || platformName == "linux-x86_64") {
         Platform = EPlatform::EP_Linux_x86_64;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"x86_64\" AND NOT HAVE_CUDA";
     } else if (platformName == "linux-x86_64-cuda") {
         Platform = EPlatform::EP_Linux_x86_64_Cuda;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"x86_64\" AND HAVE_CUDA";
     } else if (platformName == "linux-aarch64" || platformName == "linux-arm64") {
         Platform = EPlatform::EP_Linux_Aarch64;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"aarch64\" AND NOT HAVE_CUDA";
     } else if (platformName == "linux-aarch64-cuda" || platformName == "linux-arm64-cuda") {
         Platform = EPlatform::EP_Linux_Aarch64_Cuda;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"aarch64\" AND HAVE_CUDA";
     } else if (platformName == "linux-ppc64le") {
         Platform = EPlatform::EP_Linux_Ppc64LE;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"ppc64le\" AND NOT HAVE_CUDA";
     } else if (platformName == "linux-ppc64le-cuda") {
         Platform = EPlatform::EP_Linux_Ppc64LE_Cuda;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Linux\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"ppc64le\" AND HAVE_CUDA";
     } else if (platformName == "darwin" || platformName == "darwin-x86_64") {
         Platform = EPlatform::EP_MacOs_x86_64;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"x86_64\"";
     } else if (platformName == "darwin-arm64") {
         Platform = EPlatform::EP_MacOs_Arm64;
-        CMakeFlag = "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\" AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"arm64\"";
     } else if (platformName == "windows" || platformName == "windows-x86_64") {
         Platform = EPlatform::EP_Windows_x86_64;
-        CMakeFlag = "WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"AMD64\" AND NOT HAVE_CUDA";
     } else if (platformName == "windows-x86_64-cuda") {
         Platform = EPlatform::EP_Windows_x86_64_Cuda;
-        CMakeFlag = "WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL \"AMD64\" AND HAVE_CUDA";
     } else if (platformName == "android-arm" || platformName == "android-arm32") {
         Platform = EPlatform::EP_Android_Arm;
-        CMakeFlag = "ANDROID AND CMAKE_ANDROID_ARCH STREQUAL \"arm\"";
     } else if (platformName == "android-arm64") {
         Platform = EPlatform::EP_Android_Arm64;
-        CMakeFlag = "ANDROID AND CMAKE_ANDROID_ARCH STREQUAL \"arm64\"";
     } else if (platformName == "android-x86") {
         Platform = EPlatform::EP_Android_x86;
-        CMakeFlag = "ANDROID AND CMAKE_ANDROID_ARCH STREQUAL \"x86\"";
     } else if (platformName == "android-x86_64") {
         Platform = EPlatform::EP_Android_x86_64;
-        CMakeFlag = "ANDROID AND CMAKE_ANDROID_ARCH STREQUAL \"x86_64\"";
     } else {
         throw yexception() << "Unsupported platform " << platformName;
     }
@@ -90,7 +63,6 @@ TPlatformConf::TPlatformConf(std::string_view platformName) {
 TPlatform::TPlatform(std::string_view platformName)
     : Conf(platformName)
     , Graph(nullptr)
-    , Name(platformName)
 {
 }
 
@@ -143,7 +115,7 @@ void TCMakeGenerator::RenderPlatform(TPlatform& platform) {
         Cleaner.CollectDirs(*platform.Graph, platform.StartDirs);
     }
     if (!RenderCmake(Conf, platform, GlobalProperties, this)) {
-        yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform.Name);
+        yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform.Conf.Name);
     }
 }
 
@@ -183,6 +155,21 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 }
 
 void TCMakeGenerator::MergePlatforms() const {
+    TJinjaTemplate commonTemplate;
+    auto loaded = commonTemplate.Load(GeneratorDir / "common_cmake_lists.jinja", GetJinjaEnv());
+    YEXPORT_VERIFY(loaded,
+                   fmt::format("Cannot load template: \"{}\"\n", "common_cmake_lists.jinja"));
+
+    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Directory);
+    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(),
+                   "No attribute specification for directory");
+
+    TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+    commonTemplate.SetValueMap(dirValueMap);
+
+    auto& dirMap = dirValueMap->GetWritableMap();
+    dirMap["platforms"] = GeneratorSpec.Platforms;
+
     THashSet<fs::path> visitedDirs;
     for (const auto& platform : Platforms) {
         for (const auto& dir : platform.SubDirs) {
@@ -209,10 +196,14 @@ void TCMakeGenerator::MergePlatforms() const {
                 }
             }
             if (isDifferent) {
-                fmt::memory_buffer buf;
-                FormatCommonCMakeText(buf, dirPlatforms);
-                auto out = ExportFileManager->Open(dir / NCMake::CMakeListsFile);
-                out.Write(buf.data(), buf.size());
+                auto& platformCmakes = dirMap.insert_or_assign("platform_cmakelists", jinja2::ValuesList()).first->second.asList();
+                auto& platformNames = dirMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
+                for (const auto& dirPlatform : dirPlatforms) {
+                    platformCmakes.push_back(dirPlatform.CMakeListsFile);
+                    platformNames.push_back(dirPlatform.Name);
+                }
+
+                commonTemplate.RenderTo(*ExportFileManager, dir / NCMake::CMakeListsFile);
             } else {
                 auto finalPath = dir / NCMake::CMakeListsFile;
                 ExportFileManager->CopyFromExportRoot(dir / platform.Conf.CMakeListsFile, finalPath);
@@ -257,13 +248,15 @@ void TCMakeGenerator::CopyArcadiaScripts() const {
 
 void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const {
     {
-        jinja2::ValuesList platform_cmakes, platform_flags;
-        for (auto it = Platforms.begin(); it != Platforms.end(); it++) {
-            platform_cmakes.push_back(it->Conf.CMakeListsFile);
-            platform_flags.push_back(it->Conf.CMakeFlag);
+        auto& rootMap = rootValueMap->GetWritableMap();
+        rootMap["platforms"] = GeneratorSpec.Platforms;
+
+        auto& platformCmakes = rootMap.insert_or_assign("platform_cmakelists", jinja2::ValuesList()).first->second.asList();
+        auto& platformNames = rootMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
+        for (const auto& platform : Platforms) {
+            platformCmakes.push_back(platform.Conf.CMakeListsFile);
+            platformNames.push_back(platform.Conf.Name);
         }
-        rootValueMap->SetAttrValue("platform_cmakelists", platform_cmakes);
-        rootValueMap->SetAttrValue("platform_flags", platform_flags);
     }
     {
         jinja2::ValuesList globalVars;
@@ -319,15 +312,16 @@ void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap
         }
     }
 
-    rootValueMap->GetWritableMap().insert_or_assign("conan_packages",
-                                                    jinja2::ValuesList(GlobalProperties.ConanPackages.begin(),
-                                                                       GlobalProperties.ConanPackages.end()));
-    rootValueMap->GetWritableMap().insert_or_assign("conan_tool_packages",
-                                                    jinja2::ValuesList(GlobalProperties.ConanToolPackages.begin(),
-                                                                       GlobalProperties.ConanToolPackages.end()));
-    rootValueMap->GetWritableMap().insert_or_assign("conan_options",
-                                                    jinja2::ValuesList(GlobalProperties.ConanOptions.begin(),
-                                                                       GlobalProperties.ConanOptions.end()));
+    auto& rootMap = rootValueMap->GetWritableMap();
+    rootMap.insert_or_assign("conan_packages",
+                             jinja2::ValuesList(GlobalProperties.ConanPackages.begin(),
+                                                GlobalProperties.ConanPackages.end()));
+    rootMap.insert_or_assign("conan_tool_packages",
+                             jinja2::ValuesList(GlobalProperties.ConanToolPackages.begin(),
+                                                GlobalProperties.ConanToolPackages.end()));
+    rootMap.insert_or_assign("conan_options",
+                             jinja2::ValuesList(GlobalProperties.ConanOptions.begin(),
+                                                GlobalProperties.ConanOptions.end()));
 
     {
         auto [conanImportsIt, _] = rootValueMap->GetWritableMap().insert_or_assign(

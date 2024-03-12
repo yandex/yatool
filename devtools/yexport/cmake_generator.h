@@ -60,9 +60,9 @@ struct TProjectConf {
 };
 
 struct TPlatformConf {
-    std::string CMakeFlag;
     std::string CMakeListsFile;
     EPlatform Platform;
+    std::string Name;
 
     TPlatformConf(std::string_view platformName);
 };
@@ -73,7 +73,6 @@ struct TPlatform {
     TVector<TNodeId> StartDirs;
     THashMap<std::string, TVector<std::string>> GlobalVars;
     THashSet<fs::path> SubDirs;
-    std::string Name;
 
     explicit TPlatform(std::string_view platformName);
 };
