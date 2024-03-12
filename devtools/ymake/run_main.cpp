@@ -68,7 +68,6 @@ int YMakeMain(int argc, char** argv) {
         conf.PostProcess(res.GetFreeArgs());
     } catch (const yexception& error) {
         YErr() << error.what() << Endl;
-        FORCE_TRACE(U, NEvent::TStageFinished("ymake run"));
         return BR_FATAL_ERROR;
     }
 
