@@ -9,9 +9,6 @@ PY_SRCS(
 # !! Keep this list in sync with the RECURSE list in test_tool/ya.make
 
 IF (NOT YA_OPENSOURCE)
-    PEERDIR(
-        devtools/ya/test/programs/test_tool/run_diff_test
-    )
     IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
         PEERDIR(
             devtools/ya/test/programs/test_tool/upload_coverage
@@ -37,6 +34,7 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
             devtools/ya/test/programs/test_tool/resolve_sancov_coverage
             devtools/ya/test/programs/test_tool/run_clang_tidy
+            devtools/ya/test/programs/test_tool/run_diff_test
             devtools/ya/test/programs/test_tool/run_eslint
             devtools/ya/test/programs/test_tool/run_hermione
             devtools/ya/test/programs/test_tool/run_jest
