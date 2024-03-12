@@ -302,7 +302,10 @@ bool TJSONVisitor::Enter(TState& state) {
             }
         }
 
-        if (!currDone && !NewUids && nodeType == EMNT_BuildCommand && (!state.HasIncomingDep() || !IsIndirectSrcDep(state.IncomingDep()))) {
+        if (!currDone && !NewUids && (
+            (nodeType == EMNT_BuildCommand && (!state.HasIncomingDep() || !IsIndirectSrcDep(state.IncomingDep()))) ||
+            (nodeType == EMNT_BuildVariable && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand)
+        )) {
             TMd5Value md5{nodeDebug, "TJSONVisitor::Enter::<md5#2>"sv};
             auto name = currState.GetCmdName();
                 auto str = name.GetStr();
@@ -592,7 +595,11 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         }
     }
 
-    if (state.HasIncomingDep() && (IsInnerCommandDep(state.IncomingDep()) || IsBuildCommandDep(state.IncomingDep()))) {
+    if (state.HasIncomingDep() && (
+        IsInnerCommandDep(state.IncomingDep()) ||
+        IsBuildCommandDep(state.IncomingDep()) ||
+        IsLocalVariableDep(state.IncomingDep())
+    )) {
         const auto usedVars = currData.UsedReservedVars.Get();
         if (usedVars) {
             if (!prntDone) {
@@ -872,7 +879,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     }
 
     if (*dep == EDT_Property) {
-        if (IsModuleType(currNodeType) || currNodeType == EMNT_MakeFile || currNodeType == EMNT_BuildCommand || currNodeType == EMNT_NonParsedFile) {
+        if (IsModuleType(currNodeType) || currNodeType == EMNT_MakeFile || currNodeType == EMNT_BuildCommand || currNodeType == EMNT_BuildVariable || currNodeType == EMNT_NonParsedFile) {
             if (chldNode->NodeType == EMNT_Property) {
                 TStringBuf propVal = graph.GetCmdName(chldNode).GetStr();
                 TStringBuf name = GetPropertyName(propVal);
@@ -889,8 +896,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                     Y_ASSERT(mapJson);
                     HostResources.emplace_back(mapJson);
                 } else {
-                    bool nodeHasLiftedVariables = currData.StructCmdDetected && (currNodeType == EMNT_NonParsedFile || IsModuleType(currNodeType));
-                    if (!currDone && (currNodeType == EMNT_BuildCommand || nodeHasLiftedVariables) && name == NProps::USED_RESERVED_VAR) {
+                    if (!currDone && (currNodeType == EMNT_BuildCommand || currNodeType == EMNT_BuildVariable) && name == NProps::USED_RESERVED_VAR) {
                         GetOrInit(currData.UsedReservedVars).emplace(GetPropertyValue(propVal));
                     }
                 }

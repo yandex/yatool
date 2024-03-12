@@ -81,7 +81,7 @@ void TJSONVisitorNew::PrepareCurrent(TState& state) {
 }
 
 void TJSONVisitorNew::FinishCurrent(TState& state) {
-    if (CurrNode->NodeType == EMNT_BuildCommand) {
+    if (CurrNode->NodeType == EMNT_BuildCommand || CurrNode->NodeType == EMNT_BuildVariable) {
         auto name = CurrState->GetCmdName();
         if (!PrntData->StructCmdDetected) {
             Y_ASSERT(!name.IsNewFormat());
@@ -101,17 +101,30 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
                 Y_ASSERT(expr);
             } else {
                 // (presumably) this is a context variable ("0:SOME_NONINLINED_VAR=S:234")
-                auto str = name.GetStr();
-                TStringBuf val = GetCmdValue(str);
-                TStringBuf cmdName = GetCmdName(str);
-                if (cmdName.EndsWith("__NO_UID__")) {
-                    YDIAG(V)
-                        << "Variable not accounted for in uid: " << cmdName
-                        << ", value: " << Commands.PrintCmd(*Commands.Get(val, &CmdConf))
-                        << Endl;
+                if (CurrNode->NodeType == EMNT_BuildVariable) {
+                    // a local variable
+                    auto str = name.GetStr();
+                    TStringBuf val = GetCmdValue(str);
+                    TStringBuf cmdName = GetCmdName(str);
+                    if (cmdName.EndsWith("__NO_UID__")) {
+                        YDIAG(V)
+                            << "Variable not accounted for in uid: " << cmdName
+                            << ", value: " << Commands.PrintCmd(*Commands.Get(val, &CmdConf))
+                            << Endl;
+                    } else {
+                        expr = Commands.Get(val, &CmdConf);
+                        Y_ASSERT(expr);
+                    }
                 } else {
-                    expr = Commands.Get(val, &CmdConf);
-                    Y_ASSERT(expr);
+                    // a global variable: these are processed somewhere else
+                    Y_ASSERT(CurrNode->NodeType == EMNT_BuildCommand && *Edge == EDT_Include);
+
+                    if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
+                        auto str = name.GetStr();
+                        TStringBuf val = GetCmdValue(str);
+                        expr = Commands.Get(val, &CmdConf);
+                        Y_ASSERT(expr);
+                    }
                 }
             }
             if (expr)
@@ -224,6 +237,18 @@ void TJSONVisitorNew::PassToParent(TState& state) {
         UpdateParent(state, nodeName, "Include tool node name to parent structure hash");
     }
 
+    // local variables
+    if (*Edge == EDT_BuildCommand && CurrNode->NodeType == EMNT_BuildVariable) {
+        UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include local variables");
+    }
+
+    // global variables in non-modules
+    if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
+        if (Edge.From()->NodeType == EMNT_NonParsedFile && *Edge == EDT_Include && CurrNode->NodeType == EMNT_BuildCommand) {
+            UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include global variables (non-module version)");
+        }
+    }
+
     // late globs
     if (*Edge == EDT_BuildFrom && CurrNode->NodeType == EMNT_BuildCommand) {
         UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include late glob hash to parent structure hash");
@@ -334,8 +359,17 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
     for (const auto& varStr : RestoreContext.Modules.GetGlobalVars(moduleIt->Module->GetId()).GetVars()) {
         if (CurrData->UsedReservedVars->contains(varStr.first)) {
             for (const auto& varItem : varStr.second) {
-                TString value = FormatProperty(varStr.first, varItem.Name);
-                UpdateCurrent(state, value, "Include global var to current structure hash");
+                if (CurrData->StructCmdDetected) {
+                    auto expr = Commands.Get(varItem.Name, &CmdConf);
+                    Y_ASSERT(expr);
+                    UpdateCurrent(state, varStr.first, "new_cmd_name");
+                    Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
+                        CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
+                    });
+                } else {
+                    TString value = FormatProperty(varStr.first, varItem.Name);
+                    UpdateCurrent(state, value, "Include global var to current structure hash");
+                }
             }
         }
     }

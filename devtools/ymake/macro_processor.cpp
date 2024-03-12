@@ -369,6 +369,75 @@ void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId) {
     }
 }
 
+void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources) {
+
+    //
+    // srcExpr (an elemId) points to an "S:123" build command element,
+    //     which is visible in the graph for actual commands,
+    //     and invisible (not referenced directly) for context variable content
+    //
+    // dstBinding points to
+    //     either an "S:123" build command node (as an implicit .CMD=... "binding"),
+    //     or a "0:VARNAME=S:123" context variable node
+    //
+
+    auto exprVars = commands.GetCommandVars(srcExpr);
+    for (auto&& exprVarName : exprVars) {
+
+        auto isGlobalReservedVar = IsGlobalReservedVar(exprVarName);
+
+        if (isGlobalReservedVar) {
+            GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, exprVarName));
+        }
+
+        auto var = varDefinitionSources.Lookup(exprVarName);
+
+        if (!var || var->DontExpand)
+            continue;
+        if (var->size() == 0)
+            continue;
+
+        // TODO: should `IsInternalReservedVar` matter here?
+
+        if (isGlobalReservedVar) {
+            if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
+                auto [it, added] = GetOrInit(GlobalVars).emplace(exprVarName, TYVar{});
+                if (added) {
+                    ui64 id;
+                    TStringBuf cmdName;
+                    TStringBuf cmdValue;
+                    ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
+                    auto compiled = commands.Compile(cmdValue, varDefinitionSources, varDefinitionSources, false);
+                    // TODO: there's no point in allocating cmdElemId for expressions
+                    // that do _not_ have directly corresponding nodes
+                    // (and are linked as "0:VARNAME=S:123" instead)
+                    auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
+                    auto value = Graph->Names().CmdNameById(cmdElemId).GetStr();
+                    it->second.SetSingleVal(cmdName, value, id);
+                }
+            }
+
+            continue;
+        }
+
+        auto [it, added] = GetOrInit(LocalVars).emplace(exprVarName, TYVar{});
+        if (!added)
+            continue;
+        auto& subBinding = it->second;
+
+        auto val = EvalAll(var);
+        auto compiled = commands.Compile(val, Module->Vars, varDefinitionSources, false);
+        const ui32 subExpr = commands.Add(*Graph, std::move(compiled.Expression));
+        auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
+
+        subBinding.SetSingleVal(exprVarName, subExprRef, 0);
+        InitCmdNode(subBinding);
+        CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
+
+    }
+
+}
+
 bool TCommandInfo::GetCommandInfoFromStructCmd(
     TCommands& commands,
     ui32 cmdElemId,
@@ -391,27 +460,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         });
     }
 
-    {
-        auto cmdVars = commands.GetCommandVars(cmdElemId);
-        for (auto&& cmdVar : cmdVars) {
-            auto var = vars.Lookup(cmdVar);
-            if (!var || var->DontExpand)
-                continue;
-            if (var->size() == 0)
-                continue;
-            auto [it, added] = GetOrInit(ExternalVars).emplace(cmdVar, TYVar{});
-            if (!added)
-                continue; // the expected cause is `TModuleBuilder::AddGlobalVarDep` putting stuff into `ExternalVars`
-            auto& dst = it->second;
-            auto val = EvalAll(var);
-            auto compiled = commands.Compile(val, Module->Vars, vars, false);
-            const ui32 cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
-            auto value = Graph->Names().CmdNameById(cmdElemId).GetStr();
-            dst.SetSingleVal(cmdVar, value, 0);
-            if (!dst.IsReservedName && IsGlobalReservedVar(cmdVar))
-                dst.IsReservedName = true;
-        }
-    }
+    CollectVarsDeep(commands, cmdElemId, Cmd, vars);
 
     return true;
 }
@@ -1024,18 +1073,30 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     // note that we add all the vars _after_ the command,
     // so that graph walkers would be able to detect the command version
     // before getting to var processing (see TJSONEntryStats::StructCmdDetected)
-    if (ExternalVars) {
+    if (LocalVars) {
         TVector<TStringBuf> names;
-        names.reserve(ExternalVars->size());
-        for (auto& var : *ExternalVars)
+        names.reserve(LocalVars->size());
+        for (auto& var : *LocalVars)
             names.push_back(var.first);
         Sort(names);
         for (auto name : names) {
-            auto& var = ExternalVars->at(name);
+            auto& var = LocalVars->at(name);
             auto varElemId = InitCmdNode(var);
-            if (var.IsReservedName)
-                actionNode.AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, name));
-            actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
+            actionNode.AddUniqueDep(EDT_BuildCommand, EMNT_BuildVariable, varElemId);
+        }
+    }
+    if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
+        if (GlobalVars) {
+            TVector<TStringBuf> names;
+            names.reserve(GlobalVars->size());
+            for (auto& var : *GlobalVars)
+                names.push_back(var.first);
+            Sort(names);
+            for (auto name : names) {
+                auto& var = GlobalVars->at(name);
+                auto varElemId = InitCmdNode(var);
+                actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
+            }
         }
     }
 

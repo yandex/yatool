@@ -599,7 +599,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             }
             if (fresh && (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(nodeType))) {
-                if (nodeType == EMNT_BuildCommand && parentStructCmdDetected) {
+                if ((nodeType == EMNT_BuildCommand || nodeType == EMNT_BuildVariable) && parentStructCmdDetected) {
                     Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
                 } else {
                     Formatter().EmitNode(nodeType, st.Node()->ElemId, parentName, (nodeType == EMNT_BuildCommand ? SkipId(name) : name));
@@ -620,7 +620,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 Formatter().EmitPos(incDep.IsValid() ? parent->DepIndex() + 1 : 0, incDep.IsValid() ? parent->NumDeps() : 0);
             }
             Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
-            if (nodeType == EMNT_BuildCommand && parentStructCmdDetected) {
+            if ((nodeType == EMNT_BuildCommand || nodeType == EMNT_BuildVariable) && parentStructCmdDetected) {
                 Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
             } else {
                 Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(st.Node()).GetTargetId() : st.Node()->ElemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
@@ -1193,7 +1193,7 @@ void DumpFirstRelation(const TRestoreContext& restoreContext, const TTraverseSta
     for (const auto& p : {recursePath, path}) {
         for (auto it = p.begin(); it != p.end(); it++) {
             auto name = it->NodeName;
-            if (it->NodeType == EMNT_BuildCommand) {
+            if (it->NodeType == EMNT_BuildCommand || it->NodeType == EMNT_BuildVariable) {
                 name = FormatBuildCommandName(
                     yMake.Graph.GetCmdName(it->ElemId),
                     yMake.Commands,

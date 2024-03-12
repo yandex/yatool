@@ -200,6 +200,11 @@ bool IsInnerCommandDep(const TDep& dep) {
 }
 
 template <class TDep>
+bool IsLocalVariableDep(const TDep& dep) {
+    return IsFileType(dep.From()->NodeType) && *dep == EDT_BuildFrom && dep.To()->NodeType == EMNT_BuildVariable;
+}
+
+template <class TDep>
 bool IsBuildCommandDep(const TDep& dep) {
     return IsFileType(dep.From()->NodeType) && *dep == EDT_BuildCommand && dep.To()->NodeType == EMNT_BuildCommand;
 }

@@ -340,6 +340,9 @@ void TGeneralParser::ProcessCommand(TCmdView cmdView, TNodeAddCtx& node, TAddIte
         case EMNT_UnknownCommand:
             // TODO: recover it next time
             break;
+        case EMNT_BuildVariable:
+            // TODO: NOP?
+            break;
         case EMNT_Property:
             ProcessProperty(cmdView.GetStr(), node, stack);
             break;

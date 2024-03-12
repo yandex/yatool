@@ -41,6 +41,7 @@ enum EMakeNodeType : ui8 {
     EMNT_BuildCommand = 11 /* "BuildCommand" */,
     EMNT_UnknownCommand = 12 /* "UnknownCommand" */,
     EMNT_Property = 13 /* "Property" */, // actually may affect command unless entered via EDT_Property
+    EMNT_BuildVariable = 14 /* "BuildVariable" */,
     EMNT_Last = EMNT_Property,
 };
 
@@ -280,6 +281,7 @@ inline EMakeNodeKind GetNodeKind(EMakeNodeType nodeType) {
 
         case EMNT_BuildCommand:
         case EMNT_UnknownCommand:
+        case EMNT_BuildVariable:
             return EMakeNodeKind::AnyCommand;
 
         case EMNT_Property:

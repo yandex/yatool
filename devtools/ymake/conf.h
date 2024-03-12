@@ -138,6 +138,9 @@ public:
         return DefaultRequirements;
     }
 
+public:
+    static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
+
 private:
     void PrepareBuildDir() const;
     void GenerateCustomData(const TStringBuf genCustomData);

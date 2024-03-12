@@ -162,8 +162,8 @@ private:
 
     void ApplyVarAsMacro(const TStringBuf& name, bool force = false);
     void AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind = EModuleCmdKind::Default);
-    void AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node, TCommandInfo* cmdInfo, bool structCmd);
-    void AddGlobalVarDeps(TAddDepAdaptor& node, TCommandInfo* cmdInfo, bool structCmd);
+    void AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node, bool structCmd);
+    void AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd);
     void AddGlobalDep();
     void AddFileGroupVars();
     void AddDartsVars();

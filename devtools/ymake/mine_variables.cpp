@@ -142,7 +142,10 @@ void MineVariables(
         auto nodeType = nextNode->NodeType;
         auto depType = *dep;
 
-        if (depType == EDT_Include && nodeType == EMNT_BuildCommand)
+        if (
+            (depType == EDT_Include && nodeType == EMNT_BuildCommand) ||
+            (depType == EDT_BuildCommand && nodeType == EMNT_BuildVariable)
+        )
             MineThisVariable(nextNode, vars, true, [&]() {});
     }
 }

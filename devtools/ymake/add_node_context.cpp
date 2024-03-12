@@ -297,7 +297,12 @@ void TNodeAddCtx::RemoveIncludeDeps(ui64 startFrom) {
     if (!PartEdit || startFrom >= Deps.Size()) {
         return;
     }
-    auto e = std::remove_if(Deps.begin() + startFrom, Deps.end(), [](const TAddDepDescr& d) { return d.DepType == EDT_Include; });
+    auto e = std::remove_if(Deps.begin() + startFrom, Deps.end(), [](const TAddDepDescr& d) {
+        if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes)
+            return d.DepType == EDT_Include && d.NodeType != EMNT_BuildCommand;
+        else
+            return d.DepType == EDT_Include;
+    });
     Deps.Erase(e, Deps.end());
 }
 

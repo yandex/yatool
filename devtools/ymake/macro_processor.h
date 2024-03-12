@@ -58,7 +58,8 @@ struct TCommandInfo {
 
 public:
     TYVar Cmd; // dep for the main output
-    THolder<TVars> ExternalVars;
+    THolder<TVars> LocalVars;
+    THolder<TVars> GlobalVars; // TODO remove this when TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes is out
     THolder<THashMap<TString, TString>> KV;
     THolder<THashMap<TString, TString>> ToolPaths;
     THolder<THashMap<TString, TString>> ResultPaths;
@@ -254,6 +255,8 @@ private:
 
     THolder<TVector<TStringBuf>> GetDirsFromOpts(const TStringBuf opt, const TVars& vars);
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
+
+    void CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);
 };
 
 void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>& result);
