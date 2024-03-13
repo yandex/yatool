@@ -470,10 +470,11 @@ def print_cache_statistics(graph, filename, display):
     tests_task_count = sum(1 for x in not_cached_tasks if 'TEST_NAME' in x.abstract.meta.get('env', {}))
     not_tests_task_count = not_cached_task_count - tests_task_count
     executed_task_count = not_cached_task_count + cached_task_count
+    all_run_tasks_count = len(all_run_tasks)
 
     logger.debug(
         'Run tasks %d: %d cached tasks (%d cache(s) resolved by dynamic uids), %d not cached, %d failed',
-        len(all_run_tasks),
+        all_run_tasks_count,
         cached_task_count,
         dyn_cached_tasks_count,
         not_cached_task_count,
@@ -485,12 +486,17 @@ def print_cache_statistics(graph, filename, display):
         return 100.0 * part / total if total > 0 else 0
 
     cache_hit = safe_perc(cached_task_count, executed_task_count)
+    not_executed_task_count = all_run_tasks_count - not_cached_task_count
+    cache_efficiency = safe_perc(not_executed_task_count, all_run_tasks_count)
 
     display.emit_message(
-        'Cache hit ratio is {:.02f}% ({:d} of {:d}). Local: {:d} ({:.02f}%), dist: {:d} ({:.02f}%), by dynamic uids: {:d} ({:.02f}%)'.format(
+        'Cache hit ratio is {:.02f}% ({:d} of {:d}). Cache efficiency ratio is {:.02f}% ({:d} of {:d}). Local: {:d} ({:.02f}%), dist: {:d} ({:.02f}%), by dynamic uids: {:d} ({:.02f}%)'.format(
             cache_hit,
             cached_task_count,
             executed_task_count,
+            cache_efficiency,
+            not_executed_task_count,
+            all_run_tasks_count,
             local_cached_task_count,
             safe_perc(local_cached_task_count, executed_task_count),
             dist_cached_task_count,
@@ -503,9 +509,10 @@ def print_cache_statistics(graph, filename, display):
     if filename is not None:
         js_data = {
             'cache_hit': cache_hit,
+            'cache_efficiency': cache_efficiency,
             'cached_tasks': cached_task_count,
             'executed_tasks': executed_task_count,
-            'all_run_tasks': len(all_run_tasks),
+            'all_run_tasks': all_run_tasks_count,
         }
         with open(filename, 'w') as output_file:
             json.dump(js_data, output_file, indent=4, sort_keys=True)
@@ -514,7 +521,8 @@ def print_cache_statistics(graph, filename, display):
 
     stats = {
         'cache_hit': cache_hit,
-        'run_tasks': len(all_run_tasks),
+        'cache_efficiency': cache_efficiency,
+        'run_tasks': all_run_tasks_count,
         'executed_tasks': executed_task_count,
         'cached_tasks': cached_task_count,
         'not_cached_tasks': not_cached_task_count,
