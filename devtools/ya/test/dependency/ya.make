@@ -20,12 +20,6 @@ PEERDIR(
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
 )
 
-IF (NOT YA_OPENSOURCE)
-    PEERDIR(
-        devtools/ya/yalibrary/svn
-    )
-ENDIF()
-
 END()
 
 RECURSE(

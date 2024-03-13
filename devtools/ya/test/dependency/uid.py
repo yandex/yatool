@@ -74,7 +74,7 @@ class TestUidGenerator(object):
             if not base_rev_only and not cls.Path_To_Rev:
                 raise NoATDInfoException("PathToRev is empty")
         except Exception:
-            logger.warn("Cannot use saved info for arcadia_tests_data will use svn access")
+            logger.warn("Cannot use saved info for arcadia_tests_data")
 
         if not base_rev_only:
             logger.debug("Loaded {} atd revisions".format(len(cls.Path_To_Rev)))
@@ -165,19 +165,9 @@ class TestUidGenerator(object):
                 for path in tests_paths:
                     imprint_parts.append(ArcadiaTestData.generate_saved_imprint(path, path_to_rev))
             else:
-                logger.warn("Saved info for arcadia_tests_data is unavailable, will use svn access")
-                arcadia_tests_data_repo = get_arcadia_tests_data_repo(graph.get_conf())
-                if arcadia_tests_data_repo:
-                    revision = arcadia_tests_data_repo["revision"]
-                    user = "robot-canons-dloader"
-                    user_key_file = get_robot_canons_dloader_key_path(arc_root)
-                    branch_url = cls._cut_off_arcadia_from_url(arcadia_tests_data_repo["repository"]).replace(
-                        "svn://", "svn+ssh://arcadia.yandex.ru/"
-                    )
-                    svn_tests_paths = testdeps.get_test_data_svn_paths(test, branch_url)
-
-                    for path in svn_tests_paths:
-                        imprint_parts.append(ArcadiaTestData.generate_svn_imprint(path, revision, user, user_key_file))
+                logger.warn(
+                    "Saved info for arcadia_tests_data is unavailable. Make sure file `build/yandex_specific/atd/revisions.txt` exists"
+                )
 
         if test.recipes:
             imprint_parts.append(test.recipes)
@@ -191,12 +181,6 @@ class TestUidGenerator(object):
             socket.gethostname(),
         )
         return imprint.combine_imprints(*imprint_parts)
-
-    @classmethod
-    def _cut_off_arcadia_from_url(cls, arcadia_svn_url):
-        if arcadia_svn_url.endswith("/"):
-            arcadia_svn_url = arcadia_svn_url[:-1]
-        return arcadia_svn_url.rsplit("/", 1)[0]
 
 
 @exts.func.memoize()
