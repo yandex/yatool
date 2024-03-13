@@ -158,6 +158,25 @@ namespace NYexport {
         return ESNT_Unknown;
     }
 
+    bool TGraphVisitor::IsIgnored(const TSemGraph::TConstNodeRef& node) const {
+        const TSemNodeData& data = node.Value();
+        if (data.Sem.empty() || data.Sem.front().empty()) {
+            return false;
+        }
+
+        bool isIgnored = false;
+        const auto& semantics = Generator_->ApplyReplacement(data.Path, data.Sem);
+        for (const auto& sem : semantics) {
+            const auto& semName = sem[0];
+            const auto semNameType = SemNameToType(semName);
+            if (semNameType == ESNT_Ignored) {
+                isIgnored = true;
+                break;
+            }
+        }
+        return isIgnored;
+    }
+
     std::optional<bool> TGraphVisitor::OnEnter(TState&) {
         return {};
     }

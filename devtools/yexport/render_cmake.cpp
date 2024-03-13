@@ -944,7 +944,14 @@ namespace {
                     continue;
                 }
 
+                if (IsIgnored(dep.To())) {
+                    continue;
+                }
+
                 for (const auto& tool: dep.To().Edges()) {
+                    if (IsIgnored(tool.To())) {
+                        continue;
+                    }
                     TStringBuf arcadiaPath;
                     TStringBuf toolName;
                     SplitToolPath(TStringBuf(NPath::CutType(tool.To()->Path)), arcadiaPath, toolName);

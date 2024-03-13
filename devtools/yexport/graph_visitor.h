@@ -73,6 +73,7 @@ namespace NYexport {
         void AddSemanticMapping(const std::string& semName, ESemNameType type);
         bool CheckArgs(std::string_view sem, std::span<const std::string> args, TArgsConstraint constraint, const std::string& nodePath);
         ESemNameType SemNameToType(const std::string& semName) const;
+        bool IsIgnored(const TSemGraph::TConstNodeRef& node) const;
 
         TProjectBuilderPtr ProjectBuilder_;
         TSpecBasedGenerator* Generator_;
