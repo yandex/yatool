@@ -7,20 +7,6 @@ PY_SRCS(
 )
 
 # !! Keep this list in sync with the RECURSE list in test_tool/ya.make
-
-IF (NOT YA_OPENSOURCE)
-    IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
-        PEERDIR(
-            devtools/ya/test/programs/test_tool/upload_coverage
-        )
-    ENDIF()
-ENDIF()
-
-PEERDIR(
-    devtools/ya/test/programs/test_tool/build_python_coverage_report
-    devtools/ya/test/programs/test_tool/resolve_python_coverage
-)
-
 IF (PYTHON3)
     IF (NOT YA_OPENSOURCE)
         PEERDIR(
@@ -41,10 +27,16 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/sandbox_run_test
             devtools/ya/test/programs/test_tool/upload
         )
+        IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
+            PEERDIR(
+                devtools/ya/test/programs/test_tool/upload_coverage
+            )
+        ENDIF()
     ENDIF()
     PEERDIR(
         devtools/ya/test/programs/test_tool/build_clang_coverage_report
         devtools/ya/test/programs/test_tool/build_go_coverage_report
+        devtools/ya/test/programs/test_tool/build_python_coverage_report
         devtools/ya/test/programs/test_tool/build_ts_coverage_report
         devtools/ya/test/programs/test_tool/canonization_result_node
         devtools/ya/test/programs/test_tool/canonize
@@ -64,6 +56,8 @@ IF (PYTHON3)
         devtools/ya/test/programs/test_tool/merge_python_coverage
         devtools/ya/test/programs/test_tool/resolve_clang_coverage
         devtools/ya/test/programs/test_tool/resolve_go_coverage
+        devtools/ya/test/programs/test_tool/resolve_java_coverage
+        devtools/ya/test/programs/test_tool/resolve_python_coverage
         devtools/ya/test/programs/test_tool/resolve_ts_coverage
         devtools/ya/test/programs/test_tool/result_node
         devtools/ya/test/programs/test_tool/results_accumulator
@@ -86,19 +80,14 @@ IF (PYTHON3)
         devtools/ya/test/programs/test_tool/run_skipped_test
         devtools/ya/test/programs/test_tool/run_test
         devtools/ya/test/programs/test_tool/run_ut
-        devtools/ya/test/programs/test_tool/unify_clang_coverage
-        devtools/ya/test/programs/test_tool/resolve_java_coverage
         devtools/ya/test/programs/test_tool/run_y_benchmark
+        devtools/ya/test/programs/test_tool/unify_clang_coverage
     )
     IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
         PEERDIR(
             devtools/ya/test/programs/test_tool/ytexec_run_test
         )
     ENDIF()
-ELSE()
-    PEERDIR(
-        contrib/deprecated/python/faulthandler
-    )
 ENDIF()
 
 END()

@@ -2,7 +2,7 @@ import os
 import six
 import time
 
-import app
+import yalibrary.app_ctx
 import build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
@@ -22,7 +22,7 @@ def get_coverage_table_chunks_count():
 
 
 def get_svn_version():
-    return int(app.get_app_ctx().revision)
+    return int(yalibrary.app_ctx.get_app_ctx().revision)
 
 
 def get_upload_yt_table_root(arc_root, chunk, snap_shot_name):
@@ -40,7 +40,7 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
     root_path = list(roots)[0]
 
     node_log_path = "$(BUILD_ROOT)/coverage_create_root.txt"
-    node_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", global_resources, python="py2") + [
+    node_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", global_resources) + [
         "--log-path",
         node_log_path,
     ]
@@ -96,7 +96,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
     cmds = []
 
     if opts and opts.coverage_direct_upload_yt:
-        stool_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", suite.global_resources, python="py2") + [
+        stool_cmd = util_tools.get_test_tool_cmd(opts, "upload_coverage", suite.global_resources) + [
             "--log-path",
             node_log_path,
         ]
