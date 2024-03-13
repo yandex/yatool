@@ -19,10 +19,6 @@ import test.util.shared
 logger = logging.getLogger(__name__)
 
 
-def setup_logging():
-    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="%(asctime)s: %(levelname)s: %(message)s")
-
-
 def safe_read(filename):
     try:
         with open(filename) as afile:
@@ -60,8 +56,18 @@ def main():
     parser.add_argument("--batch-name", action="store", default=None)
     parser.add_argument("--file-pattern", action="store", default="*")
 
+    parser.add_argument('--log-path')
+    parser.add_argument(
+        "--log-level",
+        dest="log_level",
+        help="logging level",
+        action='store',
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
+
     args = parser.parse_args()
-    setup_logging()
+    test.util.shared.setup_logging(args.log_level, args.log_path, fmt="%(asctime)s: %(levelname)s: %(message)s")
 
     logger.debug("run_check has started")
 

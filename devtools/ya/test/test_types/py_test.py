@@ -522,6 +522,8 @@ class PyLintTestSuite(LintTestSuite):
                 os.path.join(work_dir, test.const.TRACE_FILE_NAME),
                 "--out-path",
                 out_path,
+                "--log-path",
+                os.path.join(out_path, "run_check.log"),
             ]
             + self._get_files(opts)
         )
