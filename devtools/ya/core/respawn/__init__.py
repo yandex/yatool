@@ -169,46 +169,49 @@ def _get_ya_pyver_forced():
 
 
 def check_for_respawn(new_root, handler_python_major_version=None):
-    prev_root = core.config.find_root(fail_on_error=False)
+    try:
+        prev_root = core.config.find_root(fail_on_error=False)
 
-    root_change = prev_root != new_root
-    reason_py3, expected_ya_bin_python_version, ya_pyver_set_forced = check_py23_respawn_reason(
-        handler_python_major_version
-    )
-
-    if not (root_change or reason_py3):
-        logger.debug('Same as prev source root %s', new_root)
-        logger_pyver.debug("No need to respawn to other ya-bin version")
-        return
-
-    if root_change:
-        logger.debug('New source root %s is not the same as prev %s', new_root, prev_root)
-    if reason_py3:
-        logger_pyver.debug(
-            "Expected ya-bin version different from current: expect `%s`, current is `%s`%s, will be respawned ",
-            expected_ya_bin_python_version,
-            sys.version_info.major,
-            ', setted force' if ya_pyver_set_forced else '',
+        root_change = prev_root != new_root
+        reason_py3, expected_ya_bin_python_version, ya_pyver_set_forced = check_py23_respawn_reason(
+            handler_python_major_version
         )
 
-    entry_root = yalibrary.find_root.detect_root(core.config.entry_point_path())
+        if not (root_change or reason_py3):
+            logger.debug('Same as prev source root %s', new_root)
+            logger_pyver.debug("No need to respawn to other ya-bin version")
+            return
 
-    entry_root_change = entry_root != new_root
-
-    if entry_root_change or reason_py3:
-        if root_change and handler_python_major_version:
-            logger_pyver.info(
-                "Disable python version (%d) setting for handler because of arcadia root changed (`%s` vs `%s`)",
-                handler_python_major_version,
-                prev_root,
-                new_root,
+        if root_change:
+            logger.debug('New source root %s is not the same as prev %s', new_root, prev_root)
+        if reason_py3:
+            logger_pyver.debug(
+                "Expected ya-bin version different from current: expect `%s`, current is `%s`%s, will be respawned ",
+                expected_ya_bin_python_version,
+                sys.version_info.major,
+                ', setted force' if ya_pyver_set_forced else '',
             )
-            handler_python_major_version = None
-        _src_root_respawn(arc_dir=new_root, handler_python_major_version=handler_python_major_version)
 
-    # It's needed only when a respawn happens.
-    if 'YA_STDIN' in os.environ:
-        del os.environ['YA_STDIN']
+        entry_root = yalibrary.find_root.detect_root(core.config.entry_point_path())
+
+        entry_root_change = entry_root != new_root
+
+        if entry_root_change or reason_py3:
+            if root_change and handler_python_major_version:
+                logger_pyver.info(
+                    "Disable python version (%d) setting for handler because of arcadia root changed (`%s` vs `%s`)",
+                    handler_python_major_version,
+                    prev_root,
+                    new_root,
+                )
+                handler_python_major_version = None
+            _src_root_respawn(arc_dir=new_root, handler_python_major_version=handler_python_major_version)
+
+    finally:
+        # It's needed only when a respawn happens.
+        logger.debug('Unsetting YA_STDIN env var as respawn never happened')
+        if 'YA_STDIN' in os.environ:
+            del os.environ['YA_STDIN']
 
 
 def filter_env(env_vars):

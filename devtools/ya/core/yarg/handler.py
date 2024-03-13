@@ -449,5 +449,11 @@ class FeedbackHandler(OptsHandler):
             args = sys.stdin.read()
             # Save it for a possible respawn.
             os.environ[self.YA_STDIN_PARAM] = args
+        else:
+            # We assume that YA_STDIN is not used as a source for
+            # the first launch of ya -
+            logger.debug('Read YA_STDIN from env')
+            logger.debug('Unset YA_STDIN')
+            del os.environ[self.YA_STDIN_PARAM]
         args = json.loads(args)
         return self._root_handler.act(**args)
