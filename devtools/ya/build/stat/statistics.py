@@ -487,29 +487,28 @@ def print_cache_statistics(graph, filename, display):
 
     cache_hit = safe_perc(cached_task_count, executed_task_count)
     not_executed_task_count = all_run_tasks_count - not_cached_task_count
+    avoided_task_count = not_executed_task_count - cached_task_count
     cache_efficiency = safe_perc(not_executed_task_count, all_run_tasks_count)
 
     display.emit_message(
-        'Cache hit ratio is {:.02f}% ({:d} of {:d}). Cache efficiency ratio is {:.02f}% ({:d} of {:d}). Local: {:d} ({:.02f}%), dist: {:d} ({:.02f}%), by dynamic uids: {:d} ({:.02f}%)'.format(
-            cache_hit,
-            cached_task_count,
-            executed_task_count,
+        'Cache efficiency ratio is {:.02f}% ({:d} of {:d}). Local: {:d} ({:.02f}%), dist: {:d} ({:.02f}%), by dynamic uids: {:d} ({:.02f}%), avoided: {:d} ({:.02f}%)'.format(
             cache_efficiency,
             not_executed_task_count,
             all_run_tasks_count,
             local_cached_task_count,
-            safe_perc(local_cached_task_count, executed_task_count),
+            safe_perc(local_cached_task_count, all_run_tasks_count),
             dist_cached_task_count,
-            safe_perc(dist_cached_task_count, executed_task_count),
+            safe_perc(dist_cached_task_count, all_run_tasks_count),
             dyn_cached_tasks_count,
-            safe_perc(dyn_cached_tasks_count, executed_task_count),
+            safe_perc(dyn_cached_tasks_count, all_run_tasks_count),
+            avoided_task_count,
+            safe_perc(avoided_task_count, all_run_tasks_count),
         )
     )
 
     if filename is not None:
         js_data = {
             'cache_hit': cache_hit,
-            'cache_efficiency': cache_efficiency,
             'cached_tasks': cached_task_count,
             'executed_tasks': executed_task_count,
             'all_run_tasks': all_run_tasks_count,
@@ -521,7 +520,6 @@ def print_cache_statistics(graph, filename, display):
 
     stats = {
         'cache_hit': cache_hit,
-        'cache_efficiency': cache_efficiency,
         'run_tasks': all_run_tasks_count,
         'executed_tasks': executed_task_count,
         'cached_tasks': cached_task_count,
