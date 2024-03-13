@@ -9,6 +9,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/core/yarg
     devtools/ya/yalibrary/app_ctx
+    devtools/ya/yalibrary/tools
     devtools/ya/app/modules/evlog
     devtools/ya/app/modules/params
     devtools/ya/app/modules/token_suppressions
@@ -22,8 +23,4 @@ END()
 RECURSE_FOR_TESTS(
     bin
     tests
-)
-
-RECURSE(
-    common
 )

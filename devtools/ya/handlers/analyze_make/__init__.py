@@ -3,7 +3,10 @@ import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
 import handlers.analyze_make.timeline as timeline
+import os
 import yalibrary.app_ctx
+import yalibrary.tools
+import app_config
 
 
 def execute(action):
@@ -47,6 +50,33 @@ class EvlogFileOptions(core.yarg.Options):
         ]
 
 
+class AnalyzeYaMakeOpts(core.yarg.Options):
+    def __init__(self):
+        super(AnalyzeYaMakeOpts, self).__init__()
+        self.print_path = False
+        self.args = []
+
+    @staticmethod
+    def consumer():
+        return [
+            core.yarg.ArgConsumer(
+                ['--print-path'],
+                help='print the path to analyze-make executable',
+                hook=core.yarg.SetConstValueHook('print_path', True),
+            ),
+            core.yarg.FreeArgConsumer(help='analyze-make args', hook=core.yarg.ExtendHook('args')),
+        ]
+
+
+def run_analyze_make_task_contention(params):
+    exe = yalibrary.tools.tool('analyze-make')
+    if params.print_path:
+        print(exe)
+    else:
+        cmd = [exe, 'task-contention'] + params.args
+        os.execv(exe, cmd)
+
+
 class AnalyzeMakeYaHandler(core.yarg.CompositeHandler):
     def __init__(self):
         super(AnalyzeMakeYaHandler, self).__init__('Analysis tools for ya make')
@@ -55,3 +85,10 @@ class AnalyzeMakeYaHandler(core.yarg.CompositeHandler):
             description='Timeline of build events',
             opts=[core.yarg.help.ShowHelpOptions(), EvlogFileOptions()],
         )
+        if app_config.in_house:
+            self['task-contention'] = core.yarg.OptsHandler(
+                action=run_analyze_make_task_contention,
+                description='Plot waiting processes with plotly',
+                opts=[AnalyzeYaMakeOpts()],
+                unknown_args_as_free=True,
+            )

@@ -3,7 +3,7 @@ import os
 
 import exts.yjson as json
 
-import handlers.analyze_make.common as common
+import devtools.ya.tools.analyze_make.common as common
 import yalibrary.display
 import yalibrary.formatter
 
