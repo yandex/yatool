@@ -377,6 +377,7 @@ class ReportGenerator(object):
         self._messages_dir = os.path.join(results_dir, "compiler-messages")
         ensure_removed(self._messages_dir)
         create_dirs(self._messages_dir)
+        self._processed_lock = threading.Lock()
         self._processed_uids = set()
         self._tests_by_size = defaultdict(set)
         tests_count = defaultdict(lambda: defaultdict(int))
@@ -460,8 +461,9 @@ class ReportGenerator(object):
 
     def _add_entries(self, entries):
         filtered_entries = [_f for _f in map(self._post_process, entries) if _f]
+        ci_progress = self.ya_make_progress.get_progress_ci_format()
         for report in self._reports:
-            report(filtered_entries, self.ya_make_progress.get_progress_ci_format())
+            report(filtered_entries, ci_progress)
 
     def add_configure_results(self, configure_errors):
         entries = []
@@ -550,9 +552,10 @@ class ReportGenerator(object):
     def _make_build_result(
         self, uid, target_name, target_platform, errors, metrics, module_tag, errors_links, exit_code=None
     ):
-        if not self._distbuild_graph.add_to_report(uid) or uid in self._processed_uids:
-            return None
-        self._processed_uids.add(uid)
+        with self._processed_lock:
+            if not self._distbuild_graph.add_to_report(uid) or uid in self._processed_uids:
+                return None
+            self._processed_uids.add(uid)
 
         if errors:
             status = rp.TestStatus.Fail
@@ -648,8 +651,10 @@ class ReportGenerator(object):
     def _add_test_result(self, suite, node_errors, links, report_prototype):
         import test.const as test_const
 
-        if suite.uid in self._processed_uids:
-            return
+        with self._processed_lock:
+            if suite.uid in self._processed_uids:
+                return
+            self._processed_uids.add(suite.uid)
 
         if suite.uid in report_prototype:
             entry_prototypes = report_prototype[suite.uid]
@@ -747,7 +752,6 @@ class ReportGenerator(object):
                 self.ya_make_progress.increment_test_done(toolchain, test_size, 1)
 
         self._add_entries(entries)
-        self._processed_uids.add(suite.uid)
 
         def _discard_last_item(m, key, u):
             if key in m and len(m[key]) > 0:

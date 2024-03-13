@@ -310,6 +310,10 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
 
         uid = suite.uid
         if uid in ok_tests:
+            # XXX suite has already been loaded
+            if suite.chunks:
+                continue
+
             result = TestPackedResultView(work_dir)
             try:
                 suite.load_run_results(result.trace_report_path, resolver)

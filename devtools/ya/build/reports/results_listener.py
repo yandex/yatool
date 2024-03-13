@@ -1,8 +1,10 @@
+import collections
 import copy
 import json
 import logging
 import os
 import threading
+import time
 import traceback
 
 import exts.fs
@@ -208,8 +210,11 @@ class TestNodeListener(object):
         self._logger.debug('Test node %s is failed. Status: %s', uid, status)
 
     def _on_test_node_completed(self, uid, res):
-        if 'build_root' not in res or uid in self._seen:
-            return
+        with self._lock:
+            if 'build_root' not in res or uid in self._seen:
+                return
+            self._seen.add(uid)
+
         suite = self._tests[uid]
         build_root = res['build_root']
         work_dir = test_common.get_test_suite_work_dir(
@@ -234,10 +239,7 @@ class TestNodeListener(object):
             logging.debug(msg)
 
         if self._report_generator is not None:
-            with self._lock:
-                if uid not in self._seen:
-                    self._report_generator.add_tests_results([suite], None, {}, defaultdict(list))
-        self._seen.add(uid)
+            self._report_generator.add_tests_results([suite], None, {}, defaultdict(list))
 
 
 class SlotListener(object):
@@ -274,13 +276,22 @@ class CompositeResultsListener(object):
     def __init__(self, listeners=None):
         self._listeners = []
         self._listeners.extend(listeners)
+        self._duration = collections.defaultdict(float)
 
     def add(self, listener):
         self._listeners.append(listener)
 
     def __call__(self, *args, **kwargs):
         for listener in self._listeners:
-            listener(*args, **kwargs)
+            ts = time.time()
+            try:
+                listener(*args, **kwargs)
+            finally:
+                self._duration[type(listener).__name__] += time.time() - ts
+
+    @property
+    def stat(self):
+        return {name: {"duration_sec": x} for name, x in self._duration.items()}
 
 
 class FailedNodeListener(object):

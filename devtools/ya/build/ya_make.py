@@ -1537,7 +1537,7 @@ class YaMake(object):
                 self.ctx.stripped_tests, build_errors=None, node_build_errors_links=[]
             )
 
-        if len(tests) == 0:
+        if len(tests) == 0 and (not self.opts.report_skipped_suites and not self.opts.report_skipped_suites_only):
             self._reports_generator.finish_style_report()
             self._reports_generator.finish_tests_report()
 
@@ -1595,7 +1595,9 @@ class YaMake(object):
         self._reports_generator.finish_build_report()
 
         if self.opts.remove_result_node:
-            suites = self.ctx.stripped_tests
+            suites = []
+            if self.opts.report_skipped_suites_only or self.opts.report_skipped_suites:
+                suites = self.ctx.stripped_tests
             if not self.opts.report_skipped_suites_only:
                 suites += build_report.fill_suites_results(self, self.ctx.tests, self._output_root)
         else:
@@ -1613,6 +1615,8 @@ class YaMake(object):
         self._reports_generator.finish_tests_report()
         self._reports_generator.finish_style_report()
         self._reports_generator.finish()
+        if self._build_results_listener:
+            logger.debug("Build results listener statistics: %s", self._build_results_listener.stat)
 
     def make_report(self):
         return self._report.make_report() if self._report is not None else None
@@ -1623,8 +1627,10 @@ class YaMake(object):
         self._setup_compact_for_gc()
 
         if not self.ctx.threads:
-            self._finish_reports()
-            self._generate_report()
+            with stager.scope('finalize-reports'):
+                self._finish_reports()
+                self._generate_report()
+
             self._strip_cache(self.ctx.threads)
             release_all_data()
             return
@@ -1691,8 +1697,10 @@ class YaMake(object):
                 self._test_console_report()
             if result_analyzer is not None:
                 result_analyzer()
-            self._finish_reports()
-            self._generate_report()
+
+            with stager.scope('finalize-reports'):
+                self._finish_reports()
+                self._generate_report()
 
             self.exit_code = self._calc_exit_code()
 
