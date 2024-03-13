@@ -58,8 +58,6 @@ def main():
     )
     parser.add_argument("--batch", action="store_true", default=False)
     parser.add_argument("--batch-name", action="store", default=None)
-    parser.add_argument("--token", dest="token", action='store', help="access token")
-    parser.add_argument("--token-path", dest="token_path", action='store', help="path to access token")
     parser.add_argument("--file-pattern", action="store", default="*")
 
     args = parser.parse_args()
@@ -99,12 +97,7 @@ def main():
 
     tests = []
     for test_name, test_path, checker_args in get_test_cases():
-        cmd = (
-            [sys.executable]
-            + args.checker.split(" ")
-            + checker_args
-            + test.util.shared.get_oauth_token_options(args, test_tool_mode=True)
-        )
+        cmd = [sys.executable] + args.checker.split(" ") + checker_args
 
         out_path = test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(test_name, args.check_name))
         err_path = test.common.get_unique_file_path(logs_dir, "{}.{}.err".format(test_name, args.check_name))

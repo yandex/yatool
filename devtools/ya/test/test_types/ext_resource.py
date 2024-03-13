@@ -41,7 +41,7 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
         return []
 
     def _need_auth(self):
-        return True
+        return False
 
     def get_checker(self, opts, dist_build, out_path):
         raise NotImplementedError()
