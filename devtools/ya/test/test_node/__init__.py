@@ -2407,8 +2407,6 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
     if suite.is_skipped():
         list_cmd += ["--is-skipped"]
 
-    list_cmd += util_shared.get_oauth_token_options(opts)
-
     if suite.tags:
         for tag in suite.tags:
             list_cmd += ["--test-tags", tag]

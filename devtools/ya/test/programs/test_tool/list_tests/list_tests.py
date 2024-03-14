@@ -30,10 +30,7 @@ from devtools.ya.test.programs.test_tool.lib import testroot
 from test.util import tools
 from yatest_lib import test_splitter
 
-import app_config
-
-if app_config.in_house:
-    from devtools.ya.test.dependency import sandbox_storage
+from devtools.ya.test.dependency import sandbox_storage
 
 
 logger = logging.getLogger(__name__)
@@ -63,8 +60,6 @@ def get_options():
     parser.add_option("--project-path", dest="project_path", help="project path arcadia root related")
     parser.add_option("--source-root", dest="source_root", help="source route", action='store')
     parser.add_option("--build-root", dest="build_root", help="build route", action='store')
-    parser.add_option("--token", dest="token", help="uploaded resource owner token", action='store')
-    parser.add_option("--token-path", dest="token_path", help="path to uploaded resource owner token", action='store')
     parser.add_option("--target-platform-descriptor", dest="target_platform_descriptor")
     parser.add_option(
         "--multi-target-platform-run", dest="multi_target_platform_run", action='store_true', default=False
@@ -156,11 +151,7 @@ def main():
 
     resources_root = build_root
     # cached storage is needed only for environment creation as all resources should come via graph
-    if app_config.in_house:
-        oauth_token = test.util.shared.get_oauth_token(options)
-        cached_storage = sandbox_storage.SandboxStorage(resources_root, use_cached_only=True, oauth_token=oauth_token)
-    else:
-        cached_storage = None
+    cached_storage = sandbox_storage.SandboxStorage(resources_root, use_cached_only=True, update_last_usage=False)
 
     work_dir = test_common.get_test_suite_work_dir(
         build_root,
