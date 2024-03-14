@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: python-rapidjson
-Version: 1.14
+Version: 1.16
 Summary: Python wrapper around rapidjson
 Home-page: https://github.com/python-rapidjson/python-rapidjson
 Author: Ken Robbins
@@ -154,6 +154,23 @@ __ https://python-rapidjson.readthedocs.io/en/latest/quickstart.html#incompatibi
 
 Changes
 -------
+
+1.16 (2024-02-28)
+~~~~~~~~~~~~~~~~~
+
+* Produce Python 3.8 wheels again, I deactivated it too eagerly, it's in *security fixes
+  only* mode, not yet reached its `end-of-life` state
+
+
+1.15 (2024-02-28)
+~~~~~~~~~~~~~~~~~
+
+* Honor the `recursion limit`__ also at parse time, to avoid attacks as described by
+  `CVE-2024-27454`__
+
+  __ https://docs.python.org/3.12/library/sys.html#sys.setrecursionlimit
+  __ https://monicz.dev/CVE-2024-27454
+
 
 1.14 (2023-12-14)
 ~~~~~~~~~~~~~~~~~
