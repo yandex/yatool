@@ -15,6 +15,8 @@ import exts.process
 import library.python.func
 import library.python.windows
 
+import typing as tp  # noqa
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +34,7 @@ def make_user_agent():
 
 
 def make_headers(headers=None):
+    # type: (dict[str, str] | None) -> dict
     result = {'User-Agent': make_user_agent()}
     if headers is None:
         return result
@@ -88,6 +91,7 @@ def download_file(url, path, mode=0, expected_md5=None, headers=None):
 
 
 def _http_call(url, method, data=None, headers=None, timeout=30):
+    # type: (str, str, tp.Any, dict[str, str] | None, int) -> bytes
     logger.debug('%s request using urllib2 %s%s', method, url, ', {} bytes'.format(len(data)) if data else '')
     start_time = time.time()
     req = urllib.request.Request(url, data, headers=make_headers(headers))
