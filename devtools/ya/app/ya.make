@@ -29,6 +29,7 @@ PEERDIR(
     devtools/ya/yalibrary/loggers/file_log
     devtools/ya/yalibrary/profiler
     devtools/ya/yalibrary/showstack
+    devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/ya_helper/ya_utils
 )
 

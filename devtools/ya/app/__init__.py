@@ -17,6 +17,7 @@ import exts.strings
 import exts.windows
 import yalibrary.app_ctx
 import yalibrary.find_root
+import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
 from yalibrary.ya_helper.ya_utils import ya_options
@@ -81,6 +82,7 @@ def execute_early(action):
                 ('file_in_memory_log', configure_in_memory_log(ctx, logging.DEBUG)),
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
+                ('vcs_type', configure_vcs_type()),
                 ('aggregated_stages', configure_aggregated_stages()),
             ]
         )
@@ -585,6 +587,12 @@ def configure_vcs_info():
     yield revision
 
 
+def configure_vcs_type():
+    vcs_type = vcs.detect_vcs_type(cwd=os.getcwd())
+    logging.debug('vcs type: %s', vcs_type)
+    yield vcs_type
+
+
 def configure_mlock_info():
     logger.debug(MLOCK_STATUS_MESSAGE)
     yield
@@ -637,6 +645,7 @@ def configure_report_interceptor(ctx, report_events):
             'cwd': os.getcwd(),
             '__file__': __file__,
             'version': ctx.revision,
+            'vcs_type': ctx.vcs_type,
         },
     )
 

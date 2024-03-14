@@ -43,7 +43,11 @@ def detect(paths=None, cwd=None, check_tar=None):
 
 
 def detect_vcs_type(paths=None, cwd=None, check_tar=None):
-    return detect(paths, cwd, check_tar)[0][0]
+    types = detect(paths, cwd, check_tar)[0]
+    if types:
+        return types[0]
+    else:
+        return "unknown_vcs"
 
 
 def lcp(paths):
