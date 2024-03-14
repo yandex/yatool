@@ -722,7 +722,9 @@ def replace_yt_results(graph, opts, dist_cache):
         def suitable(node):
             if opts.yt_replace_result_yt_upload_only:
                 return any(out.endswith('.ydx.pb2.yt') for out in node.get('outputs', []))
-            if opts.yt_replace_result_add_objects and any(out.endswith('.o') for out in node.get('outputs', [])):
+            if opts.yt_replace_result_add_objects and any(
+                out.endswith('.o') or out.endswith('.obj') for out in node.get('outputs', [])
+            ):
                 return True
 
             return is_dist_cache_suitable(node, original_results, opts)
