@@ -1753,6 +1753,14 @@ def in_canonize_mode(test_opts):
     return False
 
 
+def in_fuzzing_mode(test_opts):  # XXX
+    if getattr(test_opts, "fuzzing", False):
+        if test_opts.use_distbuild:
+            raise core.yarg.FlagNotSupportedException("Fuzzing is currently not supported on distbuild")
+        return True
+    return False
+
+
 def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
     if not suites:
         return []
@@ -1799,9 +1807,17 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
             else:
                 logger.warning("No tests suitable for canonization found")
                 logger.debug("Found test suites: %s", suites)
-        elif getattr(test_opts, "fuzzing", False):
+        elif in_fuzzing_mode(test_opts):
             fuzzing.inject_fuzz_postprocess_nodes(arc_root, plan, suites, test_opts)
             timer.show_step('inject fuzz postprocess nodes')
+
+    # XXX
+    if test_opts.use_distbuild:
+        if plan.get_context().get('sandbox_run_test_result_uids'):
+            raise core.yarg.FlagNotSupportedException("--run-tagged-tests-on-sandbox and --dist are not compatible")
+
+        if getattr(test_opts, 'test_diff', False):
+            raise core.yarg.FlagNotSupportedException("--canon-diff and --dist are not compatible")
 
     if (
         getattr(test_opts, 'checkout', False)
