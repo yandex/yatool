@@ -67,7 +67,11 @@ const TNodeSemantics& TTargetReplacements::ApplyReplacement(TPathView path, cons
     }
     BufferSem_ = inputSem;
     Y_ASSERT(!replacement->Addition.empty());
-    BufferSem_.insert(BufferSem_.end(), replacement->Addition.begin(), replacement->Addition.end());
+    for (const auto& addition : replacement->Addition) {
+        if (Find(BufferSem_, addition) == BufferSem_.end()) { // insert addition semantic only if absent
+            BufferSem_.emplace_back(addition);
+        }
+    }
     return BufferSem_;
 }
 
