@@ -40,9 +40,6 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
     def get_test_dependencies(self):
         return []
 
-    def _need_auth(self):
-        return False
-
     def get_checker(self, opts, dist_build, out_path):
         raise NotImplementedError()
 

@@ -492,9 +492,6 @@ class PyLintTestSuite(LintTestSuite):
     def get_checker(self, opts, for_dist_build, out_path):
         raise NotImplementedError()
 
-    def _need_auth(self):
-        return False
-
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
         work_dir = test_common.get_test_suite_work_dir(
             '$(BUILD_ROOT)',
@@ -535,8 +532,6 @@ class PyLintTestSuite(LintTestSuite):
             cmd += ["--batch", "--batch-name", self.batch_name()]
         if self._check_file_pattern():
             cmd += ["--file-pattern", self._check_file_pattern()]
-        if self._need_auth():
-            cmd += test.util.shared.get_oauth_token_options(opts)
         for f in opts.tests_filters + self._additional_filters:
             cmd += ["--tests-filters", f]
         return cmd
