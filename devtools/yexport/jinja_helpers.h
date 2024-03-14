@@ -64,7 +64,7 @@ namespace NYexport {
         std::optional<jinja2::Template> Template;
     };
 
-    void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0, const std::string& prefix = "");
+    void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0, const std::string& prefix = "", bool isLastItem = true);
     std::string Dump(const jinja2::Value& value, int depth = 0, const std::string& prefix = "");
 
 

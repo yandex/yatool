@@ -25,7 +25,7 @@ int main(int argc, char** argv) try {
     if (opts.List) {
         if (opts.ArcadiaRoot.empty()) {
             opts.ArcadiaRoot = fs::current_path();
-            spdlog::info("-a/--arcadia-root is not scpecified. CWD is assumed as Arcadia root: {}", opts.ArcadiaRoot.string());
+            spdlog::info("-a/--arcadia-root is not specified. CWD is assumed as Arcadia root: {}", opts.ArcadiaRoot.string());
             spdlog::info("Generators list may be incomplete.");
         }
         for (auto const& generator : GetAvailableGenerators(opts.ArcadiaRoot)) {

@@ -291,7 +291,7 @@ namespace NYexport {
         ValueMap = valueMap;
     }
 
-    void Dump(IOutputStream& out, const jinja2::Value& value, int depth, const std::string& prefix) {
+    void Dump(IOutputStream& out, const jinja2::Value& value, int depth, const std::string& prefix, bool isLastItem) {
         auto Indent = [&prefix](int depth) {
             return prefix + std::string(depth * 4, ' ');
         };
@@ -310,15 +310,16 @@ namespace NYexport {
                 for (const auto& key : keys) {
                     out << Indent(depth + 1) << key << ": ";
                     const auto it = map.find(key);
-                    Dump(out, it->second, depth + 1, prefix);
+                    Dump(out, it->second, depth + 1, prefix, &key == &keys.back());
                 }
             }
             out << Indent(depth) << "}";
         } else if (value.isList()) {
             out << "[\n";
-            for (const auto& val : value.asList()) {
+            const auto& vals = value.asList();
+            for (const auto& val : vals) {
                 out << Indent(depth + 1);
-                Dump(out, val, depth + 1, prefix);
+                Dump(out, val, depth + 1, prefix, &val == &vals.back());
             }
             out << Indent(depth) << "]";
         }  else if (value.isString()) {
@@ -336,7 +337,10 @@ namespace NYexport {
                 out << "???";
             }
         }
-        out << ",\n";
+        if (!isLastItem) {
+            out << ",";
+        }
+        out << "\n";
     }
 
     std::string Dump(const jinja2::Value& value, int depth, const std::string& prefix) {
