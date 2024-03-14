@@ -13,7 +13,10 @@ else:
 
 def instant_sigint_exit_handler(*args):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    os.kill(0, signal.SIGINT)
+    try:
+        os.kill(0, signal.SIGINT)
+    except Exception:
+        pass
 
     try:
         sys.stderr.write(STOP_STR)
