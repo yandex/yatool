@@ -5,7 +5,6 @@ import fnmatch
 import logging
 import os
 import re
-import sys
 import time
 import weakref
 
@@ -39,10 +38,6 @@ from yalibrary.status_view.helpers import format_paths
 
 
 logger = logging.getLogger(__name__)
-
-
-def win_path_fix(path):
-    return path if sys.platform != 'win32' else path.replace('\\', '/')
 
 
 def calc_once(func):
@@ -202,15 +197,15 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     conf = graph['conf']
     resources_map = {x['pattern']: x for x in conf['resources']}
     patterns = ptn.Patterns()
-    patterns['SOURCE_ROOT'] = win_path_fix(ctx.src_dir)
-    patterns['TOOL_ROOT'] = win_path_fix(ctx.res_dir)
-    patterns['TESTS_DATA_ROOT'] = win_path_fix(
+    patterns['SOURCE_ROOT'] = exts.windows.win_path_fix(ctx.src_dir)
+    patterns['TOOL_ROOT'] = exts.windows.win_path_fix(ctx.res_dir)
+    patterns['TESTS_DATA_ROOT'] = exts.windows.win_path_fix(
         ctx.opts.arcadia_tests_data_path or os.path.normpath(os.path.join(ctx.src_dir, '..', 'arcadia_tests_data'))
     )
-    patterns['RESOURCE_ROOT'] = win_path_fix(transient_resource_dir)
+    patterns['RESOURCE_ROOT'] = exts.windows.win_path_fix(transient_resource_dir)
 
     if ctx.opts.oauth_token_path:
-        patterns['YA_TOKEN_PATH'] = win_path_fix(ctx.opts.oauth_token_path)
+        patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(ctx.opts.oauth_token_path)
     elif ctx.opts.oauth_token:
 
         class TokenContext(object):
@@ -230,10 +225,12 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                     pass
                 return False
 
-        patterns['YA_TOKEN_PATH'] = win_path_fix(exit_stack.enter_context(TokenContext(transient_resource_dir)))
+        patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(
+            exit_stack.enter_context(TokenContext(transient_resource_dir))
+        )
 
     if ctx.opts.frepkage_root:
-        patterns['FREPKAGE_ROOT'] = win_path_fix(ctx.opts.frepkage_root)
+        patterns['FREPKAGE_ROOT'] = exts.windows.win_path_fix(ctx.opts.frepkage_root)
 
     resources = dict()
 
@@ -293,7 +290,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
         def commands(self, build_root):
             p = patterns.sub()
-            p['BUILD_ROOT'] = win_path_fix(build_root)
+            p['BUILD_ROOT'] = exts.windows.win_path_fix(build_root)
             return self._command_args(build_root, p)
 
         def prio(self):
