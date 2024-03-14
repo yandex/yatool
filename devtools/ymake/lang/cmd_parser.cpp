@@ -235,6 +235,8 @@ namespace {
             return EMacroFunctions::MsvsSource;
         } else if (key == "noauto") {
             return EMacroFunctions::NoAutoSrc;
+        } else if (key == "glob") {
+            return EMacroFunctions::Glob;
         } else {
             throw yexception() << "unknown modifier " << key;
         }

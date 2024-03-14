@@ -218,6 +218,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         }
     };
 
+    TVector<ui32> inputCoordCounts;
     for (const auto dep : node.Edges()) {
         const auto depNode = dep.To();
         const auto depNodeVal = *dep.To();
@@ -230,11 +231,14 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
 
         if (IsIndirectSrcDep(dep)) {
             Y_ASSERT(explicitInputs);
+            ui32 lateGlobSize = 0;
             for (const auto& depdep: dep.To().Edges()) {
                 if (*depdep == EDT_Property && depdep.To()->NodeType == EMNT_File) {
                     addInput(depdep);
+                    lateGlobSize++;
                 }
             }
+            inputCoordCounts.push_back(lateGlobSize);
         } else if (depNodeVal.NodeType == EMNT_BuildCommand && depType == EDT_BuildCommand) {
             TStringBuf depName = Graph.GetCmdName(depNode).GetStr();
             CmdString = depName;
@@ -250,9 +254,15 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         } else if (depType == EDT_BuildFrom && UseFileId(depNodeVal.NodeType) && !IsFakeModule(depNodeVal) && (!isModule || ModuleState->GlobalSrcs && !ModuleState->GlobalSrcs->has(depNode.Id()))) {
             if (!IsDirType(depNodeVal.NodeType) || !isModule) {
                 addInput(dep);
+                inputCoordCounts.push_back(1);
             }
         }
     }
+
+    for (ui32 i = 0; i < inputCoordCounts.size(); i++) {
+        Inputs.push_back({ Vars["INPUT"].begin() + i, inputCoordCounts[i] });
+    }
+
     if (!cmdfound) {
         throw TMakeError() << "No pattern for node " << MainFileName;
     }
@@ -362,7 +372,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
         }
         auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
         Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, CmdInfo, &Graph.Names().CommandConf);
+        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf);
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
