@@ -134,7 +134,6 @@ class StyleYaHandler(core.yarg.OptsHandler):
                 core.yarg.UsageExample(
                     '{prefix} file.cpp',
                     'restyle file.cpp',
-                    good_looking=5
                 ),
                 core.yarg.UsageExample(
                     '{prefix} folder/',

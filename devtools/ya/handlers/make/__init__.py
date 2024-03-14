@@ -15,13 +15,9 @@ class MakeYaHandler(core.yarg.OptsHandler):
             self,
             action=app.execute(action=do_ya_make),
             examples=[
-                core.yarg.UsageExample('{prefix} -r', 'Build current directory in release mode', good_looking=100),
-                core.yarg.UsageExample(
-                    '{prefix} -t -j16 library', 'Build and test library with 16 threads', good_looking=99
-                ),
-                core.yarg.UsageExample(
-                    '{prefix} --checkout -j0', 'Checkout absent directories without build', good_looking=98
-                ),
+                core.yarg.UsageExample('{prefix} -r', 'Build current directory in release mode'),
+                core.yarg.UsageExample('{prefix} -t -j16 library', 'Build and test library with 16 threads'),
+                core.yarg.UsageExample('{prefix} --checkout -j0', 'Checkout absent directories without build'),
             ],
             description=self.description,
             opts=ya_make_options(

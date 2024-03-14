@@ -199,9 +199,9 @@ debug_handler = OptsHandler(
     ],
     visible=True,
     examples=[
-        UsageExample('{prefix} last', 'Upload last debug item', good_looking=100),
-        UsageExample('{prefix} 3', 'Upload third from the end debug bundle', good_looking=99),
-        UsageExample('{prefix}', 'Show all items', good_looking=101),
-        UsageExample('{prefix} last --dry-run', 'Collect, but not upload last debug bundle', good_looking=98),
+        UsageExample('{prefix} last', 'Upload last debug item'),
+        UsageExample('{prefix} 3', 'Upload third from the end debug bundle'),
+        UsageExample('{prefix}', 'Show all items'),
+        UsageExample('{prefix} last --dry-run', 'Collect, but not upload last debug bundle'),
     ],
 )

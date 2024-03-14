@@ -36,7 +36,7 @@ FUZZ_SUBGROUP = core.yarg.Group('Fuzzing', 15, desc='https://docs.yandex-team.ru
 # Test framework specific groups
 PYTEST_SUBGROUP = core.yarg.Group('Pytest specific', 16)
 JAVA_SUBGROUP = core.yarg.Group('Java tests specific', 17)
-HERMIONE_SUBGROUP = core.yarg.Group('Hermione specific', 18)
+HERMIONE_SUBGROUP = core.yarg.Group('Hermione specific', 18, desc='https://docs.yandex-team.ru/hermione')
 JEST_SUBGROUP = core.yarg.Group('Jest specific', 19)
 JUNIT_SUBGROUP = core.yarg.Group('JUnit specific', 20)
 # Always last

@@ -188,7 +188,7 @@ class CompositeHandler(BaseHandler):
     def sub_handlers(self):
         return dict((name, handler) for (name, handler) in iteritems(self._handlers))
 
-    def __init__(self, description, visible=True, examples=None, examples_count=3, extra_help=''):
+    def __init__(self, description, visible=True, examples=None, extra_help=''):
         self._handlers = {
             '__DUMP__': DumpHandler(),
             '--help': self.help_handler,
@@ -198,7 +198,6 @@ class CompositeHandler(BaseHandler):
         self._visible = visible
         self._examples = examples or []
         self._extra_help = extra_help
-        self.examples_count = examples_count
 
     def __setitem__(self, key, value):
         self._handlers[key] = value
@@ -325,7 +324,7 @@ class CompositeHandler(BaseHandler):
                         '  {name} {desc}'.format(name=name.ljust(max_name_len + 5, ' '), desc='\n'.join(desc))
                     )
 
-        result.append(format_examples(self.opts_recursive(tuple(prefix)), self.examples_count))
+        result.append(format_examples(self.opts_recursive(tuple(prefix))))
 
         if EMPTY_KEY in handlers:
             result.append(handlers[EMPTY_KEY].format_help())
@@ -345,7 +344,6 @@ class OptsHandler(BaseHandler):
         examples=None,
         unknown_args_as_free=False,
         use_simple_args=False,
-        examples_count=3,
     ):
         self._action = action
         self._opt = merge_opts(opts)  # type: Options
@@ -354,7 +352,6 @@ class OptsHandler(BaseHandler):
         self._examples = examples or []
         self._visible = visible
         self._use_simple_args = use_simple_args  # call action with kwargs. preferred approach
-        self._examples_count = examples_count
 
     def act(self, **user_args):
         args = self._opt.params().__dict__.copy()
@@ -410,7 +407,7 @@ class OptsHandler(BaseHandler):
             # XXX: remove copy/paste
             usage = self._description + '\n\n'
             usage += 'Usage:\n' + '  ' + ' '.join(prefix) + ' ' + self.format_usage() + '\n\n'
-            usage += format_examples(self.opts_recursive(tuple(prefix)), self._examples_count)
+            usage += format_examples(self.opts_recursive(tuple(prefix)))
             usage += '\n' + self.format_help(exc.help_level)
             print_formatted(usage)
             sys.exit(0)

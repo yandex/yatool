@@ -40,7 +40,7 @@ def do_main(args, extra_help):
         suffix='_handler',
     )
 
-    handler = core.yarg.CompositeHandler(description=app_config.description, examples_count=5, extra_help=extra_help)
+    handler = core.yarg.CompositeHandler(description=app_config.description, extra_help=extra_help)
     for plugin_name in sorted(plugin_map.names()):
         handler[plugin_name] = LazyCommand(plugin_name, plugin_map.get(plugin_name))
     handler['-'] = core.yarg.FeedbackHandler(handler)

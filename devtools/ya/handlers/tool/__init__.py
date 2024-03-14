@@ -49,12 +49,11 @@ class ToolYaHandler(CompositeHandler):
             self,
             description=self.description,
             examples=[
-                core.yarg.UsageExample('{prefix} --ya-help', 'Print yatool specific options', good_looking=20),
-                core.yarg.UsageExample('{prefix} --print-path', 'Print path to tool executable file', good_looking=10),
+                core.yarg.UsageExample('{prefix} --ya-help', 'Print yatool specific options'),
+                core.yarg.UsageExample('{prefix} --print-path', 'Print path to tool executable file'),
                 core.yarg.UsageExample(
                     '{prefix} --force-update',
                     'Check tool for updates before the update interval elapses',
-                    good_looking=10,
                 ),
             ],
         )

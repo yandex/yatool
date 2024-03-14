@@ -118,13 +118,12 @@ class ShowHelpOptions(Options):
 
 
 class UsageExample(object):
-    def __init__(self, cmd, description, good_looking=3):
+    def __init__(self, cmd, description):
         self.cmd = cmd
         self.description = description
-        self.good_looking = good_looking
 
 
-def format_examples(examples, qty=3):
+def format_examples(examples):
     tbl = []
     for k, v in six.iteritems(examples):
         for x in v:
@@ -134,7 +133,6 @@ def format_examples(examples, qty=3):
                     x,
                 )
             )
-    tbl = sorted(tbl, key=lambda y: y[1].good_looking, reverse=True)[:qty]
 
     if len(tbl) == 0:
         return ''

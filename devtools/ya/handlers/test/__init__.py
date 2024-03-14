@@ -17,17 +17,22 @@ class YaTestYaHandler(core.yarg.OptsHandler):
                 core.yarg.UsageExample(
                     '{prefix}',
                     'Build and run all tests',
-                    good_looking=101,
                 ),
                 core.yarg.UsageExample(
                     '{prefix} -t',
                     'Build and run small tests only',
-                    good_looking=102,
                 ),
                 core.yarg.UsageExample(
                     '{prefix} -tt',
                     'Build and run small and medium tests',
-                    good_looking=103,
+                ),
+                core.yarg.UsageExample(
+                    '{prefix} -L',
+                    'Print test names, don\'t run them',
+                ),
+                core.yarg.UsageExample(
+                    '{prefix} -F "*subname*"',
+                    'Build and run test which name contains "subname"',
                 ),
             ],
             description=self.description,
