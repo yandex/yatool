@@ -1,19 +1,19 @@
 #include "proc_util.h"
 
 #if defined(__linux__)
-#include <errno.h>
-#include <sys/prctl.h>
-#include <sys/wait.h>
-#include <sched.h>
-#include <unistd.h>
+    #include <errno.h>
+    #include <sys/prctl.h>
+    #include <sys/wait.h>
+    #include <sched.h>
+    #include <unistd.h>
 
-#include <util/stream/file.h>
-#include <util/folder/path.h>
-#include <util/string/builder.h>
+    #include <util/stream/file.h>
+    #include <util/folder/path.h>
+    #include <util/string/builder.h>
 
-#ifndef PR_SET_CHILD_SUBREAPER
-#define PR_SET_CHILD_SUBREAPER 36
-#endif
+    #ifndef PR_SET_CHILD_SUBREAPER
+        #define PR_SET_CHILD_SUBREAPER 36
+    #endif
 #endif
 
 #include <devtools/executor/proc_info/proc_info.h>
@@ -78,17 +78,50 @@ namespace {
 #endif
     }
 }
-# ifndef CLONE_NEWUTS
-#  define CLONE_NEWUTS 0x04000000
-# endif
-# ifndef CLONE_NEWNET
-#  define CLONE_NEWNET 0x40000000
-# endif
-# ifndef CLONE_NEWUSER
-#  define CLONE_NEWUSER 0x10000000
-# endif
+#ifndef CLONE_NEWUTS
+    #define CLONE_NEWUTS 0x04000000
+#endif
+#ifndef CLONE_NEWNET
+    #define CLONE_NEWNET 0x40000000
+#endif
+#ifndef CLONE_NEWUSER
+    #define CLONE_NEWUSER 0x10000000
+#endif
 
 namespace NProcUtil {
+#if defined(_win_)
+    TSubreaperResource::TSubreaperResource(HANDLE jh) {
+        JobHandle = jh;
+    }
+#else
+    TSubreaperResource::TSubreaperResource() {
+    }
+#endif
+    void TSubreaperResource::Close() {
+    #if defined(_win_)
+        // All associated processes with job will be terminated
+        if (JobHandle) {
+            CloseHandle(JobHandle);
+        }
+    #endif
+    }
+    TSubreaperResource BecomeSubreaper() {
+#if defined(_linux_)
+        // Keep orphaned processes around to be able to kill them later
+        if (!NProcUtil::LinuxBecomeSubreaper()) {
+            Cerr << "Failed to set subreaper: " << LastSystemErrorText() << Endl;
+        }
+#endif
+#if defined(_win_)
+        HANDLE jobHandle = NProcUtil::WinCreateSubreaperJob();
+        if (!jobHandle) {
+            Cerr << "Failed to create subreaper job: " << LastSystemErrorText() << Endl;
+        }
+        return TSubreaperResource(jobHandle);
+#else
+        return TSubreaperResource();
+#endif
+    }
     void TerminateChildren() {
         TVector<pid_t> prev;
         TVector<pid_t> children;
@@ -139,7 +172,6 @@ namespace NProcUtil {
         // setting localhost up
         NNetNs::IfUp("lo", "10.1.1.1", "255.255.255.0");
     }
-
 
     bool LinuxBecomeSubreaper(std::function<void()> cleanupAfterFork) {
         if (SubreaperChildPid) {

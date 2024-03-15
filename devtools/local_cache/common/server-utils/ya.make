@@ -11,7 +11,7 @@ IF (OS_LINUX OR OS_DARWIN OR OS_IOS)
 ENDIF()
 
 PEERDIR(
-    devtools/executor/lib
+    devtools/executor/proc_util
     library/cpp/logger/global
 )
 

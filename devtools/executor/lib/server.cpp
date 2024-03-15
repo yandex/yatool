@@ -1,6 +1,6 @@
 #include "server.h"
-#include "proc_util.h"
 
+#include <devtools/executor/proc_util/proc_util.h>
 #include <devtools/executor/proto/runner.grpc.pb.h>
 
 #include <grpc/grpc.h>
@@ -254,17 +254,7 @@ private:
 };
 
 void RunServer(const TString address, bool cacheStderr, bool debug) {
-#if defined(_linux_)
-    // Keep orphaned processes around to be able to kill them later
-    if (!NProcUtil::LinuxBecomeSubreaper()) {
-        Cerr << "Failed to set subreaper: " << LastSystemErrorText() << Endl;
-    }
-#elif defined(_win_)
-    HANDLE jobHandle = NProcUtil::WinCreateSubreaperJob();
-    if (!jobHandle) {
-        Cerr << "Failed to create subreaper job: " << LastSystemErrorText() << Endl;
-    }
-#endif
+    NProcUtil::TSubreaperResource resource = NProcUtil::BecomeSubreaper();
 
     SetAsyncSignalHandler(SIGINT, RequestShutdown);
     SetAsyncSignalHandler(SIGTERM, RequestShutdown);
@@ -287,11 +277,5 @@ void RunServer(const TString address, bool cacheStderr, bool debug) {
     });
 
     server->Wait();
-
-#if defined(_win_)
-    // All associated processes with job will be terminated
-    if (jobHandle) {
-        CloseHandle(jobHandle);
-    }
-#endif
+    resource.Close();
 }

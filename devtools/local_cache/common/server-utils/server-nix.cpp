@@ -1,6 +1,6 @@
 #include "server.h"
 
-#include <devtools/executor/lib/proc_util.h>
+#include <devtools/executor/proc_util/proc_util.h>
 
 #include <library/cpp/logger/global/common.h>
 #include <library/cpp/logger/global/rty_formater.h>
