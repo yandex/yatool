@@ -2490,7 +2490,7 @@ def _gen_upload_node(opts, nd):
         'inputs': [yndex_file],
         'deps': [nd['uid']],
         'tag': node_tag,
-        'cache': False,
+        'cache': True,
         'backup': True,
         'requirements': {'network': 'full'},
         'secrets': ['YT_YNDEXER_YT_TOKEN'],
