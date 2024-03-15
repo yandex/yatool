@@ -132,7 +132,20 @@ class AndroidEmulator(object):
     def install_app(self, device_name, app_path, app_name):
         device_id = self._get_device_id(device_name)
         process.execute(self._get_adb_cmd(device_id) + ['uninstall', app_name], check_exit_code=False, env=self.env)
-        process.execute(self._get_adb_cmd(device_id) + ['install', app_path], check_exit_code=True, env=self.env)
+
+        def install_apk():
+            return process.execute(
+                self._get_adb_cmd(device_id) + ['install', app_path],
+                check_exit_code=False,
+                env=self.env,
+            )
+
+        result = install_apk()
+        while result.stdout != 'Performing Streamed Install\nSuccess\n':
+            logger.info('Install apk stdout: {}'.format(result.stdout))
+            logger.info('Install apk stderr: {}'.format(result.stderr))
+            time.sleep(5)
+            result = install_apk()
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
