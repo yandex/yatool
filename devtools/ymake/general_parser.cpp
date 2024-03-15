@@ -483,9 +483,19 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
     YDIAG(DG) << "PBC name = " << name << ", " << tokens.size() << " tokens\n";
 
     const TCommandInfo* cmdInfo = nullptr;
-    if (stack.size() >= 2 && IsOutputType(stack[stack.size() - 2].Node.NodeType) && stack[stack.size() - 2].Dep.DepType == EDT_BuildCommand) {
-        if (!stack[stack.size() - 2].Add.Get() || !(cmdInfo = stack[stack.size() - 2].Add->GetModuleData().CmdInfo.Get())) {
-            ythrow TNotImplemented() << "Output file has no cmd info. Graph seems corrupted. Reconstruct.";
+
+    if (stack.size() >= 2) {
+        const auto& prntState = stack[stack.size() - 2];
+
+        if (IsOutputType(prntState.Node.NodeType) && prntState.Dep.DepType == EDT_BuildCommand) {
+            TNodeAddCtx* addCtx = prntState.Add.Get();
+            if (addCtx) {
+                cmdInfo = addCtx->GetModuleData().CmdInfo.Get();
+            }
+
+            if (!cmdInfo) {
+                ythrow TNotImplemented() << "Output file has no cmd info. Graph seems corrupted. Reconstruct.";
+            }
         }
     }
 
