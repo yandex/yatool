@@ -401,7 +401,7 @@ class LogGenerator(object):
             if not line:
                 break
             # skip empty lines
-            if line != os.linesep:
+            if line != '\n':
                 self._stdout_extractor.feed(line)
         # instead of close we flush file,
         # because it's may be used to add extra logs after test finished
@@ -643,7 +643,7 @@ def execute_ut(
 
                 if chunk:
                     buff += chunk
-                    lines = buff.split(os.linesep)
+                    lines = buff.split('\n')
                     # if buffer doesn't contain incomplete lines
                     # last item will be empty string and we will drop it and reset buffer
                     # otherwise, incomplete line won't be processed, but stored in buffer
@@ -653,7 +653,7 @@ def execute_ut(
                         line = line.rstrip("\r\n")
                         if not line:
                             continue
-                        line += os.linesep
+                        line += '\n'
                         if not line.startswith(START_MARKER) and not line.startswith(FINISH_MARKER):
                             # write stderr immediately for pushing urgency messages
                             # and displaying actual binary stderr for debug purposes (--test-stderr mode for 'ya make').
