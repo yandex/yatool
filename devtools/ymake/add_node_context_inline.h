@@ -50,9 +50,11 @@ Y_FORCE_INLINE TAddDepAdaptor& TNodeAddCtx::AddOutput(ui64 elemId, EMakeNodeType
     if (addToOwn) {
         Y_ASSERT(UseFileId(defaultType));
 
+        Module->AddEntry(elemId);
+
         TModAddData& modData = add.GetModuleData();
-        modData.AlreadyAdded = !Module->AddEntry(elemId);
         modData.Added = true;
+
         nodeData.OnceEntered = false;
 
         if (!nodeData.AddCtx->NeedInit2) {

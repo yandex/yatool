@@ -25,7 +25,6 @@ struct TModAddData {
         struct {  // 6 bits used
             bool UsedAsInput : 1;
             bool CheckIfUsed : 1;
-            bool AlreadyAdded : 1;
             bool BadCmdInput : 1;
             bool AdditionalOutput : 1;
             bool Added : 1;
@@ -42,4 +41,3 @@ struct TModAddData {
 
     bool IsParsedPeer(ui32 elemId) const;
 };
-

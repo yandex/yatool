@@ -60,7 +60,7 @@ public:
         TNodeAddCtx& add = *i->second.AddCtx;
         i->second.Reassemble = true;
         if (addToOwn) {
-            add.ModuleData.AlreadyAdded = !OwnEntries.insert(fid).second;
+            OwnEntries.insert(fid);
             i->second.OnceEntered = false;
         }
         return add;
