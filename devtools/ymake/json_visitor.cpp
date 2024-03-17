@@ -552,7 +552,17 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
         if (IsModule(currState) && currData.WasFresh) {
             const auto mod = currState.Module;
-            if (mod->IsDependencyManagementApplied() && currData.NodeDeps) {
+            if (mod->IsDependencyManagementApplied()) {
+                TUniqVector<TNodeId>* oldDeps = currData.NodeDeps.Get();
+
+                // Here we recalculate NodeDeps for nodes under dependency management.
+                // First of all we should take all "managed peers"
+                // calculated by dependency management, as they
+                // 1) have filtered set of dependencies: only selected versions and
+                // with excludes taken into the account.
+                // 2) can have additional dependencies such as non-managed dependencies
+                // from transitive dependencies closure.
+
                 TUniqVector<TNodeId> deps;
                 const auto& lists = RestoreContext.Modules.GetNodeListStore();
                 const auto& ids = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
@@ -565,13 +575,21 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     deps.Push(peerId);
                 }
 
-                for (auto depId : *currData.NodeDeps) {
-                    auto depNode = graph.Get(depId);
-                    if (IsModuleType(depNode->NodeType)) {
-                        continue;
+                // Secondly we should take all non-module nodes from the regular NodeDeps.
+                // There are things such as BuildCommand nodes for example.
+                // We also should skip all modules, as they have all non-filtered
+                // dependencies. And all really used modules already was in "managed peers".
+
+                if (oldDeps) {
+                    for (auto depId : *oldDeps) {
+                        if (IsModuleType(graph.Get(depId)->NodeType)) {
+                            continue;
+                        }
+                        deps.Push(depId);
                     }
-                    deps.Push(depId);
                 }
+
+                // Then take NodeToolDeps as it is. No specific treatment needed.
 
                 if (currData.NodeToolDeps) {
                     for (auto toolDep : *currData.NodeToolDeps) {
@@ -579,8 +597,21 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     }
                 }
 
-                if (currData.NodeDeps->size() != deps.size()) {
-                    deps.swap(*currData.NodeDeps);
+                // Finally set new NodeDeps value, minding to leave NodeDeps holder
+                // reseted when there are no values. There are supposedly some code
+                // dependent on that same behaviour and I have no wish to search
+                // and clean up all such places.
+
+                if (!deps.empty()) {
+                    if (!oldDeps) {
+                        currData.NodeDeps.Reset(new TUniqVector<TNodeId>{});
+                        oldDeps = currData.NodeDeps.Get();
+                    }
+
+                    oldDeps->swap(deps);
+
+                } else {
+                    currData.NodeDeps.Reset();
                 }
             }
         }
