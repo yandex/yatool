@@ -55,11 +55,11 @@
   <Intrinsic Name="l_size"
       Expression="__r_.__value_.__l.__size_" />
   <DisplayString
-      Condition="is_long()">{__r_.__value_.__l.__data_, [l_size()] }</DisplayString>
+      Condition="is_long()">{__r_.__value_.__l.__data_, [l_size()] s8 }</DisplayString>
   <DisplayString
-      Condition="!is_long()">{__r_.__value_.__s.__data_, [s_size()] }</DisplayString>
-  <StringView Condition="is_long()">__r_.__value_.__l.__data_</StringView>
-  <StringView Condition="!is_long()">__r_.__value_.__s.__data_</StringView>
+      Condition="!is_long()">{__r_.__value_.__s.__data_, [s_size()] s8 }</DisplayString>
+  <StringView Condition="is_long()">__r_.__value_.__l.__data_, [l_size()] s8b</StringView>
+  <StringView Condition="!is_long()">__r_.__value_.__s.__data_, [s_size()] s8b</StringView>
   <Expand>
     <Item Name="[size]" Condition="is_long()" 
         ExcludeView="simple">l_size()</Item>
@@ -79,6 +79,7 @@
 </Type>
 
 <Type Name="std::__y1::basic_string&lt;wchar_t,*&gt;">
+  <AlternativeType Name="std::__y1::basic_string&lt;char16_t,*&gt;" />
   <Intrinsic Name="is_long"
           Expression="__r_.__value_.__s.__is_long_" />
   <Intrinsic Name="s_size"
@@ -86,11 +87,11 @@
   <Intrinsic Name="l_size"
       Expression="__r_.__value_.__l.__size_" />
   <DisplayString
-      Condition="is_long()">{__r_.__value_.__l.__data_}</DisplayString>
+      Condition="is_long()">{__r_.__value_.__l.__data_, [l_size()] su}</DisplayString>
   <DisplayString
-      Condition="!is_long()">{__r_.__value_.__s.__data_}</DisplayString>
-  <StringView Condition="is_long()">__r_.__value_.__l.__data_</StringView>
-  <StringView Condition="!is_long()">__r_.__value_.__s.__data_</StringView>
+      Condition="!is_long()">{__r_.__value_.__s.__data_, [s_size()] su}</DisplayString>
+  <StringView Condition="is_long()">__r_.__value_.__l.__data_, [l_size()] sub</StringView>
+  <StringView Condition="!is_long()">__r_.__value_.__s.__data_, [s_size()] sub</StringView>
   <Expand>
     <Item Name="[size]" Condition="is_long()" 
         ExcludeView="simple">l_size()</Item>
@@ -107,6 +108,25 @@
       <ValuePointer Condition="!is_long()">__r_.__value_.__s.__data_</ValuePointer>
     </ArrayItems>
   </Expand>
+</Type>
+
+<Type Name="std::__y1::basic_string_view&lt;char,*&gt;">
+  <DisplayString>{__data_, [__size_] s8}</DisplayString>
+  <StringView>__data_,[__size_] s8b</StringView>
+  <Expand>
+      <Item Name="[size]">__size_</Item>
+      <Item Name="[data]">__data_</Item>
+  </Expand>  
+</Type>
+
+<Type Name="std::__y1::basic_string_view&lt;wchar_t,*&gt;">
+  <AlternativeType Name="std::__y1::basic_string_view&lt;char16_t,*&gt;" />
+  <DisplayString>{__data_, [__size_] su}</DisplayString>
+  <StringView>__data_,[__size_] sub</StringView>
+  <Expand>
+      <Item Name="[size]">__size_</Item>
+      <Item Name="[data]">__data_</Item>
+  </Expand>  
 </Type>
 
 <!--
@@ -281,30 +301,6 @@
   <DisplayString>{S_.T_}</DisplayString>
   <Expand>
     <ExpandedItem>S_.T_</ExpandedItem>
-  </Expand>
-</Type>
-
-<!-- aka TStringBuf -->
-<Type Name="TBasicStringBuf&lt;char,*&gt;">
-  <DisplayString>{__data,[__size]s8}</DisplayString>
-  <Expand>
-    <Item Name="[size]" ExcludeView="simple">__size</Item>
-    <ArrayItems>
-      <Size>__size</Size>
-      <ValuePointer>__data</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-
-<!-- aka TWtringBuf -->
-<Type Name="TBasicStringBuf&lt;unsigned short,*&gt;">
-  <DisplayString>{__data,[__size]su}</DisplayString>
-  <Expand>
-    <Item Name="[size]" ExcludeView="simple">__size</Item>
-    <ArrayItems>
-      <Size>__size</Size>
-      <ValuePointer>(wchar_t*)__data</ValuePointer>
-    </ArrayItems>
   </Expand>
 </Type>
 
