@@ -13,15 +13,15 @@ __all__ = [
     "colored",
     "cprint",
     "tcolor",
-    "get_color_by_spec"
+    "get_color_by_spec",
 ]
 
 ATTRIBUTES = copy.deepcopy(ATTRIBUTES)
-ATTRIBUTES["light"] = ATTRIBUTES['bold']
+ATTRIBUTES["light"] = ATTRIBUTES["bold"]
 
 COLORS = copy.deepcopy(COLORS)
-COLORS['gray'] = COLORS['grey']
-COLORS['purple'] = COLORS['magenta']
+COLORS["gray"] = COLORS["grey"]
+COLORS["purple"] = COLORS["magenta"]
 COLORS["reset"] = 0
 
 
