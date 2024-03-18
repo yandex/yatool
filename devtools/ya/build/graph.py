@@ -1818,7 +1818,7 @@ class _GraphMaker(object):
             with stager.scope('load-graph-from-json'):
                 return ccgraph.Graph(ymake_output=ymake_res.stdout)
         except Exception as e:
-            raise GraphMalformedException(e.message)
+            raise GraphMalformedException(str(e))
 
     @staticmethod
     def _needs_wine64_for_tests(test_target_platforms):

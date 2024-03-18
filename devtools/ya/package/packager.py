@@ -431,7 +431,7 @@ def get_tool_path(name, tool_platform=None):
     except (UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException) as e:
         package.display.emit_message(
             'Not found toolchain for tool {} on platform {}: {}. Use the system one.'.format(
-                name, tool_platform, e.message
+                name, tool_platform, str(e)
             )
         )
         return name
@@ -1049,7 +1049,7 @@ def load_package(arcadia_root, package_file, included=None):
     try:
         parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
     except ValueError as e:
-        raise YaPackageException('JSON loading error: {} in {}'.format(e.message, package_file))
+        raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
 
     old = is_old_format(parsed_package)
     logger.debug("Detected package file format: %s", "new" if not old else "old")
@@ -1074,7 +1074,7 @@ def load_package(arcadia_root, package_file, included=None):
     try:
         get_validator().validate(parsed_package)
     except ValidationError as error:
-        logger.warning("Package %s has either invalid or old format: %s", package_file, error.message)
+        logger.warning("Package %s has either invalid or old format: %s", package_file, error)
 
     return parsed_package
 
@@ -1670,7 +1670,7 @@ def _get_all_includes(arcadia_root, package_file, included=None):
     try:
         parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
     except ValueError as e:
-        raise YaPackageException('JSON loading error: {} in {}'.format(e.message, package_file))
+        raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
     included.append(package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file)
 
     for include_package in parsed_package.get("include", []):

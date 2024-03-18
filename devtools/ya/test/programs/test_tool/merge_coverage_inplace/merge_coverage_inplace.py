@@ -36,7 +36,7 @@ def get_unified_coverage(coverage_path):
             except ValueError:
                 sys.stderr.write("cant load {} as json".format(line))
             except KeyError as ex:
-                sys.stderr.write("{} not in {}".format(ex.message, line))
+                sys.stderr.write("{} not in {}".format(ex, line))
     return coverage
 
 

@@ -342,7 +342,7 @@ class RunNodeTask(object):
             self._node.args['func'](self._patterns)
             return '', 0
         except yalibrary.runner.ExpectedNodeException as e:
-            return e.message, e.exit_code
+            return str(e), e.exit_code
         except Exception:
             from traceback import format_exc
 

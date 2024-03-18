@@ -194,7 +194,7 @@ def iter_nodes(ctx):
             try:
                 fill_test_map(p, ctx)
             except mp.ParseError as e:
-                raise mp.ParseError('{}: {}'.format(p, e.message))
+                raise mp.ParseError('{}: {}'.format(p, str(e)))
     for p in ctx.by_path:
         try:
             for n in iter_path_nodes(p, ctx):
@@ -210,7 +210,7 @@ def iter_nodes(ctx):
                         n.kv['disable_cache'] = 'yes'
                 yield n
         except mp.ParseError as e:
-            raise mp.ParseError('{}: {}'.format(p, e.message))
+            raise mp.ParseError('{}: {}'.format(p, str(e)))
     if ctx.opts.export_to_maven and ctx.maven_export_modules_list:
         import jbuild.gen.actions.export_to_maven as mvn_export
 

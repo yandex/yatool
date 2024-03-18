@@ -84,7 +84,7 @@ def fix_python(path, data, args):
     try:
         return fix_python_with_black(data, path, False, args)
     except RuntimeError as e:
-        if "Black produced different code on the second pass of the formatter" in e.message:  # https://st.yandex-team.ru/DEVTOOLS-7642
+        if "Black produced different code on the second pass of the formatter" in str(e):  # https://st.yandex-team.ru/DEVTOOLS-7642
             for i in range(0, 2):
                 data = fix_python_with_black(data, path, True, args)
 
