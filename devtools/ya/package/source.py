@@ -463,6 +463,9 @@ class RelativeSource(Source):
         destination = os.path.join(self.result_dir, self.destination_path())
         self.copy(source, destination)
 
+    def keep_symlinks(self):
+        return self.data['source'].get('symlinks', False)
+
 
 class DirectorySource(Source):
     def _prepare(self):
