@@ -161,6 +161,9 @@ size_t TScriptEvaluator::DoTerm(
             if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
                 ythrow TNotImplemented();
             }
+            if (auto input = std::get_if<TMacroValues::TInput>(&val); input) {
+                return Commands->InputToStringArray(*input, ctx);
+            }
             return TString(Commands->ConstToString(val, ctx));
         }
         else if constexpr (std::is_same_v<decltype(id), NPolexpr::EVarId>) {

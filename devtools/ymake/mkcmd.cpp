@@ -259,8 +259,10 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         }
     }
 
-    for (ui32 i = 0; i < inputCoordCounts.size(); i++) {
-        Inputs.push_back({ Vars["INPUT"].begin() + i, inputCoordCounts[i] });
+    ui32 inputId = 0;
+    for (ui32 inputCoordCount : inputCoordCounts) {
+        Inputs.push_back({ Vars["INPUT"].begin() + inputId, inputCoordCount });
+        inputId += inputCoordCount;
     }
 
     if (!cmdfound) {
