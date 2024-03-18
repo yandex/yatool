@@ -20,7 +20,6 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
-from yalibrary.ya_helper.ya_utils import ya_options
 
 import devtools.ya.app.modules.evlog as evlog
 import devtools.ya.app.modules.params as params
@@ -55,7 +54,6 @@ def execute_early(action):
         diag=False,
         error_file=None,
         no_report=False,
-        report_events=None,
         no_logs=False,
         no_tmp_dir=False,
         precise=False,
@@ -87,8 +85,8 @@ def execute_early(action):
             ]
         )
 
-        if not is_sensitive(args):
-            modules.append(('report', configure_report_interceptor(ctx, report_events if no_report else 'all')))
+        if not no_report and not is_sensitive(args):
+            modules.append(('report', configure_report_interceptor(ctx)))
 
         modules.extend(
             [
@@ -628,14 +626,11 @@ def _resources_report():
     }
 
 
-def configure_report_interceptor(ctx, report_events):
+def configure_report_interceptor(ctx):
     # we can only do that after respawn with valid python
     from core.report import telemetry, ReportTypes
 
-    telemetry.init_reporter(
-        suppressions=sec.mine_suppression_filter(),
-        report_events=ya_options.YaBaseOptions.parse_events_filter(report_events),
-    )
+    telemetry.init_reporter(suppressions=sec.mine_suppression_filter())
 
     telemetry.report(
         ReportTypes.EXECUTION,
@@ -699,7 +694,6 @@ def configure_report_interceptor(ctx, report_events):
                 **additional_fields
             ),
         )
-        telemetry.stop_reporter()  # flush urgent reports
 
 
 def configure_tmp_dir_interceptor(keep_tmp_dir):

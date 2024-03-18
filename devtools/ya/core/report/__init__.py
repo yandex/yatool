@@ -19,7 +19,6 @@ SUPPRESSIONS = None
 
 
 class ReportTypes(object):
-    ALL = 'all'  # <<< reserved for use in reports filter
     EXECUTION = 'execution'
     RUN_YMAKE = 'run_ymake'
     FAILURE = 'failure'
@@ -34,7 +33,10 @@ class ReportTypes(object):
     PARAMETERS = 'parameters'
     YT_CACHE_ERROR = 'yt_cache_error'
     GRAPH_STATISTICS = 'graph_statistics'
-    DISTBUILD = 'distbuild'
+    DISTBUILD_START_SCHEDULE_BUILD = 'distbuild_start_schedule_build'
+    DISTBUILD_FINISH_SCHEDULE_BUILD = 'distbuild_finish_schedule_build'
+    DISTBUILD_FINISH_BUILD = 'distbuild_finish_build'
+    DISTBUILD_FINISH_DOWNLOAD_RESULTS = 'distbuild_finish_download_results'
 
 
 @func.lazy
@@ -90,7 +92,6 @@ def set_suppression_filter(suppressions):
 class CompositeTelemetry:
     def __init__(self, backends=None):
         self._backends = backends or {}
-        self._report_events = set()
 
     @property
     def no_backends(self):
@@ -106,7 +107,7 @@ class CompositeTelemetry:
             entry = self._backends[name] = entry()
         return entry
 
-    def report(self, key, value, namespace=default_namespace(), urgent=False):
+    def report(self, key, value, namespace=default_namespace()):
         if self.no_backends:
             return
 
@@ -124,10 +125,6 @@ class CompositeTelemetry:
             # Don't expose exception: it may contain secret
             svalue = 'Unable to filter report value: {}'.format(e)
 
-        if ReportTypes.ALL not in self._report_events and key not in self._report_events:
-            logger.debug('Report_disabled %s: %s', key, svalue)  # log record for using in tests
-            return
-
         logger.debug('Report %s: %s', key, svalue)
         for _, telemetry in self.iter_backends():
             telemetry.push(
@@ -141,33 +138,18 @@ class CompositeTelemetry:
                     'key': key,
                     'value': svalue,
                     'timestamp': int(time.time()),
-                },
-                urgent=urgent,
+                }
             )
         logger.debug('Reporting done')
 
-    def init_reporter(self, shard='report', suppressions=None, report_events=None):
+    def init_reporter(self, shard='report', suppressions=None):
         if self.no_backends:
             return
-
-        self._report_events = report_events if report_events else set()
-        logger.debug(
-            "Init reporter shard=%s events=%s",
-            shard,
-            repr(self._report_events),
-        )
 
         for telemetry_name, telemetry in self.iter_backends():
             telemetry.init(os.path.join(config.misc_root(), telemetry_name), shard)
         global SUPPRESSIONS
         SUPPRESSIONS = suppressions
-
-    def stop_reporter(self):
-        if self.no_backends:
-            return
-
-        for telemetry_name, telemetry in self.iter_backends():
-            telemetry.stop()
 
     def request(self, tail, data, backend='snowden'):
         telemetry = self.get_backend_module(backend)
