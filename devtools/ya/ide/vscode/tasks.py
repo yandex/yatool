@@ -40,6 +40,8 @@ def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_p
         module_args = COMMON_ARGS
         if module_lang == "GO":
             module_args += " -DGO_COMPILE_FLAGS='-N -l'"
+        if module_lang == "PY3":
+            module_args += "--build=release"
 
         if module_type in consts.PROGRAM_MODULE_TYPES:
             tasks.append(
@@ -105,7 +107,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Build: ALL (debug)"),
                 ("type", "shell"),
-                ("command", "%s make %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", "%s make -d %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
                 (
                     "group",
                     OrderedDict(

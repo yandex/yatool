@@ -27,7 +27,6 @@ from ide import ide_common, venv, vscode
 
 TEST_WRAPPER_TEMPLATE = """#!/bin/sh
 export Y_PYTHON_ENTRY_POINT=:main
-export Y_PYTHON_SOURCE_ROOT='{arc_root}'
 export Y_PYTHON_CLEAR_ENTRY_POINT=1
 export YA_TEST_CONTEXT_FILE='{test_context}'
 exec '{path}' \"$@\"
@@ -472,7 +471,7 @@ class PyProject(object):
                         ("type", "shell"),
                         (
                             "command",
-                            "%s make %s %s"
+                            "%s make --build=release %s %s"
                             % (
                                 self.YA_PATH,
                                 COMMON_ARGS,
@@ -545,7 +544,7 @@ class PyProject(object):
                         ("type", "shell"),
                         (
                             "command",
-                            "%s make -tA --regular-tests --keep-going --test-prepare --keep-temps %s %s"
+                            "%s make --run-all-tests --build=release --regular-tests --keep-going --test-prepare --keep-temps %s %s"
                             % (
                                 self.YA_PATH,
                                 COMMON_ARGS,
@@ -563,7 +562,7 @@ class PyProject(object):
                         ("type", "shell"),
                         (
                             "command",
-                            "%s make -tA %s %s"
+                            "%s make --run-all-tests --build=release %s %s"
                             % (
                                 self.YA_PATH,
                                 COMMON_ARGS,
@@ -696,22 +695,6 @@ class PyProject(object):
                                     ),
                                     OrderedDict(
                                         (
-                                            ("label", "Build: ALL (debug)"),
-                                            ("type", "shell"),
-                                            ("command", "%s make %s -d %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
-                                            (
-                                                "group",
-                                                OrderedDict(
-                                                    (
-                                                        ("kind", "build"),
-                                                        ("isDefault", True),
-                                                    )
-                                                ),
-                                            ),
-                                        )
-                                    ),
-                                    OrderedDict(
-                                        (
                                             ("label", "Build: ALL (release)"),
                                             ("type", "shell"),
                                             ("command", "%s make %s -r %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
@@ -722,7 +705,7 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -t %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            ("command", "%s make -t -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
                                             (
                                                 "group",
                                                 OrderedDict(
@@ -740,7 +723,7 @@ class PyProject(object):
                                             ("type", "shell"),
                                             (
                                                 "command",
-                                                "%s make -t --test-size=MEDIUM %s %s"
+                                                "%s make -t -r --test-size=MEDIUM %s %s"
                                                 % (self.YA_PATH, COMMON_ARGS, TARGETS),
                                             ),
                                             ("group", "test"),
@@ -750,7 +733,7 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small + medium)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -tt %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            ("command", "%s make -tt -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
                                             ("group", "test"),
                                         )
                                     ),
@@ -760,7 +743,7 @@ class PyProject(object):
                                             ("type", "shell"),
                                             (
                                                 "command",
-                                                "%s make -t --test-size=LARGE %s %s"
+                                                "%s make -t --test-size=LARGE -r %s %s"
                                                 % (self.YA_PATH, COMMON_ARGS, TARGETS),
                                             ),
                                             ("group", "test"),
@@ -770,7 +753,7 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small + medium + large)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -tA %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            ("command", "%s make -tA -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
                                             ("group", "test"),
                                         )
                                     ),
@@ -778,7 +761,10 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (restart failed)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -tA -X %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            (
+                                                "command",
+                                                "%s make -tA -X -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS),
+                                            ),
                                             ("group", "test"),
                                         )
                                     ),

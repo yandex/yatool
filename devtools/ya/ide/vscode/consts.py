@@ -46,7 +46,6 @@ exec '{path}' \"$@\"
 
 TEST_WRAPPER_TEMPLATE = """#!/bin/sh
 export Y_PYTHON_ENTRY_POINT=:main
-export Y_PYTHON_SOURCE_ROOT='{arc_root}'
 export Y_PYTHON_CLEAR_ENTRY_POINT=1
 export YA_TEST_CONTEXT_FILE='{test_context}'
 exec '{path}' \"$@\"
