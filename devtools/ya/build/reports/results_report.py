@@ -81,9 +81,10 @@ class BatchReportBase(object):
 
     def __init__(self, func, delay=10):
         self._processor = BatchEventProcessor(func=func, delay=delay)
+        self._progress_channel = None
 
-    def log_progress(self, ya_make_progress):
-        pass
+    def set_progress_channel(self, functor):
+        self._progress_channel = functor
 
     def trace_stage(self, build_stage):
         pass
@@ -106,7 +107,7 @@ class BatchReportBase(object):
     def finish(self):
         self._processor.stop()
 
-    def __call__(self, entries, ci_progress):
+    def __call__(self, entries):
         self._processor.add_entries(entries)
 
     def _add_entry(self, item):
@@ -116,6 +117,7 @@ class BatchReportBase(object):
         self._processor.process_queue()
 
 
+# TODO we need to migrate users to JsonLineReport and get rid of AggregatingStreamingReport
 class AggregatingStreamingReport(BatchReportBase):
     FLUSHING_DELAY = 20
 
@@ -138,13 +140,13 @@ class AggregatingStreamingReport(BatchReportBase):
         self._client = client
         self._closed_tests_streams = set()
         self._closed_streams = set()
-        self._ci_progress = None
+        self._progress_channel = lambda: None
 
     def _process(self, entries):
         if self._report_only_stages:
             self._logger.debug('Skip sending chunk of %s entries due to report_only_stages option', len(entries))
         else:
-            self._client.send_chunk(entries, self._ci_progress)
+            self._client.send_chunk(entries, self._progress_channel())
 
     def _add_target_result(self, entry):
         target_path, target_platform, target_name = entry['path'], entry['toolchain'], entry.get('name')
@@ -173,9 +175,7 @@ class AggregatingStreamingReport(BatchReportBase):
             self._logger.debug('All targets have been added')
             self.finish_build_report()
 
-    def __call__(self, entries, ci_progress):
-        self._ci_progress = ci_progress
-
+    def __call__(self, entries):
         types = collections.defaultdict(int)
         for entry in entries:
             tp = entry['type']
@@ -251,19 +251,97 @@ class AggregatingStreamingReport(BatchReportBase):
 class JsonLineReport(BatchReportBase):
     _logger = logging.getLogger('JsonLineReport')
 
-    def __init__(self, filename, delay=5):
+    def __init__(self, filename, delay=5, report_progress=True, progress_delay=180):
         super(JsonLineReport, self).__init__(func=self._process, delay=delay)
         self._file = open(filename, 'w')
+        self._lock = threading.Lock()
+        self._report_progress = report_progress
+        self._progress_delay = progress_delay
+        # Dump progress with first events
+        self._progress_timestamp = 0
+        self._test_report_closed = False
 
     def _process(self, entries):
+        assert self._file, entries[0]
+
+        lines = []
         for x in entries:
-            json.dump(x, self._file)
+            data = {
+                "time": int(time.time()),
+                "type": "result",
+                "data": x,
+            }
+            lines.append(json.dumps(data))
+
+        with self._lock:
+            for line in lines:
+                self._file.write(line)
+                self._file.write("\n")
+            self._file.flush()
+
+        if self._report_progress:
+            ts = time.time()
+            if ts > self._progress_timestamp + self._progress_delay:
+                self._progress_timestamp = ts
+                self._log_progress()
+
+    def _log_progress(self):
+        if self._report_progress and self._progress_channel:
+            self._process_event(
+                type="progress",
+                value=self._progress_channel(),
+            )
+
+    def trace_stage(self, build_stage):
+        if build_stage and build_stage.get("name"):
+            self._process_event(
+                type="action",
+                name="trace_stage",
+                stage=build_stage["name"],
+            )
+
+    def finish_configure_report(self):
+        self._finish_test_type_report("configure")
+
+    def finish_build_report(self):
+        self._finish_test_type_report("build")
+
+    def finish_style_report(self):
+        self._finish_test_type_report("style")
+
+    def finish_tests_report(self):
+        self._finish_test_type_report("test")
+
+    def finish_tests_report_by_size(self, size):
+        self._finish_test_type_report("test", size)
+
+    def _process_event(self, **kw):
+        assert self._file, kw
+        assert "type" in kw, kw
+        kw["time"] = int(time.time())
+        with self._lock:
+            json.dump(kw, self._file)
             self._file.write("\n")
-        self._file.flush()
+            self._file.flush()
+
+    def _finish_test_type_report(self, test_type, test_size=None):
+        self._process_queue()
+
+        kw = {}
+        if test_size:
+            assert test_type == "test", locals()
+            kw['test_size'] = test_size
+
+        self._process_event(type="action", name="finish_test_type", test_type=test_type, **kw)
+        self._logger.debug(
+            "%s%s report is finished", test_type.capitalize(), ' ({})'.format(test_size) if test_size else ''
+        )
 
     def finish(self):
         super(JsonLineReport, self).finish()
+        self._log_progress()
         self._file.close()
+        self._file = None
 
 
 # TODO we need to migrate users to JsonLineReport and get rid of StoredReport
@@ -272,10 +350,10 @@ class StoredReport(object):
 
     def __init__(self):
         self._results = []
-        self._ci_progress = {}
+        self._progress_channel = lambda: None
 
-    def log_progress(self, ya_make_progress):
-        self._logger.debug('Progress: {}'.format(ya_make_progress.progress))
+    def set_progress_channel(self, functor):
+        self._progress_channel = functor
 
     def trace_stage(self, build_stage):
         self._logger.debug('Trace build stage %s', build_stage)
@@ -298,15 +376,14 @@ class StoredReport(object):
     def finish(self):
         self._logger.debug('Finish report')
 
-    def __call__(self, entries, ci_progress):
-        self._ci_progress = ci_progress
+    def __call__(self, entries):
         self._results.extend(entries)
 
     def make_report(self):
         return {
             'results': self._results,
             'static_values': {},
-            'progress': self._ci_progress,
+            'progress': self._progress_channel(),
         }
 
 

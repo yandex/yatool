@@ -85,19 +85,20 @@ END()
 
 RECURSE(
     build_facade
+    build_opts
+    build_plan
+    build_result
     ccgraph
     evlog
     gen_plan
     genconf
-    ymake2
-    build_opts
-    build_plan
-    build_result
     makelist
     owners
     reports
     stat
     targets
+    testlib
+    ymake2
 )
 
 IF (NOT YA_OPENSOURCE)

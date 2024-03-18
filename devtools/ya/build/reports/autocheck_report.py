@@ -412,6 +412,8 @@ class ReportGenerator(object):
             totals_build[transformed_toolchain] += 1 * (not self._opts.report_skipped_suites_only)
 
         self.ya_make_progress = YaMakeProgress(totals_build, style_tests_count, tests_count)
+        for x in self._reports:
+            x.set_progress_channel(self.ya_make_progress.get_progress_ci_format)
 
     def finish(self):
         self._logger.debug('Finish report')
@@ -461,9 +463,8 @@ class ReportGenerator(object):
 
     def _add_entries(self, entries):
         filtered_entries = [_f for _f in map(self._post_process, entries) if _f]
-        ci_progress = self.ya_make_progress.get_progress_ci_format()
         for report in self._reports:
-            report(filtered_entries, ci_progress)
+            report(filtered_entries)
 
     def add_configure_results(self, configure_errors):
         entries = []

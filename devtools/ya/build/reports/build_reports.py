@@ -146,5 +146,6 @@ def generate_empty_tests_result_report(builder):
             show_metrics=builder.opts and builder.opts.show_metrics,
             truncate=not (builder.opts and builder.opts.inline_diff),
             omitted_test_statuses=[],
+            display=builder.app_ctx.display,
         )
         reporter.on_tests_finish([])
