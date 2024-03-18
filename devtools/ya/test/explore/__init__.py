@@ -53,6 +53,7 @@ SUITE_MAP = {
     'py.imports': py_test.CheckImportsTestSuite,
     'py3test.bin': py_test.Py3TestBinSuite,
     'pytest.bin': py_test.PyTestBinSuite,
+    'tsc_typecheck': ts_test.TscTypecheckTestSuite,
     'unittest.py': library_ut.UnitTestSuite,
     'y_benchmark': benchmark.YBenchmarkSuite,
 }

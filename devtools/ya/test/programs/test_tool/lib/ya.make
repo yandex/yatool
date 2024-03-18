@@ -24,6 +24,7 @@ IF (PYTHON3)
             devtools/ya/test/programs/test_tool/run_eslint
             devtools/ya/test/programs/test_tool/run_hermione
             devtools/ya/test/programs/test_tool/run_jest
+            devtools/ya/test/programs/test_tool/run_tsc_typecheck
             devtools/ya/test/programs/test_tool/sandbox_run_test
             devtools/ya/test/programs/test_tool/upload
         )
