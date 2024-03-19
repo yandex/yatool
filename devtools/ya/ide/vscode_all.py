@@ -143,7 +143,6 @@ class VSCodeProject(object):
         build_params = copy.deepcopy(self.params)
         build_params.cmd_build_root = self.codegen_cpp_dir
         build_params.force_build_depends = self.params.tests_enabled
-        build_params.target_file = compile_commands_path
 
         def gen(prms):
             return bc.gen_compilation_database(prms, self.app_ctx)
@@ -151,11 +150,14 @@ class VSCodeProject(object):
         compilation_database = app.execute(action=gen, respawn=app.RespawnType.NONE)(build_params)
 
         if self.params.compile_commands_fix:
+            is_windows = pm.my_platform() == "win32"
             tools_replacements = [("clang++", tool_fetcher("c++")[0]), ("clang", tool_fetcher("cc")[0])]
             for item in compilation_database:
                 if item["command"].startswith("clang"):
                     item["command"] = item["command"].replace(" -I", " -isystem")
                 item["command"] = vscode.common.replace_prefix(item["command"], tools_replacements)
+                if is_windows:
+                    item["command"] = item["command"].replace("\\", "/")
 
         ide_common.emit_message("Writing {}".format(compile_commands_path))
         with open(compile_commands_path, "w") as f:
@@ -481,11 +483,6 @@ class VSCodeProject(object):
 
 
 def gen_vscode_workspace(params):
-    if pm.my_platform() == "win32" and "CPP" in params.languages:
-        ide_common.emit_message(
-            "[[bad]]C++ configuration for Windows is not supported.\nIssue: https://st.yandex-team.ru/YMAKE-342[[rst]]"
-        )
-
     # noinspection PyUnresolvedReferences
     import app_ctx  # pyright: ignore[reportMissingImports]
 
