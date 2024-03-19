@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/handlers/make
     devtools/ya/handlers/maven_import
     devtools/ya/handlers/package
+    devtools/ya/handlers/py
     devtools/ya/handlers/style
     devtools/ya/handlers/test
     devtools/ya/handlers/tool
@@ -41,7 +42,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/pr
         devtools/ya/handlers/profile
         devtools/ya/handlers/project
-        devtools/ya/handlers/py
         devtools/ya/handlers/remote_gdb
         devtools/ya/handlers/repo_check
         devtools/ya/handlers/shell
