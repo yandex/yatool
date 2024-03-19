@@ -60,11 +60,12 @@ struct TProjectConf {
 };
 
 struct TPlatformConf {
-    std::string CMakeFlag;
+    std::string CMakeFlag; // TODO: throw it out after the release
     std::string CMakeListsFile;
     EPlatform Platform;
+    std::string Name;
 
-    TPlatformConf(std::string_view platformName);
+    TPlatformConf(std::string_view platformName, const TGeneratorSpec& generatorSpec);
 };
 
 struct TPlatform {
@@ -73,10 +74,11 @@ struct TPlatform {
     TVector<TNodeId> StartDirs;
     THashMap<std::string, TVector<std::string>> GlobalVars;
     THashSet<fs::path> SubDirs;
-    std::string Name;
 
-    explicit TPlatform(std::string_view platformName);
+    explicit TPlatform(std::string_view platformName, const TGeneratorSpec& generatorSpec);
 };
+
+using TPlatformPtr = TSimpleSharedPtr<TPlatform>;
 
 struct TGlobalProperties {
     TSet<std::string> Languages;
@@ -92,16 +94,17 @@ class TCMakeGenerator: public TSpecBasedGenerator {
 private:
     TProjectConf Conf;
     TDirCleaner Cleaner;
-    TVector<TPlatform> Platforms;
+    TVector<TPlatformPtr> Platforms;
     TGlobalProperties GlobalProperties;
 
+    void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
     void CopyArcadiaScripts() const;
     void SaveConanProfile(const std::string_view& profile) const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
-    void RenderPlatform(TPlatform& platform);
+    void RenderPlatform(const TPlatformPtr platform);
 
     void PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const;
     void PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const;

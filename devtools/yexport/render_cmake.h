@@ -19,7 +19,7 @@ struct TGlobalProperties;
 constexpr std::string_view ArcadiaScriptsRoot = "build/scripts";
 constexpr std::string_view CmakeScriptsRoot = "build/scripts";
 
-bool RenderCmake(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator);
-THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator);
+bool RenderCmake(const TProjectConf& projectConf, const TSimpleSharedPtr<TPlatform> platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator);
+THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, const TSimpleSharedPtr<TPlatform> platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator);
 
 }

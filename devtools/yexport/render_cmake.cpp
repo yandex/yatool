@@ -111,7 +111,7 @@ namespace {
     public:
         class TBuilder;
 
-        TCMakeProject(const TProjectConf& projectConf, TPlatform& platform, TExportFileManager* exportFileManager)
+        TCMakeProject(const TProjectConf& projectConf, const TPlatformPtr platform, TExportFileManager* exportFileManager)
         : TProject()
         , ProjectConf(projectConf)
         , Platform(platform)
@@ -131,7 +131,7 @@ namespace {
                 auto topLevelSubdirs = jinja2::ValuesList();
                 for (auto subdir: SubdirsOrder_) {
                     Y_ASSERT(subdir);
-                    Platform.SubDirs.insert(subdir->Path);
+                    Platform->SubDirs.insert(subdir->Path);
                     if (subdir->IsTopLevel()) {
                         topLevelSubdirs.emplace_back(subdir->Path.c_str());
                     }
@@ -147,7 +147,7 @@ namespace {
             auto loaded = dirTemplate.Load(cmakeGenerator->GetGeneratorDir() / DIR_CMAKELISTS_TEMPLATE, cmakeGenerator->GetJinjaEnv());
             YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
             dirTemplate.SetValueMap(dirValueMap);
-            dirTemplate.RenderTo(*ExportFileManager, Platform.Conf.CMakeListsFile);
+            dirTemplate.RenderTo(*ExportFileManager, Platform->Conf.CMakeListsFile);
         }
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
@@ -314,7 +314,7 @@ namespace {
                     cmakeGenerator->GetJinjaEnv());
             YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
             dirTemplate.SetValueMap(dirValueMap);
-            dirTemplate.RenderTo(*ExportFileManager, subdir / Platform.Conf.CMakeListsFile);
+            dirTemplate.RenderTo(*ExportFileManager, subdir / Platform->Conf.CMakeListsFile);
         }
 
     private:
@@ -323,7 +323,7 @@ namespace {
 
     private:
         const TProjectConf& ProjectConf;
-        TPlatform& Platform;
+        const TPlatformPtr Platform;
         TExportFileManager* ExportFileManager;
     };
     using TCMakeProjectPtr = TSimpleSharedPtr<TCMakeProject>;
@@ -331,7 +331,7 @@ namespace {
     class TCMakeProject::TBuilder: public TProject::TBuilder {
     public:
 
-        TBuilder(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+        TBuilder(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
         : TProject::TBuilder(cmakeGenerator)
         , Platform(platform)
         , GlobalProperties(globalProperties)
@@ -470,7 +470,7 @@ namespace {
         }
 
         void AddGlobalVar(const std::string& name, std::span<const std::string> args) {
-            auto& platformGlobalVars = Platform.GlobalVars;
+            auto& platformGlobalVars = Platform->GlobalVars;
             if (args.empty() || platformGlobalVars.contains(name)) {
                 return;
             }
@@ -600,7 +600,7 @@ namespace {
         }
 
     private:
-        TPlatform& Platform;
+        const TPlatformPtr Platform;
         TGlobalProperties& GlobalProperties;
         TCMakeGenerator* CMakeGenerator;
 
@@ -617,7 +617,7 @@ namespace {
 
     class TCmakeRenderingVisitor : public TGraphVisitor {
     public:
-        TCmakeRenderingVisitor(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+        TCmakeRenderingVisitor(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
             : TGraphVisitor(cmakeGenerator)
         {
             CMakeProjectBuilder_ = MakeSimpleShared<TCMakeProject::TBuilder>(projectConf, platform, globalProperties, cmakeGenerator);
@@ -1038,19 +1038,19 @@ namespace {
     };
 }
 
-bool RenderCmake(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+bool RenderCmake(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
 {
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
-    IterateAll(*platform.Graph, platform.StartDirs, visitor);
+    IterateAll(*platform->Graph, platform->StartDirs, visitor);
     auto project = visitor.TakeFinalizedProject();
     project.As<TCMakeProject>()->Save(cmakeGenerator);
     return !visitor.HasErrors();
 }
 
-THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, TPlatform& platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
 {
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
-    IterateAll(*platform.Graph, platform.StartDirs, visitor);
+    IterateAll(*platform->Graph, platform->StartDirs, visitor);
     auto project = visitor.TakeFinalizedProject();
     return project.As<TCMakeProject>()->GetSubdirsTable();
 }
