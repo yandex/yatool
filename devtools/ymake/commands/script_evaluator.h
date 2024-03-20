@@ -16,11 +16,6 @@ namespace NCommands {
         const TCommands* Commands;
         const TCmdConf* CmdConf;
         const TVars* Vars;
-        // Field `Inputs` is replacement for `Var["INPUT"]`.
-        // The difference between them only in a representation of inputs:
-        // - Var["INPUT"] is a plain list of inputs. For example, ["file1", "file2", file3].
-        // - `Inputs` contains array of input. For example, [["file1"], ["file2", file3]] where ["file1"] is single input and ["file2", "file3"] is glob input.
-        const TVector<std::span<TVarStr>>* Inputs;
         TCommandInfo* CmdInfo;
 
     public:

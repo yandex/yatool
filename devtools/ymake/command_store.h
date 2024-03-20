@@ -35,8 +35,7 @@ public:
     struct TCompiledCommand {
         struct TInput {
             TStringBuf Name;
-            bool IsGlob = false;
-            TInput(TStringBuf name) : Name(name) {}
+            TInput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };
         struct TOutput {
@@ -65,11 +64,10 @@ public:
             const TCommands& commands,
             const NPolexpr::TExpression& cmdExpr,
             const TVars& vars,
-            const TVector<std::span<TVarStr>>& inputs,
             TCommandInfo& cmd,
             const TCmdConf* cmdConf
         ) {
-            commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf);
+            commands.WriteShellCmd(this, cmdExpr, vars, cmd, cmdConf);
             return *this;
         }
         auto Extract() {
@@ -130,7 +128,6 @@ public:
         ICommandSequenceWriter* writer,
         const NPolexpr::TExpression& cmdExpr,
         const TVars& vars,
-        const TVector<std::span<TVarStr>>& inputs,
         TCommandInfo& cmd,
         const TCmdConf* cmdConf
     ) const;
@@ -155,7 +152,6 @@ protected:
 
 private:
     TString ConstToString(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const;
-    TVector<TString> InputToStringArray(const TMacroValues::TInput& input, const NCommands::TEvalCtx& ctx) const;
     TString PrintRawCmdNode(NPolexpr::TConstId node) const;
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
 

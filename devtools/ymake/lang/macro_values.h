@@ -27,7 +27,6 @@ enum class EMacroFunctions: ui32 {
     LastExt,
     ExtFilter,
     KeyValue,
-    Glob,
     TODO1,
     TODO2,
     // markers
@@ -57,11 +56,7 @@ public:
         std::string_view Data;
         bool operator==(const TCmdPattern&) const = default;
     };
-    struct TGlobPattern {
-        std::string_view Data;
-        bool operator==(const TGlobPattern&) const = default;
-    };
-    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TCmdPattern, TGlobPattern>;
+    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TCmdPattern>;
 
     enum EStorageType {
         ST_LITERALS,
@@ -69,7 +64,6 @@ public:
         ST_INPUTS,
         ST_OUTPUTS,
         ST_PATTERN,
-        ST_GLOB
     };
 
     NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }

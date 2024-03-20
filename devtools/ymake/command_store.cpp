@@ -64,25 +64,6 @@ namespace {
 
             auto fnIdx = static_cast<EMacroFunctions>(id.GetIdx());
 
-            auto processInput = [this](std::string_view arg0, bool isGlob) -> TMacroValues::TValue {
-                auto names = SplitArgs(TString(arg0));
-                if (names.size() == 1) {
-                    // one does not simply reuse the original argument,
-                    // for it might have been transformed (e.g., dequoted)
-                    auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                    auto input = TMacroValues::TInput {.Coord = CollectCoord(pooledName, Inputs)};
-                    UpdateCoord(Inputs, input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                    return input;
-                }
-                auto result = TMacroValues::TInputs();
-                for (auto& name : names) {
-                    auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(name)));
-                    result.Coords.push_back(CollectCoord(pooledName, Inputs));
-                    UpdateCoord(Inputs, result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                }
-                return result;
-            };
-
             if (
                 fnIdx == EMacroFunctions::Args ||
                 fnIdx == EMacroFunctions::Terms ||
@@ -91,8 +72,7 @@ namespace {
                 fnIdx == EMacroFunctions::Output ||
                 fnIdx == EMacroFunctions::Suf ||
                 fnIdx == EMacroFunctions::Cat ||
-                fnIdx == EMacroFunctions::NoAutoSrc ||
-                fnIdx == EMacroFunctions::Glob
+                fnIdx == EMacroFunctions::NoAutoSrc
             ) {
 
                 TVector<TMacroValues::TValue> unwrappedArgs;
@@ -138,12 +118,20 @@ namespace {
                     case EMacroFunctions::Input: {
                         if (unwrappedArgs.size() != 1)
                             throw std::runtime_error{"Invalid number of arguments"};
-                        auto glob = std::get_if<TMacroValues::TGlobPattern>(&unwrappedArgs[0]);
-                        if (glob) {
-                            return processInput(glob->Data, true);
-                        }
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return processInput(arg0, false);
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() == 1) {
+                            // one does not simply reuse the original argument,
+                            // for it might have been transformed (e.g., dequoted)
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
+                            return TMacroValues::TInput {.Coord = CollectCoord(pooledName, Inputs)};
+                        }
+                        auto result = TMacroValues::TInputs();
+                        for (auto& name : names) {
+                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(name)));
+                            result.Coords.push_back(CollectCoord(pooledName, Inputs));
+                        }
+                        return result;
                     }
                     case EMacroFunctions::Output: {
                         if (unwrappedArgs.size() != 1)
@@ -183,12 +171,6 @@ namespace {
                             var.NoAutoSrc = true;
                         });
                         return arg0;
-                    }
-                    case EMacroFunctions::Glob: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return TMacroValues::TGlobPattern{ .Data = arg0 };
                     }
                     default:
                         break; // unreachable
@@ -615,13 +597,12 @@ TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr) const {
     NPolexpr::Print(dest, cmdExpr, TOverloaded{
         [&](NPolexpr::TConstId id) {
             buf = std::visit(TOverloaded{
-                [](std::string_view             val) { return fmt::format("'{}'", val); },
-                [](TMacroValues::TTool          val) { return fmt::format("Tool{{'{}'}}", val.Data); },
-                [](TMacroValues::TInput         val) { return fmt::format("Input{{{}}}", val.Coord); },
-                [](TMacroValues::TInputs        val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
-                [](TMacroValues::TOutput        val) { return fmt::format("Output{{{}}}", val.Coord); },
-                [](TMacroValues::TCmdPattern    val) { return fmt::format("'{}'", val.Data); },
-                [](TMacroValues::TGlobPattern   val) { return fmt::format("GlobPattern{{{}}}", val.Data); }
+                [](std::string_view          val) { return fmt::format("'{}'", val); },
+                [](TMacroValues::TTool       val) { return fmt::format("Tool{{'{}'}}", val.Data); },
+                [](TMacroValues::TInput      val) { return fmt::format("Input{{{}}}", val.Coord); },
+                [](TMacroValues::TInputs     val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
+                [](TMacroValues::TOutput     val) { return fmt::format("Output{{{}}}", val.Coord); },
+                [](TMacroValues::TCmdPattern val) { return fmt::format("'{}'", val.Data); }
             }, Values.GetValue(id));
             return buf;
         },
@@ -686,11 +667,10 @@ void TCommands::WriteShellCmd(
     ICommandSequenceWriter* writer,
     const NPolexpr::TExpression& cmdExpr,
     const TVars& vars,
-    const TVector<std::span<TVarStr>>& inputs,
     TCommandInfo& cmd,
     const TCmdConf* cmdConf
 ) const {
-    NCommands::TScriptEvaluator se{this, cmdConf, &vars, &inputs, &cmd};
+    NCommands::TScriptEvaluator se{this, cmdConf, &vars, &cmd};
     writer->BeginScript();
     se.DoScript(&cmdExpr, 0, writer);
     writer->EndScript(cmd, vars);
@@ -781,8 +761,8 @@ TString TCommands::ConstToString(const TMacroValues::TValue& value, const NComma
                 return TString("TODO/unreachable?/tool/") + val.Data;
             return ctx.CmdInfo.ToolPaths->at(val.Data);
         },
-        [&](TMacroValues::TInput) -> TString {
-            Y_ABORT();
+        [&](TMacroValues::TInput val) {
+            return TString(ctx.Vars.at("INPUT").at(val.Coord).Name);
         },
         [&](const TMacroValues::TInputs&) -> TString {
             Y_ABORT();
@@ -792,30 +772,18 @@ TString TCommands::ConstToString(const TMacroValues::TValue& value, const NComma
         },
         [](TMacroValues::TCmdPattern val) {
             return TString(val.Data);
-        },
-        [](TMacroValues::TGlobPattern val) {
-            return TString(val.Data);
         }
     }, value);
 }
 
-TVector<TString> TCommands::InputToStringArray(const TMacroValues::TInput& input, const NCommands::TEvalCtx& ctx) const {
-    TVector<TString> result;
-    for (auto it : ctx.Inputs[input.Coord]) {
-        result.push_back(it.Name);
-    }
-    return result;
-}
-
 TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
     return std::visit(TOverloaded{
-        [](std::string_view           val) { return TString(val); },
-        [](TMacroValues::TTool        val) { return TString(val.Data); },
-        [](TMacroValues::TInput       val) { return TString(fmt::format("{}", val.Coord)); },
-        [](TMacroValues::TInputs      val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
-        [](TMacroValues::TOutput      val) { return TString(fmt::format("{}", val.Coord)); },
-        [](TMacroValues::TCmdPattern  val) { return TString(val.Data); },
-        [](TMacroValues::TGlobPattern val) { return TString(val.Data); }
+        [](std::string_view          val) { return TString(val); },
+        [](TMacroValues::TTool       val) { return TString(val.Data); },
+        [](TMacroValues::TInput      val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TInputs     val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
+        [](TMacroValues::TOutput     val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TCmdPattern val) { return TString(val.Data); }
     }, Values.GetValue(node));
 }
 
