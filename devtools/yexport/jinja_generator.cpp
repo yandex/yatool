@@ -19,6 +19,7 @@
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template_env.h>
 
 #include <fstream>
+#include <vector>
 
 namespace NYexport {
 
@@ -198,20 +199,25 @@ bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, EA
         }
         set.emplace(GetItemValue(attrGroup, attrName, value, nodePath).asString());
     }
+    attr.clear();
+    for (const auto& value : set) { // full refill attr from set
+        attr.emplace_back(value);
+    }
     return r;
 }
 
 bool TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
     bool r = true;
-    auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
-    auto& attr = attrIt->second.asMap();
+    attrs.emplace(attrName, jinja2::ValuesMap{});
     for (const auto& value : values) {
         auto keyval = std::string_view(value.asString());
         if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
             spdlog::error("trying to add invalid element {} to 'dict' type attribute {} at node {}, each element must be in key=value format without spaces around =", keyval, attrName, nodePath);
             r = false;
         } else {
-            attr.emplace(keyval.substr(0, pos), GetItemValue(attrGroup, attrName, jinja2::Value{keyval.substr(pos + 1)}, nodePath));
+            std::string keyAttrName = attrName + std::string{ATTR_DIVIDER} + std::string{keyval.substr(0, pos)};
+            std::vector<std::string> keyAttrValues{1, std::string{keyval.substr(pos + 1)}};
+            SetAttrValue(attrs, attrGroup, keyAttrName, keyAttrValues, nodePath);
         }
     }
     return r;
@@ -508,7 +514,7 @@ EAttrTypes TJinjaGenerator::GetAttrType(EAttributeGroup attrGroup, const std::st
 }
 
 /// Get dump of attributes tree with values for testing
-void TJinjaGenerator::Dump(IOutputStream& out) {
+void TJinjaGenerator::DumpAttrs(IOutputStream& out) {
     ::NYexport::Dump(out, FinalizeAllAttrs());
 }
 

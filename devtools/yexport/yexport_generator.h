@@ -27,7 +27,7 @@ public:
     void RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
     TExportFileManager* GetExportFileManager();
 
-    virtual void Dump(IOutputStream& out) = 0; ///< Get dump of attributes tree with values for testing
+    virtual void DumpAttrs(IOutputStream& out) = 0; ///< Get dump of attributes tree with values for testing
 
 protected:
     virtual void Render(ECleanIgnored cleanIgnored) = 0;

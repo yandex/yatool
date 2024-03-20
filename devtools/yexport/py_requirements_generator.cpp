@@ -118,8 +118,8 @@ void TPyRequirementsGenerator::LoadSemGraph(const std::string&, const fs::path& 
 }
 
 /// Get dump of attributes tree with values for testing
-void TPyRequirementsGenerator::Dump(IOutputStream&) {
-    spdlog::error("Dump of Python generator now yet supported");
+void TPyRequirementsGenerator::DumpAttrs(IOutputStream&) {
+    spdlog::error("Dump attributes tree of Python generator now yet supported");
 }
 
 void TPyRequirementsGenerator::Render(ECleanIgnored) {

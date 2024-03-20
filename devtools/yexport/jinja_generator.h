@@ -60,7 +60,7 @@ public:
     THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
     void SetSpec(const TGeneratorSpec& spec) { GeneratorSpec = spec; };
 
-    void Dump(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
+    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
 
 private:
     void Render(ECleanIgnored cleanIgnored) override;
