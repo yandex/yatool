@@ -94,7 +94,7 @@ class DumpHandler(SimpleHandler):
 
 class HelpHandler(SimpleHandler):
     def handle(self, root_handler, args, prefix):
-        print_formatted(root_handler.format_help(prefix[:-1]))
+        print_formatted(root_handler.format_help(prefix[:-1], examples=False))
 
     def dump(self):
         return type(self).__name__
@@ -300,7 +300,7 @@ class CompositeHandler(BaseHandler):
 
         return result + '\n'
 
-    def format_help(self, prefix):
+    def format_help(self, prefix, examples=True):
         handlers = self.handlers_recursive()
         has_sub_commands = len([x for x in handlers.keys() if x != EMPTY_KEY]) > 0
 
@@ -324,7 +324,8 @@ class CompositeHandler(BaseHandler):
                         '  {name} {desc}'.format(name=name.ljust(max_name_len + 5, ' '), desc='\n'.join(desc))
                     )
 
-        result.append(format_examples(self.opts_recursive(tuple(prefix))))
+        if examples:
+            result.append(format_examples(self.opts_recursive(tuple(prefix))))
 
         if EMPTY_KEY in handlers:
             result.append(handlers[EMPTY_KEY].format_help())
