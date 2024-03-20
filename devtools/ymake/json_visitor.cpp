@@ -564,15 +564,17 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 // from transitive dependencies closure.
 
                 TUniqVector<TNodeId> deps;
-                const auto& lists = RestoreContext.Modules.GetNodeListStore();
-                const auto& ids = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
-                const auto& managedPeers = ids.UniqPeers;
-                for (auto peerId : lists.GetList(managedPeers)) {
-                    auto peerModule = RestoreContext.Modules.Get(graph.Get(peerId)->ElemId);
-                    if (peerModule->IsFakeModule()) {
-                        continue;
+                if (mod->GetPeerdirType() == EPT_BuildFrom) {
+                    const auto& lists = RestoreContext.Modules.GetNodeListStore();
+                    const auto& ids = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
+                    const auto& managedPeers = ids.UniqPeers;
+                    for (auto peerId : lists.GetList(managedPeers)) {
+                        auto peerModule = RestoreContext.Modules.Get(graph.Get(peerId)->ElemId);
+                        if (peerModule->IsFakeModule()) {
+                            continue;
+                        }
+                        deps.Push(peerId);
                     }
-                    deps.Push(peerId);
                 }
 
                 // Secondly we should take all non-module nodes from the regular NodeDeps.
