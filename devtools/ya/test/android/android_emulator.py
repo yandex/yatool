@@ -129,6 +129,20 @@ class AndroidEmulator(object):
                 logger.info('Running devices stderr: {}'.format(devices.stderr))
             emulator_state = get_emulator_state()
 
+        # wait while device fully booted
+        def is_device_fully_booted():
+            return (
+                process.execute(
+                    self._get_adb_cmd() + ['shell', 'getprop', 'sys.boot_completed'],
+                    check_exit_code=False,
+                    env=self.env,
+                ).stdout
+                == '1\n'
+            )
+
+        while not is_device_fully_booted():
+            time.sleep(1)
+
     def install_app(self, device_name, app_path, app_name):
         device_id = self._get_device_id(device_name)
         process.execute(self._get_adb_cmd(device_id) + ['uninstall', app_name], check_exit_code=False, env=self.env)
@@ -149,7 +163,7 @@ class AndroidEmulator(object):
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
-            check_script.write('while [[ ! -f {} ]]; do sleep 1; done; input keyevent 82'.format(end_marker))
+            check_script.write('while [[ ! -f {} ]]; do sleep 1; done;'.format(end_marker))
 
         push_dir = '/sdcard/'
         self.run_cmd(device_id, ['push', self.check_marker_script, push_dir + self.check_marker_script])
