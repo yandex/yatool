@@ -502,6 +502,10 @@ namespace {
             GlobalProperties.ConanOptions.insert(optSpec);
         }
 
+        void SetVanillaProtobuf(const bool vanillaProtobuf) {
+            GlobalProperties.VanillaProtobuf = vanillaProtobuf;
+        }
+
         void AppendTargetProperty(const std::string& name, std::span<const std::string> values) {
             auto& prop = CurTarget_.As<TCMakeTarget>()->Properties[name];
             for (const auto& val: values) {
@@ -847,6 +851,9 @@ namespace {
                     setArgs.emplace_back(QuoteAndEscapeValues(semArgs.subspan(it - semArgs.begin() + 2)));
                     CMakeProjectBuilder_->AddTargetDirMacro(set_prop, setArgs);
                 }
+            }
+            else if (semName == "vanilla_protobuf") {
+                CMakeProjectBuilder_->SetVanillaProtobuf(true);
             }
             else {
                 spdlog::error("Unknown semantic '{}' for file '{}'", semName, data.Path);

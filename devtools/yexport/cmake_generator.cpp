@@ -281,6 +281,7 @@ void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) co
                                !GlobalProperties.ConanToolPackages.empty());
     rootValueMap->SetAttrValue("project_name", Conf.ProjectName);
     rootValueMap->SetAttrValue("project_language_list", GetAdjustedLanguagesList());
+    rootValueMap->SetAttrValue("vanilla_protobuf", GlobalProperties.VanillaProtobuf);
 }
 
 void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const {

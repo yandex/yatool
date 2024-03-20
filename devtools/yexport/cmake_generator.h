@@ -88,6 +88,7 @@ struct TGlobalProperties {
     TSet<std::string> ConanOptions;
     TSet<fs::path> GlobalModules; // module pathes
     THashSet<fs::path> ArcadiaScripts;
+    bool VanillaProtobuf{false};
 };
 
 class TCMakeGenerator: public TSpecBasedGenerator {
