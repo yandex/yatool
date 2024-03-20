@@ -46,6 +46,7 @@ struct TTargetSpec {
 struct TGeneratorRule {
     TCopySpec Copy;
     THashSet<std::string> Attributes;
+    THashSet<std::string> Platforms;
     THashMap<std::string, TVector<std::string>> AddValues; //TODO: Proper values instead of std::string
 
     bool Useless() const;
@@ -63,11 +64,13 @@ struct TGeneratorSpec {
     jinja2::ValuesMap Platforms;
     TAttributeSpecification AttrGroups;
     THashMap<std::string, TVector<uint32_t>> AttrToRuleId;
+    THashMap<std::string, TVector<uint32_t>> PlatformToRuleId;
     THashMap<std::string, TVector<fs::path>> Merge;
     THashMap<uint32_t, TGeneratorRule> Rules;
     bool UseManagedPeersClosure{false};
 
-    TRuleSet GetRules(std::string_view attr) const;
+    TRuleSet GetAttrRules(const std::string_view attr) const;
+    TRuleSet GetPlatformRules(const std::string_view platform) const;
 };
 
 struct TBadGeneratorSpec: public TYExportException {

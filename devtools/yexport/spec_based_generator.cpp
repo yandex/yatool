@@ -57,9 +57,14 @@ void TSpecBasedGenerator::OnAttribute(const TAttribute& attribute) {
     for (size_t i = 0; i < attribute.Size(); ++i) {
         std::string attr(attribute.GetFirstParts(i));
         UsedAttributes.emplace(attr);
-        auto rules = GeneratorSpec.GetRules(attr);
+        auto rules = GeneratorSpec.GetAttrRules(attr);
         UsedRules.insert(rules.begin(), rules.end());
     }
+}
+
+void TSpecBasedGenerator::OnPlatform(const std::string_view& platform) {
+    auto rules = GeneratorSpec.GetPlatformRules(platform);
+    UsedRules.insert(rules.begin(), rules.end());
 }
 
 void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {

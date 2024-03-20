@@ -29,6 +29,7 @@ public:
 
     void SetupJinjaEnv();
     void OnAttribute(const TAttribute& attribute);
+    void OnPlatform(const std::string_view& platform);
 
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";

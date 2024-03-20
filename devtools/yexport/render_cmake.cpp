@@ -350,7 +350,7 @@ namespace {
         }
 
         void CustomOnAttribute(const std::string& semantica) override {
-            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetRules(semantica)) {
+            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetAttrRules(semantica)) {
                 const auto& addValues = rulePtr->AddValues;
                 if (auto valuesIt = addValues.find("includes"); valuesIt != addValues.end()) {
                     for (const auto& value : valuesIt->second) {

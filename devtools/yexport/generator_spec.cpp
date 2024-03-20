@@ -194,7 +194,7 @@ namespace {
         TVector<TTemplate> result;
         if (tmplArray.is_array()) {
             for (const auto& tmpl : AsArray(&tmplArray)) {
-                result.push_back(ParseOneTemplate(tmpl));
+                result.emplace_back(ParseOneTemplate(tmpl));
             }
         } else {
             throw TBadGeneratorSpec{
@@ -278,7 +278,11 @@ namespace {
         const auto& ruleId = rules.emplace(rules.size(), rule).first->first;
 
         for(const auto& attr : rule.Attributes) {
-            spec.AttrToRuleId[attr].push_back(ruleId);
+            spec.AttrToRuleId[attr].emplace_back(ruleId);
+        }
+
+        for(const auto& platform : rule.Platforms) {
+            spec.PlatformToRuleId[platform].emplace_back(ruleId);
         }
     }
 
@@ -364,16 +368,30 @@ namespace {
     }
 
     TGeneratorRule ParseRule(const toml::value& value) {
-        VerifyFields(value, {NKeys::Attrs}, {NKeys::Copy, NKeys::AddValues});
+        VerifyFields(value, {}, {NKeys::Attrs, NKeys::Platforms, NKeys::Copy, NKeys::AddValues});
 
-        const auto& attrs = At(&value, NKeys::Attrs);
-        const auto& attrArray = AsArray(&attrs);
-        VERIFY_GENSPEC(!attrArray.empty(), attrs, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
+        const auto* attrs = Find(&value, NKeys::Attrs);
+        const auto* platforms = Find(&value, NKeys::Platforms);
+        VERIFY_GENSPEC(/* XOR */(bool)attrs != (bool)platforms, value, NGeneratorSpecError::SpecificationError, "Rule should have one of attrs or platforms conditions");
 
         TGeneratorRule rule;
-        for(const auto& attr : attrArray){
-            rule.Attributes.insert(AsString(&attr));
+        if (attrs) {
+            const auto& attrArray = AsArray(attrs);
+            VERIFY_GENSPEC(!attrArray.empty(), *attrs, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
+
+            for(const auto& attr : attrArray){
+                rule.Attributes.insert(AsString(&attr));
+            }
         }
+        if (platforms) {
+            const auto& platformsArray = AsArray(platforms);
+            VERIFY_GENSPEC(!platformsArray.empty(), *platforms, NGeneratorSpecError::SpecificationError, "Rule should have one or more platforms");
+
+            for(const auto& platform : platformsArray){
+                rule.Platforms.insert(AsString(&platform));
+            }
+        }
+
         if (const auto* copy = Find(&value, NKeys::Copy)){
             rule.Copy = ParseCopySpec(*copy);
         }
@@ -396,7 +414,7 @@ namespace {
     TVector<fs::path> ParseMergeSpec(const toml::value& value) {
         TVector<fs::path> ans;
         for (const auto& item : AsArray(&value)) {
-            ans.push_back(AsString(&item));
+            ans.emplace_back(AsString(&item));
         }
         return ans;
     }
@@ -502,7 +520,7 @@ void TCopySpec::Append(const TCopySpec& copySpec) {
 }
 
 bool TGeneratorRule::Useless() const {
-    if (Attributes.empty()) {
+    if (Attributes.empty() && Platforms.empty()) {
         return true;
     }
     if (!Copy.Useless()) {
@@ -516,9 +534,19 @@ bool TGeneratorRule::Useless() const {
     return true;
 }
 
-
-TGeneratorSpec::TRuleSet TGeneratorSpec::GetRules(std::string_view attr) const {
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string_view attr) const {
     if (auto it = AttrToRuleId.find(attr); it != AttrToRuleId.end()) {
+        TRuleSet result;
+        for (const auto& id : it->second) {
+            result.insert(&Rules.at(id));
+        }
+        return result;
+    }
+    return {};
+}
+
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetPlatformRules(const std::string_view platform) const {
+    if (auto it = PlatformToRuleId.find(platform); it != PlatformToRuleId.end()) {
         TRuleSet result;
         for (const auto& id : it->second) {
             result.insert(&Rules.at(id));

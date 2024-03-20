@@ -114,6 +114,7 @@ void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& 
     Platforms.emplace_back(MakeSimpleShared<TPlatform>(platform, GeneratorSpec));
     graph.Swap(Platforms.back()->Graph);
     Platforms.back()->StartDirs = std::move(startDirs);
+    OnPlatform(platform);
 }
 
 void TCMakeGenerator::RenderPlatform(const TPlatformPtr platform) {
