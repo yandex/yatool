@@ -313,6 +313,10 @@ public:
         EvLog_ = nullptr;
     }
 
+    virtual bool Enabled() {
+        return EvLog_ != nullptr;
+    }
+
     void SetNeedAlwaysSafeAdd(bool val) {
         NeedAlwaysSafeAdd_ = val;
     }
