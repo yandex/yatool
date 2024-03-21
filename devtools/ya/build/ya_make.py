@@ -838,7 +838,7 @@ class Context(object):
         )
 
         self.ymake_stats = YmakeTimeStatistic()
-
+        self.configure_errors = {}
         self.lite_graph = None
         if (graph is not None or opts.use_lite_graph) and tests is not None:
             self.graph = graph
@@ -854,7 +854,6 @@ class Context(object):
                 lg.finalize_graph(self.graph, opts)
             self.tests = []
             self.stripped_tests = []
-            self.configure_errors = {}
             self.make_files = []
         else:
             (
@@ -1546,24 +1545,25 @@ class YaMake(object):
         self._reports_generator.finish_configure_report()
 
     def _calc_exit_code(self):
-        # Configuration errors result in an exit with error code 1
+        # Configuration errors result in an exit with error code 8
         # Test execution errors result in an exit with error code 10
-        # If both errors are present (mode -k / --keep-going), the system exits with exit code 1
+        # If both errors are present (mode -k / --keep-going), the system exits with exit code 8
         # in order to separate standard test execution errors from test errors associated with configuration errors.
-        # TODO see YA-1456
-        # if self.ctx.configure_errors:
-        #     return self.exit_code or error.ExitCodes.CONFIGURE_ERROR
+        # TODO remove ignore_configure_errors check when YA-1456 is done
+        if not self.opts.ignore_configure_errors and self.ctx.configure_errors:
+            return self.exit_code or core.error.ExitCodes.CONFIGURE_ERROR
 
-        # XXX Don't try to inspect test statuses in listing mode.
-        # Listing mode uses different test's info data channel and doesn't set proper test status
-        if self.opts.run_tests and not self.opts.list_tests:
-            if self.ctx.tests:
-                return self.exit_code or get_suites_exit_code(self.ctx.tests, self.opts.test_fail_exit_code)
-            else:
-                # TODO Remove --no-tests-is-error option and fail with NO_TESTS_COLLECTED exit code by default. For more info see YA-1087
-                # Return a special exit code if tests were requested, but no tests were run.
-                if self.opts.no_tests_is_error:
-                    return self.exit_code or core.error.ExitCodes.NO_TESTS_COLLECTED
+        if self.ctx.threads:
+            # XXX Don't try to inspect test statuses in listing mode.
+            # Listing mode uses different test's info data channel and doesn't set proper test status
+            if self.opts.run_tests and not self.opts.list_tests:
+                if self.ctx.tests:
+                    return self.exit_code or get_suites_exit_code(self.ctx.tests, self.opts.test_fail_exit_code)
+                else:
+                    # TODO Remove --no-tests-is-error option and fail with NO_TESTS_COLLECTED exit code by default. For more info see YA-1087
+                    # Return a special exit code if tests were requested, but no tests were run.
+                    if self.opts.no_tests_is_error:
+                        return self.exit_code or core.error.ExitCodes.NO_TESTS_COLLECTED
 
         return self.exit_code
 
@@ -1635,7 +1635,8 @@ class YaMake(object):
 
             self._strip_cache(self.ctx.threads)
             release_all_data()
-            return
+
+            return self._calc_exit_code()
 
         if exts.windows.on_win() and self.opts.create_symlinks and not self.opts.output_root:
             logger.warning(

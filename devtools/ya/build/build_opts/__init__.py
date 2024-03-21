@@ -1452,6 +1452,8 @@ class ConfigureDebugOptions(Options):
     def __init__(self):
         self.conf_debug_options = []
         self.extra_conf = None
+        # TODO remove when YA-1456 is done
+        self.ignore_configure_errors = True
 
     def consumer(self):
         return [
@@ -1470,6 +1472,17 @@ class ConfigureDebugOptions(Options):
                 visible=HelpLevel.INTERNAL,
                 deprecated=True,
             ),
+            ArgConsumer(
+                ['--ignore-configure-errors'],
+                hook=SetValueHook('ignore_configure_errors'),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_IGNORE_CONFIGURE_ERRORS',
+                hook=SetValueHook('ignore_configure_errors', return_true_if_enabled),
+            ),
+            ConfigConsumer('ignore_configure_errors'),
         ]
 
 

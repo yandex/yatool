@@ -20,8 +20,9 @@ TEMPORARY_ERROR_MESSAGES = [
 ]
 
 
-# Node exit codes
+# ya exit codes
 class ExitCodes(object):
+    CONFIGURE_ERROR = 8
     NO_TESTS_COLLECTED = 9
     TEST_FAILED = 10
     COMPILATION_FAILED = 11
