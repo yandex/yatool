@@ -51,7 +51,13 @@ public:
     static constexpr std::string_view EXCLUDES_ATTR = "excludes"; // Lists of excludes induced attributes
     static constexpr std::string_view TESTDEP_ATTR = "testdep";   // Dependency to test, if not empty, attr has path to library with test inside
 
-    static THolder<TJinjaGenerator> Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir = "");
+    static THolder<TJinjaGenerator> Load(
+        const fs::path& arcadiaRoot,
+        const std::string& generator,
+        const fs::path& configDir = "",
+        const std::optional<TDumpOpts> dumpOpts = {},
+        const std::optional<TDebugOpts> debugOpts = {}
+    );
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
@@ -60,21 +66,20 @@ public:
     THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
     void SetSpec(const TGeneratorSpec& spec) { GeneratorSpec = spec; };
 
-    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
-
-private:
-    void Render(ECleanIgnored cleanIgnored) override;
-
-    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const;
+    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
 
 private:
     friend class TJinjaProject::TBuilder;
 
+    void Render(ECleanIgnored cleanIgnored) override;
     void RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs);
 
-    jinja2::ValuesMap FinalizeAllAttrs();
+    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const;
+
     const jinja2::ValuesMap& FinalizeRootAttrs();
-    jinja2::ValuesMap FinalizeSubdirsAttrs();
+    jinja2::ValuesMap FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes = {});
+    jinja2::ValuesMap FinalizeAttrsForDump();
 
     std::string ProjectName;
 
@@ -82,8 +87,7 @@ private:
     THashMap<std::string, std::vector<jinja2::Template>> TargetTemplates;
 
     TProjectPtr Project;
-    jinja2::ValuesMap JinjaAttrs; // TODO: use attr storage from jinja_helpers
-    bool DoDump{false};
+    jinja2::ValuesMap RootAttrs; // TODO: use attr storage from jinja_helpers
 };
 
 class TJinjaProject::TBuilder : public TProject::TBuilder {

@@ -424,7 +424,9 @@ private:
 THolder<TJinjaGenerator> TJinjaGenerator::Load(
     const fs::path& arcadiaRoot,
     const std::string& generator,
-    const fs::path& configDir
+    const fs::path& configDir,
+    const std::optional<TDumpOpts> dumpOpts,
+    const std::optional<TDebugOpts> debugOpts
 ) {
     const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
     const auto generatorFile = generatorDir / GENERATOR_FILE;
@@ -432,6 +434,12 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
         YEXPORT_THROW(fmt::format("Failed to load generator {}. No {} file found", generator, generatorFile.c_str()));
     }
     THolder<TJinjaGenerator> result = MakeHolder<TJinjaGenerator>();
+    if (dumpOpts.has_value()) {
+        result->DumpOpts_ = dumpOpts.value();
+    }
+    if (debugOpts.has_value()) {
+        result->DebugOpts_ = debugOpts.value();
+    }
 
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
     result->YexportSpec = result->ReadYexportSpec(configDir);
@@ -460,7 +468,9 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     result->GetJinjaEnv()->GetSettings().cacheSize = 0;
     result->GetJinjaEnv()->AddGlobal("split", jinja2::UserCallable{
         .callable = [](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            Y_ASSERT(params["str"].isString());
             auto str = params["str"].asString();
+            Y_ASSERT(params["delimeter"].isString());
             auto delimeter = params["delimeter"].asString();
             jinja2::ValuesList list;
             size_t bpos = 0;
@@ -494,7 +504,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 }
 
 void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TNewJinjaGeneratorVisitor visitor(this, &JinjaAttrs, GeneratorSpec);
+    TNewJinjaGeneratorVisitor visitor(this, &RootAttrs, GeneratorSpec);
     IterateAll(graph, startDirs, visitor);
     Project = visitor.TakeFinalizedProject();
 }
@@ -513,15 +523,43 @@ EAttrTypes TJinjaGenerator::GetAttrType(EAttributeGroup attrGroup, const std::st
     return EAttrTypes::Unknown;
 }
 
-/// Get dump of attributes tree with values for testing
+/// Get dump of attributes tree with values for testing or debug
+void TJinjaGenerator::DumpSems(IOutputStream& out) {
+    if (DumpOpts_.DumpPathPrefixes.empty()) {
+        out << "--- ROOT\n" << Project->SemsDump;
+    }
+    for (const auto& subdir: Project->GetSubdirs()) {
+        if (subdir->Targets.empty()) {
+            continue;
+        }
+        const std::string path = subdir->Path;
+        if (!DumpOpts_.DumpPathPrefixes.empty()) {
+            bool dumpIt = false;
+            for (const auto& prefix : DumpOpts_.DumpPathPrefixes) {
+                if (path.substr(0, prefix.size()) == prefix) {
+                    dumpIt = true;
+                    break;
+                }
+            }
+            if (!dumpIt) {
+                continue;
+            }
+        }
+        out << "--- DIR " << path << "\n";
+        for (const auto& target: subdir->Targets) {
+            out << "--- TARGET " << target->Name << "\n" << target->SemsDump;
+        }
+    }
+}
+
+/// Get dump of attributes tree with values for testing or debug
 void TJinjaGenerator::DumpAttrs(IOutputStream& out) {
-    ::NYexport::Dump(out, FinalizeAllAttrs());
+    ::NYexport::Dump(out, FinalizeAttrsForDump());
 }
 
 void TJinjaGenerator::Render(ECleanIgnored) {
     YEXPORT_VERIFY(Project, "Cannot render because project was not yet loaded");
     CopyFilesAndResources();
-    DoDump = true;
     auto subdirsAttrs = FinalizeSubdirsAttrs();
     for (const auto& subdir: Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
@@ -587,52 +625,61 @@ THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() c
     return res;
 }
 
-jinja2::ValuesMap TJinjaGenerator::FinalizeAllAttrs() {
-    jinja2::ValuesMap allAttrs;
-    DoDump = false;
-    allAttrs.emplace("root", FinalizeRootAttrs());
-    allAttrs.emplace("subdirs", FinalizeSubdirsAttrs());
-    return allAttrs;
-}
-
 const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
     YEXPORT_VERIFY(Project, "Cannot finalize root attrs because project was not yet loaded");
-    if (JinjaAttrs.contains("projectName")) { // already finilized
-        return JinjaAttrs;
+    if (RootAttrs.contains("projectName")) { // already finalized
+        return RootAttrs;
     }
-    auto [subdirsIt, subdirsInserted] = JinjaAttrs.emplace("subdirs", jinja2::ValuesList{});
+    auto [subdirsIt, subdirsInserted] = RootAttrs.emplace("subdirs", jinja2::ValuesList{});
     for (const auto& subdir: Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
             continue;
         }
         subdirsIt->second.asList().emplace_back(subdir->Path.c_str());
     }
-    JinjaAttrs.emplace("arcadiaRoot", ArcadiaRoot);
+    RootAttrs.emplace("arcadiaRoot", ArcadiaRoot);
     if (ExportFileManager) {
-        JinjaAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
+        RootAttrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
     }
-    JinjaAttrs.emplace("projectName", ProjectName);
+    RootAttrs.emplace("projectName", ProjectName);
     if (!YexportSpec.AddAttrsDir.empty()) {
-        JinjaAttrs.emplace("add_attrs_dir", YexportSpec.AddAttrsDir);
+        RootAttrs.emplace("add_attrs_dir", YexportSpec.AddAttrsDir);
     }
     if (!YexportSpec.AddAttrsTarget.empty()) {
-        JinjaAttrs.emplace("add_attrs_target", YexportSpec.AddAttrsTarget);
+        RootAttrs.emplace("add_attrs_target", YexportSpec.AddAttrsTarget);
     }
-    if (DoDump) {
-        JinjaAttrs.emplace("dump", ::NYexport::Dump(JinjaAttrs, 0, "// "));
+    if (DebugOpts_.DebugAttrs) {
+        RootAttrs.emplace(DEBUG_ATTRS_ATTR, ::NYexport::Dump(RootAttrs));
     }
-    return JinjaAttrs;
+    if (DebugOpts_.DebugSems) {
+        RootAttrs.emplace(DEBUG_SEMS_ATTR, Project->SemsDump);
+    }
+    return RootAttrs;
 }
 
-jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
+jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes) {
     YEXPORT_VERIFY(Project, "Cannot finalize subdirs attrs because project was not yet loaded");
     jinja2::ValuesMap subdirsAttrs;
     for (const auto& subdir: Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
             continue;
         }
+        if (!pathPrefixes.empty()) {
+            const std::string path = subdir->Path;
+            bool finalizeIt = false;
+            for (const auto& prefix : pathPrefixes) {
+                if (path.substr(0, prefix.size()) == prefix) {
+                    finalizeIt = true;
+                    break;
+                }
+            }
+            if (!finalizeIt) {
+                continue;
+            }
+        }
         auto [subdirIt, _] = subdirsAttrs.emplace(subdir->Path.c_str(), jinja2::ValuesMap{});
         jinja2::ValuesMap& subdirAttrs = subdirIt->second.asMap();
+        std::map<std::string, std::string> semsDumps;
         for (auto target: subdir->Targets) {
             auto& targetAttrs = target->Attrs;
             targetAttrs.emplace("name", target->Name);
@@ -657,6 +704,9 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                     TJinjaProject::TBuilder::MergeTree(defaultTargetNameAttrs, YexportSpec.AddAttrsDir);
                 }
                 targetNameAttrsIt = subdirAttrs.emplace(target->Macro, std::move(defaultTargetNameAttrs)).first;
+                if (DumpOpts_.DumpSems || DebugOpts_.DebugSems) {
+                    semsDumps.emplace(target->Macro, target->SemsDump);
+                }
             }
             auto& targetNameAttrs = targetNameAttrsIt->second.asMap();
             if (isTest) {
@@ -672,13 +722,28 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs() {
                 }
             }
         }
-        if (DoDump) {
+        if (DebugOpts_.DebugAttrs) {
             for (auto& [targetName, targetNameAttrs] : subdirAttrs) {
-                targetNameAttrs.asMap().emplace("dump", ::NYexport::Dump(targetNameAttrs, 0, "// "));
+                targetNameAttrs.asMap().emplace(DEBUG_ATTRS_ATTR, ::NYexport::Dump(targetNameAttrs));
+            }
+        }
+        if (DebugOpts_.DebugSems) {
+            for (auto& [targetName, semsDump] : semsDumps) {
+                subdirAttrs[targetName].asMap().emplace(DEBUG_SEMS_ATTR, semsDump);
             }
         }
     }
     return subdirsAttrs;
+}
+
+jinja2::ValuesMap TJinjaGenerator::FinalizeAttrsForDump() {
+    // disable creating debug template attributes
+    DebugOpts_.DebugSems = false;
+    DebugOpts_.DebugAttrs = false;
+    jinja2::ValuesMap allAttrs;
+    allAttrs.emplace("root", FinalizeRootAttrs());
+    allAttrs.emplace("subdirs", FinalizeSubdirsAttrs(DumpOpts_.DumpPathPrefixes));
+    return allAttrs;
 }
 
 }

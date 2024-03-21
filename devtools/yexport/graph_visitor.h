@@ -62,12 +62,12 @@ namespace NYexport {
         void Left(TState& state);
 
     protected:
-        virtual void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs);
-        virtual void OnNodeSemanticPreOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs);
-        virtual void OnNodeSemanticPostOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs);
-        virtual std::optional<bool> OnEnter(TState& state);
-        virtual void OnLeave(TState& state);
-        virtual void OnLeft(TState& state);
+        virtual void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) = 0;
+        virtual void OnNodeSemanticPreOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/) {};
+        virtual void OnNodeSemanticPostOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/) {};
+        virtual std::optional<bool> OnEnter(TState& /*state*/) { return {}; };
+        virtual void OnLeave(TState& /*state*/) {};
+        virtual void OnLeft(TState& /*state*/) {};
 
         void OnError();
         void AddSemanticMapping(const std::string& semName, ESemNameType type);
@@ -81,6 +81,7 @@ namespace NYexport {
     private:
         void SetupSemanticMapping(const TGeneratorSpec& genspec);
         void EnsureReady();
+        void FillSemsDump(const std::string& nodePath, const TNodeSemantics& graphSems, const TNodeSemantics& appliedSems);
 
         bool HasError_;
         THashMap<std::string, ESemNameType> SemNameToType_;

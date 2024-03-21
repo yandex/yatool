@@ -126,7 +126,12 @@ void TCMakeGenerator::RenderPlatform(const TPlatformPtr platform) {
     }
 }
 
-/// Get dump of attributes tree with values for testing
+/// Get dump of semantics tree with values for testing or debug
+void TCMakeGenerator::DumpSems(IOutputStream&) {
+    spdlog::error("Dump semantics tree of Cmake generator now yet supported");
+}
+
+/// Get dump of attributes tree with values for testing or debug
 void TCMakeGenerator::DumpAttrs(IOutputStream&) {
     spdlog::error("Dump attributes tree of Cmake generator now yet supported");
 }

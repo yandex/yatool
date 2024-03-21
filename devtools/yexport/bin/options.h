@@ -1,11 +1,13 @@
 #pragma once
 
-#include "../std_helpers.h"
+#include <devtools/yexport/std_helpers.h>
+#include <devtools/yexport/dump.h>
+#include <devtools/yexport/debug.h>
 
 #include <util/generic/vector.h>
 #include <filesystem>
 
-struct TGeneratorArgs;
+namespace NYexport {
 
 struct TLoggingOpts {
     bool EnableEvlog = false;
@@ -21,8 +23,11 @@ struct TOpts {
     TVector<fs::path> SemGraphs;
     TVector<std::string> Platforms;
     std::string Generator;
+
     bool CleanIgnored = false;
     bool ReportIgnored = false;
+    TDumpOpts DumpOpts;
+    TDebugOpts DebugOpts;
 
     TLoggingOpts LoggingOpts;
 
@@ -34,3 +39,5 @@ struct TOpts {
 
     static TOpts Parse(int argc, char** argv);
 };
+
+}

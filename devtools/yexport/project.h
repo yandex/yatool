@@ -35,6 +35,8 @@ namespace NYexport {
         std::string Name;
         TVector<std::string> MacroArgs;
         jinja2::ValuesMap Attrs; // TODO: use attr storage from jinja_helpers
+        std::string SemsDump; // Semantic dumps, collected during dispatch graph
+        size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
     };
 
     class TProjectSubdir {
@@ -54,6 +56,9 @@ namespace NYexport {
         virtual ~TProject() = default;
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
+
+        std::string SemsDump; // Semantic dumps, collected during dispatch graph
+        size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>
@@ -101,8 +106,10 @@ namespace NYexport {
 
         const TProjectTarget* CurrentTarget() const noexcept;
         const TProjectSubdir* CurrentSubdir() const noexcept;
+        const TProject* CurrentProject() const noexcept { return Project_.Get(); }
         TProjectTarget* CurrentTarget() noexcept;
         TProjectSubdir* CurrentSubdir() noexcept;
+        TProject* CurrentProject() noexcept { return Project_.Get(); }
 
     protected:
         virtual void CustomFinalize() {};

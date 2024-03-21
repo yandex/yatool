@@ -44,12 +44,20 @@ namespace NYexport {
         }
 
         auto onEnterRes = OnEnter(state);
-        if (onEnterRes) {
-            return *onEnterRes;
+        if (onEnterRes.has_value()) {
+            return onEnterRes.value();
+        }
+
+        if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
+            currentProject->SemsDumpDepth++;
+        }
+        if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
+            currentTarget->SemsDumpDepth++;
         }
 
         const TSemNodeData& data = state.TopNode().Value();
         if (data.Sem.empty() || data.Sem.front().empty()) {
+            FillSemsDump(data.Path, {}, {});
             return true;
         }
 
@@ -87,6 +95,8 @@ namespace NYexport {
 
             OnTargetNodeSemantic(state, semName, semArgs);
         }
+
+        FillSemsDump(data.Path, data.Sem, semantics);
 
         for (const auto& sem : semantics) {
             const auto& semName = sem[0];
@@ -133,6 +143,18 @@ namespace NYexport {
 
             OnNodeSemanticPostOrder(state, semName, semNameType, semArgs);
         }
+
+        if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
+            if (currentProject->SemsDumpDepth > 0) {
+                currentProject->SemsDumpDepth--;
+            }
+        }
+        if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
+            if (currentTarget->SemsDumpDepth > 0) {
+                currentTarget->SemsDumpDepth--;
+            }
+        }
+
         TBase::Leave(state);
     }
 
@@ -177,10 +199,6 @@ namespace NYexport {
         return isIgnored;
     }
 
-    std::optional<bool> TGraphVisitor::OnEnter(TState&) {
-        return {};
-    }
-
     void TGraphVisitor::SetupSemanticMapping(const TGeneratorSpec& genspec) {
         SemNameToType_.emplace("IGNORED", ESNT_Ignored);
         for (const auto& [attrGroup, semNameType] : UsedAttrGroups) {
@@ -201,21 +219,6 @@ namespace NYexport {
         for (const auto& item : genspec.Targets) {
             SemNameToType_.emplace(item.first, ESNT_Target);
         }
-    }
-
-    void TGraphVisitor::OnTargetNodeSemantic(TState&, const std::string&, const std::span<const std::string>&) {
-    }
-
-    void TGraphVisitor::OnNodeSemanticPreOrder(TState&, const std::string&, ESemNameType, const std::span<const std::string>&) {
-    }
-
-    void TGraphVisitor::OnNodeSemanticPostOrder(TState&, const std::string&, ESemNameType, const std::span<const std::string>&) {
-    }
-
-    void TGraphVisitor::OnLeave(TState&) {
-    }
-
-    void TGraphVisitor::OnLeft(TState&) {
     }
 
     void TGraphVisitor::EnsureReady() {
@@ -259,4 +262,60 @@ namespace NYexport {
         }
         return true;
     }
-};
+
+    void TGraphVisitor::FillSemsDump(const std::string& nodePath, const TNodeSemantics& graphSems, const TNodeSemantics& appliedSems) {
+        if (!Generator_->DumpOpts().DumpSems && !Generator_->DebugOpts().DebugSems) {
+            return;
+        }
+        auto Indent = [&](int depth) {
+            return std::string(depth * 4, ' ');
+        };
+        auto semDump = [&](const TNodeSemantic& sem) {
+            std::string dump;
+            for (const auto& s: sem) {
+                if (s != *sem.begin()) {
+                    dump += " ";
+                }
+                dump += s;
+            }
+            return dump;
+        };
+        auto maxSize = std::max(graphSems.size(), appliedSems.size());
+        auto* currentProject = ProjectBuilder_->CurrentProject();
+        bool pathAddedToProject = false;
+        auto* currentTarget = ProjectBuilder_->CurrentTarget();
+        bool pathAddedToTarget = false;
+        for (size_t i = 0; i < maxSize; ++i) {
+            std::string graphSemDump;
+            ESemNameType graphSemType = ESNT_Unknown;
+            if (i < graphSems.size()) {
+                const auto& graphSem = graphSems[i];
+                graphSemType = SemNameToType(graphSem[0]);
+                graphSemDump = semDump(graphSem);
+            }
+            std::string appliedSemDump;
+            ESemNameType appliedSemType = ESNT_Unknown;
+            if (i < appliedSems.size()) {
+                const auto& appliedSem = appliedSems[i];
+                appliedSemType = SemNameToType(appliedSem[0]);
+                appliedSemDump = semDump(appliedSem);
+            }
+            if (graphSemType == ESNT_RootAttr || appliedSemType == ESNT_RootAttr || !currentTarget) { // all root semantics or without target add to Project
+                Y_ASSERT(currentProject);
+                auto indent = Indent(currentProject->SemsDumpDepth);
+                if (!pathAddedToProject) {
+                    currentProject->SemsDump += indent + "[ " + nodePath + " ]\n";
+                    pathAddedToProject = true;
+                }
+                currentProject->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
+            } else { // all other semantics add to target
+                auto indent = Indent(currentTarget->SemsDumpDepth);
+                if (!pathAddedToTarget) {
+                    currentTarget->SemsDump += indent + "[ " + nodePath + " ]\n";
+                    pathAddedToTarget = true;
+                }
+                currentTarget->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
+            }
+        }
+    }
+}

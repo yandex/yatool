@@ -34,7 +34,7 @@ int main(int argc, char** argv) try {
         return 0;
     }
 
-    auto generator = Load(opts.Generator, opts.ArcadiaRoot, opts.ConfigDir);
+    auto generator = Load(opts.Generator, opts.ArcadiaRoot, opts.ConfigDir, opts.DumpOpts, opts.DebugOpts);
     generator->SetProjectName(opts.ProjectName);
 
     if (opts.Generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
@@ -58,6 +58,16 @@ int main(int argc, char** argv) try {
         }
         generator->LoadSemGraph("", opts.SemGraphs.front());
     }
+    if (opts.DumpOpts.DumpSems || opts.DumpOpts.DumpAttrs) {
+        if (opts.DumpOpts.DumpSems) {
+            generator->DumpSems(Cout);
+        }
+        if (opts.DumpOpts.DumpAttrs) {
+            generator->DumpAttrs(Cout);
+        }
+        return 0;
+    }
+
     ECleanIgnored cleanIgnored = opts.CleanIgnored ? ECleanIgnored::Enabled : ECleanIgnored::Disabled;
     generator->RenderTo(opts.ExportRoot, cleanIgnored);
 

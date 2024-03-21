@@ -13,7 +13,9 @@
 
 namespace NYexport {
 
-THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir) {
+THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir,
+    const std::optional<TDumpOpts> dumpOpts, const std::optional<TDebugOpts> debugOpts
+) {
     if (generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
         return TCMakeGenerator::Load(arcadiaRoot, generator, configDir);
     }
@@ -23,7 +25,7 @@ THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& ar
     if (generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py2);
     }
-    return TJinjaGenerator::Load(arcadiaRoot, generator, configDir);
+    return TJinjaGenerator::Load(arcadiaRoot, generator, configDir, dumpOpts, debugOpts);
 }
 
 void TYexportGenerator::RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored) {

@@ -1,6 +1,6 @@
 #include "sem_graph.h"
 
-using namespace NYexport;
+namespace NYexport {
 
 TString TSemGraph::ToString(const TSemGraph::TConstNodeRef& node) {
     return node.Value().Path;
@@ -12,4 +12,6 @@ const TSemDepData* TSemGraph::GetDepData(TSemDepId semDepId) const {
     } else {
         return nullptr;
     }
+}
+
 }

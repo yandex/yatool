@@ -3,8 +3,6 @@
 
 #include <spdlog/spdlog.h>
 
-namespace NYexport {
-
 namespace {
 
     class TPrefixedFileSystem: public jinja2::IFilesystemHandler {
@@ -44,6 +42,8 @@ namespace {
         const std::string Prefix_;
     };
 }
+
+namespace NYexport {
 
 const TGeneratorSpec& TSpecBasedGenerator::GetGeneratorSpec() const {
     return GeneratorSpec;
@@ -140,4 +140,5 @@ void TSpecBasedGenerator::CopyFilesAndResources() {
         }
     }
 }
+
 }

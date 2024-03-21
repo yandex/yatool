@@ -5,6 +5,8 @@
 #include "std_helpers.h"
 #include "target_replacements.h"
 #include "jinja_helpers.h"
+#include "dump.h"
+#include "debug.h"
 
 #include <util/generic/hash_set.h>
 
@@ -31,10 +33,19 @@ public:
     void OnAttribute(const TAttribute& attribute);
     void OnPlatform(const std::string_view& platform);
 
+    const TDumpOpts& DumpOpts() const {
+        return DumpOpts_;
+    }
+    const TDebugOpts& DebugOpts() const {
+        return DebugOpts_;
+    }
+
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";
     static constexpr const char* GENERATOR_TEMPLATES_PREFIX = "[generator]/";
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
+    static constexpr const char* DEBUG_SEMS_ATTR = "dump_sems";
+    static constexpr const char* DEBUG_ATTRS_ATTR = "dump_attrs";
 
 protected:
     void CopyFilesAndResources();
@@ -49,7 +60,9 @@ protected:
     TYexportSpec YexportSpec;
     THashSet<std::string> UsedAttributes;
     THashSet<const TGeneratorRule*> UsedRules;
-    TTargetReplacements TargetReplacements_;
+    TTargetReplacements TargetReplacements_;///< Patches for semantics by path
+    TDumpOpts DumpOpts_;///< Dump options for semantics and template attributes
+    TDebugOpts DebugOpts_;///< Debug options for semantics and template attributes
 
     TYexportSpec ReadYexportSpec(fs::path configDir = "");
 

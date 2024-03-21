@@ -80,6 +80,8 @@ namespace {
 
 }
 
+namespace NYexport {
+
 void SetupLogger(TLoggingOpts opts) {
     spdlog::default_logger()->sinks() = {};
     if (opts.EnableStderr)
@@ -99,4 +101,6 @@ void SetupLogger(TLoggingOpts opts) {
     } else {
         traceSink = MakeHolder<NYMake::TScopedTraceSink<TDefaultTracer>>();
     }
+}
+
 }

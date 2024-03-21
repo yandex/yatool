@@ -3,6 +3,8 @@
 #include <devtools/yexport/diag/exception.h>
 #include <devtools/yexport/diag/trace.h>
 #include <devtools/yexport/export_file_manager.h>
+#include <devtools/yexport/dump.h>
+#include <devtools/yexport/debug.h>
 
 #include <util/generic/ptr.h>
 #include <util/generic/vector.h>
@@ -27,16 +29,22 @@ public:
     void RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
     TExportFileManager* GetExportFileManager();
 
-    virtual void DumpAttrs(IOutputStream& out) = 0; ///< Get dump of attributes tree with values for testing
+    virtual void DumpSems(IOutputStream& out) = 0; ///< Get dump of semantics tree with values for testing or debug
+    virtual void DumpAttrs(IOutputStream& out) = 0; ///< Get dump of attributes tree with values for testing or debug
 
 protected:
     virtual void Render(ECleanIgnored cleanIgnored) = 0;
 
     THolder<TExportFileManager> ExportFileManager;
-
 };
 
-THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir = "");
+THolder<TYexportGenerator> Load(
+    const std::string& generator,
+    const fs::path& arcadiaRoot,
+    const fs::path& configDir = "",
+    const std::optional<TDumpOpts> dumpOpts = {},
+    const std::optional<TDebugOpts> debugOpts = {}
+);
 TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot);
 
 }

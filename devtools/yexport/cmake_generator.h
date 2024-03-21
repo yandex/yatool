@@ -122,7 +122,8 @@ public:
     void SetProjectName(const std::string& projectName) override;
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
 
-    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
+    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
 };
 
 }

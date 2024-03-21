@@ -5,7 +5,9 @@
 
 #include <library/cpp/getopt/small/last_getopt.h>
 
-using namespace NYexport;
+#include <spdlog/spdlog.h>
+
+namespace NYexport {
 
 TOpts TOpts::Parse(int argc, char** argv) {
     TOpts ret;
@@ -31,6 +33,26 @@ TOpts TOpts::Parse(int argc, char** argv) {
         .StoreResult(&ret.PyDepsDump);
     opts.AddLongOption("py2", "Use python2 contrib version [deprecated]").NoArgument().StoreValue(&ret.PyVer, "py2");
     opts.AddLongOption("py3", "Use python3 contrib version [default behavior] [deprecated]").NoArgument().StoreValue(&ret.PyVer, "py3");
+
+    opts.AddLongOption(0, "dump-mode", "List divided by '|' of: sems (semantics tree to stdout), attrs (attributes tree to stdout)").Handler1T<std::string>([&](const std::string& arg) {
+        auto error = ParseDumpMode(arg, ret.DumpOpts);
+        if (!error.empty()) {
+            spdlog::error(error);
+        }
+    });
+    opts.AddLongOption(0, "dump-path-prefixes", "Dump only this list of relative path prefixes divided by '|'").Handler1T<std::string>([&](const std::string& arg) {
+        auto error = ParseDumpPathPrefixes(arg, ret.DumpOpts);
+        if (!error.empty()) {
+            spdlog::error(error);
+        }
+    });
+    opts.AddLongOption(0, "debug-mode", "List divided by '|' of: sems (semantics tree to \"dump_sems\" attribute of each templates), attrs (attributes tree to \"dump_attrs\" attribute of each templates)").Handler1T<std::string>([&](const std::string& arg) {
+        auto error = ParseDebugMode(arg, ret.DebugOpts);
+        if (!error.empty()) {
+            spdlog::error(error);
+        }
+    });
+
     NLastGetopt::TOptsParseResult{&opts, argc, argv};
 
     if (ret.PyVer == "py2") {
@@ -38,4 +60,6 @@ TOpts TOpts::Parse(int argc, char** argv) {
     }
 
     return ret;
+}
+
 }

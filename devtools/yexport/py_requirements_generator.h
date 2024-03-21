@@ -56,7 +56,9 @@ public:
 
     void Render(IInputStream& pyDepsDump, IOutputStream& dest) const;
 
-    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing
+    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
+
 private:
     void Render(ECleanIgnored cleanIgnored) override;
 

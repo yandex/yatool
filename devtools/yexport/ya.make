@@ -3,7 +3,9 @@ LIBRARY()
 SRCS(
     attribute.cpp
     cmake_generator.cpp
+    debug.cpp
     dir_cleaner.cpp
+    dump.cpp
     export_file_manager.cpp
     generator_spec.cpp
     graph_visitor.cpp
