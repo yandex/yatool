@@ -2744,7 +2744,6 @@ def _resolve_test_tools(graph_maker, toolchain, debug_id, opts):
     ]
     resources = [
         tconst.TEST_TOOL_HOST,
-        tconst.TEST_TOOL3_HOST,
         tconst.TEST_TOOL_TARGET,
         tconst.XCODE_TOOLS_RESOURCE,
         tconst.GO_TOOLS_RESOURCE,
@@ -2775,7 +2774,7 @@ def _resolve_test_tools(graph_maker, toolchain, debug_id, opts):
 
 def _resolve_test_tool_only(graph_maker, toolchain, debug_id, opts):
     targets = [os.path.join('build', 'platform', 'test_tool')]
-    resources = [tconst.TEST_TOOL_HOST, tconst.TEST_TOOL3_HOST]
+    resources = [tconst.TEST_TOOL_HOST]
     return _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debug_id)
 
 

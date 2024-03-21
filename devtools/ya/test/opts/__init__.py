@@ -1853,12 +1853,6 @@ class TestToolOptions(core.yarg.Options):
                 subgroup=TESTTOOL_SUBGROUP,
             ),
             TestArgConsumer(
-                ['--test-tool3-bin'],
-                help='Path to test_tool3 binary',
-                hook=core.yarg.SetValueHook('test_tool3_bin'),
-                subgroup=TESTTOOL_SUBGROUP,
-            ),
-            TestArgConsumer(
                 ['--profile-test-tool'],
                 help="Profile specified test_tool handlers",
                 hook=core.yarg.SetAppendHook('profile_test_tool'),
@@ -1872,10 +1866,6 @@ class TestToolOptions(core.yarg.Options):
                 if hasattr(params, flags):
                     getattr(params, flags)['TEST_TOOL_HOST_LOCAL'] = self.test_tool_bin
                     getattr(params, flags)['TEST_TOOL_TARGET_LOCAL'] = self.test_tool_bin
-        if self.test_tool3_bin:
-            for flags in ['flags', 'host_flags']:
-                if hasattr(params, flags):
-                    getattr(params, flags)['TEST_TOOL3_HOST_LOCAL'] = self.test_tool3_bin
 
 
 class InterimOptions(core.yarg.Options):

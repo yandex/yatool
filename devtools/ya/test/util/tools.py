@@ -215,15 +215,6 @@ def get_test_tool_path(opts, global_resources, run_on_target):
     return path
 
 
-def get_test_tool3_path(opts, global_resources, run_on_target):
-    local_const_name = const.TEST_TOOL_TARGET_LOCAL if run_on_target else const.TEST_TOOL3_HOST_LOCAL
-    resource_const_name = const.TEST_TOOL_TARGET if run_on_target else const.TEST_TOOL3_HOST
-    if opts and local_const_name in opts.flags:
-        assert opts.flags[local_const_name], local_const_name
-        return opts.flags[local_const_name]
-    return '{}/test_tool3'.format(global_resources.get(resource_const_name, '$({})'.format(resource_const_name)))
-
-
 def get_wine64_path(global_resources):
     return '{}/bin/wine64'.format(global_resources.get(const.WINE_TOOL, '$({})'.format(const.WINE_TOOL)))
 
@@ -233,25 +224,12 @@ def get_wine32_path(global_resources):
 
 
 def get_test_tool_cmd(opts, tool_name, global_resources, wrapper=False, run_on_target_platform=False, python=None):
-    if python:
-        py_ver = python
-    else:
-        py_ver = "py3"
-
-    if py_ver == "py2":
-        cmd = [
-            get_test_tool_path(
-                opts, global_resources, run_on_target_platform and const.TEST_TOOL_TARGET in global_resources
-            ),
-            tool_name,
-        ]
-    else:
-        cmd = [
-            get_test_tool3_path(
-                opts, global_resources, run_on_target_platform and const.TEST_TOOL_TARGET in global_resources
-            ),
-            tool_name,
-        ]
+    cmd = [
+        get_test_tool_path(
+            opts, global_resources, run_on_target_platform and const.TEST_TOOL_TARGET in global_resources
+        ),
+        tool_name,
+    ]
     target_tools = getattr(opts, "profile_test_tool", [])
     if target_tools and tool_name in target_tools:
         if wrapper:
