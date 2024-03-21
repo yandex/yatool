@@ -29,7 +29,6 @@ ya gen-config [OPTION]… [ya.conf]…
 ## Пример ya.conf 
 ```
 # Save config to the junk/{USER}/ya.conf or to the ~/.ya/ya.conf
-# For more info see https://docs.yandex-team.ru/yatool/commands/gen_config
 #
 # Add all symlink-dirs in modules to exclude dirs (--auto-exclude-symlinks)
 # auto_exclude_symlinks = false
