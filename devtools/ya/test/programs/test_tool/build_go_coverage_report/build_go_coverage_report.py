@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import platform
 import sys
 import six
 
@@ -51,12 +50,16 @@ def get_options():
     return parser.parse_args()
 
 
-def get_host_platform():
-    return platform.system().lower()
-
-
 def extract_filename(segment_info):
     return segment_info.split(":")[0]
+
+
+def resolve_go_tool(path, binname):
+    path = os.path.join(path, "pkg/tool")
+    names = os.listdir(path)
+    # go toolchain contains only one platform
+    assert len(names) == 1, names
+    return os.path.join(path, names[0], binname)
 
 
 def build_report(params):
@@ -84,7 +87,7 @@ def build_report(params):
         cov_files, mergedir, cov_fn, params.prefix_filter, params.exclude_regexp
     )
     cmd = [
-        os.path.join(params.gotools_path, "pkg/tool/{}_amd64/cover".format(get_host_platform())),
+        resolve_go_tool(params.gotools_path, "cover"),
         "-html=" + merged_coverage_filename,
         "-o",
         os.path.join(os.path.join(os.getcwd(), result_dir), "report.html"),
