@@ -212,6 +212,10 @@ def check_for_respawn(new_root, handler_python_major_version=None):
         logger.debug('Unsetting YA_STDIN env var as respawn never happened')
         if 'YA_STDIN' in os.environ:
             del os.environ['YA_STDIN']
+        if YA_PYVER_REQUIRE in os.environ:
+            del os.environ[YA_PYVER_REQUIRE]
+        if YA_PYVER_SET_FORCED in os.environ:
+            del os.environ[YA_PYVER_SET_FORCED]
 
 
 def filter_env(env_vars):
