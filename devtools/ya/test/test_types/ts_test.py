@@ -10,6 +10,7 @@ import test.test_types.common as common_types
 
 JEST_TEST_TYPE = "jest"
 HERMIONE_TEST_TYPE = "hermione"
+PLAYWRIGHT_TEST_TYPE = "playwright"
 
 
 class BaseTestSuite(common_types.AbstractTestSuite):
@@ -171,6 +172,46 @@ class HermioneTestSuite(BaseTestSuite):
             ]
 
         return cmd
+
+
+class PlaywrightTestSuite(BaseTestSuite):
+    @classmethod
+    def get_type_name(cls):
+        return PLAYWRIGHT_TEST_TYPE
+
+    def get_type(self):
+        return PLAYWRIGHT_TEST_TYPE
+
+    def support_splitting(self, opts=None):
+        return False
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
+        generic_cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_playwright",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd = (
+            generic_cmd
+            + common_cmd_opts
+            + [
+                "--config",
+                self.dart_info.get("CONFIG-PATH"),
+                "--timeout",
+                str(self.timeout),
+                "--verbose",
+            ]
+        )
+
+        return cmd
+
+    @property
+    def supports_coverage(self):
+        return False
 
 
 class EslintTestSuite(common_types.AbstractTestSuite):
