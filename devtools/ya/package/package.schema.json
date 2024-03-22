@@ -213,6 +213,9 @@
                         "type": "string",
                         "uniqueItems": true
                     }
+                },
+                "symlinks": {
+                    "type": "boolean"
                 }
             },
             "required": ["type", "path"],
