@@ -1336,6 +1336,7 @@ inline void TUpdIter::Leave(TState& state) {
         auto& pprev = state[state.size() - 3];
         auto isMakefileProperty = IsMakeFilePropertyDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType) && pprev.IsAtDirMkfDep(prev.Node.NodeType);
         auto isModuleProperty = IsModulePropertyDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType) && st.Node.NodeType == EMNT_BuildCommand;
+        auto isMakefileIncludeFile = IsMakeFileIncludeDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType) && pprev.IsAtDirMkfDep(prev.Node.NodeType);
 
         if (isMakefileProperty || isModuleProperty) {
             ui64 propId;
@@ -1363,6 +1364,11 @@ inline void TUpdIter::Leave(TState& state) {
             !prev.Entry().HasChanges &&
             (IsMakeFileType(prev.Node.NodeType) || IsModuleType(prev.Node.NodeType)) && IsPropertyDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType)
         ) {
+            prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
+            st.Entry().OnceEntered = false;
+            st.ForceReassemble();
+        }
+        else if (isMakefileIncludeFile && !prev.Entry().HasChanges && CurEnt->second.HasChanges) {
             prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
             st.Entry().OnceEntered = false;
             st.ForceReassemble();
