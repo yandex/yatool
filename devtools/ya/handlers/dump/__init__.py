@@ -45,6 +45,7 @@ from core.yarg import (
     UpdateValueHook,
     SetAppendHook,
     ExtendHook,
+    DictPutHook,
     ArgsValidatingException,
     Group,
 )
@@ -853,6 +854,7 @@ class DumpDescriptionOptions(Options):
     def __init__(self):
         self.dump_all_conf_docs = False
         self.conf_docs_json = False
+        self.replacements = {}
 
     @staticmethod
     def consumer():
@@ -867,6 +869,12 @@ class DumpDescriptionOptions(Options):
                 ['--json'],
                 help='Dump information for all entities including internal in json format, uses are included',
                 hook=SetConstValueHook('conf_docs_json', True),
+                group=DUMP_OPTS_GROUP,
+            ),
+            ArgConsumer(
+                ['--replacements'],
+                help='Replaces for doc',
+                hook=DictPutHook('replacements'),
                 group=DUMP_OPTS_GROUP,
             ),
         ]
@@ -1121,7 +1129,13 @@ def do_conf(params):
 
 
 def do_conf_docs(params):
-    _do_dump(dump_mmm_docs, params, dump_all_conf_docs=params.dump_all_conf_docs, conf_docs_json=params.conf_docs_json)
+    _do_dump(
+        dump_mmm_docs,
+        params,
+        dump_all_conf_docs=params.dump_all_conf_docs,
+        conf_docs_json=params.conf_docs_json,
+        replacements=params.replacements,
+    )
 
 
 def do_dump_raw_vcs_info(params):

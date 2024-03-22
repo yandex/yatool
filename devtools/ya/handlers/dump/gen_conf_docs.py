@@ -1,4 +1,5 @@
 from __future__ import absolute_import, unicode_literals
+
 import exts.yjson as json
 import re
 import os
@@ -33,10 +34,11 @@ class _Markdown:
         'deprecated': re.compile('.*#.*deprecated.*', flags=re.IGNORECASE),
     }
 
-    def __init__(self, arc_root, dump_all_descs, use_svn):
+    def __init__(self, arc_root, dump_all_descs, use_svn, replacements):
         self.descs = {'macros': {}, 'modules': {}, 'multimodules': {}, 'unknowns': {}}
         self.links = {}
         self.anchors = {}
+        self.replacements = replacements
         try:
             self.svn_revision, _ = vcsversion.repo_config(arc_root) if use_svn else (-1, '')
         except Exception:
@@ -65,6 +67,8 @@ class _Markdown:
                 for name in sorted(self.descs[type]):
                     link = self.descs[type][name]['link']
                     res += six.ensure_str(link)
+        if self.replacements:
+            res = self.apply_replacements(res)
 
         return res
 
@@ -294,6 +298,11 @@ class _Markdown:
     def _remove_formatting(x):
         return x.replace("_", r"\_").replace("*", r"\*")
 
+    def apply_replacements(self, res):
+        for old, new in self.replacements.items():
+            res = res.replace(old, new)
+        return res
+
 
 def _gen(
     custom_build_directory,
@@ -344,6 +353,7 @@ def dump_mmm_docs(
     platform=None,
     host_platform=None,
     target_platforms=None,
+    replacements=False,
 ):
     json_dump_name = os.path.join(build_root, 'ymake.dump.ydx.json')
     arc_root = core.config.find_root_from(build_targets)
@@ -375,7 +385,7 @@ def dump_mmm_docs(
             contents = jfile.read()
             jdata = json.loads(contents)
         no_svn = True if 'NO_SVN_DEPENDS' in flags and strtobool(flags['NO_SVN_DEPENDS']) else False
-        doc = _Markdown(arc_root, dump_all_conf_docs, not no_svn)
+        doc = _Markdown(arc_root, dump_all_conf_docs, not no_svn, replacements)
         for efile in jdata:
             for entry in jdata[efile]:
                 doc.process_entry(efile, entry)
