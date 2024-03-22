@@ -254,7 +254,7 @@ private:
 };
 
 void RunServer(const TString address, bool cacheStderr, bool debug) {
-    NProcUtil::TSubreaperResource resource = NProcUtil::BecomeSubreaper();
+    NProcUtil::TSubreaperApplicant applicant = NProcUtil::TSubreaperApplicant();
 
     SetAsyncSignalHandler(SIGINT, RequestShutdown);
     SetAsyncSignalHandler(SIGTERM, RequestShutdown);
@@ -277,5 +277,5 @@ void RunServer(const TString address, bool cacheStderr, bool debug) {
     });
 
     server->Wait();
-    resource.Close();
+    applicant.Close();
 }

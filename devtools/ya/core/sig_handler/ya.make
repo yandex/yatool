@@ -7,6 +7,7 @@ PY_SRCS(
 
 PEERDIR(
     contrib/python/termcolor
+    devtools/executor/proc_util/python
 )
 
 STYLE_PYTHON()

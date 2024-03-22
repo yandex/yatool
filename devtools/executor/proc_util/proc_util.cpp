@@ -89,23 +89,16 @@ namespace {
 #endif
 
 namespace NProcUtil {
+    void TSubreaperApplicant::Close() {
 #if defined(_win_)
-    TSubreaperResource::TSubreaperResource(HANDLE jh) {
-        JobHandle = jh;
-    }
-#else
-    TSubreaperResource::TSubreaperResource() {
-    }
-#endif
-    void TSubreaperResource::Close() {
-    #if defined(_win_)
         // All associated processes with job will be terminated
         if (JobHandle) {
             CloseHandle(JobHandle);
         }
-    #endif
+#endif
     }
-    TSubreaperResource BecomeSubreaper() {
+
+    TSubreaperApplicant::TSubreaperApplicant() {
 #if defined(_linux_)
         // Keep orphaned processes around to be able to kill them later
         if (!NProcUtil::LinuxBecomeSubreaper()) {
@@ -113,15 +106,13 @@ namespace NProcUtil {
         }
 #endif
 #if defined(_win_)
-        HANDLE jobHandle = NProcUtil::WinCreateSubreaperJob();
-        if (!jobHandle) {
+        JobHandle = NProcUtil::WinCreateSubreaperJob();
+        if (!JobHandle) {
             Cerr << "Failed to create subreaper job: " << LastSystemErrorText() << Endl;
         }
-        return TSubreaperResource(jobHandle);
-#else
-        return TSubreaperResource();
 #endif
     }
+
     void TerminateChildren() {
         TVector<pid_t> prev;
         TVector<pid_t> children;

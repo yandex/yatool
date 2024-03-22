@@ -558,7 +558,8 @@ def configure_active_state(app_ctx, interruptable):
     state = yalibrary.active_state.ActiveState(__name__)
 
     if interruptable:
-        signal.signal(signal.SIGINT, core.sig_handler.instant_sigint_exit_handler)
+        exit_handler = core.sig_handler.create_sigint_exit_handler()
+        signal.signal(signal.SIGINT, exit_handler)
     else:
         if os.environ.get('Y_FAST_CANCEL', 'no') != 'yes':
             signal.signal(signal.SIGINT, lambda _, __: state.stopping())
