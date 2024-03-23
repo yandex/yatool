@@ -71,6 +71,7 @@ IF (NOT YA_OPENSOURCE)
             devtools/ya/handlers/grep
             devtools/ya/handlers/jstyle
             devtools/ya/handlers/nile
+            devtools/ya/handlers/run
             devtools/ya/handlers/sed
             devtools/ya/handlers/ydb
             devtools/ya/handlers/yql
@@ -118,6 +119,7 @@ RECURSE(
     py
     remote_gdb
     repo_check
+    run
     sed
     shell
     stat
