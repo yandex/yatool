@@ -341,12 +341,12 @@ def highlight_func(s):
 class FrameBase(object):
     def __init__(
         self,
-        frame_no=None,
-        addr="",
-        func="",
-        source="",
-        source_no="",
-        func_name="",
+        frame_no=None,  # type: int
+        addr="",  # type: str
+        func="",  # type: str
+        source="",  # type: str
+        source_no="",  # type: str
+        func_name="",  # type: str
     ):
         self.frame_no = frame_no
         self.addr = addr
@@ -506,6 +506,77 @@ class GDBFrame(FrameBase):
                 source=self.source,
             )
         return source, source_fmt
+
+
+class PythonFrame(FrameBase):
+    SOURCE_RE = re.compile(r'File "(?P<module_path>.*)", line (?P<error_line_no>\d+), in (?P<func_name>.*)')
+
+    def __init__(
+        self,
+        frame_no=None,  # type: int
+        module_path="",  # type: str
+        in_function_name="",  # type: str
+        error_line="",  # type: str
+        error_line_no=0,  # type: int
+        error_column_selector="",  # type: str
+    ):
+
+        self._error_line = error_line.strip()
+        offset = len(error_line) - len(self._error_line)
+        if "^" in error_column_selector:
+            self._error_col_start = error_column_selector.index("^") - offset
+            self._error_col_end = error_column_selector.rindex("^") - offset
+        else:
+            self._error_col_start = 0
+            self._error_col_end = len(self._error_line)
+        self._error_line_no = error_line_no
+        self._module_path = module_path.strip()
+        self._in_function_name = in_function_name.strip()
+
+        super(PythonFrame, self).__init__(
+            frame_no=frame_no,
+            addr="",
+            func=self._error_line,
+            source=self._module_path,
+            source_no=str(self._error_line_no),
+            func_name=self._in_function_name,
+        )
+
+    @property
+    def source_link(self):
+        link = os.path.join(ARCADIA_ROOT_LINK, self.source)
+        if self.source_no:
+            link = link + "#L{}".format(self.source_no)
+        return link
+
+    @property
+    def error_line_html(self):
+        return '{prefix}<span class="python-error-area">{error}</span>{suffix}'.format(
+            prefix=self._error_line[:self._error_col_start],
+            error=self._error_line[self._error_col_start:self._error_col_end+1],
+            suffix=self._error_line[self._error_col_end+2:]
+        )
+
+    def html(self):
+        if not self._in_function_name:
+            file_line = ""
+            error_line = '<span class="python-error-message">{}</span>'.format(self._error_line)
+        else:
+            file_line = (
+                '<p>'
+                'File <a target="_blank" href="{source_link}">"{source}", line {line}</a>, '
+                'in <strong>{func}</strong>'
+                '</p>'
+            ).format(
+                source_link=self.source_link,
+                source=self._module_path,
+                line=self._error_line_no,
+                func=self._in_function_name,
+            )
+            error_line = '<p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="python-error-line">{error_line}</span></p>'.format(
+                error_line=self.error_line_html,
+            )
+        return '<div class="python-frame">{}{}</div>'.format(file_line, error_line)
 
 
 class SDCAssertFrame(LLDBFrame):
@@ -755,9 +826,10 @@ class Stack(object):
         if not same_hash:
             ans += '<a name="stack{0}"></a>'.format(self.hash())
 
-        ans += '<span class="hash"><a href="#stack{0}">#{0}</a>, {1} stack(s) with same hash</span>\n'.format(
-            self.hash(), same_count,
-        )
+        if same_count >= 0:
+            ans += '<span class="hash"><a href="#stack{0}">#{0}</a>, {1} stack(s) with same hash</span>\n'.format(
+                self.hash(), same_count,
+            )
 
         for f in self.frames:
             ans += f.html()
@@ -945,7 +1017,9 @@ class SDCAssertStack(LLDBStack):
     ]
 
 
-def parse_python_traceback(trace):
+def parse_python_traceback(
+    trace,  # type: str
+):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
     trace = trace.replace("/home/zomb-sandbox/client/", "/")
     trace = trace.replace("/home/zomb-sandbox/tasks/", "/sandbox/")
     trace = trace.split("\n")
@@ -964,6 +1038,75 @@ def parse_python_traceback(trace):
             frame_args["func"] = row.strip()
             stack.push_frame(GDBFrame(**frame_args))
     return [[stack]], [[stack.raw()]], 6
+
+
+def parse_python_traceback_2(
+    trace,  # type: str
+):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
+    """
+    This is a replacement for an older parse_python_traceback (find above).
+
+    The main difference is that it builds PythonFrame objects instead of GDBFrame objects and splits different
+    tracebacks into stacks. This in turn allows for a better html representation of the provided traceback
+    """
+
+    trace = trace.strip().split("\n")
+
+    frame_no = 0
+    line_index = 1
+    stack = Stack(lines=[])
+    stack_list = []
+
+    while line_index < len(trace):
+        line = trace[line_index]
+
+        if not line.strip():
+            line_index += 1
+            continue
+
+        if line.strip().startswith("Traceback"):
+            stack_list.append(stack)
+            stack = Stack(lines=[])
+            line_index += 1
+            frame_no = 0
+            continue
+
+        frame_no += 1
+
+        m = PythonFrame.SOURCE_RE.match(line.strip())
+
+        if not m:
+            stack.push_frame(PythonFrame(
+                frame_no=frame_no,
+                error_line=line,
+            ))
+            line_index += 1
+            continue
+
+        module_path = m.group("module_path")
+        in_function_name = m.group("func_name")
+        error_line_no = m.group("error_line_no")
+        error_line = trace[line_index + 1]
+        error_column_selector = ""
+        next_index = line_index + 2
+
+        if next_index < len(trace) and trace[next_index].strip().startswith("^"):
+            error_column_selector = trace[next_index]
+            next_index += 1
+        stack.push_frame(PythonFrame(
+            frame_no=frame_no,
+            module_path=module_path,
+            in_function_name=in_function_name,
+            error_line_no=error_line_no,
+            error_line=error_line,
+            error_column_selector=error_column_selector,
+        ))
+        line_index = next_index
+
+    if stack and len(stack.frames):
+        stack_list.append(stack)
+
+    return [stack_list], [[s.raw() for s in stack_list]], 6
 
 
 def stack_factory(stack):
