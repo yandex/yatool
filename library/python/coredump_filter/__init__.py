@@ -555,12 +555,14 @@ class PythonFrame(FrameBase):
             prefix=self._error_line[:self._error_col_start],
             error=self._error_line[self._error_col_start:self._error_col_end+1],
             suffix=self._error_line[self._error_col_end+2:]
-        )
+        ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
 
     def html(self):
         if not self._in_function_name:
             file_line = ""
-            error_line = '<span class="python-error-message">{}</span>'.format(self._error_line)
+            error_line = '<span class="python-error-message">{}</span>'.format(
+                self._error_line,
+            ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
         else:
             file_line = (
                 '<p>'
