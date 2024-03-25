@@ -188,7 +188,7 @@ def _get_bootstrap_intervals():
 
 def _fill_tracer_with_environ_stages():
     last_environ_stage_tstamp = time.time()
-    stages = os.environ.get('YA_STAGES', '')
+    stages = os.environ.pop('YA_STAGES', '')
     if stages:
         prev_stage = None
         for stage in stages.split(":"):
