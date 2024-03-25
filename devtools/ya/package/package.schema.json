@@ -606,6 +606,19 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "cwd": {
+                        "description": "Current working directory to run binary",
+                        "type": "string"
+                    },
+                    "env": {
+                        "description": "Environment variables to run binary",
+                        "type": "object",
+                        "patternProperties": {
+                            ".*": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }

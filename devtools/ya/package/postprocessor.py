@@ -33,7 +33,20 @@ class Postprocessor(object):
     def run(self):
         real_arguments = self.data.get("arguments", [])
         real_arguments = [i.format(**self.formatters) for i in real_arguments]
-        out, err = package.process.run_process(self.get_binary(), real_arguments, cwd=self.result_dir)
+
+        cwd = self.result_dir
+        data_cwd = self.data.get("cwd")
+        if data_cwd:
+            cwd = os.path.join(self.result_dir, data_cwd.format(**self.formatters))
+
+        real_env = None
+        data_env = self.data.get("env")
+        if data_env:
+            real_env = os.environ.copy()
+            for k, v in data_env.items():
+                real_env[k] = v.format(**self.formatters)
+
+        out, err = package.process.run_process(self.get_binary(), real_arguments, cwd=cwd, env=real_env)
         if self.opts.be_verbose:
             package.display.emit_message('{}[[good]]POSTPROCESS OUTPUT[[rst]]: {}'.format(package.PADDING, out))
             package.display.emit_message('{}[[good]]POSTPROCESS ERROR[[rst]]: {}'.format(package.PADDING, err))
