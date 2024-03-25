@@ -12,7 +12,7 @@ CLANG_TIDY_TEST_TYPE = "clang_tidy"
 class ClangTidySuite(common_types.AbstractTestSuite):
     def __init__(self, *args, **kwargs):
         super(ClangTidySuite, self).__init__(*args, **kwargs)
-        self.clang_tidy_inputs = set()
+        self.clang_tidy_inputs = []
         self.library_path = None
         self.global_library_path = None
 
@@ -39,11 +39,11 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         lib_path = os.path.join("$(BUILD_ROOT)", self.binary_path(''))
         if graph.get_uids_by_outputs(lib_path):
             self.library_path = lib_path
-            self.clang_tidy_inputs.add(lib_path)
+            self.clang_tidy_inputs.append(lib_path)
         glob_lib_path = self.global_tidy_library()
         if graph.get_uids_by_outputs(glob_lib_path):
             self.global_library_path = glob_lib_path
-            self.clang_tidy_inputs.add(glob_lib_path)
+            self.clang_tidy_inputs.append(glob_lib_path)
         return super(ClangTidySuite, self).fill_test_build_deps(graph)
 
     def get_test_dependencies(self):
