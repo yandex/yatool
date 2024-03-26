@@ -356,21 +356,58 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
     if (!hasModule || !moduleIt->Module || !CurrData->UsedReservedVars) {
         return;
     }
-    for (const auto& varStr : RestoreContext.Modules.GetGlobalVars(moduleIt->Module->GetId()).GetVars()) {
-        if (CurrData->UsedReservedVars->contains(varStr.first)) {
-            for (const auto& varItem : varStr.second) {
-                if (CurrData->StructCmdDetected) {
-                    auto expr = Commands.Get(varItem.Name, &CmdConf);
-                    Y_ASSERT(expr);
-                    UpdateCurrent(state, varStr.first, "new_cmd_name");
-                    Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
-                        CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
-                    });
-                } else {
-                    TString value = FormatProperty(varStr.first, varItem.Name);
-                    UpdateCurrent(state, value, "Include global var to current structure hash");
+
+    auto addVarsFromModule = [&](ui32 moduleElemId) {
+        for (const auto& [varName, varValue] : RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars()) {
+            if (CurrData->UsedReservedVars->contains(varName)) {
+                for (const auto& varItem : varValue) {
+                    if (CurrData->StructCmdDetected) {
+                        auto expr = Commands.Get(varItem.Name, &CmdConf);
+                        Y_ASSERT(expr);
+                        UpdateCurrent(state, varName, "new_cmd_name");
+                        Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
+                            CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
+                        });
+                    } else {
+                        TString value = FormatProperty(varName, varItem.Name);
+                        UpdateCurrent(state, value, "Include global var to current structure hash");
+                    }
                 }
             }
+        }
+    };
+
+    ui32 moduleElemId = moduleIt->Module->GetId();
+    addVarsFromModule(moduleElemId);
+
+    // Here we also look at GlobalVars from peers under dependency management.
+    // When collecting GlobalVars in TGlobalVarsCollector we skip propagation for such peers,
+    // as GlobalVars set can not be derived from GlobalVars in direct peers.
+
+    // E.g. module B can depend on module C and has it's global variables,
+    // but a module A depending on module B can however exclude module C and
+    // will not has it's global variables despite module B has them and is a direct peer of A.
+
+    // So we can't fill GlobalVars while doing traverse by TGlobalVarsCollector. And we can't fill
+    // them later by a separate traverse or other post-processing, as we already need them now in
+    // JSON visitor and TGlobalVarsCollector traverse is embedded in it.
+
+    // We could have two sets of "GlobalVars": the usual one and the one that arise
+    // from dependency managament, but not participate in transitive propagation. But anyway
+    // we will have to use them both here (and maybe at other places). So it is almost the same.
+
+    // There is somewhat equivalent code in TModuleRestorer::UpdateGlobalVarsFromModule,
+    // which collects dependency management global variables values in the same fashion
+    // when a JSON rendering takes place. But it does a little more work than needed here
+    // and is being called only when we have missed JSON cache.
+    // So I think no such code reuse is suitable.
+
+    TModule* module = RestoreContext.Modules.Get(moduleElemId);
+    if (module->GetAttrs().RequireDepManagement) {
+        const auto managedPeersListId = RestoreContext.Modules.GetModuleNodeIds(moduleElemId).UniqPeers;
+        for (TNodeId peerNodeId : RestoreContext.Modules.GetNodeListStore().GetList(managedPeersListId)) {
+            ui32 peerModuleElemId = RestoreContext.Graph[peerNodeId]->ElemId;
+            addVarsFromModule(peerModuleElemId);
         }
     }
 }
