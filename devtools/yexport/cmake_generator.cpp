@@ -23,47 +23,14 @@ TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, E
 {
 }
 
-TPlatformConf::TPlatformConf(std::string_view platformName, const TGeneratorSpec& generatorSpec)
+TPlatformConf::TPlatformConf(std::string_view platformName)
     : Name(platformName)
 {
-    if (platformName == "linux" || platformName == "linux-x86_64") {
-        Platform = EPlatform::EP_Linux_x86_64;
-    } else if (platformName == "linux-x86_64-cuda") {
-        Platform = EPlatform::EP_Linux_x86_64_Cuda;
-    } else if (platformName == "linux-aarch64" || platformName == "linux-arm64") {
-        Platform = EPlatform::EP_Linux_Aarch64;
-    } else if (platformName == "linux-aarch64-cuda" || platformName == "linux-arm64-cuda") {
-        Platform = EPlatform::EP_Linux_Aarch64_Cuda;
-    } else if (platformName == "linux-ppc64le") {
-        Platform = EPlatform::EP_Linux_Ppc64LE;
-    } else if (platformName == "linux-ppc64le-cuda") {
-        Platform = EPlatform::EP_Linux_Ppc64LE_Cuda;
-    } else if (platformName == "darwin" || platformName == "darwin-x86_64") {
-        Platform = EPlatform::EP_MacOs_x86_64;
-    } else if (platformName == "darwin-arm64") {
-        Platform = EPlatform::EP_MacOs_Arm64;
-    } else if (platformName == "windows" || platformName == "windows-x86_64") {
-        Platform = EPlatform::EP_Windows_x86_64;
-    } else if (platformName == "windows-x86_64-cuda") {
-        Platform = EPlatform::EP_Windows_x86_64_Cuda;
-    } else if (platformName == "android-arm" || platformName == "android-arm32") {
-        Platform = EPlatform::EP_Android_Arm;
-    } else if (platformName == "android-arm64") {
-        Platform = EPlatform::EP_Android_Arm64;
-    } else if (platformName == "android-x86") {
-        Platform = EPlatform::EP_Android_x86;
-    } else if (platformName == "android-x86_64") {
-        Platform = EPlatform::EP_Android_x86_64;
-    } else {
-        throw yexception() << "Unsupported platform " << platformName;
-    }
-    const auto& flagIt = generatorSpec.Platforms.find(platformName.data());
-    CMakeFlag = (flagIt != generatorSpec.Platforms.end()) ? flagIt->second.asString() : "";
     CMakeListsFile = fmt::format("CMakeLists.{}.txt", platformName);
 }
 
-TPlatform::TPlatform(std::string_view platformName, const TGeneratorSpec& generatorSpec)
-    : Conf(platformName, generatorSpec)
+TPlatform::TPlatform(std::string_view platformName)
+    : Conf(platformName)
     , Graph(nullptr)
 {
 }
@@ -77,11 +44,6 @@ TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaR
 void TCMakeGenerator::SetArcadiaRoot(const fs::path& arcadiaRoot) {
     ArcadiaRoot = arcadiaRoot;
     Conf.ArcadiaRoot = arcadiaRoot;
-}
-
-void TCMakeGenerator::SaveConanProfile(const std::string_view& profile) const {
-    auto path = fs::path("cmake") / "conan-profiles" / profile;
-    ExportFileManager->Copy( GeneratorDir / path, path);
 }
 
 THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, const std::string& generator, const fs::path& configDir) {
@@ -111,7 +73,7 @@ void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& 
                    fmt::format("No specification for platform \"{}\"", platform));
 
     auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
-    Platforms.emplace_back(MakeSimpleShared<TPlatform>(platform, GeneratorSpec));
+    Platforms.emplace_back(MakeSimpleShared<TPlatform>(platform));
     graph.Swap(Platforms.back()->Graph);
     Platforms.back()->StartDirs = std::move(startDirs);
     OnPlatform(platform);
@@ -169,11 +131,9 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const {
     auto& platformCmakes = valuesMap.insert_or_assign("platform_cmakelists", jinja2::ValuesList()).first->second.asList();
     auto& platformNames = valuesMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
-    auto& platformFlags = valuesMap.insert_or_assign("platform_flags", jinja2::ValuesList()).first->second.asList();
     for (const auto& platform : platforms) {
         platformCmakes.emplace_back(platform->Conf.CMakeListsFile);
         platformNames.emplace_back(platform->Conf.Name);
-        platformFlags.emplace_back(platform->Conf.CMakeFlag);
     }
 }
 void TCMakeGenerator::MergePlatforms() const {
@@ -202,7 +162,7 @@ void TCMakeGenerator::MergePlatforms() const {
             TVector<TPlatformPtr> dirPlatforms;
             dirPlatforms.emplace_back(platform);
             for (const auto& otherPlatform : Platforms) {
-                if (platform->Conf.Platform == otherPlatform->Conf.Platform) {
+                if (platform->Conf.Name == otherPlatform->Conf.Name) {
                     continue;
                 }
 
@@ -292,33 +252,6 @@ void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) co
 void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const {
     if (GlobalProperties.ConanPackages.empty() && GlobalProperties.ConanToolPackages.empty()) {
         return;
-    }
-
-    for (const auto& platform: Platforms) {
-        switch (platform->Conf.Platform) {
-            case EPlatform::EP_Linux_x86_64:
-            case EPlatform::EP_Linux_x86_64_Cuda:
-            case EPlatform::EP_MacOs_x86_64:
-            case EPlatform::EP_Windows_x86_64:
-            case EPlatform::EP_Windows_x86_64_Cuda:
-            case EPlatform::EP_Other:
-                break;
-            case EPlatform::EP_Android_Arm: SaveConanProfile("android.armv7.profile"); break;
-            case EPlatform::EP_Android_Arm64: SaveConanProfile("android.arm64.profile"); break;
-            case EPlatform::EP_Android_x86: SaveConanProfile("android.x86.profile"); break;
-            case EPlatform::EP_Android_x86_64: SaveConanProfile("android.x86_64.profile"); break;
-            case EPlatform::EP_Linux_Aarch64:
-            case EPlatform::EP_Linux_Aarch64_Cuda:
-                SaveConanProfile("linux.aarch64.profile");
-                break;
-            case EPlatform::EP_Linux_Ppc64LE:
-            case EPlatform::EP_Linux_Ppc64LE_Cuda:
-                SaveConanProfile("linux.ppc64le.profile");
-                break;
-            case EPlatform::EP_MacOs_Arm64:
-                SaveConanProfile("macos.arm64.profile");
-                break;
-        }
     }
 
     auto& rootMap = rootValueMap->GetWritableMap();
