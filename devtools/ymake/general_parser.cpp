@@ -241,6 +241,8 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
                 TFileView incView = fileConf.ReplaceRoot(name, NPath::Source);
                 if (fileConf.YPathExists(incView, EPathKind::File)) {
                     RelocateFile(node, incView.GetElemId(), EMNT_File, stack.back());
+                } else {
+                    nodeEntry.HasChanges = false;
                 }
                 break;
             }
@@ -258,6 +260,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
                 TModuleResolver resolver(*mod, YMake.Conf, YMake.GetModuleResolveContext(*mod));
                 resolver.ResolveSourcePath(src, {}, TModuleResolver::Default);
                 if (!src.IsPathResolved) {
+                    nodeEntry.HasChanges = false;
                     break;
                 }
                 Y_ASSERT(src.ElemId); // IsPathResolved=true here and ElemId must be filled too
