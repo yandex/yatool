@@ -143,12 +143,12 @@ class Project(object):
         self.project = params.py_tmp_project
         self.source_path = os.path.join(params.arc_root, self.project)
         self.output_path = tempfile.mkdtemp(prefix='ya_py-')
-        self.exe_name = 'yapy' + ('.exe' if on_win() else '')
+        self.exe_name = 'yapy'
         self.targets = set(params.rel_targets) if not params.py_bare else set()
 
     @property
     def exe_path(self):
-        return os.path.join(self.output_path, self.project, self.exe_name)
+        return os.path.join(self.output_path, self.project, self.exe_name + ('.exe' if on_win() else ''))
 
     def prepare(self):
         if os.path.exists(self.source_path):
