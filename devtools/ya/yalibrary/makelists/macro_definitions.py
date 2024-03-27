@@ -283,7 +283,7 @@ class Macro(Node):
             return Flags(name)
         elif name == 'ADDINCL':
             return Addincl()
-        elif name in ['RUN_PYTHON2', 'RUN_PYTHON3', 'LUA', 'RUN_PROGRAM']:
+        elif name in ['RUN_PYTHON3', 'LUA', 'RUN_PROGRAM']:
             return Script(name)
         elif name in ['ARCHIVE', 'ARCHIVE_ASM', 'BUILD_MNS']:
             return Archive(name)
