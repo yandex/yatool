@@ -135,7 +135,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
         SetCurrentNamespace(&Module->GetVars());
         SetOriginalVars(&Module->GetOrigVars());
     } else if (IsBlockDataModule(data)) {
-        TString what = TString::Join("module [[alt1]]", name, "[[rst]] inside module ", Module->GetModuleConf().Name);
+        TString what = TString::Join("module [[alt1]]", name, "[[rst]] inside module ", Module->GetModuleConf().Name, ". Maybe you need to place ", name, " after END()?");
         TRACE(S, NEvent::TMakeSyntaxError(what, Makefile));
         YConfErrPrecise(Syntax, GetStatementRow(name), GetStatementColumn(name)) << what << ". Skip [[alt1]]" << name << "[[rst]] macro." << Endl;
         return true;
