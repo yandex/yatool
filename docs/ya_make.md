@@ -151,7 +151,7 @@
 - `--target-platform default-android-armv8a` — собрать под Android на ARM (в версии armv8a) компилятором по умолчанию;
 - `--target-platform windows` — собрать под Windows (и архитектуру по умолчанию x86-64) компилятором по умолчанию.
 
-Подробная информация по кросс-компиляции(ссылка) 
+Подробная информация по кросс-компиляции(ссылка платформа) 
 
 ### Опции тестирования
 
@@ -187,6 +187,58 @@
 
 - `–test-type=TEST_TYPE_FILTERS`: Ограничивает запуск только теми тестами, которые относятся к указанным типам (например, UNITTEST, PYTEST). Это удобно при необходимости проведения специфичных видов тестирования.
 
+### Дополнительные опции
+
+Дополнительные опции `ya make` предоставляют дополнительные возможности для управления сборкой и тестированием проектов, а также для интеграции с внешними инструментами и услугами. Эти настройки позволяют разработчикам гибко настраивать процесс сборки, оптимизировать использование ресурсов, улучшить интеграцию с CI/CD и другими системами, а также получить подробную информацию о процессе сборки и его результате. Ниже рассмотрены ключевые дополнительные опции `ya make`.
+
+#### Управление кэшем
+
+- `–no-cache:` Отключает использование кэша для сборки. Это может быть полезно при диагностике проблем, связанных с кэшированием, или при необходимости гарантировать, что все компоненты проекта собираются заново.
+
+- `–cache-size=SIZE`: Устанавливает максимальный размер кэша. Это позволяет контролировать занимаемое место на диске, оптимизируя процесс сборки за счет удаления старых или редко используемых данных из кэша.
+
+#### Вывод дополнительной информации
+
+- `–verbose`: Увеличивает детализацию выводимой информации о процессе сборки. Подробный вывод может помочь разобраться в причинах предупреждений или ошибках во время сборки.
+
+- `–time-report`: Включает отчет о времени, затраченном на сборку каждого компонента проекта. Эта опция полезна для оптимизации производительности сборки, позволяя выявлять “узкие места”.
+
+#### Управление результатами сборки
+
+- `-o OUTPUT_DIR, --output=OUTPUT_DIR`: Указывает конкретную директорию для сохранения результатов сборки. Это повышает удобство работы с результатами сборки, позволяя легко собирать артефакты в одном месте для архивации или деплоя.
+
+- `–add-result=PATH`: Позволяет явно указать дополнительные файлы или паттерны файлов, которые следует включить в результаты сборки. Это может настраиваться для включения логов, отчетов или других важных файлов.
+
+#### Контроль за зависимостями
+
+- `–strict-dependencies`: Усиливает проверки зависимостей между модулями. С этой опцией `ya make` требует более точного объявления зависимостей в проекте, что повышает его стабильность и предсказуемость сборки.
+
+#### Дополнительные инструменты анализа и тестирования
+
+- `–sanitizer=TYPE`: Включает использование инструментов санитизации (например, AddressSanitizer или ThreadSanitizer) для обнаружения ошибок во время выполнения. Это помогает находить сложные ошибки, такие как обращения к некорректной памяти, утечки памяти и гонки данных.
+
+- `–coverage`: Активирует сбор информации о покрытии кода тестами. Этот режим позволяет оценить, какая часть кода была протестирована, и выявить участки кода, нуждающиеся в дополнительном тестировании.
+
+#### Профилирование и оптимизация
+
+-`–profiling`: Включает генерацию данных профилирования для анализа производительности исполняемого файла. Это помогает выявлять "узкие" места в коде и оптимизировать время исполнения.
+
+- `–opt-level=LEVEL`: Устанавливает уровень оптимизации кода для компилятора. Это позволяет балансировать между временем компиляции и эффективностью исполняемого кода.
+
+#### Настройка вывода и логирования
+
+- –log-level=LEVEL: Определяет уровень детализации логирования для операций сборки и тестирования. Это позволяет получить больше информации о процессе сборки или, наоборот, снизить объем выводимой информации для повышения читабельности.
+
+- –report-to=TARGET: Указывает целевое назначение для отчетов и логов сборки. Можно настроить отправку отчетов непосредственно в файл, в систему управления версиями или в инструмент мониторинга.
+
+Подробная информация по настройке исполнения сборки 
+(ссылка на страницу, где описываем 
+- Отображение прогресса
+- Управление результатами сборки
+- Строгий контроль зависимостей
+- Локальное кэширование
+- Использование распределённого кэша
+  )
 
 #### Популярные рецепты
 
@@ -233,13 +285,7 @@ PEERDIR(library/util)
 
 Работа с файлами `ya.make` требует понимания структуры и синтаксиса этих файлов, что позволяет гибко настраивать процесс сборки проекта и управлять сложными системами зависимостей. С более подробной информацией, как писать `ya.make` можно ознакомится здесь(ссылка)
 
-
-
-
-
-
-
-## Сборочные переменные { #D }
+## Сборочные переменные 
 
 В команде `ya make` можно указать дополнительные флаги (переменные) с помощью опции `-DVAR[=VALUE]`. Если не указывать значение переменной, по умолчанию оно будет выставлено в `yes`.
 
@@ -249,705 +295,8 @@ PEERDIR(library/util)
 * Предопределённые переменные, управляющие конфигурацией, например `ya make -DCATBOOST_OPENSOURCE` (сборка как для open source) или `ya make -DCUDA_VERSION=10.1` (сборка с CUDA).
 * Переменные для использования в ya.make `ya make -DMACRO1 -DMACRO2=42`, где в `ya.make` написано, например `IF (MACRO1)`.
 
-Список доступных переменных достаточно большой и часто меняется. Самые часто используемые переменные можно найти в соответствующих разделах [руководства по системе сборки](../../manual/index.md):
+Список доступных переменных достаточно большой и часто меняется. Самые часто используемые переменные можно найти в соответствующим разделе (ссылка на описание, сделать разделы по языкам)
 
-- [Переменные общие для всех языков](../../manual/common/vars.md#D)
-- [Переменные для С/С++](../../manual/cpp/vars.md#D)
-- [Переменные для Python](../../manual/python/vars.md#D)
-- [Переменные для Java](../../manual/java/vars.md#D)
-- [Переменные для Go](../../manual/go/vars.md#D)
-
-
-{% note warning %}
-
-Настоятельно не рекомендуется описывать сборку проектов таким образом, чтобы она для нормальной работы требовала каких-то флагов. В автосборке CI в норме никакие проектно-специфичные переменные не выставляются.
-Если у вас на столько сложный случай, что требуется изменение поведения системы сборки обратитесь в [поддержку devtools](https://st.yandex-team.ru/createTicket?queue=DEVTOOLSSUPPORT), вам помогут
-как с описанием сборки, так и с настройкой CI-процессов.
-
-{% endnote %}
-
-## Настройки исполнения сборки { #options }
-
-При исполнении сборки можно настроить довольно много параметров, включая
-
-- [Отображение прогресса](#progress)
-- [Управление результатами сборки](#results)
-- [Строгий контроль зависимостей](#sandboxing)
-- [Локальное кэширование](./local_ya_cache.md)
-- [Локальное исполнение сборки](./local.md)
-- [Исполнение сборки на кластере распределённой сборки](./dist.md)
-- [Использование распределённого кэша](./yt_store.md)
-
-### Общие настройки
-
-По умолчанию сборка исполняется до первой ошибки, чтобы построить как можно больше (и увидеть как можно больше ошибок) используйте опцию `-k`/`--keep-going`.
-
-{% note alert %}
-
-Опция `-k`/`--keep-going` продолжает сборку даже в присутствии ошибок конфигурирования. Однако, корректность такой сборки не гарантируется.
-
-{% endnote %}
-
-По умолчанию все результаты локальной сборки (как промежуточные, так и финальные кэшируются). Кэширование результатов сборки описывается в разделе [результаты сборки](local_ya_cache.md#local-results).
-Если хочется полностью отключить кэширование и перестроить код полностью с нуля используйте опцию `--rebuild`.
-
-
-### Отображения прогресса { #progress }
-
-По умолчанию `ya make` выводит прогресс на консоль в стиле `ninja`, т. е. по возможности использует одну строку под статус сборки. Поскольку сборка распараллеливается статус отображается только для
-одной из исполняющихся параллельно сборочных команд, про остальные в конце строки написано `+X more`.
-
-Вывод по умолчанию выгляди следующим образом
-
-```
- |99.3%| [JV] {debug} $(B)/devtools/ya/test/tests/tags/data/java/data-java.jar                                       +12 more / 76.8GiB
-  ^^^^        ^^^^^^^                                                                                                ^^^^^^^^   ^^^^^^^
-Прогресс     Конфигурация и платформа                                                                                сколько    занято
-         ^^^          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                           ещё    сборкой
-         Тип          Вход или результат, идентифицирующий команду,                                                исполняется    место в кэше
-       команды                                                                                                        команд
-```
-
-Кроме исполнения команд система сборки может исполнять вспомогательные процессы, если одновременно с ними не исполняются сборочные команды, то статус отображает их исполнение. Например
-
-Управление кэшем (например очистка) или какие-то работы по очистке рабочего места:
-
-```
-|99.3%| AUXILARY TASKS
-```
-
-[Конфигурирование](../../general/how_it_works) имеет собственный индикатор прогресса:
-
-```
-[2 ymakes processing] [150/180 modules configured] [4675 files read] [60/100 modules rendered]
-```
-
-В нём отображается:
-
-1. Число активных процессов анализа зависимостей (ymake).
-   - Анализ зависимостей делается утилитой `ymake` для каждой конфигурации отдельно. Обычно мы анализируем в одной сборке 4 конфигурации (`[target,host] x [pic,nopic]`). Часть из этого делается последовательно, часть параллельно, поэтому чаще всего будет `2 ymakes processing`.
-   - Числа для остальных пунктов суммируются для всех конфигураций.
-2. Совокупное число модулей, для которых проведён анализ зависимостей;
-   - При конфигурировании система сборки оперирует понятием модуля. При чтении ya.make и конфигурировании модулей система сборки узнаёт, что есть ещё модули в зависимостях, и конфигурирует их. Поэтому у `modules configured` бегут обе цифры.
-   - Под анализом зависимостей есть кэш и если он используется, то цифры бегут очень быстро.
-3. Число прочитанных системой сборки файлов (отображается, только если файлы читаются медленно);
-   - Для расчёта UIDов и анализа зависимостей система сборки читает не только ya.make файлы, но и файлы исходного кода. В зависимости от ситуации, файлы могут не читаться вовсе, читаться из кэша файловой системы, читаться с диска или читаться по сети. Заранее число файлов неизвестно, поэтому отображается только одна цифра.
-
-   {% note tip %}
-
-    Если побежали файлы и они даже не побежали, а поползли, значит чтения медленные, возможно, сетевые. В этом случае стоит перезапустить сборку с параметром `--prefetch`.
-    
-   {% endnote %}
-
-4. Количество модулей, для которых построены сборочные команды.
-   - Когда граф зависимостей построен, он [превращается в граф команд](../../general/how_it_works). Это довольно тяжёлое текстовое преобразование Преобразование делается по-модульно, но здесь уже система сборки знает, сколько работы ей надо сделать. Поэтому у `modules rendered` вторая цифра меняется, только когда система сборки начинает рендерить следующую конфигурацию, в остальное время она статична.
-   - Под рендерингом есть кэш и при работе с ним цифры меняются очень быстро.
-
-{% note tip %}
-
-При выводе чего-то кроме статуса, а также если статус не влезает в ширину терминала вывод переходит на другую строку. По умолчанию `ya make` выводит на консоль stderr исполняющихся команд,
-а обрезать строку статуса по ширине пока не умеет.
-
-{% endnote %}
-
-Изменить вывод статуса на построчный можно опцией `-T`. Этот же режим включается при перенаправлении вывода команды `ya make` в файл.
-
-Вывод команды ya make можно расширить следующими опциями:
-
-- `-v, --verbose` — выводить текст исполнившихся сборочных команд
-- `--do-not-output-stderrs` — не выводить stderr команд
-- `--show-timings` — выводить времена исполнения команд в статус **Работает только с `-T`**
-- `--show-extra-progress` — выводить расширенный прогресс (количество исполненных команд) в статус. **Работает только с `-T`**
-- `--cache-stat` — перед сборкой выдать статистику по наполнению локального кэша
-- `--stat` — в конце сборки выдать статистику по сборке. Статистика включает использование кэшей, критический путь, самые долгие сборочные шаги и т.п.
-
-  **Пример статистики**
-
-    ```
-    Cache hit ratio is 66.67% (2 of 3). Local: 2 (66.67%), dist: 0 (0.00%)
-
-    Dist cache download: count=0, size=0 bytes, speed=0.0 bytes/s
-
-    Disk usage for tools/sdk 3.57 GiB
-    Additional disk space consumed for build cache 0 bytes
-
-    Critical path:
-    [1800 ms] [TS] [rnd-6fhs6g7mena0lj3a default-linux-x86_64 release]: devtools/ymake/ut/unittest [started: 0 (1655207840079), finished: 1800 (1655207841879)]
-    Time from start: 1800 ms, time elapsed by graph 1800 ms, time diff 0 ms.
-
-    The longest 10 tasks:
-    [1800 ms] [TS] [rnd-6fhs6g7mena0lj3a default-linux-x86_64 release]: devtools/ymake/ut/unittest [started: 1655207840079, finished: 1655207841879]
-    [ 736 ms] [prepare:FromCache(W09-1vAMmTiIUbzkgxWf-w$(BUILD_ROOT)/devtools/ymake/ut/devtools-ymake-ut)] local [started: 1655207839338, finished: 1655207840074]
-    [ 465 ms] [prepare:clean symres] local [started: 1655207839212, finished: 1655207839677]
-    [ 176 ms] [prepare:$(yt-store-get-meta)] local [count: 1, cps: 5.68, ave time 176.00 msec]
-    [  80 ms] [prepare:$(AC-has)] local [count: 2, cps: 25.00, ave time 40.00 msec]
-    [  40 ms] [prepare:$(JDK-893501938)] local [started: 1655207839350, finished: 1655207839390]
-    [  38 ms] [prepare:$(JDK17-893501938)] local [started: 1655207839359, finished: 1655207839397]
-    [  33 ms] [prepare:$(JDK11-3963791836)] local [started: 1655207839362, finished: 1655207839395]
-    [  31 ms] [prepare:$(WITH_JDK-sbr:3195072371)] local [started: 1655207839348, finished: 1655207839379]
-    [  31 ms] [prepare:$(WITH_JDK11-sbr:3064614561)] local [started: 1655207839357, finished: 1655207839388]
-
-    Total time by type:
-    [TS] - 1800 ms.
-    [prepare:get from local cache] - 741 ms.
-    [prepare:tools] - 469 ms.
-    [prepare:clean] - 469 ms.
-    [prepare:yt-store] - 176 ms.
-    [prepare:AC] - 84 ms.
-
-    Total tasks times:
-    Total failed tasks time - 0 ms (0.00%)
-    Total tests tasks time - 1800 ms (100.00%)
-    Total run tasks time - 1800 ms
-
-    Configure time - 3.3 s
-
-    Statistics overhead 118 ms
-    Ok
-    ```
-### Результаты сборки { #results }
-
-Результаты сборки формируются на основании файлов `ya.make`, собранных командой `ya make`, исходя
-
-- из значений опций `--target/-C`,
-- свободных опций,
-- рабочей директории,
-- путей в макросах `RECURSE` и `DEPENDS`.
-
-По умолчанию **целями сборки** являются *модули*, непосредственно указанные в `ya.make` директорий в командной строке, а также рекурсивно во всех
-макросах `RECURSE` достижимых из `ya.make` директорий в командной строке.
-
-Это поведение может быть изменено следующими опциями:
-
-- `-t или -A` - запуск тестов добавляет к сборке то, что достижимо из макросов `RECURSE_FOR_TESTS` и `DEPENDS`. Правила поиска тестов такие же, как описано выше,
-  т. е. `RECURSE_FOR_TESTS` в `ya.make` модулей достижимых по PEERDIR не учитываются. Кроме добавления модулей к сборке эти макросы приводят к запуску тестов.
-
-- `--force-build-depends` - добавить в сборку всё, что нужно для запуска тестов (как с опциями `-t/-A`) но тесты не запускать.
-
-- `-DTRAVERSE_RECURSE_FOR_TESTS` - трактовать `RECURSE_FOR_TESTS` при поиске сборочных целей как обычный `RECURSE`.
-
-- `--ignore-recurses` - не использовать `RECURSE`, строить только модули, непосредственно указанные в командной строке
-
-Результаты сборки могут быть сложены на постоянное хранение в **выходную директорию**, указанную с помощью опции ```-o/--output <path>```. Система сборки никак не отслеживает
-файлы в директории `<path>`, и удалять их надо вручную.
-
-На Linux/MacOS, если не указана опция `--no-src-links`, результаты будут сложены во временное хранилище, кэш результатов. В этом случае файлы и
-директории из кэша результатов доступны по символическим ссылкам из рабочей копии репозитория.
-
-{% note alert %}
-
-Сборка исполняет свои команды в специальных **сборочных директориях**, каждую команду в своей. Полученные там результаты попадают в отдельные директории **сборочного кэша**,
-а также выборочно становятся результатами сборки - символическими ссылками в рабочей копии и файлами в *выходной директории*. При [распределённой сборке](./dist.md) если указано скачивание результатов,
-то скачиваются только *результаты сборки*, а не всё, что было построено.
-
-Иногда нужно сохранить файлы прямо там, где исполнялась сборка (в сборочных директориях), например, чтобы воспроизвести
-отдельные команды сборки. Чтобы добиться этого есть опция `--keep-temps`.
-
-О том, где и как хранятся локальные результаты и какие есть настройки локального кэширования можно прочитать на [отдельной странице](local_ya_cache.md)
-
-{% endnote %}
-
-В множество результатов сборки по умолчанию попадают только конечные артефакты для *целей сборки* такие, как программа, результат запуска теста и т. п.
-Важно понимать, что только результаты и всё, что нужно для их построение реально строится. Поэтому если что-то не достижимо из результатов сборки строиться оно не будет.
-
-Иногда нужно сохранить промежуточные результаты, или наоборот отфильтровать ненужные конечные результаты. Перечисленные ниже опции влияют на следующие аспекты поведения:
-
-- Файлы, доступные как символические ссылки на Linux и macOS (если не указана опция `--no-src-links`);
-- Файлы, попадающие в директорию *результатов сборки*;
-- Файлы, скачиваемые с кластера распределённой сборки при сборке с ключами `--dist -E` ([сборка на кластере распределённой сборки](./dist.md) с подвозом результатов).
-
-Чтобы расширить множество привозимых результатов, можно использовать опцию `--add-result=.<suff>`.  В конфигурационном файле `ya.conf` можно задать `add_result = [".suff"]`.
-Важно понимать, что эта опция ничего не добавляет к сборке, она лишь влияет на то, что окажется в *выходной директории* и символическими ссылками в рабочей копии. Опция действует
-только на результаты сборки в *целевой платформе* чтобы избежать неоднозначности если одни и те же файлы результатов (но потенциально с разным содержимым) могут быть получены и в
-целевой и в сборочной платформах.
-
-Например, команда
-
-```
-ya make -o=<output> <target> --add-result=.o --add-result=.obj
-```
-
-сложит объектные файлы в директорию `<output>` и (на Linux и MacOS) создаст ссылки на файлы из кэша результатов в директории с исходниками.
-
-Для упрощения работы в частых случаев есть несколько дополнительных опций:
-
-- `--add-protobuf-result` — Добавить все результаты генерации для `Protobuf`.
-- `--add-flatbuf-result` — Добавить результаты генерации `Flatbuffers`.
-- `--add-modules-to-results` — Сделать все модули (включая зависимые по PEERDIR) результатами сборки.
-- `--add-host-result=.<suff>` — Добавить выбранные результаты из сборочной платформы.
-- `--all-outputs-to-result` — Не фильтровать результаты команд. Обычно `--add-result` фильтрует результаты команд по расширениям, с помощью этой опции можно запросить все результаты для команд,
-подходящих под `--add-result`.
-   Например:
-   ```bash
-   $ ya make --add-result=.pb.h
-   ```
-   привезёт только файлы `.pb.h`, а
-   ```bash
-   $ ya make --add-result=.pb.h --all-outputs-to-result
-   ```
-   привезёт как `.pb.h`, так и `.pb.cc`. Это, в частности, может быть полезно при привозе результатов от сборки на кластере распределённой сборки, когда для локального кэширования важно привезти
-   именно полный, а не фильтрованный результат.
-
-Иногда хочется построить только генерируемые файлы, но не библиотеки/программы. Для этого служит опция `--replace-result`. Она оставит в *результатах сборки* только то, что выбрано
-в `--add-result`, всё остальное будет удалено и не будет строиться совсем.
-
-Множество отображаемых результатов можно сузить с помощью опции `--no-output-for=.<suff>` или параметра конфигурационного файла `suppress_outputs = [".suff"]`.
-Сужение не исключает файлы из сборки, оно лишь говорит системе сборки, что результаты не надо складывать в рабочую копию и выходную директорию. Это, в частности, означает, что
-
-- Опция `--no-output-for` никак не взаимодействует с `--replace-result`. Файлы, исключённые из подвоза всё равно будут построены и останутся в кэше.
-- Опция `--no-output-for` не сужает набор файлов, привозимых с кластера распределённой сборки. Они будут скачаны и сложены в кэш, но не будут отображены как результаты сборки.
-
-### Строгий контроль зависимостей { #sandboxing }
-
-По-молчанию локальная сборка и автосборка исполняются в режиме, где каждому сборочному узлу на чтение доступен весь репозиторий. Контроль зависимостей возложен на стадию конфигурирования: она анализирует зависимости команд и засчитывает все нужные файлы в UID-ы, более подробно можно прочитать [здесь](../../general/how_it_works#build).
-
-Однако, это может приводить к проблемам если сборочная зависимость упущена. Если это зависимость от другой команды, то её результат не будет предоставлен и команда с упущенной зависимостью завершится с ошибкой. Это понятная, легко обнаруживаемая и легко исправляемая ситуация. Хуже если упущена зависмость от файла в репозитории. В этом случае конфигурирование не засчитает содержимое файла в UID, а команда сможет его прочитать. Закэширование состояние будет зависеть от содержимого файла и это вызовет массу проблем:
-
-- Сборочный кэш будет "отравлен" содержимым файла и поведение сборки будет различным в зависимости от того, какое состояние закшировалось.
-- Изменение файла не будет влиять на пересборку зависимостей, хотя должно.
-- В конечном счёте возможна ситуация, что в релиз уедет система, с неактуальным состоянием такого файла.
-
-Чтобы решить эту проблему существует опциональный режим *строго контроля зависимостей*. Он задаётся флагом `--sandboxing`, доступен как локально (на платформах Linux и macOS), так и в [распределённой сборке](./dist.md).
-В этом режиме конфигурирование записывает в сборочный граф все необходимые (по мнению системы сборки) файлы для каждой сборочной команды и при исполнении команде предоставляются только эти файлы. Реализовано это на технологии FUSE - для каждого сборочного узла создаётся точка монтирования, которая предоставляется как корень репозитории и специальная логика на основе информации из графа предоставляет в ней досуп только к файлам из списка, переденного в сборочном графе для этой команды.
-
-{% note info %}
-
-Режим `--sandboxing`, к сожалению, не включен по умолчанию поскольку:
-- Он замедляет как конфигуирование (необходимо передавать в графе существенно больше информации), так и сборку: перемонтирование замедляет исполнение узлов, а FUSE-фильтрация и различные пути для файлов в разных узлах замедляют файловые операции.
-- По исторически причинам в репозитории очень много нарушений и их надо починить прежде, чем это включать на всех.
-
-Однако, в автосборке есть [конфигурация с включенными sandboxing-ом](https://a.yandex-team.ru/arcadia/autocheck/linux/ya.make?rev=r10673979#L66-67), а локально можно использовать ключ `--sandboxing`
-
-{% endnote %}
-
-{% note tip %}
-
-Локальная сборка [на кластере разспределённой сборки (`--dist`)](./dist.md) имеет эффект, похожий на *строгий контроль зависимостей*, но более расслабленный. В этом режиме все файлы нужные для __всего сборочного графа__ [передаются в виде архива в кластер распределённой сборки и используются как образ репозитория](./dist#local), соотвественно если упущенная зависимость не нужна соседним узлам графа, то эффект будет аналогичен sandboxing'у, однако если файл нужен, то упущенная завсимость обнаружена не будет.
-
-{% endnote %}
-
-## Работа с тестами { #tests }
-
-ya make предоставляет развитые возможности запуска тестов.
-
-Для простого запуска тестов есть следующие ключи командной строки.
-
-- `-t`/`-tt`/`-ttt` — запустить тесты. `-t` - только SMALL, `-tt` - SMALL и MEDIUM, `-ttt` - тесты всех размеров.
-- `A`, `--run-all-tests` — запустить тесты всех размеров (тоже, что что и `-ttt`).
-
-**Пример**
-
-```bash
-[arcadia]$ ya make -t devtools/examples/tutorials/python
-```
-
-Запустит все тесты, которые найдёт по `RECURSE`/`RECURSE_FOR_TESTS` от `devtools/examples/tutorials/python`, включая тесты стиля и тесты импорта для Python. При этом будут использованы умолчания для сборки:
-
-- Платформа будет определена по *реальной платформе* на которой запущена команда `ya make` (кроме систем на базе процессора M1, для них сборка происходит под `x86_64`). Для того, чтобы запустить сборку под платформу m1, нужно указать `--target-platform default-darwin-arm64`.
-- Тесты будут собраны в режиме `debug` — он используется по умолчанию.
-- Кроме тестов будут собраны все остальные цели (библиотеки и программы), достижимые по `RECURSE`/`RECURSE_FOR_TESTS` от `devtools/examples/tutorials/python`. Это включает сборку всех необходимых зависимостей.
-
-Более подробно о запуске тестов можно прочитать на [отдельной странице](./tests.md)
-
-
-
-Чтобы запустить сборку на своём ноутбуке достаточно выполнить команду `ya make <target>`, где `<target>` — директория проекта, который хочется построить.
-Сборка может быть *локальной* или *распределённой*. Бóльшая часть возможностей доступна как локально, так и в распределённой сборке, однако есть ряд особенностей, связанных с тем, как выполняется сборка.
-
-## Пользовательские настройки и умолчания
-
-По умолчанию (без дополнительных опций) команда `ya make` работает в соответствии c
-
-- локальными настройками, описанными в файлах ya.conf
-- указанными переменными среды,
-- глобальными умолчаниями
-- умолчаниями для системы, на которой запускается сборка.
-
-  ## Опции
-  
-### Основные опции
-```
-    -d                  Debug build
-    -r                  Release build
-    --sanitize=SANITIZE Sanitizer type(address, memory, thread, undefined, leak)
-    --sanitizer-flag=SANITIZER_FLAGS
-                        Additional flag for sanitizer
-    --lto               Build with LTO
-    --thinlto           Build with ThinLTO
-    --sanitize-coverage=SANITIZE_COVERAGE
-                        Enable sanitize coverage
-    --afl               Use AFL instead of libFuzzer
-    --musl              Build with musl-libc
-    --pch               Build with Precompiled Headers
-    --hardening         Build with hardening
-    --race              Build Go projects with race detector
-    --cuda=CUDA_PLATFORM
-                        Cuda platform(optional, required, disabled) (default: optional)
-    --report-config=REPORT_CONFIG_PATH
-                        Set path to TestEnvironment report config
-    -k, --keep-going    Build as much as possible
-    -v, --verbose       Be verbose
-    -T                  Do not rewrite output information (ninja/make)
-    --do-not-output-stderrs
-                        Do not output any stderrs
-    -h, --help          Print help
-    -j=BUILD_THREADS, --threads=BUILD_THREADS
-                        Build threads count (default: NCPU)
-    --clear             Clear temporary data
-    --no-src-links      Do not create any symlink in source directory
-    --ttl=TTL           Resource TTL in days (pass 'inf' - to mark resource not removable) (default: 14)
-    -o=OUTPUT_ROOT, --output=OUTPUT_ROOT
-                        Directory with build results
-    --no-output-for=SUPPRESS_OUTPUTS
-                        Do not symlink/copy output for files with given suffix, they may still be save in cache as result
-    --checkout          Checkout missing dirs
-    -q, --quiet         Checkout silently (for svn)
-```
-### Опции запуска тестов
-```
-  Testing options
-   Run tests
-    -t, --run-tests     Run tests (-t runs only SMALL tests, -tt runs SMALL and MEDIUM tests, -ttt runs SMALL, MEDIUM and FAT tests)
-    -A, --run-all-tests Run test suites of all sizes
-    --add-peerdirs-tests=PEERDIRS_TEST_TYPE
-                        Peerdirs test types (none, gen, all) (default: none)
-    --test-threads=TEST_THREADS
-                        Restriction on concurrent tests (no limit by default) (default: 0)
-    --fail-fast         Fail after the first test failure
-    -L, --list-tests    List tests
-   Filtering
-    -X, --last-failed-tests
-                        restart tests which failed in last run for chosen target
-    -F=TESTS_FILTERS, --test-filter=TESTS_FILTERS
-                        Run only tests that match <tests-filter>
-    --test-size=TEST_SIZE_FILTERS
-                        Run only specified set of tests
-    --test-type=TEST_TYPE_FILTERS
-                        Run only specified types of tests
-    --style             Run only "classpath.clash flake8.py2 flake8.py3 gofmt govet java.style" style tests (implies --strip-skipped-test-deps)
-    --regular-tests     Run only "boost_test exectest fuzz g_benchmark go_bench go_test gtest java py2test py3test pytest unittest" test types
-    --test-tag=TEST_TAGS_FILTER
-                        Run tests that have specified tag
-    --test-filename=TEST_FILES_FILTER
-                        Run only tests with specified filenames (pytest only)
-    --test-size-timeout=TEST_SIZE_TIMEOUTS
-                        Set test timeout for each size (small=60, medium=600, large=3600)
-   Console report
-    -P, --show-passed-tests
-                        Show passed tests
-    --show-skipped-tests
-                        Show skipped tests
-    --inline-diff       Disable truncation of the comments and print diff to the terminal
-    --show-metrics      Show metrics on console (You need to add "-P" option to see metrics for the passed tests)
-   Linters
-    --disable-flake8-migrations
-                        Enable all flake8 checks
-   Canonization
-    -Z, --canonize-tests
-                        Canonize selected tests
-    --canonize-via-skynet
-                        use skynet to upload big canonical data
-    --canonize-via-http use http to upload big canonical data
-    --canon-diff=TEST_DIFF
-                        Show test canonical data diff, allowed values are r<revision>, rev1:rev2, HEAD, PREV
-   Debugging
-    --pdb               Start pdb on errors
-    --gdb               Run c++ unittests in gdb
-    --tests-retries=TESTS_RETRIES
-                        Run every test specified number of times (default: 1)
-    --no-random-ports   Use requested ports
-    --test-stderr       Output test stderr to console online
-    --test-stdout       Output test stdout to console online
-    --test-disable-timeout
-                        Turn off timeout for tests (only for local runs, incompatible with --cache-tests, --dist)
-    --test-debug        Test debug mode (prints test pid after launch and implies --test-threads=1 --test-disable-timeout --retest --test-stderr)
-    --disable-test-graceful-shutdown
-                        Test node will be killed immediately after the timeout
-   Runtime environment
-    --test-param=TEST_PARAMS
-                        Arbitrary parameters to be passed to tests (name=val)
-    --private-ram-drive Creates a private ram drive for all test nodes requesting one
-   Test uid calculation
-    --cache-tests       Use cache for tests
-    --retest            No cache for tests
-   Test dependencies
-    --strip-skipped-test-deps
-                        Don't build skipped test's dependencies
-    --drop-graph-result-before-tests
-                        Build only targets required for requested tests
-   File reports
-    --allure=ALLURE_REPORT (deprecated)
-                        Path to allure report to be generated
-    --junit=JUNIT_PATH  Path to junit report to be generated
-   Test outputs
-    --no-test-outputs   Don't save testing_out_stuff
-    --no-dir-outputs (deprecated)
-                        Tar testing output dir in the intermediate machinery
-    --keep-full-test-logs
-                        Don't truncate logs on distbuild
-    --test-keep-symlinks
-                        Don't delete symlinks from test output
-   Coverage
-    --coverage (deprecated)
-                        Collect coverage information. (deprecated alias for "--gcov --java-coverage --python-coverage --coverage-report")
-    --coverage-prefix-filter=COVERAGE_PREFIX_FILTER
-                        Inspect only matched paths
-    --coverage-exclude-regexp=COVERAGE_EXCLUDE_REGEXP
-                        Exclude matched paths from coverage report
-    --coverage-report-path=COVERAGE_REPORT_PATH
-                        Path inside output dir where to store gcov cpp coverage report (use with --output)
-    --python-coverage   Collect python coverage information
-    --go-coverage       Collect go coverage information
-    --java-coverage     Collect java coverage information
-    --merge-coverage    Merge all resolved coverage files to one file
-    --sancov            Collect sanitize coverage information (automatically increases tests timeout at 1.5 times)
-    --clang-coverage    Clang's source based coverage (automatically increases tests timeout at 1.5 times)
-    --fast-clang-coverage-merge
-                        Merge profiles in the memory in test's runtime using fuse
-    --coverage-report   Build HTML coverage report (use with --output)
-    --enable-java-contrib-coverage
-                        Add sources and classes from contib/java into jacoco report
-    --enable-contrib-coverage
-                        Build contrib with coverage options and insert coverage.extractor tests for contrib binaries
-    --nlg-coverage      Collect Alice's NLG coverage information
-   Fuzzing
-    --fuzzing           Extend test's corpus
-    --fuzz-opts=FUZZ_OPTS
-                        Space separated string of fuzzing options (default: )
-    --fuzz-case=FUZZ_CASE_FILENAME
-                        Specify path to the file with data for fuzzing (conflicting with "--fuzzing")
-    --fuzz-minimization-only
-                        Allows to run minimization without fuzzing (should be used with "--fuzzing")
-   Pytest specific
-    --test-log-level=TEST_LOG_LEVEL
-                        Specifies logging level for output test logs ("critical", "error", "warning", "info", "debug")
-    --test-traceback=TEST_TRACEBACK
-                        Test traceback style for pytests ("long", "short", "line", "native", "no") (default: short)
-    --profile-pytest    Profile pytest calls
-   Java tests specific
-    --jstyle-runner-path=JSTYLE_RUNNER_PATH
-                        Path to custom runner for java style tests
-    -R=PROPERTIES, --system-property=PROPERTIES
-                        Set system property (name=val)
-    --system-properties-file=PROPERTIES_FILES
-                        Load system properties from file
-    --jvm-args=JVM_ARGS Add jvm args for jvm launch
-   Developer options
-    --test-tool-bin=TEST_TOOL_BIN
-                        Path to test_tool binary
-    --test-tool3-bin=TEST_TOOL3_BIN
-                        Path to test_tool3 binary
-    --profile-test-tool=PROFILE_TEST_TOOL
-                        Profile specified test_tool handlers
-```
-### Расширенные опции
-```
-    --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://wiki.yandex-team.ru/yatool/build-types (default: debug)
-    -D=FLAGS            Set variables (name[=val], "yes" if val is omitted)
-    --rebuild           Rebuild all
-    --strict-inputs     Enable strict mode
-    --build-results-report=BUILD_RESULTS_REPORT_FILE
-                        Dump build report to file in the --output-dir
-    --build-results-report-tests-only
-                        Report only test results in the report
-    --build-report-type=BUILD_REPORT_TYPE
-                        Build report type(canonical, human_readable) (default: canonical)
-    --build-results-resource-id=BUILD_RESULTS_RESOURCE_ID
-                        Id of sandbox resource id containing build results
-    --use-links-in-report
-                        Use links in report instead of local paths
-    --report-skipped-suites
-                        Report skipped suites
-    --report-skipped-suites-only
-                        Report only skipped suites
-    --dump-raw-results  Dump raw build results to the output root
-    -C=BUILD_TARGETS, --target=BUILD_TARGETS
-                        Targets to build
-    --stat              Show additional statistics
-    --stat-dir=STATISTICS_OUT_DIR
-                        Additional statistics output dir
-    --mask-roots        Mask source and build root paths in stderr
-    -S=CUSTOM_SOURCE_ROOT, --source-root=CUSTOM_SOURCE_ROOT
-                        Custom source root (autodetected by default)
-    -B=CUSTOM_BUILD_DIRECTORY, --build-dir=CUSTOM_BUILD_DIRECTORY
-                        Custom build directory (autodetected by default)
-    --misc-build-info-dir=MISC_BUILD_INFO_DIR
-                        Directory for miscellaneous build files (build directory by default)
-    --host-build-type=HOST_BUILD_TYPE
-                        Host platform build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://wiki.yandex-team.ru/yatool/build-types (default: release)
-    --host-platform=HOST_PLATFORM
-                        Host platform
-    --host-platform-flag=HOST_PLATFORM_FLAGS
-                        Host platform flag
-    --c-compiler=C_COMPILER
-                        Specifies path to the custom compiler for the host and target platforms
-    --cxx-compiler=CXX_COMPILER
-                        Specifies path to the custom compiler for the host and target platforms
-    --target-platform=TARGET_PLATFORMS
-                        Target platform
-    --target-platform-build-type=TARGET_PLATFORM_BUILD_TYPE
-                        Set build type for the last target platform
-    --target-platform-release
-                        Set release build type for the last target platform
-    --target-platform-debug
-                        Set debug build type for the last target platform
-    --target-platform-tests
-                        Run tests for the last target platform
-    --target-platform-test-size=TARGET_PLATFORM_TEST_SIZE
-                        Run tests only with given size for the last target platform
-    --target-platform-test-type=TARGET_PLATFORM_TEST_TYPE
-                        Run tests only with given type for the last target platform
-    --target-platform-regular-tests
-                        Run only "boost_test exectest fuzz go_bench go_test gtest g_benchmark java junit py2test py3test pytest testng unittest" test types for the last target platform
-    --target-platform-flag=TARGET_PLATFORM_FLAG
-                        Set build flag for the last target platform
-    --target-platform-c-compiler=TARGET_PLATFORM_COMPILER
-                        Specifies path to the custom compiler for the last target platform
-    --target-platform-cxx-compiler=TARGET_PLATFORM_COMPILER
-                        Specifies path to the custom compiler for the last target platform
-    --universal-binaries
-                        Generate multiplatform binaries
-    --show-command=SHOW_COMMAND
-                        Print command for selected build output
-    --add-result=ADD_RESULT
-                        Process selected build output as a result
-    --add-protobuf-result
-                        Process protobuf output as a result
-    --add-flatbuf-result
-                        Process flatbuf output as a result
-    --show-timings      Print execution time for commands
-    --show-extra-progress
-                        Print extra progress info
-    --replace-result    Build only --add-result targets
-    --add-modules-to-results
-                        Process all modules as results
-    --no-local-executor Use Popen instead of local executor
-    --use-clonefile     Use clonefile instead of hardlink on macOS
-    --force-build-depends
-                        Build by DEPENDS anyway
-    --ignore-recurses   Do not build by RECURSES
-    -I=INSTALL_DIR, --install=INSTALL_DIR
-                        Path to accumulate resulting binaries and libraries
-    --html-display=HTML_DISPLAY
-                        Alternative output in html format
-    --teamcity          Generate additional info for teamcity
-    --tools-cache-size=TOOLS_CACHE_SIZE
-                        Max tool cache size (default: 30GiB)
-    --cache-size=CACHE_SIZE
-                        Max cache size (default: 300GiB)
-    --pgo-add           Create PGO profile
-    --pgo-use=PGO_USER_PATH
-                        PGO profiles path
-    --pic               Force PIC mode
-    --maps-mobile       Enable mapsmobi configuration preset
-    --share-results     Share results with skynet
-    --profile=PROFILE_TO_FILE
-                        Write profile info to file
-    --stages=STAGES_PROFILE
-                        Write stages info to file
-    -x=DEBUG_OPTIONS, --dev=DEBUG_OPTIONS
-                        ymake debug options
-    --vcs-file=VCS_FILE Provides VCS file
-    --dump-files-path=DUMP_FILE_PATH
-                        Put extra ymake dumps into specified directory
-    --dev-conf=CONF_DEBUG_OPTIONS
-                        Configure step debug options: list-files, print-commands, force-run, verbose-run
-    --ymake-bin=YMAKE_BIN
-                        Path to ymake binary
-    --no-ymake-resource Do not use ymake binary as part of build commands
-    --no-ya-bin-resource
-                        Do not use ya-bin binary as part of build commands
-    --do-not-use-local-conf
-                        Do not use local configuration files
-    --local-conf-path=LOCAL_CONF_PATH
-                        Path to <local.ymake>
-    --build-custom-json=CUSTOM_JSON
-                        Build custom graph specified by file name
-    --custom-context=CUSTOM_CONTEXT
-                        Use custom context specified by file name (requires additionally passing --build-custom-json)
-    -G, --dump-graph    Dump full build graph to stdout
-    --dump-json-graph   Dump full build graph as json to stdout
-    -M, --makefile      Generate Makefile
-    --dist              Run on distbuild
-    --keep-temps        Do not remove temporary build roots. Print test's working directory to the stderr (use --test-stderr to make sure it's printed at the test start)
-    --profile-to=PROFILE_TO
-                        Run with cProfile
-    --log-file=LOG_FILE Append verbose log into specified file
-    --evlog-file=EVLOG_FILE
-                        Dump event log into specified file
-    --no-evlogs         Disable standard evlogs in YA_CACHE_DIR
-    --evlog-dump-platform
-                        Add platform in event message
-    --cache-stat        Show cache statistics
-    --gc                Remove all cache except uids from the current graph
-    --gc-symlinks       Remove all symlink results except files from the current graph
-    --symlinks-ttl=SYMLINKS_TTL
-                        Results cache TTL (default: 168.0h)
-    --yt-store          Use YT storage
-    --yt-proxy=YT_PROXY YT storage proxy (default: hahn.yt.yandex.net)
-    --yt-dir=YT_DIR     YT storage cypress directory pass (default: //home/devtools/cache)
-    --yt-token=YT_TOKEN YT token
-    --yt-token-path=YT_TOKEN_PATH
-                        YT token path (default: ~/.yt/token)
-    --yt-put            Upload to YT store
-    --yt-create-tables  Create YT storage tables
-    --yt-max-store-size=YT_MAX_CACHE_SIZE
-                        YT storage max size
-    --yt-store-filter=YT_CACHE_FILTER
-                        YT store filter
-    --yt-store-ttl=YT_STORE_TTL
-                        YT store ttl in hours(0 for infinity) (default: 24)
-    --yt-store-codec=YT_STORE_CODEC
-                        YT store codec
-    --yt-replace-result Build only targets that need to be uploaded to the YT store
-    --yt-store-threads=YT_STORE_THREADS
-                        YT store max threads (default: 3)
-    --raw-params=RAW_PARAMS
-                        Params dict as json encoded with base64
-    --dump-distbuild-result=DUMP_DISTBUILD_RESULT
-                        Dump result returned by distbuild (default: False)
-    --build-time=BUILD_EXECUTION_TIME
-                        Set maximum build execution time (in seconds)
-    -E, --download-artifacts
-                        Download build artifacts when using distributed build
-```
-### Опции Java-сборки
-```
-    --sonar             Analyze code with sonar.
-    --sonar-project-filter=SONAR_PROJECT_FILTERS
-                        Analyze only projects that match any filter
-    -N=SONAR_PROPERTIES, --sonar-property=SONAR_PROPERTIES
-                        Property for sonar analyzer(name[=val], "yes" if val is omitted")
-    --sonar-java-args=SONAR_JAVA_ARGS
-                        Java machine properties for sonar scanner run
-    --get-deps=GET_DEPS Compile and collect all dependencies into specified directory
-    -s, --sources       Make sources jars as well
-    --maven-export      Export to maven repository
-    --maven-no-recursive-deps
-                        Not export recursive dependencies
-    --maven-exclude-transitive-from-deps
-                        Exclude transitive from dependencies
-    --version=VERSION   Version of artifacts for exporting to maven
-    --deploy            Deploy artifact to repository
-    --repository-id=REPOSITORY_ID
-                        Maven repository id
-    --repository-url=REPOSITORY_URL
-                        Maven repository url
-    --settings=MAVEN_SETTINGS
-                        Maven settings.xml file path
-    --maven-out-dir=MAVEN_OUTPUT
-                        Maven output directory( for .class files )
-    --use-uncanonical-pom-name
-                        Use uncanonical pom output filename( {artifact}.pom )
-    -J=JAVAC_FLAGS, --javac-opts=JAVAC_FLAGS
-                        Set common javac flags (name=val)
-```
-### Опции авторизации
-```
-    --key=SSH_KEYS      Path to private ssh key to exchange for OAuth token
-    --token=OAUTH_TOKEN oAuth token
-    --user=USERNAME     Custom user name for authorization
-```
 ## Популярные рецепты
 
 * `ya make -r` - собрать код c оптимизациями и отладочной информацией 
@@ -959,4 +308,4 @@ ya make предоставляет развитые возможности за�
 * `ya make -t`  - запустить только быстрые тесты
 * `ya make -tL` - вывести список быстрых тестов
 * `ya make -A`  - запустить все тесты
-* `ya make -h`  - посмотреть справку по всем опциям
+
