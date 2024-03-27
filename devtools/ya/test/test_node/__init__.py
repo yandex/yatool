@@ -49,6 +49,11 @@ import test.util.tools as util_tools
 import yalibrary.last_failed.last_failed as last_failed
 import yalibrary.upload.consts
 
+import typing as tp
+
+if tp.TYPE_CHECKING:
+    from test.facility.containers import Suite  # noqa
+
 logger = logging.getLogger(__name__)
 
 # Don't use sys.maxint - it can't be serialized to yson (ya:yt mode)
@@ -150,6 +155,8 @@ class TestFramer(object):
         return configure_suites(suites, self._prepare_suite, 'suites-configuration', add_error_func=self.add_conf_error)
 
     def _prepare_suite(self, suite):
+        # type: (Suite) -> None
+
         # XXX Bad design, see YA-1440
         suite.init_from_opts(self.opts)
 
@@ -1339,10 +1346,10 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
             if should_skip.get(basename):
                 files_to_skip.add(basename)
 
-    for filename in files_to_skip:
+    for filename in sorted(files_to_skip):
         cmd += ['--skip-file', filename]
 
-    for filename in dirs_to_skip:
+    for filename in sorted(dirs_to_skip):
         cmd += ['--skip-dir', filename]
 
     if opts and getattr(opts, "fast_clang_coverage_merge"):
@@ -1543,6 +1550,7 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
 
 
 def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_descriptor):
+    # type: (tp.Any, tp.Any, Suite, tp.Any, tp.Any, tp.Any) -> tp.Any
     acc_nodes = []
     tests_retries = 1 if test.const.YaTestTags.Noretries in suite.tags else opts.tests_retries
     if suite.fork_test_files_requested(opts) and opts.test_files_filter:

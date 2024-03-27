@@ -57,7 +57,7 @@ class PyTestSuite(common.PythonTestSuite):
         return True
 
     def get_test_files(self, opts=None):
-        test_files = set(super(PyTestSuite, self).get_test_files(opts))
+        test_files = sorted(set(super(PyTestSuite, self).get_test_files(opts)))
 
         if opts is not None and opts.canonize_tests:
             return test_files
