@@ -478,31 +478,47 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         }
         TUniqVector<TString> lateOuts;
         bool usePeersLateOuts = Module->GetAttrs().UsePeersLateOuts;
+        bool isNewCmdFormat = false;
+        auto modNode = Context.Graph.GetFileNodeById(Module->GetId());
+        for (auto edge : modNode.Edges()) {
+            if (*edge == EDT_BuildCommand && edge.To()->NodeType == EMNT_BuildCommand) {
+                isNewCmdFormat = Context.Graph.GetCmdName(Context.Graph[edge.To().Id()]).IsNewFormat();
+                break;
+            }
+        }
         for (const auto& peer : Context.Modules.GetNodeListStore().GetList(modIds.UniqPeers)) {
             const auto peerRef = Context.Graph[peer];
             ui32 elemId = peerRef->ElemId;
-            if (!IsFakeModule(elemId)) {
-                prefix.clear();
-                const auto peerModule = Context.Modules.Get(elemId);
-                if (peerModule->IsCompleteTarget()) {
-                    prefix += ",complete";
-                }
-                if (peerModule->IsFinalTarget()) {
-                    prefix += ",final";
-                }
-                if (modIds.LocalPeers.contains(peer)) {
-                    prefix += ",local";
-                }
-                (prefix += ",") += peerModule->GetTag();
-                const auto peerPath = conf.RealPath(Context.Graph.GetFileName(peerRef));
-                auto& varStr = AddPath(vars["PEERS"], prefix + peerPath);
-                varStr.HasPeerDirTags = true;
-            }
             if (usePeersLateOuts) {
                 for (const auto& lateOut : Context.Modules.GetModuleLateOuts(elemId)) {
                     lateOuts.Push(lateOut);
                 }
             }
+
+            if (IsFakeModule(elemId)) {
+                continue;
+            }
+            const auto peerPath = conf.RealPath(Context.Graph.GetFileName(peerRef));
+            if (isNewCmdFormat) {
+                AddPath(vars["PEERS"], peerPath);
+                continue;
+            }
+
+            prefix.clear();
+            const auto peerModule = Context.Modules.Get(elemId);
+            if (peerModule->IsCompleteTarget()) {
+                prefix += ",complete";
+            }
+            if (peerModule->IsFinalTarget()) {
+                prefix += ",final";
+            }
+            if (modIds.LocalPeers.contains(peer)) {
+                prefix += ",local";
+            }
+            (prefix += ",") += peerModule->GetTag();
+
+            auto& varStr = AddPath(vars["PEERS"], prefix + peerPath);
+            varStr.HasPeerDirTags = true;
         }
         if (usePeersLateOuts) {
             vars["PEERS_LATE_OUTS"];
