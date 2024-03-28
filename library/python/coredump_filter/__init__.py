@@ -280,6 +280,7 @@ MY_PATH = os.path.dirname(os.path.abspath(__file__))
 CORE_PROC_VERSION = "0.2.1"
 
 ARCADIA_ROOT_SIGN = "$S/"
+KNOWN_ARCADIA_ROOT_SIGNS = {"$S", "-S"}
 SIGNAL_NOT_FOUND = "signal not found"
 
 
@@ -490,9 +491,11 @@ class GDBFrame(FrameBase):
         source_fmt = ""
         source = ""
         link = ""
-        dirs = self.source.split("/")
+        dirs = self.source.strip("/").split("/")
         if len(dirs) > 1 and "/{dir}/".format(dir=dirs[1]) in ARCADIA_ROOT_DIRS:
-            link = self.source.replace(ARCADIA_ROOT_SIGN, ARCADIA_ROOT_LINK)
+            if dirs[0] in KNOWN_ARCADIA_ROOT_SIGNS:
+                source = os.path.join(*dirs[1:])
+                link = os.path.join(ARCADIA_ROOT_LINK, source)
         else:
             source = self.source
         if self.source_no:
@@ -501,9 +504,9 @@ class GDBFrame(FrameBase):
                 link += "?#L{line}".format(line=self.source_no)
 
         if link:
-            source = '<a href="{link}">{source}</a>'.format(
+            source = '<a href="{link}">/{source_path}</a>'.format(
                 link=link,
-                source=self.source,
+                source_path=source,
             )
         return source, source_fmt
 
