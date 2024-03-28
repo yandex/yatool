@@ -648,16 +648,18 @@ def remove_corpus_data_duplicates(target, dirs):
     logger.debug("Searching for duplicates in: %s", target)
     found = {}
     for dirname in dirs:
-        for filename in os.listdir(dirname):
-            filename = os.path.join(dirname, filename)
-            found[cityhash.filehash64(six.ensure_binary(filename))] = filename
+        for root, dirs, files in os.walk(dirname):
+            for filename in files:
+                filename = os.path.join(root, filename)
+                found[cityhash.filehash64(six.ensure_binary(filename))] = filename
 
-    for filename in os.listdir(target):
-        filename = os.path.join(target, filename)
-        hashval = cityhash.filehash64(six.ensure_binary(filename))
-        if hashval in found:
-            logger.debug("Removing '%s' as duplicate of '%s'", filename, found[hashval])
-            exts.fs.ensure_removed(filename)
+    for root, dirs, files in os.walk(target):
+        for filename in files:
+            filename = os.path.join(root, filename)
+            hashval = cityhash.filehash64(six.ensure_binary(filename))
+            if hashval in found:
+                logger.debug("Removing '%s' as duplicate of '%s'", filename, found[hashval])
+                exts.fs.ensure_removed(filename)
 
 
 def get_metrics(fuzz_output, stats, corpus_dirs):
