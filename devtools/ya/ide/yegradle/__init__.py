@@ -243,6 +243,8 @@ def do_yegradle(params):
         sem_graph,
         '--generator',
         'ide-gradle',
+        '--debug-mode',
+        'sems|attrs',
         '--target',
         project_name,
     ]
