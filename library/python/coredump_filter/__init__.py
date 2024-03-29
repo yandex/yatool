@@ -513,6 +513,9 @@ class GDBFrame(FrameBase):
 
 class PythonFrame(FrameBase):
     SOURCE_RE = re.compile(r'File "(?P<module_path>.*)", line (?P<error_line_no>\d+), in (?P<func_name>.*)')
+    SOURCE_REPLACEMENTS = {
+        "/home/zomb-sandbox/tasks/": "/sandbox/",
+    }
 
     def __init__(
         self,
@@ -533,7 +536,7 @@ class PythonFrame(FrameBase):
             self._error_col_start = 0
             self._error_col_end = len(self._error_line)
         self._error_line_no = error_line_no
-        self._module_path = module_path.strip()
+        self._module_path = module_path.strip().lstrip("/")
         self._in_function_name = in_function_name.strip()
 
         super(PythonFrame, self).__init__(
@@ -1089,6 +1092,11 @@ def parse_python_traceback_2(
             continue
 
         module_path = m.group("module_path")
+        for prefix in PythonFrame.SOURCE_REPLACEMENTS:
+            if module_path.startswith(prefix):
+                module_path = os.path.join(PythonFrame.SOURCE_REPLACEMENTS[prefix], module_path[len(prefix):])
+                break
+
         in_function_name = m.group("func_name")
         error_line_no = m.group("error_line_no")
         error_line = trace[line_index + 1]
