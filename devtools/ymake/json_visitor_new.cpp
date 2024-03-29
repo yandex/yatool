@@ -172,6 +172,18 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
             }
         }
 
+        // IncludeStructure hash should have an additional mark for fake modules.
+        // There can be no other differences in hashes for a case when an ordinary module
+        // becomes fake. E.g. it could happen when there was GLOBAL and non-GLOBAL SRCS first,
+        // and then all sources became GLOBAL. When this happens the module would disappear
+        // from $PEERS and corresponding command line arguments where PEERS closure happens.
+        // But without this "fake" mark we have no way to know that the command structure changed
+        // as the graph structure remains mostly the same (the difference is there are
+        // no GROUP_NAME=ModuleInputs entries in module and that's almost all).
+        if (CurrState->Module->IsFakeModule()) {
+            CurrState->Hash->New()->IncludeStructureMd5Update("FakeModuleTag"_sb, "Add fake module tag"sv);
+        }
+
         // include managed peers closure to structure hash
         if (CurrState->Module->IsDependencyManagementApplied() && CurrData->NodeDeps) {
             for (TNodeId nodeId : *CurrData->NodeDeps) {
