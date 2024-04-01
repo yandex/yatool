@@ -3045,11 +3045,12 @@ def ya_make_options(  # compat
     run_tests_size=1,
     is_ya_test=False,
     strip_idle_build_results=False,
+    build_type='debug',
 ):
     return (
         [
             ShowHelpOptions(),
-            BuildTypeOptions(build_type='debug'),
+            BuildTypeOptions(build_type=build_type),
             FlagsOptions(),
             CustomFetcherOptions(),
             RebuildOptions(),
