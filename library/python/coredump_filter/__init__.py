@@ -563,6 +563,19 @@ class PythonFrame(FrameBase):
             suffix=self._error_line[self._error_col_end+2:]
         ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
 
+    def raw(self):
+        error_line = self._error_line
+        if not self._in_function_name:
+            file_line = ""
+        else:
+            error_line = '  {}'.format(self._error_line)
+            file_line = 'File "{source}", line {line}, in {func}'.format(
+                source=self._module_path,
+                line=self._error_line_no,
+                func=self._in_function_name,
+            )
+        return "{}\n{}".format(file_line, error_line)
+
     def html(self):
         if not self._in_function_name:
             file_line = ""
