@@ -75,7 +75,7 @@ private:
     void Render(ECleanIgnored cleanIgnored) override;
     void RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs);
 
-    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const;
+    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const;
 
     const jinja2::ValuesMap& FinalizeRootAttrs();
     jinja2::ValuesMap FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes = {});
@@ -95,22 +95,22 @@ public:
     TBuilder(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs);
 
     template<IterableValues Values>
-    bool SetRootAttr(const std::string& attrName, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(*RootAttrs, EAttributeGroup::Root, attrName, values, nodePath);
+    void SetRootAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
+        SetAttrValue(*RootAttrs, EAttributeGroup::Root, attrName, values, nodePath);
     }
 
     template<IterableValues Values>
-    bool SetTargetAttr(const std::string& attrName, const Values& values, const std::string& nodePath) {
+    void SetTargetAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
         if (!CurTarget_) {
             spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
-            return false;
+            return;
         }
-        return SetAttrValue(CurTarget_->Attrs, EAttributeGroup::Target, attrName, values, nodePath);
+        SetAttrValue(CurTarget_->Attrs, EAttributeGroup::Target, attrName, values, nodePath);
     }
 
     template<IterableValues Values>
-    bool SetInducedAttr(jinja2::ValuesMap& attrs,const std::string& attrName, const Values& values, const std::string& nodePath) {
-        return SetAttrValue(attrs, EAttributeGroup::Induced, attrName, values, nodePath);
+    void SetInducedAttr(jinja2::ValuesMap& attrs, const std::string_view attrName, const Values& values, const std::string& nodePath) {
+        SetAttrValue(attrs, EAttributeGroup::Induced, attrName, values, nodePath);
     }
 
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
@@ -118,11 +118,11 @@ public:
     void SetTestModDir(const std::string& testModDir);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
 
-    std::tuple<std::string, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs);
+    std::tuple<std::string_view, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string_view attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs);
 
     template<IterableValues Values>
-    bool SetAttrValue(jinja2::ValuesMap& jinjaAttrs, EAttributeGroup attrGroup, const std::string& attrName, const Values& values, const std::string& nodePath, bool itemMode = false) {
-        TAttribute attribute(attrName);
+    void SetAttrValue(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string_view attrName, const Values& values, const std::string& nodePath) const {
+        // Convert values to jinja2::ValuesList
         jinja2::ValuesList jvalues;
         const jinja2::ValuesList* valuesPtr;
         if constexpr(std::same_as<Values, jinja2::ValuesList>) {
@@ -131,94 +131,32 @@ public:
             Copy(values.begin(), values.end(), std::back_inserter(jvalues));
             valuesPtr = &jvalues;
         }
-        auto attrType = Generator->GetAttrType(attrGroup, attrName);
-        Y_ASSERT(attrType != EAttrTypes::Unknown);
-        if (!itemMode && attribute.IsItem()) { // attr with -ITEM tail not in item mode
-            std::string parentAttrName(attribute.GetFirstParts(attribute.Size() - 2));
-            if (attrType == EAttrTypes::Dict && Generator->GetAttrType(attrGroup, parentAttrName) == EAttrTypes::List) { // item is dist and parent is list
-                auto [attrIt, _] = jinjaAttrs.emplace(parentAttrName, jinja2::ValuesList{});
-                attrIt->second.asList().emplace_back(jinja2::ValuesMap{});
-                return true;
-            } else {
-                spdlog::error("trying create item of not list attribute {} at node {}", parentAttrName, nodePath);
-                return false;
-            }
-        }
-        size_t lastDivPos = itemMode ? std::string::npos : attrName.rfind(ATTR_DIVIDER);
-        // If attrName has attribute divider use temp treeJinjaAttrs for set attr
-        jinja2::ValuesMap tempJinjaAttrs;
-        std::string treeAttrName;
-        jinja2::ValuesMap& setJinjaAttrs = lastDivPos == std::string::npos ? jinjaAttrs : tempJinjaAttrs;
-        const std::string& setAttrName = lastDivPos == std::string::npos ? attrName : attrName.substr(lastDivPos + 1);
-        bool r = false;
-        switch (attrType) {
-            case EAttrTypes::Str:
-                r = SetStrAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Bool:
-                r = SetBoolAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Flag:
-                r = SetFlagAttr(setJinjaAttrs, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::List:
-                r = AppendToListAttr(setJinjaAttrs, attrGroup, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Set:
-                r = AppendToSetAttr(setJinjaAttrs, attrGroup, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::SortedSet:
-                r = AppendToSortedSetAttr(setJinjaAttrs, attrGroup, setAttrName, *valuesPtr, nodePath);
-                break;
-            case EAttrTypes::Dict:
-                r = AppendToDictAttr(setJinjaAttrs, attrGroup, setAttrName, *valuesPtr, nodePath);
-                break;
-            default:
-                spdlog::error("Unknown attribute {} type at node {}", attrName, nodePath);
-        }
-        if (!r || lastDivPos == std::string::npos) {
-            return r;
-        }
-
-        // Convert attrName with dividers to upperAttrName and tree of attributes base on ValuesMap
-        auto [upperAttrName, treeJinjaAttrs] = MakeTreeJinjaAttrs(attrName, lastDivPos, std::move(tempJinjaAttrs));
-        auto upperAttrType = Generator->GetAttrType(attrGroup, upperAttrName);
-        if (upperAttrType == EAttrTypes::Dict) {
-            // Merge result tree attrubutes to jinjaAttrs
-            MergeTreeToAttr(jinjaAttrs, upperAttrName, treeJinjaAttrs);
-        } else if (upperAttrType == EAttrTypes::List) {
-            auto upperIt = jinjaAttrs.find(upperAttrName);
-            if (upperIt == jinjaAttrs.end() || !upperIt->second.isList()) {
-                spdlog::error("Not found upper list attribute {} for merging at node {}", upperAttrName, nodePath);
-                return false;
-            }
-            auto& upperList = upperIt->second.asList();
-            if (upperList.empty()) {
-                spdlog::error("Try merge to empty upper list attribute {} at node {}", upperAttrName, nodePath);
-                return false;
-            }
-            // Merge result tree attrubutes to last item
-            MergeTree(upperList.back().asMap(), treeJinjaAttrs);
-        } else {
-            spdlog::error("Unknown upper attribute {} type '{}' at node {}", upperAttrName, ToString<EAttrTypes>(upperAttrType), nodePath);
-            return false;
-        }
-        return true;
+        TAttribute attribute(attrName);
+        SetAttrValue(attrs, attrGroup, attribute, 0, *valuesPtr, [&]() {
+            return "attribute " + attribute.str() + " at node " + nodePath;// debug string for error messages
+        });
     }
 
     static void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
 
 private:
-    bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);
-    bool SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    bool SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    bool SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    jinja2::Value GetItemValue(EAttributeGroup attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
-    bool AppendToListAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
-    bool AppendToSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string&);
-    bool AppendToSortedSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    bool AppendToDictAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath);
-    void MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesMap& tree);
+    using TGetDebugStr = const std::function<std::string()>&;
+
+    static bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);
+
+    void SetAttrValue(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const TAttribute& attribute, size_t atPos, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
+
+    static jinja2::Value GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr);
+    static void SetStrAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
+    static void SetBoolAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
+    static void SetFlagAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
+
+    void AppendToListAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
+    void AppendToSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
+    void AppendToSortedSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
+    void AppendToDictAttr(jinja2::ValuesMap& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
+
+    EAttrTypes GetItemAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const;
 
     jinja2::ValuesMap* RootAttrs;
     TJinjaGenerator* Generator;

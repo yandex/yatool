@@ -1,6 +1,7 @@
 #include "jinja_generator.h"
 #include "read_sem_graph.h"
 #include "graph_visitor.h"
+#include "attribute.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
@@ -47,23 +48,6 @@ static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& v
     return true;
 }
 
-bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const jinja2::Value& value) {
-    if (list.empty()) {
-        return false;
-    }
-    TStringBuilder valueStr;
-    TStringBuilder listValueStr;
-    Dump(valueStr.Out, value);
-    for (const auto& listValue : list) {
-        listValueStr.clear();
-        Dump(listValueStr.Out, listValue);
-        if (valueStr == listValueStr) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool TJinjaProject::TBuilder::AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath) {
     if (!CurTarget_) {
         spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
@@ -89,7 +73,7 @@ const TNodeSemantics& TJinjaProject::TBuilder::ApplyReplacement(TPathView path, 
     return Generator->ApplyReplacement(path, inputSem);
 }
 
-std::tuple<std::string, jinja2::ValuesMap> TJinjaProject::TBuilder::MakeTreeJinjaAttrs(const std::string& attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs) {
+std::tuple<std::string_view, jinja2::ValuesMap> TJinjaProject::TBuilder::MakeTreeJinjaAttrs(const std::string_view attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs) {
     auto upperAttrName = attrNameWithDividers.substr(0, lastDivPos); // current attr for tree
     // Parse upperAttrName for all tree levels
     while ((lastDivPos = upperAttrName.rfind(ATTR_DIVIDER)) != std::string::npos) {
@@ -101,131 +85,208 @@ std::tuple<std::string, jinja2::ValuesMap> TJinjaProject::TBuilder::MakeTreeJinj
     return {upperAttrName, treeJinjaAttrs};
 }
 
-bool TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    if (values.size() > 1) {
-        spdlog::error("trying to add {} elements to 'str' type attribute {} at node {}, type 'str' should have only 1 element", values.size(), attrName, nodePath);
-        r = false;
+bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const jinja2::Value& value) {
+    if (list.empty()) {
+        return false;
     }
-    auto v = values.empty() ? std::string{} : values[0].asString();
-    const auto [attrIt, inserted] = attrs.emplace(attrName, v);
+    TStringBuilder valueStr;
+    TStringBuilder listValueStr;
+    Dump(valueStr.Out, value);
+    for (const auto& listValue : list) {
+        listValueStr.clear();
+        Dump(listValueStr.Out, listValue);
+        if (valueStr == listValueStr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void TJinjaProject::TBuilder::SetAttrValue(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const TAttribute& attribute, size_t atPos, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+    if (atPos == (attribute.Size() - 1)) {// last item - append complex attribute or set simple attribute
+        auto attrType = Generator->GetAttrType(attrGroup, attribute.GetFirstParts(atPos));
+        auto keyName = attribute.GetPart(atPos);
+        switch (attrType) {
+            case EAttrTypes::Str:
+                SetStrAttr(attrs, keyName, GetSimpleAttrValue(attrType, values, getDebugStr), getDebugStr);
+                break;
+            case EAttrTypes::Bool:
+                SetBoolAttr(attrs, keyName, GetSimpleAttrValue(attrType, values, getDebugStr), getDebugStr);
+                break;
+            case EAttrTypes::Flag:
+                SetFlagAttr(attrs, keyName, GetSimpleAttrValue(attrType, values, getDebugStr), getDebugStr);
+                break;
+            case EAttrTypes::List:{
+                auto [listAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesList{});
+                AppendToListAttr(listAttrIt->second.asList(), attrGroup, attribute, values, getDebugStr);
+            }; break;
+            case EAttrTypes::Set:{
+                auto [setAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesList{});
+                AppendToSetAttr(setAttrIt->second.asList(), attrGroup, attribute, values, getDebugStr);
+            }; break;
+            case EAttrTypes::SortedSet:{
+                auto [sortedSetAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesList{});
+                AppendToSortedSetAttr(sortedSetAttrIt->second.asList(), attrGroup, attribute, values, getDebugStr);
+            }; break;
+            case EAttrTypes::Dict:{
+                auto [dictAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesMap{});
+                AppendToDictAttr(dictAttrIt->second.asMap(), attrGroup, attribute, values, getDebugStr);
+            }; break;
+            default:
+                spdlog::error("Skipped unknown {}", getDebugStr());
+        }
+    } else { // middle item - create list/dict attribute
+        auto attrType = Generator->GetAttrType(attrGroup, attribute.GetFirstParts(atPos));
+        auto keyName = attribute.GetPart(atPos);
+        switch (attrType) {
+            case EAttrTypes::List:{// only special case may be here - list of dicts
+                auto listItem = std::string{attribute.GetFirstParts(atPos)} + ITEM_SUFFIX;
+                auto itemAttrType = Generator->GetAttrType(attrGroup, std::string{listItem});
+                if (itemAttrType != EAttrTypes::Dict) {
+                    spdlog::error("trying create middle item {} which is list of {} at {}", keyName, ToString<EAttrTypes>(itemAttrType), getDebugStr());
+                    break;
+                }
+                auto [listAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesList{});
+                auto& list = listAttrIt->second.asList();
+                if (listItem == attribute.str()) {// magic attribute <list>-ITEM must append new empty item
+                    list.emplace_back(jinja2::ValuesMap{});
+                    break;
+                }
+                if (list.empty()) {
+                    spdlog::error("trying set item of empty list {} at {}", keyName, getDebugStr());
+                    break;
+                }
+                // Always apply attributes to last item of list
+                SetAttrValue(list.back().asMap(), attrGroup, attribute, atPos + 1, values, getDebugStr);
+            }; break;
+            case EAttrTypes::Dict:{
+                auto [dictAttrIt, _] = attrs.emplace(keyName, jinja2::ValuesMap{});
+                SetAttrValue(dictAttrIt->second.asMap(), attrGroup, attribute, atPos + 1, values, getDebugStr);
+            }; break;
+            default:
+                spdlog::error("Can't create middle {} for type {} of {}", keyName, ToString<EAttrTypes>(attrType), getDebugStr());
+        }
+    }
+}
+
+jinja2::Value TJinjaProject::TBuilder::GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
+    switch (attrType) {
+        case EAttrTypes::Str:
+            if (values.size() > 1) {
+                spdlog::error("trying to add {} elements to 'str' type {}, type 'str' should have only 1 element", values.size(), getDebugStr());
+                // but continue and use first item
+            }
+            return values.empty() ? std::string{} : values[0].asString();
+        case EAttrTypes::Bool:
+            if (values.size() > 1) {
+                spdlog::error("trying to add {} elements to 'bool' type {}, type 'bool' should have only 1 element", values.size(), getDebugStr());
+                // but continue and use first item
+            }
+            return values.empty() ? false : IsTrue(values[0].asString());
+        case EAttrTypes::Flag:
+            if (values.size() > 0) {
+                spdlog::error("trying to add {} elements to 'flag' type {}, type 'flag' should have only 0 element", values.size(), getDebugStr());
+                // but continue
+            }
+            return true;
+        default:
+            spdlog::error("try get simple value of {} with type {}", ToString<EAttrTypes>(attrType), getDebugStr());
+            return {};// return empty value
+    }
+}
+
+void TJinjaProject::TBuilder::SetStrAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr) {
+    const auto& v = value.asString();
+    const auto [attrIt, inserted] = attrs.emplace(keyName, value);
     if (!inserted && attrIt->second.asString() != v) {
-        spdlog::error("Set string value '{}' of attribute {} at node {}, but it already has value '{}', overwritten", v, attrName, nodePath, attrIt->second.asString());
-        attrIt->second = v;
+        spdlog::error("Set string value '{}' of {}, but it already has value '{}', overwritten", v, getDebugStr(), attrIt->second.asString());
+        attrIt->second = value;
     }
-    return r;
 }
 
-bool TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    if (values.size() > 1) {
-        spdlog::error("trying to add {} elements to 'bool' type attribute {} at node {}, type 'bool' should have only 1 element", values.size(), attrName, nodePath);
-        r = false;
-    }
-    auto v = values.empty() ? false : IsTrue(values[0].asString());
-    const auto [attrIt, inserted] = attrs.emplace(attrName, v);
+void TJinjaProject::TBuilder::SetBoolAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr) {
+    const auto v = value.get<bool>();
+    const auto [attrIt, inserted] = attrs.emplace(keyName, value);
     if (!inserted && attrIt->second.get<bool>() != v) {
-        spdlog::error("Set bool value {} of attribute {} at node {}, but it already has value {}, overwritten", v ? "True" : "False", attrName, nodePath, attrIt->second.get<bool>() ? "True" : "False");
-        attrIt->second = v;
+        spdlog::error("Set bool value {} of {}, but it already has value {}, overwritten", v ? "True" : "False", getDebugStr(), attrIt->second.get<bool>() ? "True" : "False");
+        attrIt->second = value;
     }
-    return r;
 }
 
-bool TJinjaProject::TBuilder::SetFlagAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    if (values.size() > 0) {
-        spdlog::error("trying to add {} elements to 'flag' type attribute {} at node {}, type 'flag' should have only 0 element", values.size(), attrName, nodePath);
-        r = false;
-    }
-    attrs.insert_or_assign(attrName, true);
-    return r;
+void TJinjaProject::TBuilder::SetFlagAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr /*getDebugStr*/) {
+    attrs.insert_or_assign(std::string{keyName}, value);
 }
 
-jinja2::Value TJinjaProject::TBuilder::GetItemValue(EAttributeGroup attrGroup, const std::string& attrName, const jinja2::Value& value, const std::string& nodePath) {
-    jinja2::ValuesMap tempAttrs;
-    auto attrNameItem = attrName + ITEM_SUFFIX;
-    SetAttrValue(tempAttrs, attrGroup, attrNameItem, jinja2::ValuesList{value}, nodePath, true);
-    return tempAttrs[attrNameItem];
-}
-
-bool TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
-    auto& attr = attrIt->second.asList();
+void TJinjaProject::TBuilder::AppendToListAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+    auto itemAttrType = GetItemAttrType(attrGroup, attribute.str());
     for (const auto& value : values) {
-        attr.emplace_back(GetItemValue(attrGroup, attrName, value, nodePath));
-    }
-    return true;
-}
-
-bool TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
-    auto& attr = attrIt->second.asList();
-    for (const auto& value : values) {
-        if (value.isMap() || value.isList()) {
-            spdlog::error("trying to add invalid type (map or list) element to set {} at {}", attrName, nodePath);
-            r = false;
+        auto item = GetSimpleAttrValue(itemAttrType, jinja2::ValuesList{value}, getDebugStr);
+        if (item.isEmpty()) {
             continue;
         }
-        auto itemValue = GetItemValue(attrGroup, attrName, value, nodePath);
+        attr.emplace_back(std::move(item));
+    }
+}
+
+void TJinjaProject::TBuilder::AppendToSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+    auto itemAttrType = GetItemAttrType(attrGroup, attribute.str());
+    for (const auto& value : values) {
+        auto item = GetSimpleAttrValue(itemAttrType, jinja2::ValuesList{value}, getDebugStr);
+        if (item.isEmpty()) {
+            continue;
+        }
         bool exists = false;
         for (const auto& v: attr) {
-            if (exists |= v.asString() == itemValue.asString()) {
+            if (exists |= v.asString() == item.asString()) {
                 break;
             }
         }
         if (!exists) { // add to list only if not exists
-            attr.emplace_back(itemValue);
+            attr.emplace_back(std::move(item));
         }
     }
-    return r;
 }
 
-bool TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
-    auto& attr = attrIt->second.asList();
+void TJinjaProject::TBuilder::AppendToSortedSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+    auto itemAttrType = GetItemAttrType(attrGroup, attribute.str());
     std::set<std::string> set;
     if (!attr.empty()) {
-        for (const auto& value : attr) {
-            set.emplace(value.asString());
+        for (const auto& item : attr) { //fill set by exists values
+            set.emplace(item.asString());
         }
     }
     for (const auto& value : values) {
-        if (value.isMap() || value.isList()) {
-            spdlog::error("trying to add invalid type (map or list) element to sorted set {} at {}", attrName, nodePath);
-            r = false;
+        auto item = GetSimpleAttrValue(itemAttrType, jinja2::ValuesList{value}, getDebugStr);
+        if (item.isEmpty()) {
             continue;
         }
-        set.emplace(GetItemValue(attrGroup, attrName, value, nodePath).asString());
+        set.emplace(item.asString());// append new values
     }
     attr.clear();
-    for (const auto& value : set) { // full refill attr from set
-        attr.emplace_back(value);
+    for (const auto& item : set) { // full refill attr from set
+        attr.emplace_back(item);
     }
-    return r;
 }
 
-bool TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string& attrName, const jinja2::ValuesList& values, const std::string& nodePath) {
-    bool r = true;
-    attrs.emplace(attrName, jinja2::ValuesMap{});
+void TJinjaProject::TBuilder::AppendToDictAttr(jinja2::ValuesMap& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
     for (const auto& value : values) {
         auto keyval = std::string_view(value.asString());
         if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
-            spdlog::error("trying to add invalid element {} to 'dict' type attribute {} at node {}, each element must be in key=value format without spaces around =", keyval, attrName, nodePath);
-            r = false;
+            spdlog::error("trying to add invalid element {} to dict {}, each element must be in key=value format without spaces around =", keyval, getDebugStr());
         } else {
-            std::string keyAttrName = attrName + std::string{ATTR_DIVIDER} + std::string{keyval.substr(0, pos)};
-            std::vector<std::string> keyAttrValues{1, std::string{keyval.substr(pos + 1)}};
-            SetAttrValue(attrs, attrGroup, keyAttrName, keyAttrValues, nodePath);
+            auto key = keyval.substr(0, pos);
+            auto keyAttrType = Generator->GetAttrType(attrGroup, attribute.str() + std::string{ATTR_DIVIDER} + std::string{key});
+            auto val = GetSimpleAttrValue(keyAttrType, jinja2::ValuesList{std::string{keyval.substr(pos + 1)}}, getDebugStr);
+            if (val.isEmpty()) {
+                continue;
+            }
+            attr.insert_or_assign(std::string{key}, std::move(val));
         }
     }
-    return r;
 }
 
-void TJinjaProject::TBuilder::MergeTreeToAttr(jinja2::ValuesMap& attrs, const std::string& attrName, const jinja2::ValuesMap& tree) {
-    auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
-    MergeTree(attrIt->second.asMap(), tree);
+EAttrTypes TJinjaProject::TBuilder::GetItemAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const {
+    return Generator->GetAttrType(attrGroup, std::string{attrName} + ITEM_SUFFIX);
 }
 
 void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree) {
@@ -514,7 +575,7 @@ void TJinjaGenerator::LoadSemGraph(const std::string&, const fs::path& semGraph)
     AnalizeSemGraph(startDirs, *graph);
 }
 
-EAttrTypes TJinjaGenerator::GetAttrType(EAttributeGroup attrGroup, const std::string& attrName) const {
+EAttrTypes TJinjaGenerator::GetAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const {
     if (const auto* attrs = GeneratorSpec.AttrGroups.FindPtr(attrGroup)) {
         if (const auto it = attrs->find(attrName); it != attrs->end()) {
             return it->second;
