@@ -54,7 +54,8 @@ def merge_darts(darts):
         for field in MERGE_FIELDS:
             if field in dart_info:
                 dart_info[field] = sorted(list(set(dart_info[field])))
-    return darts_map.values()
+
+    return [darts_map[key] for key in sorted(darts_map.keys())]
 
 
 def decode_recipe_cmdline(raw):
