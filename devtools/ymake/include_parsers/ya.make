@@ -21,7 +21,6 @@ SRCS(
     sc_parser.cpp
     swig_parser.cpp
     xs_parser.cpp
-    xsyn_parser.cpp
     ydl_imports_parser.rl6
     ydl_parser.cpp
     ts_import_parser.rl6
@@ -33,8 +32,21 @@ PEERDIR(
     devtools/ymake/options
     devtools/ymake/symbols
     library/cpp/regex/pcre
-    library/cpp/xml/document
 )
+
+IF (OPENSOURCE)
+    SRCS(
+        dummy_xsyn_parser.cpp
+    )
+ELSE()
+    SRCS(
+        xsyn_parser.cpp
+    )
+
+    PEERDIR(
+        library/cpp/xml/document
+    )
+ENDIF()
 
 END()
 

@@ -19,7 +19,6 @@ PEERDIR(
     devtools/ymake/lang
     devtools/ymake/lang/makelists
     devtools/ymake/make_plan
-    devtools/msvs
     devtools/ymake/options
     devtools/ymake/resolver
     devtools/ymake/symbols
@@ -43,7 +42,6 @@ PEERDIR(
     library/cpp/string_utils/base64
     library/cpp/svnversion
     library/cpp/ucompress
-    library/cpp/xml/document
     library/cpp/zipatch
 )
 
@@ -129,18 +127,6 @@ SRCS(
     module_state.cpp
     module_store.cpp
     module_wrapper.cpp
-    msvs.cpp
-    msvs/command.cpp
-    msvs/configuration.cpp
-    msvs/file.cpp
-    msvs/guid.cpp
-    msvs/module.cpp
-    msvs/obj.cpp
-    msvs/project.cpp
-    msvs/project_tree.cpp
-    msvs/query.cpp
-    msvs/vcxproj.cpp
-    msvs/version.cpp
     node_builder.cpp
     node_printer.cpp
     out.cpp
@@ -177,6 +163,31 @@ SRCS(
     vars.cpp
     ymake.cpp
 )
+
+IF (OPENSOURCE)
+    SRCS(
+        dummy_msvs.cpp
+    )
+ELSE()
+    SRCS(
+        msvs.cpp
+        msvs/command.cpp
+        msvs/configuration.cpp
+        msvs/file.cpp
+        msvs/guid.cpp
+        msvs/module.cpp
+        msvs/obj.cpp
+        msvs/project.cpp
+        msvs/project_tree.cpp
+        msvs/query.cpp
+        msvs/vcxproj.cpp
+        msvs/version.cpp
+    )
+    PEERDIR(
+        devtools/msvs
+        library/cpp/xml/document
+    )
+ENDIF()
 
 IF(NEW_UIDS_BY_DEFAULT)
     CFLAGS(GLOBAL -DNEW_UIDS_BY_DEFAULT)
@@ -233,12 +244,17 @@ RECURSE_FOR_TESTS(
     include_processors/ut
     lang/makelists/fuzz
     lang/makelists/ut
-    msvs/ut
     resolver/ut
     symbols/ut
     ut
     ut/hexencoder
 )
+
+IF (NOT OPENSOURCE)
+    RECURSE(
+        msvs/ut
+    )
+ENDIF()
 
 IF (OS_WINDOWS OR YA_OPENSOURCE OR OPENSOURCE)
     # This excludes integrational tests, but leaves unit tests
