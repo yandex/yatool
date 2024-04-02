@@ -16,10 +16,6 @@
 
 ## Опции
 ```
-   Usage:
-  ya gc cache [OPTION]...
-
-
 Options:
   Ya operation control
     -h, --help          Print help. Use -hh for more options and -hhh for even more.
