@@ -1119,7 +1119,7 @@ def do_json_test_list(params):
 
 
 def do_test_list(params):
-    print(pickle.dumps(get_tests(params)))
+    sys.stdout.buffer.write(pickle.dumps(get_tests(params)))
 
 
 def do_conf(params):
