@@ -1,5 +1,54 @@
 # ya dump
 
+Команда `ya dump` разработана для извлечения и предоставления детализированной информации о различных аспектах системы сборки и репозитория. 
+
+Эта информация может включать в себя сведения о сборочном графе, зависимостях между модулями, конфигурационных параметрах и многом другом.
+
+### 2. Синтаксис
+
+Общий формат команды выглядит следующим образом:
+```
+ya dump <subcommand> [OPTION] [TARGET]
+```
+Где:
+- `ya dump` является основным вызовом команды и указывает на то, что вы хотите использовать функциональность извлечения данных о проекте.
+- `<subcommand>` обозначает конкретное действие или отчет, который вы хотите получить.
+Например, modules, dep-graph, conf-docs и т.д. Каждая подкоманда имеет своё предназначение и набор дополнительных параметров и опций.
+- `[OPTION]` (необязательный) — это дополнительные флаги или ключи, которые модифицируют поведение выбранной подкоманды. Опции позволяют настроить вывод команды, уточнить, какие данные необходимо извлечь, или изменить формат вывода.
+- `[TARGET]` (необязательный) — это дополнительные параметры, необходимые для выполнения некоторых подкоманд. Аргументы могут включать пути к файлам, названия модулей или другие специфические данные, необходимые для выполнения команды.
+Вызов [справки](helpyadump.md) по всем доступным подкомандам:
+```
+ya dump --help
+```
+### Подкоманды `<subcommand>`
+
+Подкоманды ya dump выводят информацию о сборочном графе, а также позволяют получить информацию о системе сборки.
+
+Первая группа подкоманд может быть полезна для анализа зависимостей между модулями, а также для поиска проблем. К ней относятся:
+
+- `ya dump modules` – список зависимых модулей.
+- `ya dump relation` – зависимость между двумя модулями.
+- `ya dump all-relations` – все зависимости между двумя модулями.
+- `ya dump dot-graph` – граф всех межмодульных зависимостей данного проекта.
+- `ya dump dep-graph`, `ya dump json-dep-graph` – граф зависимостей системы сборки.
+- `ya dump build-plan` – граф сборочных команд.
+- `ya dump loops`, `ya dump peerdir-loops` – информация о циклах в графе зависимостей.
+- `ya dump compile-commands`, `ya dump compilation-database` – информация о сборочных командах (compilation database).
+
+По умолчанию вывод этих подкоманд основан на графе обычной сборки без тестов.  
+
+Для поиска информации с учётом сборки тестов надо добавить опцию `-t`, например, `ya dump modules -t`.
+
+Вторая группа - это различная информация от системы сборки. К ней относятся:
+
+- ya dump groups – группы владельцев проектов.
+- ya dump json-test-list – информация о тестах.
+- ya dump recipes – информация о поднимаемых рецептах.
+- ya dump conf-docs - документация по макросам и модулям.
+- ya dump debug — сборка отладочного bundle.
+
+
+
 Получить различную информацию о репозитории и сборке.
 
 `ya dump <subcommand> [OPTIONS]`
@@ -29,28 +78,80 @@
 * ya dump debug — сборка отладочного bundle
 * ya dump --help - справка по командам `ya dump`
 
-## Доступные команды
+### Опции
+
+Для удобства использования и повышения гибкости команды ya dump предлагают разнообразные опции, которые можно разделить на несколько групп в соответствии с их применением и областью действия. 
+
+Вот основные группы опций:
+
+#### Общие опции:
+
+Эти опции могут быть применены к любой подкоманде и часто используются для настройки вывода информации или специфики выполнения.
+
+- --help: Вывод справочной информации о команде или конкретной подкоманде.
+- -t, --force-build-depends: Включение информации о сборке тестов в выводимые данные.
+- -d: Выбор директории, относительно которой будет производиться выполнение команды. Это полезно, когда нужно работать с проектом, находящимся не в текущей директории.
+
 ```
- all-relations             All relations between internal graph nodes in dot format
- atd-revisions             Dump revisions of trunk/arcadia_tests_data
- build-plan                Build plan
- compilation-database      Alias for compile-commands
- compile-commands          JSON compilation database
- conf-docs                 Print descriptions of entities (modules, macros, multimodules, etc.)
- dep-graph                 Dependency internal graph
- dir-graph                 Dependencies between directories
- dot-graph                 Dependency between directories in dot format
- files                     File list
- groups                    Owner groups (from arcadia/groups)
- imprint                   Directory imprint
- json-dep-graph            Dependency graph as json
- json-test-list            All test entries as json
- loops                     All loops in arcadia
- module-info               Modules info
- modules                   All modules
- peerdir-loops             Loops by peerdirs
- relation                  PEERDIR relations
- root                      Print Arcadia root
- test-list                 All test entries
+h, --help          Print help. Use -hh for more options and -hhh for even more.
+    -k, --keep-going    Build as much as possible насколько возможно
+    -C=BUILD_TARGETS, --target=BUILD_TARGETS
+                        Targets to build
+  Platform/build configuration
+    -D=FLAGS            Set variables (name[=val], "yes" if val is omitted)
+    --host-platform-flag=HOST_PLATFORM_FLAGS
+                        Host platform flag
+    --target-platform=TARGET_PLATFORMS
+                        Target platform
+    --target-platform-flag=TARGET_PLATFORM_FLAG
+                        Set build flag for the last target platform
+    -d                  Debug build
+    -r                  Release build
+    --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type (default: release)
+    --sanitize=SANITIZE Sanitizer type(address, memory, thread, undefined, leak)
+    --race              Build Go projects with race detector
 ```
+
+#### Опции фильтрации:
+
+Эти опции используются для фильтрации и уточнения данных, которые должны быть извлечены или представлены в результате выполнения подкоманды.
+
+- `--ignore-recurses`: Игнорирование рекурсивных зависимостей (RECURSE тегов в ya.make файлах).
+- `--no-tools`: Исключение зависимостей, связанных с инструментами сборки из вывода.
+- `--from=<module>`, `--to=<module>`: Указание начальной и конечной точки для отображения пути зависимостей. Опции `--from` и `--to` можно указывать по несколько раз
+
+#### Опции форматирования:
+
+Предоставляют дополнительные возможности для настройки формата вывода результатов выполнения подкоманд.
+
+- `--json`: Вывод информации в формате JSON. Подходит, когда данные предполагается дальше обрабатывать программным путем.
+- `--flat-json`, `--flat-json-files` (для подкоманды dep-graph):  Форматирует вывод графа зависимостей в плоский JSON список, фокусируясь на файловых зависимостях или дугах графа. Граф зависимостей обычно содержит файловые ноды и ноды команд. Опция `--flat-json-files` позволяет вывести только файловые ноды и зависимости между ними.
+
+#### Опции целевой сущности:
+
+Эти опции позволяют определить целевые файлы, модули или другие элементы, для которых должна быть выполнена операция.
+
+- --target=<path>: Указание конкретного модуля или директории, для которой следует выполнить операцию. Актуально для подкоманд, работающих с конкретными целями сборки.
+
+### Прочие опции:
+
+Различные специфичные опции, связанные с отдельными подкомандами и предоставляющие дополнительный функционал или специальные формы вывода данных.
+
+- --dump-all: Используется с подкомандой conf-docs для включения в вывод внутренних макросов и модулей.
+- --no-addincls: Исключает ADDINCL зависимости из результата запроса.
+
+Чтобы просмотреть список всех доступных опций для конкретной подкоманды утилиты ya dump, можно использовать параметр --help сразу после указания интересующей подкоманды.
+
+Это выведет подробную справку по опциям и их использованию для выбранной подкоманды.
+
+Пример команды для просмотра опций:
+
+ya dump <subcommand> --help
+
+Где <subcommand> нужно заменить на конкретное имя подкоманды, для которой вы хотите получить дополнительную информацию. Например, если вы хотите узнать все доступные опции для подкоманды modules, команда будет выглядеть так:
+```
+ya dump modules --help
+```
+
+
 
