@@ -2,6 +2,11 @@ import base64
 import six
 import shlex
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from test.test_types.common import AbstractTestSuite  # noqa
+
 MERGE_FIELDS = ["FILES", "TEST-FILES"]
 HASH_FIELDS = ["SCRIPT-REL-PATH", "SOURCE-FOLDER-PATH", "TEST-NAME"]
 
@@ -31,7 +36,8 @@ def get_dart_id(dart_info):
 
 
 def get_suite_id(suite):
-    return (suite.get_type_name(), suite.project_path, suite.salt)
+    # type: (AbstractTestSuite) -> tuple
+    return (suite.name, suite.get_type_name(), suite.project_path, suite.salt)
 
 
 def merge_darts(darts):

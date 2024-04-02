@@ -25,7 +25,7 @@ from test.util import tools
 
 logger = logging.getLogger(__name__)
 
-SUITE_MAP = {
+SUITE_MAP = {  # type: dict[str, types_common.AbstractTestSuite]
     'custom_lint': custom_lint.CustomLintTestSuite,
     'boost.test': boost_test.BoostTestSuite,
     'check.data': ext_resource.CheckDataSbrTestSuite,
@@ -87,7 +87,8 @@ def generate_tests_by_dart(
                 ]
             ):
                 logger.error(
-                    'Found more than one test with the same name %s in %s, will test a random one',
+                    'Found more than one test with the same suite uid %s, name %s in %s, will test a random one',
+                    suite_uid,
                     suite.name,
                     suite.project_path,
                 )
