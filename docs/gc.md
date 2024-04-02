@@ -16,25 +16,31 @@
 
 ## Опции
 ```
-    -h, --help          Справка
-    --size-limit=CACHE_SIZE Ограничение на размер локального кэша сборки       
-    --object-size-limit=OBJECT_SIZE_LIMIT Очистить сборочный кэш от объектов больше заднного размера (в MiB если не указано иное)
-    --age-limit=AGE_LIMIT Очистить сборочный кэш от объектов старше заднного (в часах если не указано иное)
+   Usage:
+  ya gc cache [OPTION]...
 
-  Advanced options
-    --tools-cache-size=TOOLS_CACHE_SIZE
-                        Ограничение на размер кэша инструментов. (default: 30GiB)
-    --cache-size=CACHE_SIZE
-                        Очистить сборочный кэш до заданного размера (в GiB если не указано иное).
-                        По умолчанию берётся 
+
+Options:
+  Ya operation control
+    -h, --help          Print help. Use -hh for more options and -hhh for even more.
+    Expert options
     -B=CUSTOM_BUILD_DIRECTORY, --build-dir=CUSTOM_BUILD_DIRECTORY
-                        Альтернативная сборочная директория
-  Developers options
-    --cache-stat        Показать статистику кэша после очистки
-    --gc                В этой команде ничего не делает
-    --gc-symlinks       В этой команде ничего не делает
+                        Custom build directory (autodetected by default)
+  Local cache
+    --cache-stat        Show cache statistics
+    --gc                Remove all cache except uids from the current graph
+    --gc-symlinks       Remove all symlink results except files from the current graph
+    Advanced options
+    --tools-cache-size=TOOLS_CACHE_SIZE
+                        Max tool cache size (default: 30.0GiB)
     --symlinks-ttl=SYMLINKS_TTL
-                        Если задано, то удаляет симлинки из рабочей копии старше заданного возраста
+                        Results cache TTL (default: 0.0h)
+    --cache-size=CACHE_SIZE
+                        Max cache size (default: 140.04687070846558GiB)
+    --cache-codec=CACHE_CODEC
+                        Cache codec (default: )
+    --auto-clean=AUTO_CLEAN_RESULTS_CACHE
+                        Auto clean results cache (default: True)
 ```
 ## Автоматизация очистки
 
