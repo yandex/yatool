@@ -67,6 +67,22 @@ def fiter_paths(root, paths, patterns):
     return result
 
 
+def _is_dir_path(path):
+    if path.endswith(os.sep):
+        return True
+    if os.altsep and path.endswith(os.altsep):
+        return True
+    return False
+
+
+def _strip_dir_sep(path):
+    if path.endswith(os.sep):
+        return path[:-1]
+    if os.altsep and path.endswith(os.altsep):
+        return path[:-1]
+    return path
+
+
 class Source(object):
     def __init__(
         self,
@@ -226,7 +242,7 @@ class Source(object):
             package.fs_util.copy_tree(source, destination)
 
     def copy(self, source, destination):
-        if source.endswith('/'):
+        if _is_dir_path(source):
             raise YaPackageSourceException(
                 "Source path {} is not a certain file or directory(ends with '/')".format(source)
             )
@@ -237,7 +253,7 @@ class Source(object):
             if not isinstance(self.data['source']['files'], list):
                 raise YaPackageSourceException('Files parameter should be list')
 
-            if not destination.endswith('/'):
+            if not _is_dir_path(destination):
                 raise YaPackageSourceException(
                     "Files should be used only with a directory destination(ends with '/') {}".format(destination)
                 )
@@ -310,7 +326,7 @@ class Source(object):
                 else:
                     logger.warning(msg)
         else:
-            if destination.endswith('/'):
+            if _is_dir_path(destination):
                 destination = os.path.join(destination, os.path.basename(source))
 
             if os.path.exists(destination):
@@ -327,7 +343,7 @@ class Source(object):
 
         if 'exclude' in self.data['source']:
             used_patterns = set()
-            for path, pattern in filter_files(destination.rstrip("/"), self.data['source']['exclude']):
+            for path, pattern in filter_files(_strip_dir_sep(destination), self.data['source']['exclude']):
                 used_patterns.add(pattern)
                 destination_path = os.path.join(destination, path)
 
