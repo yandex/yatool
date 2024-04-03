@@ -467,7 +467,7 @@ def print_cache_statistics(graph, filename, display):
         x for x in all_run_tasks if not x.from_cache and x.get_time_elapsed() and not x.dynamically_resolved_cache
     )
     not_cached_task_count = len(not_cached_tasks)
-    tests_task_count = sum(1 for x in not_cached_tasks if 'TEST_NAME' in x.abstract.meta.get('env', {}))
+    tests_task_count = sum(1 for x in not_cached_tasks if x.is_test())
     not_tests_task_count = not_cached_task_count - tests_task_count
     executed_task_count = not_cached_task_count + cached_task_count
     all_run_tasks_count = len(all_run_tasks)

@@ -156,6 +156,9 @@ class RunTask(ResourceNode):
             self.abstract.description,
         )
 
+    def is_test(self):
+        return self.abstract.meta.get('kv', {}).get('run_test_node', False)
+
 
 class PrepareTask(ResourceNode):
     def __init__(self, prepare_type, host):
