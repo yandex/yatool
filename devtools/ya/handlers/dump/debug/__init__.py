@@ -47,6 +47,7 @@ class DumpDebugProcessingOptions(Options):
         self.dump_debug_choose = None
         self.dry_run = False
         self.upload = True
+        self.resource_owner = None
 
     @staticmethod
     def consumer():
@@ -67,6 +68,12 @@ class DumpDebugProcessingOptions(Options):
                 help="Dry run",
                 hook=SetConstValueHook('dry_run', True),
                 visible=core.yarg.help_level.HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--resource-owner'],
+                help="Sandbox resource owner",
+                hook=SetValueHook('resource_owner'),
+                visible=core.yarg.help_level.HelpLevel.ADVANCED,
             ),
         ]
 
