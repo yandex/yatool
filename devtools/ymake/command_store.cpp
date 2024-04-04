@@ -335,8 +335,8 @@ struct TCommands::TCmdWriter {
     void BeginArgument() { S.Commands.back().emplace_back(); }
     template<typename T>
     void WriteTerm(T t)  { S.Commands.back().back().emplace_back(std::move(t)); }
-    void EndArgument()   { if (S.Commands.back().back().empty()) S.Commands.back().pop_back(); }
-    void EndCommand()    { if (S.Commands.back().empty()) S.Commands.pop_back(); }
+    void EndArgument()   {}
+    void EndCommand()    {}
 private:
     NCommands::TSyntax& S;
 };
