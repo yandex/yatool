@@ -8,6 +8,7 @@ import subprocess
 import yalibrary.vcs
 import yalibrary.tools
 import exts.process
+import core.event_handling as event_handling
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,19 @@ def start_prefetch(opts):
     return prefetcher
 
 
+class ArcPrefetchSubscriber(event_handling.SubscriberSpecifiedTopics):
+    topics = {"NEvent.TNeedDirHint"}
+
+    def __init__(
+        self,
+        prefetcher,  # type: ArcPrefetcher
+    ):
+        self._prefetcher = prefetcher
+
+    def _action(self, event):
+        self._prefetcher.add_target(event['Dir'])
+
+
 class ArcPrefetcher:
     MAX_PREFETCH_TARGETS = 20
     POLL_TIMEOUT = 0.5
@@ -46,11 +60,6 @@ class ArcPrefetcher:
 
     def add_target(self, target):
         self._targets_queue.put(target)
-
-    def event_listener(self, event):
-        if event['_typename'] == 'NEvent.TNeedDirHint':
-            self.add_target(event['Dir'])
-            event['drop_event'] = True
 
     def start(self):
         logger.debug('Starting arc prefetch-files thread...')

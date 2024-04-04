@@ -12,6 +12,7 @@ import jbuild.gen.actions.idea as idea
 import build.graph as bg
 import build.build_opts as bo
 import build.ya_make as ya_make
+import core.event_handling
 import core.yarg
 
 
@@ -117,16 +118,15 @@ def do_idea(params):
 
     import app_ctx  # XXX: via args
 
-    def event_to_log_listener(event):
-        logger.debug('Configure message %s', event)
-
-    listeners = [
-        ya_make.get_print_listener(jopts, app_ctx.display),
-        event_to_log_listener,
+    subscribers = [
+        ya_make.DisplayMessageSubscriber(jopts, app_ctx.display),
+        core.event_handling.EventToLogSubscriber(),
     ]
     if getattr(app_ctx, 'evlog', None):
-        listeners.append(ya_make.ymake_listener(app_ctx.evlog.get_writer('ymake')))
-    ev_listener = ya_make.compose_listeners(*listeners)
+        subscribers.append(ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')))
+
+    event_queue = app_ctx.event_queue
+    event_queue.subscribe(*subscribers)
 
     jopts.flags['BUILD_LANGUAGES'] = 'JAVA'
     jopts.all_outputs_to_result = True
@@ -143,7 +143,7 @@ def do_idea(params):
     with tmp.temp_dir() as dump_dir:
         jopts.dump_file_path = dump_dir
         graph, _, _, ctx, _ = bg.build_graph_and_tests(
-            jopts, check=True, ev_listener=ev_listener, display=app_ctx.display
+            jopts, check=True, event_queue=event_queue, display=app_ctx.display
         )
         target_dumps = [
             dump

@@ -16,6 +16,13 @@ from jbuild.gen import consts
 from six.moves import map
 
 
+def _get_queue(opts, app_ctx):
+    event_queue = app_ctx.event_queue
+    event_queue.subscribe(ya_make.DisplayMessageSubscriber(opts, app_ctx.display))
+
+    return event_queue
+
+
 def fix_windows(path):
     return path.replace('\\', '/')
 
@@ -31,7 +38,7 @@ def get_java_ctx_with_tests(opts):
     import app_ctx  # XXX: via args
 
     _, tests, _, ctx, _ = build_graph.build_graph_and_tests(
-        jopts, check=True, ev_listener=ya_make.get_print_listener(jopts, app_ctx.display), display=app_ctx.display
+        jopts, check=True, event_queue=_get_queue(jopts, app_ctx), display=app_ctx.display
     )
 
     return ctx, tests
@@ -111,9 +118,10 @@ def print_ymake_dep_tree(opts):
 
     import app_ctx
 
-    ev_listener = ya_make.get_print_listener(opts, app_ctx.display)
+    event_queue = _get_queue(opts, app_ctx)
+
     for ev in evlog:
-        ev_listener(ev)
+        event_queue(ev)
 
     formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
     print(formatter.format_message(res.stdout))
@@ -135,9 +143,10 @@ def print_classpath(opts):
 
     import app_ctx
 
-    ev_listener = ya_make.get_print_listener(opts, app_ctx.display)
+    event_queue = _get_queue(opts, app_ctx)
+
     for ev in evlog:
-        ev_listener(ev)
+        event_queue(ev)
 
     formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
     print(formatter.format_message(res.stdout))

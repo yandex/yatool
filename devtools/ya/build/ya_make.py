@@ -55,6 +55,7 @@ import build.reports.autocheck_report as ar
 import build.reports.results_listener as pr
 
 import core.config as core_config
+import core.event_handling as event_handling
 import core.yarg
 import core.error
 import core.profiler as cp
@@ -74,7 +75,12 @@ import build.stat.graph_metrics as st
 import build.stat.statistics as bs
 from build import build_facade, frepkage, test_results_console_printer
 from build.reports import build_reports as build_report
-from build.evlog.progress import ModulesFilesStatistic, PrintProgressListener, get_print_status_func, YmakeTimeStatistic
+from build.evlog.progress import (
+    ModulesFilesStatistic,
+    PrintProgressSubscriber,
+    get_print_status_func,
+    YmakeTimeStatistic,
+)
 
 try:
     from yalibrary import build_graph_cache
@@ -141,12 +147,12 @@ def normalize_by_dir(dirs, dir_):
     return res
 
 
-def get_print_listener(opts, display, printed=None):
-    if printed is None:
-        printed = set()
+class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
+    topics = {"NEvent.TDisplayMessage"}
 
-    def should_print(msg):
-        if opts.be_verbose:
+    def _should_print(self, msg):
+        # type: (dict) -> bool
+        if self._opts.be_verbose:
             return True
 
         if 'noauto' in msg:
@@ -155,61 +161,67 @@ def get_print_listener(opts, display, printed=None):
 
         return True
 
-    def print_listener(ev):
-        if ev['_typename'] == 'NEvent.TDisplayMessage':
-            severity = ev['Type']
-            sub = '[' + ev['Sub'] + ']' if ev['Sub'] else ''
-            data = ev['Message']
+    def __init__(self, opts, display, printed=None):
+        # type: (tp.Any, tp.Any, tp.Any | None) -> None
+        self._opts = opts
+        self._display = display
+        self._printed = printed or set()
 
-            data = six.ensure_str(data)
+    def _action(self, event):
+        # type: (dict) -> None
+        severity = event['Type']
+        sub = '[' + event['Sub'] + ']' if event['Sub'] else ''
+        data = event['Message']
 
-            where = 'in [[imp]]{}[[rst]]'.format(ev['Where']) if 'Where' in ev else ''
-            if len(where):
-                where += ':{}:{}: '.format(ev['Row'], ev['Column']) if 'Row' in ev and 'Column' in ev else ': '
-            platform = '{{{}}} '.format(ev['Platform']) if 'Platform' in ev else ''
+        data = six.ensure_str(data)
 
-            msg = '{}[[{}]]{}{}[[rst]]: {}{}'.format(platform, ev['Mod'], severity, sub, where, data)
-            if msg not in printed and (opts.be_verbose or severity != 'Debug'):
-                printed.add(msg)
+        where = 'in [[imp]]{}[[rst]]'.format(event['Where']) if 'Where' in event else ''
+        if len(where):
+            where += ':{}:{}: '.format(event['Row'], event['Column']) if 'Row' in event and 'Column' in event else ': '
+        platform = '{{{}}} '.format(event['Platform']) if 'Platform' in event else ''
 
-                if should_print(msg):
-                    display.emit_message(msg)
+        msg = '{}[[{}]]{}{}[[rst]]: {}{}'.format(platform, event['Mod'], severity, sub, where, data)
+        if msg not in self._printed and (self._opts.be_verbose or severity != 'Debug'):
+            self._printed.add(msg)
 
-    return print_listener
-
-
-def ymake_listener(evlog_writer):
-    def listener(event):
-        evlog_writer(event['_typename'], **event)
-
-    return listener
+            if self._should_print(msg):
+                self._display.emit_message(msg)
 
 
-class CompositeEventListener(object):
-    def __init__(self, listeners=None):
-        self._listeners = listeners if listeners is not None else []
+class YmakeEvlogSubscriber(event_handling.SubscriberLoggable):
+    def __init__(
+        self, evlog_writer  # type: tp.Any
+    ):
+        self._evlog_writer = evlog_writer
 
-    def append(self, listener):
-        self._listeners.append(listener)
-
-    def prepend(self, listener):
-        self._listeners.insert(0, listener)
-
-    def __call__(self, event):
-        if self._is_dropped(event):
-            return
-        for listener in self._listeners:
-            listener(event)
-            if self._is_dropped(event):
-                break
-
-    @staticmethod
-    def _is_dropped(event):
-        return 'drop_event' in event and event['drop_event']
+    def _action(self, event):
+        # type: (dict) -> None
+        self._evlog_writer(event['_typename'], **event)
 
 
-def compose_listeners(*listeners):
-    return CompositeEventListener(listeners=listeners)
+class PrintMessageSubscriber(event_handling.SubscriberLoggable):
+    def __init__(self):
+        self.errors = collections.defaultdict(set)
+
+    def _action(self, event):
+        # type: (dict) -> None
+        if event['_typename'] == 'NEvent.TDisplayMessage' and event['Type'] == 'Error' and 'Where' in event:
+            platform = '{{{}}}: '.format(event['Platform']) if 'Platform' in event else ''
+            self.errors[event['Where']].add(
+                ce.ConfigureError(platform + event['Message'].strip(), event.get('Row', 0), event.get('Column', 0))
+            )
+        elif event['_typename'] == 'NEvent.TLoopDetected' and event.get('LoopNodes'):
+            nodes = []
+            for item in event['LoopNodes']:
+                nodes.append(item['Name'])
+
+            message = 'Loop detected: ' + ' --> '.join(reversed(nodes))
+            for item in event['LoopNodes']:
+                if item['Type'] == 'Directory':
+                    self.errors[item['Name']].add(ce.ConfigureError(message, 0, 0))
+
+        event_sorted = json.dumps(event, sort_keys=True)
+        logger.debug('Configure message %s', event_sorted)
 
 
 def _checkout(opts, display=None):
@@ -238,7 +250,7 @@ def _checkout(opts, display=None):
     while True:
         events = []
         try:
-            lg.build_graph_and_tests(opts2, check=False, ev_listener=events.append, display=display)
+            lg.build_graph_and_tests(opts2, check=False, event_queue=events.append, display=display)
         except lg.GraphMalformedException:
             pass
         dirs, root_dirs = evlog.missing_dirs(events, root_dirs)
@@ -279,42 +291,29 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
     prefetcher = pf.start_prefetch(opts) if opts.prefetch else None
 
     printed = set()
-    errors = collections.defaultdict(set)
+    errors_collector = PrintMessageSubscriber()
 
-    def configure_messages_listener(event):
-        if event['_typename'] == 'NEvent.TDisplayMessage' and event['Type'] == 'Error' and 'Where' in event:
-            platform = '{{{}}}: '.format(event['Platform']) if 'Platform' in event else ''
-            errors[event['Where']].add(
-                ce.ConfigureError(platform + event['Message'].strip(), event.get('Row', 0), event.get('Column', 0))
-            )
-        elif event['_typename'] == 'NEvent.TLoopDetected' and event.get('LoopNodes'):
-            nodes = []
-            for item in event['LoopNodes']:
-                nodes.append(item['Name'])
+    event_queue = app_ctx.event_queue
 
-            message = 'Loop detected: ' + ' --> '.join(reversed(nodes))
-            for item in event['LoopNodes']:
-                if item['Type'] == 'Directory':
-                    errors[item['Name']].add(ce.ConfigureError(message, 0, 0))
+    configure_time_subscribers = [
+        PrintProgressSubscriber(modules_files_stats),
+        DisplayMessageSubscriber(opts, display, printed),
+        ymake_stats,
+        errors_collector,
+    ]
 
-        logger.debug('Configure message {}'.format(event))
-
-    ev_listener = CompositeEventListener(
-        listeners=[
-            PrintProgressListener(modules_files_stats),
-            get_print_listener(opts, display, printed),
-            ymake_stats.get_ymake_listener(),
-            configure_messages_listener,
-        ]
-    )
     if getattr(app_ctx, 'evlog', None):
-        ev_listener.append(ymake_listener(app_ctx.evlog.get_writer('ymake')))
+        configure_time_subscribers.append(
+            YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
+        )
     if prefetcher is not None:
-        ev_listener.prepend(prefetcher.event_listener)
+        configure_time_subscribers.append(pf.ArcPrefetchSubscriber(prefetcher))
+
+    event_queue.subscribe(*configure_time_subscribers)
 
     try:
         graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(
-            opts, check=True, ev_listener=ev_listener, display=display
+            opts, check=True, event_queue=event_queue, display=display
         )
     finally:
         if prefetcher is not None:
@@ -327,7 +326,7 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
             s = os.path.dirname(s).replace('$B/', '')
         return s
 
-    errors = {fix_dir(k): sorted(list(v)) for k, v in six.iteritems(errors)}
+    errors = {fix_dir(k): sorted(list(v)) for k, v in six.iteritems(errors_collector.errors)}
     return graph, tests, stripped_tests, errors, make_files
 
 

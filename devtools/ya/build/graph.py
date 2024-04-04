@@ -1134,10 +1134,10 @@ class _ToolEventListener(object):
             self.__prev_ev_listener(event)
 
 
-def build_graph_and_tests(opts, check, ev_listener, display=None):
+def build_graph_and_tests(opts, check, event_queue, display=None):
     with contextlib2.ExitStack() as exit_stack:
         try:
-            return _build_graph_and_tests(opts, check, ev_listener, exit_stack, display)
+            return _build_graph_and_tests(opts, check, event_queue, exit_stack, display)
         except AssertionError:
             ex_type, ex_val, ex_bt = sys.exc_info()
             six.reraise(
@@ -1219,7 +1219,7 @@ class _GraphMaker(object):
         src_dir,
         bld_dir,
         res_dir,
-        ev_listener,
+        event_queue,
         test_target_platforms,
         check,
         exit_stack,
@@ -1232,7 +1232,7 @@ class _GraphMaker(object):
         self._src_dir = src_dir
         self._conf_dir = os.path.join(bld_dir, 'conf')
         self._res_dir = res_dir
-        self._ev_listener = ev_listener
+        self._event_queue = event_queue
         self._test_target_platforms = test_target_platforms
         self._check = check
         self._exit_stack = exit_stack
@@ -1526,9 +1526,9 @@ class _GraphMaker(object):
             java_dart_path = os.path.join(tmp_dir, 'java.dart')
         make_files_dart_path = os.path.join(tmp_dir, 'makefiles.dart')
 
-        current_ev_listener = self._ev_listener
+        current_ev_listener = self._event_queue
         if tool_targets_queue_putter is not None:
-            current_ev_listener = _ToolEventListener(self._ev_listener, tool_targets_queue_putter)
+            current_ev_listener = _ToolEventListener(self._event_queue, tool_targets_queue_putter)
             enabled_events += YmakeEvents.TOOLS.value
 
         with stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
@@ -1835,14 +1835,14 @@ class _GraphMaker(object):
         )
 
 
-def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
+def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
     import core.config
 
     build_graph_and_tests_stage = stager.start('build_graph_and_tests')
 
     print_status = get_print_status_func(opts, display, logger)
 
-    conf_error_reporter = _ConfErrorReporter(ev_listener)
+    conf_error_reporter = _ConfErrorReporter(event_queue)
 
     if 'CC' in os.environ or 'CXX' in os.environ:
         logger.info(
@@ -2009,7 +2009,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
         src_dir,
         bld_dir,
         res_dir,
-        ev_listener,
+        event_queue,
         test_target_platforms,
         check,
         exit_stack,
@@ -2073,7 +2073,7 @@ def _build_graph_and_tests(opts, check, ev_listener, exit_stack, display):
     ctx = None
     if opts.flags.get('YA_IDE_IDEA') == 'yes':
         with stager.scope('ya-ide-idea'):
-            graph, ctx = _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, graph_handles[0], graph)
+            graph, ctx = _prepare_for_ya_ide_idea(graph_maker, opts, event_queue, graph_handles[0], graph)
 
     with stager.scope('iter-extra-resources'):
         for pattern, name in _iter_extra_resources(graph):

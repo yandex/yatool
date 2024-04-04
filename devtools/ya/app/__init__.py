@@ -11,6 +11,7 @@ import core.gsid
 import core.sig_handler
 import core.stage_tracer as stage_tracer
 import core.stage_aggregator as stage_aggregator
+import core.event_handling as event_handling
 import devtools.ya.core.sec as sec
 import exts.os2
 import exts.strings
@@ -141,6 +142,7 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
             ('showstack', configure_showstack()),
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
+            ('event_queue', configure_event_queue()),
         ]
         if not getattr(parameters, 'no_evlogs', None) and not strtobool(os.environ.get('YA_NO_EVLOGS', '0')):
             modules.append(('evlog', evlog.configure(ctx)))
@@ -595,6 +597,11 @@ def configure_vcs_type():
 def configure_mlock_info():
     logger.debug(MLOCK_STATUS_MESSAGE)
     yield
+
+
+def configure_event_queue():
+    queue = event_handling.EventQueue()
+    yield queue
 
 
 def check_and_respawn_if_possible(handler_python_major_version=None):

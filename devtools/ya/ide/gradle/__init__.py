@@ -214,9 +214,11 @@ def apply_graph(params, sem_graph, gradle_project_root):
             opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
 
         logger.info("Making building graph with opts\n")
+        app_ctx.event_queue.subscribe(ya_make.DisplayMessageSubscriber(opts, app_ctx.display))
         graph, _, _, _, _ = bg.build_graph_and_tests(
-            opts, check=True, ev_listener=ya_make.get_print_listener(opts, app_ctx.display), display=app_ctx.display
+            opts, check=True, event_queue=app_ctx.event_queue, display=app_ctx.display
         )
+
         builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
         exit_code = builder.go()
         if exit_code != 0:

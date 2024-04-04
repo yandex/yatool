@@ -1,6 +1,8 @@
 from enum import Enum
 import threading
-from collections import defaultdict
+import collections
+
+import core.event_handling as event_handling
 
 
 class Mode(Enum):
@@ -198,7 +200,9 @@ class ModulesFilesStatistic:
                 self._try_print_message(timestamp)
 
 
-class PrintProgressListener(object):
+class PrintProgressSubscriber(event_handling.SubscriberExcludedTopics):
+    topics = {"NEvent.TNeedDirHint"}
+
     class YmakeLastState:
         def __init__(self):
             self.files_read = 0
@@ -211,10 +215,11 @@ class PrintProgressListener(object):
         self,
         modules_files_stats,  # type: ModulesFilesStatistic
     ):
-        self.ymake_states = defaultdict(PrintProgressListener.YmakeLastState)
+        self.ymake_states = collections.defaultdict(PrintProgressSubscriber.YmakeLastState)
         self.modules_files_stats = modules_files_stats
 
-    def __call__(self, event):
+    def _action(self, event):
+        # type: (dict) -> None
         ymake_run_uid = event.get('ymake_run_uid')
         if ymake_run_uid is None:
             return
@@ -224,8 +229,6 @@ class PrintProgressListener(object):
         prev_ymake_state = self.ymake_states[ymake_run_uid]
 
         if typename == "NEvent.TConfModulesStat":
-            event["drop_event"] = True
-
             self.modules_files_stats.handler(
                 event,
                 delta_done=event["Done"] - prev_ymake_state.modules_done,
@@ -234,14 +237,12 @@ class PrintProgressListener(object):
             prev_ymake_state.modules_done = event["Done"]
             prev_ymake_state.modules_total = event["Total"]
         elif typename == "NEvent.TFilesStat":
-            event["drop_event"] = True
             self.modules_files_stats.handler(
                 event,
                 delta_files=event["Count"] - prev_ymake_state.files_read,
             )
             prev_ymake_state.files_read = event["Count"]
         elif typename == "NEvent.TRenderModulesStat":
-            event["drop_event"] = True
             self.modules_files_stats.handler(
                 event,
                 delta_rendered=event["Done"] - prev_ymake_state.rendered_done,
@@ -295,32 +296,31 @@ class ConfigureTask:
         return ""
 
 
-class YmakeTimeStatistic:
+class YmakeTimeStatistic(event_handling.SubscriberSpecifiedTopics):
+    topics = {"NEvent.TStageStarted", "NEvent.TStageFinished"}
+
     def __init__(self):
         self.current_open_threads = {}
         self.threads_time = []
         self.min_timestamp_ms = None
         self.max_timestamp_ms = None
 
-    def get_ymake_listener(self):
-        def ymake_listener(event):
-            if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
-                thread_name = threading.current_thread().name
-                self.current_open_threads[thread_name] = event['_timestamp']
-                if self.min_timestamp_ms is None:
-                    self.min_timestamp_ms = event["_timestamp"] / 1000
+    def _action(self, event):
+        if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
+            thread_name = threading.current_thread().name
+            self.current_open_threads[thread_name] = event['_timestamp']
+            if self.min_timestamp_ms is None:
+                self.min_timestamp_ms = event["_timestamp"] / 1000
 
-            elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
-                thread_name = threading.current_thread().getName()
-                self.max_timestamp_ms = event["_timestamp"] / 1000
-                self.threads_time.append(
-                    ConfigureTask(
-                        start=self.current_open_threads[thread_name],
-                        end=event["_timestamp"],
-                        thread_name=thread_name,
-                        debug_id=event.get("debug_id", 0),
-                    )
+        elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
+            thread_name = threading.current_thread().getName()
+            self.max_timestamp_ms = event["_timestamp"] / 1000
+            self.threads_time.append(
+                ConfigureTask(
+                    start=self.current_open_threads[thread_name],
+                    end=event["_timestamp"],
+                    thread_name=thread_name,
+                    debug_id=event.get("debug_id", 0),
                 )
-                del self.current_open_threads[thread_name]
-
-        return ymake_listener
+            )
+            del self.current_open_threads[thread_name]

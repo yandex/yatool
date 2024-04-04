@@ -6,6 +6,7 @@ PEERDIR(
     devtools/ya/conf
     devtools/ya/core/config
     devtools/ya/core/error
+    devtools/ya/core/event_handling
     devtools/ya/core/gsid
     devtools/ya/core/imprint
     devtools/ya/core/report
