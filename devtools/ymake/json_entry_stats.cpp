@@ -62,7 +62,7 @@ void TJsonStatsOld::SetSelfContextSign(const TMd5SigValue& md5, TUidDebugNodeId 
 
 TJsonStatsNew::TJsonStatsNew(TNodeDebugOnly nodeDebug)
     : StructureUID(nodeDebug, "TJSONEntryStats::StructureUID"sv)
-    , IncludeStructureUID(nodeDebug, "TJSONEntryStats::StructureForConsumerUID"sv)
+    , IncludeStructureUID(nodeDebug, "TJSONEntryStats::IncludeStructureUID"sv)
     , ContentUID(nodeDebug, "TJSONEntryStats::ContentUID"sv)
     , IncludeContentUID(nodeDebug, "TJSONEntryStats::IncludeContentUID"sv)
     , FullUID(nodeDebug, "TJSONEntryStats::FullUID"sv)
