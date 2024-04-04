@@ -1413,7 +1413,7 @@ static void PostProcessRawMacroValue(ECmdFormat cmdFormat, const TMacroData& mac
         // of formal arguments of macros called during substitution/evaluation at this preprocessing stage)
         // we are substituting raw values with corresponding macro modificators
         TString modifiers;
-        for (auto flag : { EMF_WorkDir, EMF_AsStdout, EMF_SetEnv, EMF_Quote, EMF_BreakQuote, EMF_QuoteEach, EMF_MsvsSource, EMF_Comma, EMF_ResourceUri, EMF_TaredOut } ) {
+        for (auto flag : { EMF_WorkDir, EMF_AsStdout, EMF_SetEnv, EMF_Quote, EMF_BreakQuote, EMF_QuoteEach, EMF_Comma, EMF_ResourceUri, EMF_TaredOut } ) {
             if (macroData.Flags.Get(flag)) {
                 ( modifiers += ';' ) += ModifierFlagToName(flag);
             }
@@ -1614,7 +1614,6 @@ bool TCommandInfo::ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* m
         var.DirAllowed |= macroData.Flags.Get(EMF_DirAllowed);
         var.RawInput |= macroData.Flags.Get(EMF_Input) && macroData.RawString;
         var.AddToModOutputs |= macroData.Flags.Get(EMF_AddToModOutputs);
-        var.MsvsSource |= macroData.Flags.Get(EMF_MsvsSource);
         var.Result |= macroData.Flags.Get(EMF_Result);
         var.IsOutput |= macroData.Flags.Get(EMF_Output);
         var.Main |= macroData.Flags.Get(EMF_Main);
@@ -1635,7 +1634,6 @@ bool TCommandInfo::ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* m
             var.DirAllowed |= macroData.Flags.Get(EMF_DirAllowed);
             var.RawInput |= macroData.Flags.Get(EMF_Input) && macroData.RawString;
             var.AddToModOutputs |= macroData.Flags.Get(EMF_AddToModOutputs);
-            var.MsvsSource |= macroData.Flags.Get(EMF_MsvsSource);
             var.Result |= macroData.Flags.Get(EMF_Result);
             var.IsOutput |= macroData.Flags.Get(EMF_Output);
             var.Main |= macroData.Flags.Get(EMF_Main);

@@ -68,7 +68,6 @@ namespace {
         { TStringBuf("cmdsep"), EMF_CommandSeparator },
         { TStringBuf("add_to_outs"), EMF_AddToModOutputs },
         { TStringBuf("kv"), EMF_KeyValue },
-        { TStringBuf("msvs_source"), EMF_MsvsSource },
         { TStringBuf("result"), EMF_Result },
         { TStringBuf("lastext"), EMF_LastExt },
         { TStringBuf("main"), EMF_Main },

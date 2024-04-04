@@ -370,15 +370,6 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
         CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
         const auto& cmdInfo = CmdInfo;
 
-        if (Vars["INPUT"].size() == cmdInfo.GetInput().size()) {
-            for (size_t n = 0; n < Vars["INPUT"].size(); n++) {
-                Vars["INPUT"][n].MsvsSource = cmdInfo.GetInput()[n].MsvsSource;
-            }
-        } else {
-            const auto* mainOutput = cmdInfo.GetMainOutput();
-            YDIAG(Dev) << "Input sequence mismatch: " << (mainOutput ? mainOutput->Name : "") << Endl;
-        }
-
         TYVar& toolVar = Vars["TOOLS"];
         if (cmdInfo.ToolPaths) {
             for (const auto& tool : *cmdInfo.ToolPaths) {

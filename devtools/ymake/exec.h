@@ -18,7 +18,6 @@ struct ICommandSequenceWriter {
     virtual void BeginCommand() = 0;
     virtual void WriteArgument(TStringBuf arg) = 0;
     virtual void WriteEnv(TStringBuf env) = 0;
-    virtual void RegisterPrimaryInput(TString name) = 0;
     virtual void EndCommand() = 0;
     virtual void EndScript(TCommandInfo& cmdInfo, const TVars& vars) = 0;
     virtual void PostScript(TVars& vars) = 0;
@@ -28,7 +27,6 @@ protected:
 
 struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
     virtual void WriteEnv(TStringBuf)          override { ythrow TNotImplemented(); }
-    virtual void RegisterPrimaryInput(TString) override {  }
     virtual void PostScript(TVars&)            override {  }
 protected:
     ~TCommandSequenceWriterStubs() = default;

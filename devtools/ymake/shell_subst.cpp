@@ -99,10 +99,6 @@ void TSubst2Shell::WriteEnv(TStringBuf env) {
     Commands.back().EnvSetDefs.push_back(envStr);
 }
 
-void TSubst2Shell::RegisterPrimaryInput(TString name) {
-    PrimaryInput = std::move(name);
-}
-
 void TSubst2Shell::EndCommand() {
     TSingleCmd& cmd = Commands.back();
     TString cmdStr = std::move(std::get<TString>(cmd.CmdStr));
@@ -112,14 +108,7 @@ void TSubst2Shell::EndCommand() {
 void TSubst2Shell::EndScript(TCommandInfo&, const TVars&) {
 }
 
-void TSubst2Shell::PostScript(TVars& vars) {
-    if (!PrimaryInput.empty()) {
-        auto inputs = vars.find("INPUT");
-        if (inputs != vars.end())
-            for (auto& input : inputs->second)
-                if (input.Name == PrimaryInput)
-                    input.MsvsSource = true;
-    }
+void TSubst2Shell::PostScript(TVars&) {
 }
 
 IOutputStream& TSubst2Shell::PrintAsLine(IOutputStream& out) const {

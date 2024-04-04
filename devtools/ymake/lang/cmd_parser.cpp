@@ -231,8 +231,6 @@ namespace {
             return EMacroFunctions::SetEnv;
         } else if (key == "kv") {
             return EMacroFunctions::KeyValue;
-        } else if (key == "msvs_source") {
-            return EMacroFunctions::MsvsSource;
         } else if (key == "noauto") {
             return EMacroFunctions::NoAutoSrc;
         } else {

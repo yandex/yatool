@@ -11,7 +11,6 @@ struct TVars;
 
 class TSubst2Shell: public TMultiCmdDescr, private ICommandSequenceWriter {
     TStringBuf OrigCmd;
-    TString PrimaryInput;
     bool ForMSVS;
 
 public:
@@ -32,7 +31,6 @@ private:
     void BeginCommand() override;
     void WriteArgument(TStringBuf arg) override;
     void WriteEnv(TStringBuf env) override;
-    void RegisterPrimaryInput(TString name) override;
     void EndCommand() override;
     void EndScript(TCommandInfo& cmdInfo, const TVars& vars) override;
     void PostScript(TVars& vars) override;

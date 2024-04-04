@@ -69,7 +69,6 @@ enum EModifierFlag {
     EMF_CommandSeparator,
     EMF_AddToModOutputs,
     EMF_KeyValue,
-    EMF_MsvsSource,                     // experimental IDE markup DEVTOOLS-1512
     EMF_Result,                         // only for inputs
     EMF_LastExt,                        // extract the last extention suffix from the file name
     EMF_Main,                           // whether it is main input/output or not

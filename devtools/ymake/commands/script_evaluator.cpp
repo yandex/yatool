@@ -224,7 +224,6 @@ TTermValue TScriptEvaluator::EvalFn(
         case EMacroFunctions::KeyValue: RenderKeyValue(ctx, args); return {};
         case EMacroFunctions::TODO1: return RenderTODO1(args);
         case EMacroFunctions::TODO2: return RenderTODO2(args);
-        case EMacroFunctions::MsvsSource: return RenderMsvsSource(writer, args);
         default:
             break;
     }

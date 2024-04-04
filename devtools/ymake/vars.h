@@ -93,7 +93,6 @@ struct TVarStr {
             // ^^^^^^^^^^^^^^^^^^^^
             // 24bits up until here
 
-            ui32 MsvsSource : 1;   // experimental IDE markup DEVTOOLS-1512
             ui32 Result : 1;
             ui32 IsOutput : 1;
             ui32 Main : 1;
@@ -101,10 +100,10 @@ struct TVarStr {
             ui32 ResolveToModuleBinDirLocalized : 1;
             ui32 HasPeerDirTags : 1; // Name can be prefixed with comma separated tags
             ui16 ResourceUri : 1;  // for local vars only
+            ui16 KeepDirStruct : 1;
             // ^^^^^^^^^^^^^^^^^^^^
             // 32bits up until here
 
-            ui16 KeepDirStruct : 1;
             ui16 TaredOut : 1;
             ui16 OutInclsFromInput: 1;
             ui16 OutputInThisModule: 1;  // Dynamic mark for vars created as outputs in current module

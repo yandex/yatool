@@ -19,6 +19,5 @@ namespace NCommands {
     TTermValue RenderExtFilter(std::span<const TTermValue> args);
     TTermValue RenderTODO1(std::span<const TTermValue> args);
     TTermValue RenderTODO2(std::span<const TTermValue> args);
-    TTermValue RenderMsvsSource(ICommandSequenceWriter* writer, std::span<const TTermValue> args);
 
 }

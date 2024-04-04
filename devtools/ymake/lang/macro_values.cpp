@@ -32,7 +32,6 @@ namespace {
             case EMacroFunctions::LastExt:
             case EMacroFunctions::KeyValue:
             case EMacroFunctions::TODO1:
-            case EMacroFunctions::MsvsSource:
             case EMacroFunctions::NoAutoSrc:
                 res = 1;
                 break;

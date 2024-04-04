@@ -342,22 +342,3 @@ TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
     }, args[1]);
     return fmt::format("TODO2({}, {})", arg0, arg1);
 }
-
-TTermValue NCommands::RenderMsvsSource(ICommandSequenceWriter* writer, std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "MsvsSource requires 1 argument";
-    }
-    auto arg0 = std::visit(TOverloaded{
-        [](std::monostate) -> TString {
-            ythrow TNotImplemented();
-        },
-        [&](const TString& s) {
-            return s;
-        },
-        [&](const TVector<TString>&) -> TString {
-            ythrow TNotImplemented();
-        }
-    }, args[0]);
-    writer->RegisterPrimaryInput(arg0);
-    return arg0;
-}

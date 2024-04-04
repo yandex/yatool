@@ -30,7 +30,6 @@ enum class EMacroFunctions: ui32 {
     TODO1,
     TODO2,
     // markers
-    MsvsSource, // input-only, postevaluated
     NoAutoSrc, // output-only, preevaluated
 };
 
