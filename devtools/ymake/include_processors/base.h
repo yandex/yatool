@@ -224,3 +224,4 @@ TParserBaseRef MakeYDLParser(TParsersCache* cache);
 TParserBaseRef MakeNlgParser(TParsersCache* cache);
 TParserBaseRef MakeCfgprotoParser(TParsersCache* cache, TSymbols& symbols);
 TParserBaseRef MakeTsParser(TParsersCache* cache);
+TParserBaseRef MakeRosParser(TParsersCache* cache);

@@ -130,7 +130,8 @@ namespace {
                 std::make_tuple("ydl", TVector<TStringBuf>({"ydl"}), ParserConstructor<MakeYDLParser>()),
                 std::make_tuple("nlg", TVector<TStringBuf>({"nlg"}), ParserConstructor<MakeNlgParser>()),
                 std::make_tuple("proto", TVector<TStringBuf>({"cfgproto"}), ParserConstructor<MakeCfgprotoParser>()),
-                std::make_tuple("other", TVector<TStringBuf>({"ts", "js", "tsx", "jsx"}), ParserConstructor<MakeTsParser>())
+                std::make_tuple("other", TVector<TStringBuf>({"ts", "js", "tsx", "jsx"}), ParserConstructor<MakeTsParser>()),
+                std::make_tuple("ros", TVector<TStringBuf>({"msg"}), ParserConstructor<MakeRosParser>()),
         };
         return languages_and_extensions;
     }
@@ -139,6 +140,7 @@ namespace {
         // List of languagues whose ADDINCLs are non-paths
         // Can be used when it's necessary to propagate additional data from peers
         static TSet<TString> languages = {
+            "ros",
         };
 
         return languages;

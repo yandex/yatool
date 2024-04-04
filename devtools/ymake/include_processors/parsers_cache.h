@@ -1,6 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/include_parsers/cython_parser.h>
+#include <devtools/ymake/include_parsers/ros_parser.h>
 #include <devtools/ymake/symbols/name_store.h>
 
 #include <util/generic/variant.h>
@@ -29,7 +30,14 @@ namespace NParsersCache {
         Y_SAVELOAD_DEFINE(PathId, Kind, ImportList);
     };
 
-    using TParseResult = std::variant<TVector<TIncludeSavedState>, TVector<TCythonIncludeSavedState>>;
+    struct TRosIncludeSavedState {
+        ui32 PackageNameId;
+        ui32 MessageNameId;
+
+        Y_SAVELOAD_DEFINE(PackageNameId, MessageNameId);
+    };
+
+    using TParseResult = std::variant<TVector<TIncludeSavedState>, TVector<TCythonIncludeSavedState>, TVector<TRosIncludeSavedState>>;
 
     template <typename TDst, typename TSrc>
     TDst Convert(TNameStore& names, const TSrc& from);
@@ -67,6 +75,10 @@ public:
         ResultsMap[resultId] = NParsersCache::Convert<NParsersCache::TCythonIncludeSavedState>(Names, includes);
     }
 
+    void Add(ui64 resultId, const TVector<TRosDep>& includes) {
+        ResultsMap[resultId] = NParsersCache::Convert<NParsersCache::TRosIncludeSavedState>(Names, includes);
+    }
+
     void Add(ui64 resultId, const NParsersCache::TParseResult& includes) {
         ResultsMap[resultId] = includes;
     }
@@ -89,6 +101,19 @@ public:
         }
         const auto& cached = std::get<TVector<NParsersCache::TCythonIncludeSavedState>>(it->second);
         result = NParsersCache::Convert<TCythonDep>(Names, cached);
+        return true;
+    }
+
+    bool Get(ui64 resultId, TVector<TRosDep>& result) {
+        auto it = ResultsMap.find(resultId);
+        if (it == ResultsMap.end()) {
+            return false;
+        }
+
+        const auto& cached = std::get<TVector<NParsersCache::TRosIncludeSavedState>>(it->second);
+
+        result = NParsersCache::Convert<TRosDep>(Names, cached);
+
         return true;
     }
 

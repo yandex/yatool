@@ -18,6 +18,7 @@ SRCS(
     nlg_includes_parser.rl6
     proto_parser.cpp
     ragel_parser.cpp
+    ros_parser.cpp
     sc_parser.cpp
     swig_parser.cpp
     xs_parser.cpp

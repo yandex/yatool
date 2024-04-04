@@ -12,6 +12,7 @@
 #include "nlg_processor.h"
 #include "proto_processor.h"
 #include "ragel_processor.h"
+#include "ros_processor.h"
 #include "swig_processor.h"
 #include "xs_processor.h"
 #include "ydl_processor.h"
@@ -28,6 +29,7 @@
 #include <devtools/ymake/include_parsers/nlg_parser.h>
 #include <devtools/ymake/include_parsers/proto_parser.h>
 #include <devtools/ymake/include_parsers/ragel_parser.h>
+#include <devtools/ymake/include_parsers/ros_parser.h>
 #include <devtools/ymake/include_parsers/sc_parser.h>
 #include <devtools/ymake/include_parsers/swig_parser.h>
 #include <devtools/ymake/include_parsers/xs_parser.h>
@@ -195,4 +197,8 @@ TParserBaseRef MakeCfgprotoParser(TParsersCache* cache, TSymbols& symbols) {
 
 TParserBaseRef MakeTsParser(TParsersCache* cache) {
     return new TIncludesProcessor<TString, TTsImportParser, TTsImportProcessor>(cache);
+}
+
+TParserBaseRef MakeRosParser(TParsersCache* cache) {
+    return new TIncludesProcessor<TRosDep, TRosIncludeParser, TRosIncludeProcessor>(cache);
 }

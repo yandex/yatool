@@ -93,6 +93,7 @@ SRCS(
     include_processors/parsers_cache.cpp
     include_processors/proto_processor.cpp
     include_processors/ragel_processor.cpp
+    include_processors/ros_processor.cpp
     include_processors/swig_processor.cpp
     include_processors/xs_processor.cpp
     include_processors/ydl_processor.cpp

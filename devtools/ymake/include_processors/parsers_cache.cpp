@@ -4,6 +4,7 @@
 #include <devtools/ymake/include_parsers/go_parser.h>
 #include <devtools/ymake/include_parsers/incldep.h>
 #include <devtools/ymake/include_parsers/ragel_parser.h>
+#include <devtools/ymake/include_parsers/ros_parser.h>
 
 namespace NParsersCache {
     template <>
@@ -34,6 +35,14 @@ namespace NParsersCache {
             restored.List.push_back(TString(names.GetName<TFileView>(id).GetTargetStr()));
         }
         return restored;
+    }
+
+    template <>
+    TRosDep Convert(TNameStore& names, const TRosIncludeSavedState& saved) {
+        return {
+            TString(names.GetName<TFileView>(saved.PackageNameId).GetTargetStr()),
+            TString(names.GetName<TFileView>(saved.MessageNameId).GetTargetStr()),
+        };
     }
 
     template <>
@@ -76,6 +85,14 @@ namespace NParsersCache {
         for (const auto& str : parsed.List) {
             saved.ImportList.push_back(names.Add(str));
         }
+        return saved;
+    }
+
+    template <>
+    TRosIncludeSavedState Convert(TNameStore& names, const TRosDep& parsed) {
+        TRosIncludeSavedState saved;
+        saved.PackageNameId = names.Add(parsed.PackageName);
+        saved.MessageNameId = names.Add(parsed.MessageName);
         return saved;
     }
 
