@@ -154,7 +154,9 @@ def load_tests_from_log(opts, suite, boost_log_path):
         subtest_name = test_case_el.attributes["name"].value
         parent_el = test_case_el.parentNode
         parents = []
-        while parent_el.tagName != "TestLog":
+
+        # boost test bug workaround https://st.yandex-team.ru/MAPSMOBCORE-20420
+        while not isinstance(parent_el, xml_parser.Document) and parent_el.tagName != "TestLog":
             if parent_el.attributes["name"].value == MASTER_TEST_SUITE:
                 parent = get_default_suite_name(opts.binary)
             else:
