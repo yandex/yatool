@@ -71,21 +71,6 @@ def install_resource(resource_path, installer, force_refetch=False):
     return resource_path
 
 
-def update_resource(resource_path, updater):
-    '''
-    Update existing resource cache or create new if it doesn't exist before.
-    Newly created resource cache is incomplete (doesn't have resource and guard files)
-    and it is subject to delete during `true' resource install (by install_resource() function)
-    '''
-    with safe_resource_lock(resource_path):
-        if not os.path.exists(resource_path):
-            fs.create_dirs(resource_path)
-        elif not os.path.isdir(resource_path):
-            logger.debug('Will not install cache in %s', resource_path)
-            return
-        updater()
-
-
 def install_symlink(resource_path, link_path):
     with safe_resource_lock(link_path):
         if not os.path.islink(link_path) or os.readlink(link_path) != resource_path:

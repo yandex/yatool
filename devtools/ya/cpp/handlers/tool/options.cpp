@@ -24,7 +24,6 @@ namespace NYa::NTool {
         "--force-update",
         "--get-param",
         "--get-resource-id",
-        "--get-task-id",
         "--hide-arm64-host-warning",
         "--key",
         "--noya-tc",

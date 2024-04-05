@@ -62,9 +62,6 @@ class _Bottle(object):
 
         return self.__fetcher.resource_id_from_cache()
 
-    def sid(self):
-        return self.__formula.get("sandbox_id")
-
     def __getitem__(self, name):
         if not self.__executable:
             return self.resolve()
@@ -180,10 +177,6 @@ class _ToolChain(object):
             tool_params['toolchain'] = tc
             return executable, tool_params
 
-    def task_id(self, tool_name):
-        tc, toolchain, location = self.__find_toolchain(tool_name)
-        return _bottle(tc, location['bottle']).sid()
-
     def resource_id_from_cache(self, tool_name, for_platform):
         tc, toolchain, location = self.__find_toolchain(tool_name)
         return str(_bottle(tc, location['bottle'], for_platform).get_resource_id_from_cache())
@@ -254,10 +247,6 @@ def environ(name, toolchain_extra=None):
 
 def resource_id(name, toolchain_extra, for_platform):
     return _ToolChain(toolchain_extra).resource_id_from_cache(name, for_platform)
-
-
-def task_id(name, toolchain_extra=None):
-    return _ToolChain(toolchain_extra).task_id(name)
 
 
 def toolchain_root(name, toolchain_extra, for_platform):

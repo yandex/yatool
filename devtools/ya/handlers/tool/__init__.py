@@ -26,7 +26,7 @@ import app
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions
 from core.yarg.groups import PRINT_CONTROL_GROUP
 from core.yarg.help_level import HelpLevel
-from yalibrary.tools import environ, param, resource_id, task_id, tool, tools, toolchain_root, toolchain_sys_libs
+from yalibrary.tools import environ, param, resource_id, tool, tools, toolchain_root, toolchain_sys_libs
 from yalibrary.toolscache import lock_resource
 from yalibrary.platform_matcher import is_darwin_rosetta
 import core.config
@@ -88,7 +88,6 @@ class ToolOptions(Options):
         self.param = None
         self.platform = None
         self.target_platforms = []
-        self.need_task_id = None
         self.need_resource_id = None
         self.show_help = False
         self.tail_args = []
@@ -125,7 +124,6 @@ class ToolOptions(Options):
                 help="Get resource id for specific platform (the platform should be specified)",
                 hook=SetConstValueHook('need_resource_id', True),
             ),
-            ArgConsumer(['--get-task-id'], help="Get task id", hook=SetConstValueHook('need_task_id', True)),
             ArgConsumer(['--ya-help'], help="Show help", hook=SetConstValueHook('show_help', True)),
             ArgConsumer(
                 ['--target-platform'],
@@ -204,13 +202,7 @@ def do_tool(params):
     lock_result = False
     for_platform = params.platform or params.host_platform or None
 
-    if params.need_task_id:
-        tid = task_id(tool_name, params.toolchain)
-        if tid is not None:
-            print(tid)
-        else:
-            raise Exception("Tool '{}' has no task id".format(tool_name))
-    elif params.need_resource_id:
+    if params.need_resource_id:
         print(resource_id(tool_name, params.toolchain, for_platform))
     elif params.param:
         print(param(tool_name, params.toolchain, params.param))

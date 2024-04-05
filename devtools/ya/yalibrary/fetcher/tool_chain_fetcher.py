@@ -25,7 +25,6 @@ from .cache_helper import (
     install_symlink,
     installed,
     safe_resource_lock,
-    update_resource,
 )
 from .resource_fetcher import (
     fetch_resource_if_need,
@@ -76,17 +75,6 @@ def get_tool_chain_fetcher(
             binname,
             force_refetch,
             bottle_name,
-        )
-    elif "sandbox_id" in formula:
-        return _ToolChainSandboxFetcher(
-            root,
-            toolchain_name,
-            platform_replacements,
-            formula['match'],
-            formula["sandbox_id"],
-            for_platform,
-            binname,
-            force_refetch,
         )
     else:
         raise Exception("Unsupported formula: {}".format(formula))
@@ -181,152 +169,6 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
     def _make_by_platform(self):
         raise NotImplementedError()
-
-
-class _ToolChainSandboxFetcher(_ToolChainFetcherImplBase):
-    def __init__(self, root, name, platform_replacements, match, sid, for_platform, binname, force_refetch):
-        super(_ToolChainSandboxFetcher, self).__init__(
-            root, name, platform_replacements, for_platform, binname, force_refetch
-        )
-        self.__task_ids = _to_list(sid)
-        self.__match = match.lower()
-        self.__platform_cache_needs_refreshing = False
-
-    def resource_id_from_cache(self):
-        resource = self._get_matched_resource()
-        self._install_cache(resource)
-        self._install_symlink(resource, platform_cache_only=True)
-
-        return self._get_resource_uri(resource)
-
-    def _load_by_platform_from_platform_cache(self):
-        logger.debug('{}: lookup platform mapping in tools cache'.format(self._toolchain_name))
-        task_id_set = set(self.__task_ids)
-        for task_id in self.__task_ids:
-            cache_path = os.path.join(self._resource_path(task_id), _CACHE_FILE_NAME)
-            if os.path.exists(cache_path):
-                self.__platform_cache_needs_refreshing = True
-                with open(cache_path) as platform_cache:
-                    try:
-                        by_platform = json.load(platform_cache)
-                    except ValueError:
-                        logger.exception('Cannot parse {}'.format(cache_path))
-                        continue
-                    found_task_ids = set((r['task']['id'] for r in by_platform.values()))
-                    # Is by platform cache contains all required task_ids
-                    if found_task_ids >= task_id_set:
-                        self.__platform_cache_needs_refreshing = False
-                        logger.debug('{}: platform mapping is loaded from {}'.format(self._toolchain_name, cache_path))
-                        return {k: r for k, r in by_platform.items() if r['task']['id'] in task_id_set}
-        logger.debug(
-            '{}: platform mapping is not found in tools cache for {}'.format(self._toolchain_name, self._details())
-        )
-        return None
-
-    def _load_by_platform_from_sandbox(self):
-        logger.debug('{}: load platform mapping from sandbox for {}'.format(self._toolchain_name, self._details()))
-        resources = _list_all_resources(state='READY', task_id=self.__task_ids)
-        by_platform = {}
-        for resource in resources:
-            if resource['type'] in ['TASK_LOGS', 'PLATFORM_MAPPING', 'BUILD_LOGS']:
-                continue
-            if self._match_description(resource):
-                attrs = resource.get('attributes', {})
-                platform = None
-                if 'platform' in attrs:
-                    platform = attrs['platform']
-                else:
-                    platform = 'any'
-                by_platform[platform] = resource
-        return by_platform
-
-    def _make_by_platform(self):
-        if config.has_mapping():
-            return self._make_by_platform_from_mapping_config()
-
-        by_platform = self._load_by_platform_from_platform_cache()
-        if by_platform:
-            # Legacy platform cache may contain not filtered resources. Filter them again
-            by_platform = {p: r for p, r in by_platform.items() if self._match_description(r)}
-        else:
-            by_platform = self._load_by_platform_from_sandbox()
-        dump_file = os.environ.get("YA_DUMP_RESOURCES_FILE")
-        if dump_file:
-            _dump_resources_file(dump_file, by_platform.values())
-        return by_platform
-
-    def _make_by_platform_from_mapping_config(self):
-        by_platform = {}
-        mapping_tasks = config.mapping()["tasks"]
-        for task_id in self.__task_ids:
-            task_id = str(task_id)
-            if task_id in mapping_tasks:
-                for platform in mapping_tasks[task_id]:
-                    by_platform[platform] = {
-                        'id': mapping_tasks[task_id][platform],
-                        'task': {
-                            'id': task_id,
-                        },
-                    }
-        return by_platform
-
-    def _match_description(self, resource):
-        def filter(x):
-            return self.__match in x.lower()
-
-        return filter(resource['description']) or filter(resource.get('attributes', {}).get('description', ''))
-
-    def _get_resource_uri(self, resource):
-        return "sbr:{}".format(resource["id"])
-
-    def _get_resource_id(self, resource):
-        return resource['id']
-
-    def _fetch(self):
-        resource = self._get_matched_resource()
-        fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
-        where = fetch_resource_if_need(
-            fetcher,
-            self._root,
-            self._get_resource_uri(resource),
-            progress_callback,
-            force_refetch=self._force_refetch,
-            **self._binname_kwargs
-        )
-        self._install_cache(resource)
-        self._install_symlink(resource)
-        return where
-
-    def _details(self):
-        return "{} task-id".format(self.__task_ids)
-
-    def _install_cache(self, resource):
-        """
-        Tools downloaded during local execution may lack CACHE_FILE_NAME
-        """
-        resource_path = self._resource_path(self._get_resource_id(resource))
-        cache_path = os.path.join(resource_path, _CACHE_FILE_NAME)
-        if not os.path.exists(cache_path) or self.__platform_cache_needs_refreshing:
-            update_resource(resource_path, lambda: self._write_platform_cache(resource_path))
-
-    def _install_symlink(self, resource, platform_cache_only=False):
-        resource_id = self._get_resource_id(resource)
-        resource_path = self._resource_path(resource_id)
-        link_path = self._resource_path(resource["task"]["id"])
-        # Permit some stale symlinks and directories with platform cache only
-        # to avoid polling in tool cache.
-        if not platform_cache_only:
-            toolscache.notify_tool_cache(link_path)
-        return install_symlink(resource_path, link_path)
-
-    def _write_platform_cache(self, resource_path):
-        by_platform = self._by_platform
-        logger.debug('{}: install {} to {}'.format(self._toolchain_name, _CACHE_FILE_NAME, resource_path))
-        temp_cache = os.path.join(resource_path, _CACHE_FILE_NAME + '.tmp')
-        cache_file = os.path.join(resource_path, _CACHE_FILE_NAME)
-        with open(temp_cache, mode="w") as f:
-            json.dump(by_platform, f, indent=4)
-        fs.replace(temp_cache, cache_file)
 
 
 class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
