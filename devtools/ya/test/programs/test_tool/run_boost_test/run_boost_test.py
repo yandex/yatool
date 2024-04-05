@@ -5,7 +5,6 @@ import argparse
 import logging
 import os
 import signal
-import subprocess
 import sys
 
 import xml.dom.minidom as xml_parser
@@ -333,7 +332,7 @@ def run_tests(opts):
 
             def smooth_shutdown(signo, frame):
                 os.kill(proc.process.pid, signal.SIGQUIT)
-                _, status = subprocess._eintr_retry_call(os.waitpid, proc.process.pid, 0)
+                _, status = os.waitpid(proc.process.pid, 0)
                 proc.process._handle_exitstatus(status)
 
             signal.signal(signal.SIGUSR2, smooth_shutdown)
