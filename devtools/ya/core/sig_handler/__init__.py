@@ -14,7 +14,13 @@ else:
 
 
 def create_sigint_exit_handler():
-    obj = proc_util.SubreaperApplicant()
+    if os.name == 'nt':
+        # Become a subreaper on windows because os.kill(0, signal.SIGINT) doesn't work on this platform.
+        subreaper_obj = proc_util.SubreaperApplicant()
+    else:
+        # Don't become subreaper on unix platforms, otherwise ya-tc won't outlast ya,
+        # which is not expected for a caching daemon process.
+        subreaper_obj = None
 
     def instant_sigint_exit_handler(*args):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -24,10 +30,11 @@ def create_sigint_exit_handler():
         except Exception:
             pass
 
-        try:
-            obj.close()
-        except Exception:
-            pass
+        if subreaper_obj:
+            try:
+                subreaper_obj.close()
+            except Exception:
+                pass
 
         try:
             sys.stderr.write(STOP_STR)
