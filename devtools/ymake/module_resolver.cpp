@@ -359,7 +359,12 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
         return;
     }
 
-    const auto incDirs = Module.IncDirs.Get(langId);
+    TIterableCollections<TDirs> incDirs;
+
+    if (!NLanguages::GetLanguageAddinclsAreNonPaths(langId)) {
+        incDirs = Module.IncDirs.Get(langId);
+    }
+
     size_t numDirs = incDirs.Total();
     resolverOptions.ResolveAsKnown = false; // This should happen in first call above
     const TResolveCacheValue* addinclResult = numDirs > 0 ?
