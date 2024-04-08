@@ -486,7 +486,7 @@ class PyProject(object):
             conf = OrderedDict(
                 (
                     ("name", name),
-                    ("type", "python"),
+                    ("type", "debugpy"),
                     ("request", "launch"),
                     ("args", []),
                     ("env", {"PYDEVD_USE_CYTHON": "NO"}),  # FIXME Workaround for pydevd not supporting Python 3.11

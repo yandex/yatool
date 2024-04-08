@@ -8,10 +8,6 @@ from ide import ide_common
 from . import common, consts, dump, tasks
 
 
-def gen_run_configurations(modules, arc_root, python_wrappers_dir):
-    pass
-
-
 def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool_fetcher, python_wrappers_dir, goroot):
     is_mac = pm.my_platform().startswith("darwin")
     cpp_debug_params = None
@@ -95,7 +91,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
             configuration = OrderedDict(
                 (
                     ("name", conf_name),
-                    ("type", "python"),
+                    ("type", "debugpy"),
                     ("request", "launch"),
                     ("args", []),
                     ("env", {"PYDEVD_USE_CYTHON": "NO"}),  # FIXME Workaround for pydevd not supporting Python 3.11
