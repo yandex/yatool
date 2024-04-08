@@ -380,7 +380,7 @@ class FrameBase(object):
         return self.source
 
     def raw(self):
-        return "{frame} {func} {source}".format(
+        return "{frame: <3} {func} {source}".format(
             frame=self.frame_no,
             func=self.func,
             source=self.source,
@@ -504,7 +504,7 @@ class GDBFrame(FrameBase):
                 link += "?#L{line}".format(line=self.source_no)
 
         if link:
-            source = '<a href="{link}">/{source_path}</a>'.format(
+            source = '<a href="{link}">{source_path}</a>'.format(
                 link=link,
                 source_path=source,
             )
