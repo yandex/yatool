@@ -784,7 +784,7 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def tags(self):
-        return list(set([_f for _f in self.dart_info.get('TAG', []) if _f]))
+        return sorted(set([_f for _f in self.dart_info.get('TAG', []) if _f]))
 
     @property
     def default_requirements(self):
