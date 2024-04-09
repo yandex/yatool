@@ -73,11 +73,3 @@ class CheckDataSbrTestSuite(CheckResourceTestSuite):
 class CheckMDSTestSuite(ExtResourceAbstractSuite):
     def get_checker(self, opts, dist_build, out_path):
         return "check_mds"
-
-
-class CheckExternalTestSuite(ExtResourceAbstractSuite):
-    def get_checker(self, opts, dist_build, out_path):
-        return "check_external --source-root $(SOURCE_ROOT) --project-path " + self.project_path
-
-    def get_test_related_paths(self, source_root, opts):
-        return ["{}/{}/{}".format(source_root, self.project_path, x) for x in self._get_files()]

@@ -29,7 +29,6 @@ SUITE_MAP = {  # type: dict[str, types_common.AbstractTestSuite]
     'custom_lint': custom_lint.CustomLintTestSuite,
     'boost.test': boost_test.BoostTestSuite,
     'check.data': ext_resource.CheckDataSbrTestSuite,
-    'check.external': ext_resource.CheckExternalTestSuite,
     'check.mds': ext_resource.CheckMDSTestSuite,
     'check.resource': ext_resource.CheckResourceTestSuite,
     'clang_tidy': clang_tidy.ClangTidySuite,
