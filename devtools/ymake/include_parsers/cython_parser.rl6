@@ -81,8 +81,8 @@ include_stmt = ("include" ws+ (('"' include_capture :> '"') |
 
 cdef_capture = ([^\n<>]*) >StartCapture %EndCapture;
 cdef_source = (('<' cdef_capture '>') | cdef_capture);
-cdef = ("cdef" ws+ "extern" ws+ "from" ws+ (('"' cdef_source :> '"') |
-                                            ("'" cdef_source :> "'")) [^\n]*) %SetCdef;
+cdef = ("cdef" ws+ "extern" ws+ "from" ws+ "r"? (('"' cdef_source :> '"') |
+                                                ("'" cdef_source :> "'")) [^\n]*) %SetCdef;
 
 cimport_ident = [^\t\v\f\r\n #,()\\]+;
 cimport_capture = cimport_ident >StartCapture %EndCapture;
