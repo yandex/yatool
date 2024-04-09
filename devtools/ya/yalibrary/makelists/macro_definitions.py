@@ -447,6 +447,9 @@ class Value(Node):
             return NotImplemented
         return self.name == v.name
 
+    def __hash__(self):
+        return hash(self.name)
+
     def _write(self):
         out = []
 
@@ -874,13 +877,13 @@ class Owner(Macro):
         self.sort_values()
 
     def sort_values(self):
-        logins = []
-        groups = []
+        logins = set()
+        groups = set()
         for node in self.children:
             if node.name.startswith('g:'):
-                groups.append(node)
+                groups.add(node)
             else:
-                logins.append(node)
+                logins.add(node)
 
         self.children = sorted(logins) + sorted(groups)
 
