@@ -203,6 +203,25 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         }
     }
 
+    if (CurrData->OutTogetherDependency) {
+        // When a command works with a generated file that is an additional output,
+        // the command should depend on the corresponding main output node, because
+        // it is associated to it's build command and the JSON node, which in turn
+        // will be in the command's JSON node dependencies.
+        // As for now we store all such dependencies in NodeDeps, and we store all nodes
+        // of input files there too. Thus we can not distinguish such main output node
+        // dependency from a real input file, and the main output file name will be
+        // listed in the "inputs" section of JSON node, even though this file is not
+        // present in the command arguments and is not really used.
+        // So we should include main output name in the IncludeStructure hash
+        // because when the name changes, all JSON nodes whose commands include this file
+        // will change too, specifically theirs "inputs" sections.
+        // TODO: This is a workaround, and should be removed when "inputs" sections
+        // no more contain spurious dependency main outputs.
+        TString mainOutputName = Graph->ToString(Graph->Get(CurrData->OutTogetherDependency));
+        CurrState->Hash->New()->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
+    }
+
     // Node name will be in $AUTO_INPUT for the consumer of this node.
     if (IsFileType(CurrNode->NodeType)) {
         CurrState->Hash->New()->IncludeStructureMd5Update(Graph->ToString(CurrNode), "Node name for $AUTO_INPUT");
