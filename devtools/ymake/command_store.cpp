@@ -39,11 +39,11 @@ namespace {
         }
 
         bool Condition(NPolexpr::TFuncId func) {
-            auto fnIdx = static_cast<EMacroFunctions>(func.GetIdx());
-            return fnIdx == EMacroFunctions::Tool
-                || fnIdx == EMacroFunctions::Input
-                || fnIdx == EMacroFunctions::Output
-                || fnIdx == EMacroFunctions::NoAutoSrc;
+            RootFnIdx = static_cast<EMacroFunctions>(func.GetIdx());
+            return RootFnIdx == EMacroFunctions::Tool
+                || RootFnIdx == EMacroFunctions::Input
+                || RootFnIdx == EMacroFunctions::Output
+                || RootFnIdx == EMacroFunctions::NoAutoSrc;
         };
 
         TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
@@ -166,11 +166,13 @@ namespace {
                     case EMacroFunctions::NoAutoSrc: {
                         if (unwrappedArgs.size() != 1)
                             throw std::runtime_error{"Invalid number of arguments"};
-                        auto arg0 = std::get<TMacroValues::TOutput>(unwrappedArgs[0]);
-                        UpdateCoord(Outputs, arg0.Coord, [](auto& var) {
+                        auto arg0 = std::get_if<TMacroValues::TOutput>(&unwrappedArgs[0]);
+                        if (!arg0)
+                            throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid output";
+                        UpdateCoord(Outputs, arg0->Coord, [](auto& var) {
                             var.NoAutoSrc = true;
                         });
-                        return arg0;
+                        return *arg0;
                     }
                     default:
                         break; // unreachable
@@ -178,7 +180,9 @@ namespace {
 
             }
 
-            throw std::runtime_error{"Unsupported function"};
+            throw TConfigurationError()
+                << "Cannot process modifier [[bad]]" << ToString(fnIdx) << "[[rst]]"
+                << " while preevaluating [[bad]]" << ToString(RootFnIdx) << "[[rst]]";
 
         }
 
@@ -204,6 +208,7 @@ namespace {
         const TVars& Vars;
         TInputs& Inputs;
         TOutputs& Outputs;
+        EMacroFunctions RootFnIdx;
 
     };
 
