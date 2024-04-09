@@ -117,7 +117,7 @@ def execute_early(action):
     return helper
 
 
-def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=None, interruptable=False):
+def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=None):
     # noinspection PyStatementEffect
     def helper(parameters):
         stager.finish("handler-selection")
@@ -132,7 +132,7 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
         modules = [
             ('params', params.configure(parameters, with_respawn, handler_python_major_version)),
             ('hide_token', token_suppressions.configure(ctx)),
-            ('state', configure_active_state(ctx, interruptable)),
+            ('state', configure_active_state(ctx)),
             ('display', configure_display(ctx)),
             ('custom_file_log', configure_custom_file_log(ctx)),
             ('display_log', configure_display_log(ctx)),
@@ -555,19 +555,14 @@ def configure_display(app_ctx):
         term_display.close()
 
 
-def configure_active_state(app_ctx, interruptable):
+def configure_active_state(app_ctx):
     import signal
     import yalibrary.active_state
 
     state = yalibrary.active_state.ActiveState(__name__)
+    sigint_exit_handler = core.sig_handler.create_sigint_exit_handler()
 
-    if interruptable:
-        exit_handler = core.sig_handler.create_sigint_exit_handler()
-        signal.signal(signal.SIGINT, exit_handler)
-    else:
-        if os.environ.get('Y_FAST_CANCEL', 'no') != 'yes':
-            signal.signal(signal.SIGINT, lambda _, __: state.stopping())
-
+    signal.signal(signal.SIGINT, sigint_exit_handler)
     signal.signal(signal.SIGTERM, lambda _, __: state.stopping())
 
     try:
