@@ -171,12 +171,16 @@ namespace NUserService {
 
     // TODO: add configuration parameters.
     void TSingletonServer::BuildAndStartService() {
+        constexpr int MAX_MESSAGE_LENGTH = 8 * (1 << 20);
+
         ServerBuilder builder;
 
         int port = 0;
 
         MyName_ = GetAddress(Config_);
         builder.AddListeningPort(MyName_.ToGrpcAddress(), InsecureServerCredentials(), &port);
+        builder.SetMaxReceiveMessageSize(MAX_MESSAGE_LENGTH);
+        builder.SetMaxSendMessageSize(MAX_MESSAGE_LENGTH);
 
         // Create an instance owned by 'this'.
         ErrorHandler_ = [this](TLog& log, const std::exception& e) -> void {
