@@ -345,6 +345,8 @@ class EslintTestSuite(common_types.AbstractTestSuite):
 
 class TscTypecheckTestSuite(common_types.AbstractTestSuite):
     TS_FILES_EXTS = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
+    TS_MODULE_TAGS = ("ts", "ts_proto")
+    TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
 
     def __init__(
         self,
@@ -362,7 +364,6 @@ class TscTypecheckTestSuite(common_types.AbstractTestSuite):
             split_file_name=None,
             multi_target_platform_run=multi_target_platform_run,
         )
-        self._not_build_deps = set()
         self._ts_config_path = self.dart_info.get("TS_CONFIG_PATH")
         self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._files = [
@@ -379,7 +380,14 @@ class TscTypecheckTestSuite(common_types.AbstractTestSuite):
 
     @property
     def cache_test_results(self):
-        # suite is considered to be steady and cached by default
+        return True
+
+    @property
+    def supports_canonization(self):
+        return False
+
+    @property
+    def supports_clean_environment(self):
         return False
 
     def get_type(self):
@@ -410,24 +418,53 @@ class TscTypecheckTestSuite(common_types.AbstractTestSuite):
         )
 
     def get_test_related_paths(self, arc_root, opts):
-        return [self._source_folder_path(arc_root)]
+        inputs = self.get_run_cmd_inputs(opts)
 
-    # def post_add_build_dep(self, graph, uid):
-    #     TODO: add transient ts + ts_prepare_deps deps
-    #     node = graph.get_node_by_uid(uid)
-    #     deps = node.get("deps", [])
-    #     logger.info("{}: {}".format(uid, repr(graph.get_projects_by_uids(uid))))
+        return [
+            f.replace(jbuild.gen.consts.SOURCE_ROOT, arc_root)
+            for f in inputs
+            if f.startswith(jbuild.gen.consts.SOURCE_ROOT)
+        ]
 
-    #     for dep_uid in deps:
-    #         # do not process dep several times
-    #         if dep_uid in self._build_deps :
-    #             continue
-    #         project = graph.get_projects_by_uids(dep_uid)
-    #         if not project:
-    #             self._not_build_deps.add(dep_uid)
-    #             logger.info("{}: no project".format(dep_uid))
-    #             continue
-    #         logger.info("{}: {}".format(dep_uid, repr(project)))
+    def setup_dependencies(self, graph):
+        super().setup_dependencies(graph)
+        seen = set()
+
+        for uid in self.get_build_dep_uids():
+            self._propagate_ts_transient_deps(graph, uid, seen)
+
+    def _propagate_ts_transient_deps(self, graph, uid, seen):
+        """
+        Ymake propagates deps for TS modules because they are configured as
+            .PEERDIR_POLICY=as_build_from
+            .NODE_TYPE=Bundle
+        We need same logic for test node too.
+
+        If test node has TS node in deps, then it also should include TS deps of that TS node.
+        We need to add deps from one level only, because ymake set all
+        """
+        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
+        node = graph.get_node_by_uid(uid)
+        module_tag = graph.get_module_tag(node)
+
+        if module_tag not in TscTypecheckTestSuite.TS_MODULE_TAGS:
+            # Ignore non-TS modules
+            return
+
+        for dep_uid in node.get("deps", []):
+            if dep_uid in self._build_deps or dep_uid in seen:
+                # Do not process same dep several times
+                continue
+
+            seen.add(dep_uid)
+            project = graph.get_projects_by_uids(dep_uid)
+            if not project:
+                # Ignore non-module deps, only modules should be propagated
+                continue
+            project_path, toolchain, _, dep_module_tag, tags = project
+            if dep_module_tag in TscTypecheckTestSuite.TS_TRANSIENT_MODULE_TAGS:
+                # Only add TS modules
+                self.add_build_dep(project_path, toolchain, dep_uid, tags)
 
     def _abs_source_path(self, path):
         return os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path, path)
