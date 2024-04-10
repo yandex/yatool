@@ -49,7 +49,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/svn
         devtools/ya/handlers/upload
         devtools/ya/handlers/vmctl
-        devtools/ya/handlers/webide
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
         devtools/ya/handlers/yav
@@ -130,7 +129,6 @@ RECURSE(
     upload
     vim
     vmctl
-    webide
     whoami
     wine
     yav
