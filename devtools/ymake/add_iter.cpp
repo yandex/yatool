@@ -449,7 +449,7 @@ bool TDGIterAddable::NeedUpdate(TYMake& yMake, TFileHolder& fileContent, bool re
                     nameStr = TDiagCtrl::TWhere::TOP_LEVEL;
                 }
                 TScopedContext context(elemId, nameStr);
-                YConfErr(BadDir) << "reference to missing dir " << "[[imp]]" << nameStr << "[[rst]]" << Endl;
+                YConfErr(BadDir) << "reference to missing dir " << "[[imp]]" << name.CutType() << "[[rst]]" << Endl;
             }
 
             if (actualDirType == EMNT_Directory && !Graph.GetFileNode(MakefileNodeNameForDir(yMake.Names.FileConf, name)).IsValid()) {
