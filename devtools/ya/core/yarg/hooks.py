@@ -24,6 +24,16 @@ def counter_name(name):
     return '_{}_counter'.format(name)
 
 
+class CaseInsensitiveValues(list):
+    def __init__(self, seq=()):
+        assert all(isinstance(val, str) for val in seq), "all values should be str in %s" % seq
+        super(CaseInsensitiveValues, self).__init__(seq)
+
+    def __contains__(self, item):
+        assert isinstance(item, str), "%s should be string" % item
+        return any(item.lower() == val.lower() for val in self)
+
+
 class BaseHook(object):
     def __call__(self, to, *args):
         # type: ("Options", tp.Optional[tp.Any]) -> None
@@ -45,7 +55,7 @@ class BaseHook(object):
 
 class SetValueHook(BaseHook):
     def __init__(self, name, transform=None, values=FILES, default_value=None):
-        # type: (str, tp.Optional[tp.Callable[[tp.Any], tp.Any]], list[tp.Any], tp.Any) -> None
+        # type: (str, tp.Optional[tp.Callable[[tp.Any], tp.Any]], tp.Iterable[tp.Any], tp.Any) -> None
         self.name = name
         self.transform = transform
         self.values = values

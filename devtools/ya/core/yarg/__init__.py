@@ -35,6 +35,7 @@ from core.yarg.hooks import (  # noqa: F401
     DictUpdateHook,
     SetConstAppendHook,
     UpdateValueHook,
+    CaseInsensitiveValues,
 )
 from core.yarg.options import Options, merge_opts, RawParamsOptions, ParamAsArgs  # noqa: F401
 from core.yarg.params import Params, merge_params  # noqa: F401, F403
