@@ -262,6 +262,7 @@ void TBuildConfiguration::FillMiscValues() {
     AddDataPaths = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_DATA"));
     ForceListDirInResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_FORCE_LISTDIR"));
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
+    UseNewUids = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_USE_NEW_UIDS"));
     MainOutputAsExtra_ = NYMake::IsTrue(CommandConf.EvalValue("MAIN_OUTPUT_AS_EXTRA"));
 
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
