@@ -92,7 +92,12 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
         self['cache'] = core.yarg.OptsHandler(
             action=app.execute(action=do_cache, respawn=app.RespawnType.OPTIONAL),
             description='Strip build cache and old build directories',
-            opts=[core.common_opts.ShowHelpOptions(), CollectCacheOptions(), CustomBuildRootOptions()],
+            opts=[
+                core.common_opts.ShowHelpOptions(),
+                CollectCacheOptions(),
+                CustomBuildRootOptions(),
+                core.common_opts.AuthOptions(),
+            ],
             visible=True,
         )
         self['dist_cache'] = core.yarg.OptsHandler(
