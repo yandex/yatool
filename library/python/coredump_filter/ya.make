@@ -12,6 +12,10 @@ RESOURCE_FILES(
     styles.css
 )
 
+PEERDIR(
+    contrib/python/six
+)
+
 IF(PYTHON2)
     PEERDIR(contrib/deprecated/python/enum34)
 ENDIF()
