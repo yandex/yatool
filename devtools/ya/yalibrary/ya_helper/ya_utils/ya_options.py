@@ -367,6 +367,8 @@ class YaMakeOptions(YaBaseOptions):
         self.cache_size = self._pop("cache_size")
         self.tools_cache_size = self._pop("tools_cache_size")
 
+        self.ignore_configure_errors = self._pop('ignore_configure_errors')
+
     def _generate_post_handler(self):
         result = []
         if self.use_distbuild:
@@ -771,6 +773,9 @@ class YaMakeOptions(YaBaseOptions):
             env['YA_CACHE_SIZE'] = str(self.cache_size)
         if self.tools_cache_size:
             env['YA_TOOLS_CACHE_SIZE'] = str(self.tools_cache_size)
+
+        if self.ignore_configure_errors:
+            env['YA_IGNORE_CONFIGURE_ERRORS'] = '1'
 
         return env
 
