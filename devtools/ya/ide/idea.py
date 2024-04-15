@@ -15,6 +15,8 @@ import build.ya_make as ya_make
 import core.event_handling
 import core.yarg
 
+from build.evlog.progress import PrintProgressSubscriber, ModulesFilesStatistic, get_print_status_func
+
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,14 @@ def do_idea(params):
 
     import app_ctx  # XXX: via args
 
+    display = getattr(app_ctx, 'display', None)
+    print_status = get_print_status_func(params, display, logger)
+    modules_files_stats = ModulesFilesStatistic(
+        stream=print_status,
+        is_rewritable=params.output_style == "ninja",
+    )
     subscribers = [
+        PrintProgressSubscriber(modules_files_stats),
         ya_make.DisplayMessageSubscriber(jopts, app_ctx.display),
         core.event_handling.EventToLogSubscriber(),
     ]
