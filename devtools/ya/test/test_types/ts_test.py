@@ -343,10 +343,189 @@ class EslintTestSuite(common_types.AbstractTestSuite):
         return cmd
 
 
-class TscTypecheckTestSuite(common_types.AbstractTestSuite):
-    TS_FILES_EXTS = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
+class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
     TS_MODULE_TAGS = ("ts", "ts_proto")
     TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
+
+    @classmethod
+    def get_ci_type_name(cls):
+        return "style"
+
+    def _get_config_files(self):
+        return []
+
+    def support_retries(self):
+        return False
+
+    def support_splitting(self, opts=None):
+        return False
+
+    @property
+    def cache_test_results(self):
+        return True
+
+    @property
+    def supports_canonization(self):
+        return False
+
+    @property
+    def supports_clean_environment(self):
+        return False
+
+    def _abs_source_path(self, path):
+        return os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path, path)
+
+    def _abs_build_path(self, path):
+        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.project_path, path)
+
+    def get_test_dependencies(self):
+        return list(
+            set(
+                [x for x in self.dart_info.get("CUSTOM-DEPENDENCIES", "").split(" ") if x]
+                + [self._abs_build_path("pre.pnpm-lock.yaml")]
+            )
+        )
+
+    def get_run_cmd_inputs(self, opts):
+        source_inputs = self._get_config_files() + ["package.json", "pnpm-lock.yaml"]
+        return list(
+            set(
+                self._files
+                + [self._abs_source_path(f) for f in source_inputs]
+                + [self._abs_build_path("pre.pnpm-lock.yaml")]
+            )
+        )
+
+    def get_test_related_paths(self, arc_root, opts):
+        inputs = self.get_run_cmd_inputs(opts)
+
+        return [
+            f.replace(jbuild.gen.consts.SOURCE_ROOT, arc_root)
+            for f in inputs
+            if f.startswith(jbuild.gen.consts.SOURCE_ROOT)
+        ]
+
+    def setup_dependencies(self, graph):
+        super(AbstractFrontendStyleSuite, self).setup_dependencies(graph)
+        seen = set()
+
+        for uid in self.get_build_dep_uids():
+            self._propagate_ts_transient_deps(graph, uid, seen)
+
+    def _propagate_ts_transient_deps(self, graph, uid, seen):
+        """
+        Ymake propagates deps for TS modules because they are configured as
+            .PEERDIR_POLICY=as_build_from
+            .NODE_TYPE=Bundle
+        We need same logic for test node too.
+
+        If test node has TS node in deps, then it also should include TS deps of that TS node.
+        We need to add deps from one level only, because ymake set all
+        """
+        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
+        node = graph.get_node_by_uid(uid)
+        module_tag = graph.get_module_tag(node)
+
+        if module_tag not in self.TS_MODULE_TAGS:
+            # Ignore non-TS modules
+            return
+
+        for dep_uid in node.get("deps", []):
+            if dep_uid in self._build_deps or dep_uid in seen:
+                # Do not process same dep several times
+                continue
+
+            seen.add(dep_uid)
+            project = graph.get_projects_by_uids(dep_uid)
+            if not project:
+                # Ignore non-module deps, only modules should be propagated
+                continue
+            project_path, toolchain, _, dep_module_tag, tags = project
+            if dep_module_tag in self.TS_TRANSIENT_MODULE_TAGS:
+                # Only add TS modules
+                self.add_build_dep(project_path, toolchain, dep_uid, tags)
+
+    @property
+    def test_run_cwd(self):
+        return self._abs_build_path("")
+
+
+class EslintNewTestSuite(AbstractFrontendStyleSuite):
+    def __init__(
+        self,
+        dart_info,
+        modulo=1,
+        modulo_index=0,
+        target_platform_descriptor=None,
+        multi_target_platform_run=False,
+    ):
+        super(EslintNewTestSuite, self).__init__(
+            dart_info,
+            modulo,
+            modulo_index,
+            target_platform_descriptor,
+            split_file_name=None,
+            multi_target_platform_run=multi_target_platform_run,
+        )
+        self._eslint_config_path = self.dart_info.get("ESLINT_CONFIG_PATH")
+        self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
+        self._files = sorted(self.dart_info.get("TEST-FILES", []))
+
+    @classmethod
+    def get_type_name(cls):
+        return "eslint"
+
+    def get_type(self):
+        return "eslint"
+
+    def _get_config_files(self):
+        return [self._eslint_config_path]
+
+    def get_list_cmd(self, arc_root, build_root, opts):
+        return []
+
+    def get_computed_test_names(self, opts):
+        return ["{}::eslint".format(os.path.basename(filename)) for filename in self._files]
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        test_work_dir = test_common.get_test_suite_work_dir(
+            jbuild.gen.consts.BUILD_ROOT,
+            self.project_path,
+            self.name,
+            retry,
+            split_count=self._modulo,
+            split_index=self._modulo_index,
+            target_platform_descriptor=self.target_platform_descriptor,
+            multi_target_platform_run=self.multi_target_platform_run,
+            remove_tos=opts.remove_tos,
+        )
+        cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_eslint",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+        cmd += [
+            "--source-root",
+            jbuild.gen.consts.SOURCE_ROOT,
+            "--build-root",
+            jbuild.gen.consts.BUILD_ROOT,
+            "--source-folder-path",
+            self.dart_info.get("SOURCE-FOLDER-PATH"),
+            "--nodejs",
+            self._nodejs_resource,
+            "--eslint-config-path",
+            self._eslint_config_path,
+            "--tracefile",
+            os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
+        ]
+        cmd += self._files[self._modulo_index :: self._modulo]
+        return cmd
+
+
+class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
+    TS_FILES_EXTS = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
 
     def __init__(
         self,
@@ -371,106 +550,14 @@ class TscTypecheckTestSuite(common_types.AbstractTestSuite):
         ]
 
     @classmethod
-    def get_ci_type_name(cls):
-        return "style"
-
-    @classmethod
     def get_type_name(cls):
         return "typecheck"
-
-    @property
-    def cache_test_results(self):
-        return True
-
-    @property
-    def supports_canonization(self):
-        return False
-
-    @property
-    def supports_clean_environment(self):
-        return False
 
     def get_type(self):
         return "tsc_typecheck"
 
-    def support_retries(self):
-        return False
-
-    def support_splitting(self, opts=None):
-        return False
-
-    def get_test_dependencies(self):
-        # deps only to CUSTOM-DEPENDENCIES, do not include moddir
-        return list(
-            set(
-                [x for x in self.dart_info.get("CUSTOM-DEPENDENCIES", "").split(" ") if x]
-                + [self._abs_build_path("pre.pnpm-lock.yaml")]
-            )
-        )
-
-    def get_run_cmd_inputs(self, opts):
-        return list(
-            set(
-                self._files
-                + [self._abs_source_path(f) for f in [self._ts_config_path, "package.json", "pnpm-lock.yaml"]]
-                + [self._abs_build_path("pre.pnpm-lock.yaml")]
-            )
-        )
-
-    def get_test_related_paths(self, arc_root, opts):
-        inputs = self.get_run_cmd_inputs(opts)
-
-        return [
-            f.replace(jbuild.gen.consts.SOURCE_ROOT, arc_root)
-            for f in inputs
-            if f.startswith(jbuild.gen.consts.SOURCE_ROOT)
-        ]
-
-    def setup_dependencies(self, graph):
-        super().setup_dependencies(graph)
-        seen = set()
-
-        for uid in self.get_build_dep_uids():
-            self._propagate_ts_transient_deps(graph, uid, seen)
-
-    def _propagate_ts_transient_deps(self, graph, uid, seen):
-        """
-        Ymake propagates deps for TS modules because they are configured as
-            .PEERDIR_POLICY=as_build_from
-            .NODE_TYPE=Bundle
-        We need same logic for test node too.
-
-        If test node has TS node in deps, then it also should include TS deps of that TS node.
-        We need to add deps from one level only, because ymake set all
-        """
-        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
-        node = graph.get_node_by_uid(uid)
-        module_tag = graph.get_module_tag(node)
-
-        if module_tag not in TscTypecheckTestSuite.TS_MODULE_TAGS:
-            # Ignore non-TS modules
-            return
-
-        for dep_uid in node.get("deps", []):
-            if dep_uid in self._build_deps or dep_uid in seen:
-                # Do not process same dep several times
-                continue
-
-            seen.add(dep_uid)
-            project = graph.get_projects_by_uids(dep_uid)
-            if not project:
-                # Ignore non-module deps, only modules should be propagated
-                continue
-            project_path, toolchain, _, dep_module_tag, tags = project
-            if dep_module_tag in TscTypecheckTestSuite.TS_TRANSIENT_MODULE_TAGS:
-                # Only add TS modules
-                self.add_build_dep(project_path, toolchain, dep_uid, tags)
-
-    def _abs_source_path(self, path):
-        return os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path, path)
-
-    def _abs_build_path(self, path):
-        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.project_path, path)
+    def _get_config_files(self):
+        return [self._ts_config_path]
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         # test_work_dir: $(BUILD_ROOT)/devtools/dummy_arcadia/typescript/with_lint/test-results/eslint
