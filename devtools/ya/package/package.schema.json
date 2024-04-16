@@ -582,7 +582,167 @@
         "params": {
             "description": "Fixed 'ya package' parameters",
             "type": "object",
-            "uniqueItems": true
+            "properties": {
+                "arch_all": {
+                    "description": "Use 'Architecture: all' in debian",
+                    "type": "boolean"
+                },
+                "artifactory": {
+                    "description": "Build package and upload it to artifactory",
+                    "type": "boolean"
+                },
+                "compress_archive": {
+                    "description": "Don't compress tar archive (for --tar only)",
+                    "type": "boolean"
+                },
+                "compression_filter": {
+                    "description": "Specifies compression filter (gzip/zstd)",
+                    "type": "string",
+                    "enum": ["gzip", "zstd"]
+                },
+                "compression_level": {
+                    "description": "Specifies compression level (0-9 for gzip [6 is default], 0-22 for zstd [3 is default])",
+                    "type": "integer"
+                },
+                "create_dbg": {
+                    "description": "Create separate package with debug info (works only in case of --strip or --full-strip)",
+                    "type": "boolean"
+                },
+                "custom_version": {
+                    "description": "Custom package version",
+                    "type": "string"
+                },
+                "debian_arch": {
+                    "description": "Debian arch (passed to debuild as `-a`)",
+                    "type": "string"
+                },
+                "debian_compression_level": {
+                    "description": "Set deb-file compression level",
+                    "type": "string",
+                    "enum": ["none", "low", "medium", "high"]
+                },
+                "debian_compression_type": {
+                    "description": "Deb-file compression type used when building deb-file (allowed types: gzip (default), xz, bzip2, lzma, none)",
+                    "type": "string",
+                    "enum": ["gzip", "xz", "bzip2", "lzma", "none"]
+                },
+                "docker_add_host": {
+                    "description": "Same as Docker --add-host",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "docker_secrets": {
+                    "description": "Allows to pass secrets to docker similar to `docker --secret`",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "docker_build_arg": {
+                    "description": "--build-arg parameter for `docker build` command, set it in the <key>=<value> form",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "docker_build_network": {
+                    "description": "--network parameter for `docker build` command",
+                    "type": "string"
+                },
+                "docker_platform": {
+                    "description": "Specify platform for docker build (require buildx)",
+                    "type": "string"
+                },
+                "docker_registry": {
+                    "description": "Docker registry",
+                    "type": "string"
+                },
+                "docker_repository": {
+                    "description": "Specify private repository",
+                    "type": "string"
+                },
+                "docker_save_image": {
+                    "description": "Save docker image to archive",
+                    "type": "boolean"
+                },
+                "docker_target": {
+                    "description": "Specifying target build stage (--target)",
+                    "type": "string"
+                },
+                "dupload_max_attempts": {
+                    "description": "How many times try to run dupload if it fails",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "dupload_no_mail": {
+                    "description": "Dupload --no-mail",
+                    "type": "boolean"
+                },
+                "ensure_package_published": {
+                    "description": "Ensure that package is available in the repository",
+                    "type": "boolean"
+                },
+                "force_dupload": {
+                    "description": "Dupload --force",
+                    "type": "boolean"
+                },
+                "format": {
+                    "description": "Set specific package format",
+                    "type": "string",
+                    "enum": ["debian", "tar", "docker", "rpm", "wheel", "aar", "npm"]
+                },
+                "full_strip": {
+                    "description": "Strip binaries",
+                    "type": "boolean"
+                },
+                "overwrite_read_only_files": {
+                    "description": "Overwrite read-only files in package",
+                    "type": "boolean"
+                },
+                "raw_package": {
+                    "description": "Used with --tar to get package content without tarring",
+                    "type": "boolean"
+                },
+                "resource_attrs": {
+                    "description": "Resource attr, set it in the <name>=<value> form",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "resource_type": {
+                    "description": "Created resource type",
+                    "type": "string"
+                },
+                "sign": {
+                    "description": "Do not sign debian package",
+                    "type": "boolean"
+                },
+                "sloppy_deb": {
+                    "description": "Fewer checks and no compression when building debian package",
+                    "type": "boolean"
+                },
+                "store_debian": {
+                    "description": "Save debian package in a separate archive",
+                    "type": "boolean"
+                },
+                "strip": {
+                    "description": "Strip binaries (only debug symbols: 'strip -g')",
+                    "type": "boolean"
+                },
+                "wheel_platform": {
+                    "description": "Set wheel package platform",
+                    "type": "string"
+                },
+                "wheel_python3": {
+                    "description": "Use python3 when building wheel package",
+                    "type": "boolean"
+                }
+            },
+            "uniqueItems": true,
+            "additionalProperties": false
         },
         "postprocess": {
             "description": "Postprocess the package by executing some applications",
