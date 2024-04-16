@@ -39,6 +39,7 @@ class PackageOperationalOptions(core.yarg.Options):
         self.dump_build_targets = None
         self.dump_inputs = None
         self.ignore_fail_tests = False
+        self.key = None
         self.list_codecs = False
         self.nanny_release = None
         self.package_output = None
@@ -47,6 +48,7 @@ class PackageOperationalOptions(core.yarg.Options):
         self.raw_package_path = None
         self.run_long_tests = False
         self.sandbox_download_protocols = []
+        self.sandbox_task_id = 0
         self.upload = False
         self.wheel_access_key_path = None
         self.wheel_secret_key_path = None
@@ -137,6 +139,13 @@ class PackageOperationalOptions(core.yarg.Options):
                 subgroup=TAR_SUBGROUP,
             ),
             core.yarg.ArgConsumer(
+                names=['--key'],
+                help='The key to use for signing',
+                hook=core.yarg.SetValueHook('key'),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
                 names=['--codecs-list'],
                 help='Show available codecs for --uc',
                 hook=core.yarg.SetConstValueHook('list_codecs', True),
@@ -161,6 +170,14 @@ class PackageOperationalOptions(core.yarg.Options):
                     'sandbox_download_protocols', transform=lambda val: [_f for _f in val.split(",") if _f]
                 ),
                 visible=False,
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--set-sandbox-task-id'],
+                visible=False,
+                help='Use the provided task id for the package version if needed',
+                hook=core.yarg.SetValueHook('sandbox_task_id', int),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
@@ -332,12 +349,10 @@ class PackageCustomizableOptions(core.yarg.Options):
         self.force_dupload = False
         self.format = None
         self.full_strip = False
-        self.key = None
         self.overwrite_read_only_files = False
         self.raw_package = False
         self.resource_attrs = {}
         self.resource_type = "YA_PACKAGE"
-        self.sandbox_task_id = 0
         self.sign = True
         self.sloppy_deb = False
         self.store_debian = True
@@ -363,27 +378,12 @@ class PackageCustomizableOptions(core.yarg.Options):
                 subgroup=COMMON_SUBGROUP,
             ),
             core.yarg.ArgConsumer(
-                names=['--set-sandbox-task-id'],
-                visible=False,
-                help='Use the provided task id for the package version if needed',
-                hook=core.yarg.SetValueHook('sandbox_task_id', int),
-                group=core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-            ),
-            core.yarg.ArgConsumer(
                 names=['--wheel-platform'],
                 visible=True,
                 help='Set wheel package platform',
                 hook=core.yarg.SetValueHook('wheel_platform'),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=PYTHON_WHEEL_SUBGROUP,
-            ),
-            core.yarg.ArgConsumer(
-                names=['--key'],
-                help='The key to use for signing',
-                hook=core.yarg.SetValueHook('key'),
-                group=core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
             ),
             core.yarg.ArgConsumer(
                 names=['--debian'],
