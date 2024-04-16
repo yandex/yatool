@@ -13,6 +13,7 @@ class StyleOptions(core.yarg.Options):
     def __init__(self):
         self.targets = []
         self.dry_run = False
+        self.check = False
         self.full_output = False
         self.stdin_filename = 'source.cpp'
         self.py2 = False
@@ -27,6 +28,12 @@ class StyleOptions(core.yarg.Options):
                 ['--dry-run'],
                 help='Print diff instead of overwriting files',
                 hook=core.yarg.SetConstValueHook('dry_run', True),
+                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--check'],
+                help="Don't format files but return code 3 if some files would be reformatted",
+                hook=core.yarg.SetConstValueHook('check', True),
                 group=core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(

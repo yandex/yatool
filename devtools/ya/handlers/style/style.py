@@ -49,28 +49,29 @@ def colorize(text, *args, **kwargs):
 
 def apply_style(path, data, new_data, args):
     # type(str, str, str, StyleOptions) -> None:
-    if new_data != data:
-        if args and args.dry_run:
-            if args.full_output:
-                sys.stdout.write('fix {}\n{}\n'.format(colorize(path, color='green', attrs=['bold']), new_data))
-            else:
-                diff = difflib.unified_diff(data.splitlines(), new_data.splitlines())
-                diff = list(diff)[2:]  # Drop header with filenames
-                diff = '\n'.join(diff)
+    logger.info('fix %s', colorize(path, color='green', attrs=['bold']))
 
-                sys.stdout.write('fix {}\n{}\n'.format(colorize(path, color='green', attrs=['bold']), diff))
-        else:
-            logger.info('fix %s', colorize(path, color='green', attrs=['bold']))
+    tmp = path + '.tmp'
 
-            tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        f.write(new_data)
 
-            with open(tmp, 'w') as f:
-                f.write(new_data)
+    # never break original file
+    path_st_mode = os.stat(path).st_mode
+    replace_file(tmp, path)
+    os.chmod(path, path_st_mode)
 
-            # never break original file
-            path_st_mode = os.stat(path).st_mode
-            replace_file(tmp, path)
-            os.chmod(path, path_st_mode)
+
+def apply_style_dry_run(path, data, new_data, args):
+    # type(str, str, str, StyleOptions) -> None:
+    if args.full_output:
+        sys.stdout.write('fix {}\n{}\n'.format(colorize(path, color='green', attrs=['bold']), new_data))
+    else:
+        diff = difflib.unified_diff(data.splitlines(), new_data.splitlines())
+        diff = list(diff)[2:]  # Drop header with filenames
+        diff = '\n'.join(diff)
+
+        sys.stdout.write('fix {}\n{}\n'.format(colorize(path, color='green', attrs=['bold']), diff))
 
 
 def fix_yamake(path, data, args):
@@ -119,9 +120,16 @@ def wrap_format(func, loader, args):
             print(func(path, data, args))
         else:
             if args.force or rules.style_required(path, data):
-                apply_style(path, data, func(path, data, args), args)
+                formatted_data = func(path, data, args)
+                if formatted_data != data:
+                    if args.dry_run:
+                        apply_style_dry_run(path, data, formatted_data, args)
+                    elif not args.check:
+                        apply_style(path, data, formatted_data, args)
+                    return 1
             else:
                 logger.warning('skip %s', path)
+        return 0
 
     return f
 
@@ -174,7 +182,9 @@ def prepare_tools(kinds, args):
             # ensure black downloaded
             yalibrary.tools.tool('black' if not args.py2 else 'black_py2')
 
-            args.python_config_file = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
+            args.python_config_file = tempfile.NamedTemporaryFile(
+                delete=False
+            )  # will be deleted by tmp_dir_interceptor
             args.python_config_file.write(python_config())
             args.python_config_file.flush()  # will be read from other subprocesses
             # keep file open
@@ -256,18 +266,19 @@ def run_style(args):
 
     threads = []
 
-    def thr_func():
+    def thr_func(rets, idx):
         while True:
             check_cancel_state()
             try:
-                q.get()()
+                rets[idx] = q.get()()
             except StopIteration:
                 return
             except Exception:
                 logger.exception('in thr_func()')
 
+    rets = [0] * args.build_threads
     for i in range(0, args.build_threads):
-        t = threading.Thread(target=thr_func)
+        t = threading.Thread(target=thr_func, args=(rets, i))
         t.start()
         threads.append(t)
 
@@ -283,3 +294,6 @@ def run_style(args):
 
         for t in threads:
             t.join()
+
+    ret = 3 if any(rets) and args.check else 0
+    return ret
