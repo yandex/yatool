@@ -1942,6 +1942,8 @@ TString TCommandInfo::SubstMacroDeeply(const TYVar* origin, const TStringBuf& ma
 
     //YDIAG(DG) << "Subst into: " << res << Endl;
 
+    static constexpr size_t ITER_LIMIT = 128;// maximum iterations count for macro subst
+    size_t iter = 0;
     while (haveToSubst && modifiedRes.size()) {
         TVector<TMacroData> macros;
         GetMacrosFromPattern(res, macros, patternHasPrefix);
@@ -1951,6 +1953,10 @@ TString TCommandInfo::SubstMacroDeeply(const TYVar* origin, const TStringBuf& ma
             res = modifiedRes;
         } else {
             haveToSubst = false;
+        }
+        if (++iter >= ITER_LIMIT) {
+            ythrow yexception() << "Macro subst exceeded the limit " << ITER_LIMIT << Endl;
+            break;
         }
     }
     return modifiedRes;
