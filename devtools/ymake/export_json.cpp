@@ -21,6 +21,7 @@
 #include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/make_plan/make_plan.h>
+#include <devtools/ymake/mkcmd_inputs_outputs.h>
 #include <devtools/ymake/symbols/symbols.h>
 
 #include <library/cpp/blockcodecs/codecs.h>
@@ -256,8 +257,9 @@ namespace {
             Y_ASSERT(Conf.DumpInputsInJSON);
             FillInputs();
             FillDepsAndExtraInputs();
+            PrepareInputs();
 
-            Subst2Json.UpdateInputs(MakeCommand.CmdInfo);
+            Subst2Json.UpdateInputs();
         }
 
         TMd5Value CalculateDepsId() {
@@ -278,6 +280,8 @@ namespace {
             FillDepsAndExtraInputs();
             FillExtraOuts();
 
+            PrepareInputs();
+
             Subst2Json.GenerateJsonTargetProperties(Graph[NodeId], GetModule(), IsGlobalNode);
             MakeCommand.CmdInfo.MkCmdAcceptor = Subst2Json.GetAcceptor();
         }
@@ -292,31 +296,30 @@ namespace {
         }
 
         void FillDepsAndExtraInputs() {
+            TString moduleDir;
+            auto getModuleDir = [&]() -> TStringBuf {
+                if (moduleDir.Empty()) {
+                    const TFileView moduleFile = Graph.GetFileName(Graph.Get(ModuleId));
+                    moduleDir = NPath::SetType(NPath::Parent(moduleFile.GetTargetStr()), NPath::Source);
+                }
+                return moduleDir;
+            };
+
             for (const auto& [depName, depId] : NodeDeps) {
                 const auto dependencyIt = CmdBuilder.Nodes.find(depId);
                 Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
                 if (dependencyIt->second.HasBuildCmd) {
                     DumpInfo.Deps.Push(depId);
                 }
-                const auto node = Graph.Get(depId);
-                if (IsModuleType(node->NodeType) && !Conf.DumpInputsInJSON && !Conf.ShouldAddPeersToInputs()) {
+
+                auto depNodeRef = Graph[depId];
+                if (IsModuleType(depNodeRef->NodeType) && !Conf.DumpInputsInJSON && !Conf.ShouldAddPeersToInputs()) {
                     continue;
                 }
-                const TString dependencyPath = Conf.RealPath(Graph.GetFileName(node));
 
-                if (!dependencyPath.empty()) {
-                    DumpInfo.ExtraInput.push_back(TVarStr(dependencyPath, false, true));
-                } else {
-                    ///if input file is $U - best effort to resolve it in curdir
-                    const TFileView moduleName = Graph.GetFileName(Graph.Get(ModuleId));
-                    const TFsPath resolvedModuleName = NPath::SetType(NPath::Parent(moduleName.GetTargetStr()), NPath::Source);
-
-                    YErr() << depName << ": resolve this input file in current source dir " << resolvedModuleName << ". Be ready for build problems." << Endl;
-
-                    const TString depPath = resolvedModuleName / NPath::CutType(depName);
-                    DumpInfo.ExtraInput.push_back(TVarStr(Conf.RealPath(depPath), false, true));
-                }
+                DumpInfo.Inputs.push_back(InputToPath(Conf, depNodeRef, getModuleDir));
             }
+
             for (const auto& [depName, depId] : ToolDeps) {
                 const auto dependencyIt = CmdBuilder.Nodes.find(depId);
                 Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
@@ -324,6 +327,36 @@ namespace {
                 DumpInfo.ToolDeps.Push(depId);
                 // Note: we rely here on the fact that tools are also included into deps
             }
+
+            auto isGlobalSrc = [](const TConstDepNodeRef&) {
+                // We assume there is no GlobalSrcs in explicit inputs,
+                // and we running ProcessInputsAndOutputs here only for them.
+                // There is already assert for this in ProcessInputsAndOutputs
+                // when doing full processing from TMakeCommand::MineInputsAndOutputs.
+                return false;
+            };
+
+            auto addInput = [&](const TConstDepNodeRef& inputNode, bool /* explicitInputs */) {
+                DumpInfo.Inputs.push_back(InputToPath(Conf, inputNode, getModuleDir));
+            };
+
+            bool isModule = NodeId == ModuleId;
+            ProcessInputsAndOutputs<true>(Graph[NodeId], isModule, Modules, addInput, isGlobalSrc);
+        }
+
+        void PrepareInputs() {
+            THashSet<TString> uniqInputs;
+            uniqInputs.reserve(DumpInfo.Inputs.size());
+            TVector<TString> preparedInputs{Reserve(DumpInfo.Inputs.size())};
+
+            for (const TString& input : DumpInfo.Inputs) {
+                auto [_, wasNew] = uniqInputs.insert(input);
+                if (wasNew) {
+                    preparedInputs.push_back(input);
+                }
+            }
+
+            DumpInfo.Inputs.swap(preparedInputs);
         }
 
         void FillExtraOuts() {

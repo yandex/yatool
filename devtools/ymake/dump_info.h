@@ -10,7 +10,6 @@
 #include <util/system/types.h>
 
 struct TDumpInfoEx {
-    TYVar ExtraInput;
     TYVar ExtraOutput;
     TVector<TString> LateOuts;
     TVector<TString> Inputs;

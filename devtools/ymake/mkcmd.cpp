@@ -11,6 +11,7 @@
 #include "ymake.h"
 
 #include <devtools/ymake/json_subst.h>
+#include <devtools/ymake/mkcmd_inputs_outputs.h>
 
 #include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -142,9 +143,7 @@ TMakeCommand::TMakeCommand(const TRestoreContext& restoreContext, const TCommand
 }
 
 TString TMakeCommand::RealPath(const TConstDepNodeRef& node) const {
-    const auto& fileConf = Graph.Names().FileConf;
-    TFileView resolvedNode = fileConf.ResolveLink(Graph.GetFileName(node));
-    return Conf.RealPath(resolvedNode);
+    return ::RealPath(Conf, Graph, node);
 }
 TString TMakeCommand::RealPathEx(const TConstDepNodeRef& node) const {
     const auto& fileConf = Graph.Names().FileConf;
@@ -188,77 +187,64 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
     TVector<TVarStrEx> output;
     output.push_back(mainOut);
     if (isModule) {
-        CmdInfo.AddOutputInternal(mainOut); //for module TARGET is always a first output
+        // For module TARGET is always a first output.
+        CmdInfo.AddOutputInternal(mainOut);
     }
 
-    size_t numDeps = node.Edges().Total();
-    //UNPACK_64 -> in NumDeps=quantity of Deps; Ptr to first dep
     bool cmdfound = false;
-    bool explicitInputs = true;
-    size_t cnt = 0;
 
-    auto addInput = [&](const TConstDepRef& dep){
-        const TNodeId node = dep.To().Id();
-        YDIAG(MkCmd) << "Input dependency: " << MainFileName << " " << (int)(*dep) << Endl;
-        TString inpDep = RealPath(dep.To());
-        if (inpDep.empty()) {
-            ///if input file is $U - best effort to resolve it in CurDir
-            auto& fileConf = Graph.Names().FileConf;
-            const auto depName = fileConf.ResolveLink(Graph.GetFileName(dep.To()));
-            YErr() << depName << ": resolve this input file in current source dir " << ModuleState->CurDir << ". Be ready for build problems." << Endl;
-            inpDep = Conf.RealPath(NPath::Join(ModuleState->CurDir.GetTargetStr(), depName.CutType()));
+    TStringBuf moduleDir;
+    auto getModuleDir = [&]() {
+        if (moduleDir.Empty()) {
+            moduleDir = ModuleState->CurDir.GetTargetStr();
         }
-        TVarStr inpFile = TVarStr(inpDep, false, true);
+        return moduleDir;
+    };
+
+    auto isGlobalSrc = [&](const TConstDepNodeRef& depNode) -> bool {
+        if (isModule && ModuleState->GlobalSrcs) {
+            return ModuleState->GlobalSrcs->has(depNode.Id());
+        }
+
+        return false;
+    };
+
+    auto addInput = [&](const TConstDepNodeRef& node, bool explicitInputs){
+        YDIAG(MkCmd) << "Input dependency: " << MainFileName << " " << Graph.ToString(node) << Endl;
+
+        TString inputPath = InputToPath(Conf, node, getModuleDir);
+        TVarStr inputVarItem = TVarStr(inputPath, false, true);
+
         if (!explicitInputs) {
-            Y_ASSERT(ModuleState->GlobalSrcs && !ModuleState->GlobalSrcs->has(node)); //we don't need global Srcs in AUTO_INPUT
-            inpFile.IsAuto = true;
-            Vars["AUTO_INPUT"].push_back(inpFile);
+            // We don't need GlobalSrcs in AUTO_INPUT.
+            Y_ASSERT(!isGlobalSrc(node));
+
+            inputVarItem.IsAuto = true;
+            Vars["AUTO_INPUT"].push_back(inputVarItem);
+
         } else {
-            Vars["INPUT"].push_back(inpFile);
+            Vars["INPUT"].push_back(inputVarItem);
         }
     };
 
-    for (const auto dep : node.Edges()) {
-        const auto depNode = dep.To();
-        const auto depNodeVal = *dep.To();
-        const auto depType = *dep;
-        YDIAG(MkCmd) << cnt++ << " dep from " << numDeps << ": " << Graph.ToString(depNode) << Endl;
+    auto addOutput = [&](const TConstDepNodeRef& depNode) {
+        output.push_back(TVarStrEx(RealPathEx(depNode), depNode->ElemId, true));
+    };
 
-        if (isModule && IsModuleType(depNodeVal.NodeType)) {
-            continue;
-        }
+    auto setCmd = [&](const TConstDepNodeRef& depNode) {
+        CmdString = Graph.GetCmdName(depNode).GetStr();
+        CmdNode = depNode.Id();
+        cmdfound = true;
+    };
 
-        if (IsIndirectSrcDep(dep)) {
-            Y_ASSERT(explicitInputs);
-            for (const auto& depdep: dep.To().Edges()) {
-                if (*depdep == EDT_Property && depdep.To()->NodeType == EMNT_File) {
-                    addInput(depdep);
-                }
-            }
-        } else if (depNodeVal.NodeType == EMNT_BuildCommand && depType == EDT_BuildCommand) {
-            TStringBuf depName = Graph.GetCmdName(depNode).GetStr();
-            CmdString = depName;
-            CmdNode = depNode.Id();
-            cmdfound = true;
-        } else if (depType == EDT_OutTogetherBack) {
-            if (!IsFakeModule(depNodeVal)) {
-                output.push_back(TVarStrEx(RealPathEx(depNode), depNodeVal.ElemId, true)); //move "OUTPUT" and "INPUT" to const?
-            }
-        } else if (depType == EDT_Group) {
-            TStringBuf depName = Graph.GetCmdName(depNode).GetStr();
-            explicitInputs = depName == NStaticConf::INPUTS_MARKER;
-        } else if (depType == EDT_BuildFrom && UseFileId(depNodeVal.NodeType) && !IsFakeModule(depNodeVal) && (!isModule || ModuleState->GlobalSrcs && !ModuleState->GlobalSrcs->has(depNode.Id()))) {
-            if (!IsDirType(depNodeVal.NodeType) || !isModule) {
-                addInput(dep);
-            }
-        }
-    }
+    ProcessInputsAndOutputs<false>(node, isModule, Modules, addInput, isGlobalSrc, addOutput, setCmd);
+
     if (!cmdfound) {
         throw TMakeError() << "No pattern for node " << MainFileName;
     }
 
-    //TODO: INPUT, OUTPUT has to be released as internal variables.
-    // Module as target shouldn't be in OUTPUT
+    // TODO: INPUT, OUTPUT has to be released as internal variables.
+    // Module as target shouldn't be in OUTPUT.
     Vars["OUTPUT"].Assign(output);
 }
 
@@ -280,16 +266,6 @@ void TMakeCommand::MineVarsAndExtras(TDumpInfoEx* addInfo, TNodeId nodeId, TNode
 
     if (addInfo) {
         addInfo->SetExtraValues(Vars); // f.e. it sets $UID in Vars in TSubst2Json
-
-        THashSet<TStringBuf> originalExtraInput;
-        TYVar& extraInput = addInfo->ExtraInput;
-        extraInput.InsertNamesTo(originalExtraInput);
-
-        for (const auto& input : inputVar) {
-            if (!originalExtraInput.contains(input.Name)) {
-                extraInput.push_back(input);
-            }
-        }
 
         Y_ASSERT(ModuleState);
         if (RequirePeers && !ModuleState->PeerIds.empty()) {

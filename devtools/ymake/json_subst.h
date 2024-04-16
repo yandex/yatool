@@ -69,7 +69,7 @@ public:
     void FakeFinish(TCommandInfo& cmdInfo);
     void CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars);
 
-    void UpdateInputs(TCommandInfo& cmdInfo);
+    void UpdateInputs();
 
 private:
     // TJsonCmdAcceptor implementation.
