@@ -6,11 +6,11 @@ import six
 
 import os
 import sys
-import tarfile
 import tempfile
 
 from build import graph as bgraph
 import exts.yjdump as yjdump
+import exts.archive as archive
 
 logger = logging.getLogger(__name__)
 
@@ -95,22 +95,42 @@ def create_frepkage(build_context, graph, arc_root):
     # Dump graph when all modifications are done
     ctx_file = dump_build_context(temp_dir)
 
-    with tarfile.TarFile.gzopen(tar_file, 'w', compresslevel=1) as tar:
-        tar.add(ctx_file, os.path.basename(ctx_file))
+    paths_to_arch = []
+    paths_to_arch.append(
+        (
+            ctx_file,
+            os.path.basename(ctx_file),
+        )
+    )
+    paths_to_arch.append(
+        (
+            os.path.realpath(sys.executable),
+            'ya-bin',
+        )
+    )
+    # Pack external inputs
+    for filename, arcname in sorted(six.iteritems(external_inputs)):
+        if arcname:
+            logger.warn('Adding external input to frepkage: %s', filename)
+            paths_to_arch.append(
+                (
+                    os.path.realpath(filename),
+                    arcname,
+                )
+            )
+        else:
+            logger.debug('Skip external data: %s', filename)
+    # Pack source inputs
+    for path, hash_value in inputs:
+        paths_to_arch.append(
+            (
+                os.path.join(arc_root, path),
+                os.path.join('arcadia', path),
+            )
+        )
+        source_package.check_hash(path, arc_root, hash_value)
 
-        # Always pack ya-bin to make frepkage hermetic and be able to run graph without arcadia
-        tar.add(os.path.realpath(sys.executable), 'ya-bin')
-
-        # Pack external inputs
-        for filename, arcname in sorted(six.iteritems(external_inputs)):
-            if arcname:
-                logger.warn('Adding external input to frepkage: %s', filename)
-                tar.add(os.path.realpath(filename), arcname)
-            else:
-                logger.debug('Skip external data: %s', filename)
-
-        # Pack source inputs
-        for path, hash_value in inputs:
-            tar.add(os.path.join(arc_root, path), os.path.join('arcadia', path))
-            source_package.check_hash(path, arc_root, hash_value)
+    archive.create_tar(
+        paths=paths_to_arch, tar_file_path=tar_file, compression_filter="gzip", compression_level=1, fixed_mtime=None
+    )
     return tar_file
