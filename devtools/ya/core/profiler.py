@@ -1,6 +1,6 @@
 import exts.yjson as json
 import logging
-import multiprocessing
+import threading
 import os
 import time
 import collections
@@ -22,7 +22,7 @@ _DATA = collections.defaultdict(dict)
 
 @func.lazy
 def _profile_lock():
-    return multiprocessing.Lock()
+    return threading.Lock()
 
 
 def clear(to_file):
