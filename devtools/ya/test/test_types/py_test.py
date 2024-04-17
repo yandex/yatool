@@ -178,7 +178,7 @@ class PyTestSuite(common.PythonTestSuite):
         if opts and getattr(opts, "pdb", None):
             cmd += ["--pdb", "--pdbcls", "IPython.terminal.debugger:TerminalPdb"]
 
-        if opts and getattr(opts, "allure_report"):
+        if self.supports_allure and opts and getattr(opts, "allure_report"):
             cmd += ["--alluredir", os.path.join(work_dir, "allure")]
             if not self._use_arcadia_python:
                 logger.warning("allure report may not be built if any of allure dependencies is not installed")
@@ -417,7 +417,7 @@ class ExecTest(PyTestBinSuite):
 
     @property
     def supports_allure(self):
-        return True
+        return False
 
 
 class LintTestSuite(common.StyleTestSuite):
