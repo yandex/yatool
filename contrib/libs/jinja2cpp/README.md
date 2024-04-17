@@ -7,11 +7,10 @@
 [![Standard](https://img.shields.io/badge/c%2B%2B-17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 [![Standard](https://img.shields.io/badge/c%2B%2B-20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 [![Coverage Status](https://codecov.io/gh/jinja2cpp/Jinja2Cpp/branch/master/graph/badge.svg)](https://codecov.io/gh/jinja2cpp/Jinja2Cpp)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/ff01fa4410ac417f8192dce78e919ece)](https://www.codacy.com/app/flexferrum/Jinja2Cpp_2?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jinja2cpp/Jinja2Cpp&amp;utm_campaign=Badge_Grade)
 [![Github Releases](https://img.shields.io/github/release/jinja2cpp/Jinja2Cpp/all.svg)](https://github.com/jinja2cpp/Jinja2Cpp/releases)
 [![Github Issues](https://img.shields.io/github/issues/jinja2cpp/Jinja2Cpp.svg)](http://github.com/jinja2cpp/Jinja2Cpp/issues)
 [![GitHub License](https://img.shields.io/badge/license-Mozilla-blue.svg)](https://raw.githubusercontent.com/jinja2cpp/Jinja2Cpp/master/LICENSE)
-[![conan.io](https://api.bintray.com/packages/conan/conan-center/jinja2cpp%3A_/images/download.svg?version=1.1.0%3A_) ](https://bintray.com/conan/conan-center/jinja2cpp%3A_/1.1.0%3A_/link)
+[![conan.io](https://api.bintray.com/packages/conan/conan-center/jinja2cpp%3A_/images/download.svg?version=1.2.1%3A_) ](https://conan.io/center/jinja2cpp)
 [![Gitter Chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Jinja2Cpp/Lobby)
 
 C++ implementation of the Jinja2 Python template engine. This library brings support of powerful Jinja2 template features into the C++ world, reports  dynamic HTML pages and source code generation.
@@ -61,7 +60,7 @@ hello; world!!!
 
 To use Jinja2C++ in your project you have to:
 * Clone the Jinja2C++ repository
-* Build it according to the [instructions](https://jinja2cpp.dev/docs/build_and_install.html)
+* Build it according to the [instructions](https://jinja2cpp.github.io/docs/build_and_install.html)
 * Link to your project.
 
 Usage of Jinja2C++ in the code is pretty simple:
@@ -91,7 +90,7 @@ Hello World!!!
 
 That's all!
 
-More detailed examples and features description can be found in the documentation: [https://jinja2cpp.dev/docs/usage](https://jinja2cpp.dev/docs/usage)
+More detailed examples and features description can be found in the documentation: [https://jinja2cpp.github.io/docs/usage](https://jinja2cpp.github.io/docs/usage)
 
 ## Current Jinja2 support
 Currently, Jinja2C++ supports the limited number of Jinja2 features. By the way, Jinja2C++ is planned to be a fully [jinja2 specification](http://jinja.pocoo.org/docs/2.10/templates/)-conformant. The current support is limited to:
@@ -112,7 +111,7 @@ Currently, Jinja2C++ supports the limited number of Jinja2 features. By the way,
 -  recursive loops
 -  space control and 'raw'/'endraw' blocks
 
-Full information about Jinja2 specification support and compatibility table can be found here: [https://jinja2cpp.dev/docs/j2_compatibility.html](https://jinja2cpp.dev/docs/j2_compatibility.html).
+Full information about Jinja2 specification support and compatibility table can be found here: [https://jinja2cpp.github.io/docs/j2_compatibility.html](https://jinja2cpp.github.io/docs/j2_compatibility.html).
 
 ## Supported compilers
 Compilation of Jinja2C++ tested on the following compilers (with C++14 and C++17 enabled features):
@@ -135,10 +134,10 @@ Compilation of Jinja2C++ tested on the following compilers (with C++14 and C++17
 | **X-Code** 9, 10, 11  | [![Build Status](https://travis-ci.org/jinja2cpp/Jinja2Cpp.svg?branch=master)](https://travis-ci.org/jinja2cpp/Jinja2Cpp) |
 | **MSVC** 2017 (x86, x64), **MSVC** 2019 (x86, x64), C++14/C++17 | [![](https://github.com/jinja2cpp/Jinja2Cpp/workflows/CI-windows-build/badge.svg)](https://github.com/jinja2cpp/Jinja2Cpp/actions?query=workflow%3ACI-windows-build) |
 | **g++** 5, 6, 7, 8, 9, 10, 11 **clang** 5, 6, 7, 8, 9, 10, 11, 12 C++14/C++17/C++20 | [![](https://github.com/jinja2cpp/Jinja2Cpp/workflows/CI-linux-build/badge.svg)](https://github.com/jinja2cpp/Jinja2Cpp/actions?query=workflow%3ACI-linux-build) |
- 
+
 ## Build and install
 Jinja2C++ has several external dependencies:
--  `boost` library (at least version 1.65) 
+-  `boost` library (at least version 1.65)
 -  `nonstd::expected-lite` [https://github.com/martinmoene/expected-lite](https://github.com/martinmoene/expected-lite)
 -  `nonstd::variant-lite` [https://github.com/martinmoene/variant-lite](https://github.com/martinmoene/variant-lite)
 -  `nonstd::optional-lite` [https://github.com/martinmoene/optional-lite](https://github.com/martinmoene/optional-lite)
@@ -183,24 +182,37 @@ In this case, Jinja2C++ will be built with internally-shipped dependencies and i
 Jinja2C++ can be used as conan.io package. In this case, you should do the following steps:
 
 1. Install conan.io according to the documentation ( https://docs.conan.io/en/latest/installation.html )
-2. Add a reference to Jinja2C++ package (`jinja2cpp/1.1.0`) to your conanfile.txt, conanfile.py or CMakeLists.txt. For instance, with the usage of `conan-cmake` integration it could be written this way:
+2. Add a reference to Jinja2C++ package (`jinja2cpp/1.2.1`) to your conanfile.txt, conanfile.py or CMakeLists.txt. For instance, with the usage of `conan-cmake` integration it could be written this way:
 
 ```cmake
-include (../../cmake/conan.cmake)
-if (NOT MSVC)
-    set (CONAN_SETTINGS SETTINGS compiler.libcxx=libstdc++11)
-endif ()
 
-conan_cmake_run(REQUIRES 
+cmake_minimum_required(VERSION 3.24)
+project(Jinja2CppSampleConan CXX)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
+
+add_definitions("-std=c++14")
+
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+  message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
+                "${CMAKE_BINARY_DIR}/conan.cmake"
+                TLS_VERIFY ON)
+endif()
+include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+conan_cmake_autodetect(settings)
+conan_cmake_run(REQUIRES
                     jinja2cpp/1.1.0
-                    gtest/1.7.0@bincrafters/stable
+                    gtest/1.14.0
                 BASIC_SETUP
                 ${CONAN_SETTINGS}
-                OPTIONS 
-                    jinja2cpp:shared=False
-                    gtest:shared=False
+                OPTIONS
+                    jinja2cpp/*:shared=False
+                    gtest/*:shared=False
                 BUILD missing)
-                
+
 set (TARGET_NAME jinja2cpp_build_test)
 
 add_executable (${TARGET_NAME} main.cpp)
@@ -230,6 +242,8 @@ You can define (via -D command-line CMake option) the following build flags:
 Jinja2C++ tries to use standard versions of `std::variant`, `std::string_view` and `std::optional` if possible.
 
 ## Acknowledgments
+Thanks to **@flexferrum** for creating this library, for being one of the brightest minds in software engineering community. Rest in peace, friend.
+
 Thanks to **@manu343726** for CMake scripts improvement, bug hunting, and fixing and conan.io packaging.
 
 Thanks to **@martinmoene** for the perfectly implemented xxx-lite libraries.
@@ -240,6 +254,35 @@ Thanks to **@martinus** for the fast hash maps implementation.
 
 
 ## Changelog
+
+
+### Version 1.3.1
+
+#### Changes and improvements
+- bump deps versions
+- add new json binding - boost::json
+- speedup regex parsing by switching to boost::regex(std::regex extremely slow)
+    - templates are now loading faster
+
+#### Fixed bugs
+- small fixes across code base
+
+#### Breaking changes
+- internal deps now used through cmake fetch_content
+- default json serializer/deserializer is switched to boost::json
+
+### Version 1.2.1
+
+#### Changes and improvements
+- bump deps versions
+- support modern compilers(up to Clang 12) and standards(C++20)
+- tiny code style cleanup
+
+#### Fixed bugs
+- small fixes across code base
+
+#### Breaking changes
+- internal deps point to make based boost build
 
 ### Version 1.1.0
 #### Changes and improvements
@@ -298,13 +341,13 @@ Thanks to **@martinus** for the fast hash maps implementation.
 
 ### Version 0.9.2
 #### Major changes
-- User-defined callables implemented. Now you can define your own callable objects, pass them as input parameters and use them inside templates as regular (global) functions, filters or testers. See details here: https://jinja2cpp.dev/docs/usage/ud_callables.html
+- User-defined callables implemented. Now you can define your own callable objects, pass them as input parameters and use them inside templates as regular (global) functions, filters or testers. See details here: https://jinja2cpp.github.io/docs/usage/ud_callables.html
 - Now you can define global (template environment-wide) parameters that are accessible for all templates bound to this environment.
 - `include`, `import` and `from` statements implemented. Now it's possible to include other templates and use macros from other templates.
 - `with` statement implemented
 - `do` statement implemented
 - Sample build projects for various Jinja2C++ usage variants created: https://github.com/jinja2cpp/examples-build](https://github.com/jinja2cpp/examples-build)
-- Documentation site created for Jinja2C++: https://jinja2cpp.dev/
+- Documentation site created for Jinja2C++: https://jinja2cpp.github.io
 
 #### Minor changes
 - Render-time error handling added

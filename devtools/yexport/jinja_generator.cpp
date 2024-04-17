@@ -528,7 +528,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 
     result->GetJinjaEnv()->GetSettings().cacheSize = 0;
     result->GetJinjaEnv()->AddGlobal("split", jinja2::UserCallable{
-        .callable = [](const jinja2::UserCallableParams& params) -> jinja2::Value {
+        /*fptr=*/[](const jinja2::UserCallableParams& params) -> jinja2::Value {
             Y_ASSERT(params["str"].isString());
             auto str = params["str"].asString();
             Y_ASSERT(params["delimeter"].isString());
@@ -543,7 +543,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
             list.emplace_back(str.substr(bpos));
             return list;
         },
-        .argsInfo = { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
+        /*argsInfos=*/ { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
     });
 
     setUpTemplates(result->GeneratorSpec.Root.Templates, result->Templates);

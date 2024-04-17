@@ -270,7 +270,7 @@ namespace {
                 return false;
             }
             const auto depHasData = dep.Data.Defined();
-            jinja2::ValuesMap::const_iterator excludesIt;
+            jinja2::ValuesMap::iterator excludesIt;
             bool hasExcludes = false;
             if (!UseManagedPeersClosure_ && depHasData) {
                 const auto& depAttrs = dep.Data.GetRef();
@@ -280,7 +280,7 @@ namespace {
                 }
             }
             if (depHasData) {
-                const auto& depAttrs = dep.Data.GetRef();
+                auto& depAttrs = dep.Data.GetRef();
                 excludesIt = depAttrs.find(DEPATTR_EXCLUDES);
                 if (excludesIt != depAttrs.end()) {
                     Y_ASSERT(excludesIt->second.isList());

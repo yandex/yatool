@@ -1,12 +1,13 @@
 #ifndef JINJA2CPP_STRING_HELPERS_H
 #define JINJA2CPP_STRING_HELPERS_H
 
-#include <string_view>
 #include "value.h"
 
+#include <string_view>
+
+#include <cwchar>
 #include <string>
 #include <type_traits>
-#include <cwchar>
 
 namespace jinja2
 {

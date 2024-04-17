@@ -1,7 +1,6 @@
 #include "filters.h"
 #include "generic_adapters.h"
 #include "out_stream.h"
-#include "rapid_json_serializer.h"
 #include "testers.h"
 #include "value_helpers.h"
 #include "value_visitors.h"
@@ -13,6 +12,15 @@
 #include <random>
 #include <sstream>
 #include <string>
+
+#ifdef JINJA2CPP_WITH_JSON_BINDINGS_BOOST
+#error #include "binding/boost_json_serializer.h"
+using DocumentWrapper = jinja2::boost_json_serializer::DocumentWrapper;
+#else
+#include "binding/rapid_json_serializer.h"
+using DocumentWrapper = jinja2::rapidjson_serializer::DocumentWrapper;
+#endif
+
 
 using namespace std::string_literals;
 
@@ -141,7 +149,7 @@ InternalValue Serialize::Filter(const InternalValue& value, RenderContext& conte
     if (m_mode == JsonMode)
     {
         const auto indent = ConvertToInt(this->GetArgumentValue("indent", context));
-        jinja2::rapidjson_serializer::DocumentWrapper jsonDoc;
+        DocumentWrapper jsonDoc;
         const auto jsonValue = jsonDoc.CreateValue(value);
         const auto jsonString = jsonValue.AsString(static_cast<uint8_t>(indent));
         const auto result = std::accumulate(jsonString.begin(), jsonString.end(), ""s, [](const auto &str, const auto &c)

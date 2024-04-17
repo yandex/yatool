@@ -3,7 +3,6 @@
 LIBRARY()
 
 LICENSE(
-    BSL-1.0 AND
     MIT AND
     MPL-1.1 AND
     MPL-2.0
@@ -11,9 +10,9 @@ LICENSE(
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(1.2.1)
+VERSION(1.3.1)
 
-ORIGINAL_SOURCE(https://github.com/jinja2cpp/Jinja2Cpp/archive/1.2.1.tar.gz)
+ORIGINAL_SOURCE(https://github.com/jinja2cpp/Jinja2Cpp/archive/1.3.1.tar.gz)
 
 PEERDIR(
     contrib/libs/fmt
@@ -43,17 +42,19 @@ CFLAGS(
     -DFMT_USE_INTERNAL=TRUE
     -DJINJA2CPP_BUILD_AS_SHARED
     -DJINJA2CPP_LINK_AS_SHARED
+    -DJINJA2CPP_USE_REGEX_BOOST
 )
 
 SRCS(
+    src/binding/rapid_json_serializer.cpp
     src/error_info.cpp
     src/expression_evaluator.cpp
     src/expression_parser.cpp
     src/filesystem_handler.cpp
     src/filters.cpp
+    src/generic_list.cpp
     src/internal_value.cpp
     src/lexer.cpp
-    src/rapid_json_serializer.cpp
     src/serialize_filters.cpp
     src/statements.cpp
     src/string_converter_filter.cpp

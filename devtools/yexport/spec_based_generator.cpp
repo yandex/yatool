@@ -29,6 +29,10 @@ namespace {
             Filesystem_.SetRootFolder(path);
         }
 
+        bool IsEqual(const IComparable& other) const override {
+            return Filesystem_.IsEqual(other);
+        }
+
     private:
         std::string_view CutPrefix(const std::string& name) const {
             std::string_view sv = name;
