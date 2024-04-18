@@ -4,6 +4,8 @@
 #include <devtools/ymake/compact_graph/iter_direct_peerdir.h>
 #include <devtools/ymake/compact_graph/query.h>
 
+#include <devtools/ymake/diag/trace.h>
+
 namespace NPropagateChangeFlags {
     constexpr TNodeId InvalidLoop = static_cast<TNodeId>(-1);
 
@@ -145,4 +147,17 @@ namespace NPropagateChangeFlags {
 void PropagateChangeFlags(TDepGraph& graph, const TGraphLoops& loops, TVector<TTarget>& startTargets) {
     NPropagateChangeFlags::TVisitor visitor{graph, loops};
     IterateAll(graph, startTargets, visitor);
+
+    bool hasStructuralChanges = false;
+    bool hasContentChanges = false;
+    for (auto target : startTargets) {
+        auto node = graph.Get(target.Id);
+        hasStructuralChanges |= node->State.HasRecursiveStructuralChanges();
+        hasContentChanges |= node->State.HasRecursiveContentChanges();
+    }
+
+    NEvent::TGraphChanges ev;
+    ev.SetHasStructuralChanges(hasStructuralChanges);
+    ev.SetHasContentChanges(hasContentChanges);
+    FORCE_TRACE(U, ev);
 }

@@ -69,6 +69,16 @@ public:
         return ChangedScope_ == Recursive && !ContentChanged_ && !StructureChanged_;
     }
 
+    bool HasRecursiveContentChanges() const {
+        Y_ASSERT(ChangedScope_ == TNodeState::Recursive);
+        return ContentChanged_;
+    }
+
+    bool HasRecursiveStructuralChanges() const {
+        Y_ASSERT(ChangedScope_ == TNodeState::Recursive);
+        return StructureChanged_;
+    }
+
 private:
     // File content was changed.
     bool ContentChanged_ : 1 = false;

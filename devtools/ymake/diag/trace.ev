@@ -283,3 +283,9 @@ message TMonitoringStat {
         bool BoolValue = 5;
     };
 };
+
+message TGraphChanges {
+    option (message_id) = 46;
+    required bool HasStructuralChanges = 1;
+    required bool HasContentChanges = 2;
+};
