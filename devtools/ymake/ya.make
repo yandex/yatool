@@ -53,8 +53,8 @@ ENDIF()
 
 SRCS(
     add_dep_adaptor.cpp
-    add_iter.cpp
     add_iter_debug.cpp
+    add_iter.cpp
     add_node_context.cpp
     addincls.cpp
     args_converter.cpp
@@ -67,16 +67,16 @@ SRCS(
     conf.cpp
     config/config.cpp
     debug_log.cpp
-    global_vars_collector.cpp
     dependency_management.cpp
     diag_reporter.cpp
     dirs.cpp
     dump_owners.cpp
     exec.cpp
-    export_json.cpp
     export_json_debug.cpp
+    export_json.cpp
     flat_json_graph.cpp
     general_parser.cpp
+    global_vars_collector.cpp
     incl_fixer.cpp
     include_processors/base.cpp
     include_processors/cfgproto_processor.cpp
@@ -95,25 +95,26 @@ SRCS(
     include_processors/ragel_processor.cpp
     include_processors/ros_processor.cpp
     include_processors/swig_processor.cpp
+    include_processors/ts_processor.cpp
     include_processors/xs_processor.cpp
     include_processors/ydl_processor.cpp
-    include_processors/ts_processor.cpp
-    induced_props.cpp
     induced_props_debug.cpp
+    induced_props.cpp
     isolated_projects.cpp
     json_entry_stats.cpp
     json_md5.cpp
     json_subst.cpp
-    json_visitor.cpp
     json_visitor_new.cpp
+    json_visitor.cpp
     lang/plugin_facade.cpp # XXX
+    licenses_conf.cpp
     list_modules.cpp
     macro_processor.cpp
     macro_string.cpp
     macro.cpp
     main.cpp
-    makefile_loader.cpp
     make_plan_cache.cpp
+    makefile_loader.cpp
     managed_deps_iter.cpp
     md5_debug.cpp
     mine_variables.cpp
@@ -131,10 +132,10 @@ SRCS(
     node_builder.cpp
     node_printer.cpp
     out.cpp
-    path_matcher.cpp
     parser_manager.cpp
-    peers.cpp
+    path_matcher.cpp
     peers_rules.cpp
+    peers.cpp
     plugins/cmd_context_class.cpp
     plugins/context_class.cpp
     plugins/cpp_plugins.cpp
@@ -144,8 +145,8 @@ SRCS(
     plugins/plugin_macro_impl.cpp
     plugins/plugin_resource_handler.cpp
     plugins/pyinit.pyx
-    plugins/ymake.pyx
     plugins/ymake_module_adapter.cpp
+    plugins/ymake.pyx
     propagate_change_flags.cpp
     recurse_graph.cpp
     run_main.cpp
@@ -153,9 +154,9 @@ SRCS(
     saveload.cpp
     sem_graph.cpp
     shell_subst.cpp
+    spdx.cpp
     sysincl_conf.cpp
     sysincl_resolver.cpp
-    spdx.cpp
     tools_miner.cpp
     trace_start.cpp
     transitive_constraints.cpp

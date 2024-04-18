@@ -4,6 +4,7 @@
 #include <devtools/ymake/isolated_projects.h>
 #include <devtools/ymake/peers_rules.h>
 #include <devtools/ymake/sysincl_resolver.h>
+#include <devtools/ymake/licenses_conf.h>
 
 #include <devtools/ymake/include_processors/base.h>
 
@@ -50,6 +51,7 @@ public:
     THashMap<TString, THashSet<TString>> PluginDeps;
 
     TSysinclResolver Sysincl;
+    THashMap<TString, TLicenseGroup> Licenses;
     TVector<TStringBuf> IncludeExts;
     TVector<TStringBuf> LangsRequireBuildAndSrcRoots;
 
@@ -145,6 +147,7 @@ private:
     void PrepareBuildDir() const;
     void GenerateCustomData(const TStringBuf genCustomData);
     void LoadSystemHeaders(MD5& confData);
+    void LoadLicenses();
     void LoadPeersRules(MD5& confData);
     void LoadBlackLists(MD5& confData);
     void LoadIsolatedProjects(MD5& confData);

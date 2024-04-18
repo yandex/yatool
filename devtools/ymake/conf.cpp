@@ -1,6 +1,7 @@
 #include "conf.h"
 
 #include "sysincl_conf.h"
+#include "licenses_conf.h"
 
 #include <devtools/ymake/macro.h>
 #include <devtools/ymake/macro_processor.h>
@@ -167,6 +168,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (Diag()->IslPrjs) {
         LoadIsolatedProjects(confData);
     }
+    LoadLicenses();
     FillMiscValues();
     InitExcludedPeerdirs();
 
@@ -203,6 +205,15 @@ void TBuildConfiguration::LoadSystemHeaders(MD5& confData) {
         sysinclFiles.emplace_back(SourceRoot / it.Token());
     }
     Sysincl = LoadSystemIncludes(sysinclFiles, confData);
+}
+
+void TBuildConfiguration::LoadLicenses() {
+    TString licenses = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("LICENSES"), CommandConf);
+    TVector<TFsPath> licensesFiles;
+    for (const auto& it : StringSplitter(licenses).Split(' ').SkipEmpty()) {
+        licensesFiles.emplace_back(SourceRoot / it.Token());
+    }
+    Licenses = ::LoadLicenses(licensesFiles);
 }
 
 void TBuildConfiguration::LoadPeersRules(MD5& confData) {

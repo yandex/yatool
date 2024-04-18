@@ -273,6 +273,7 @@ namespace {
         };
 
         TRestrictLicensesLoader(const TVars& globals) {
+            // это то, что мы можем достать из чтения json файлов сразу списком -- это первый уровень структуры json файла
             const TStringBuf licenseProps = GetValueOrEmpty(globals, LICENSE_PROPERTIES);
 
             constexpr size_t maxProperties = NSPDX::TPropSet{}.size() - 1; // 1 bit is reserved for INVALID property for unknown licenses
@@ -283,6 +284,7 @@ namespace {
                 }
                 PropNames.push_back(property);
             }
+            // это наполнение мы тоже можем сразу делать при чтении json файлов
             size_t pos = 0;
             for (auto property : PropNames) {
                 const auto propBit = pos++;
