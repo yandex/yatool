@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 import os
+import six
 import sys
 import difflib
 import tempfile
@@ -53,8 +54,8 @@ def apply_style(path, data, new_data, args):
 
     tmp = path + '.tmp'
 
-    with open(tmp, 'w') as f:
-        f.write(new_data)
+    with open(tmp, 'wb') as f:
+        f.write(six.ensure_binary(new_data))
 
     # never break original file
     path_st_mode = os.stat(path).st_mode
