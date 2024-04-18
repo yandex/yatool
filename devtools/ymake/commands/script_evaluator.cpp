@@ -73,15 +73,20 @@ size_t TScriptEvaluator::DoCommand(const NPolexpr::TExpression* expr, size_t cmd
 }
 
 size_t TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size_t termBegin, ICommandSequenceWriter* writer) {
-    TEvalCtx ctx{*Vars, *CmdInfo};
+    TEvalCtx ctx{*Vars, *CmdInfo, *Inputs};
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, termBegin, TOverloaded{
         [&](NPolexpr::TConstId id) -> TTermValue {
             auto val = Commands->Values.GetValue(id);
             if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
                 auto result = TVector<TString>();
-                for (auto& coord : inputs->Coords)
-                    result.push_back(Commands->ConstToString(TMacroValues::TInput {.Coord = coord}, ctx));
+                for (auto& coord : inputs->Coords) {
+                    auto inputResult = Commands->InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
+                    result.insert(result.end(), inputResult.begin(), inputResult.end());
+                }
                 return result;
+            }
+            if (auto input = std::get_if<TMacroValues::TInput>(&val); input) {
+                return Commands->InputToStringArray(*input, ctx);
             }
             return TString(Commands->ConstToString(val, ctx));
         },
@@ -148,13 +153,16 @@ size_t TScriptEvaluator::DoTerm(
     size_t begin,
     TArgAccumulator* writer
 ) {
-    TEvalCtx ctx{*Vars, *CmdInfo};
+    TEvalCtx ctx{*Vars, *CmdInfo, *Inputs};
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, [&](auto id, auto&&... args) -> TTermValue {
         if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
             static_assert(sizeof...(args) == 0);
             auto val = Commands->Values.GetValue(id);
             if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
                 ythrow TNotImplemented();
+            }
+            if (auto input = std::get_if<TMacroValues::TInput>(&val); input) {
+                return Commands->InputToStringArray(*input, ctx);
             }
             return TString(Commands->ConstToString(val, ctx));
         }

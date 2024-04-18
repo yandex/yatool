@@ -257,6 +257,7 @@ private:
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
 
     void CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);
+    void ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr);
 };
 
 void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>& result);

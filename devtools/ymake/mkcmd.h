@@ -26,6 +26,7 @@ class TMakeCommand {
 public:
     TVars Vars;
     TCommandInfo CmdInfo; // here we get correct coordinates for input, output and tool subst
+    TVector<std::span<TVarStr>> Inputs;
 
 private:
     TMakeModuleStatePtr ModuleState;

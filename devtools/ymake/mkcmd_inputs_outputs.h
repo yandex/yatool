@@ -23,6 +23,7 @@ inline TString RealPath(const TBuildConfiguration& conf, const TDepGraph& graph,
 template<
     bool onlyExplicitInputs,
     typename TAddInputFunc = std::function<void(const TConstDepRef&, bool)>,
+    typename TAddSpanInputFunc = std::function<void(ui32, ui32)>,
     typename TIsGlobalSrcFunc = std::function<bool(const TConstDepNodeRef&)>,
     typename TAddOutputFunc = std::function<void(const TConstDepNodeRef&)>,
     typename TSetCmdFunc = std::function<void(const TConstDepNodeRef&)>
@@ -32,6 +33,7 @@ inline void ProcessInputsAndOutputs(
     const TModules& modules,
     TAddInputFunc&& addInput,
     TIsGlobalSrcFunc&& isGlobalSrc,
+    TAddSpanInputFunc&& addSpanInput = TAddSpanInputFunc{},
     TAddOutputFunc&& addOutput = TAddOutputFunc{},
     TSetCmdFunc&& setCmd = TSetCmdFunc{}
 ) {
@@ -41,6 +43,7 @@ inline void ProcessInputsAndOutputs(
     const TDepGraph& graph = TDepGraph::Graph(node);
 
     bool explicitInputs = true;
+    TVector<ui32> inputCoordCounts;
 
     for (const auto dep : node.Edges()) {
         const auto depNode = dep.To();
@@ -76,11 +79,17 @@ inline void ProcessInputsAndOutputs(
 
                     if (!depIsGlobalSrc) {
                         addInput(depNode, explicitInputs);
+                        if (explicitInputs) {
+                            inputCoordCounts.push_back(1);
+                        }
                     }
                 }
 
             } else {
                 addInput(depNode, explicitInputs);
+                if (explicitInputs) {
+                    inputCoordCounts.push_back(1);
+                }
             }
 
             continue;
@@ -89,12 +98,14 @@ inline void ProcessInputsAndOutputs(
         if (IsIndirectSrcDep(dep)) {
             Y_ASSERT(explicitInputs);
 
+            ui32 lateGlobSize = 0;
             for (const auto& depdep: dep.To().Edges()) {
                 if (*depdep == EDT_Property && depdep.To()->NodeType == EMNT_File) {
                     addInput(depdep.To(), explicitInputs);
+                    lateGlobSize++;
                 }
             }
-
+            inputCoordCounts.push_back(lateGlobSize);
             continue;
         }
 
@@ -110,6 +121,14 @@ inline void ProcessInputsAndOutputs(
                 setCmd(depNode);
                 continue;
             }
+        }
+    }
+
+    if constexpr (!onlyExplicitInputs) {
+        ui32 inputId = 0;
+        for (ui32 inputSize : inputCoordCounts) {
+            addSpanInput(inputId, inputSize);
+            inputId += inputSize;
         }
     }
 }

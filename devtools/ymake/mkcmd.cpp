@@ -227,6 +227,10 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         }
     };
 
+    auto addSpanInput = [&](ui32 inputId, ui32 inputSize) {
+        Inputs.push_back({ Vars["INPUT"].begin() + inputId, inputSize });
+    };
+
     auto addOutput = [&](const TConstDepNodeRef& depNode) {
         output.push_back(TVarStrEx(RealPathEx(depNode), depNode->ElemId, true));
     };
@@ -237,7 +241,8 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         cmdfound = true;
     };
 
-    ProcessInputsAndOutputs<false>(node, isModule, Modules, addInput, isGlobalSrc, addOutput, setCmd);
+
+    ProcessInputsAndOutputs<false>(node, isModule, Modules, addInput, isGlobalSrc, addSpanInput, addOutput, setCmd);
 
     if (!cmdfound) {
         throw TMakeError() << "No pattern for node " << MainFileName;
@@ -338,7 +343,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
         }
         auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
         Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, CmdInfo, &Graph.Names().CommandConf);
+        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf);
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";

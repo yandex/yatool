@@ -450,7 +450,9 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
     Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), true);
 
     for (const auto& input : cmdInputs) {
-        GetInputInternal().Push(input.Name);
+        TVarStrEx in(input.Name);
+        in.IsGlob = input.IsGlob;
+        GetInputInternal().Push(in);
     }
 
     for (const auto& output : cmdOutputs) {
@@ -712,6 +714,9 @@ TCommandInfo::ECmdInfoState TCommandInfo::CheckInputs(TModuleBuilder& modBuilder
     }
 
     for (auto& input : GetInput()) {
+        if (input.IsGlob) {
+            continue;
+        }
         const TString origInput = input.Name;
         if (!modBuilder.ResolveSourcePath(input, InputDir, lastTry ? TModuleBuilder::LastTry : TModuleBuilder::Default) && !lastTry) {
             YDIAG(VV) << "Input '" << input.Name << "' in " << Get1(&Cmd) << " is not ready, delay processing" << Endl;
@@ -960,6 +965,15 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     for (auto& input : GetInput()) {
         YDIAG(DG) << "Input dep: " << input.Name << Endl;
 
+        if (input.IsGlob) {
+            if (modBuilder.CurrentInputGroup != groupId) {
+                inputNode.AddDepIface(EDT_Group, EMNT_Property, groupId);
+                modBuilder.CurrentInputGroup = groupId;
+            }
+            ProcessGlobInput(actionNode, input.Name);
+            continue;
+        }
+
         if (finalTargetCmd) {
             modBuilder.AddDep(input, inputNode, true, groupId);
         } else {
@@ -1103,6 +1117,40 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     return true;
 }
 
+void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
+
+    auto CreateGlobNode = [&node, this](const TModuleGlobInfo& globInfo) {
+        node.AddUniqueDep(EDT_BuildFrom, EMNT_BuildCommand, globInfo.GlobId);
+        auto& [id, entryStats] = *UpdIter->Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &(UpdIter->YMake), Module);
+        auto& globNode = entryStats.GetAddCtx(Module, UpdIter->YMake);
+        globNode.NodeType = EMNT_BuildCommand;
+        globNode.ElemId = globInfo.GlobId;
+        entryStats.OnceEntered = false;
+        entryStats.SetReassemble(true);
+        PopulateGlobNode(globNode, globInfo);
+    };
+
+    try {
+        TExcludeMatcher excludeMatcher;
+        TUniqVector<ui32> matches;
+        TGlob glob(Graph->Names().FileConf, globStr, Module->GetDir());
+        for (const auto& result : glob.Apply(excludeMatcher)) {
+            matches.Push(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
+        }
+        const TString globCmd = FormatCmd(Module->GetName().GetElemId(), NProps::LATE_GLOB, globStr);
+        TModuleGlobInfo globInfo = {
+            Graph->Names().AddName(EMNT_BuildCommand, globCmd),
+            Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
+            glob.GetWatchDirs().Data(),
+            matches.Take(),
+            {},
+            0
+        };
+        CreateGlobNode(globInfo);
+    } catch (const yexception& error){
+        YConfErr(Syntax) << "Invalid pattern in [[alt1]]" << globStr << "[[rst]]: " << error.what() << Endl;
+    }
+}
 
 bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode) {
     Y_ENSURE(UpdIter != nullptr);
