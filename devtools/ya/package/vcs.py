@@ -1,6 +1,7 @@
 import json
 import logging
 import traceback
+import re
 
 import exts.func
 import exts.tmp
@@ -54,11 +55,18 @@ class SvnRevision(VcsInfo):
 
 
 class Branch(VcsInfo):
+    def __init__(self, arcadia_root, revision_means_trunk=True):
+        super(Branch, self).__init__(arcadia_root)
+        self.revision_means_trunk = revision_means_trunk
+
     def calc(self, info):
         branch = info.get('branch')
         if branch:
             vcs_type, _, _ = vcsversion.detect(cwd=self._arcadia_root)
             branch = branch.split('/')[-1]
             if vcs_type and vcs_type[0] == 'arc':
-                branch = branch.replace('_', '-')
+                if self.revision_means_trunk and info.get('revision') and re.match(r'^[0-9a-f]{40}$', branch):
+                    branch = "trunk"
+                else:
+                    branch = branch.replace('_', '-')
         return branch

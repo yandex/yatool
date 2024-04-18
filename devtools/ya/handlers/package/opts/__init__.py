@@ -676,6 +676,7 @@ class InterimOptions(core.yarg.Options):
 
     def __init__(self):
         self.verify_patterns_usage = True
+        self.arc_revision_means_trunk = True
 
     # All this options
     #  - !! should never be available in YA_PACKAGE sandbox task !!
@@ -688,4 +689,11 @@ class InterimOptions(core.yarg.Options):
                 hook=core.yarg.SetConstValueHook('verify_patterns_usage', False),
                 visible=self.Visible,
             ),
+            core.yarg.ArgConsumer(
+                names=['--arc-revision-means-hash'],
+                help='If Arc HEAD points to a commit with a revision and the branch is not specified, then the branch is considered to be a \'trunk\'',
+                hook=core.yarg.SetConstValueHook('arc_revision_means_trunk', False),
+                visible=self.Visible,
+            ),
+            core.yarg.ConfigConsumer("arc_revision_means_trunk"),
         ]

@@ -1147,7 +1147,7 @@ class PackageContext:
 
         self._params = update_params(self._spec, self._params, self._package_path)
 
-        self._branch = str(package.vcs.Branch(self._arcadia_root))
+        self._branch = str(package.vcs.Branch(self._arcadia_root, self._params.arc_revision_means_trunk))
         self._package_name = self._read_spec_safe('meta', 'name', 'package_name')
 
         # Setup formatters, which are not part of context
