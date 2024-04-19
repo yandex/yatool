@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(16.10.0)
+VERSION(16.12.1)
 
 LICENSE(MIT)
 
@@ -16,7 +16,6 @@ PY_SRCS(
     path/classes.pyi
     path/compat/py38.py
     path/masks.py
-    path/masks.pyi
     path/matchers.py
     path/matchers.pyi
 )

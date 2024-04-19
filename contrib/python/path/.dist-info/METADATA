@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: path
-Version: 16.10.0
+Version: 16.12.1
 Summary: A module wrapper for os.path
 Home-page: https://github.com/jaraco/path
 Author: Jason Orendorff
@@ -18,23 +18,22 @@ Requires-Python: >=3.8
 License-File: LICENSE
 Provides-Extra: docs
 Requires-Dist: sphinx >=3.5 ; extra == 'docs'
-Requires-Dist: sphinx <7.2.5 ; extra == 'docs'
 Requires-Dist: jaraco.packaging >=9.3 ; extra == 'docs'
 Requires-Dist: rst.linker >=1.9 ; extra == 'docs'
 Requires-Dist: furo ; extra == 'docs'
 Requires-Dist: sphinx-lint ; extra == 'docs'
 Requires-Dist: jaraco.tidelift >=1.4 ; extra == 'docs'
 Provides-Extra: testing
-Requires-Dist: pytest >=6 ; extra == 'testing'
+Requires-Dist: pytest !=8.1.1,>=6 ; extra == 'testing'
 Requires-Dist: pytest-checkdocs >=2.4 ; extra == 'testing'
 Requires-Dist: pytest-cov ; extra == 'testing'
+Requires-Dist: pytest-mypy ; extra == 'testing'
 Requires-Dist: pytest-enabler >=2.2 ; extra == 'testing'
 Requires-Dist: pytest-ruff >=0.2.1 ; extra == 'testing'
 Requires-Dist: appdirs ; extra == 'testing'
 Requires-Dist: packaging ; extra == 'testing'
 Requires-Dist: more-itertools ; extra == 'testing'
 Requires-Dist: pygments ; extra == 'testing'
-Requires-Dist: pytest-mypy ; (platform_python_implementation != "PyPy") and extra == 'testing'
 Requires-Dist: pywin32 ; (platform_system == "Windows" and python_version < "3.12") and extra == 'testing'
 
 .. image:: https://img.shields.io/pypi/v/path.svg
@@ -53,7 +52,7 @@ Requires-Dist: pywin32 ; (platform_system == "Windows" and python_version < "3.1
 .. image:: https://readthedocs.org/projects/path/badge/?version=latest
    :target: https://path.readthedocs.io/en/latest/?badge=latest
 
-.. image:: https://img.shields.io/badge/skeleton-2023-informational
+.. image:: https://img.shields.io/badge/skeleton-2024-informational
    :target: https://blog.jaraco.com/skeleton
 
 .. image:: https://tidelift.com/badges/package/pypi/path
