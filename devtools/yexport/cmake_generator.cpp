@@ -55,6 +55,13 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
+    if (result->GeneratorSpec.Common.Templates.size() != 1) {
+        throw yexception() << fmt::format("[error] Strong one common template required for generator {}, but not found in {}", generator, generatorFile.c_str());
+    }
+    if (result->GeneratorSpec.Dir.Templates.empty()) {
+        throw yexception() << fmt::format("[error] At least one directory template required for generator {}, but not found in {}", generator, generatorFile.c_str());
+    }
+
     result->GeneratorDir = generatorDir;
     result->SetArcadiaRoot(arcadiaRoot);
     result->SetupJinjaEnv();
@@ -138,8 +145,9 @@ void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVecto
 }
 void TCMakeGenerator::MergePlatforms() const {
     TJinjaTemplate commonTemplate;
-    auto loaded = commonTemplate.Load(GeneratorDir / "common_cmake_lists.jinja", GetJinjaEnv());
-    YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", "common_cmake_lists.jinja"));
+    const auto& commonTemplateSpec = *GeneratorSpec.Common.Templates.begin();
+    auto loaded = commonTemplate.Load(GeneratorDir / commonTemplateSpec.Template, GetJinjaEnv(), commonTemplateSpec.ResultName);
+    YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", commonTemplateSpec.Template.c_str()));
 
     auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Directory);
     YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for directory");
@@ -177,9 +185,9 @@ void TCMakeGenerator::MergePlatforms() const {
             }
             if (isDifferent) {
                 InsertPlatforms(dirMap, dirPlatforms);
-                commonTemplate.RenderTo(*ExportFileManager, dir / NCMake::CMakeListsFile);
+                commonTemplate.RenderTo(*ExportFileManager, dir, platform->Conf.Name);
             } else {
-                auto finalPath = dir / NCMake::CMakeListsFile;
+                auto finalPath = commonTemplate.RenderFilename(dir, platform->Conf.Name);
                 ExportFileManager->CopyFromExportRoot(dir / platform->Conf.CMakeListsFile, finalPath);
                 for (const auto& dirPlatform : dirPlatforms) {
                     ExportFileManager->Remove(dir / dirPlatform->Conf.CMakeListsFile);
@@ -289,11 +297,10 @@ void TCMakeGenerator::RenderRootTemplates(TTargetAttributesPtr rootValueMap) con
     const auto& rootTemplates = GeneratorSpec.Root.Templates;
     for (const auto& tmpl : rootTemplates) {
         TJinjaTemplate rootTempate;
-        auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv());
-        YEXPORT_VERIFY(loaded,
-                       fmt::format("Cannot load template: \"{}\"\n", tmpl.Template.string()));
+        auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv(), tmpl.ResultName);
+        YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", tmpl.Template.string()));
         rootTempate.SetValueMap(rootValueMap);
-        rootTempate.RenderTo(*ExportFileManager, tmpl.ResultName);
+        rootTempate.RenderTo(*ExportFileManager);
     }
 }
 

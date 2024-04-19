@@ -59,8 +59,10 @@ using TAttributeSpecification = THashMap<EAttributeGroup, TAttributeGroup>;
 struct TGeneratorSpec {
     using TRuleSet = THashSet<const TGeneratorRule*>;
 
-    TTargetSpec Root;
-    THashMap<std::string, TTargetSpec> Targets;
+    TTargetSpec Root;///< Root of export for one platform
+    TTargetSpec Common;///< Combine few platforms in one directory
+    TTargetSpec Dir;///< One directory for one platform
+    THashMap<std::string, TTargetSpec> Targets;///< Targets in directory by name
     jinja2::ValuesMap Platforms;
     TAttributeSpecification AttrGroups;
     THashMap<std::string, TVector<uint32_t>> AttrToRuleId;

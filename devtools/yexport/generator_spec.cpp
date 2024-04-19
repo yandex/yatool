@@ -16,6 +16,8 @@ namespace NYexport {
 
 namespace NKeys {
     constexpr const char* Root = "root";
+    constexpr const char* Common = "common";// Combine few platforms in one directory
+    constexpr const char* Dir = "dir";
     constexpr const char* Template = "template";
     constexpr const char* ManyTemplates = "templates";
     constexpr const char* Path = "path";
@@ -435,6 +437,14 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
         TGeneratorSpec genspec;
 
         genspec.Root = ParseTargetSpec(root, features);
+        const auto& common = toml::find_or(doc, NKeys::Common, toml::table{});
+        if (!common.empty()) {
+            genspec.Common = ParseTargetSpec(common, features);
+        }
+        const auto& dir = toml::find_or(doc, NKeys::Dir, toml::table{});
+        if (!dir.empty()) {
+            genspec.Dir = ParseTargetSpec(dir, features);
+        }
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
             genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
         }

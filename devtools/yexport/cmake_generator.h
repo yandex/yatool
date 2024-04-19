@@ -18,10 +18,6 @@
 
 namespace NYexport {
 
-namespace NCMake {
-    constexpr std::string_view CMakeListsFile = "CMakeLists.txt";
-}
-
 struct TProjectConf {
     std::string ProjectName;
     fs::path ArcadiaRoot;

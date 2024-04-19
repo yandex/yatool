@@ -55,13 +55,15 @@ namespace NYexport {
         TJinjaTemplate() = default;
 
         void SetValueMap(TTargetAttributesPtr valueMap);
-        bool Load(const fs::path& templatePath, jinja2::TemplateEnv* env);
-        bool RenderTo(TExportFileManager& exportFileManager, const fs::path& relativeToExportRoot);
+        bool Load(const fs::path& templatePath, jinja2::TemplateEnv* env, const std::string& renderBasename = {});
+        fs::path RenderFilename(const fs::path& relativeToExportRootDirname, const std::string& platformName) const;
+        bool RenderTo(TExportFileManager& exportFileManager, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
 
         TTargetAttributes& GetValueMap();
     private:
         TTargetAttributesPtr ValueMap;
         std::optional<jinja2::Template> Template;
+        std::string RenderBasename;
     };
 
     void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0, bool isLastItem = true);

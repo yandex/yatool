@@ -26,9 +26,6 @@ namespace {
     constexpr std::string_view YMAKE_SOURCE_PREFIX = "$S/";
     constexpr std::string_view YMAKE_BUILD_PREFIX = "$B/";
 
-    // TODO: get template from generator.toml
-    constexpr std::string_view DIR_CMAKELISTS_TEMPLATE = "dir_cmake_lists.jinja";
-
     enum class ECMakeAttrScope {Private, Public, Interface};
     enum class EMacroMergePolicy {MultipleCalls, FirstCall, ConcatArgs};
 
@@ -127,6 +124,14 @@ namespace {
 
             TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
 
+            std::vector<TJinjaTemplate> dirTemplates;
+            for (const auto& dirTemplateSpec: cmakeGenerator->GetGeneratorSpec().Dir.Templates) {
+                TJinjaTemplate dirTemplate;
+                auto loaded = dirTemplate.Load(cmakeGenerator->GetGeneratorDir() / dirTemplateSpec.Template, cmakeGenerator->GetJinjaEnv(), dirTemplateSpec.ResultName);
+                YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", dirTemplateSpec.Template.c_str()));
+                dirTemplates.emplace_back(std::move(dirTemplate));
+            }
+
             {
                 auto topLevelSubdirs = jinja2::ValuesList();
                 for (auto subdir: SubdirsOrder_) {
@@ -135,7 +140,7 @@ namespace {
                     if (subdir->IsTopLevel()) {
                         topLevelSubdirs.emplace_back(subdir->Path.c_str());
                     }
-                    SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator);
+                    SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator, dirTemplates);
                 }
 
                 const auto [_, inserted] = dirValueMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
@@ -143,11 +148,10 @@ namespace {
                 cmakeGenerator->ApplyRules(*dirValueMap);
             }
 
-            TJinjaTemplate dirTemplate;
-            auto loaded = dirTemplate.Load(cmakeGenerator->GetGeneratorDir() / DIR_CMAKELISTS_TEMPLATE, cmakeGenerator->GetJinjaEnv());
-            YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
-            dirTemplate.SetValueMap(dirValueMap);
-            dirTemplate.RenderTo(*ExportFileManager, Platform->Conf.CMakeListsFile);
+            for (auto& dirTemplate: dirTemplates) {
+                dirTemplate.SetValueMap(dirValueMap);
+                dirTemplate.RenderTo(*ExportFileManager, "", Platform->Conf.Name);
+            }
         }
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
@@ -252,7 +256,8 @@ namespace {
 
         void SaveSubdirCMake(const fs::path& subdir,
                              const TCMakeList& data,
-                             const TCMakeGenerator* cmakeGenerator) {
+                             const TCMakeGenerator* cmakeGenerator,
+                             std::vector<TJinjaTemplate>& dirTemplates) {
             const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
             const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
             YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
@@ -308,13 +313,10 @@ namespace {
                 }
             }
 
-            TJinjaTemplate dirTemplate;
-            auto loaded = dirTemplate.Load(
-                    cmakeGenerator->GetGeneratorDir() / DIR_CMAKELISTS_TEMPLATE,
-                    cmakeGenerator->GetJinjaEnv());
-            YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", DIR_CMAKELISTS_TEMPLATE));
-            dirTemplate.SetValueMap(dirValueMap);
-            dirTemplate.RenderTo(*ExportFileManager, subdir / Platform->Conf.CMakeListsFile);
+            for (auto& dirTemplate: dirTemplates) {
+                dirTemplate.SetValueMap(dirValueMap);
+                dirTemplate.RenderTo(*ExportFileManager, subdir, Platform->Conf.Name);
+            }
         }
 
     private:
