@@ -303,9 +303,9 @@ void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attrs, const jinja2::
     }
 }
 
-class TNewJinjaGeneratorVisitor: public TGraphVisitor {
+class TJinjaGeneratorVisitor: public TGraphVisitor {
 public:
-    TNewJinjaGeneratorVisitor(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs, const TGeneratorSpec& generatorSpec)
+    TJinjaGeneratorVisitor(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs, const TGeneratorSpec& generatorSpec)
         : TGraphVisitor(generator)
     {
         JinjaProjectBuilder_ = MakeSimpleShared<TJinjaProject::TBuilder>(generator, rootAttrs);
@@ -565,7 +565,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
 }
 
 void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TNewJinjaGeneratorVisitor visitor(this, &RootAttrs, GeneratorSpec);
+    TJinjaGeneratorVisitor visitor(this, &RootAttrs, GeneratorSpec);
     IterateAll(graph, startDirs, visitor);
     Project = visitor.TakeFinalizedProject();
 }

@@ -280,11 +280,11 @@ namespace {
         const auto& ruleId = rules.emplace(rules.size(), rule).first->first;
 
         for(const auto& attr : rule.Attributes) {
-            spec.AttrToRuleId[attr].emplace_back(ruleId);
+            spec.AttrToRuleIds[attr].emplace_back(ruleId);
         }
 
         for(const auto& platform : rule.Platforms) {
-            spec.PlatformToRuleId[platform].emplace_back(ruleId);
+            spec.PlatformToRuleIds[platform].emplace_back(ruleId);
         }
     }
 
@@ -545,7 +545,7 @@ bool TGeneratorRule::Useless() const {
 }
 
 TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string_view attr) const {
-    if (auto it = AttrToRuleId.find(attr); it != AttrToRuleId.end()) {
+    if (auto it = AttrToRuleIds.find(attr); it != AttrToRuleIds.end()) {
         TRuleSet result;
         for (const auto& id : it->second) {
             result.insert(&Rules.at(id));
@@ -556,7 +556,7 @@ TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string_view att
 }
 
 TGeneratorSpec::TRuleSet TGeneratorSpec::GetPlatformRules(const std::string_view platform) const {
-    if (auto it = PlatformToRuleId.find(platform); it != PlatformToRuleId.end()) {
+    if (auto it = PlatformToRuleIds.find(platform); it != PlatformToRuleIds.end()) {
         TRuleSet result;
         for (const auto& id : it->second) {
             result.insert(&Rules.at(id));

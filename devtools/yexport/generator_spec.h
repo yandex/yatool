@@ -65,8 +65,8 @@ struct TGeneratorSpec {
     THashMap<std::string, TTargetSpec> Targets;///< Targets in directory by name
     jinja2::ValuesMap Platforms;
     TAttributeSpecification AttrGroups;
-    THashMap<std::string, TVector<uint32_t>> AttrToRuleId;
-    THashMap<std::string, TVector<uint32_t>> PlatformToRuleId;
+    THashMap<std::string, TVector<uint32_t>> AttrToRuleIds;
+    THashMap<std::string, TVector<uint32_t>> PlatformToRuleIds;
     THashMap<std::string, TVector<fs::path>> Merge;
     THashMap<uint32_t, TGeneratorRule> Rules;
     bool UseManagedPeersClosure{false};

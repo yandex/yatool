@@ -37,6 +37,7 @@ namespace NYexport {
         dir->Targets.push_back(target);
         return {*this, dir, target};
     }
+
     void TProject::TBuilder::OnAttribute(const std::string& attribute) {
         Generator_->OnAttribute(attribute);
         CustomOnAttribute(attribute);

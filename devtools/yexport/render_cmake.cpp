@@ -108,50 +108,11 @@ namespace {
     public:
         class TBuilder;
 
-        TCMakeProject(const TProjectConf& projectConf, const TPlatformPtr platform, TExportFileManager* exportFileManager)
+        TCMakeProject(const TProjectConf& projectConf)
         : TProject()
         , ProjectConf(projectConf)
-        , Platform(platform)
-        , ExportFileManager(exportFileManager)
         {
             SetFactoryTypes<TCMakeList, TCMakeTarget>();
-        }
-
-        void Save(const TCMakeGenerator* cmakeGenerator) {
-            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
-            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
-            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
-
-            TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
-
-            std::vector<TJinjaTemplate> dirTemplates;
-            for (const auto& dirTemplateSpec: cmakeGenerator->GetGeneratorSpec().Dir.Templates) {
-                TJinjaTemplate dirTemplate;
-                auto loaded = dirTemplate.Load(cmakeGenerator->GetGeneratorDir() / dirTemplateSpec.Template, cmakeGenerator->GetJinjaEnv(), dirTemplateSpec.ResultName);
-                YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", dirTemplateSpec.Template.c_str()));
-                dirTemplates.emplace_back(std::move(dirTemplate));
-            }
-
-            {
-                auto topLevelSubdirs = jinja2::ValuesList();
-                for (auto subdir: SubdirsOrder_) {
-                    Y_ASSERT(subdir);
-                    Platform->SubDirs.insert(subdir->Path);
-                    if (subdir->IsTopLevel()) {
-                        topLevelSubdirs.emplace_back(subdir->Path.c_str());
-                    }
-                    SaveSubdirCMake(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator, dirTemplates);
-                }
-
-                const auto [_, inserted] = dirValueMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
-                Y_ASSERT(inserted);
-                cmakeGenerator->ApplyRules(*dirValueMap);
-            }
-
-            for (auto& dirTemplate: dirTemplates) {
-                dirTemplate.SetValueMap(dirValueMap);
-                dirTemplate.RenderTo(*ExportFileManager, "", Platform->Conf.Name);
-            }
         }
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
@@ -254,10 +215,10 @@ namespace {
             return targetValueMap;
         }
 
-        void SaveSubdirCMake(const fs::path& subdir,
+    public:
+        TTargetAttributesPtr GetSubdirValuesMap(const fs::path& subdir,
                              const TCMakeList& data,
-                             const TCMakeGenerator* cmakeGenerator,
-                             std::vector<TJinjaTemplate>& dirTemplates) {
+                             const TCMakeGenerator* cmakeGenerator) const {
             const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
             const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
             YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
@@ -312,21 +273,14 @@ namespace {
                     targets.emplace_back(MakeTargetAttributes(cmakeTarget, cmakeGenerator)->GetMap());
                 }
             }
-
-            for (auto& dirTemplate: dirTemplates) {
-                dirTemplate.SetValueMap(dirValueMap);
-                dirTemplate.RenderTo(*ExportFileManager, subdir, Platform->Conf.Name);
-            }
+            return dirValueMap;
         }
 
     private:
         static constexpr std::string_view CMakePrologueFile = "prologue.cmake";
         static constexpr std::string_view CMakeEpilogueFile = "epilogue.cmake";
 
-    private:
         const TProjectConf& ProjectConf;
-        const TPlatformPtr Platform;
-        TExportFileManager* ExportFileManager;
     };
     using TCMakeProjectPtr = TSimpleSharedPtr<TCMakeProject>;
 
@@ -339,7 +293,7 @@ namespace {
         , GlobalProperties(globalProperties)
         , CMakeGenerator(cmakeGenerator)
         {
-            Project_ = MakeSimpleShared<TCMakeProject>(projectConf, platform, cmakeGenerator->GetExportFileManager());
+            Project_ = MakeSimpleShared<TCMakeProject>(projectConf);
         }
 
         void CustomFinalize() override {
@@ -1047,13 +1001,15 @@ namespace {
     };
 }
 
-bool RenderCmake(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
-{
+bool AnalizePlatformSemGraph(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator) {
     TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
     IterateAll(*platform->Graph, platform->StartDirs, visitor);
-    auto project = visitor.TakeFinalizedProject();
-    project.As<TCMakeProject>()->Save(cmakeGenerator);
+    platform->Project = visitor.TakeFinalizedProject();
     return !visitor.HasErrors();
+}
+
+TTargetAttributesPtr GetSubdirValuesMap(const TPlatformPtr platform, TProjectSubdirPtr subdir, const TCMakeGenerator* cmakeGenerator) {
+    return platform->Project.As<TCMakeProject>()->GetSubdirValuesMap(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator);
 }
 
 THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)

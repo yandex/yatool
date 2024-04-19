@@ -314,6 +314,17 @@ namespace NYexport {
         ValueMap = valueMap;
     }
 
+    std::vector<TJinjaTemplate> LoadJinjaTemplates(const fs::path& templatesDir, jinja2::TemplateEnv* env, const std::vector<TTemplate>& templateSpecs) {
+        std::vector<TJinjaTemplate> templates;
+        for (const auto& templateSpec: templateSpecs) {
+            TJinjaTemplate t;
+            if (t.Load(templatesDir / templateSpec.Template, env, templateSpec.ResultName)) {
+                templates.emplace_back(std::move(t));
+            }
+        }
+        return templates;
+    }
+
     void Dump(IOutputStream& out, const jinja2::Value& value, int depth, bool isLastItem) {
         auto Indent = [](int depth) {
             return std::string(depth * 4, ' ');

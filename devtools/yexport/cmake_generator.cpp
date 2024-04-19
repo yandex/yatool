@@ -75,9 +75,9 @@ void TCMakeGenerator::SetProjectName(const std::string& projectName) {
 }
 
 void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& semGraph) {
-    const auto& platformIt = GeneratorSpec.Platforms.find(platform);
-    YEXPORT_VERIFY(platformIt != GeneratorSpec.Platforms.end(),
-                   fmt::format("No specification for platform \"{}\"", platform));
+    if (!platform.empty()) {
+        YEXPORT_VERIFY(GeneratorSpec.Platforms.find(platform) != GeneratorSpec.Platforms.end(), fmt::format("No specification for platform \"{}\"", platform));
+    }
 
     auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
     Platforms.emplace_back(MakeSimpleShared<TPlatform>(platform));
@@ -86,13 +86,37 @@ void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& 
     OnPlatform(platform);
 }
 
-void TCMakeGenerator::RenderPlatform(const TPlatformPtr platform) {
+void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.CollectDirs(*platform->Graph, platform->StartDirs);
     }
-    if (!RenderCmake(Conf, platform, GlobalProperties, this)) {
+    if (!AnalizePlatformSemGraph(Conf, platform, GlobalProperties, this)) {
         yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform->Conf.Name);
     }
+
+    const auto& generatorSpec = GetGeneratorSpec();
+    const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
+    YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
+
+    TTargetAttributesPtr rootdirValuesMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+
+    auto dirJinjaTemplates = LoadJinjaTemplates(generatorSpec.Dir.Templates);
+
+    auto topLevelSubdirs = jinja2::ValuesList();
+    for (auto subdir: platform->Project->GetSubdirs()) {
+        Y_ASSERT(subdir);
+        platform->SubDirs.insert(subdir->Path);
+        if (subdir->IsTopLevel()) {
+            topLevelSubdirs.emplace_back(subdir->Path.c_str());
+        }
+        auto subdirValuesMap = GetSubdirValuesMap(platform, subdir, this);
+        RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Conf.Name);
+    }
+
+    const auto [_, inserted] = rootdirValuesMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
+    Y_ASSERT(inserted);
+
+    RenderJinjaTemplates(rootdirValuesMap, dirJinjaTemplates, "", platform->Conf.Name);
 }
 
 /// Get dump of semantics tree with values for testing or debug
@@ -107,7 +131,14 @@ void TCMakeGenerator::DumpAttrs(IOutputStream&) {
 
 void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     Conf.CleanIgnored = cleanIgnored;
+    RenderPlatforms();
+    RenderRoot();
+    if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
+        Cleaner.Clean(*ExportFileManager);
+    }
+}
 
+void TCMakeGenerator::RenderPlatforms() {
     for (auto& platform : Platforms) {
         RenderPlatform(platform);
     }
@@ -116,23 +147,20 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 
     MergePlatforms();
     CopyArcadiaScripts();
+}
 
-    {
-        auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
-        YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(),
-                       "No attribute specification for root");
+void TCMakeGenerator::RenderRoot() {
+    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
+    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for root");
 
-        TTargetAttributesPtr rootValueMap = TTargetAttributes::Create(attrSpecIt->second, "root");
+    auto rootJinjaTemplates = LoadJinjaTemplates(GetGeneratorSpec().Root.Templates);
 
-        PrepareRootCMakeList(rootValueMap);
-        PrepareConanRequirements(rootValueMap);
-        ApplyRules(*rootValueMap);
-        RenderRootTemplates(rootValueMap);
-    }
-
-    if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
-        Cleaner.Clean(*ExportFileManager);
-    }
+    TTargetAttributesPtr rootValuesMap = TTargetAttributes::Create(attrSpecIt->second, "root");
+    PrepareRootCMakeList(rootValuesMap);
+    PrepareConanRequirements(rootValuesMap);
+    ApplyRules(*rootValuesMap);
+    SetCurrentDirectory(ExportFileManager->GetExportRoot());
+    RenderJinjaTemplates(rootValuesMap, rootJinjaTemplates);
 }
 
 void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const {
@@ -143,6 +171,7 @@ void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVecto
         platformNames.emplace_back(platform->Conf.Name);
     }
 }
+
 void TCMakeGenerator::MergePlatforms() const {
     TJinjaTemplate commonTemplate;
     const auto& commonTemplateSpec = *GeneratorSpec.Common.Templates.begin();
@@ -229,25 +258,22 @@ void TCMakeGenerator::CopyArcadiaScripts() const {
 }
 
 void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const {
-    {
-        auto& rootMap = rootValueMap->GetWritableMap();
-        rootMap["platforms"] = GeneratorSpec.Platforms;
-        InsertPlatforms(rootMap, Platforms);
-    }
-    {
-        jinja2::ValuesList globalVars;
-        for (const auto &platform: Platforms) {
-            auto varList = jinja2::ValuesList();
-            for (const auto &[flag, args]: platform->GlobalVars) {
-                auto arg_list = jinja2::ValuesList();
-                arg_list.emplace_back(flag);
-                arg_list.insert(arg_list.end(), args.begin(), args.end());
-                varList.emplace_back(arg_list);
-            }
-            globalVars.emplace_back(varList);
+    auto& rootMap = rootValueMap->GetWritableMap();
+    rootMap["platforms"] = GeneratorSpec.Platforms;
+    InsertPlatforms(rootMap, Platforms);
+
+    jinja2::ValuesList globalVars;
+    for (const auto &platform: Platforms) {
+        auto varList = jinja2::ValuesList();
+        for (const auto &[flag, args]: platform->GlobalVars) {
+            auto arg_list = jinja2::ValuesList();
+            arg_list.emplace_back(flag);
+            arg_list.insert(arg_list.end(), args.begin(), args.end());
+            varList.emplace_back(arg_list);
         }
-        rootValueMap->SetAttrValue("platform_vars", globalVars);
+        globalVars.emplace_back(varList);
     }
+    rootValueMap->SetAttrValue("platform_vars", globalVars);
 
     rootValueMap->SetAttrValue("use_conan",
                                !GlobalProperties.ConanPackages.empty() ||
@@ -273,34 +299,30 @@ void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap
                              jinja2::ValuesList(GlobalProperties.ConanOptions.begin(),
                                                 GlobalProperties.ConanOptions.end()));
 
-    {
-        auto [conanImportsIt, _] = rootValueMap->GetWritableMap().insert_or_assign(
-                "conan_imports",
-                jinja2::ValuesList(GlobalProperties.ConanOptions.begin(), GlobalProperties.ConanOptions.end()));
-        auto& conanImports = conanImportsIt->second.asList();
-        for (std::string_view import: GlobalProperties.ConanImports) {
-            // TODO: find better way to avoid unquoting here. Import spec is quoted since
-            // I don't know any way of adding semantics arg with spaces in core.conf without
-            // quoting it.
-            if (import.starts_with('"') && import.ends_with('"')) {
-                import.remove_prefix(1);
-                import.remove_suffix(1);
-            }
-            conanImports.emplace_back(import);
+    auto [conanImportsIt, _] = rootValueMap->GetWritableMap().insert_or_assign(
+            "conan_imports",
+            jinja2::ValuesList(GlobalProperties.ConanOptions.begin(), GlobalProperties.ConanOptions.end()));
+    auto& conanImports = conanImportsIt->second.asList();
+    for (std::string_view import: GlobalProperties.ConanImports) {
+        // TODO: find better way to avoid unquoting here. Import spec is quoted since
+        // I don't know any way of adding semantics arg with spaces in core.conf without
+        // quoting it.
+        if (import.starts_with('"') && import.ends_with('"')) {
+            import.remove_prefix(1);
+            import.remove_suffix(1);
         }
+        conanImports.emplace_back(import);
     }
 }
 
-void TCMakeGenerator::RenderRootTemplates(TTargetAttributesPtr rootValueMap) const {
-    SetCurrentDirectory(ExportFileManager->GetExportRoot());
+std::vector<TJinjaTemplate> TCMakeGenerator::LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const {
+    return NYexport::LoadJinjaTemplates(GetGeneratorDir(), GetJinjaEnv(), templateSpecs);
+}
 
-    const auto& rootTemplates = GeneratorSpec.Root.Templates;
-    for (const auto& tmpl : rootTemplates) {
-        TJinjaTemplate rootTempate;
-        auto loaded = rootTempate.Load(GeneratorDir / tmpl.Template, GetJinjaEnv(), tmpl.ResultName);
-        YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", tmpl.Template.string()));
-        rootTempate.SetValueMap(rootValueMap);
-        rootTempate.RenderTo(*ExportFileManager);
+void TCMakeGenerator::RenderJinjaTemplates(TTargetAttributesPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname, const std::string& platformName) {
+    for (auto& jinjaTemplate: jinjaTemplates) {
+        jinjaTemplate.SetValueMap(valuesMap);
+        jinjaTemplate.RenderTo(*ExportFileManager, relativeToExportRootDirname, platformName);
     }
 }
 

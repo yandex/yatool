@@ -4,7 +4,7 @@
 #include "dir_cleaner.h"
 #include "jinja_helpers.h"
 #include "spec_based_generator.h"
-#include "yexport_generator.h"
+#include "project.h"
 
 #include <util/generic/hash.h>
 #include <util/generic/hash_set.h>
@@ -40,6 +40,7 @@ struct TPlatform {
     TVector<TNodeId> StartDirs;
     THashMap<std::string, TVector<std::string>> GlobalVars;
     THashSet<fs::path> SubDirs;
+    TProjectPtr Project;
 
     explicit TPlatform(std::string_view platformName);
 };
@@ -64,6 +65,8 @@ private:
     TVector<TPlatformPtr> Platforms;
     TGlobalProperties GlobalProperties;
 
+    void RenderPlatforms();
+    void RenderRoot();
     void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
     void MergePlatforms() const;
     TVector<std::string> GetAdjustedLanguagesList() const;
@@ -74,9 +77,11 @@ private:
 
     void PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const;
     void PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const;
-    void RenderRootTemplates(TTargetAttributesPtr rootValueMap) const;
 
-    virtual void Render(ECleanIgnored cleanIgnored) override;
+    void Render(ECleanIgnored cleanIgnored) override;
+
+    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const;
+    void RenderJinjaTemplates(TTargetAttributesPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
 
 public:
     TCMakeGenerator() = default;

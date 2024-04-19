@@ -37,7 +37,20 @@ int main(int argc, char** argv) try {
     auto generator = Load(opts.Generator, opts.ArcadiaRoot, opts.ConfigDir, opts.DumpOpts, opts.DebugOpts);
     generator->SetProjectName(opts.ProjectName);
 
-    if (opts.Generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
+    if (opts.Generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || opts.Generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
+        if (opts.PyDepsDump.empty()) {
+            spdlog::error("path to py dependency dump is required for the {} generator", opts.Generator);
+            return 1;
+        }
+        generator->LoadSemGraph("", opts.PyDepsDump);
+    }
+    if (opts.Platforms.empty()) { // no platforms, load strong one semgraph with empty platform
+        if (opts.SemGraphs.size() != 1) {
+            spdlog::error("Requires exactly one semantic graph while using generator");
+            return 1;
+        }
+        generator->LoadSemGraph("", opts.SemGraphs.front());
+    } else { // count of platforms must be equal count of semgraph
         if (opts.Platforms.size() != opts.SemGraphs.size()) {
             spdlog::error("Number of platforms isn't equal to number of semantic graphs.");
             return 1;
@@ -45,18 +58,6 @@ int main(int argc, char** argv) try {
         for (size_t i = 0; i < opts.SemGraphs.size(); i++) {
             generator->LoadSemGraph(opts.Platforms[i], opts.SemGraphs[i]);
         }
-    } else if (opts.Generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || opts.Generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
-        if (opts.PyDepsDump.empty()) {
-            spdlog::error("path to py dependency dump is required for the {} generator", opts.Generator);
-            return 1;
-        }
-        generator->LoadSemGraph("", opts.PyDepsDump);
-    } else {
-        if (opts.SemGraphs.size() != 1) {
-            spdlog::error("Requires exactly one semantic graph while using generator");
-            return 1;
-        }
-        generator->LoadSemGraph("", opts.SemGraphs.front());
     }
     if (opts.DumpOpts.DumpSems || opts.DumpOpts.DumpAttrs) {
         if (opts.DumpOpts.DumpSems) {
