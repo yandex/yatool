@@ -470,6 +470,7 @@ class EslintNewTestSuite(AbstractFrontendStyleSuite):
         self._eslint_config_path = self.dart_info.get("ESLINT_CONFIG_PATH")
         self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._files = sorted(self.dart_info.get("TEST-FILES", []))
+        self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
 
     @classmethod
     def get_type_name(cls):
@@ -480,6 +481,20 @@ class EslintNewTestSuite(AbstractFrontendStyleSuite):
 
     def _get_config_files(self):
         return [self._eslint_config_path]
+
+    def support_splitting(self, opts=None):
+        return self._file_processing_time > 0
+
+    # we are splitting by `LINT-FILE-PROCESSING-TIME`
+    # it allows us to fine tune a chunk size from build plugin (nots.py)
+    # and it's auto adjusted to timeout setting
+    def get_split_factor(self, opts):
+        if opts and opts.testing_split_factor:
+            return opts.testing_split_factor
+
+        if self._files and self.support_splitting():
+            return int(math.ceil(self._file_processing_time * len(self._files) / self.timeout))
+        return 1
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return []
