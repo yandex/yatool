@@ -70,7 +70,6 @@ import build.gen_plan as gp
 import build.graph as lg
 import build.makefile as mk
 import build.owners as ow
-import build.prefetch as pf
 import build.stat.graph_metrics as st
 import build.stat.statistics as bs
 from build import build_facade, frepkage, test_results_console_printer
@@ -224,6 +223,16 @@ class PrintMessageSubscriber(event_handling.SubscriberLoggable):
         logger.debug('Configure message %s', event_sorted)
 
 
+class AppendSubscriber(event_handling.SubscriberExcludedTopics):
+    topics = set()
+
+    def __init__(self, store):
+        self._store = store
+
+    def _action(self, event):
+        self._store.append(event)
+
+
 def _checkout(opts, display=None):
     if not getattr(opts, "checkout", False):
         return
@@ -250,7 +259,8 @@ def _checkout(opts, display=None):
     while True:
         events = []
         try:
-            lg.build_graph_and_tests(opts2, check=False, event_queue=events.append, display=display)
+            with event_handling.EventQueue().subscription_scope(AppendSubscriber(events)) as event_queue:
+                lg.build_graph_and_tests(opts2, check=False, event_queue=event_queue, display=display)
         except lg.GraphMalformedException:
             pass
         dirs, root_dirs = evlog.missing_dirs(events, root_dirs)
@@ -288,12 +298,8 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
     display = getattr(app_ctx, 'display', None)
     _checkout(opts, display)
 
-    prefetcher = pf.start_prefetch(opts) if opts.prefetch else None
-
     printed = set()
     errors_collector = PrintMessageSubscriber()
-
-    event_queue = app_ctx.event_queue
 
     configure_time_subscribers = [
         PrintProgressSubscriber(modules_files_stats),
@@ -306,18 +312,9 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
         configure_time_subscribers.append(
             YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
         )
-    if prefetcher is not None:
-        configure_time_subscribers.append(pf.ArcPrefetchSubscriber(prefetcher))
 
-    event_queue.subscribe(*configure_time_subscribers)
-
-    try:
-        graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(
-            opts, check=True, event_queue=event_queue, display=display
-        )
-    finally:
-        if prefetcher is not None:
-            prefetcher.stop()
+    with app_ctx.event_queue.subscription_scope(*configure_time_subscribers):
+        graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(opts, check=True, display=display)
 
     def fix_dir(s):
         if s.startswith('$S/'):

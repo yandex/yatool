@@ -189,6 +189,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         build_options.use_distbuild = False
 
     build_options.ymake_bin = params.ymake_bin
+    build_options.prefetch = params.prefetch
 
     build_options.host_platform = params.host_platform
     build_options.host_flags = copy.deepcopy(params.host_flags)

@@ -627,7 +627,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.FlagsOptions(),
                 build.build_opts.OutputOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
-                build.build_opts.ArcPrefetchOptions(),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
                 core.common_opts.YaBin3Options(),
@@ -643,7 +642,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
-                build.build_opts.ArcPrefetchOptions(),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
                 core.common_opts.YaBin3Options(),
@@ -658,7 +656,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
-                build.build_opts.ArcPrefetchOptions(),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
                 core.common_opts.YaBin3Options(),
@@ -674,7 +671,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.FlagsOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
-                build.build_opts.ArcPrefetchOptions(),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
                 core.common_opts.YaBin3Options(),
@@ -684,12 +680,11 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['vscode'] = core.yarg.OptsHandler(
             action=app.execute(ide.vscode_all.gen_vscode_workspace),
             description=get_description('Generate VSCode multi-language project.', ref_name='multi'),
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
+            opts=ide.ide_common.ide_minimal_opts(targets_free=True, prefetch=True)
             + [
                 ide.vscode.opts.VSCodeAllOptions(),
                 ide.ide_common.YaExtraArgsOptions(),
                 bcd.CompilationDatabaseOptions(),
-                build.build_opts.ArcPrefetchOptions(prefetch=True, visible=False),
                 build.build_opts.FlagsOptions(),
                 build.build_opts.OutputOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),

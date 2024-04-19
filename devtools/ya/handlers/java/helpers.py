@@ -16,11 +16,8 @@ from jbuild.gen import consts
 from six.moves import map
 
 
-def _get_queue(opts, app_ctx):
-    event_queue = app_ctx.event_queue
-    event_queue.subscribe(ya_make.DisplayMessageSubscriber(opts, app_ctx.display))
-
-    return event_queue
+def _get_subscribers(opts, app_ctx):
+    return [ya_make.DisplayMessageSubscriber(opts, app_ctx.display)]
 
 
 def fix_windows(path):
@@ -37,9 +34,8 @@ def get_java_ctx_with_tests(opts):
 
     import app_ctx  # XXX: via args
 
-    _, tests, _, ctx, _ = build_graph.build_graph_and_tests(
-        jopts, check=True, event_queue=_get_queue(jopts, app_ctx), display=app_ctx.display
-    )
+    with app_ctx.event_queue.subscription_scope(*_get_subscribers(jopts, app_ctx)):
+        _, tests, _, ctx, _ = build_graph.build_graph_and_tests(jopts, check=True, display=app_ctx.display)
 
     return ctx, tests
 
@@ -118,10 +114,9 @@ def print_ymake_dep_tree(opts):
 
     import app_ctx
 
-    event_queue = _get_queue(opts, app_ctx)
-
-    for ev in evlog:
-        event_queue(ev)
+    with app_ctx.event_queue.subscription_scope(*_get_subscribers(opts, app_ctx)) as event_queue:
+        for ev in evlog:
+            event_queue(ev)
 
     formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
     print(formatter.format_message(res.stdout))
@@ -143,10 +138,9 @@ def print_classpath(opts):
 
     import app_ctx
 
-    event_queue = _get_queue(opts, app_ctx)
-
-    for ev in evlog:
-        event_queue(ev)
+    with app_ctx.event_queue.subscription_scope(*_get_subscribers(opts, app_ctx)) as event_queue:
+        for ev in evlog:
+            event_queue(ev)
 
     formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
     print(formatter.format_message(res.stdout))

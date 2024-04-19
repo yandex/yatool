@@ -12,7 +12,6 @@ PY_SRCS(
     graph.py
     graph_path.py
     makefile.py
-    prefetch.py
     targets_deref.py
     test_results_console_printer.py
     ya_make.py
@@ -34,6 +33,7 @@ PEERDIR(
     devtools/ya/build/genconf
     devtools/ya/build/makelist
     devtools/ya/build/owners
+    devtools/ya/build/prefetch
     devtools/ya/build/reports
     devtools/ya/build/stat
     devtools/ya/build/targets
@@ -94,6 +94,7 @@ RECURSE(
     genconf
     makelist
     owners
+    prefetch
     reports
     stat
     targets

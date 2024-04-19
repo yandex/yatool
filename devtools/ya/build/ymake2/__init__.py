@@ -28,8 +28,10 @@ import yalibrary.tools as tools
 import core.yarg
 import core.config
 import core.report
+import core.event_handling
 
 import build.genconf
+import build.prefetch as prefetch
 from build.ymake2 import consts
 from build.ymake2 import run_ymake
 from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
@@ -72,6 +74,15 @@ class YMakeResult(object):
         return default_value
 
 
+def _get_ev_listener_param():
+    try:
+        import app_ctx
+
+        return app_ctx.event_queue
+    except ImportError:
+        return lambda _: _
+
+
 def _ymake_params(check=True):
     return [
         core.yarg.Param(name='ymake_bin', default_value=None),
@@ -79,7 +90,7 @@ def _ymake_params(check=True):
         core.yarg.Param(name='check', default_value=check),
         core.yarg.Param(name='extra_env', default_value=None),
         core.yarg.Param(name='mode', default_value=None),  # XXX: remove me
-        core.yarg.Param(name='ev_listener', default_value=lambda _: _),
+        core.yarg.Param(name='ev_listener', default_value=_get_ev_listener_param()),
         core.yarg.Param(name='_purpose', default_value='UNKNOWN'),
     ]
 
@@ -518,6 +529,17 @@ def _run_ymake(**kwargs):
     if not kwargs.get('custom_build_directory'):
         kwargs['custom_build_directory'] = tempfile.mkdtemp('yatmpbld')  # XXX: always define from outside
 
+    prefetcher = None
+    if app_ctx:
+        prefetcher = prefetch.ArcPrefetchSubscriber.get_subscriber(
+            getattr(app_ctx.params, 'arc_root', None),
+            getattr(app_ctx.params, 'prefetch', False),
+            getattr(app_ctx, 'vcs_type', ''),
+            _ymake_unique_run_id,
+        )
+        if prefetcher:
+            app_ctx.event_queue.subscribe(prefetcher)
+
     try:
         with tmp.temp_file() as temp_meta:
             binary = kwargs.pop('ymake_bin', None) or _mine_ymake_binary()
@@ -602,6 +624,9 @@ def _run_ymake(**kwargs):
         }
         raise
     finally:
+        if app_ctx and prefetcher is not None:
+            app_ctx.event_queue.unsubscribe(prefetcher)
+
         if _stat_info_postprocessing.get('start'):
             _stat_info_postprocessing['finish'] = time.time()
             _stat_info_postprocessing['duration'] = (

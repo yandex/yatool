@@ -78,10 +78,9 @@ def generate_wrappers(params, arcadia_root):
     if getattr(app_ctx, 'evlog', None):
         subscribers.append(ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')))
 
-    event_queue = app_ctx.event_queue
-    event_queue.subscribe(*subscribers)
+    with app_ctx.event_queue.subscription_scope(*subscribers):
+        task, _, _, _, _ = bg.build_graph_and_tests(params, check=True, display=app_ctx.display)
 
-    task, _, _, _, _ = bg.build_graph_and_tests(params, check=True, event_queue=event_queue, display=app_ctx.display)
     results = task['result']
     targets = []
     for graph_node in task['graph']:

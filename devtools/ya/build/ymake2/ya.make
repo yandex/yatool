@@ -20,6 +20,8 @@ PEERDIR(
     devtools/ya/yalibrary/tools
     devtools/ya/build/ccgraph
     devtools/ya/build/genconf
+    devtools/ya/build/prefetch
+    devtools/ya/yalibrary/find_root
     library/cpp/blockcodecs
     library/cpp/pybind
     library/cpp/ucompress

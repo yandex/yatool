@@ -67,7 +67,7 @@ from build.build_opts import (
     CustomBuildRootOptions,
     ContinueOnFailOptions,
 )
-from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions
+from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
 from core.common_opts import CrossCompilationOptions, YaBin3Options
 from test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
@@ -96,6 +96,7 @@ class DumpYaHandler(CompositeHandler):
             ToolsOptions(),
             ConfigurationPresetsOptions(),
             YaBin3Options(),
+            ArcPrefetchOptions(),
         ]
 
     def __init__(self):

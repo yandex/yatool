@@ -30,6 +30,7 @@ import yalibrary.fetcher as fetcher
 import yalibrary.tools as tools
 import core.yarg
 import core.report
+import core.event_handling
 from core.imprint import imprint
 from core import stage_tracer
 import test.const as tconst
@@ -1134,7 +1135,15 @@ class _ToolEventListener(object):
             self.__prev_ev_listener(event)
 
 
-def build_graph_and_tests(opts, check, event_queue, display=None):
+def build_graph_and_tests(opts, check, event_queue=None, display=None):
+    if event_queue is None:
+        try:
+            import app_ctx
+
+            event_queue = app_ctx.event_queue
+        except ImportError:
+            event_queue = core.event_handling.EventQueue()
+
     with contextlib2.ExitStack() as exit_stack:
         try:
             return _build_graph_and_tests(opts, check, event_queue, exit_stack, display)

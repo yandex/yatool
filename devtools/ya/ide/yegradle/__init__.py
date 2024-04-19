@@ -95,9 +95,7 @@ def apply_graph(params, sem_graph, gradle_project_root):
             opts.rel_targets.append(rel_dir)
             opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
 
-        graph, _, _, _, _ = bg.build_graph_and_tests(
-            opts, check=True, event_queue=app_ctx.event_queue, display=app_ctx.display
-        )
+        graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, display=app_ctx.display)
         builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
         exit_code = builder.go()
         if exit_code != 0:

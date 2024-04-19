@@ -134,9 +134,6 @@ def do_idea(params):
     if getattr(app_ctx, 'evlog', None):
         subscribers.append(ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')))
 
-    event_queue = app_ctx.event_queue
-    event_queue.subscribe(*subscribers)
-
     jopts.flags['BUILD_LANGUAGES'] = 'JAVA'
     jopts.all_outputs_to_result = True
     jopts.add_result.append('.jar')
@@ -151,9 +148,8 @@ def do_idea(params):
     recurses = []
     with tmp.temp_dir() as dump_dir:
         jopts.dump_file_path = dump_dir
-        graph, _, _, ctx, _ = bg.build_graph_and_tests(
-            jopts, check=True, event_queue=event_queue, display=app_ctx.display
-        )
+        with app_ctx.event_queue.subscription_scope(*subscribers):
+            graph, _, _, ctx, _ = bg.build_graph_and_tests(jopts, check=True, display=app_ctx.display)
         target_dumps = [
             dump
             for dump in os.listdir(dump_dir)

@@ -25,6 +25,14 @@ class BaseSubscriber(object):
         if self._filter_event(msg):
             self._action(msg)
 
+    def on_subscribe(self):
+        # type: () -> None
+        pass
+
+    def on_unsubscribe(self):
+        # type: () -> None
+        pass
+
 
 class SubscriberSpecifiedTopics(BaseSubscriber):
     topics = set()

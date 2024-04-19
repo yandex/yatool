@@ -143,9 +143,10 @@ class SSHProxy(object):
         exts.process.run_process(self.SSH, self.ssh_args + [self.host, 'touch'] + (opts or []) + [path], check=True)
 
 
-def ide_minimal_opts(targets_free=False):
+def ide_minimal_opts(targets_free=False, prefetch=False):
     return [
         build.build_opts.BuildTargetsOptions(with_free=targets_free),
+        build.build_opts.ArcPrefetchOptions(prefetch=prefetch),
         core.common_opts.ShowHelpOptions(),
         core.common_opts.DumpDebugOptions(),
         core.common_opts.AuthOptions(),
