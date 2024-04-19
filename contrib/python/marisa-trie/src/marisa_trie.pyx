@@ -185,7 +185,7 @@ cdef class _Trie:
            The method will be removed in version 0.8.0. Please use
            :meth:`load` instead.
         """
-        warnings.warn("Trie.save is deprecated and will "
+        warnings.warn("Trie.read is deprecated and will "
                       "be removed in marisa_trie 0.8.0. Please use "
                       "Trie.load instead.", DeprecationWarning)
         self._trie.read(f.fileno())
@@ -482,6 +482,17 @@ cdef class Trie(_UnicodeKeyedTrie):
         while self._trie.common_prefix_search(ag):
             res.append(self._get_key(ag))
         return res
+
+    def iter_prefixes_with_ids(self, unicode key):
+        """
+        Return an iterator of (prefix, id) pairs of all prefixes of a given key.
+        """
+        cdef bytes b_key = <bytes>key.encode('utf8')
+        cdef agent.Agent ag
+        ag.set_query(b_key, len(b_key))
+
+        while self._trie.common_prefix_search(ag):
+            yield (self._get_key(ag), ag.key().id())
 
     def iteritems(self, unicode prefix=""):
         """

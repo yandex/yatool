@@ -2,9 +2,13 @@
 
 PY23_LIBRARY()
 
-VERSION(0.7.5)
+VERSION(0.8.0)
 
 LICENSE(MIT)
+
+PEERDIR(
+    contrib/python/setuptools
+)
 
 ADDINCL(
     contrib/python/marisa-trie/marisa-trie/include
