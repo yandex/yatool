@@ -369,6 +369,8 @@ class YaMakeOptions(YaBaseOptions):
 
         self.ignore_configure_errors = self._pop('ignore_configure_errors')
 
+        self.no_prefetch = self._pop('no_prefetch')
+
     def _generate_post_handler(self):
         result = []
         if self.use_distbuild:
@@ -566,6 +568,9 @@ class YaMakeOptions(YaBaseOptions):
             result += ['--yt-dir', self.yt_dir]
         if self.yt_token_path:
             result += ['--yt-token-path', self.yt_token_path]
+
+        if self.no_prefetch:
+            result += ['--no-prefetch']
 
         return result
 
