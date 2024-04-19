@@ -35,7 +35,6 @@ import app_config
 
 if app_config.in_house:
     import yalibrary.svn as svn
-    import devtools.ya.test.canon.upload as upload
 
 
 MAX_DEFAULT_FILE_SIZE = 150 * 1024
@@ -461,6 +460,9 @@ class CanonicalData(object):
                 if self._no_src_changes:
                     yatest_logger.debug("Skipping uploading")
                 elif app_config.in_house:
+                    # inplace because it takes up to 80ms to get imported
+                    import devtools.ya.test.canon.upload as upload
+
                     if self._mds:
                         upload.upload_to_mds(
                             upload_targets_group,
