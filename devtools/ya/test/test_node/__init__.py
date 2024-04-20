@@ -411,7 +411,7 @@ def create_test_node(
                 runner_cmd += extra_args + [filename]
                 outputs += [filename]
 
-        if opts and getattr(opts, "fast_clang_coverage_merge") and 'ya:nofuse' not in suite.tags:
+        if opts and getattr(opts, "fast_clang_coverage_merge"):
             log_path = os.path.join(work_dir, 'coverage_merge.log')
             runner_cmd += ["--fast-clang-coverage-merge", log_path]
             outputs += [log_path]
