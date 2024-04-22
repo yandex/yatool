@@ -493,6 +493,10 @@ def _run_ymake(**kwargs):
                         cache_name = m.group(1)
                         action = m.group(2) + '_enabled'
                         _caches[cache_name][action] = True
+            elif _type == "NEvent.TGraphChanges":
+                _run_info["has_content_changes"] = j.get("HasContentChanges", None)
+                _run_info["has_structural_changes"] = j.get("HasStructuralChanges", None)
+
         except Exception:
             logger.exception("While processing event: `%s`", j)
 
