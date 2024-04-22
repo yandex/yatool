@@ -176,6 +176,8 @@ void TModuleBuilder::RecursiveAddInputs() {
     }
     DelayedInducedDeps.clear();
 
+    AddAllSrcsVar();
+
     Module.SetInputsComplete();
     Module.SetDirsComplete();
     return;
@@ -513,6 +515,38 @@ void TModuleBuilder::AddDartsVars() {
             varStrEx.IsMacro = true;
             AddInputVarDep(varStrEx, propNode);
         }
+    }
+}
+
+void TModuleBuilder::AddAllSrcsVar() {
+    if (!ShouldAddAllSrcs() || AllSrcsVarNode != nullptr) {
+        return;
+    }
+
+    auto varCmd = FormatCmd(Module.GetId(), "ALL_SRCS", "");
+    const auto varId = Graph.Names().AddName(EMNT_BuildCommand, varCmd);
+    Node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, varId);
+
+    auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, varId), &UpdIter.YMake, &Module);
+    AllSrcsVarNode = &entryStats.GetAddCtx(&Module, UpdIter.YMake);
+
+    YDIAG(GUpd) << "AllSrcsVarNode initialized for module " << Node.ElemId << "\n";
+
+    // Process items added before AllSrcsVarNode was initialized
+    for (auto depNode : AllSrcs) {
+        AllSrcsVarNode->AddUniqueDep(EDT_BuildFrom, depNode.NodeType, depNode.ElemId);
+    }
+    AllSrcs = {};
+}
+
+void TModuleBuilder::AddDepToAllSrcs(TDepTreeNode depNode) {
+    YDIAG(GUpd) << "Adding source " << depNode.ElemId << " to module " << Module.GetId() << "\n";
+    if (AllSrcsVarNode) {
+        AllSrcsVarNode->AddUniqueDep(EDT_BuildFrom, depNode.NodeType, depNode.ElemId);
+    } else {
+        // TModuleBuilder::RecursiveAddInputs() can be not called yet,
+        // so remember this source in a vector, emptied as soon as AllSrcsVarNode is created
+        AllSrcs.push_back(depNode);
     }
 }
 

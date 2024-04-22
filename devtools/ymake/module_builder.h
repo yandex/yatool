@@ -117,6 +117,14 @@ public:
     /// @brief Recursively collect inputs from macros
     void RecursiveAddInputs();
 
+    /// @brief Append given node to module's ALL_SRCS property
+    void AddDepToAllSrcs(TDepTreeNode depNode);
+
+    /// @brief True if ALL_SRCS node will be added to module
+    bool ShouldAddAllSrcs() {
+        return Module.GetAttrs().UseAllSrcs;
+    }
+
     void SaveInputResolution(const TVarStrEx& input, TStringBuf origInput, TFileView curDir);
 
     /// @brief Apply macro call processing as during ya.make load but with immediate
@@ -167,6 +175,7 @@ private:
     void AddGlobalDep();
     void AddFileGroupVars();
     void AddDartsVars();
+    void AddAllSrcsVar();
 
     void TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args); // try-catch for ProcessStatement
     void ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
@@ -184,4 +193,7 @@ private:
     THashSet<ui64, TIdentity> VarMacroApplied;
     TAddDepAdaptor* GlobalNode = nullptr;
     bool GlobalSrcsAreAdded = false;
+
+    TVector<TDepTreeNode> AllSrcs;
+    TNodeAddCtx* AllSrcsVarNode = nullptr;
 };

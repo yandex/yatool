@@ -85,7 +85,7 @@ namespace {
     };
 
     const TStringBuf INTERNAL_NAME = TStringBuf("internal");
-    const TStringBuf VAR_USE_ALL_SRCS = TStringBuf(".USE_ALL_SRCS");
+    const TStringBuf VAR_USE_ALL_SRCS = TStringBuf("USE_ALL_SRCS");
 
     const char* YesNo(bool val) noexcept {
         return val ? "yes" : "no";

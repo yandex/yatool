@@ -627,6 +627,8 @@ struct TDGIterAddable: public TUpdIterStBase {
     TModule* RestoreModule(TYMake& yMake) const;
     bool NeedModule(const TAddIterStack& stack) const;
 
+    TModuleBuilder* GetParentModuleBuilder(TUpdIter& dgIter);
+
     Y_FORCE_INLINE bool IsEdited() const {
         return Add && !Add->NeedInit2;
     }

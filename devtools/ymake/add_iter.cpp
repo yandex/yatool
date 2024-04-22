@@ -381,6 +381,29 @@ inline TModule* TDGIterAddable::GetModuleForEdit(TDepGraph& graph, TUpdIter& dgI
     return stMod.EnterModule(dgIter.YMake);
 }
 
+TModuleBuilder* TDGIterAddable::GetParentModuleBuilder(TUpdIter& dgIter) {
+    if (!NeedModule(dgIter.State)) {
+        return nullptr;
+    }
+
+    if (!ModulePosition) {
+        // in that case parent module is TUpdIter::ParentModule,
+        // which is TModules::RootModule,
+        // which doesn't have AddCtx (not present in graph at all)
+        return nullptr;
+    }
+
+    if (!dgIter.State[ModulePosition].Add) {
+        // we can make new AddCtx using
+        // `GetAddCtx(dgIter.State[ModulePosition].RestoreModule(dgIter.YMake), dgIter.YMake, true);`
+        // like in TDGIterAddable::EnterModule,
+        // but anyway it would not contain ModuleBldr
+        return nullptr;
+    }
+
+    return dgIter.State[ModulePosition].Add->ModuleBldr;
+}
+
 static inline bool IsReassemblingDirectory(const TDGIterAddable* parent) {
     if (!parent) {
         return false;
@@ -1384,6 +1407,14 @@ inline void TUpdIter::Leave(TState& state) {
                  Diag()->Where.back().second == Graph.GetFileName(st.Node).GetTargetStr());
         Diag()->Where.pop_back();
     }
+
+    // After leaving a module - delete it's builder
+    if (st.Add && st.Add->IsModule) {
+        delete st.Add->ModuleBldr;
+        st.Add->ModuleBldr = nullptr;
+        ResolveCaches.Drop(st.Add->Module->GetId());
+        YDIAG(GUpd) << "Deleted builder for module " << st.Add->ElemId << "\n";
+    }
 }
 
 bool TUpdIter::DirectDepsNeedUpdate(const TDGIterAddable& st, const TDepTreeNode& oldDepNode) {
@@ -1695,11 +1726,6 @@ inline void TUpdIter::Left(TState& state) {
                     AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
                     node->ModuleBldr->RecursiveAddInputs();
                 }
-                if (node->ModuleBldr != nullptr) {
-                    delete node->ModuleBldr;
-                    node->ModuleBldr = nullptr;
-                }
-                ResolveCaches.Drop(node->Module->GetId());
             }
 
             if (IsPeerdirDep(st.Node.NodeType, dep.DepType, dep.DepNode.NodeType)) {
@@ -1763,6 +1789,17 @@ inline void TUpdIter::Left(TState& state) {
             } else if (LastType == EMNT_BuildCommand && Graph.Names().CommandConf.GetById(LastElem).KeepTargetPlatform) { // IsInnerCommandDep
                 Graph.Names().CommandConf.GetById(node->ElemId).KeepTargetPlatform = true;
             }
+        }
+    }
+
+    // Add node we are currently leaving to parent module's ALL_SRCS, if it matches the condition:
+    auto& dep = st.Dep;
+    bool isSourceFile = dep.DepType == EDT_BuildFrom && dep.DepNode.NodeType == EMNT_File;
+    bool isGlobOrGroup = dep.DepType == EDT_BuildFrom && dep.DepNode.NodeType == EMNT_BuildCommand;
+    if (isSourceFile || isGlobOrGroup) {
+        auto* moduleBuilder = st.GetParentModuleBuilder(*this);
+        if (moduleBuilder && moduleBuilder->ShouldAddAllSrcs()) {
+            moduleBuilder->AddDepToAllSrcs(dep.DepNode);
         }
     }
 }
