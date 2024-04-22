@@ -3,6 +3,7 @@ PY23_LIBRARY(ya-lib)
 SRCDIR(devtools/ya)
 
 PEERDIR(
+    devtools/ya/handlers/buf
     devtools/ya/handlers/dump
     devtools/ya/handlers/gc
     devtools/ya/handlers/gen_config
@@ -28,7 +29,6 @@ IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/handlers/__trace__
         devtools/ya/handlers/addremove
-        devtools/ya/handlers/buf
         devtools/ya/handlers/clang_tidy
         devtools/ya/handlers/clone
         devtools/ya/handlers/completion
