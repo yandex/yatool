@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: path
-Version: 16.12.1
+Version: 16.14.0
 Summary: A module wrapper for os.path
 Home-page: https://github.com/jaraco/path
 Author: Jason Orendorff

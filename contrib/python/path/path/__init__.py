@@ -25,23 +25,22 @@ Example::
 from __future__ import annotations
 
 import builtins
-import sys
-import warnings
-import os
-import fnmatch
-import glob
-import shutil
-import hashlib
-import errno
-import tempfile
-import functools
-import re
 import contextlib
+import datetime
+import errno
+import fnmatch
+import functools
+import glob
+import hashlib
 import importlib
 import itertools
-import datetime
+import os
+import re
+import shutil
+import sys
+import tempfile
+import warnings
 from numbers import Number
-from typing import Union
 
 with contextlib.suppress(ImportError):
     import win32security
@@ -60,32 +59,27 @@ from io import (
     TextIOWrapper,
 )
 from typing import (
+    IO,
+    TYPE_CHECKING,
     Any,
     BinaryIO,
     Callable,
-    IO,
     Iterator,
-    Optional,
     overload,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from _typeshed import (
         OpenBinaryMode,
-        OpenBinaryModeUpdating,
         OpenBinaryModeReading,
+        OpenBinaryModeUpdating,
         OpenBinaryModeWriting,
         OpenTextMode,
     )
     from typing_extensions import Literal
 
-from . import matchers
-from . import masks
-from . import classes
-from .compat.py38 import removesuffix
-
+from . import classes, masks, matchers
+from .compat.py38 import removeprefix, removesuffix
 
 __all__ = ['Path', 'TempDir']
 
@@ -100,7 +94,7 @@ U_NL_END = re.compile(U_NEWLINE.pattern + '$')
 _default_linesep = object()
 
 
-def _make_timestamp_ns(value: Union[Number, datetime.datetime]) -> Number:
+def _make_timestamp_ns(value: Number | datetime.datetime) -> Number:
     timestamp_s = value if isinstance(value, Number) else value.timestamp()
     return int(timestamp_s * 10**9)
 
@@ -203,7 +197,7 @@ class Path(str):
     # --- Special Python methods.
 
     def __repr__(self):
-        return '{}({})'.format(type(self).__name__, super().__repr__())
+        return f'{type(self).__name__}({super().__repr__()})'
 
     # Adding a Path and a string yields a Path.
     def __add__(self, more):
@@ -241,7 +235,7 @@ class Path(str):
     __rtruediv__ = __rdiv__
 
     def __enter__(self):
-        self._old_dir = self.getcwd()
+        self._old_dir = self.cwd()
         os.chdir(self)
         return self
 
@@ -249,19 +243,36 @@ class Path(str):
         os.chdir(self._old_dir)
 
     @classmethod
-    def getcwd(cls):
+    def cwd(cls):
         """Return the current working directory as a path object.
 
         .. seealso:: :func:`os.getcwd`
         """
         return cls(os.getcwd())
 
+    @classmethod
+    def getcwd(cls):
+        warnings.warn(
+            ".getcwd is deprecated; use cwd",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.cwd()
+
     #
     # --- Operations on Path strings.
 
-    def abspath(self):
+    def absolute(self):
         """.. seealso:: :func:`os.path.abspath`"""
         return self._next_class(self.module.abspath(self))
+
+    def abspath(self):
+        warnings.warn(
+            ".abspath is deprecated; use absolute",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.absolute()
 
     def normcase(self):
         """.. seealso:: :func:`os.path.normcase`"""
@@ -325,7 +336,7 @@ class Path(str):
         return suffix
 
     @property
-    def ext(self):
+    def ext(self):  # pragma: no cover
         warnings.warn(
             ".ext is deprecated; use suffix",
             DeprecationWarning,
@@ -498,10 +509,10 @@ class Path(str):
 
         If there is no relative path from `self` to `dest`, for example if
         they reside on different drives in Windows, then this returns
-        ``dest.abspath()``.
+        ``dest.absolute()``.
         """
-        origin = self.abspath()
-        dest = self._next_class(dest).abspath()
+        origin = self.absolute()
+        dest = self._next_class(dest).absolute()
 
         orig_list = origin.normcase().splitall()
         # Don't normcase dest!  We want to preserve the case.
@@ -689,11 +700,11 @@ class Path(str):
         self,
         mode: OpenTextMode = ...,
         buffering: int = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
-        opener: Optional[Callable[[str, int], int]] = ...,
+        opener: Callable[[str, int], int] | None = ...,
     ) -> TextIOWrapper: ...
 
     @overload
@@ -701,9 +712,9 @@ class Path(str):
         self,
         mode: OpenBinaryMode,
         buffering: Literal[0],
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> FileIO: ...
@@ -713,9 +724,9 @@ class Path(str):
         self,
         mode: OpenBinaryModeUpdating,
         buffering: Literal[-1, 1] = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> BufferedRandom: ...
@@ -725,9 +736,9 @@ class Path(str):
         self,
         mode: OpenBinaryModeReading,
         buffering: Literal[-1, 1] = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> BufferedReader: ...
@@ -737,9 +748,9 @@ class Path(str):
         self,
         mode: OpenBinaryModeWriting,
         buffering: Literal[-1, 1] = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> BufferedWriter: ...
@@ -749,9 +760,9 @@ class Path(str):
         self,
         mode: OpenBinaryMode,
         buffering: int,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> BinaryIO: ...
@@ -761,9 +772,9 @@ class Path(str):
         self,
         mode: str,
         buffering: int = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
         opener: Callable[[str, int], int] = ...,
     ) -> IO[Any]: ...
@@ -787,11 +798,11 @@ class Path(str):
         size: int,
         mode: OpenTextMode = ...,
         buffering: int = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
-        opener: Optional[Callable[[str, int], int]] = ...,
+        opener: Callable[[str, int], int] | None = ...,
     ) -> Iterator[str]: ...
 
     @overload
@@ -800,11 +811,11 @@ class Path(str):
         size: int,
         mode: OpenBinaryMode,
         buffering: int = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
-        opener: Optional[Callable[[str, int], int]] = ...,
+        opener: Callable[[str, int], int] | None = ...,
     ) -> Iterator[builtins.bytes]: ...
 
     @overload
@@ -813,12 +824,12 @@ class Path(str):
         size: int,
         mode: str,
         buffering: int = ...,
-        encoding: Optional[str] = ...,
-        errors: Optional[str] = ...,
-        newline: Optional[str] = ...,
+        encoding: str | None = ...,
+        errors: str | None = ...,
+        newline: str | None = ...,
         closefd: bool = ...,
-        opener: Optional[Callable[[str, int], int]] = ...,
-    ) -> Iterator[Union[str, builtins.bytes]]: ...
+        opener: Callable[[str, int], int] | None = ...,
+    ) -> Iterator[str | builtins.bytes]: ...
 
     def chunks(self, size, *args, **kwargs):
         """Returns a generator yielding chunks of the file, so it can
@@ -877,9 +888,9 @@ class Path(str):
     def write_text(
         self,
         text: str,
-        encoding: Optional[str] = ...,
+        encoding: str | None = ...,
         errors: str = ...,
-        linesep: Optional[str] = ...,
+        linesep: str | None = ...,
         append: bool = ...,
     ) -> None: ...
 
@@ -889,7 +900,7 @@ class Path(str):
         text: builtins.bytes,
         encoding: None = ...,
         errors: str = ...,
-        linesep: Optional[str] = ...,
+        linesep: str | None = ...,
         append: bool = ...,
     ) -> None: ...
 
@@ -1096,7 +1107,7 @@ class Path(str):
         """.. seealso:: :func:`os.path.exists`"""
         return self.module.exists(self)
 
-    def isdir(self):
+    def isdir(self):  # pragma: no cover
         warnings.warn(
             "isdir is deprecated; use is_dir",
             DeprecationWarning,
@@ -1108,7 +1119,7 @@ class Path(str):
         """.. seealso:: :func:`os.path.isdir`"""
         return self.module.isdir(self)
 
-    def isfile(self):
+    def isfile(self):  # pragma: no cover
         warnings.warn(
             "isfile is deprecated; use is_file",
             DeprecationWarning,
@@ -1248,7 +1259,7 @@ class Path(str):
         """
         return os.access(self, *args, **kwargs)
 
-    def stat(self):
+    def stat(self, *, follow_symlinks=True):
         """
         Perform a ``stat()`` system call on this path.
 
@@ -1257,7 +1268,7 @@ class Path(str):
 
         .. seealso:: :meth:`lstat`, :func:`os.stat`
         """
-        return os.stat(self)
+        return os.stat(self, follow_symlinks=follow_symlinks)
 
     def lstat(self):
         """
@@ -1315,6 +1326,15 @@ class Path(str):
 
         .. seealso:: :meth:`get_owner`""",
     )
+
+    if 'grp' in globals():  # pragma: no cover
+
+        def group(self, *, follow_symlinks=True):
+            """
+            Return the group name of the file gid.
+            """
+            gid = self.stat(follow_symlinks=follow_symlinks).st_gid
+            return grp.getgrgid(gid).gr_name
 
     if hasattr(os, 'statvfs'):
 
@@ -1470,6 +1490,14 @@ class Path(str):
 
     # --- Links
 
+    def hardlink_to(self, target: str) -> None:
+        """
+        Create a hard link at self, pointing to target.
+
+        .. seealso:: :func:`os.link`
+        """
+        os.link(target, self)
+
     def link(self, newpath):
         """Create a hard link at `newpath`, pointing to this file.
 
@@ -1477,6 +1505,14 @@ class Path(str):
         """
         os.link(self, newpath)
         return self._next_class(newpath)
+
+    def symlink_to(self, target: str, target_is_directory: bool = False) -> None:
+        """
+        Create a symbolic link at self, pointing to target.
+
+        .. seealso:: :func:`os.symlink`
+        """
+        os.symlink(target, self, target_is_directory)
 
     def symlink(self, newlink=None):
         """Create a symbolic link at `newlink`, pointing here.
@@ -1498,7 +1534,7 @@ class Path(str):
 
         .. seealso:: :meth:`readlinkabs`, :func:`os.readlink`
         """
-        return self._next_class(os.readlink(self))
+        return self._next_class(removeprefix(os.readlink(self), '\\\\?\\'))
 
     def readlinkabs(self):
         """Return the path to which this symbolic link points.
@@ -1508,7 +1544,7 @@ class Path(str):
         .. seealso:: :meth:`readlink`, :func:`os.readlink`
         """
         p = self.readlink()
-        return p if p.isabs() else (self.parent / p).abspath()
+        return p if p.isabs() else (self.parent / p).absolute()
 
     # High-level functions from shutil
     # These functions will be bound to the instance such that
@@ -1873,7 +1909,7 @@ class Handlers:
         raise
 
     def warn(msg):
-        warnings.warn(msg, TreeWalkWarning)
+        warnings.warn(msg, TreeWalkWarning, stacklevel=2)
 
     def ignore(msg):
         pass
