@@ -85,6 +85,7 @@ jinja2::TemplateEnv* TSpecBasedGenerator::GetJinjaEnv() const {
 
 void TSpecBasedGenerator::SetupJinjaEnv() {
     JinjaEnv = std::make_unique<jinja2::TemplateEnv>();
+    JinjaEnv->GetSettings().cacheSize = 0;// REQUIRED for use templates with same relative path, jinja2cpp caching by path without root
     SourceTemplateFs = std::make_shared<jinja2::RealFileSystem>();
     auto GeneratorTemplateFs = std::make_shared<TPrefixedFileSystem>(GENERATOR_TEMPLATES_PREFIX);
     GeneratorTemplateFs->SetRootFolder(GeneratorDir);

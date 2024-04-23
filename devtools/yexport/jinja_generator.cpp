@@ -650,7 +650,7 @@ void TJinjaGenerator::Render(ECleanIgnored) {
 }
 
 void TJinjaGenerator::RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs) {
-    SetCurrentDirectory(ArcadiaRoot/subdir);
+    SetCurrentDirectory(ArcadiaRoot / subdir);
     const auto& tmpls = GeneratorSpec.Targets.begin()->second.Templates;
     for (size_t templateIndex = 0; templateIndex < tmpls.size(); templateIndex++){
         const auto& tmpl = tmpls[templateIndex];

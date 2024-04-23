@@ -108,9 +108,8 @@ namespace {
     public:
         class TBuilder;
 
-        TCMakeProject(const TProjectConf& projectConf)
-        : TProject()
-        , ProjectConf(projectConf)
+        TCMakeProject()
+            : TProject()
         {
             SetFactoryTypes<TCMakeList, TCMakeTarget>();
         }
@@ -216,21 +215,13 @@ namespace {
         }
 
     public:
-        TTargetAttributesPtr GetSubdirValuesMap(const fs::path& subdir,
-                             const TCMakeList& data,
-                             const TCMakeGenerator* cmakeGenerator) const {
+        TTargetAttributesPtr GetSubdirValuesMap(const TCMakeList& data, const TCMakeGenerator* cmakeGenerator) const {
             const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
             const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
             YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
 
             TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
             auto& dirMap = dirValueMap->GetWritableMap();
-
-            {
-                fs::path arcadiaSubdir{ProjectConf.ArcadiaRoot / subdir};
-                dirValueMap->SetAttrValue("prologue", (arcadiaSubdir / CMakePrologueFile).c_str());
-                dirValueMap->SetAttrValue("epilogue", (arcadiaSubdir / CMakeEpilogueFile).c_str());
-            }
 
             {
                 auto [packagesIt, inserted] = dirMap.emplace("packages", jinja2::ValuesList());
@@ -273,27 +264,23 @@ namespace {
                     targets.emplace_back(MakeTargetAttributes(cmakeTarget, cmakeGenerator)->GetMap());
                 }
             }
+            dirValueMap->SetAttrValue("prologue", "prologue.cmake");// DEPRECATED
+            dirValueMap->SetAttrValue("epilogue", "epilogue.cmake");// DEPRECATED
             return dirValueMap;
         }
-
-    private:
-        static constexpr std::string_view CMakePrologueFile = "prologue.cmake";
-        static constexpr std::string_view CMakeEpilogueFile = "epilogue.cmake";
-
-        const TProjectConf& ProjectConf;
     };
     using TCMakeProjectPtr = TSimpleSharedPtr<TCMakeProject>;
 
     class TCMakeProject::TBuilder: public TProject::TBuilder {
     public:
 
-        TBuilder(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+        TBuilder(const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
         : TProject::TBuilder(cmakeGenerator)
         , Platform(platform)
         , GlobalProperties(globalProperties)
         , CMakeGenerator(cmakeGenerator)
         {
-            Project_ = MakeSimpleShared<TCMakeProject>(projectConf);
+            Project_ = MakeSimpleShared<TCMakeProject>();
         }
 
         void CustomFinalize() override {
@@ -577,10 +564,10 @@ namespace {
 
     class TCmakeRenderingVisitor : public TGraphVisitor {
     public:
-        TCmakeRenderingVisitor(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+        TCmakeRenderingVisitor(const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
             : TGraphVisitor(cmakeGenerator)
         {
-            CMakeProjectBuilder_ = MakeSimpleShared<TCMakeProject::TBuilder>(projectConf, platform, globalProperties, cmakeGenerator);
+            CMakeProjectBuilder_ = MakeSimpleShared<TCMakeProject::TBuilder>(platform, globalProperties, cmakeGenerator);
             ProjectBuilder_ = CMakeProjectBuilder_;
             for (const auto& targetSemantic : KnownTargets) {
                 AddSemanticMapping(targetSemantic, ESNT_Target);
@@ -1001,20 +988,20 @@ namespace {
     };
 }
 
-bool AnalizePlatformSemGraph(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator) {
-    TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
+bool AnalizePlatformSemGraph(const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator) {
+    TCmakeRenderingVisitor visitor(platform, globalProperties, cmakeGenerator);
     IterateAll(*platform->Graph, platform->StartDirs, visitor);
     platform->Project = visitor.TakeFinalizedProject();
     return !visitor.HasErrors();
 }
 
 TTargetAttributesPtr GetSubdirValuesMap(const TPlatformPtr platform, TProjectSubdirPtr subdir, const TCMakeGenerator* cmakeGenerator) {
-    return platform->Project.As<TCMakeProject>()->GetSubdirValuesMap(subdir->Path, *subdir.As<TCMakeList>(), cmakeGenerator);
+    return platform->Project.As<TCMakeProject>()->GetSubdirValuesMap(*subdir.As<TCMakeList>(), cmakeGenerator);
 }
 
-THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TProjectConf& projectConf, const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
+THashMap<fs::path, TSet<fs::path>> GetSubdirsTable(const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator)
 {
-    TCmakeRenderingVisitor visitor(projectConf, platform, globalProperties, cmakeGenerator);
+    TCmakeRenderingVisitor visitor(platform, globalProperties, cmakeGenerator);
     IterateAll(*platform->Graph, platform->StartDirs, visitor);
     auto project = visitor.TakeFinalizedProject();
     return project.As<TCMakeProject>()->GetSubdirsTable();

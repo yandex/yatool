@@ -27,15 +27,8 @@ struct TProjectConf {
     TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
 };
 
-struct TPlatformConf {
-    std::string CMakeListsFile;
-    std::string Name;
-
-    TPlatformConf(std::string_view platformName);
-};
-
 struct TPlatform {
-    TPlatformConf Conf;
+    std::string Name;
     THolder<TSemGraph> Graph;
     TVector<TNodeId> StartDirs;
     THashMap<std::string, TVector<std::string>> GlobalVars;
@@ -68,12 +61,12 @@ private:
     void RenderPlatforms();
     void RenderRoot();
     void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
-    void MergePlatforms() const;
+    void MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const;
     TVector<std::string> GetAdjustedLanguagesList() const;
     void CopyArcadiaScripts() const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
-    void RenderPlatform(const TPlatformPtr platform);
+    void RenderPlatform(const TPlatformPtr platform, std::vector<TJinjaTemplate>& dirJinjaTemplates);
 
     void PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const;
     void PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const;

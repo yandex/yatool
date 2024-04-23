@@ -23,14 +23,8 @@ TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, E
 {
 }
 
-TPlatformConf::TPlatformConf(std::string_view platformName)
-    : Name(platformName)
-{
-    CMakeListsFile = fmt::format("CMakeLists.{}.txt", platformName);
-}
-
 TPlatform::TPlatform(std::string_view platformName)
-    : Conf(platformName)
+    : Name(platformName)
     , Graph(nullptr)
 {
 }
@@ -55,11 +49,11 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
     result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
-    if (result->GeneratorSpec.Common.Templates.size() != 1) {
-        throw yexception() << fmt::format("[error] Strong one common template required for generator {}, but not found in {}", generator, generatorFile.c_str());
-    }
     if (result->GeneratorSpec.Dir.Templates.empty()) {
         throw yexception() << fmt::format("[error] At least one directory template required for generator {}, but not found in {}", generator, generatorFile.c_str());
+    }
+    if (result->GeneratorSpec.Common.Templates.size() != result->GeneratorSpec.Dir.Templates.size()) {
+        throw yexception() << fmt::format("[error] Common templates count {} must be equal dir templates count {} for generator {}", result->GeneratorSpec.Common.Templates.size(), result->GeneratorSpec.Dir.Templates.size(), generator);
     }
 
     result->GeneratorDir = generatorDir;
@@ -86,21 +80,17 @@ void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& 
     OnPlatform(platform);
 }
 
-void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
+void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTemplate>& dirJinjaTemplates) {
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.CollectDirs(*platform->Graph, platform->StartDirs);
     }
-    if (!AnalizePlatformSemGraph(Conf, platform, GlobalProperties, this)) {
-        yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform->Conf.Name);
+    if (!AnalizePlatformSemGraph(platform, GlobalProperties, this)) {
+        yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform->Name);
     }
 
     const auto& generatorSpec = GetGeneratorSpec();
     const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
     YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
-
-    TTargetAttributesPtr rootdirValuesMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
-
-    auto dirJinjaTemplates = LoadJinjaTemplates(generatorSpec.Dir.Templates);
 
     auto topLevelSubdirs = jinja2::ValuesList();
     for (auto subdir: platform->Project->GetSubdirs()) {
@@ -110,13 +100,15 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
             topLevelSubdirs.emplace_back(subdir->Path.c_str());
         }
         auto subdirValuesMap = GetSubdirValuesMap(platform, subdir, this);
-        RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Conf.Name);
+        SetCurrentDirectory(ArcadiaRoot / subdir->Path);
+        RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Name);
     }
 
+    TTargetAttributesPtr rootdirValuesMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
     const auto [_, inserted] = rootdirValuesMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
     Y_ASSERT(inserted);
-
-    RenderJinjaTemplates(rootdirValuesMap, dirJinjaTemplates, "", platform->Conf.Name);
+    SetCurrentDirectory(ArcadiaRoot);
+    RenderJinjaTemplates(rootdirValuesMap, dirJinjaTemplates, "", platform->Name);
 }
 
 /// Get dump of semantics tree with values for testing or debug
@@ -139,13 +131,12 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 }
 
 void TCMakeGenerator::RenderPlatforms() {
+    auto dirJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Dir.Templates);
     for (auto& platform : Platforms) {
-        RenderPlatform(platform);
+        RenderPlatform(platform, dirJinjaTemplates);
     }
-
     CopyFilesAndResources();
-
-    MergePlatforms();
+    MergePlatforms(dirJinjaTemplates);
     CopyArcadiaScripts();
 }
 
@@ -159,70 +150,71 @@ void TCMakeGenerator::RenderRoot() {
     PrepareRootCMakeList(rootValuesMap);
     PrepareConanRequirements(rootValuesMap);
     ApplyRules(*rootValuesMap);
-    SetCurrentDirectory(ExportFileManager->GetExportRoot());
+    SetCurrentDirectory(ArcadiaRoot);
     RenderJinjaTemplates(rootValuesMap, rootJinjaTemplates);
 }
 
 void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const {
-    auto& platformCmakes = valuesMap.insert_or_assign("platform_cmakelists", jinja2::ValuesList()).first->second.asList();
     auto& platformNames = valuesMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
     for (const auto& platform : platforms) {
-        platformCmakes.emplace_back(platform->Conf.CMakeListsFile);
-        platformNames.emplace_back(platform->Conf.Name);
+        platformNames.emplace_back(platform->Name);
     }
 }
 
-void TCMakeGenerator::MergePlatforms() const {
-    TJinjaTemplate commonTemplate;
-    const auto& commonTemplateSpec = *GeneratorSpec.Common.Templates.begin();
-    auto loaded = commonTemplate.Load(GeneratorDir / commonTemplateSpec.Template, GetJinjaEnv(), commonTemplateSpec.ResultName);
-    YEXPORT_VERIFY(loaded, fmt::format("Cannot load template: \"{}\"\n", commonTemplateSpec.Template.c_str()));
+void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const {
+    auto commonJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Common.Templates);
+    Y_ASSERT(commonJinjaTemplates.size() == dirJinjaTemplates.size());
+
+    auto templatesCount = dirJinjaTemplates.size();
 
     auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Directory);
     YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for directory");
 
-    TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
-    commonTemplate.SetValueMap(dirValueMap);
-
-    auto& dirMap = dirValueMap->GetWritableMap();
-    dirMap["platforms"] = GeneratorSpec.Platforms;
-
-    THashSet<fs::path> visitedDirs;
-    for (const auto& platform : Platforms) {
-        for (const auto& dir : platform->SubDirs) {
-            if (visitedDirs.contains(dir)) {
-                continue;
-            }
-
-            bool isDifferent = false;
-            TString md5 = ExportFileManager->MD5(dir / platform->Conf.CMakeListsFile);
-            TVector<TPlatformPtr> dirPlatforms;
-            dirPlatforms.emplace_back(platform);
-            for (const auto& otherPlatform : Platforms) {
-                if (platform->Conf.Name == otherPlatform->Conf.Name) {
+    for (size_t i = 0; i < templatesCount; ++i) {
+        auto& dirTemplate = dirJinjaTemplates[i];
+        auto& commonTemplate = commonJinjaTemplates[i];
+        THashSet<fs::path> visitedDirs;
+        for (const auto& platform : Platforms) {
+            for (const auto& dir : platform->SubDirs) {
+                if (visitedDirs.contains(dir)) {
                     continue;
                 }
 
-                if (otherPlatform->SubDirs.contains(dir)) {
-                    if (md5 != ExportFileManager->MD5(dir / otherPlatform->Conf.CMakeListsFile)) {
+                bool isDifferent = false;
+                TString md5 = ExportFileManager->MD5(dirTemplate.RenderFilename(dir, platform->Name));
+                TVector<TPlatformPtr> dirPlatforms;
+                dirPlatforms.emplace_back(platform);
+                for (const auto& otherPlatform : Platforms) {
+                    if (platform->Name == otherPlatform->Name) {
+                        continue;
+                    }
+
+                    if (otherPlatform->SubDirs.contains(dir)) {
+                        if (md5 != ExportFileManager->MD5(dirTemplate.RenderFilename(dir, otherPlatform->Name))) {
+                            isDifferent = true;
+                        }
+                        dirPlatforms.emplace_back(otherPlatform);
+                    } else {
                         isDifferent = true;
                     }
-                    dirPlatforms.emplace_back(otherPlatform);
+                }
+                if (isDifferent) {
+                    TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+                    auto& dirMap = dirValueMap->GetWritableMap();
+                    dirMap["platforms"] = GeneratorSpec.Platforms;
+                    InsertPlatforms(dirMap, dirPlatforms);
+                    SetCurrentDirectory(ArcadiaRoot / dir);
+                    commonTemplate.SetValueMap(dirValueMap);
+                    commonTemplate.RenderTo(*ExportFileManager, dir, platform->Name);
                 } else {
-                    isDifferent = true;
+                    auto finalPath = commonTemplate.RenderFilename(dir, platform->Name);
+                    ExportFileManager->CopyFromExportRoot(dirTemplate.RenderFilename(dir, platform->Name), finalPath);
+                    for (const auto& dirPlatform : dirPlatforms) {
+                        ExportFileManager->Remove(dirTemplate.RenderFilename(dir, dirPlatform->Name));
+                    }
                 }
+                visitedDirs.insert(dir);
             }
-            if (isDifferent) {
-                InsertPlatforms(dirMap, dirPlatforms);
-                commonTemplate.RenderTo(*ExportFileManager, dir, platform->Conf.Name);
-            } else {
-                auto finalPath = commonTemplate.RenderFilename(dir, platform->Conf.Name);
-                ExportFileManager->CopyFromExportRoot(dir / platform->Conf.CMakeListsFile, finalPath);
-                for (const auto& dirPlatform : dirPlatforms) {
-                    ExportFileManager->Remove(dir / dirPlatform->Conf.CMakeListsFile);
-                }
-            }
-            visitedDirs.insert(dir);
         }
     }
 }
