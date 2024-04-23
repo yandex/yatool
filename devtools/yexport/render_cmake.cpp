@@ -264,8 +264,6 @@ namespace {
                     targets.emplace_back(MakeTargetAttributes(cmakeTarget, cmakeGenerator)->GetMap());
                 }
             }
-            dirValueMap->SetAttrValue("prologue", "prologue.cmake");// DEPRECATED
-            dirValueMap->SetAttrValue("epilogue", "epilogue.cmake");// DEPRECATED
             return dirValueMap;
         }
     };
