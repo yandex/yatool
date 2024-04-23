@@ -5,7 +5,6 @@ import collections
 import io
 import itertools
 import json
-import tarfile
 import shutil
 import os.path as op
 import xml.etree.ElementTree as et
@@ -17,6 +16,7 @@ import jbuild.gen.consts as consts
 import jbuild.gen.node as node
 import jbuild.gen.makelist_parser2 as mp2
 import yalibrary.graph.base as graph_base
+import exts.archive as archive
 import exts.fs as fs
 import exts.path2 as path2
 from . import compile
@@ -1398,8 +1398,9 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         srcdirs.append((srcdir, True))
         prefixes.append(None)
         gens.append(True)
-
     javac_generated_srcs_tar = target.plain.get(consts.SAVE_JAVAC_GENERATED_SRCS_TAR)
+    sys.stderr.write('b4 if\n')
+
     if javac_generated_srcs_tar and javac_generated_srcs_tar[0] and not forced_lib(path, ctx):
         javac_generated_srcs_tar = javac_generated_srcs_tar[0][0]
         srcdir = os.path.join(
@@ -1408,20 +1409,21 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
             + ('_test' if is_test(target.plain) else ''),
         )
         tar_real_name = javac_generated_srcs_tar.replace(consts.BUILD_ROOT, results_root)
-        if op.isfile(tar_real_name):
-            with tarfile.open(tar_real_name) as tf:
-                if len(tf.getmembers()) > 1:
-                    proj = os.path.join(
-                        srcdir.replace(consts.BUILD_ROOT, project_root),
-                        'ya_generated' + ('_test' if is_test(target.plain) else ''),
-                    )
-                    funcz.append(funcs.rm(proj))
-                    funcz.append(funcs.mkdirp(proj))
-                    funcz.append(funcs.untar_all(tar_real_name, proj))
-                    srcdir = srcdir.replace(consts.BUILD_ROOT, PROJECT_DIR, 1)
-                    srcdirs.append((srcdir, False))
-                    prefixes.append(None)
-                    gens.append(True)
+        sys.stderr.write('tar_real_name b4: %s\n' % tar_real_name)
+
+        if op.isfile(tar_real_name) and not archive.is_empty(tar_real_name):
+            sys.stderr.write('tar_real_name after: %s\n' % tar_real_name)
+            proj = os.path.join(
+                srcdir.replace(consts.BUILD_ROOT, project_root),
+                'ya_generated' + ('_test' if is_test(target.plain) else ''),
+            )
+            funcz.append(funcs.rm(proj))
+            funcz.append(funcs.mkdirp(proj))
+            funcz.append(funcs.untar_all(tar_real_name, proj))
+            srcdir = srcdir.replace(consts.BUILD_ROOT, PROJECT_DIR, 1)
+            srcdirs.append((srcdir, False))
+            prefixes.append(None)
+            gens.append(True)
 
     roots = [
         Root(
@@ -1857,16 +1859,17 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
                             fs.create_dirs(os.path.join(test_data_dir, res_path))
                         for ext in ('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz'):
                             if origin_filename.endswith(ext):
-                                with tarfile.open(os.path.join(results_root, res_id, 'resource')) as tf:
-                                    for member in tf.getmembers():
-                                        try:
-                                            tf.extract(member.name, path=os.path.join(test_data_dir, res_path))
-                                        except Exception:
-                                            logging.warning(
-                                                "Cant extract {} ({}) be ready to problems".format(
-                                                    member.name, os.path.dirname(td[0])
-                                                )
-                                            )
+                                archive_filename = os.path.join(results_root, res_id, 'resource')
+                                try:
+                                    archive.extract_from_tar(
+                                        archive_filename, path=os.path.join(test_data_dir, res_path)
+                                    )
+                                except Exception:
+                                    logging.exception(
+                                        "Cant extract {} ({}) be ready to problems".format(
+                                            archive_filename, os.path.dirname(td[0])
+                                        )
+                                    )
                                 break
                         else:
                             dest = os.path.join(test_data_dir, res_path, origin_filename)

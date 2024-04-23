@@ -1,9 +1,9 @@
 import shutil
 import subprocess
-import tarfile
 import os
-
+import exts.archive as archive
 import exts.fs as fs
+
 import yalibrary.tools as tools
 
 
@@ -57,7 +57,6 @@ def mkdirp(p):
 
 def untar_all(s, d):
     def f():
-        with tarfile.open(s) as tf:
-            tf.extractall(d)
+        archive.extract_from_tar(s, d)
 
     return f

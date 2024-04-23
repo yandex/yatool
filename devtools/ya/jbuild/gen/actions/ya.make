@@ -22,6 +22,7 @@ PY_SRCS(
 
 PEERDIR(
     contrib/python/six
+    devtools/ya/exts
     devtools/ya/build/build_plan
     devtools/ya/build/targets
     devtools/ya/jbuild/commands

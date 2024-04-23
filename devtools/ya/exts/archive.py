@@ -65,6 +65,10 @@ def check_archive(tar_file_path):
     return archive.check_tar(tar_file_path)
 
 
+def is_empty(tar_file_path):
+    return archive.is_empty(tar_file_path)
+
+
 _FILTER_SIGNATURE = {
     '7z': b'\x37\x7A\xBC\xAF\x27\x1C',
     'gz': b'\x1F\x8B',
