@@ -6,7 +6,7 @@ import os
 import six
 
 import core.config
-import yalibrary.fetcher
+import yalibrary.fetcher.tool_chain_fetcher
 import yalibrary.platform_matcher as pm
 from yalibrary.toolscache import toolscache_version
 from exts import func
@@ -39,12 +39,11 @@ class _Bottle(object):
         self.__formula = formula
         self.__bottle_name = bottle_name
         self.__executable = executable
-        self.__formula = formula
         if self.__executable and not isinstance(self.__executable, dict):
             binname = self.__executable
         else:
             binname = None
-        self.__fetcher = yalibrary.fetcher.get_tool_chain_fetcher(
+        self.__fetcher = yalibrary.fetcher.tool_chain_fetcher.get_tool_chain_fetcher(
             core.config.tool_root(toolscache_version()),
             toolchain_name,
             bottle_name,

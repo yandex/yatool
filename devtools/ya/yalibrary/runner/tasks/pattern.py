@@ -9,7 +9,7 @@ import six
 
 import core.error
 
-from yalibrary import fetcher
+from yalibrary.fetcher import resource_fetcher
 from yalibrary.active_state import Cancelled
 import yalibrary.worker_threads as worker_threads
 
@@ -61,7 +61,7 @@ class PreparePattern(object):
 
     def fetch(self, item):
         platform = getattr(self._ctx.opts, 'host_platform', None)
-        resource_desc = fetcher.select_resource(item, platform)
+        resource_desc = resource_fetcher.select_resource(item, platform)
         resource = resource_desc['resource']
         resource_type, resource_id = resource.split(':', 1)
         accepted_resource_types = {'file', 'https', 'base64'} | self._fetchers_storage.accepted_schemas()

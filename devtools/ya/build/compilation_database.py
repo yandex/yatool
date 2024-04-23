@@ -14,7 +14,7 @@ import build.build_opts
 import build.gen_plan2
 import build.graph_path
 
-from yalibrary import fetcher
+from yalibrary.fetcher import resource_fetcher
 from yalibrary.toolscache import toolscache_version
 
 
@@ -118,14 +118,14 @@ def create_patterns(params, graph, app_ctx):
         tool_root = core.config.tool_root(toolscache_version(params))
         patterns['TOOL_ROOT'] = tool_root
         for resource in graph['conf']['resources']:
-            resource_desc = fetcher.select_resource(resource)
+            resource_desc = resource_fetcher.select_resource(resource)
             resource_uri = resource_desc['resource']
             strip_prefix = resource_desc.get("strip_prefix")
             resource_type, _ = resource_uri.split(':', 1)
             if resource_type == 'base64':
-                where = fetcher.fetch_base64_resource(build_root, resource_uri)
+                where = resource_fetcher.fetch_base64_resource(build_root, resource_uri)
             else:
-                where = fetcher.fetch_resource_if_need(
+                where = resource_fetcher.fetch_resource_if_need(
                     app_ctx.fetchers_storage.get_by_type(resource_type),
                     tool_root,
                     resource_uri,

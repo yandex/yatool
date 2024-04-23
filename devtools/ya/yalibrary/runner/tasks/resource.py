@@ -5,7 +5,7 @@ import time
 
 import core.error
 
-from yalibrary import fetcher
+from yalibrary.fetcher import common as fetcher_common
 from yalibrary.active_state import Cancelled
 import yalibrary.worker_threads as worker_threads
 
@@ -127,7 +127,7 @@ class PrepareResource(object):
                     uri,
                     progress_callback,
                     self._ctx.state,
-                    install_params=(fetcher.FIXED_NAME, False),
+                    install_params=(fetcher_common.FIXED_NAME, False),
                     keep_directory_packed=True,
                 )
             )

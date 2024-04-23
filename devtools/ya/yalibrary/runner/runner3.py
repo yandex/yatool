@@ -25,7 +25,7 @@ import test.const
 
 from yalibrary import status_view
 from yalibrary.active_state import Cancelled
-from yalibrary.fetcher import fetch_resource_if_need
+from yalibrary.fetcher.resource_fetcher import fetch_resource_if_need
 from yalibrary.runner import build_root
 from yalibrary.runner import patterns as ptn
 from yalibrary.runner import runqueue

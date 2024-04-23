@@ -26,7 +26,7 @@ import exts.func
 from exts.strtobool import strtobool
 
 import app_config
-import yalibrary.fetcher as fetcher
+import yalibrary.fetcher.tool_chain_fetcher as fetcher
 import yalibrary.tools as tools
 import core.yarg
 import core.report
@@ -556,7 +556,7 @@ def _resolve_tool_resid(tool, res_dir):
 
 def _resolve_tool(tool, res_dir):
     if tool['params'].get('use_bundle', False):
-        formula = fetcher.tool_chain_fetcher.get_formula_value(tool['formula'])
+        formula = fetcher.get_formula_value(tool['formula'])
         return platform_map.graph_json_from_resource_json(tool['params']['match_root'], json.dumps(formula))
     else:
         return {
