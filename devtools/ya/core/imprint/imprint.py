@@ -5,7 +5,6 @@ import six
 
 from exts import func, os2, hashing
 from core.config import misc_root, find_root
-import devtools.ya.test.error as test_error
 
 # from yalibrary.monitoring import YaMonEvent
 
@@ -188,16 +187,7 @@ class Imprint:
 
     @staticmethod
     def _new_content_hash():
-        def safe_filehash(x):
-            try:
-                return hashing.fast_filehash(x)
-            except RuntimeError as e:
-                # There might be encrypted files, which cannot be read.
-                # Report issue to a related suite and use path to calc a hash instead of using content
-                test_error.SuiteCtx.add_error(e)
-                return hashing.fast_hash(x)
-
-        return BaseCache("content_hash", SimpleMapper(safe_filehash))
+        return BaseCache("content_hash", SimpleMapper(hashing.fast_filehash))
 
     def enable_fs(self, read=True, write=True, cache_source_path=None, process_arcadia_clash=True, quiet=False):
         # TODO: Check -xx
