@@ -37,9 +37,11 @@ namespace {
 namespace NCache {
     struct TConversionContext {
         TNameStore& Names;
+        bool StoreInputs;
 
-        explicit TConversionContext(TNameStore& names)
+        explicit TConversionContext(TNameStore& names, bool storeInputs)
                 : Names(names)
+                , StoreInputs(storeInputs)
         {
         }
 
@@ -194,7 +196,9 @@ namespace NCache {
             Convert(src.TaredOuts, dst.TaredOuts);
             Convert(src.TargetProps, dst.TargetProps);
             Convert(src.OldEnv, dst.OldEnv);
-            Convert(src.Inputs, dst.Inputs);
+            if (StoreInputs) {
+                Convert(src.Inputs, dst.Inputs);
+            }
             Convert(src.Outputs, dst.Outputs);
             Convert(src.LateOuts, dst.LateOuts);
             Convert(src.ResourceUris, dst.ResourceUris);
@@ -286,7 +290,7 @@ bool TMakePlanCache::RestoreNode(const TStringBuf& id, bool partialMatch, TMakeN
     Stats.Inc(partialMatch
         ? NStats::EJsonCacheStats::PartialMatchRequests
         : NStats::EJsonCacheStats::FullMatchRequests);
-    NCache::TConversionContext context(Names);
+    NCache::TConversionContext context(Names, Conf.StoreInputsInJsonCache);
 
     TMakeNodeSavedState::TCacheId cacheId;
     context.Convert(id, cacheId.Id);
@@ -309,7 +313,7 @@ bool TMakePlanCache::RestoreNode(const TStringBuf& id, bool partialMatch, TMakeN
 
 void TMakePlanCache::AddRenderedNode(const TMakeNode& newNode, TStringBuf name, TStringBuf cacheUid, TStringBuf renderId) {
     Stats.Inc(NStats::EJsonCacheStats::AddedItems);
-    NCache::TConversionContext context(Names);
+    NCache::TConversionContext context(Names, Conf.StoreInputsInJsonCache);
     if (SaveToCache) {
         AddedNodes.emplace_back(newNode, name, cacheUid, renderId, Conf, context);
     }

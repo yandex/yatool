@@ -41,4 +41,8 @@ void TCommandLineOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
     if (KeepGoing || KeepOn) {
         KeepGoing = KeepOn = true;
     }
+
+    if (DumpInputsInJSON) {
+        StoreInputsInJsonCache = false;
+    }
 }

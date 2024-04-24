@@ -22,6 +22,7 @@ struct TCommandLineOptions {
     bool DisableHumanReadableOutput = false;
     bool DumpInputsMapInJSON = false;
     bool DumpInputsInJSON = false;
+    bool StoreInputsInJsonCache = true;
     bool CheckDataPaths = false;
     bool ReadFileContentFromZipatch = false;
 

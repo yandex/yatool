@@ -180,20 +180,21 @@ namespace {
             }
         }
 
-        void RefreshNode(TMakeNode& node) {
-            if (RenderedWithoutSubst) {
-                node.Deps.clear();
-                node.Inputs.clear();
-                node.ToolDeps.clear();
-                Subst2Json.FakeFinish(MakeCommand.CmdInfo);
-            } else {
-                ReplaceNodeDeps(node);
-                if (Conf.DumpInputsInJSON) {
-                    ReplaceNodeInputs();
-                }
-                node.Uid = DumpInfo.UID;
-                node.SelfUid = DumpInfo.SelfUID;
-            }
+        void RefreshFullyRestoredNode(TMakeNode& node) {
+            node.Uid = DumpInfo.UID;
+            node.SelfUid = DumpInfo.SelfUID;
+
+            ReplaceNodeDeps(node);
+            ReplaceNodeInputs();
+            RestoreLateOutsFromNode(node);
+        }
+
+        void RefreshPartiallyRestoredNode(TMakeNode& node) {
+            node.Deps.clear();
+            node.Inputs.clear();
+            node.ToolDeps.clear();
+            ReplaceNodeInputs();
+            Subst2Json.FakeFinish(MakeCommand.CmdInfo);
         }
 
         void RestoreLateOutsFromNode(TMakeNode& node) {
@@ -254,12 +255,13 @@ namespace {
         }
 
         void ReplaceNodeInputs() {
-            Y_ASSERT(Conf.DumpInputsInJSON);
-            FillInputs();
-            FillDepsAndExtraInputs();
-            PrepareInputs();
+            if (!Conf.StoreInputsInJsonCache) {
+                FillRegularInputs();
+                FillFullInputs();
+                PrepareInputs();
 
-            Subst2Json.UpdateInputs();
+                Subst2Json.UpdateInputs();
+            }
         }
 
         TMd5Value CalculateDepsId() {
@@ -274,19 +276,20 @@ namespace {
         void PrepareNodeForRendering() {
             Y_ASSERT(!RenderedWithoutSubst);
 
+            FillDeps();
+            FillRegularInputs();
             if (Conf.DumpInputsInJSON) {
-                FillInputs();
+                FillFullInputs();
             }
-            FillDepsAndExtraInputs();
-            FillExtraOuts();
-
             PrepareInputs();
+
+            FillExtraOuts();
 
             Subst2Json.GenerateJsonTargetProperties(Graph[NodeId], GetModule(), IsGlobalNode);
             MakeCommand.CmdInfo.MkCmdAcceptor = Subst2Json.GetAcceptor();
         }
 
-        void FillInputs() {
+        void FillFullInputs() {
             const auto& nodeInputs = CmdBuilder.GetNodeInputs(NodeId);
             if (nodeInputs && !nodeInputs->empty()) {
                 for (const auto& input : *nodeInputs.Get()) {
@@ -295,7 +298,40 @@ namespace {
             }
         }
 
-        void FillDepsAndExtraInputs() {
+        void FillDeps() {
+            for (const auto& [depName, depId] : NodeDeps) {
+                const auto dependencyIt = CmdBuilder.Nodes.find(depId);
+                Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
+                if (dependencyIt->second.HasBuildCmd) {
+                    DumpInfo.Deps.Push(depId);
+                }
+            }
+
+            for (const auto& [depName, depId] : ToolDeps) {
+                const auto dependencyIt = CmdBuilder.Nodes.find(depId);
+                Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
+                Y_ASSERT(dependencyIt->second.HasBuildCmd);
+                DumpInfo.ToolDeps.Push(depId);
+                // Note: we rely here on the fact that tools are also included into deps
+            }
+        }
+
+        void PrepareInputs() {
+            THashSet<TString> uniqInputs;
+            uniqInputs.reserve(DumpInfo.Inputs.size());
+            TVector<TString> preparedInputs{Reserve(DumpInfo.Inputs.size())};
+
+            for (const TString& input : DumpInfo.Inputs) {
+                auto [_, wasNew] = uniqInputs.insert(input);
+                if (wasNew) {
+                    preparedInputs.push_back(input);
+                }
+            }
+
+            DumpInfo.Inputs.swap(preparedInputs);
+        }
+
+        void FillRegularInputs() {
             TString moduleDir;
             auto getModuleDir = [&]() -> TStringBuf {
                 if (moduleDir.Empty()) {
@@ -305,27 +341,14 @@ namespace {
                 return moduleDir;
             };
 
-            for (const auto& [depName, depId] : NodeDeps) {
-                const auto dependencyIt = CmdBuilder.Nodes.find(depId);
-                Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
-                if (dependencyIt->second.HasBuildCmd) {
-                    DumpInfo.Deps.Push(depId);
-                }
-
+            for (const auto& [_, depId] : NodeDeps) {
                 auto depNodeRef = Graph[depId];
+
                 if (IsModuleType(depNodeRef->NodeType) && !Conf.DumpInputsInJSON && !Conf.ShouldAddPeersToInputs()) {
                     continue;
                 }
 
                 DumpInfo.Inputs.push_back(InputToPath(Conf, depNodeRef, getModuleDir));
-            }
-
-            for (const auto& [depName, depId] : ToolDeps) {
-                const auto dependencyIt = CmdBuilder.Nodes.find(depId);
-                Y_ASSERT(dependencyIt != CmdBuilder.Nodes.end());
-                Y_ASSERT(dependencyIt->second.HasBuildCmd);
-                DumpInfo.ToolDeps.Push(depId);
-                // Note: we rely here on the fact that tools are also included into deps
             }
 
             auto isGlobalSrc = [](const TConstDepNodeRef&) {
@@ -342,21 +365,6 @@ namespace {
 
             bool isModule = NodeId == ModuleId;
             ProcessInputsAndOutputs<true>(Graph[NodeId], isModule, Modules, addInput, isGlobalSrc);
-        }
-
-        void PrepareInputs() {
-            THashSet<TString> uniqInputs;
-            uniqInputs.reserve(DumpInfo.Inputs.size());
-            TVector<TString> preparedInputs{Reserve(DumpInfo.Inputs.size())};
-
-            for (const TString& input : DumpInfo.Inputs) {
-                auto [_, wasNew] = uniqInputs.insert(input);
-                if (wasNew) {
-                    preparedInputs.push_back(input);
-                }
-            }
-
-            DumpInfo.Inputs.swap(preparedInputs);
         }
 
         void FillExtraOuts() {
@@ -424,8 +432,7 @@ namespace {
         bool restored = cache.RestoreByCacheUid(cacheUid, node);
         BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(restored));
         if (restored) {
-            renderer.RefreshNode(*node);
-            renderer.RestoreLateOutsFromNode(*node);
+            renderer.RefreshFullyRestoredNode(*node);
             cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
             return;
         }
@@ -443,7 +450,7 @@ namespace {
             restored = cache.RestoreByRenderId(renderId, node);
             BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
             if (restored) {
-                renderer.RefreshNode(*node);
+                renderer.RefreshPartiallyRestoredNode(*node);
                 // Update node in cache to avoid partial rendering next time
                 cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
                 cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
@@ -627,6 +634,8 @@ namespace {
         TFsPath tmpFile;
         TFsPath cacheFile;
         {
+            YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
+
             TMakePlanCache cache(yMake.Conf);
             yMake.JSONCacheLoaded(cache.LoadFromFile());
 
