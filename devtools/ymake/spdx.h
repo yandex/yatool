@@ -39,4 +39,5 @@ namespace NSPDX {
 
     using LicenseHandler = std::function<void(TStringBuf)>;
     void ForEachLicense(TStringBuf licenses, const LicenseHandler& handler);
+    void ForEachLicense(const TVector<TString>& licenses, const LicenseHandler& handler);
 }

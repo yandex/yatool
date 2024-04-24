@@ -258,8 +258,6 @@ namespace {
         constexpr static TStringBuf EXPLICIT_LICENSE_EXCEPTIONS = "EXPLICIT_LICENSE_EXCEPTIONS";
         constexpr static TStringBuf MODULEWISE_LICENSES_RESTRICTIONS = "MODULEWISE_LICENSES_RESTRICTIONS";
         constexpr static TStringBuf MODULEWISE_LICENSES_RESTRICTION_TYPES = "MODULEWISE_LICENSES_RESTRICTION_TYPES";
-        // Global conf vars
-        constexpr static TStringBuf LICENSE_PROPERTIES = "LICENSE_PROPERTIES";
 
     public:
         constexpr static const TStringBuf CONF_VARS[] = {
@@ -272,55 +270,7 @@ namespace {
             MODULEWISE_LICENSES_RESTRICTION_TYPES,
         };
 
-        TRestrictLicensesLoader(const TVars& globals) {
-            // это то, что мы можем достать из чтения json файлов сразу списком -- это первый уровень структуры json файла
-            const TStringBuf licenseProps = GetValueOrEmpty(globals, LICENSE_PROPERTIES);
-
-            constexpr size_t maxProperties = NSPDX::TPropSet{}.size() - 1; // 1 bit is reserved for INVALID property for unknown licenses
-            for (TStringBuf property : StringSplitter(licenseProps).Split(' ').SkipEmpty()) {
-                if (PropNames.size() == maxProperties) {
-                    YConfErr(KnownBug) << "To many license properties. All propries starting from '" << property << "' will not be checked." << Endl;
-                    break;
-                }
-                PropNames.push_back(property);
-            }
-            // это наполнение мы тоже можем сразу делать при чтении json файлов
-            size_t pos = 0;
-            for (auto property : PropNames) {
-                const auto propBit = pos++;
-                if (const auto licenses = globals.Get1(TString{"LICENSES_"} + property); !licenses.empty()) {
-                    NSPDX::ForEachLicense(EvalExpr(globals, GetPropertyValue(licenses)), [&](TStringBuf license) {
-                        Licenses[license].Static.set(propBit);
-                        Licenses[license].Dynamic.set(propBit);
-                    });
-                }
-
-                if (const auto licenses = globals.Get1(TString{"LICENSES_"} + property + "_STATIC"); !licenses.empty()) {
-                    NSPDX::ForEachLicense(EvalExpr(globals, GetPropertyValue(licenses)), [&](TStringBuf license) {
-                        Licenses[license].Static.set(propBit);
-                    });
-                }
-
-                if (const auto licenses = globals.Get1(TString{"LICENSES_"} + property + "_DYNAMIC"); !licenses.empty()) {
-                    NSPDX::ForEachLicense(EvalExpr(globals, GetPropertyValue(licenses)), [&](TStringBuf license) {
-                        Licenses[license].Dynamic.set(propBit);
-                    });
-                }
-            }
-
-            PropNames.push_back(TStringBuf("INVALID"));
-            DefaultLicenseName = GetValueOrEmpty(globals, "DEFAULT_MODULE_LICENSE");
-            if (DefaultLicenseName.empty()) {
-                DefaultLicense.push_back(GetInvalidLicenseProps());
-                return;
-            }
-
-            try {
-                DefaultLicense = NSPDX::ParseLicenseExpression(Licenses, DefaultLicenseName);
-            } catch (const NSPDX::TExpressionError& err) {
-                YConfErr(Misconfiguration) << "Failed to evaluate default license: " << err.what() << Endl;;
-                DefaultLicense.push_back(GetInvalidLicenseProps());
-            }
+        TRestrictLicensesLoader(const TVars&) {
         }
 
         static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars& globals) {
@@ -330,6 +280,8 @@ namespace {
         }
 
         TTransitiveRequirement Load(TDepGraph&, const TBuildConfiguration& conf, const TModule& module) {
+            LoadLicenses(conf);
+
             auto holderExceptions = GetExceptions(conf, module.Vars);
             // Validates licenses on module if they were not yet vaidated and populates cache.
             GetModuleLicenses(module, conf, *holderExceptions);
@@ -364,6 +316,45 @@ namespace {
         }
 
     private:
+        void LoadLicenses(const TBuildConfiguration& conf) {
+            if (IsLicenseConfLoaded) {
+                return;
+            }
+            auto& allLicenses = conf.Licenses;
+
+            constexpr size_t maxProperties = NSPDX::TPropSet{}.size() - 1; // 1 bit is reserved for INVALID property for unknown licenses
+            if (allLicenses.size() >= maxProperties) {
+                YConfErr(KnownBug) << "To many license properties." << Endl;
+            }
+
+            size_t pos = 0;
+            for (const auto& [propName, licenseGroup] : allLicenses) {
+                const auto propBit = pos++;
+                PropNames.push_back(propName);
+                NSPDX::ForEachLicense(licenseGroup.Dynamic, [&](TStringBuf license) { Licenses[license].Dynamic.set(propBit); });
+                NSPDX::ForEachLicense(licenseGroup.Static, [&](TStringBuf license) { Licenses[license].Static.set(propBit); });
+
+                if (pos == maxProperties) {
+                    break;
+                }
+            }
+
+            PropNames.push_back(TStringBuf("INVALID"));
+            DefaultLicenseName = GetValueOrEmpty(conf.CommandConf, "DEFAULT_MODULE_LICENSE");
+            if (DefaultLicenseName.empty()) {
+                DefaultLicense.push_back(GetInvalidLicenseProps());
+                return;
+            }
+
+            try {
+                DefaultLicense = NSPDX::ParseLicenseExpression(Licenses, DefaultLicenseName);
+            } catch (const NSPDX::TExpressionError& err) {
+                YConfErr(Misconfiguration) << "Failed to evaluate default license: " << err.what() << Endl;;
+                DefaultLicense.push_back(GetInvalidLicenseProps());
+            }
+            IsLicenseConfLoaded = true;
+        }
+
         void CheckModuleLicenses(TRestoreContext restoreContext, TNodeId modId, const TRestrictions& restrictions, TExceptions& exceptions, TScopeClosureRef closure) {
             for (TNodeId peer : closure.Closure) {
                 const auto* module = restoreContext.Modules.Get(restoreContext.Graph[peer]->ElemId);
@@ -494,6 +485,7 @@ namespace {
         TVector<TStringBuf> PropNames;
         TVector<NSPDX::TLicenseProps> DefaultLicense;
         TStringBuf DefaultLicenseName;
+        bool IsLicenseConfLoaded = false;
     };
 
     class TCheckDependentDirsLoader {

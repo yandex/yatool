@@ -212,4 +212,9 @@ namespace NSPDX {
         }
     }
 
+    void ForEachLicense(const TVector<TString>& licenses, const LicenseHandler& handler) {
+        for (const auto& license : licenses) {
+            handler(license);
+        }
+    }
 }
