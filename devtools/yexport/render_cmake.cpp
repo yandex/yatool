@@ -808,14 +808,20 @@ namespace {
                 if (IsGlobalSrcDep(dep)) {
                     // Note: There is assumption here that all PEERDIR nodes are traversed before GlobalSrcDeps
                     const auto fres = Mod2Target.find(dep.From().Id());
-                    Y_ASSERT(fres != Mod2Target.end());
-                    const auto& cmakeTarget = *dynamic_cast<const TCMakeTarget*>(fres->second);
-                    const auto linkLibs = cmakeTarget.Attributes.find("target_link_libraries");
-                    if (linkLibs != cmakeTarget.Attributes.end()) {
-                        TAttrValues libs;
-                        Copy(linkLibs->second.Iface.begin(), linkLibs->second.Iface.end(), std::back_inserter(libs.Pub));
-                        Copy(linkLibs->second.Pub.begin(), linkLibs->second.Pub.end(), std::back_inserter(libs.Pub));
-                        CMakeProjectBuilder_->AddTargetAttrs("target_link_libraries", libs);
+                    if (fres != Mod2Target.end()) {
+                        const auto& cmakeTarget = *dynamic_cast<const TCMakeTarget*>(fres->second);
+                        const auto linkLibs = cmakeTarget.Attributes.find("target_link_libraries");
+                        if (linkLibs != cmakeTarget.Attributes.end()) {
+                            TAttrValues libs;
+                            Copy(linkLibs->second.Iface.begin(), linkLibs->second.Iface.end(), std::back_inserter(libs.Pub));
+                            Copy(linkLibs->second.Pub.begin(), linkLibs->second.Pub.end(), std::back_inserter(libs.Pub));
+                            CMakeProjectBuilder_->AddTargetAttrs("target_link_libraries", libs);
+                        }
+                    } else {
+                        spdlog::error(
+                            "Main target not found for global target '{}'. Most likely main target ya.make module is not intended for opensource export",
+                            CMakeProjectBuilder_->CurrentTarget()->Name
+                        );
                     }
                 }
             }
