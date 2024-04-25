@@ -1,5 +1,6 @@
 import logging
 import os
+import requests
 import six
 import sys
 import time
@@ -710,11 +711,9 @@ def _list_resources(**kwargs):
 
 
 def _do_sandbox_method(method, **kwargs):
-    import requests
-    from yalibrary.yandex.sandbox import SandboxClient
-
     rest_params = {'total_wait': _SB_REST_API_TIMEOUT, 'check_for_cancel': _get_cancel_checker()}
     guards.update_guard(guards.GuardTypes.FETCH)
+    from yalibrary.yandex.sandbox import SandboxClient
 
     try:
         return method(SandboxClient(token=_get_sandbox_token(), rest_params=rest_params), **kwargs)
