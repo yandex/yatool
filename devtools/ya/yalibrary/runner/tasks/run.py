@@ -301,6 +301,7 @@ class RunNodeTask(object):
         self._stderr = None
         self.raw_stderr = None
         self._tags = self._node.tags[:]
+        self._seen_tags = set()
         self._status = None
         self._patterns = ctx.patterns.sub()
         self._patterns['BUILD_ROOT'] = self._build_root.path
@@ -327,7 +328,9 @@ class RunNodeTask(object):
         self._status = status
 
     def append_tag(self, tag):
-        self._tags.append(tag)
+        if tag not in self._seen_tags:
+            self._tags.append(tag)
+            self._seen_tags.add(tag)
 
     def execute(self):
         logging.debug('Run node %s in build root %s', self._node.uid, self._build_root.path)
