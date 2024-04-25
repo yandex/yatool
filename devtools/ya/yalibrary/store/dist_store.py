@@ -95,13 +95,16 @@ class DistStore(object):
         execution_log['$({}-cache-hit)'.format(self._name)] = self._cache_hit
 
         for k, v in six.iteritems(self._timers):
+            real_time = self._get_real_time(k)
+
             stat_dict = {
                 'count': self._counters[k],
                 'failures': self._failures[k],
                 'prepare': '',
-                'timing': (0, self._get_real_time(k)),
+                'timing': (0, real_time),
                 'total_time': True,
                 'type': self._name,
+                'real_time': real_time,
             }
             report.telemetry.report('{}-{}'.format(self._stats_name, k), stat_dict)
             execution_log["$({}-{})".format(self._name, k)] = stat_dict
