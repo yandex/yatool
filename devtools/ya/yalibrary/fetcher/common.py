@@ -45,7 +45,7 @@ def deploy_tool(archive, extract_to, post_process, resource_info, resource_uri, 
         logger.debug("move {0} to {1} dir".format(archive, os.path.join(extract_to, base_name)))
         fs.move(archive, os.path.join(extract_to, base_name))
     elif FIXED_NAME == post_process:
-        logger.debug("move {0} to {1} dir".format(archive, os.path.join(extract_to, RESOURCE_CONTENT_FILE_NAME)))
+        logger.debug("move {0} to {1}".format(archive, os.path.join(extract_to, RESOURCE_CONTENT_FILE_NAME)))
         fs.move(archive, os.path.join(extract_to, RESOURCE_CONTENT_FILE_NAME))
     elif BINARY == post_process:
         file_name = os.path.basename(binname)
