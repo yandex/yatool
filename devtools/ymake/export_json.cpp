@@ -293,7 +293,7 @@ namespace {
             const auto& nodeInputs = CmdBuilder.GetNodeInputs(NodeId);
             if (nodeInputs && !nodeInputs->empty()) {
                 for (const auto& input : *nodeInputs.Get()) {
-                    DumpInfo.Inputs.push_back(Conf.RealPath(Graph.GetFileName(Graph.Get(input)))); // FIXME(spreis): This is really big hammer
+                    DumpInfo.Inputs().push_back(Conf.RealPath(Graph.GetFileName(Graph.Get(input)))); // FIXME(spreis): This is really big hammer
                 }
             }
         }
@@ -318,17 +318,17 @@ namespace {
 
         void PrepareInputs() {
             THashSet<TString> uniqInputs;
-            uniqInputs.reserve(DumpInfo.Inputs.size());
-            TVector<TString> preparedInputs{Reserve(DumpInfo.Inputs.size())};
+            uniqInputs.reserve(DumpInfo.Inputs().size());
+            TVector<TString> preparedInputs{Reserve(DumpInfo.Inputs().size())};
 
-            for (const TString& input : DumpInfo.Inputs) {
+            for (const TString& input : DumpInfo.Inputs()) {
                 auto [_, wasNew] = uniqInputs.insert(input);
                 if (wasNew) {
                     preparedInputs.push_back(input);
                 }
             }
 
-            DumpInfo.Inputs.swap(preparedInputs);
+            DumpInfo.Inputs().swap(preparedInputs);
         }
 
         void FillRegularInputs() {
@@ -348,7 +348,7 @@ namespace {
                     continue;
                 }
 
-                DumpInfo.Inputs.push_back(InputToPath(Conf, depNodeRef, getModuleDir));
+                DumpInfo.Inputs().push_back(InputToPath(Conf, depNodeRef, getModuleDir));
             }
 
             auto isGlobalSrc = [](const TConstDepNodeRef&) {
@@ -360,7 +360,7 @@ namespace {
             };
 
             auto addInput = [&](const TConstDepNodeRef& inputNode, bool /* explicitInputs */) {
-                DumpInfo.Inputs.push_back(InputToPath(Conf, inputNode, getModuleDir));
+                DumpInfo.Inputs().push_back(InputToPath(Conf, inputNode, getModuleDir));
             };
 
             bool isModule = NodeId == ModuleId;

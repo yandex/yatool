@@ -82,19 +82,6 @@ namespace {
         XXXFinalizeJsonList(res);
         return res;
     }
-
-    TString StrVector2JsonList(const TVector<TString>& vec) {
-        TStringStream ss;
-        NJson::TJsonWriter writer(&ss, false);
-        writer.OpenArray();
-        for (const auto& x : vec)
-            writer.Write(x);
-        writer.CloseArray();
-        writer.Flush();
-        TString res;
-        res.swap(ss.Str());
-        return res;
-    }
 } // namespace
 
 void TJsonCmdAcceptor::Start(const TStringBuf& cmd, TString& res[[maybe_unused]]) {
@@ -230,7 +217,7 @@ inline void TJsonCmdAcceptor::FinishToken(TString& res, const char* at, bool nex
     InToken = nextIsMacro || TopQuote;
 }
 
-TSubst2Json::TSubst2Json(const TJSONVisitor& vis, const TDumpInfoUID& dumpInfo, TMakeNode* makeNode)
+TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode)
     : DumpInfo(dumpInfo)
     , JSONVisitor(vis)
     , MakeNode(makeNode)
@@ -275,8 +262,7 @@ void TSubst2Json::UpdateInputs() {
     TVars vars;
     TMakeNode& makeNode = *MakeNode;
 
-    auto inputs = StrVector2JsonList(DumpInfo.Inputs);
-    makeNode.Inputs.swap(inputs);
+    DumpInfo.MoveInputsTo(makeNode.Inputs);
 }
 
 void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
@@ -288,7 +274,7 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
     makeNode.OldEnv["ARCADIA_ROOT_DISTBUILD"] = "$(SOURCE_ROOT)";
 
     Y_ASSERT(makeNode.Inputs.empty());
-    makeNode.Inputs = StrVector2JsonList(DumpInfo.Inputs);
+    DumpInfo.MoveInputsTo(makeNode.Inputs);
 
     for (const auto& dep : DumpInfo.Deps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);

@@ -12,12 +12,27 @@
 struct TDumpInfoEx {
     TYVar ExtraOutput;
     TVector<TString> LateOuts;
-    TVector<TString> Inputs;
     TUniqVector<TNodeId> Deps;
     TUniqVector<TNodeId> ToolDeps;
     virtual void SetExtraValues(TVars&) = 0;
     virtual ~TDumpInfoEx() {
     }
+
+    TVector<TString>& Inputs() {
+        Y_ASSERT(InputsValid_);
+        return Inputs_;
+    }
+
+    void MoveInputsTo(TVector<TString>& dst) {
+        Y_ASSERT(InputsValid_);
+        dst.clear();
+        dst.swap(Inputs_);
+        InputsValid_ = false;
+    }
+
+private:
+    TVector<TString> Inputs_;
+    bool InputsValid_ = true;
 };
 
 struct TDumpInfoUID : TDumpInfoEx {

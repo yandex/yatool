@@ -71,8 +71,11 @@ void TMakeNode::WriteAsJson(TJsonWriter& writer) const {
     }
     writer.CloseArray();
 
-    Y_DEBUG_ABORT_UNLESS(ValidateJson(this->Inputs), "%s", this->Inputs.c_str());
-    writer.UnsafeWrite("inputs", this->Inputs);
+    writer.OpenArray("inputs");
+    for (const auto& x : this->Inputs) {
+        writer.Write(x);
+    }
+    writer.CloseArray();
 
     Y_DEBUG_ABORT_UNLESS(ValidateJson(this->Outputs), "%s", this->Outputs.c_str());
     writer.UnsafeWrite("outputs", this->Outputs);

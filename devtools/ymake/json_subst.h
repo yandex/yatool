@@ -53,7 +53,7 @@ private:
 
 class TSubst2Json: public TJsonCmdAcceptor {
     // data
-    const TDumpInfoUID& DumpInfo;
+    TDumpInfoUID& DumpInfo;
     TKeyValueMap<TString> TargetProperties;
     const TJSONVisitor& JSONVisitor;
 
@@ -61,7 +61,7 @@ class TSubst2Json: public TJsonCmdAcceptor {
     TMakeNode* MakeNode = nullptr;
 
 public:
-    TSubst2Json(const TJSONVisitor&, const TDumpInfoUID&, TMakeNode* makeNode);
+    TSubst2Json(const TJSONVisitor&, TDumpInfoUID&, TMakeNode* makeNode);
 
     void GenerateJsonTargetProperties(const TConstDepNodeRef&, const TModule* mod, bool isGlobalNode);
 

@@ -56,7 +56,7 @@ struct TMakeNodeDescription {
     TKeyValueMap<T> Requirements;
     TVector<T> Deps;
     TVector<T> ToolDeps;
-    TJoined Inputs;
+    TVector<T> Inputs;
     TJoined Outputs;
     TVector<T> LateOuts; // also contains inside Outputs
     TVector<T> ResourceUris;
