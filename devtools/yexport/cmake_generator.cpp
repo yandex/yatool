@@ -48,12 +48,13 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     }
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
-    result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
-    if (result->GeneratorSpec.Dir.Templates.empty()) {
+    auto& generatorSpec = result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
+
+    if (generatorSpec.Dir.Templates.empty()) {
         throw yexception() << fmt::format("[error] At least one directory template required for generator {}, but not found in {}", generator, generatorFile.c_str());
     }
-    if (result->GeneratorSpec.Common.Templates.size() != result->GeneratorSpec.Dir.Templates.size()) {
-        throw yexception() << fmt::format("[error] Common templates count {} must be equal dir templates count {} for generator {}", result->GeneratorSpec.Common.Templates.size(), result->GeneratorSpec.Dir.Templates.size(), generator);
+    if (generatorSpec.Common.Templates.size() != generatorSpec.Dir.Templates.size()) {
+        throw yexception() << fmt::format("[error] Common templates count {} must be equal dir templates count {} for generator {}", generatorSpec.Common.Templates.size(), generatorSpec.Dir.Templates.size(), generator);
     }
 
     result->GeneratorDir = generatorDir;
@@ -88,10 +89,6 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
         yexception() << fmt::format("ERROR: There are exceptions during rendering of platform {}.\n", platform->Name);
     }
 
-    const auto& generatorSpec = GetGeneratorSpec();
-    const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
-    YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
-
     auto topLevelSubdirs = jinja2::ValuesList();
     for (auto subdir: platform->Project->GetSubdirs()) {
         Y_ASSERT(subdir);
@@ -104,7 +101,7 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
         RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Name);
     }
 
-    TTargetAttributesPtr rootdirValuesMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+    TAttrsPtr rootdirValuesMap = MakeAttrs(EAttrGroup::Directory, "rootdir");
     const auto [_, inserted] = rootdirValuesMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
     Y_ASSERT(inserted);
     SetCurrentDirectory(ArcadiaRoot);
@@ -141,17 +138,13 @@ void TCMakeGenerator::RenderPlatforms() {
 }
 
 void TCMakeGenerator::RenderRoot() {
-    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Root);
-    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for root");
-
     auto rootJinjaTemplates = LoadJinjaTemplates(GetGeneratorSpec().Root.Templates);
-
-    TTargetAttributesPtr rootValuesMap = TTargetAttributes::Create(attrSpecIt->second, "root");
-    PrepareRootCMakeList(rootValuesMap);
-    PrepareConanRequirements(rootValuesMap);
-    ApplyRules(*rootValuesMap);
+    auto rootAttrs = MakeAttrs(EAttrGroup::Root, "root");
+    PrepareRootCMakeList(rootAttrs);
+    PrepareConanRequirements(rootAttrs);
+    ApplyRules(rootAttrs);
     SetCurrentDirectory(ArcadiaRoot);
-    RenderJinjaTemplates(rootValuesMap, rootJinjaTemplates);
+    RenderJinjaTemplates(rootAttrs, rootJinjaTemplates);
 }
 
 void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const {
@@ -166,9 +159,6 @@ void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinja
     Y_ASSERT(commonJinjaTemplates.size() == dirJinjaTemplates.size());
 
     auto templatesCount = dirJinjaTemplates.size();
-
-    auto attrSpecIt = GeneratorSpec.AttrGroups.find(EAttributeGroup::Directory);
-    YEXPORT_VERIFY(attrSpecIt != GeneratorSpec.AttrGroups.end(), "No attribute specification for directory");
 
     for (size_t i = 0; i < templatesCount; ++i) {
         auto& dirTemplate = dirJinjaTemplates[i];
@@ -199,7 +189,7 @@ void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinja
                     }
                 }
                 if (isDifferent) {
-                    TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
+                    TAttrsPtr dirValueMap = MakeAttrs(EAttrGroup::Directory, dir);
                     auto& dirMap = dirValueMap->GetWritableMap();
                     dirMap["platforms"] = GeneratorSpec.Platforms;
                     InsertPlatforms(dirMap, dirPlatforms);
@@ -219,14 +209,14 @@ void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinja
     }
 }
 
-TVector<std::string> TCMakeGenerator::GetAdjustedLanguagesList() const {
+jinja2::ValuesList TCMakeGenerator::GetAdjustedLanguagesList() const {
     /*
         > If enabling ASM, list it last so that CMake can check whether compilers for other languages like C work for assembly too.
 
         https://cmake.org/cmake/help/latest/command/project.html
     */
     bool hasAsm = false;
-    TVector<std::string> languages;
+    jinja2::ValuesList languages;
 
     for (const auto& lang : GlobalProperties.Languages) {
         if (lang == "ASM"sv) {
@@ -249,7 +239,7 @@ void TCMakeGenerator::CopyArcadiaScripts() const {
     }
 }
 
-void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const {
+void TCMakeGenerator::PrepareRootCMakeList(TAttrsPtr rootValueMap) const {
     auto& rootMap = rootValueMap->GetWritableMap();
     rootMap["platforms"] = GeneratorSpec.Platforms;
     InsertPlatforms(rootMap, Platforms);
@@ -265,17 +255,15 @@ void TCMakeGenerator::PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) co
         }
         globalVars.emplace_back(varList);
     }
-    rootValueMap->SetAttrValue("platform_vars", globalVars);
+    rootMap["platform_vars"] = globalVars;
 
-    rootValueMap->SetAttrValue("use_conan",
-                               !GlobalProperties.ConanPackages.empty() ||
-                               !GlobalProperties.ConanToolPackages.empty());
-    rootValueMap->SetAttrValue("project_name", Conf.ProjectName);
-    rootValueMap->SetAttrValue("project_language_list", GetAdjustedLanguagesList());
-    rootValueMap->SetAttrValue("vanilla_protobuf", GlobalProperties.VanillaProtobuf);
+    rootMap["use_conan"] = !GlobalProperties.ConanPackages.empty() || !GlobalProperties.ConanToolPackages.empty();
+    rootMap["project_name"] = Conf.ProjectName;
+    rootMap["project_language_list"] = GetAdjustedLanguagesList();
+    rootMap["vanilla_protobuf"] = GlobalProperties.VanillaProtobuf;
 }
 
-void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const {
+void TCMakeGenerator::PrepareConanRequirements(TAttrsPtr rootValueMap) const {
     if (GlobalProperties.ConanPackages.empty() && GlobalProperties.ConanToolPackages.empty()) {
         return;
     }
@@ -304,17 +292,6 @@ void TCMakeGenerator::PrepareConanRequirements(TTargetAttributesPtr rootValueMap
             import.remove_suffix(1);
         }
         conanImports.emplace_back(import);
-    }
-}
-
-std::vector<TJinjaTemplate> TCMakeGenerator::LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const {
-    return NYexport::LoadJinjaTemplates(GetGeneratorDir(), GetJinjaEnv(), templateSpecs);
-}
-
-void TCMakeGenerator::RenderJinjaTemplates(TTargetAttributesPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname, const std::string& platformName) {
-    for (auto& jinjaTemplate: jinjaTemplates) {
-        jinjaTemplate.SetValueMap(valuesMap);
-        jinjaTemplate.RenderTo(*ExportFileManager, relativeToExportRootDirname, platformName);
     }
 }
 

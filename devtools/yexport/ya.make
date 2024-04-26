@@ -2,6 +2,7 @@ LIBRARY()
 
 SRCS(
     attribute.cpp
+    attributes.cpp
     cmake_generator.cpp
     debug.cpp
     dir_cleaner.cpp
@@ -11,6 +12,7 @@ SRCS(
     graph_visitor.cpp
     jinja_generator.cpp
     jinja_helpers.cpp
+    jinja_template.cpp
     project.cpp
     py_requirements_generator.cpp
     read_sem_graph.cpp

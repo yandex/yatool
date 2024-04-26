@@ -39,11 +39,11 @@ namespace NKeys {
         {"generator_root", ECopyLocation::GeneratorRoot},
     };
 
-    static const THashMap<std::string, EAttributeGroup> StringToAttributeGroup = {
-        {"root", EAttributeGroup::Root},
-        {"target", EAttributeGroup::Target},
-        {"induced", EAttributeGroup::Induced},
-        {"dir", EAttributeGroup::Directory},
+    static const THashMap<std::string, EAttrGroup> StringToAttributeGroup = {
+        {"root", EAttrGroup::Root},
+        {"target", EAttrGroup::Target},
+        {"induced", EAttrGroup::Induced},
+        {"dir", EAttrGroup::Directory},
     };
 
     THashSet<std::string> CopyLocationSet() {
@@ -69,7 +69,7 @@ namespace NKeys {
         return res;
     }
 
-    std::string GetAttributeGroupList() {
+    std::string GetAttrGroupList() {
         std::string res = "[";
         bool first = true;
         for (const auto& [key, _] : StringToAttributeGroup) {
@@ -279,20 +279,20 @@ namespace {
         auto& rules = spec.Rules;
         const auto& ruleId = rules.emplace(rules.size(), rule).first->first;
 
-        for(const auto& attr : rule.Attributes) {
+        for(const auto& attr : rule.AttrNames) {
             spec.AttrToRuleIds[attr].emplace_back(ruleId);
         }
 
-        for(const auto& platform : rule.Platforms) {
+        for(const auto& platform : rule.PlatformNames) {
             spec.PlatformToRuleIds[platform].emplace_back(ruleId);
         }
     }
 
-    void ParseAttribute(const std::string& attrName, TAttributeGroup& attrGroup, const toml::value& attrDesc, TGeneratorSpec& spec) {
+    void ParseAttr(const std::string& attrName, TAttrGroup& attrGroup, const toml::value& attrDesc, TGeneratorSpec& spec) {
         auto [attrType, copy] = GetAttrTypeCopy(attrDesc);
         EAttrTypes eattrType = EAttrTypes::Unknown;
         std::string_view curAttrType = attrType;
-        TAttribute attribute(attrName);
+        TAttr attribute(attrName);
         for (i32 i = (i32)attribute.Size() - 1; i >= 0; --i) {
             std::string curAttrName(attribute.GetFirstParts(i));
             if (!attrGroup.contains(curAttrName)) { // don't overwrite already defined attributes
@@ -326,14 +326,14 @@ namespace {
 
         if (copy) {
             TGeneratorRule rule;
-            rule.Attributes.insert(attrName);
+            rule.AttrNames.insert(attrName);
             rule.Copy = *copy;
             AddRule(spec, rule);
         }
     }
 
-    TAttributeGroup ParseAttributeGroup(const toml::value& attrs, TGeneratorSpec& spec) {
-        TAttributeGroup attrsGroup;
+    TAttrGroup ParseAttrGroup(const toml::value& attrs, TGeneratorSpec& spec) {
+        TAttrGroup attrsGroup;
         const auto& attrsTable = attrs.as_table();
         // We must parse attributes from small length to long length
         // for apply parent attribute type before children
@@ -347,7 +347,7 @@ namespace {
             return *l < *r;
         });
         for (auto attrName : attrNames) {
-            ParseAttribute(*attrName, attrsGroup, attrsTable.at(*attrName), spec);
+            ParseAttr(*attrName, attrsGroup, attrsTable.at(*attrName), spec);
         }
         // By default all list/set/sorted_set items are strings
         for (const auto& [attrName, attrType]: attrsGroup) {
@@ -382,7 +382,7 @@ namespace {
             VERIFY_GENSPEC(!attrArray.empty(), *attrs, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
 
             for(const auto& attr : attrArray){
-                rule.Attributes.insert(AsString(&attr));
+                rule.AttrNames.insert(AsString(&attr));
             }
         }
         if (platforms) {
@@ -390,7 +390,7 @@ namespace {
             VERIFY_GENSPEC(!platformsArray.empty(), *platforms, NGeneratorSpecError::SpecificationError, "Rule should have one or more platforms");
 
             for(const auto& platform : platformsArray){
-                rule.Platforms.insert(AsString(&platform));
+                rule.PlatformNames.insert(AsString(&platform));
             }
         }
 
@@ -452,17 +452,17 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
         const auto& platforms = find_or<toml::table>(doc, NKeys::Platforms, toml::table{});
         genspec.Platforms = ParsePlatformsSpec(platforms);
 
-        auto& attrs = genspec.AttrGroups;
+        auto& attrGroups = genspec.AttrGroups;
         for (const auto& [name, attrspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
             auto attrGroupIt = NKeys::StringToAttributeGroup.find(name);
             VERIFY_GENSPEC(attrGroupIt != NKeys::StringToAttributeGroup.end(), attrspec, NGeneratorSpecError::SpecificationError,
-                    "Unknown attribute group [" + name + "]. Attribute group should be one of the following " + NKeys::GetAttributeGroupList());
-            attrs[attrGroupIt->second] = ParseAttributeGroup(attrspec, genspec);
+                    "Unknown attribute group [" + name + "]. Attribute group should be one of the following " + NKeys::GetAttrGroupList());
+            attrGroups[attrGroupIt->second] = ParseAttrGroup(attrspec, genspec);
         }
 
-        const auto inducedIt = attrs.find(EAttributeGroup::Induced);
-        if (inducedIt != attrs.end()) {
-            auto [targetIt, targetInserted] = attrs.emplace(EAttributeGroup::Target, TAttributeGroup{});
+        const auto inducedIt = attrGroups.find(EAttrGroup::Induced);
+        if (inducedIt != attrGroups.end()) {
+            auto [targetIt, targetInserted] = attrGroups.emplace(EAttrGroup::Target, TAttrGroup{});
             auto& targetItems = targetIt->second;
             for (const auto& [attrName, attrType]: inducedIt->second) {
                 if (attrName.IsItem()) {
@@ -530,7 +530,7 @@ void TCopySpec::Append(const TCopySpec& copySpec) {
 }
 
 bool TGeneratorRule::Useless() const {
-    if (Attributes.empty() && Platforms.empty()) {
+    if (AttrNames.empty() && PlatformNames.empty()) {
         return true;
     }
     if (!Copy.Useless()) {

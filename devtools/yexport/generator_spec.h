@@ -45,16 +45,16 @@ struct TTargetSpec {
 
 struct TGeneratorRule {
     TCopySpec Copy;
-    THashSet<std::string> Attributes;
-    THashSet<std::string> Platforms;
+    THashSet<std::string> AttrNames;
+    THashSet<std::string> PlatformNames;
     THashMap<std::string, TVector<std::string>> AddValues; //TODO: Proper values instead of std::string
 
     bool Useless() const;
     bool operator== (const TGeneratorRule&) const noexcept = default;
 };
 
-using TAttributeGroup = THashMap<TAttribute, EAttrTypes>;
-using TAttributeSpecification = THashMap<EAttributeGroup, TAttributeGroup>;
+using TAttrGroup = THashMap<TAttr, EAttrTypes>;
+using TAttrGroups = THashMap<EAttrGroup, TAttrGroup>;
 
 struct TGeneratorSpec {
     using TRuleSet = THashSet<const TGeneratorRule*>;
@@ -64,7 +64,7 @@ struct TGeneratorSpec {
     TTargetSpec Dir;///< One directory for one platform
     THashMap<std::string, TTargetSpec> Targets;///< Targets in directory by name
     jinja2::ValuesMap Platforms;
-    TAttributeSpecification AttrGroups;
+    TAttrGroups AttrGroups;
     THashMap<std::string, TVector<uint32_t>> AttrToRuleIds;
     THashMap<std::string, TVector<uint32_t>> PlatformToRuleIds;
     THashMap<std::string, TVector<fs::path>> Merge;

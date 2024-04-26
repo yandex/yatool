@@ -2,6 +2,7 @@
 
 #include "std_helpers.h"
 #include "spec_based_generator.h"
+#include "attributes.h"
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
 
@@ -34,7 +35,7 @@ namespace NYexport {
         std::string Macro;
         std::string Name;
         TVector<std::string> MacroArgs;
-        jinja2::ValuesMap Attrs; // TODO: use attr storage from jinja_helpers
+        TAttrsPtr Attrs;
         std::string SemsDump; // Semantic dumps, collected during dispatch graph
         size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
     };
@@ -46,7 +47,7 @@ namespace NYexport {
 
         TVector<TProjectTargetPtr> Targets;
         TVector<TProjectSubdirPtr> Subdirectories;
-        jinja2::ValuesMap Attrs; // TODO: use attr storage from jinja_helpers
+        TAttrsPtr Attrs;
         fs::path Path;
     };
 

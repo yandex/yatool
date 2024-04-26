@@ -48,6 +48,7 @@ namespace NYexport {
             ESNT_RootAttr,    // Root of all targets attribute
             ESNT_TargetAttr,  // Target for generator attribute
             ESNT_InducedAttr, // Target for generator induced attribute (add to list for parent node in graph)
+            ESNT_DirectoryAttr,// Directory attribute
             ESNT_Ignored,     // Must ignore this target for generator
         };
 

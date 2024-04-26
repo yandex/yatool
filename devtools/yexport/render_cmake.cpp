@@ -136,21 +136,18 @@ namespace {
             return result;
         }
 
-        static TTargetAttributesPtr MakeTargetAttributes(
+        static TAttrsPtr MakeTargetAttrs(
                 const TCMakeTarget* tgt,
                 const TCMakeGenerator* cmakeGenerator
         ) {
-            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
-            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Target);
-            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for target");
-
-            TTargetAttributesPtr targetValueMap = TTargetAttributes::Create(attrSpecIt->second, "target");
-            auto& targetMap = targetValueMap->GetWritableMap();
+            auto name = "target " + tgt->Macro + " " + tgt->Name;
+            TAttrsPtr targetAttrs = cmakeGenerator->MakeAttrs(EAttrGroup::Target, name);
+            auto& targetMap = targetAttrs->GetWritableMap();
 
             // Target definition
             targetMap.insert_or_assign("macro", tgt->Macro.c_str());
             targetMap.insert_or_assign("name", tgt->Name.c_str());
-            targetValueMap->SetAttrValue("is_interface", tgt->InterfaceTarget);
+            targetAttrs->SetAttrValue("is_interface", tgt->InterfaceTarget ? jinja2::ValuesList{"true"} : jinja2::ValuesList{"false"}, name);
 
             {
                 const auto [_, inserted] = targetMap.emplace("macro_args", jinja2::ValuesList(tgt->MacroArgs.begin(), tgt->MacroArgs.end()));
@@ -211,17 +208,14 @@ namespace {
                 Y_ASSERT(inserted);
             }
 
-            return targetValueMap;
+            return targetAttrs;
         }
 
     public:
-        TTargetAttributesPtr GetSubdirValuesMap(const TCMakeList& data, const TCMakeGenerator* cmakeGenerator) const {
-            const auto generatorSpec = cmakeGenerator->GetGeneratorSpec();
-            const auto attrSpecIt = generatorSpec.AttrGroups.find(EAttributeGroup::Directory);
-            YEXPORT_VERIFY(attrSpecIt != generatorSpec.AttrGroups.end(), "No attribute specification for dir");
-
-            TTargetAttributesPtr dirValueMap = TTargetAttributes::Create(attrSpecIt->second, "dir");
-            auto& dirMap = dirValueMap->GetWritableMap();
+        TAttrsPtr GetSubdirValuesMap(const TCMakeList& data, const TCMakeGenerator* cmakeGenerator) const {
+            auto name = "dir " + data.Path.string();
+            TAttrsPtr dirAttrs = cmakeGenerator->MakeAttrs(EAttrGroup::Directory, name);
+            auto& dirMap = dirAttrs->GetWritableMap();
 
             {
                 auto [packagesIt, inserted] = dirMap.emplace("packages", jinja2::ValuesList());
@@ -261,10 +255,10 @@ namespace {
                 auto& targets = targetsIt->second.asList();
                 for (auto tgt: data.Targets) {
                     const auto cmakeTarget = tgt.As<TCMakeTarget>().Get();
-                    targets.emplace_back(MakeTargetAttributes(cmakeTarget, cmakeGenerator)->GetMap());
+                    targets.emplace_back(MakeTargetAttrs(cmakeTarget, cmakeGenerator)->GetMap());
                 }
             }
-            return dirValueMap;
+            return dirAttrs;
         }
     };
     using TCMakeProjectPtr = TSimpleSharedPtr<TCMakeProject>;
@@ -593,6 +587,7 @@ namespace {
             curTarget->Name = semArgs[1];
             curTarget->Macro = semName;
             curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+            curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name);
 
             Mod2Target.emplace(state.TopNode().Id(), ProjectBuilder_->CurrentTarget());
             // TODO(svidyuk) populate target props on post order part of the traversal and keep track locally used tools only instead of global dict
@@ -999,7 +994,7 @@ bool AnalizePlatformSemGraph(const TPlatformPtr platform, TGlobalProperties& glo
     return !visitor.HasErrors();
 }
 
-TTargetAttributesPtr GetSubdirValuesMap(const TPlatformPtr platform, TProjectSubdirPtr subdir, const TCMakeGenerator* cmakeGenerator) {
+TAttrsPtr GetSubdirValuesMap(const TPlatformPtr platform, TProjectSubdirPtr subdir, const TCMakeGenerator* cmakeGenerator) {
     return platform->Project.As<TCMakeProject>()->GetSubdirValuesMap(*subdir.As<TCMakeList>(), cmakeGenerator);
 }
 

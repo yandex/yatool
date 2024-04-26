@@ -2,7 +2,7 @@
 
 #include "generator_spec.h"
 #include "dir_cleaner.h"
-#include "jinja_helpers.h"
+#include "jinja_template.h"
 #include "spec_based_generator.h"
 #include "project.h"
 
@@ -62,19 +62,16 @@ private:
     void RenderRoot();
     void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
     void MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const;
-    TVector<std::string> GetAdjustedLanguagesList() const;
+    jinja2::ValuesList GetAdjustedLanguagesList() const;
     void CopyArcadiaScripts() const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
     void RenderPlatform(const TPlatformPtr platform, std::vector<TJinjaTemplate>& dirJinjaTemplates);
 
-    void PrepareRootCMakeList(TTargetAttributesPtr rootValueMap) const;
-    void PrepareConanRequirements(TTargetAttributesPtr rootValueMap) const;
+    void PrepareRootCMakeList(TAttrsPtr rootValueMap) const;
+    void PrepareConanRequirements(TAttrsPtr rootValueMap) const;
 
     void Render(ECleanIgnored cleanIgnored) override;
-
-    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const;
-    void RenderJinjaTemplates(TTargetAttributesPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
 
 public:
     TCMakeGenerator() = default;

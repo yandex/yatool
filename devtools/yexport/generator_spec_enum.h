@@ -18,7 +18,7 @@ enum class ECopyLocation {
     SourceRoot,
 };
 
-enum class EAttributeGroup {
+enum class EAttrGroup {
     Unknown = 0,
     Root,      // Root of all targets attribute
     Target,    // Target for generator attribute

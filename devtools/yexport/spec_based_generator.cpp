@@ -57,7 +57,7 @@ const fs::path& TSpecBasedGenerator::GetGeneratorDir() const {
     return GeneratorDir;
 }
 
-void TSpecBasedGenerator::OnAttribute(const TAttribute& attribute) {
+void TSpecBasedGenerator::OnAttribute(const TAttr& attribute) {
     for (size_t i = 0; i < attribute.Size(); ++i) {
         std::string attr(attribute.GetFirstParts(i));
         UsedAttributes.emplace(attr);
@@ -71,10 +71,10 @@ void TSpecBasedGenerator::OnPlatform(const std::string_view& platform) {
     UsedRules.insert(rules.begin(), rules.end());
 }
 
-void TSpecBasedGenerator::ApplyRules(TTargetAttributes& jinjaTemplate) const {
+void TSpecBasedGenerator::ApplyRules(TAttrsPtr attrs) const {
     for (const auto& rule : UsedRules) {
         for (const auto& [attr, values] : rule->AddValues) {
-            jinjaTemplate.AppendAttrValue(attr, values);
+            attrs->SetAttrValue(attr, values, "apply_rules");
         }
     }
 }
@@ -94,6 +94,26 @@ void TSpecBasedGenerator::SetupJinjaEnv() {
     // Order matters. Jinja should search files with generator/ prefix in generator directory, and only if there is no such file fallback to source directory
     JinjaEnv->AddFilesystemHandler(GENERATOR_TEMPLATES_PREFIX, GeneratorTemplateFs);
     JinjaEnv->AddFilesystemHandler({}, SourceTemplateFs);
+
+    // Handmade split function
+    JinjaEnv->AddGlobal("split", jinja2::UserCallable{
+        /*fptr=*/[](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            Y_ASSERT(params["str"].isString());
+            auto str = params["str"].asString();
+            Y_ASSERT(params["delimeter"].isString());
+            auto delimeter = params["delimeter"].asString();
+            jinja2::ValuesList list;
+            size_t bpos = 0;
+            size_t dpos;
+            while ((dpos = str.find(delimeter, bpos)) != std::string::npos) {
+                list.emplace_back(str.substr(bpos, dpos - bpos));
+                bpos = dpos + delimeter.size();
+            }
+            list.emplace_back(str.substr(bpos));
+            return list;
+        },
+        /*argsInfos=*/ { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
+    });
 }
 void TSpecBasedGenerator::SetCurrentDirectory(const fs::path& dir) const {
     YEXPORT_VERIFY(JinjaEnv, "Cannot set current directory to " << dir << " before setting up jinja enviroment");
@@ -114,6 +134,17 @@ TYexportSpec TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
         }
     }
     return {};
+}
+
+TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::string& name) const {
+    const auto attrGroupIt = GeneratorSpec.AttrGroups.find(eattrGroup);
+    if (attrGroupIt != GeneratorSpec.AttrGroups.end()) {
+        return TAttrs::Create(attrGroupIt->second, name);
+    } else {
+        static const TAttrGroup EMPTY_ATTR_GROUP;
+        spdlog::error("No attribute specification for {}", ToString<EAttrGroup>(eattrGroup));
+        return TAttrs::Create(EMPTY_ATTR_GROUP, name);
+    }
 }
 
 fs::path TSpecBasedGenerator::PathByCopyLocation(ECopyLocation location) const {
@@ -143,6 +174,17 @@ void TSpecBasedGenerator::CopyFilesAndResources() {
         for (const auto& file : files) {
             ExportFileManager->Copy(dir / file, file);
         }
+    }
+}
+
+std::vector<TJinjaTemplate> TSpecBasedGenerator::LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const {
+    return NYexport::LoadJinjaTemplates(GetGeneratorDir(), GetJinjaEnv(), templateSpecs);
+}
+
+void TSpecBasedGenerator::RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname, const std::string& platformName) {
+    for (auto& jinjaTemplate: jinjaTemplates) {
+        jinjaTemplate.SetValueMap(attrs);
+        jinjaTemplate.RenderTo(*ExportFileManager, relativeToExportRootDirname, platformName);
     }
 }
 

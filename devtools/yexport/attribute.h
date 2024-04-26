@@ -13,12 +13,12 @@ namespace NYexport {
     inline const std::string ITEM_TYPE = "ITEM"; // Magic suffix for set list item type
     inline const std::string ITEM_SUFFIX = ATTR_DIVIDER + ITEM_TYPE;
 
-    class TAttribute {
+    class TAttr {
     public:
-        TAttribute() = default;
-        TAttribute(const char* attribute);
-        TAttribute(const std::string& attribute);
-        TAttribute(std::string_view attribute);
+        TAttr() = default;
+        TAttr(const char* attribute);
+        TAttr(const std::string& attribute);
+        TAttr(std::string_view attribute);
 
         bool IsItem() const;
         size_t Size() const;
@@ -31,29 +31,29 @@ namespace NYexport {
         operator std::string() const;
         const std::string& str() const;
 
-        bool operator==(const TAttribute& other) const = default;
-        bool operator!=(const TAttribute& other) const = default;
+        bool operator==(const TAttr& other) const = default;
+        bool operator!=(const TAttr& other) const = default;
 
     private:
         std::string_view GetPart(size_t from, size_t to) const;
 
-        const std::string Attribute_;
+        const std::string Attr_;
         TVector<size_t> Dividers_;
     };
 
 }
 
 template <>
-struct THash<NYexport::TAttribute>: public THash<std::string> {
-    size_t operator()(const NYexport::TAttribute& val) const {
+struct THash<NYexport::TAttr>: public THash<std::string> {
+    size_t operator()(const NYexport::TAttr& val) const {
         return static_cast<const THash<std::string>&>(*this)(val.str());
     }
 };
 
 template <>
-struct TEqualTo<NYexport::TAttribute> {
+struct TEqualTo<NYexport::TAttr> {
     template <class TOther>
-    inline bool operator()(const NYexport::TAttribute& a, const TOther& b) const {
+    inline bool operator()(const NYexport::TAttr& a, const TOther& b) const {
         return a == b;
     }
 };

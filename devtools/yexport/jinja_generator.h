@@ -63,8 +63,6 @@ public:
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
 
     void AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph);
-    THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
-    void SetSpec(const TGeneratorSpec& spec) { GeneratorSpec = spec; };
 
     void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
     void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
@@ -73,9 +71,9 @@ private:
     friend class TJinjaProject::TBuilder;
 
     void Render(ECleanIgnored cleanIgnored) override;
-    void RenderSubdir(const fs::path& subdir, const jinja2::ValuesMap& subdirAttrs);
+    void RenderSubdir(TProjectSubdirPtr subdir);
 
-    EAttrTypes GetAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const;
+    EAttrTypes GetAttrType(EAttrGroup attrGroup, const std::string_view attrName) const;
 
     const jinja2::ValuesMap& FinalizeRootAttrs();
     jinja2::ValuesMap FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes = {});
@@ -83,20 +81,37 @@ private:
 
     std::string ProjectName;
 
-    std::vector<jinja2::Template> Templates;
-    THashMap<std::string, std::vector<jinja2::Template>> TargetTemplates;
+    std::vector<TJinjaTemplate> RootTemplates;
+    std::vector<TJinjaTemplate> DirTemplates;
+    std::vector<TJinjaTemplate> CommonTemplates;
+    THashMap<std::string, std::vector<TJinjaTemplate>> TargetTemplates;
 
     TProjectPtr Project;
-    jinja2::ValuesMap RootAttrs; // TODO: use attr storage from jinja_helpers
+    TAttrsPtr RootAttrs;
+
+public: // for tests only
+    THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
+    void SetSpec(const TGeneratorSpec& spec);
 };
 
 class TJinjaProject::TBuilder : public TProject::TBuilder {
 public:
-    TBuilder(TJinjaGenerator* generator, jinja2::ValuesMap* rootAttrs);
+    TBuilder(TJinjaGenerator* generator, TAttrsPtr rootAttrs);
 
     template<IterableValues Values>
     void SetRootAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
-        SetAttrValue(*RootAttrs, EAttributeGroup::Root, attrName, values, nodePath);
+        Y_ASSERT(RootAttrs);
+        RootAttrs->SetAttrValue(attrName, values, nodePath);
+    }
+
+    template<IterableValues Values>
+    void SetDirectoryAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
+        if (!CurSubdir_) {
+            spdlog::error("attempt to add directory attribute '{}' while there is no active directory at node {}", attrName, nodePath);
+            return;
+        }
+        Y_ASSERT(CurSubdir_->Attrs);
+        CurSubdir_->Attrs->SetAttrValue(attrName, values, nodePath);
     }
 
     template<IterableValues Values>
@@ -105,37 +120,14 @@ public:
             spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
             return;
         }
-        SetAttrValue(CurTarget_->Attrs, EAttributeGroup::Target, attrName, values, nodePath);
-    }
-
-    template<IterableValues Values>
-    void SetInducedAttr(jinja2::ValuesMap& attrs, const std::string_view attrName, const Values& values, const std::string& nodePath) {
-        SetAttrValue(attrs, EAttributeGroup::Induced, attrName, values, nodePath);
+        Y_ASSERT(CurTarget_->Attrs);
+        CurTarget_->Attrs->SetAttrValue(attrName, values, nodePath);
     }
 
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
     void OnAttribute(const std::string& attribute);
     void SetTestModDir(const std::string& testModDir);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
-
-    std::tuple<std::string_view, jinja2::ValuesMap> MakeTreeJinjaAttrs(const std::string_view attrNameWithDividers, size_t lastDivPos, jinja2::ValuesMap&& treeJinjaAttrs);
-
-    template<IterableValues Values>
-    void SetAttrValue(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const std::string_view attrName, const Values& values, const std::string& nodePath) const {
-        // Convert values to jinja2::ValuesList
-        jinja2::ValuesList jvalues;
-        const jinja2::ValuesList* valuesPtr;
-        if constexpr(std::same_as<Values, jinja2::ValuesList>) {
-            valuesPtr = &values;
-        } else {
-            Copy(values.begin(), values.end(), std::back_inserter(jvalues));
-            valuesPtr = &jvalues;
-        }
-        TAttribute attribute(attrName);
-        SetAttrValue(attrs, attrGroup, attribute, 0, *valuesPtr, [&]() {
-            return "attribute " + attribute.str() + " at node " + nodePath;// debug string for error messages
-        });
-    }
 
     static void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
 
@@ -144,21 +136,7 @@ private:
 
     static bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);
 
-    void SetAttrValue(jinja2::ValuesMap& attrs, EAttributeGroup attrGroup, const TAttribute& attribute, size_t atPos, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
-
-    static jinja2::Value GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr);
-    static void SetStrAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
-    static void SetBoolAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
-    static void SetFlagAttr(jinja2::ValuesMap& attrs, const std::string_view keyName, const jinja2::Value& value, TGetDebugStr getDebugStr);
-
-    void AppendToListAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
-    void AppendToSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
-    void AppendToSortedSetAttr(jinja2::ValuesList& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
-    void AppendToDictAttr(jinja2::ValuesMap& attr, EAttributeGroup attrGroup, const TAttribute& attribute, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const;
-
-    EAttrTypes GetItemAttrType(EAttributeGroup attrGroup, const std::string_view attrName) const;
-
-    jinja2::ValuesMap* RootAttrs;
+    TAttrsPtr RootAttrs;
     TJinjaGenerator* Generator;
 };
 
