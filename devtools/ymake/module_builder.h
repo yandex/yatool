@@ -125,6 +125,14 @@ public:
         return Module.GetAttrs().UseAllSrcs;
     }
 
+    /// @brief True if given node is module's ALL_SRCS node
+    bool IsAllSrcsNode(const TNodeAddCtx* other) {
+        if (AllSrcs.Node == nullptr) {
+            return false;
+        }
+        return AllSrcs.Node == other;
+    }
+
     void SaveInputResolution(const TVarStrEx& input, TStringBuf origInput, TFileView curDir);
 
     /// @brief Apply macro call processing as during ya.make load but with immediate
@@ -175,7 +183,8 @@ private:
     void AddGlobalDep();
     void AddFileGroupVars();
     void AddDartsVars();
-    void AddAllSrcsVar();
+
+    void AddAllSrcsNode();
 
     void TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args); // try-catch for ProcessStatement
     void ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
@@ -194,6 +203,10 @@ private:
     TAddDepAdaptor* GlobalNode = nullptr;
     bool GlobalSrcsAreAdded = false;
 
-    TVector<TDepTreeNode> AllSrcs;
-    TNodeAddCtx* AllSrcsVarNode = nullptr;
+    struct TAllSrcsContext {
+        TVector<TDepTreeNode> TemporalDepStorage;
+        TNodeAddCtx* Node = nullptr;
+    };
+
+    TAllSrcsContext AllSrcs;
 };

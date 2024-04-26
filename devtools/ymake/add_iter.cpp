@@ -1858,6 +1858,15 @@ inline TUpdIter::EDepVerdict TUpdIter::AcceptDep(TState& state) {
         return EDepVerdict::No;
     }
 
+    // Don't traverse ALL_SRCS subgraph twice
+    if (auto* moduleBuilder = st.GetParentModuleBuilder(*this);
+        moduleBuilder
+        && moduleBuilder->IsAllSrcsNode(st.Entry().AddCtx)
+        && st.Entry().OnceEntered
+    ) {
+        return EDepVerdict::No;
+    }
+
     auto ResolvedInputsChanged = [&st, this](TModAddData& moduleInfo, TModule& module) {
         Y_ASSERT(moduleInfo.InputsStatus == EInputsStatus::EIS_NotChecked);
         if (st.ResolvedInputChanged(YMake, module)) {
