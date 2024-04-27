@@ -161,7 +161,7 @@ private:
 
     using TMinedVars = THashMap<
         TStringBuf, // name
-        TVector<NCommands::TSyntax> // definitions indexed by recursion depth
+        TVector<THolder<NCommands::TSyntax>> // definitions indexed by recursion depth
     >;
     struct TCmdWriter;
     const NCommands::TSyntax& Parse(TMacroValues& values, TString src);

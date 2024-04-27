@@ -398,10 +398,10 @@ void TCommands::Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, 
         TStringBuf cmdName;
         TStringBuf cmdValue;
         ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
-        newVar->second.push_back(Parse(Values, TString(cmdValue)));
+        newVar->second.push_back(MakeHolder<NCommands::TSyntax>(Parse(Values, TString(cmdValue))));
 
         auto bump = TCounterBump(depth->second);
-        Premine(newVar->second.back(), inlineVars, allVars, newVars);
+        Premine(*newVar->second.back(), inlineVars, allVars, newVars);
     };
 
     for (auto& cmd : ast.Commands)
@@ -460,7 +460,7 @@ void TCommands::InlineModValueTerm(
                     return;
                 }
                 auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                auto& thatDef = thatVar->second[depth->second];
+                auto& thatDef = *thatVar->second[depth->second];
                 if (thatDef.Commands.size() == 0)
                     return;
                 if (thatDef.Commands.size() != 1)
@@ -512,7 +512,7 @@ void TCommands::InlineScalarTerms(
                     return;
                 }
                 auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                auto& thatDef = thatVar->second[depth->second];
+                auto& thatDef = *thatVar->second[depth->second];
                 if (thatDef.Commands.size() == 0)
                     return;
                 if (thatDef.Commands.size() != 1)
@@ -553,7 +553,7 @@ void TCommands::InlineScalarTerms(
                             if (thatVar == vars.end())
                                 return false;
                             auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                            auto& thatDef = thatVar->second[depth->second];
+                            auto& thatDef = *thatVar->second[depth->second];
                             if (thatDef.Commands.size() == 0)
                                 return true;
                             if (thatDef.Commands.size() != 1)
@@ -589,7 +589,7 @@ void TCommands::InlineArguments(
         if (thatVar == vars.end())
             return false;
         auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-        auto& thatDef = thatVar->second[depth->second];
+        auto& thatDef = *thatVar->second[depth->second];
         if (thatDef.Commands.size() == 0)
             return true;
         if (thatDef.Commands.size() != 1)
@@ -627,7 +627,7 @@ void TCommands::InlineCommands(
         if (thatVar == vars.end())
             return false;
         auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-        auto& thatDef = thatVar->second[depth->second];
+        auto& thatDef = *thatVar->second[depth->second];
         auto bump = TCounterBump(depth->second);
         InlineCommands(thatDef.Commands, vars, writer);
         return true;
