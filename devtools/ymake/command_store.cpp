@@ -7,7 +7,6 @@
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/lang/cmd_parser.h>
 #include <devtools/ymake/polexpr/evaluate.h>
-#include <devtools/ymake/polexpr/reduce_if.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/common/string.h>
 
@@ -28,15 +27,96 @@ namespace {
         TRefReducer(
             TMacroValues& values,
             const TVars& vars,
-            TInputs& inputs,
-            TOutputs& outputs
+            TCommands::TCompiledCommand& sink
         )
             : Values(values)
             , Vars(vars)
-            , Inputs(inputs)
-            , Outputs(outputs)
+            , Sink(sink)
         {
         }
+
+    public:
+
+        void ReduceIf(NCommands::TSyntax& ast) {
+            for (auto& cmd : ast.Commands)
+                ReduceCmd(cmd);
+            Sink.Expression = NCommands::Compile(Values, ast);
+        }
+
+    private:
+
+        void ReduceCmd(NCommands::TSyntax::TCommand& cmd) {
+            for (auto& arg : cmd)
+                for (auto& term : arg)
+                    if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&term); sub) {
+                        auto cutoff = std::find_if(
+                            sub->Mods.begin(), sub->Mods.end(),
+                            [&](auto& mod) {return Condition(Values.Func2Id(mod.Name));}
+                        );
+                        if (cutoff == sub->Mods.end()) {
+                            ReduceCmd(sub->Body);
+                            continue;
+                        }
+                        auto val = EvalCmd(sub->Body);
+                        auto rcutoff = std::make_reverse_iterator(cutoff);
+                        for (auto mod = sub->Mods.rbegin(); mod != rcutoff; ++mod)
+                            val = ApplyMod(*mod, val);
+                        sub->Mods.erase(cutoff, sub->Mods.end());
+                        if (sub->Mods.empty())
+                            term = val;
+                        else
+                            sub->Body = {{val}};
+                    }
+        }
+
+        NPolexpr::TConstId EvalCmd(const NCommands::TSyntax::TCommand& cmd) {
+            TVector<NPolexpr::TConstId> args;
+            args.reserve(cmd.size());
+            for (auto& arg : cmd) {
+                TVector<NPolexpr::TConstId> terms;
+                terms.reserve(arg.size());
+                for (auto& term : arg) {
+                    terms.push_back(std::visit(TOverloaded{
+                        [&](NPolexpr::TConstId id) {
+                            return id;
+                        },
+                        [&](NPolexpr::EVarId id) {
+                            return Wrap(Evaluate(id));
+                        },
+                        [&](const NCommands::TSyntax::TSubstitution& sub) -> NPolexpr::TConstId {
+                            Y_UNUSED(sub);
+                            ythrow TNotImplemented();
+                        }
+                    }, term));
+                }
+                args.push_back(Wrap(Evaluate(Values.Func2Id(EMacroFunctions::Terms), std::span(terms))));
+            }
+            return Wrap(Evaluate(Values.Func2Id(EMacroFunctions::Args), std::span(args)));
+        }
+
+        NPolexpr::TConstId ApplyMod(const NCommands::TSyntax::TSubstitution::TModifier& mod, NPolexpr::TConstId val) {
+            TVector<NPolexpr::TConstId> args;
+            args.reserve(mod.Values.size() + 1);
+            for (auto& modVal : mod.Values) {
+                TVector<NPolexpr::TConstId> catArgs;
+                catArgs.reserve(modVal.size());
+                for (auto& modTerm : modVal) {
+                    catArgs.push_back(std::visit(TOverloaded{
+                        [&](NPolexpr::TConstId id) {
+                            return id;
+                        },
+                        [&](NPolexpr::EVarId id) {
+                            return Wrap(Evaluate(id));
+                        },
+                    }, modTerm));
+                }
+                args.push_back(Wrap(Evaluate(Values.Func2Id(EMacroFunctions::Cat), std::span(catArgs))));
+            }
+            args.push_back(val);
+            return Wrap(Evaluate(Values.Func2Id(mod.Name), std::span(args)));
+        }
+
+    private:
 
         bool Condition(NPolexpr::TFuncId func) {
             RootFnIdx = static_cast<EMacroFunctions>(func.GetIdx());
@@ -70,15 +150,15 @@ namespace {
                     // one does not simply reuse the original argument,
                     // for it might have been transformed (e.g., dequoted)
                     auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                    auto input = TMacroValues::TInput {.Coord = CollectCoord(pooledName, Inputs)};
-                    UpdateCoord(Inputs, input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
+                    auto input = TMacroValues::TInput {.Coord = CollectCoord(pooledName, Sink.Inputs)};
+                    UpdateCoord(Sink.Inputs, input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
                     return input;
                 }
                 auto result = TMacroValues::TInputs();
                 for (auto& name : names) {
                     auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(name)));
-                    result.Coords.push_back(CollectCoord(pooledName, Inputs));
-                    UpdateCoord(Inputs, result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
+                    result.Coords.push_back(CollectCoord(pooledName, Sink.Inputs));
+                    UpdateCoord(Sink.Inputs, result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
                 }
                 return result;
             };
@@ -154,7 +234,7 @@ namespace {
                             // one does not simply reuse the original argument,
                             // for it might have been transformed (e.g., dequoted)
                             auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                            return TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Outputs)};
+                            return TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Sink.Outputs)};
                         }
                         throw std::runtime_error{"Output arrays are not supported"};
                     }
@@ -181,7 +261,7 @@ namespace {
                         auto arg0 = std::get_if<TMacroValues::TOutput>(&unwrappedArgs[0]);
                         if (!arg0)
                             throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid output";
-                        UpdateCoord(Outputs, arg0->Coord, [](auto& var) {
+                        UpdateCoord(Sink.Outputs, arg0->Coord, [](auto& var) {
                             var.NoAutoSrc = true;
                         });
                         return *arg0;
@@ -224,8 +304,7 @@ namespace {
 
         TMacroValues& Values;
         const TVars& Vars;
-        TInputs& Inputs;
-        TOutputs& Outputs;
+        TCommands::TCompiledCommand& Sink;
         EMacroFunctions RootFnIdx;
 
     };
@@ -592,11 +671,10 @@ TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inli
     auto ast = Inline(cachedAst, newVars);
     checkRecursionStuff();
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
-    auto expr = NCommands::Compile(Values, ast);
     if (preevaluate)
-        return Preevaluate(expr, allVars, oam);
+        return Preevaluate(ast, allVars, oam);
     else
-        return TCompiledCommand{.Expression = std::move(expr)};
+        return TCompiledCommand{.Expression = NCommands::Compile(Values, ast)};
 }
 
 ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
@@ -672,7 +750,7 @@ void TCommands::StreamCmdRepr(
     }
 }
 
-TCommands::TCompiledCommand TCommands::Preevaluate(const NPolexpr::TExpression& expr, const TVars& vars, EOutputAccountingMode oam) {
+TCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam) {
     TCompiledCommand result;
     switch (oam) {
         case EOutputAccountingMode::Default:
@@ -682,8 +760,8 @@ TCommands::TCompiledCommand TCommands::Preevaluate(const NPolexpr::TExpression& 
             result.Outputs.Base = 1;
             break;
     }
-    auto reducer = TRefReducer{Values, vars, result.Inputs, result.Outputs};
-    result.Expression = NPolexpr::ReduceIf<TMacroValues::TValue>(expr, std::move(reducer));
+    auto reducer = TRefReducer{Values, vars, result};
+    reducer.ReduceIf(expr);
     return result;
 }
 
