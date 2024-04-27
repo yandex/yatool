@@ -70,6 +70,7 @@ struct TGeneratorSpec {
     THashMap<std::string, TVector<fs::path>> Merge;
     THashMap<uint32_t, TGeneratorRule> Rules;
     bool UseManagedPeersClosure{false};
+    bool IgnorePlatforms{false};
 
     TRuleSet GetAttrRules(const std::string_view attr) const;
     TRuleSet GetPlatformRules(const std::string_view platform) const;

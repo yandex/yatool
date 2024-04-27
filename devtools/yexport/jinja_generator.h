@@ -29,14 +29,6 @@ class TJinjaGenerator;
 template<typename Values>
 concept IterableValues = std::ranges::range<Values>;
 
-struct TJinjaTarget : TProjectTarget {
-    std::string TestModDir; ///< If target is test, here directory of module with this test inside
-
-    bool IsTest() const {
-        return !TestModDir.empty();
-    }
-};
-
 class TJinjaProject : public TProject {
 public:
     class TBuilder;
@@ -61,22 +53,23 @@ public:
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
+    TProjectPtr AnalizeSemGraph(const TPlatform& platform);
 
-    void AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph);
-
-    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpSems(IOutputStream& out) const override; ///< Get dump of semantics tree with values for testing or debug
     void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
 
 private:
     friend class TJinjaProject::TBuilder;
 
     void Render(ECleanIgnored cleanIgnored) override;
-    void RenderSubdir(TProjectSubdirPtr subdir);
-
-    EAttrTypes GetAttrType(EAttrGroup attrGroup, const std::string_view attrName) const;
+    void RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanIgnored);
+    void MergePlatforms();
+    void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
+    void RenderRoot();
+    void RenderSubdir(TPlatformPtr platform, TProjectSubdirPtr subdir);
 
     const jinja2::ValuesMap& FinalizeRootAttrs();
-    jinja2::ValuesMap FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes = {});
+    jinja2::ValuesMap FinalizeSubdirsAttrs(TPlatformPtr platform, const std::vector<std::string>& pathPrefixes = {});
     jinja2::ValuesMap FinalizeAttrsForDump();
 
     std::string ProjectName;
@@ -86,11 +79,10 @@ private:
     std::vector<TJinjaTemplate> CommonTemplates;
     THashMap<std::string, std::vector<TJinjaTemplate>> TargetTemplates;
 
-    TProjectPtr Project;
     TAttrsPtr RootAttrs;
 
 public: // for tests only
-    THashMap<fs::path, TVector<TJinjaTarget>> GetSubdirsTargets() const;
+    THashMap<fs::path, TVector<TProjectTarget>> GetSubdirsTargets() const;
     void SetSpec(const TGeneratorSpec& spec);
 };
 
@@ -126,14 +118,11 @@ public:
 
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
     void OnAttribute(const std::string& attribute);
-    void SetTestModDir(const std::string& testModDir);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
 
     static void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
 
 private:
-    using TGetDebugStr = const std::function<std::string()>&;
-
     static bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);
 
     TAttrsPtr RootAttrs;

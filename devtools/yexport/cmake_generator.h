@@ -1,10 +1,8 @@
 #pragma once
 
 #include "generator_spec.h"
-#include "dir_cleaner.h"
 #include "jinja_template.h"
 #include "spec_based_generator.h"
-#include "project.h"
 
 #include <util/generic/hash.h>
 #include <util/generic/hash_set.h>
@@ -27,19 +25,6 @@ struct TProjectConf {
     TProjectConf(std::string_view name, const fs::path& arcadiaRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
 };
 
-struct TPlatform {
-    std::string Name;
-    THolder<TSemGraph> Graph;
-    TVector<TNodeId> StartDirs;
-    THashMap<std::string, TVector<std::string>> GlobalVars;
-    THashSet<fs::path> SubDirs;
-    TProjectPtr Project;
-
-    explicit TPlatform(std::string_view platformName);
-};
-
-using TPlatformPtr = TSimpleSharedPtr<TPlatform>;
-
 struct TGlobalProperties {
     TSet<std::string> Languages;
     TSet<std::string> ConanPackages;
@@ -54,8 +39,6 @@ struct TGlobalProperties {
 class TCMakeGenerator: public TSpecBasedGenerator {
 private:
     TProjectConf Conf;
-    TDirCleaner Cleaner;
-    TVector<TPlatformPtr> Platforms;
     TGlobalProperties GlobalProperties;
 
     void RenderPlatforms();
@@ -82,8 +65,9 @@ public:
     void SetProjectName(const std::string& projectName) override;
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
 
-    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpSems(IOutputStream& out) const override; ///< Get dump of semantics tree with values for testing or debug
     void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
+    bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
 };
 
 }

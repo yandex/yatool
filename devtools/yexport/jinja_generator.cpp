@@ -25,7 +25,7 @@
 namespace NYexport {
 
 TJinjaProject::TJinjaProject() {
-    SetFactoryTypes<TProjectSubdir, TJinjaTarget>();
+    SetFactoryTypes<TProjectSubdir, TProjectTarget>();
 }
 
 TJinjaProject::TBuilder::TBuilder(TJinjaGenerator* generator, TAttrsPtr rootAttrs)
@@ -64,10 +64,6 @@ bool TJinjaProject::TBuilder::AddToTargetInducedAttr(const std::string& attrName
 
 void TJinjaProject::TBuilder::OnAttribute(const std::string& attribute) {
     Generator->OnAttribute(attribute);
-}
-
-void TJinjaProject::TBuilder::SetTestModDir(const std::string& testModDir) {
-    CurTarget_.As<TJinjaTarget>()->TestModDir = testModDir;
 }
 
 const TNodeSemantics& TJinjaProject::TBuilder::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
@@ -132,12 +128,12 @@ public:
         }
         auto macroArgs = semArgs.subspan(2);
         state.Top().CurTargetHolder = ProjectBuilder_->CreateTarget(modDir);
-        if (isTestTarget) {
-            JinjaProjectBuilder_->SetTestModDir(modDir);
-        }
         auto* curSubdir = ProjectBuilder_->CurrentSubdir();
         curSubdir->Attrs = Generator_->MakeAttrs(EAttrGroup::Directory, "dir " + curSubdir->Path.string());
         auto* curTarget = ProjectBuilder_->CurrentTarget();
+        if (isTestTarget) {
+            curTarget->TestModDir = modDir;
+        }
         curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name);
         auto& attrs = curTarget->Attrs->GetWritableMap();
         curTarget->Name = semArgs[1];
@@ -147,7 +143,7 @@ public:
         curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
         attrs.emplace("macroArgs", jinja2::ValuesList(curTarget->MacroArgs.begin(), curTarget->MacroArgs.end()));
         attrs.emplace("isTest", isTestTarget);
-        const auto* jinjaTarget = dynamic_cast<const TJinjaTarget*>(JinjaProjectBuilder_->CurrentTarget());
+        const auto* jinjaTarget = dynamic_cast<const TProjectTarget*>(JinjaProjectBuilder_->CurrentTarget());
         Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
     }
 
@@ -293,7 +289,7 @@ private:
 
     TSimpleSharedPtr<TJinjaProject::TBuilder> JinjaProjectBuilder_;
 
-    THashMap<TNodeId, const TJinjaTarget*> Mod2Target_;
+    THashMap<TNodeId, const TProjectTarget*> Mod2Target_;
     THashMap<TNodeId, TAttrsPtr> InducedAttrs_;
     TVector<std::string> TestSubdirs_;
 };
@@ -308,7 +304,7 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
     const auto generatorFile = generatorDir / GENERATOR_FILE;
     if (!fs::exists(generatorFile)) {
-        YEXPORT_THROW(fmt::format("Failed to load generator {}. No {} file found", generator, generatorFile.c_str()));
+        YEXPORT_THROW(fmt::format("Failed to load generator {}, file {} not found", generator, generatorFile.c_str()));
     }
     THolder<TJinjaGenerator> result = MakeHolder<TJinjaGenerator>();
     if (dumpOpts.has_value()) {
@@ -317,77 +313,84 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     if (debugOpts.has_value()) {
         result->DebugOpts_ = debugOpts.value();
     }
-
-    auto& generatorSpec = result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
-
-    result->YexportSpec = result->ReadYexportSpec(configDir);
     result->GeneratorDir = generatorDir;
     result->ArcadiaRoot = arcadiaRoot;
     result->SetupJinjaEnv();
 
-    result->RootTemplates = result->LoadJinjaTemplates(generatorSpec.Root.Templates);
-    result->DirTemplates = result->LoadJinjaTemplates(generatorSpec.Dir.Templates);
-    result->CommonTemplates = result->LoadJinjaTemplates(generatorSpec.Common.Templates);
+    const auto& generatorSpec = result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
+    result->YexportSpec = result->ReadYexportSpec(configDir);
 
+    if (result->GeneratorSpec.Root.Templates.empty()) {
+        throw TBadGeneratorSpec("[error] No root templates exists in the generator file: " + generatorFile.string());
+    }
     if (result->GeneratorSpec.Targets.empty()) {
-        std::string message = "[error] No targets exist in the generator file: ";
+        std::string message = "[error] No targets exists in the generator file: ";
         throw TBadGeneratorSpec(message.append(generatorFile));
     }
 
+    result->RootTemplates = result->LoadJinjaTemplates(generatorSpec.Root.Templates);
+    result->DirTemplates = result->LoadJinjaTemplates(generatorSpec.Dir.Templates);
+    result->CommonTemplates = result->LoadJinjaTemplates(generatorSpec.Common.Templates);
     for (const auto& [targetName, target]: generatorSpec.Targets) {
         result->TargetTemplates[targetName] = result->LoadJinjaTemplates(target.Templates);
     }
-
-    result->RootAttrs = result->MakeAttrs(EAttrGroup::Root, "root");
-
     return result;
 }
 
-void TJinjaGenerator::AnalizeSemGraph(const TVector<TNodeId>& startDirs, const TSemGraph& graph) {
-    TJinjaGeneratorVisitor visitor(this, RootAttrs, GeneratorSpec);
-    IterateAll(graph, startDirs, visitor);
-    Project = visitor.TakeFinalizedProject();
-}
-
-void TJinjaGenerator::LoadSemGraph(const std::string&, const fs::path& semGraph) {
-    const auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
-    AnalizeSemGraph(startDirs, *graph);
-}
-
-EAttrTypes TJinjaGenerator::GetAttrType(EAttrGroup attrGroup, const std::string_view attrName) const {
-    if (const auto* attrs = GeneratorSpec.AttrGroups.FindPtr(attrGroup)) {
-        if (const auto it = attrs->find(attrName); it != attrs->end()) {
-            return it->second;
-        }
+void TJinjaGenerator::LoadSemGraph(const std::string& platformName, const fs::path& semGraph) {
+    if (!platformName.empty()) {
+        YEXPORT_VERIFY(GeneratorSpec.Platforms.find(platformName) != GeneratorSpec.Platforms.end(), fmt::format("No specification for platform \"{}\"", platformName));
+    } else {
+        YEXPORT_VERIFY(IgnorePlatforms(), "Empty platform name for generator without ignore platforms");
     }
-    return EAttrTypes::Unknown;
+    auto [graph, startDirs] = ReadSemGraph(semGraph, GeneratorSpec.UseManagedPeersClosure);
+    auto& platform = *Platforms.emplace_back(MakeSimpleShared<TPlatform>(platformName));
+    graph.Swap(platform.Graph);
+    platform.StartDirs = std::move(startDirs);
+    OnPlatform(platformName);
+    if (!RootAttrs) { // first call, make root attributes storage
+        RootAttrs = MakeAttrs(EAttrGroup::Root, "root");
+    }
+    platform.Project = AnalizeSemGraph(platform);
+}
+
+TProjectPtr TJinjaGenerator::AnalizeSemGraph(const TPlatform& platform) {
+    TJinjaGeneratorVisitor visitor(this, RootAttrs, GeneratorSpec);
+    IterateAll(*platform.Graph, platform.StartDirs, visitor);
+    return visitor.TakeFinalizedProject();
 }
 
 /// Get dump of attributes tree with values for testing or debug
-void TJinjaGenerator::DumpSems(IOutputStream& out) {
-    if (DumpOpts_.DumpPathPrefixes.empty()) {
-        out << "--- ROOT\n" << Project->SemsDump;
-    }
-    for (const auto& subdir: Project->GetSubdirs()) {
-        if (subdir->Targets.empty()) {
-            continue;
+void TJinjaGenerator::DumpSems(IOutputStream& out) const {
+    const auto ignorePlatforms = IgnorePlatforms();
+    for (const auto& platform: Platforms) {
+        if (!ignorePlatforms) {
+            out << "--- PLATFORM " << platform->Name << "\n";
         }
-        const std::string path = subdir->Path;
-        if (!DumpOpts_.DumpPathPrefixes.empty()) {
-            bool dumpIt = false;
-            for (const auto& prefix : DumpOpts_.DumpPathPrefixes) {
-                if (path.substr(0, prefix.size()) == prefix) {
-                    dumpIt = true;
-                    break;
-                }
-            }
-            if (!dumpIt) {
+        if (DumpOpts_.DumpPathPrefixes.empty()) {
+            out << "--- ROOT\n" << platform->Project->SemsDump;
+        }
+        for (const auto& subdir: platform->Project->GetSubdirs()) {
+            if (subdir->Targets.empty()) {
                 continue;
             }
-        }
-        out << "--- DIR " << path << "\n";
-        for (const auto& target: subdir->Targets) {
-            out << "--- TARGET " << target->Name << "\n" << target->SemsDump;
+            const std::string path = subdir->Path;
+            if (!DumpOpts_.DumpPathPrefixes.empty()) {
+                bool dumpIt = false;
+                for (const auto& prefix : DumpOpts_.DumpPathPrefixes) {
+                    if (path.substr(0, prefix.size()) == prefix) {
+                        dumpIt = true;
+                        break;
+                    }
+                }
+                if (!dumpIt) {
+                    continue;
+                }
+            }
+            out << "--- DIR " << path << "\n";
+            for (const auto& target: subdir->Targets) {
+                out << "--- TARGET " << target->Name << "\n" << target->SemsDump;
+            }
         }
     }
 }
@@ -397,72 +400,128 @@ void TJinjaGenerator::DumpAttrs(IOutputStream& out) {
     ::NYexport::Dump(out, FinalizeAttrsForDump());
 }
 
-void TJinjaGenerator::Render(ECleanIgnored) {
-    YEXPORT_VERIFY(Project, "Cannot render because project was not yet loaded");
+void TJinjaGenerator::Render(ECleanIgnored cleanIgnored) {
+    for (auto& platform : Platforms) {
+        RenderPlatform(platform, cleanIgnored);
+    }
     CopyFilesAndResources();
-    FinalizeSubdirsAttrs();
-    for (const auto& subdir: Project->GetSubdirs()) {
+    MergePlatforms();
+    RenderRoot();
+    if (cleanIgnored == ECleanIgnored::Enabled) {
+        Cleaner.Clean(*ExportFileManager);
+    }
+
+}
+
+void TJinjaGenerator::RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanIgnored) {
+    if (cleanIgnored == ECleanIgnored::Enabled) {
+        Cleaner.CollectDirs(*platform->Graph, platform->StartDirs);
+    }
+
+    FinalizeSubdirsAttrs(platform);
+    for (const auto& subdir: platform->Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
             continue;
         }
-        RenderSubdir(subdir);
     }
 
+    auto topLevelSubdirs = jinja2::ValuesList();
+    for (auto subdir: platform->Project->GetSubdirs()) {
+        Y_ASSERT(subdir);
+        if (subdir->IsTopLevel()) {
+            topLevelSubdirs.emplace_back(subdir->Path.string());
+        }
+        RenderSubdir(platform, subdir);
+    }
+
+    TAttrsPtr rootdirAttrs = MakeAttrs(EAttrGroup::Directory, "rootdir");
+    const auto [_, inserted] = rootdirAttrs->GetWritableMap().emplace("subdirs", topLevelSubdirs);
+    Y_ASSERT(inserted);
+    SetCurrentDirectory(ArcadiaRoot);
+    RenderJinjaTemplates(rootdirAttrs, DirTemplates, "", platform->Name);
+}
+
+void TJinjaGenerator::MergePlatforms() {
+    TSpecBasedGenerator::MergePlatforms(DirTemplates, CommonTemplates);
+}
+
+void TJinjaGenerator::RenderRoot() {
+    ApplyRules(RootAttrs);
     FinalizeRootAttrs();
+    SetCurrentDirectory(ArcadiaRoot);
     RenderJinjaTemplates(RootAttrs, RootTemplates);
 }
 
-void TJinjaGenerator::RenderSubdir(TProjectSubdirPtr subdir) {
+void TJinjaGenerator::RenderSubdir(TPlatformPtr platform, TProjectSubdirPtr subdir) {
+    if (!subdir->Attrs && DirTemplates.empty()) { // directory without targets and no directory templates, skip it
+        return;
+    }
     SetCurrentDirectory(ArcadiaRoot / subdir->Path);
+    if (!DirTemplates.empty()) {
+        RenderJinjaTemplates(subdir->Attrs, DirTemplates, subdir->Path, platform->Name);
+    }
     for (const auto& [targetName, targetNameAttrs] : subdir->Attrs->GetMap()) {
         // TODO vvv Store attributes in TAttrs
         TAttrsPtr targetAttrsStorage = MakeAttrs(EAttrGroup::Target, targetName);
         targetAttrsStorage->GetWritableMap() = targetNameAttrs.asMap();
         // TODO ^^^ Store attributes in TAttrs
-        RenderJinjaTemplates(targetAttrsStorage, TargetTemplates[targetName], subdir->Path);
+        RenderJinjaTemplates(targetAttrsStorage, TargetTemplates[targetName], subdir->Path, platform->Name);
     }
 }
 
 const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
-    YEXPORT_VERIFY(Project, "Cannot finalize root attrs because project was not yet loaded");
-    if (!RootAttrs) {
-        RootAttrs = MakeAttrs(EAttrGroup::Root, "root");
-    }
+    YEXPORT_VERIFY(!Platforms.empty(), "Cannot finalize root attrs because project was not yet loaded");
     auto& attrs = RootAttrs->GetWritableMap();
     if (attrs.contains("projectName")) { // already finalized
         return attrs;
     }
-    auto [subdirsIt, subdirsInserted] = attrs.emplace("subdirs", jinja2::ValuesList{});
-    for (const auto& subdir: Project->GetSubdirs()) {
-        if (subdir->Targets.empty()) {
-            continue;
-        }
-        subdirsIt->second.asList().emplace_back(subdir->Path.c_str());
-    }
-    attrs.emplace("arcadiaRoot", ArcadiaRoot);
-    if (ExportFileManager) {
-        attrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
-    }
     attrs.emplace("projectName", ProjectName);
-    if (!YexportSpec.AddAttrsDir.empty()) {
-        attrs.emplace("add_attrs_dir", YexportSpec.AddAttrsDir);
-    }
-    if (!YexportSpec.AddAttrsTarget.empty()) {
-        attrs.emplace("add_attrs_target", YexportSpec.AddAttrsTarget);
+    const auto ignorePlatforms = IgnorePlatforms();
+    std::unordered_set<std::string> existsSubdirs;
+    auto [subdirsIt, subdirsInserted] = attrs.emplace("subdirs", jinja2::ValuesList{});
+    auto& subdirs = subdirsIt->second.asList();
+    for (const auto& platform : Platforms) {
+        for (const auto& subdir: platform->Project->GetSubdirs()) {
+            if (subdir->Targets.empty()) {
+                continue;
+            }
+            auto subdirPath = subdir->Path.string();
+            if (!existsSubdirs.contains(subdirPath)) {
+                subdirs.emplace_back(subdirPath);
+                existsSubdirs.insert(subdirPath);
+            }
+        }
+        attrs.emplace("arcadiaRoot", ArcadiaRoot);
+        if (ExportFileManager) {
+            attrs.emplace("exportRoot", ExportFileManager->GetExportRoot());
+        }
+        if (!YexportSpec.AddAttrsDir.empty()) {
+            attrs.emplace("add_attrs_dir", YexportSpec.AddAttrsDir);
+        }
+        if (!YexportSpec.AddAttrsTarget.empty()) {
+            attrs.emplace("add_attrs_target", YexportSpec.AddAttrsTarget);
+        }
     }
     if (DebugOpts_.DebugAttrs) {
         attrs.emplace(DEBUG_ATTRS_ATTR, ::NYexport::Dump(RootAttrs->GetMap()));
     }
     if (DebugOpts_.DebugSems) {
-        attrs.emplace(DEBUG_SEMS_ATTR, Project->SemsDump);
+        for (const auto& platform : Platforms) {
+            if (ignorePlatforms) {
+                attrs.emplace(DEBUG_SEMS_ATTR, platform->Project->SemsDump);
+            } else {
+                auto [debugSemsIt, _] = attrs.emplace(DEBUG_SEMS_ATTR, jinja2::ValuesMap{});
+                debugSemsIt->second.asMap().emplace(platform->Name, platform->Project->SemsDump);
+            }
+        }
     }
     return RootAttrs->GetMap();
 }
 
-jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(const std::vector<std::string>& pathPrefixes) {
-    YEXPORT_VERIFY(Project, "Cannot finalize subdirs attrs because project was not yet loaded");
+jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, const std::vector<std::string>& pathPrefixes) {
+    YEXPORT_VERIFY(!Platforms.empty(), "Cannot finalize subdirs attrs because project was not yet loaded");
     jinja2::ValuesMap subdirsAttrs;
-    for (auto& subdir: Project->GetSubdirs()) {
+    for (auto& subdir: platform->Project->GetSubdirs()) {
         if (subdir->Targets.empty()) {
             continue;
         }
@@ -505,7 +564,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(const std::vector<std::s
                 }
             }
             auto& targetMacroAttrs = targetMacroAttrsIt->second.asMap();
-            auto isTest = target.As<TJinjaTarget>()->IsTest();
+            auto isTest = target.As<TProjectTarget>()->IsTest();
             if (isTest) {
                 targetMacroAttrs.insert_or_assign("hasTest", true);
             }
@@ -540,26 +599,42 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeAttrsForDump() {
     DebugOpts_.DebugAttrs = false;
     jinja2::ValuesMap allAttrs;
     allAttrs.emplace("root", FinalizeRootAttrs());
-    allAttrs.emplace("subdirs", FinalizeSubdirsAttrs(DumpOpts_.DumpPathPrefixes));
+    if (IgnorePlatforms()) {
+        allAttrs.emplace("subdirs", FinalizeSubdirsAttrs(Platforms[0], DumpOpts_.DumpPathPrefixes));
+    } else {
+        for (auto& platform : Platforms) {
+            auto platformSubdirs = FinalizeSubdirsAttrs(platform, DumpOpts_.DumpPathPrefixes);
+            if (!platformSubdirs.empty()) {
+                auto [allSubdirsIt, _] = allAttrs.emplace("subdirs", jinja2::ValuesMap{});
+                allSubdirsIt->second.asMap().emplace(platform->Name, std::move(platformSubdirs));
+            }
+        }
+    }
     return allAttrs;
 }
 
-THashMap<fs::path, TVector<TJinjaTarget>> TJinjaGenerator::GetSubdirsTargets() const {
-    YEXPORT_VERIFY(Project, "Cannot get subdirs table because project was not yet loaded");
-    THashMap<fs::path, TVector<TJinjaTarget>> res;
-    for (const auto& subdir: Project->GetSubdirs()) {
-        TVector<TJinjaTarget> targets;
-        Transform(subdir->Targets.begin(), subdir->Targets.end(), std::back_inserter(targets), [&](TProjectTargetPtr target) { return *target.As<TJinjaTarget>(); });
-        res.emplace(subdir->Path, targets);
+THashMap<fs::path, TVector<TProjectTarget>> TJinjaGenerator::GetSubdirsTargets() const {
+    YEXPORT_VERIFY(!Platforms.empty(), "Cannot get subdirs table because project was not yet loaded");
+    THashMap<fs::path, TVector<TProjectTarget>> res;
+    for (const auto& platform : Platforms) {
+        for (const auto& subdir: platform->Project->GetSubdirs()) {
+            TVector<TProjectTarget> targets;
+            Transform(subdir->Targets.begin(), subdir->Targets.end(), std::back_inserter(targets), [&](TProjectTargetPtr target) {
+                return *target.As<TProjectTarget>();
+            });
+            auto subdirIt = res.find(subdir->Path);
+            if (subdirIt == res.end()) {
+                res.emplace(subdir->Path, std::move(targets));
+            } else {
+                subdirIt->second.insert(subdirIt->second.end(), targets.begin(), targets.end());
+            }
+        }
     }
     return res;
 }
 
 void TJinjaGenerator::SetSpec(const TGeneratorSpec& spec) {
     GeneratorSpec = spec;
-    if (!RootAttrs) {
-        RootAttrs = MakeAttrs(EAttrGroup::Root, "root");
-    }
 };
 
 }

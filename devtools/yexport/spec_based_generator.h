@@ -6,8 +6,10 @@
 #include "target_replacements.h"
 #include "attributes.h"
 #include "jinja_template.h"
+#include "dir_cleaner.h"
 #include "dump.h"
 #include "debug.h"
+#include "project.h"
 
 #include <util/generic/hash_set.h>
 
@@ -16,6 +18,21 @@
 #include <type_traits>
 
 namespace NYexport {
+
+struct TPlatform {
+    std::string Name;
+    THolder<TSemGraph> Graph;
+    TVector<TNodeId> StartDirs;
+    THashMap<std::string, TVector<std::string>> GlobalVars;
+    TProjectPtr Project;
+
+    TPlatform() = delete;
+    explicit TPlatform(std::string_view platformName)
+        : Name(platformName)
+    {}
+};
+
+using TPlatformPtr = TSimpleSharedPtr<TPlatform>;
 
 /// Common base class for generators configurable with generator.toml specs
 class TSpecBasedGenerator : public TYexportGenerator {
@@ -49,11 +66,14 @@ public:
     }
 
     TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name) const;
+    bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
 
 protected:
     void CopyFilesAndResources();
     std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const;
     void RenderJinjaTemplates(TAttrsPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
+    void MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& commonTemplates) const;
+    static void InsertPlatforms(jinja2::ValuesMap& valuesMap, const std::vector<TPlatformPtr>& platforms);
 
     using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
     using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;
@@ -63,6 +83,8 @@ protected:
 
     TGeneratorSpec GeneratorSpec;
     TYexportSpec YexportSpec;
+    TVector<TPlatformPtr> Platforms;
+    TDirCleaner Cleaner;
     THashSet<std::string> UsedAttributes;
     THashSet<const TGeneratorRule*> UsedRules;
     TTargetReplacements TargetReplacements_;///< Patches for semantics by path

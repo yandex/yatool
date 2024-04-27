@@ -278,7 +278,7 @@ namespace {
         void CustomFinalize() override {
             for (auto subdir : Project_->GetSubdirs()) {
                 auto& cmakeList = *subdir.As<TCMakeList>();
-                for (const auto& child : cmakeList.Subdirectories) {
+                for (const auto& child : cmakeList.Subdirs) {
                     cmakeList.SubdirectoriesToAdd.insert(child->Path.filename());
                 }
             }

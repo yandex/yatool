@@ -29,8 +29,9 @@ public:
     void RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
     TExportFileManager* GetExportFileManager();
 
-    virtual void DumpSems(IOutputStream& out) = 0; ///< Get dump of semantics tree with values for testing or debug
+    virtual void DumpSems(IOutputStream& out) const = 0; ///< Get dump of semantics tree with values for testing or debug
     virtual void DumpAttrs(IOutputStream& out) = 0; ///< Get dump of attributes tree with values for testing or debug
+    virtual bool IgnorePlatforms() const = 0;///< Generator ignore platforms and wait strong one sem-graph as input
 
 protected:
     virtual void Render(ECleanIgnored cleanIgnored) = 0;

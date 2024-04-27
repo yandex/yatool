@@ -115,6 +115,7 @@ void TSpecBasedGenerator::SetupJinjaEnv() {
         /*argsInfos=*/ { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
     });
 }
+
 void TSpecBasedGenerator::SetCurrentDirectory(const fs::path& dir) const {
     YEXPORT_VERIFY(JinjaEnv, "Cannot set current directory to " << dir << " before setting up jinja enviroment");
     SourceTemplateFs->SetRootFolder(dir.c_str());
@@ -145,6 +146,10 @@ TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::strin
         spdlog::error("No attribute specification for {}", ToString<EAttrGroup>(eattrGroup));
         return TAttrs::Create(EMPTY_ATTR_GROUP, name);
     }
+}
+
+bool TSpecBasedGenerator::IgnorePlatforms() const {
+    return GeneratorSpec.IgnorePlatforms;
 }
 
 fs::path TSpecBasedGenerator::PathByCopyLocation(ECopyLocation location) const {
@@ -185,6 +190,60 @@ void TSpecBasedGenerator::RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJin
     for (auto& jinjaTemplate: jinjaTemplates) {
         jinjaTemplate.SetValueMap(attrs);
         jinjaTemplate.RenderTo(*ExportFileManager, relativeToExportRootDirname, platformName);
+    }
+}
+
+void TSpecBasedGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& commonTemplates) const {
+    if (commonTemplates.empty()) { // can't merge platforms without common templates
+        return;
+    }
+
+    THashMap<fs::path, std::vector<TPlatformPtr>> dir2platforms;// list of platforms for each dir
+    for (const auto& platform : Platforms) {
+        for (const auto& dir : platform->Project->GetSubdirs()) {
+            dir2platforms[dir->Path].emplace_back(platform);
+        }
+    }
+
+    Y_ASSERT(commonTemplates.size() == dirTemplates.size());
+    auto templatesCount = dirTemplates.size();
+    for (size_t i = 0; i < templatesCount; ++i) {
+        const auto& dirTemplate = dirTemplates[i];
+        auto& commonTemplate = commonTemplates[i];
+        for (const auto& [dir, dirPlatforms]: dir2platforms) {
+            bool isDifferent = false;
+            if (dirPlatforms.size() > 1) {
+                TString md5 = ExportFileManager->MD5(dirTemplate.RenderFilename(dir, dirPlatforms[0]->Name));
+                for (size_t j = 1; j < dirPlatforms.size(); ++j) {
+                    TString otherMd5 = ExportFileManager->MD5(dirTemplate.RenderFilename(dir, dirPlatforms[j]->Name));
+                    if (isDifferent |= (md5 != otherMd5)) {
+                        break;
+                    }
+                }
+            }
+            if (isDifferent) {
+                TAttrsPtr dirValueMap = MakeAttrs(EAttrGroup::Directory, dir);
+                auto& dirMap = dirValueMap->GetWritableMap();
+                dirMap["platforms"] = GeneratorSpec.Platforms;
+                InsertPlatforms(dirMap, dirPlatforms);
+                SetCurrentDirectory(ArcadiaRoot / dir);
+                commonTemplate.SetValueMap(dirValueMap);
+                commonTemplate.RenderTo(*ExportFileManager, dir);
+            } else {
+                auto finalPath = commonTemplate.RenderFilename(dir, "");
+                ExportFileManager->CopyFromExportRoot(dirTemplate.RenderFilename(dir, dirPlatforms[0]->Name), finalPath);
+                for (const auto& dirPlatform : dirPlatforms) {
+                    ExportFileManager->Remove(dirTemplate.RenderFilename(dir, dirPlatform->Name));
+                }
+            }
+        }
+    }
+}
+
+void TSpecBasedGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const std::vector<TPlatformPtr>& platforms) {
+    auto& platformNames = valuesMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
+    for (const auto& platform : platforms) {
+        platformNames.emplace_back(platform->Name);
     }
 }
 

@@ -1,5 +1,6 @@
 #include "project.h"
 #include "diag/exception.h"
+#include "spec_based_generator.h"
 
 namespace NYexport {
 
@@ -66,7 +67,7 @@ namespace NYexport {
             createDirectories.push_back(currDirPtr);
         }
         for (size_t i = 0; i + 1 < createDirectories.size(); ++i) {
-            createDirectories[i + 1]->Subdirectories.push_back(createDirectories[i]);
+            createDirectories[i + 1]->Subdirs.push_back(createDirectories[i]);
         }
 
         return subdirs.at(dir);

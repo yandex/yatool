@@ -56,8 +56,9 @@ public:
 
     void Render(IInputStream& pyDepsDump, IOutputStream& dest) const;
 
-    void DumpSems(IOutputStream& out) override; ///< Get dump of semantics tree with values for testing or debug
+    void DumpSems(IOutputStream& out) const override; ///< Get dump of semantics tree with values for testing or debug
     void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
+    bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
 
 private:
     void Render(ECleanIgnored cleanIgnored) override;

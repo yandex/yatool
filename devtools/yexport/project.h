@@ -1,7 +1,6 @@
 #pragma once
 
 #include "std_helpers.h"
-#include "spec_based_generator.h"
 #include "attributes.h"
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
@@ -15,6 +14,7 @@
 
 namespace NYexport {
 
+    class TSpecBasedGenerator;
     class TProjectTarget;
     class TProjectSubdir;
     class TProject;
@@ -38,6 +38,12 @@ namespace NYexport {
         TAttrsPtr Attrs;
         std::string SemsDump; // Semantic dumps, collected during dispatch graph
         size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
+
+        std::string TestModDir; ///< If target is test, here directory of module with this test inside
+
+        bool IsTest() const {
+            return !TestModDir.empty();
+        }
     };
 
     class TProjectSubdir {
@@ -46,7 +52,7 @@ namespace NYexport {
         bool IsTopLevel() const;
 
         TVector<TProjectTargetPtr> Targets;
-        TVector<TProjectSubdirPtr> Subdirectories;
+        TVector<TProjectSubdirPtr> Subdirs;
         TAttrsPtr Attrs;
         fs::path Path;
     };

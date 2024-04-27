@@ -44,9 +44,9 @@ int main(int argc, char** argv) try {
         }
         generator->LoadSemGraph("", opts.PyDepsDump);
     }
-    if (opts.Platforms.empty()) { // no platforms, load strong one semgraph with empty platform
+    if (opts.Platforms.empty() || generator->IgnorePlatforms()) { // no platforms, load strong one semgraph with empty platform name
         if (opts.SemGraphs.size() != 1) {
-            spdlog::error("Requires exactly one semantic graph while using generator");
+            spdlog::error("Requires exactly one semantic graph while using generator {}", opts.Generator);
             return 1;
         }
         generator->LoadSemGraph("", opts.SemGraphs.front());

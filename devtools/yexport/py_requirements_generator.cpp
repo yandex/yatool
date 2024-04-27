@@ -118,13 +118,17 @@ void TPyRequirementsGenerator::LoadSemGraph(const std::string&, const fs::path& 
 }
 
 /// Get dump of semantics tree with values for testing or debug
-void TPyRequirementsGenerator::DumpSems(IOutputStream&) {
+void TPyRequirementsGenerator::DumpSems(IOutputStream&) const {
     spdlog::error("Dump semantics of Python generator now yet supported");
 }
 
 /// Get dump of attributes tree with values for testing or debug
 void TPyRequirementsGenerator::DumpAttrs(IOutputStream&) {
     spdlog::error("Dump attributes of Python generator now yet supported");
+}
+
+bool TPyRequirementsGenerator::IgnorePlatforms() const {
+    return true;// always ignore platforms
 }
 
 void TPyRequirementsGenerator::Render(ECleanIgnored) {

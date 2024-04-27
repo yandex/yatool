@@ -72,11 +72,11 @@ template <typename TIterState, typename TVisitor>
 using TSemGraphDepthIterator = TDepthGraphIterator<TIterState, TVisitor, TSemGraph>;
 
 template <typename TVisitor>
-void IterateAll(const TSemGraph& graph, const TVector<TNodeId>& nodes, TVisitor& visitor) {
+void IterateAll(const TSemGraph& graph, const TVector<TNodeId>& nodeIds, TVisitor& visitor) {
     typename TVisitor::TState state;
-    for (TNodeId start : nodes) {
+    for (TNodeId nodeId : nodeIds) {
         TSemGraphDepthIterator<typename TVisitor::TState, TVisitor> it(graph, state, visitor);
-        if (it.Init(graph[start])) {
+        if (it.Init(graph[nodeId])) {
             it.Run();
         }
     }

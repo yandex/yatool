@@ -30,6 +30,7 @@ namespace NKeys {
     constexpr const char* Merge = "merge";
     constexpr const char* Type = "type";
     constexpr const char* UseManagedPeersClosure = "use_managed_peers_closure";
+    constexpr const char* IgnorePlatforms = "ignore_platforms";
     constexpr const char* Rules = "rules";
     constexpr const char* AddValues = "add_values";
     constexpr const char* Values = "values";
@@ -437,13 +438,15 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
         TGeneratorSpec genspec;
 
         genspec.Root = ParseTargetSpec(root, features);
-        const auto& common = toml::find_or(doc, NKeys::Common, toml::table{});
-        if (!common.empty()) {
-            genspec.Common = ParseTargetSpec(common, features);
-        }
         const auto& dir = toml::find_or(doc, NKeys::Dir, toml::table{});
+        const auto& common = toml::find_or(doc, NKeys::Common, toml::table{});
         if (!dir.empty()) {
             genspec.Dir = ParseTargetSpec(dir, features);
+            if (!common.empty()) {
+                genspec.Common = ParseTargetSpec(common, features);
+            }
+        } else if (!common.empty()) {
+            spdlog::error("Section {} ignored, because section {} not exists", NKeys::Common, NKeys::Dir);
         }
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
             genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
@@ -504,6 +507,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpe
         }
 
         genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
+        genspec.IgnorePlatforms = toml::get<bool>(find_or<toml::value>(doc, NKeys::IgnorePlatforms, toml::boolean{false}));
         return genspec;
     } catch (const toml::exception& err) {
         throw TBadGeneratorSpec{err.what()};

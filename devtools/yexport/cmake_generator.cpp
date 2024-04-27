@@ -23,12 +23,6 @@ TProjectConf::TProjectConf(std::string_view name, const fs::path& arcadiaRoot, E
 {
 }
 
-TPlatform::TPlatform(std::string_view platformName)
-    : Name(platformName)
-    , Graph(nullptr)
-{
-}
-
 TCMakeGenerator::TCMakeGenerator(std::string_view name, const fs::path& arcadiaRoot)
     : Conf(name, arcadiaRoot)
 {
@@ -92,7 +86,6 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
     auto topLevelSubdirs = jinja2::ValuesList();
     for (auto subdir: platform->Project->GetSubdirs()) {
         Y_ASSERT(subdir);
-        platform->SubDirs.insert(subdir->Path);
         if (subdir->IsTopLevel()) {
             topLevelSubdirs.emplace_back(subdir->Path.c_str());
         }
@@ -101,21 +94,25 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
         RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Name);
     }
 
-    TAttrsPtr rootdirValuesMap = MakeAttrs(EAttrGroup::Directory, "rootdir");
-    const auto [_, inserted] = rootdirValuesMap->GetWritableMap().emplace("subdirs", topLevelSubdirs);
+    TAttrsPtr rootdirAttrs = MakeAttrs(EAttrGroup::Directory, "rootdir");
+    const auto [_, inserted] = rootdirAttrs->GetWritableMap().emplace("subdirs", topLevelSubdirs);
     Y_ASSERT(inserted);
     SetCurrentDirectory(ArcadiaRoot);
-    RenderJinjaTemplates(rootdirValuesMap, dirJinjaTemplates, "", platform->Name);
+    RenderJinjaTemplates(rootdirAttrs, dirJinjaTemplates, "", platform->Name);
 }
 
 /// Get dump of semantics tree with values for testing or debug
-void TCMakeGenerator::DumpSems(IOutputStream&) {
+void TCMakeGenerator::DumpSems(IOutputStream&) const {
     spdlog::error("Dump semantics tree of Cmake generator now yet supported");
 }
 
 /// Get dump of attributes tree with values for testing or debug
 void TCMakeGenerator::DumpAttrs(IOutputStream&) {
     spdlog::error("Dump attributes tree of Cmake generator now yet supported");
+}
+
+bool TCMakeGenerator::IgnorePlatforms() const {
+    return false;// always require platforms
 }
 
 void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
@@ -156,57 +153,7 @@ void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVecto
 
 void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const {
     auto commonJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Common.Templates);
-    Y_ASSERT(commonJinjaTemplates.size() == dirJinjaTemplates.size());
-
-    auto templatesCount = dirJinjaTemplates.size();
-
-    for (size_t i = 0; i < templatesCount; ++i) {
-        auto& dirTemplate = dirJinjaTemplates[i];
-        auto& commonTemplate = commonJinjaTemplates[i];
-        THashSet<fs::path> visitedDirs;
-        for (const auto& platform : Platforms) {
-            for (const auto& dir : platform->SubDirs) {
-                if (visitedDirs.contains(dir)) {
-                    continue;
-                }
-
-                bool isDifferent = false;
-                TString md5 = ExportFileManager->MD5(dirTemplate.RenderFilename(dir, platform->Name));
-                TVector<TPlatformPtr> dirPlatforms;
-                dirPlatforms.emplace_back(platform);
-                for (const auto& otherPlatform : Platforms) {
-                    if (platform->Name == otherPlatform->Name) {
-                        continue;
-                    }
-
-                    if (otherPlatform->SubDirs.contains(dir)) {
-                        if (md5 != ExportFileManager->MD5(dirTemplate.RenderFilename(dir, otherPlatform->Name))) {
-                            isDifferent = true;
-                        }
-                        dirPlatforms.emplace_back(otherPlatform);
-                    } else {
-                        isDifferent = true;
-                    }
-                }
-                if (isDifferent) {
-                    TAttrsPtr dirValueMap = MakeAttrs(EAttrGroup::Directory, dir);
-                    auto& dirMap = dirValueMap->GetWritableMap();
-                    dirMap["platforms"] = GeneratorSpec.Platforms;
-                    InsertPlatforms(dirMap, dirPlatforms);
-                    SetCurrentDirectory(ArcadiaRoot / dir);
-                    commonTemplate.SetValueMap(dirValueMap);
-                    commonTemplate.RenderTo(*ExportFileManager, dir, platform->Name);
-                } else {
-                    auto finalPath = commonTemplate.RenderFilename(dir, platform->Name);
-                    ExportFileManager->CopyFromExportRoot(dirTemplate.RenderFilename(dir, platform->Name), finalPath);
-                    for (const auto& dirPlatform : dirPlatforms) {
-                        ExportFileManager->Remove(dirTemplate.RenderFilename(dir, dirPlatform->Name));
-                    }
-                }
-                visitedDirs.insert(dir);
-            }
-        }
-    }
+    TSpecBasedGenerator::MergePlatforms(dirJinjaTemplates, commonJinjaTemplates);
 }
 
 jinja2::ValuesList TCMakeGenerator::GetAdjustedLanguagesList() const {
