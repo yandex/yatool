@@ -908,7 +908,6 @@ class ExecutorOptions(Options):
         self.use_clonefile = True
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
-        self.force_use_copy_instead_hardlink = False
 
     @staticmethod
     def consumer():
@@ -974,13 +973,6 @@ class ExecutorOptions(Options):
                 visible=HelpLevel.ADVANCED,
             ),
             EnvConsumer('YA_NO_CLONEFILE', hook=SetValueHook('use_clonefile', False)),
-            ArgConsumer(
-                ['--force-use-copy-instead-hardlink-macos-arm64'],
-                help='Use copy instead hardlink when clonefile is unavailable',
-                hook=SetConstValueHook('force_use_copy_instead_hardlink', True),
-                group=OPERATIONAL_CONTROL_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
         ]
 
     def postprocess2(self, params):
