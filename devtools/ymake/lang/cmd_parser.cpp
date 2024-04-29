@@ -11,30 +11,6 @@ using namespace NCommands;
 
 namespace {
 
-    EMacroFunctions CompileFnName(TStringBuf key) {
-        static const THashMap<TStringBuf, EMacroFunctions> names = {
-            {"hide",    EMacroFunctions::Hide},
-            {"clear",   EMacroFunctions::Clear},
-            {"input",   EMacroFunctions::Input},
-            {"output",  EMacroFunctions::Output},
-            {"tool",    EMacroFunctions::Tool},
-            {"pre",     EMacroFunctions::Pre},
-            {"suf",     EMacroFunctions::Suf},
-            {"quo",     EMacroFunctions::Quo},
-            {"noext",   EMacroFunctions::CutExt},
-            {"lastext", EMacroFunctions::LastExt},
-            {"ext",     EMacroFunctions::ExtFilter},
-            {"env",     EMacroFunctions::SetEnv},
-            {"kv",      EMacroFunctions::KeyValue},
-            {"noauto",  EMacroFunctions::NoAutoSrc},
-            {"glob",    EMacroFunctions::Glob},
-        };
-        auto it = names.find(key);
-        if (it == names.end())
-            throw yexception() << "unknown modifier " << key;
-        return it->second;
-    }
-
     //
     //
     //
@@ -87,7 +63,7 @@ namespace {
         // substitution pieces
 
         std::any visitSubModKey(CmdParser::SubModKeyContext *ctx) override {
-            GetCurrentSubst().Mods.push_back({CompileFnName(ctx->getText()), {}});
+            GetCurrentSubst().Mods.push_back({ctx->getText(), {}});
             return visitChildren(ctx);
         }
 
@@ -228,6 +204,42 @@ TSyntax NCommands::Parse(TMacroValues& values, TStringBuf src) {
 
 namespace {
 
+    EMacroFunctions CompileFnName(TStringBuf key) {
+        if (key == "hide") {
+            return EMacroFunctions::Hide;
+        } else if (key == "clear") {
+            return EMacroFunctions::Clear;
+        } else if (key == "input") {
+            return EMacroFunctions::Input;
+        } else if (key == "output") {
+            return EMacroFunctions::Output;
+        } else if (key == "tool") {
+            return EMacroFunctions::Tool;
+        } else if (key == "pre") {
+            return EMacroFunctions::Pre;
+        } else if (key == "suf") {
+            return EMacroFunctions::Suf;
+        } else if (key == "quo") {
+            return EMacroFunctions::Quo;
+        } else if (key == "noext") {
+            return EMacroFunctions::CutExt;
+        } else if (key == "lastext") {
+            return EMacroFunctions::LastExt;
+        } else if (key == "ext") {
+            return EMacroFunctions::ExtFilter;
+        } else if (key == "env") {
+            return EMacroFunctions::SetEnv;
+        } else if (key == "kv") {
+            return EMacroFunctions::KeyValue;
+        } else if (key == "noauto") {
+            return EMacroFunctions::NoAutoSrc;
+        } else if (key == "glob") {
+            return EMacroFunctions::Glob;
+        } else {
+            throw yexception() << "unknown modifier " << key;
+        }
+    }
+
     void CompileArgs(TMacroValues& values, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
         NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, values.Func2Id(EMacroFunctions::Args));
         for (size_t arg = 0; arg != cmd.size(); ++arg) {
@@ -242,7 +254,7 @@ namespace {
                     },
                     [&](const TSyntax::TSubstitution& s) {
                         for (auto&& m : s.Mods) {
-                            auto func = m.Name;
+                            auto func = CompileFnName(m.Name);
                             if (values.FuncArity(func) != m.Values.size() + 1)
                                 throw yexception()
                                     << "bad modifier argument count for " << m.Name
@@ -276,21 +288,17 @@ namespace {
                                 }
                             }
                         }
-                        auto justOneThing
-                            = s.Body.size() == 1 && s.Body.front().size() == 1
-                            ? &s.Body.front().front()
-                            : nullptr;
-                        // these special cases are here mostly to reinforce the notion
-                        // that `${VAR}` should be equivalent to `$VAR`;
-                        // we use it with `${mods:VAR}`, as well,
-                        // to cut down on `Args(Terms(...))` wrappers
-                        // (the "const" version may appear as a result of preevaluation);
-                        // conceptually, with proper typing support,
-                        // this should not be required
-                        if (auto* id = std::get_if<NPolexpr::TConstId>(justOneThing); id) {
-                            termsBuilder.Append(*id);
-                        } else if (auto* id = std::get_if<NPolexpr::EVarId>(justOneThing); id) {
-                            termsBuilder.Append(*id);
+                        if (
+                            s.Body.size() == 1 && s.Body.front().size() == 1 &&
+                            std::holds_alternative<NPolexpr::EVarId>(s.Body.front().front())
+                        ) {
+                            // this special case is here mostly to reinforce the notion
+                            // that `${VAR}` should be equivalent to `$VAR`;
+                            // we use it with `${mods:VAR}`, as well,
+                            // to cut down on `Args(Terms(...))` wrappers;
+                            // conceptually, with proper typing support,
+                            // this should not be required
+                            termsBuilder.Append(std::get<NPolexpr::EVarId>(s.Body.front().front()));
                         } else {
                             CompileArgs(values, s.Body, termsBuilder);
                         }

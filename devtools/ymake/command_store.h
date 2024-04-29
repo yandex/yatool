@@ -124,7 +124,7 @@ public:
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr) const;
     void StreamCmdRepr(const NPolexpr::TExpression& cmdExpr, std::function<void(const char* data, size_t size)> sink) const;
 
-    TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
+    TCompiledCommand Preevaluate(const NPolexpr::TExpression& expr, const TVars& vars, EOutputAccountingMode oam);
 
     void WriteShellCmd(
         ICommandSequenceWriter* writer,
