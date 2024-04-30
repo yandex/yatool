@@ -35,7 +35,7 @@ def execute(
         create_new_process_group = False
     if create_new_process_group or stdout_to_stderr:
 
-        def preexec_fn():
+        def preexec_fn():  # noqa: F811
             if create_new_process_group:
                 os.setpgrp()
             if stdout_to_stderr:

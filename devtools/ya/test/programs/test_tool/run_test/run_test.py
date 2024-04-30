@@ -1520,7 +1520,7 @@ def main():
         if options.smooth_shutdown_signals and not exts.windows.on_win():
             logger.debug("Wrapper supports %s smooth shutdown signals", options.smooth_shutdown_signals)
 
-            def timeout_callback(exec_obj, timeout):
+            def timeout_callback(exec_obj, timeout):  # noqa: F811
                 pid = exec_obj.process.pid
 
                 def safe_kill(pid, sig):
