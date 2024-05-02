@@ -1399,7 +1399,6 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         prefixes.append(None)
         gens.append(True)
     javac_generated_srcs_tar = target.plain.get(consts.SAVE_JAVAC_GENERATED_SRCS_TAR)
-    sys.stderr.write('b4 if\n')
 
     if javac_generated_srcs_tar and javac_generated_srcs_tar[0] and not forced_lib(path, ctx):
         javac_generated_srcs_tar = javac_generated_srcs_tar[0][0]
@@ -1409,10 +1408,8 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
             + ('_test' if is_test(target.plain) else ''),
         )
         tar_real_name = javac_generated_srcs_tar.replace(consts.BUILD_ROOT, results_root)
-        sys.stderr.write('tar_real_name b4: %s\n' % tar_real_name)
 
         if op.isfile(tar_real_name) and not archive.is_empty(tar_real_name):
-            sys.stderr.write('tar_real_name after: %s\n' % tar_real_name)
             proj = os.path.join(
                 srcdir.replace(consts.BUILD_ROOT, project_root),
                 'ya_generated' + ('_test' if is_test(target.plain) else ''),
