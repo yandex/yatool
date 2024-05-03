@@ -1859,7 +1859,7 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
                                 archive_filename = os.path.join(results_root, res_id, 'resource')
                                 try:
                                     archive.extract_from_tar(
-                                        archive_filename, path=os.path.join(test_data_dir, res_path)
+                                        tar_file_path=archive_filename, output_dir=os.path.join(test_data_dir, res_path)
                                     )
                                 except Exception:
                                     logging.exception(
