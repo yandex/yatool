@@ -1,6 +1,8 @@
+import logging
+import os
+
 import six
 
-import os
 
 import core.stages_profiler
 from core import config, profiler
@@ -46,6 +48,9 @@ import core.config as cc
 
 import yalibrary.upload.consts
 from yalibrary.platform_matcher import is_darwin_rosetta
+
+
+logger = logging.getLogger(__name__)
 
 
 class BuildTypeConsumer(ArgConsumer):
@@ -1020,10 +1025,14 @@ class AuthOptions(Options):
             with open(self.oauth_token_path, 'r') as f:
                 token = f.read().strip()
                 if not token:
+                    logger.debug(
+                        'Attempted to read a token from {}, but the file is empty'.format(self.oauth_token_path)
+                    )
                     return
 
                 self.oauth_token = token
-        except Exception:
+        except Exception as e:
+            logger.debug('Could not read .ya_token file at {}: {}'.format(self.oauth_token_path, e))
             self.oauth_token_path = None
 
     def postprocess2(self, params):
