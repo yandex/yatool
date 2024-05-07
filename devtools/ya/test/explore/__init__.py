@@ -34,7 +34,7 @@ SUITE_MAP = {  # type: dict[str, types_common.AbstractTestSuite]
     'clang_tidy': clang_tidy.ClangTidySuite,
     'coverage.extractor': cov_test.CoverageExtractorTestSuite,
     'eslint': ts_test.EslintTestSuite,
-    'eslint.new': ts_test.EslintNewTestSuite,
+    'eslint.new': ts_test.EslintTestSuite,
     'exectest': py_test.ExecTest,
     'fuzz.test': fuzz_test.FuzzTestSuite,
     'g_benchmark': benchmark.GBenchmarkSuite,
