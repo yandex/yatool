@@ -340,8 +340,11 @@ def create_test_node(
 
     runner_cmd += cmdline.get_environment_relative_options(suite, opts)
 
+    if opts and (opts.keep_temps or opts.show_test_cwd):
+        runner_cmd += ["--show-test-cwd"]
+
     if opts and opts.keep_temps:
-        runner_cmd += ["--show-test-cwd", "--dont-replace-roots", "--keep-temps"]
+        runner_cmd += ["--dont-replace-roots", "--keep-temps"]
 
     if opts.remove_tos:
         runner_cmd += ["--remove-tos"]
@@ -2124,7 +2127,7 @@ def inject_result_node(
     if opts and (opts.report_skipped_suites or opts.report_skipped_suites_only):
         result_cmd += ["--show-discovered"]
 
-    if opts and opts.keep_temps:
+    if opts and (opts.keep_temps or opts.show_test_cwd):
         result_cmd += ["--show-test-cwd"]
 
     if opts and opts.show_metrics:

@@ -578,6 +578,7 @@ class DebuggingOptions(core.yarg.Options):
         self.tests_retries = 1
         self.test_binary_args = []
         self.dump_test_environment = False
+        self.show_test_cwd = False
 
     def consumer(self):
         return [
@@ -698,6 +699,10 @@ class DebuggingOptions(core.yarg.Options):
             params.cache_tests = False
             # Disable status refreshing for certain node
             params.status_refresh_interval = None
+            params.show_test_cwd = True
+
+        if params.show_test_cwd:
+            params.test_stderr = True
 
         if params.tests_retries and params.tests_retries > 10 and params.use_distbuild:
             raise core.yarg.ArgsValidatingException(
