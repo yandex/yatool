@@ -228,7 +228,7 @@ void TCMakeGenerator::PrepareConanRequirements(TAttrsPtr rootValueMap) const {
 
     auto [conanImportsIt, _] = rootValueMap->GetWritableMap().insert_or_assign(
             "conan_imports",
-            jinja2::ValuesList(GlobalProperties.ConanOptions.begin(), GlobalProperties.ConanOptions.end()));
+            jinja2::ValuesList{});
     auto& conanImports = conanImportsIt->second.asList();
     for (std::string_view import: GlobalProperties.ConanImports) {
         // TODO: find better way to avoid unquoting here. Import spec is quoted since
