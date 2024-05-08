@@ -1799,7 +1799,7 @@ inline void TUpdIter::Left(TState& state) {
     if (isSourceFile || isGlobOrGroup) {
         auto* moduleBuilder = st.GetParentModuleBuilder(*this);
         if (moduleBuilder && moduleBuilder->ShouldAddAllSrcs()) {
-            moduleBuilder->AddDepToAllSrcs(dep.DepNode);
+            moduleBuilder->AllSrcs.AddDep(dep.DepNode);
         }
     }
 }
@@ -1861,7 +1861,7 @@ inline TUpdIter::EDepVerdict TUpdIter::AcceptDep(TState& state) {
     // Don't traverse ALL_SRCS subgraph twice
     if (auto* moduleBuilder = st.GetParentModuleBuilder(*this);
         moduleBuilder
-        && moduleBuilder->IsAllSrcsNode(st.Entry().AddCtx)
+        && moduleBuilder->AllSrcs.IsAllSrcsNode(st.Entry().AddCtx)
         && st.Entry().OnceEntered
     ) {
         return EDepVerdict::No;

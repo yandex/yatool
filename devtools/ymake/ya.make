@@ -12,6 +12,7 @@ PEERDIR(
     devtools/draft
     devtools/common/blacklist
     devtools/libs/yaplatform
+    devtools/ymake/all_srcs
     devtools/ymake/common
     devtools/ymake/compact_graph
     devtools/ymake/diag

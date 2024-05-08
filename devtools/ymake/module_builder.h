@@ -8,6 +8,7 @@
 #include "module_loader.h"
 #include "module_wrapper.h"
 
+#include <devtools/ymake/all_srcs/all_srcs_context.h>
 #include <devtools/ymake/common/uniq_vector.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -51,6 +52,9 @@ public:
     TVector<TInducedDeps> DelayedInducedDeps;
     TVector<std::pair<ui32, TAutoPtr<TCommandInfo>>> FileGroupCmds;
     THashMap<ui32, TVector<TString>> DartIdToGroupVars;
+
+    friend class TAllSrcsContext;
+    TAllSrcsContext AllSrcs;
 
     bool HasBuildFrom = false;
 
@@ -117,20 +121,9 @@ public:
     /// @brief Recursively collect inputs from macros
     void RecursiveAddInputs();
 
-    /// @brief Append given node to module's ALL_SRCS property
-    void AddDepToAllSrcs(TDepTreeNode depNode);
-
     /// @brief True if ALL_SRCS node will be added to module
     bool ShouldAddAllSrcs() {
         return Module.GetAttrs().UseAllSrcs;
-    }
-
-    /// @brief True if given node is module's ALL_SRCS node
-    bool IsAllSrcsNode(const TNodeAddCtx* other) {
-        if (AllSrcs.Node == nullptr) {
-            return false;
-        }
-        return AllSrcs.Node == other;
     }
 
     void SaveInputResolution(const TVarStrEx& input, TStringBuf origInput, TFileView curDir);
@@ -184,8 +177,6 @@ private:
     void AddFileGroupVars();
     void AddDartsVars();
 
-    void AddAllSrcsNode();
-
     void TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args); // try-catch for ProcessStatement
     void ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool BundleStatements(const TStringBuf& name, const TVector<TStringBuf>& args);
@@ -202,11 +193,4 @@ private:
     THashSet<ui64, TIdentity> VarMacroApplied;
     TAddDepAdaptor* GlobalNode = nullptr;
     bool GlobalSrcsAreAdded = false;
-
-    struct TAllSrcsContext {
-        TVector<TDepTreeNode> TemporalDepStorage;
-        TNodeAddCtx* Node = nullptr;
-    };
-
-    TAllSrcsContext AllSrcs;
 };
