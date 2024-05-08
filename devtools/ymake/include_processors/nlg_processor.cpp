@@ -39,6 +39,24 @@ void TNlgIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
         AddIncludesToNode(node, resolvedIncludes, moduleWrapper);
     }
 
+    // We actually need "include" dependencies between *.pb.txt files.
+    // The *.pb.txt files act as representatives of corresponding *.nlg "modules"
+    // and should be available transitively when generating code for subsequent
+    // dependent *.nlg-s.
+    //
+    // Links between dummy.h files are not enough, as they are not direct inputs (or their "include"-s)
+    // for code generation, and we should not form transitive closure interchanging "include"-s
+    // between main and additional outputs.
+    //
+    // We also can not add "include" edge directly to the additional output (which is *.pb.txt),
+    // and can not bind induced dependencies to "txt" extension as there is no processor and rule
+    // for this extension.
+    // So we binds *.pb.txt to everything, and actually as all the files are the outputs of a single command
+    // no real excessive dependencies will be created in JSON graph.
+    resolvedIncludes.clear();
+    moduleWrapper.ResolveAsUnset(protoIncludes, resolvedIncludes);
+    node.AddParsedIncls("*", resolvedIncludes);
+
     TVector<TInclude> headerIncludes = PrepareIncludes(inclDeps, ".h");
     resolvedIncludes.clear();
     moduleWrapper.ResolveAsUnset(headerIncludes, resolvedIncludes);
