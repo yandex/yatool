@@ -52,6 +52,9 @@ namespace NYexport {
         if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
             currentProject->SemsDumpDepth++;
         }
+        if (auto* currentSubdir = ProjectBuilder_->CurrentSubdir(); currentSubdir) {
+            currentSubdir->SemsDumpDepth++;
+        }
         if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
             currentTarget->SemsDumpDepth++;
         }
@@ -148,6 +151,11 @@ namespace NYexport {
         if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
             if (currentProject->SemsDumpDepth > 0) {
                 currentProject->SemsDumpDepth--;
+            }
+        }
+        if (auto* currentSubdir = ProjectBuilder_->CurrentSubdir(); currentSubdir) {
+            if (currentSubdir->SemsDumpDepth > 0) {
+                currentSubdir->SemsDumpDepth--;
             }
         }
         if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
@@ -283,9 +291,8 @@ namespace NYexport {
         };
         auto maxSize = std::max(graphSems.size(), appliedSems.size());
         auto* currentProject = ProjectBuilder_->CurrentProject();
-        bool pathAddedToProject = false;
+        auto* currentSubdir = ProjectBuilder_->CurrentSubdir();
         auto* currentTarget = ProjectBuilder_->CurrentTarget();
-        bool pathAddedToTarget = false;
         for (size_t i = 0; i < maxSize; ++i) {
             std::string graphSemDump;
             ESemNameType graphSemType = ESNT_Unknown;
@@ -301,22 +308,38 @@ namespace NYexport {
                 appliedSemType = SemNameToType(appliedSem[0]);
                 appliedSemDump = semDump(appliedSem);
             }
-            if (graphSemType == ESNT_RootAttr || appliedSemType == ESNT_RootAttr || !currentTarget) { // all root semantics or without target add to Project
-                Y_ASSERT(currentProject);
-                auto indent = Indent(currentProject->SemsDumpDepth);
-                if (!pathAddedToProject) {
-                    currentProject->SemsDump += indent + "[ " + nodePath + " ]\n";
-                    pathAddedToProject = true;
+            auto isType = [&](ESemNameType semNameType) {
+                return graphSemType == semNameType || appliedSemType == semNameType;
+            };
+            auto renderSemsDump = [&](TSemsDump* semsDump) {
+                Y_ASSERT(semsDump);
+                auto indent = Indent(semsDump->SemsDumpDepth);
+                if (!semsDump->SemsPathAdded) {
+                    semsDump->SemsDump += indent + "[ " + nodePath + " ]\n";
+                    semsDump->SemsPathAdded = true;
                 }
-                currentProject->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
-            } else { // all other semantics add to target
-                auto indent = Indent(currentTarget->SemsDumpDepth);
-                if (!pathAddedToTarget) {
-                    currentTarget->SemsDump += indent + "[ " + nodePath + " ]\n";
-                    pathAddedToTarget = true;
-                }
-                currentTarget->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
+                semsDump->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
+            };
+            auto isRootAttr = isType(ESNT_RootAttr);
+            auto isDirAttr = isType(ESNT_DirectoryAttr);
+            auto isTarget = isType(ESNT_Target);
+            if (isRootAttr || !currentTarget) { // all root semantics or without target add to Project
+                renderSemsDump(currentProject);
+            }
+            if (isDirAttr || isTarget || !currentTarget) { // all directory semantics or without target add to Subdir
+                renderSemsDump(currentSubdir);
+            }
+            if (!isRootAttr && !isDirAttr && !isTarget && currentTarget) {
+                renderSemsDump(currentTarget);
             }
         }
+        auto clearPathAdded = [&](TSemsDump* semsDump) {
+            if (semsDump) {
+                semsDump->SemsPathAdded = false;
+            }
+        };
+        clearPathAdded(currentProject);
+        clearPathAdded(currentSubdir);
+        clearPathAdded(currentTarget);
     }
 }

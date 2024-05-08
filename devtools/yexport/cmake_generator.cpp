@@ -44,11 +44,8 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
     auto& generatorSpec = result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
 
-    if (generatorSpec.Dir.Templates.empty()) {
-        throw yexception() << fmt::format("[error] At least one directory template required for generator {}, but not found in {}", generator, generatorFile.c_str());
-    }
-    if (generatorSpec.Common.Templates.size() != generatorSpec.Dir.Templates.size()) {
-        throw yexception() << fmt::format("[error] Common templates count {} must be equal dir templates count {} for generator {}", generatorSpec.Common.Templates.size(), generatorSpec.Dir.Templates.size(), generator);
+    if (!generatorSpec.Targets.contains(EMPTY_TARGET)) {
+        throw yexception() << fmt::format("[error] targets.{} section required for generator {}, but not found in {}", EMPTY_TARGET, generator, generatorFile.c_str());
     }
 
     result->GeneratorDir = generatorDir;
@@ -84,7 +81,7 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
     }
 
     auto topLevelSubdirs = jinja2::ValuesList();
-    for (auto subdir: platform->Project->GetSubdirs()) {
+    for (const auto& subdir: platform->Project->GetSubdirs()) {
         Y_ASSERT(subdir);
         if (subdir->IsTopLevel()) {
             topLevelSubdirs.emplace_back(subdir->Path.c_str());
@@ -125,7 +122,7 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 }
 
 void TCMakeGenerator::RenderPlatforms() {
-    auto dirJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Dir.Templates);
+    auto dirJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Targets[EMPTY_TARGET].Templates);
     for (auto& platform : Platforms) {
         RenderPlatform(platform, dirJinjaTemplates);
     }
@@ -152,8 +149,8 @@ void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVecto
 }
 
 void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const {
-    auto commonJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Common.Templates);
-    TSpecBasedGenerator::MergePlatforms(dirJinjaTemplates, commonJinjaTemplates);
+    auto mergePlatformJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Targets.at(EMPTY_TARGET).MergePlatformTemplates);
+    TSpecBasedGenerator::MergePlatforms(dirJinjaTemplates, mergePlatformJinjaTemplates);
 }
 
 jinja2::ValuesList TCMakeGenerator::GetAdjustedLanguagesList() const {

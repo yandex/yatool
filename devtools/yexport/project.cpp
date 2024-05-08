@@ -9,12 +9,17 @@ namespace NYexport {
     }
 
     const TVector<TProjectSubdirPtr>& TProject::GetSubdirs() const {
-        return SubdirsOrder_;
+        return Subdirs_;
     }
+
+    TVector<TProjectSubdirPtr>& TProject::GetSubdirs() {
+        return Subdirs_;
+    }
+
     void TProject::Reset() {
         Factory_ = nullptr;
-        SubdirsByPath_.clear();
-        SubdirsOrder_.clear();
+        PathToSubdir_.clear();
+        Subdirs_.clear();
     }
 
     TProject::TBuilder::TBuilder(TSpecBasedGenerator* generator) : Generator_(generator) {
@@ -46,8 +51,8 @@ namespace NYexport {
 
     TProjectSubdirPtr TProject::TBuilder::CreateDirectories(const fs::path& dir) {
         YEXPORT_VERIFY(Project_->Factory_, "Creating project directory without factory");
-        auto& subdirs = Project_->SubdirsByPath_;
-        auto& subdirsOrder = Project_->SubdirsOrder_;
+        auto& subdirs = Project_->PathToSubdir_;
+        auto& subdirsOrder = Project_->Subdirs_;
         auto currDir = dir;
 
         TVector<TProjectSubdirPtr> createDirectories;

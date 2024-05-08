@@ -26,9 +26,4 @@ enum class EAttrGroup {
     Directory, // Attributes of subdirectory
 };
 
-enum class ESpecFeatures {
-    All,
-    CopyFilesOnly
-};
-
 }

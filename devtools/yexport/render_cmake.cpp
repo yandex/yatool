@@ -116,7 +116,7 @@ namespace {
 
         THashMap<fs::path, TSet<fs::path>> GetSubdirsTable() const {
             THashMap<fs::path, TSet<fs::path>> result;
-            for (auto subdir: SubdirsOrder_) {
+            for (auto subdir: Subdirs_) {
                 result.insert({subdir->Path, subdir.As<TCMakeList>()->SubdirectoriesToAdd});
             }
             return result;
@@ -250,12 +250,19 @@ namespace {
             Y_ASSERT(inserted);
 
             {
-                auto [targetsIt, inserted] = dirMap.emplace("targets", jinja2::ValuesList());
+                auto [extraTargetsIt, inserted] = dirMap.emplace("extra_targets", jinja2::ValuesList());
                 Y_ASSERT(inserted);
-                auto& targets = targetsIt->second.asList();
+                auto& extraTargets = extraTargetsIt->second.asList();
                 for (auto tgt: data.Targets) {
                     const auto cmakeTarget = tgt.As<TCMakeTarget>().Get();
-                    targets.emplace_back(MakeTargetAttrs(cmakeTarget, cmakeGenerator)->GetMap());
+                    auto targetAttrs = MakeTargetAttrs(cmakeTarget, cmakeGenerator)->GetMap();
+                    if (cmakeTarget->Macro == "add_global_library_for" ||
+                        cmakeTarget->Macro == "add_recursive_library" ||
+                        cmakeTarget->Macro == "add_swig_jni_library") {
+                        extraTargets.emplace_back(targetAttrs);
+                    } else {
+                        dirMap.emplace("target", targetAttrs);
+                    }
                 }
             }
             return dirAttrs;

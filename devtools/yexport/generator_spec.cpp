@@ -16,13 +16,15 @@ namespace NYexport {
 
 namespace NKeys {
     constexpr const char* Root = "root";
-    constexpr const char* Common = "common";// Combine few platforms in one directory
-    constexpr const char* Dir = "dir";
     constexpr const char* Template = "template";
-    constexpr const char* ManyTemplates = "templates";
+    constexpr const char* Templates = "templates";
+    constexpr const char* MergePlatformTemplate = "merge_platform_template";
+    constexpr const char* MergePlatformTemplates = "merge_platform_templates";
     constexpr const char* Path = "path";
     constexpr const char* Dest = "dest";
     constexpr const char* Copy = "copy";
+    constexpr const char* IsExtraTarget = "is_extra_target";
+    constexpr const char* IsTest = "is_test";
     constexpr const char* Targets = "targets";
     constexpr const char* Platforms = "platforms";
     constexpr const char* Attr = "attr";
@@ -161,9 +163,9 @@ namespace {
         return result;
     }
 
-    TTemplate ParseOneTemplate(const toml::value& tmpl) {
+    TTemplateSpec ParseOneTemplate(const toml::value& tmpl) {
         if (tmpl.is_string()) {
-            TTemplate templateResult;
+            TTemplateSpec templateResult;
             templateResult.Template = AsString(&tmpl);
 
             if (templateResult.Template.extension() != ".jinja") {
@@ -193,8 +195,8 @@ namespace {
         }
     }
 
-    TVector<TTemplate> ParseManyTemplates(const toml::value& tmplArray) {
-        TVector<TTemplate> result;
+    TVector<TTemplateSpec> ParseManyTemplates(const toml::value& tmplArray) {
+        TVector<TTemplateSpec> result;
         if (tmplArray.is_array()) {
             for (const auto& tmpl : AsArray(&tmplArray)) {
                 result.emplace_back(ParseOneTemplate(tmpl));
@@ -208,37 +210,65 @@ namespace {
         return result;
     }
 
-    TVector<TTemplate> ParseTemplates(const toml::value& target) {
-        bool containsOne = target.contains(NKeys::Template);
-        bool containsMany = target.contains(NKeys::ManyTemplates);
-
+    TVector<TTemplateSpec> ParseSomeTemplates(const toml::value& target, const char* keyTemplate, const char* keyTemplates, bool mayBeEmpty = false) {
+        bool containsOne = target.contains(keyTemplate);
+        bool containsMany = target.contains(keyTemplates);
+        if (mayBeEmpty && !containsOne && !containsMany) {
+            return {};
+        }
         if (!(containsOne ^ containsMany)) {
             throw TBadGeneratorSpec{
                 toml::format_error(
-                    "[error] invalid attrubutes",
+                    "[error] invalid attributes",
                     target,
                     "must contains template = {path='...', dest='...'} "
                     "or "
                     "templates = [{path='...', dest='...'}, {path='...', dest='...'}]"
-                    + std::string((containsOne & containsMany ? " but not together" : ""))
+                    + std::string((containsOne & containsMany ? ", but not together" : ""))
                 )
             };
         }
-
         if (containsMany) {
-            return ParseManyTemplates(At(&target, NKeys::ManyTemplates));
+            return ParseManyTemplates(At(&target, keyTemplates));
         } else {
-            return {ParseOneTemplate(At(&target, NKeys::Template))};
+            return {ParseOneTemplate(At(&target, keyTemplate))};
         }
     }
 
-    TTargetSpec ParseTargetSpec(const toml::value& target, ESpecFeatures features) {
+    TVector<TTemplateSpec> ParseTemplates(const toml::value& target) {
+        return ParseSomeTemplates(target, NKeys::Template, NKeys::Templates);
+    }
+
+    TVector<TTemplateSpec> ParseMergePlatformTemplates(const toml::value& target) {
+        return ParseSomeTemplates(target, NKeys::MergePlatformTemplate, NKeys::MergePlatformTemplates, true);
+    }
+
+    TTargetSpec ParseTargetSpec(const toml::value& target, bool mayBeExtraTarget = false) {
         VERIFY_GENSPEC(target.is_table(), target, NGeneratorSpecError::WrongFieldType, "Should be a table");
-        VerifyFields(target, {}, {NKeys::Template, NKeys::ManyTemplates, NKeys::Copy});
 
         TTargetSpec targetSpec;
-        if (features != CopyFilesOnly) {
+        if (mayBeExtraTarget) {
+            targetSpec.IsExtraTarget = toml::get<bool>(toml::find_or<toml::value>(target, NKeys::IsExtraTarget, toml::boolean{false}));
+        };
+        if (targetSpec.IsExtraTarget) {
+            VerifyFields(target, {}, {NKeys::Copy, NKeys::IsExtraTarget, NKeys::IsTest});
+            targetSpec.IsTest = toml::get<bool>(toml::find_or<toml::value>(target, NKeys::IsTest, toml::boolean{false}));
+        } else {
+            VerifyFields(target, {}, {NKeys::Template, NKeys::Templates, NKeys::Copy});
+        }
+
+        if (!targetSpec.IsExtraTarget) {
             targetSpec.Templates = ParseTemplates(target);
+            targetSpec.MergePlatformTemplates = ParseMergePlatformTemplates(target);
+            if (!targetSpec.MergePlatformTemplates.empty() && targetSpec.Templates.size() != targetSpec.MergePlatformTemplates.size()) {
+                throw TBadGeneratorSpec{
+                    toml::format_error(
+                        "[error] invalid attributes",
+                        target,
+                        "must contains equal count of template(s) and merge_platform_template(s)"
+                    )
+                };
+            }
         }
         if (target.contains(NKeys::Copy)) {
             targetSpec.Copy = ParseCopySpec(At(&target, NKeys::Copy));
@@ -423,33 +453,23 @@ namespace {
     }
 }
 
-TGeneratorSpec ReadGeneratorSpec(const fs::path& path, ESpecFeatures features) {
+TGeneratorSpec ReadGeneratorSpec(const fs::path& path) {
     std::ifstream input{path};
     if (!input)
         throw std::system_error{errno, std::system_category(), "failed to open " + path.string()};
-    return ReadGeneratorSpec(input, path, features);
+    return ReadGeneratorSpec(input, path);
 }
 
-TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpecFeatures features) {
+TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
     try {
         const auto doc = toml::parse(input, path.string());
         const auto& root = toml::find(doc, NKeys::Root);
 
         TGeneratorSpec genspec;
 
-        genspec.Root = ParseTargetSpec(root, features);
-        const auto& dir = toml::find_or(doc, NKeys::Dir, toml::table{});
-        const auto& common = toml::find_or(doc, NKeys::Common, toml::table{});
-        if (!dir.empty()) {
-            genspec.Dir = ParseTargetSpec(dir, features);
-            if (!common.empty()) {
-                genspec.Common = ParseTargetSpec(common, features);
-            }
-        } else if (!common.empty()) {
-            spdlog::error("Section {} ignored, because section {} not exists", NKeys::Common, NKeys::Dir);
-        }
+        genspec.Root = ParseTargetSpec(root);
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
-            genspec.Targets[name] = ParseTargetSpec(tgtspec, features);
+            genspec.Targets[name] = ParseTargetSpec(tgtspec, true);
         }
 
         const auto& platforms = find_or<toml::table>(doc, NKeys::Platforms, toml::table{});

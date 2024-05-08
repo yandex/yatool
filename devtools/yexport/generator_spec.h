@@ -19,6 +19,13 @@
 
 namespace NYexport {
 
+struct TTemplateSpec {
+    fs::path Template;
+    std::string ResultName;
+
+    bool operator== (const TTemplateSpec&) const noexcept = default;
+};
+
 struct TCopySpec {
     THashMap<ECopyLocation, THashSet<fs::path>> Items;
 
@@ -28,17 +35,12 @@ struct TCopySpec {
     bool operator== (const TCopySpec&) const noexcept = default;
 };
 
-
-struct TTemplate {
-    fs::path Template;
-    std::string ResultName;
-
-    bool operator== (const TTemplate&) const noexcept = default;
-};
-
 struct TTargetSpec {
-    std::vector<TTemplate> Templates = {};
-    TCopySpec Copy;
+    bool IsExtraTarget{false};///< This target is extra, must be without templates
+    bool IsTest{false};///< Used only with ExtraTarget == true! This target is test
+    std::vector<TTemplateSpec> Templates = {};///< Templates (only for main targets)
+    std::vector<TTemplateSpec> MergePlatformTemplates = {};///< Templates for merge platforms (must be same count as Templates)
+    TCopySpec Copy;///< Lists for copy files
 
     bool operator==(const TTargetSpec&) const noexcept = default;
 };
@@ -60,8 +62,6 @@ struct TGeneratorSpec {
     using TRuleSet = THashSet<const TGeneratorRule*>;
 
     TTargetSpec Root;///< Root of export for one platform
-    TTargetSpec Common;///< Combine few platforms in one directory
-    TTargetSpec Dir;///< One directory for one platform
     THashMap<std::string, TTargetSpec> Targets;///< Targets in directory by name
     jinja2::ValuesMap Platforms;
     TAttrGroups AttrGroups;
@@ -93,9 +93,7 @@ namespace NGeneratorSpecError {
     constexpr const char* UnknownField = "Unknown field";
 }
 
-using enum ESpecFeatures;
-
-TGeneratorSpec ReadGeneratorSpec(const fs::path& path, ESpecFeatures features = All);
-TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path, ESpecFeatures features = All);
+TGeneratorSpec ReadGeneratorSpec(const fs::path& path);
+TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path);
 
 }

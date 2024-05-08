@@ -43,6 +43,7 @@ public:
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
     static constexpr const char* DEBUG_SEMS_ATTR = "dump_sems";
     static constexpr const char* DEBUG_ATTRS_ATTR = "dump_attrs";
+    static constexpr const char* EMPTY_TARGET = "EMPTY";///< Magic target for use in directory without any targets
 
     TSpecBasedGenerator() noexcept = default;
     virtual ~TSpecBasedGenerator() = default;
@@ -70,7 +71,7 @@ public:
 
 protected:
     void CopyFilesAndResources();
-    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const;
+    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplateSpec>& templateSpecs) const;
     void RenderJinjaTemplates(TAttrsPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
     void MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& commonTemplates) const;
     static void InsertPlatforms(jinja2::ValuesMap& valuesMap, const std::vector<TPlatformPtr>& platforms);

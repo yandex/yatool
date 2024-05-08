@@ -50,6 +50,7 @@ public:
         const std::optional<TDumpOpts> dumpOpts = {},
         const std::optional<TDebugOpts> debugOpts = {}
     );
+    void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
@@ -70,20 +71,19 @@ private:
 
     const jinja2::ValuesMap& FinalizeRootAttrs();
     jinja2::ValuesMap FinalizeSubdirsAttrs(TPlatformPtr platform, const std::vector<std::string>& pathPrefixes = {});
+    void CommonFinalizeAttrs(TAttrs& attrs, const jinja2::ValuesMap& addAttrs);
     jinja2::ValuesMap FinalizeAttrsForDump();
 
     std::string ProjectName;
 
     std::vector<TJinjaTemplate> RootTemplates;
-    std::vector<TJinjaTemplate> DirTemplates;
-    std::vector<TJinjaTemplate> CommonTemplates;
     THashMap<std::string, std::vector<TJinjaTemplate>> TargetTemplates;
+    THashMap<std::string, std::vector<TJinjaTemplate>> MergePlatformTargetTemplates;
 
     TAttrsPtr RootAttrs;
 
 public: // for tests only
     THashMap<fs::path, TVector<TProjectTarget>> GetSubdirsTargets() const;
-    void SetSpec(const TGeneratorSpec& spec);
 };
 
 class TJinjaProject::TBuilder : public TProject::TBuilder {

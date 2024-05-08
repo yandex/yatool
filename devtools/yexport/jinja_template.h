@@ -24,5 +24,5 @@ namespace NYexport {
         std::string RenderBasename;
     };
 
-    std::vector<TJinjaTemplate> LoadJinjaTemplates(const fs::path& templatesDir, jinja2::TemplateEnv* env, const std::vector<TTemplate>& templateSpecs);
+    std::vector<TJinjaTemplate> LoadJinjaTemplates(const fs::path& templatesDir, jinja2::TemplateEnv* env, const std::vector<TTemplateSpec>& templateSpecs);
 }

@@ -33,9 +33,11 @@ void LoadTargetReplacements(const fs::path& path, TTargetReplacements& targetRep
 void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetReplacements& targetReplacements);
 
 inline const std::string YEXPORT_ADD_ATTRS = "add_attrs"; ///< Section in yexport.toml for direct transit attributes to generator
+inline const std::string YEXPORT_ADDATTRS_ROOT = "root"; ///< Direct transit attributes for root
 inline const std::string YEXPORT_ADDATTRS_DIR = "dir"; ///< Direct transit attributes for directories
 inline const std::string YEXPORT_ADDATTRS_TARGET = "target"; ///< Direct transit attributes for targets
 struct TYexportSpec {
+    jinja2::ValuesMap AddAttrsRoot; ///< Attributes from yexport.toml for direct transit to root
     jinja2::ValuesMap AddAttrsDir; ///< Attributes from yexport.toml for direct transit to directory
     jinja2::ValuesMap AddAttrsTarget; ///< Attributes from yexport.toml for direct transit to target
 

@@ -240,10 +240,12 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
                 toml::format_error(
                     "[error] Invalid format of " + std::string(YEXPORT_ADD_ATTRS),
                     addattrsSection,
-                    std::string(YEXPORT_ADD_ATTRS) + " must be table with optional " + std::string(YEXPORT_ADDATTRS_DIR) + " and " + std::string(YEXPORT_ADDATTRS_TARGET) + " values"
+                    std::string(YEXPORT_ADD_ATTRS) + " must be table with optional " + std::string(YEXPORT_ADDATTRS_ROOT) + ", " + std::string(YEXPORT_ADDATTRS_DIR) + " or " + std::string(YEXPORT_ADDATTRS_TARGET) + " values"
                 )
             });
         }
+        const auto& addattrsRoot = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_ROOT, toml::table{});
+        spec.AddAttrsRoot = ParseTable(addattrsRoot.as_table());
         const auto& addattrsDir = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_DIR, toml::table{});
         spec.AddAttrsDir = ParseTable(addattrsDir.as_table());
         const auto& addattrsTarget = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_TARGET, toml::table{});
@@ -258,6 +260,7 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
 
 void TYexportSpec::Dump(IOutputStream& out) const {
     jinja2::ValuesMap map;
+    map.emplace(YEXPORT_ADD_ATTRS + "." + YEXPORT_ADDATTRS_ROOT, AddAttrsRoot);
     map.emplace(YEXPORT_ADD_ATTRS + "." + YEXPORT_ADDATTRS_DIR, AddAttrsDir);
     map.emplace(YEXPORT_ADD_ATTRS + "." + YEXPORT_ADDATTRS_TARGET, AddAttrsTarget);
     ::NYexport::Dump(out, map);

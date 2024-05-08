@@ -182,7 +182,7 @@ void TSpecBasedGenerator::CopyFilesAndResources() {
     }
 }
 
-std::vector<TJinjaTemplate> TSpecBasedGenerator::LoadJinjaTemplates(const std::vector<TTemplate>& templateSpecs) const {
+std::vector<TJinjaTemplate> TSpecBasedGenerator::LoadJinjaTemplates(const std::vector<TTemplateSpec>& templateSpecs) const {
     return NYexport::LoadJinjaTemplates(GetGeneratorDir(), GetJinjaEnv(), templateSpecs);
 }
 
@@ -193,8 +193,8 @@ void TSpecBasedGenerator::RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJin
     }
 }
 
-void TSpecBasedGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& commonTemplates) const {
-    if (commonTemplates.empty()) { // can't merge platforms without common templates
+void TSpecBasedGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& mergePlatformTemplates) const {
+    if (mergePlatformTemplates.empty()) { // can't merge platforms without common templates
         return;
     }
 
@@ -205,11 +205,11 @@ void TSpecBasedGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirT
         }
     }
 
-    Y_ASSERT(commonTemplates.size() == dirTemplates.size());
+    Y_ASSERT(mergePlatformTemplates.size() == dirTemplates.size());
     auto templatesCount = dirTemplates.size();
     for (size_t i = 0; i < templatesCount; ++i) {
         const auto& dirTemplate = dirTemplates[i];
-        auto& commonTemplate = commonTemplates[i];
+        auto& commonTemplate = mergePlatformTemplates[i];
         for (const auto& [dir, dirPlatforms]: dir2platforms) {
             bool isDifferent = false;
             if (dirPlatforms.size() > 1) {

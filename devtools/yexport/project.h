@@ -28,7 +28,14 @@ namespace NYexport {
     template <typename T>
     concept CSubdirLike = std::derived_from<T, TProjectSubdir> && std::is_default_constructible_v<T>;
 
-    class TProjectTarget {
+    class TSemsDump {
+    public:
+        std::string SemsDump;///< Semantic dumps, collected during dispatch graph
+        size_t SemsDumpDepth{0};///< Current depth of semantics for SemsDump
+        bool SemsPathAdded{false};///< Is current path in graph added to dump
+    };
+
+    class TProjectTarget : public TSemsDump {
     public:
         virtual ~TProjectTarget() = default;
 
@@ -36,8 +43,6 @@ namespace NYexport {
         std::string Name;
         TVector<std::string> MacroArgs;
         TAttrsPtr Attrs;
-        std::string SemsDump; // Semantic dumps, collected during dispatch graph
-        size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
 
         std::string TestModDir; ///< If target is test, here directory of module with this test inside
 
@@ -46,26 +51,25 @@ namespace NYexport {
         }
     };
 
-    class TProjectSubdir {
+    class TProjectSubdir : public TSemsDump {
     public:
         virtual ~TProjectSubdir() = default;
         bool IsTopLevel() const;
 
-        TVector<TProjectTargetPtr> Targets;
-        TVector<TProjectSubdirPtr> Subdirs;
+        TVector<TProjectTargetPtr> Targets;///< All targets for directory
+        TVector<TProjectSubdirPtr> Subdirs;///< Direct subdirectories
         TAttrsPtr Attrs;
         fs::path Path;
+        std::string MainTargetMacro;///< Macro attribute of main target
     };
 
-    class TProject {
+    class TProject  : public TSemsDump {
     public:
         class TBuilder;
         virtual ~TProject() = default;
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
-
-        std::string SemsDump; // Semantic dumps, collected during dispatch graph
-        size_t SemsDumpDepth{0}; // Current depth of semantics for SemsDump
+        TVector<TProjectSubdirPtr>& GetSubdirs();
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>
@@ -75,8 +79,8 @@ namespace NYexport {
         }
         void Reset();
 
-        THashMap<fs::path, TProjectSubdirPtr> SubdirsByPath_;
-        TVector<TProjectSubdirPtr> SubdirsOrder_;
+        THashMap<fs::path, TProjectSubdirPtr> PathToSubdir_;
+        TVector<TProjectSubdirPtr> Subdirs_;
 
     private:
         class TFactory {
