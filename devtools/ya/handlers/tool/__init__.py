@@ -128,7 +128,7 @@ class ToolOptions(Options):
             ArgConsumer(
                 ['--target-platform'],
                 help='Target platform',
-                hook=SetAppendHook('target_platforms', values=CrossCompilationOptions.generate_target_platforms_cxx()),
+                hook=SetAppendHook('target_platforms', values=CrossCompilationOptions.generate_target_platforms_cxx),
             ),
             ArgConsumer(
                 ['--hide-arm64-host-warning'],

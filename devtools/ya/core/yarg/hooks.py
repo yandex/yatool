@@ -17,6 +17,7 @@ if tp.TYPE_CHECKING:
 
 
 # used for autocompletion
+# see https://zsh.sourceforge.io/Doc/Release/Completion-System.html#index-_005ffiles
 FILES = ['_files']
 
 
@@ -53,12 +54,24 @@ class BaseHook(object):
         return None
 
 
-class SetValueHook(BaseHook):
+class ValueHook(BaseHook):
+    def __init__(self, values=None, *args, **kwargs):
+        # type: (tp.Optional[tp.Union[tp.Callable, tp.Iterable[str]]], tp.Any, tp.Any) -> None
+        self._values = values or FILES
+
+    @property
+    def values(self):
+        if callable(self._values):
+            self._values = self._values()
+        return self._values
+
+
+class SetValueHook(ValueHook):
     def __init__(self, name, transform=None, values=FILES, default_value=None):
         # type: (str, tp.Optional[tp.Callable[[tp.Any], tp.Any]], tp.Iterable[tp.Any], tp.Any) -> None
+        super(SetValueHook, self).__init__(values)
         self.name = name
         self.transform = transform
-        self.values = values
         self.default_value = default_value
 
     def __call__(self, to, x):
@@ -109,11 +122,11 @@ class SetConstValueHook(BaseHook):
         return False
 
 
-class SetAppendHook(BaseHook):
+class SetAppendHook(ValueHook):
     def __init__(self, name, transform=None, values=FILES):
+        super(SetAppendHook, self).__init__(values)
         self.name = name
         self.transform = transform
-        self.values = values
 
     def __call__(self, to, x):
         if not hasattr(to, self.name):
@@ -141,11 +154,11 @@ class SetAppendHook(BaseHook):
         return True
 
 
-class ExtendHook(BaseHook):
+class ExtendHook(ValueHook):
     def __init__(self, name, transform=None, values=FILES):
+        super(ExtendHook, self).__init__(values)
         self.name = name
         self.transform = transform
-        self.values = values  # type: tp.Optional[tp.Union[str, tp.Iterable]]
 
     def __call__(self, to, x):
         if not hasattr(to, self.name):
@@ -174,11 +187,11 @@ class ExtendHook(BaseHook):
         return True
 
 
-class DictPutHook(BaseHook):
+class DictPutHook(ValueHook):
     def __init__(self, name, default_value=None, values=FILES):
+        super(DictPutHook, self).__init__(values)
         self.name = name
         self.default_value = default_value
-        self.values = values
 
     def __call__(self, to, x):
         if not hasattr(to, self.name):
@@ -219,10 +232,10 @@ class SetConstAppendHook(BaseHook):
         return False
 
 
-class SetRawParamsHook(BaseHook):
+class SetRawParamsHook(ValueHook):
     def __init__(self, name, values=FILES):
+        super(SetRawParamsHook, self).__init__(values)
         self.name = name
-        self.values = values
 
     def _load_params(self, x):
         return json.loads(base64.decodebytes(six.ensure_binary(x)))

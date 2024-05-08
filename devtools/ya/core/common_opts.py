@@ -803,7 +803,7 @@ class CrossCompilationOptions(Options):
                 help='Target platform',
                 hook=CrossCompilationOptions.PlatformSetAppendHook(
                     'target_platforms',
-                    values=CrossCompilationOptions.generate_target_platforms_cxx(),
+                    values=CrossCompilationOptions.generate_target_platforms_cxx,
                     transform=CrossCompilationOptions.make_platform,
                 ),
                 group=PLATFORM_CONFIGURATION_GROUP,

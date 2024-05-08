@@ -195,10 +195,11 @@ def _get_config_from_arc_rel_path(path):
     raise MissingConfigError('Cannot find config "{}"'.format(path))
 
 
+@func.memoize()
 def _try_read_from(f):
     if os.path.exists(f):
         with open(f, 'r') as config_file:
-            logger.debug('Use conf from %s', f)
+            logger.debug('Reading contents of %s', f)
             return json.load(config_file)
 
     return None
