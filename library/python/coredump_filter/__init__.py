@@ -556,6 +556,10 @@ class PythonFrame(FrameBase):
         return link
 
     @property
+    def error_line(self):
+        return self._error_line
+
+    @property
     def error_line_html(self):
         return '{prefix}<span class="python-error-area">{error}</span>{suffix}'.format(
             prefix=self._error_line[:self._error_col_start],
@@ -1112,13 +1116,17 @@ def parse_python_traceback_2(
 
         in_function_name = m.group("func_name")
         error_line_no = m.group("error_line_no")
-        error_line = trace[line_index + 1]
         error_column_selector = ""
-        next_index = line_index + 2
+        if not PythonFrame.SOURCE_RE.match(trace[line_index + 1].strip()):
+            error_line = trace[line_index + 1]
+            next_index = line_index + 2
+            if next_index < len(trace) and trace[next_index].strip().startswith("^"):
+                error_column_selector = trace[next_index]
+                next_index += 1
+        else:
+            error_line = ""
+            next_index = line_index + 1
 
-        if next_index < len(trace) and trace[next_index].strip().startswith("^"):
-            error_column_selector = trace[next_index]
-            next_index += 1
         stack.push_frame(PythonFrame(
             frame_no=frame_no,
             module_path=module_path,
