@@ -5,7 +5,7 @@
 class TNlgIncludeProcessor: public TIncludeProcessorBase {
 public:
     TNlgIncludeProcessor();
-    ui32 Version() const override { return 1; }
+    ui32 Version() const override { return 2; }
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& moduleWrapper,
                          TFileView incFileName,
