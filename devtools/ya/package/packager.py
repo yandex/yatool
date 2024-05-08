@@ -1075,7 +1075,12 @@ def load_package(arcadia_root, package_file, included=None):
     try:
         get_validator().validate(parsed_package)
     except ValidationError as error:
-        logger.warning("Package %s has either invalid or old format: %s", package_file, error)
+        if error.message.startswith('Additional properties are not allowed'):
+            logger.error("Package %s has either invalid or old format: ", package_file)
+            raise error
+        else:
+            # XXX Some tests are not ready for this check, see https://a.yandex-team.ru/review/5823503/details#comment-8692504
+            logger.warning("Package %s has either invalid or old format: %s", package_file, error)
 
     return parsed_package
 
