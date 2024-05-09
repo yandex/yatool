@@ -627,6 +627,7 @@ class PyProject(object):
                                     "forbeslindesay.forbeslindesay-taskrunner",
                                 ],
                             ),
+                            ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
                         )
                     ),
                 ),

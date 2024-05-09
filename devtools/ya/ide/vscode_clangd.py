@@ -465,6 +465,7 @@ def gen_vscode_workspace(params):
                                 "forbeslindesay.forbeslindesay-taskrunner",
                             ],
                         ),
+                        ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
                     )
                 ),
             ),

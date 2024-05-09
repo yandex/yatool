@@ -297,7 +297,12 @@ class VSCodeProject(object):
             (
                 (
                     "extensions",
-                    OrderedDict((("recommendations", vscode.workspace.get_recommended_extensions(self.params)),)),
+                    OrderedDict(
+                        (
+                            ("recommendations", vscode.workspace.get_recommended_extensions(self.params)),
+                            ("unwantedRecommendations", vscode.workspace.get_unwanted_extensions(self.params)),
+                        )
+                    ),
                 ),
             )
         )

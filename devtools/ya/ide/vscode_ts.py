@@ -109,6 +109,7 @@ def get_workspace_template(params, YA_PATH):
                                 'forbeslindesay.forbeslindesay-taskrunner',
                             ],
                         ),
+                        ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
                     )
                 ),
             ),

@@ -282,3 +282,9 @@ def get_recommended_extensions(params):
     if "GO" in params.languages:
         extensions.append("golang.go")
     return extensions
+
+
+def get_unwanted_extensions(params):
+    return [
+        "ms-vscode.cmake-tools",
+    ]
