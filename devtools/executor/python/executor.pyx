@@ -214,7 +214,7 @@ class Result(object):
                     yield line
 
         if self.buff:
-            yield self.buff
+            yield six.ensure_str(self.buff, errors='replace')
         self.buff = ''
         if self.returncode is None:
             self.returncode = 0
