@@ -14,6 +14,11 @@ import hashlib
 import json
 import logging
 
+if six.PY3:
+    from html import escape as html_escape
+else:
+    from cgi import escape as html_escape
+
 logger = logging.getLogger(__name__)
 
 
@@ -549,7 +554,9 @@ class PythonFrame(FrameBase):
         )
 
     @property
-    def source_link(self):
+    def source_link(self):  # type: () -> str
+        if self.source.startswith("<"):
+            return ""
         link = os.path.join(ARCADIA_ROOT_LINK, self.source)
         if self.source_no:
             link = link + "#L{}".format(self.source_no)
@@ -594,13 +601,15 @@ class PythonFrame(FrameBase):
                 '</p>'
             ).format(
                 source_link=self.source_link,
-                source=self._module_path,
+                source=html_escape(self._module_path),
                 line=self._error_line_no,
                 func=self._in_function_name,
             )
-            error_line = '<p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="python-error-line">{error_line}</span></p>'.format(
-                error_line=self.error_line_html,
-            )
+            if self.error_line_html:
+                error_line = '<p>{shift}<span class="python-error-line">{error_line}</span></p>'.format(
+                    shift="&nbsp;" * 4,
+                    error_line=self.error_line_html,
+                )
         return '<div class="python-frame">{}{}</div>'.format(file_line, error_line)
 
 
