@@ -754,7 +754,7 @@ int main_real(TBuildConfiguration& conf) {
             YErr() << "Invalid link type for license properties dump '" << conf.LicenseLinkType << "'. Only 'static' or 'dynamic' allowed." << Endl;
             return BR_FATAL_ERROR;
         }
-        DoDumpLicenseInfo(conf.CommandConf, peerType, conf.DumpLicensesInfo, conf.LicenseTagVars);
+        DoDumpLicenseInfo(conf, conf.CommandConf, peerType, conf.DumpLicensesInfo, conf.LicenseTagVars);
         return BR_OK;
     }
     if (conf.DumpForcedDependencyManagements || conf.DumpForcedDependencyManagementsAsJson) {

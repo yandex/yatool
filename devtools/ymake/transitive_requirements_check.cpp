@@ -315,7 +315,6 @@ namespace {
             return Licenses;
         }
 
-    private:
         void LoadLicenses(const TBuildConfiguration& conf) {
             if (IsLicenseConfLoaded) {
                 return;
@@ -355,6 +354,7 @@ namespace {
             IsLicenseConfLoaded = true;
         }
 
+    private:
         void CheckModuleLicenses(TRestoreContext restoreContext, TNodeId modId, const TRestrictions& restrictions, TExceptions& exceptions, TScopeClosureRef closure) {
             for (TNodeId peer : closure.Closure) {
                 const auto* module = restoreContext.Modules.Get(restoreContext.Graph[peer]->ElemId);
@@ -921,8 +921,9 @@ void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TV
 
 TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY{TRANSITIVE_CHECK_REGISTRY_ARRAY};
 
-void DoDumpLicenseInfo(const TVars& globals, NSPDX::EPeerType peerType, bool humanReadable, TArrayRef<TString> tagVars) {
+void DoDumpLicenseInfo(const TBuildConfiguration& conf, const TVars& globals, NSPDX::EPeerType peerType, bool humanReadable, TArrayRef<TString> tagVars) {
     TRestrictLicensesLoader loader{globals};
+    loader.LoadLicenses(conf);
     TMap<TStringBuf, TSet<TString>> orderdedPropsContent;
     for (const auto& [lic, props]: loader.GetLicenses()) {
         for (TStringBuf propName: loader.GetPropNames(props.GetProps(peerType))) {
