@@ -1796,7 +1796,8 @@ inline void TUpdIter::Left(TState& state) {
     auto& dep = st.Dep;
     bool isSourceFile = dep.DepType == EDT_BuildFrom && dep.DepNode.NodeType == EMNT_File;
     bool isGlobOrGroup = dep.DepType == EDT_BuildFrom && dep.DepNode.NodeType == EMNT_BuildCommand;
-    if (isSourceFile || isGlobOrGroup) {
+    bool isHeader = dep.DepType == EDT_Search && dep.DepNode.NodeType == EMNT_File;
+    if (isSourceFile || isGlobOrGroup || isHeader) {
         auto* moduleBuilder = st.GetParentModuleBuilder(*this);
         if (moduleBuilder && moduleBuilder->ShouldAddAllSrcs()) {
             moduleBuilder->AllSrcs.AddDep(dep.DepNode);
