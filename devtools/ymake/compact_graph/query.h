@@ -2,6 +2,7 @@
 
 #include "dep_graph.h"
 #include "iter.h"
+#include <devtools/ymake/prop_names.h>
 
 /// @brief Find module node in depth-first iter state
 /// According to latest version of code we only ensure that this is not a sole node
@@ -184,9 +185,21 @@ Y_FORCE_INLINE bool IsDartPropDep(const TDep& dep) {
 }
 
 template <class TDep>
+Y_FORCE_INLINE bool IsAllSrcsPropDep(const TDep& dep) {
+    return
+        IsModuleType(dep.From()->NodeType)
+        && *dep == EDT_Property
+        && dep.To()->NodeType == EMNT_BuildCommand
+        && TDepGraph::GetCmdName(dep.To()).GetStr().Contains(NProps::ALL_SRCS);
+}
+
+template <class TDep>
 Y_FORCE_INLINE bool IsLateGlobPropDep(const TDep& dep) {
     return
-        (IsModuleType(dep.From()->NodeType) && *dep == EDT_Property && dep.To()->NodeType == EMNT_BuildCommand);
+        IsModuleType(dep.From()->NodeType)
+        && *dep == EDT_Property
+        && dep.To()->NodeType == EMNT_BuildCommand
+        && TDepGraph::GetCmdName(dep.To()).GetStr().Contains(NProps::LATE_GLOB);
 }
 
 template <class TDep>

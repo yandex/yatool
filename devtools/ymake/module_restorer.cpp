@@ -114,12 +114,23 @@ namespace {
 
             if (IsModule(state.Top())) {
                 ModuleElemId = state.TopNode()->ElemId;
-            } else if (state.HasIncomingDep() && (IsIndirectSrcDep(state.IncomingDep()) || IsDartPropDep(state.IncomingDep()))) {
+                return true;
+            }
+
+            if (!state.HasIncomingDep()) {
+                return true;
+            }
+
+            if (IsIndirectSrcDep(state.IncomingDep())
+                || IsDartPropDep(state.IncomingDep())
+                || IsAllSrcsPropDep(state.IncomingDep())
+            ) {
                 if (IsCurrentModuleFilesGroupVar(state.Top())) {
-                    MineData(state.Top().Node());
+                    GetOrMineVarValue(state.TopNode());
                 }
                 return false;
             }
+
             return true;
         }
 
@@ -133,88 +144,99 @@ namespace {
         }
 
         enum class EStatementType {
-            GLOB = 0,
+            GLOB,
             GROUP_VAR,
-            ALL_SRCS
         };
 
         EStatementType GetStatementType(const TDepGraph::TConstNodeRef& node) {
-            const TStringBuf prop = TDepGraph::GetCmdName(node).GetStr();
-            TStringBuf cmdName = GetCmdName(prop);
-            if (cmdName == NProps::GLOB || cmdName == NProps::LATE_GLOB) {
+            auto varName = GetVarName(node);
+            if (EqualToOneOf(varName, NProps::GLOB, NProps::LATE_GLOB)) {
                 return EStatementType::GLOB;
-            }
-            if (cmdName == NProps::ALL_SRCS) {
-                return EStatementType::ALL_SRCS;
             }
             return EStatementType::GROUP_VAR;
         }
 
-        void MineData(const TDepGraph::TConstNodeRef& node) {
-            EStatementType type = GetStatementType(node);
-            switch (type) {
+        const TUniqVector<TNodeId>& GetOrMineVarValue(const TConstDepNodeRef& node) {
+            switch (GetStatementType(node)) {
                 case EStatementType::GLOB: {
-                    MineGlobData(node);
-                }
-                case EStatementType::ALL_SRCS: {
-                    MineAllSrcsData(node);
+                    if (!GlobFiles.contains(node.Id())) {
+                        MineGlobData(node);
+                    }
+                    Y_ASSERT(GlobFiles.contains(node.Id()));
+                    return GlobFiles[node.Id()];
                 }
                 case EStatementType::GROUP_VAR: {
-                    MineGroupVarData(node);
-                }
-            }
-        }
-
-        void MineAllSrcsData(const TDepGraph::TConstNodeRef&) {
-            return;
-        }
-
-        void MineGroupVarData(const TDepGraph::TConstNodeRef& node) {
-            const TStringBuf prop = TDepGraph::GetCmdName(node).GetStr();
-            TStringBuf groupVarName = GetCmdName(prop);
-            TUniqVector<TNodeId>& varValues = MinedData[groupVarName];
-            for (const auto& dep : node.Edges()) {
-                if (dep.To()->NodeType == EMNT_BuildCommand) {
-                    EStatementType buildFromType = GetStatementType(dep.To());
-                    if (buildFromType == EStatementType::GLOB) {
-                        auto globFiles = MineGlobData(dep.To());
-                        globFiles.AddTo(varValues);
-                    } else if (buildFromType == EStatementType::ALL_SRCS) {
-                        MineAllSrcsData(dep.To());
-                        Y_ASSERT(MinedData.contains(NProps::ALL_SRCS));
-                        MinedData[NProps::ALL_SRCS].AddTo(varValues);
+                    auto varName = GetVarName(node);
+                    if (!MinedData.contains(varName)) {
+                        MineGroupVarData(node);
                     }
-                } else if (dep.To()->NodeType == EMNT_File) {
-                    varValues.Push(dep.To().Id());
+                    Y_ASSERT(MinedData.contains(varName));
+                    return MinedData[varName];
                 }
             }
+            Y_UNREACHABLE();
         }
 
-        TUniqVector<TNodeId> MineGlobData(const TDepGraph::TConstNodeRef& node) {
+        void MineGroupVarData(const TConstDepNodeRef& node) {
+            auto varName = GetVarName(node);
+            TUniqVector<TNodeId> files;
+
+            for (const auto& dep : node.Edges()) {
+                switch (dep.To()->NodeType) {
+                    case EMNT_File: {
+                        files.Push(dep.To().Id());
+                        break;
+                    }
+                    case EMNT_BuildCommand: {
+                        GetOrMineVarValue(dep.To()).AddTo(files);
+                        break;
+                    }
+                    default: /*nop*/;
+                }
+            }
+
+            MinedData[varName] = std::move(files);
+        }
+
+        void MineGlobData(const TConstDepNodeRef& node) {
             TUniqVector<TStringBuf> varNames;
             TUniqVector<TNodeId> files;
+
             for (const auto&  dep: node.Edges()) {
                 if (*dep != EDT_Property) {
                     continue;
                 }
 
-                if (dep.To()->NodeType == EMNT_Property) {
-                    const TStringBuf prop = TDepGraph::GetCmdName(dep.To()).GetStr();
-                    if (GetPropertyName(prop) == NProps::REFERENCED_BY) {
-                        varNames.Push(GetPropertyValue(prop));
+                switch (dep.To()->NodeType) {
+                    case EMNT_File: {
+                        files.Push(dep.To().Id());
+                        break;
                     }
-                } else if (dep.To()->NodeType == EMNT_File) {
-                    files.Push(dep.To().Id());
+                    case EMNT_Property: {
+                        const TStringBuf prop = TDepGraph::GetCmdName(dep.To()).GetStr();
+                        if (GetPropertyName(prop) == NProps::REFERENCED_BY) {
+                            varNames.Push(GetPropertyValue(prop));
+                        }
+                        break;
+                    }
+                    default: /*nop*/;
                 }
             }
+
             for (auto var: varNames) {
                 files.AddTo(MinedData[var]);
             }
-            return files;
+
+            GlobFiles[node.Id()] = std::move(files);
+        }
+
+        static TStringBuf GetVarName(const TConstDepNodeRef& node) {
+            return GetCmdName(TDepGraph::GetCmdName(node).GetStr());
         }
 
     private:
         THashMap<TStringBuf, TUniqVector<TNodeId>> MinedData;
+        THashMap<TNodeId, TUniqVector<TNodeId>> GlobFiles;
         ui32 ModuleElemId = 0;
     };
 
