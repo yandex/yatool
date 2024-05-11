@@ -137,6 +137,7 @@ public:
     void DepsCacheMonEvent() const;
     void JSONCacheMonEvent() const;
     void UidsCacheMonEvent() const;
+    void GraphChangesPredictionEvent() const;
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);
     TRestoreContext GetRestoreContext();

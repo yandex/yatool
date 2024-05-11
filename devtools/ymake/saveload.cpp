@@ -774,6 +774,12 @@ void TYMake::DepsCacheMonEvent() const {
     }
 }
 
+void TYMake::GraphChangesPredictionEvent() const {
+    NEvent::TGraphChangesPrediction ev;
+    ev.SetPredictsStructuralChanges(true);
+    FORCE_TRACE(U, ev);
+}
+
 void TYMake::JSONCacheMonEvent() const {
     if (JSONCacheLoaded_) {
         NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), true); // loaded OK

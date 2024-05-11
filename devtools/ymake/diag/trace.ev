@@ -289,3 +289,8 @@ message TGraphChanges {
     required bool HasStructuralChanges = 1;
     required bool HasContentChanges = 2;
 };
+
+message TGraphChangesPrediction {
+    option (message_id) = 47;
+    required bool PredictsStructuralChanges = 1;
+};
