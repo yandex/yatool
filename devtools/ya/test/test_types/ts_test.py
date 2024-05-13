@@ -244,10 +244,16 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
         return False
 
     def _abs_source_path(self, path):
-        return os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path, path)
+        prefix = os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path)
+        return path if path.startswith(prefix) else os.path.normpath(os.path.join(prefix, path))
 
     def _abs_build_path(self, path):
-        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.project_path, path)
+        prefix = os.path.join(jbuild.gen.consts.BUILD_ROOT, self.project_path)
+        return path if path.startswith(prefix) else os.path.normpath(os.path.join(prefix, path))
+
+    def _rel_from_abs_source(self, path):
+        prefix = os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path)
+        return os.path.relpath(path, prefix) if path.startswith(prefix) else path
 
     def get_test_dependencies(self):
         return list(
@@ -261,8 +267,7 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
         source_inputs = self._get_config_files() + ["package.json", "pnpm-lock.yaml"]
         return list(
             set(
-                self._files
-                + [self._abs_source_path(f) for f in source_inputs]
+                [self._abs_source_path(f) for f in source_inputs + self._files]
                 + [self._abs_build_path("pre.pnpm-lock.yaml")]
             )
         )
@@ -406,7 +411,7 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             "--tracefile",
             os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
         ]
-        cmd += self._files[self._modulo_index :: self._modulo]
+        cmd += [self._rel_from_abs_source(f) for f in self._files[self._modulo_index :: self._modulo]]
         return cmd
 
 
