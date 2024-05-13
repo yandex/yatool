@@ -520,7 +520,7 @@ def populate_contrib(
             continue
 
         # OWNER
-        macro = find_or_create(project, 'OWNER')
+        macro = find_or_create(project, 'SUBSCRIBER')
 
         if not macro.find_nodes(owner):
             macro.add_value(owner)
@@ -617,7 +617,7 @@ def populate_contrib(
 
         else:
             parent_project = md.Project('JAVA_CONTRIB_PROXY')
-            find_or_create(parent_project, 'OWNER').add_value(owner)
+            find_or_create(parent_project, 'SUBSCRIBER').add_value(owner)
             find_or_create(parent_project, 'PEERDIR').add_value(max_peerdir)
             find_or_create(parent_project, 'END')
 
@@ -642,7 +642,7 @@ def populate_contrib(
                 else:
                     recurse_macro = md.Macro('RECURSE')
                     recurse_macro.add_value(os.path.basename(path))
-                    owner_macro = md.Macro('OWNER')
+                    owner_macro = md.Macro('SUBSCRIBER')
                     owner_macro.add_value(owner)
                     node = md.Node('', md.TYPE_UNKNOWN)
                     node.children.extend([owner_macro, recurse_macro])
@@ -692,8 +692,8 @@ def populate_contrib_unified(
         project = md.Project('JAVA_CONTRIB')
         project_by_path[project_path] = project
 
-        # OWNER
-        macro = find_or_create(project, 'OWNER')
+        # SUBSCRIBER
+        macro = find_or_create(project, 'SUBSCRIBER')
 
         if not macro.find_nodes(owner):
             macro.add_value(owner)
@@ -782,7 +782,7 @@ def populate_contrib_unified(
             macro.add_value(max_peerdir)
         else:
             parent_project = md.Project('JAVA_CONTRIB_PROXY')
-            find_or_create(parent_project, 'OWNER').add_value(owner)
+            find_or_create(parent_project, 'SUBSCRIBER').add_value(owner)
             find_or_create(parent_project, 'PEERDIR').add_value(max_peerdir)
             find_or_create(parent_project, 'END')
 
@@ -807,7 +807,7 @@ def populate_contrib_unified(
                 else:
                     recurse_macro = md.Macro('RECURSE')
                     recurse_macro.add_value(os.path.basename(path))
-                    owner_macro = md.Macro('OWNER')
+                    owner_macro = md.Macro('SUBSCRIBER')
                     owner_macro.add_value(owner)
                     node = md.Node('', md.TYPE_UNKNOWN)
                     node.children.extend([owner_macro, recurse_macro])
