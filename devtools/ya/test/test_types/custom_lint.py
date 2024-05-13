@@ -14,11 +14,11 @@ class CustomLintTestSuite(LintTestSuite):
     def __init__(self, dart_info, **kwargs):
         super(CustomLintTestSuite, self).__init__(dart_info, **kwargs)
         self._files = self.get_suite_files()
-        self._configs = dart_info.get("LINT-CONFIGS", [])
+        self._configs = dart_info.get("LINT-CONFIGS") or []
         self._lint_name = dart_info["LINT-NAME"]
         self._linter = dart_info["LINTER"]
         self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
-        self._extra_params = dart_info.get("LINT-EXTRA-PARAMS", [])
+        self._extra_params = dart_info.get("LINT-EXTRA-PARAMS") or []
 
     def support_splitting(self, opts=None):
         return self._file_processing_time > 0
