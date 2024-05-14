@@ -369,6 +369,8 @@ class YaMakeOptions(YaBaseOptions):
 
         self.ignore_configure_errors = self._pop('ignore_configure_errors')
 
+        self.no_prefetch = self._pop('no_prefetch')
+
     def _generate_post_handler(self):
         result = []
         if self.use_distbuild:
@@ -776,6 +778,9 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.ignore_configure_errors:
             env['YA_IGNORE_CONFIGURE_ERRORS'] = '1'
+
+        if self.no_prefetch:
+            env['YA_PREFETCH'] = '0'
 
         return env
 
