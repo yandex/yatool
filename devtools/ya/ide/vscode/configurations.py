@@ -10,6 +10,7 @@ from . import common, consts, dump, tasks
 
 def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool_fetcher, python_wrappers_dir, goroot):
     is_mac = pm.my_platform().startswith("darwin")
+    is_win = pm.my_platform().startswith("win")
     cpp_debug_params = None
     if "CPP" in languages:
         if is_mac:
@@ -19,6 +20,21 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                     ("env", {}),
                     (
                         "sourceMap",
+                        {
+                            "/-S": arc_root,
+                            "/-B": output_root or arc_root,
+                        },
+                    ),
+                )
+            )
+        elif is_win:
+            cpp_debug_params = OrderedDict(
+                (
+                    ("type", "cppvsdbg"),
+                    ("environment", []),
+                    ("visualizerFile", os.path.join(arc_root, "devtools/msvs/arcadia.natvis")),
+                    (
+                        "sourceFileMap",
                         {
                             "/-S": arc_root,
                             "/-B": output_root or arc_root,
@@ -176,7 +192,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                 environment = {"YA_TEST_CONTEXT_FILE": os.path.join(test_results_path, "test.context")}
                 if is_mac:
                     configuration["env"] = environment
-                elif gdb_path:
+                else:
                     configuration["environment"] = [{"name": n, "value": m} for n, m in environment.items()]
             else:
                 ide_common.emit_message(
