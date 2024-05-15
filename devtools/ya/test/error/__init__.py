@@ -1,10 +1,19 @@
 import contextlib
 import logging
+import six
+import traceback
 
 import core.config
 
 
 logger = logging.getLogger(__name__)
+
+
+def _format_exception(exc):
+    if six.PY2:
+        return "{}".format(exc)
+    else:
+        return "".join(traceback.format_exception(exc))
 
 
 class _SuiteCtx:
@@ -28,16 +37,15 @@ class _SuiteCtx:
             log_func = logger.exception
         else:
             log_func = logger.warning
-
         if self._stack:
             func, suite = self._stack[-1]
-            msg = "[[unimp]]<{}>[[rst]] {}".format(suite, exc)
+            msg = "[[unimp]]<{}>[[rst]] {}".format(suite, _format_exception(exc))
             if func:
                 func(msg=msg, path=suite.project_path, sub='SuiteConf')
             else:
                 log_func("Broken suite: %s", msg)
         else:
-            msg = "Failed to register suite error outside of suite context: {}".format(exc)
+            msg = "Failed to register suite error outside of suite context: {}".format(_format_exception(exc))
             if core.config.is_test_mode():
                 raise RuntimeError(msg)
             else:
