@@ -437,7 +437,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     logger->info("Some info message");
 }
 ```
+---
 
+#### Mapped Diagnostic Context
+```c++
+// Mapped Diagnostic Context (MDC) is a map that stores key-value pairs (string values) in thread local storage.
+// Each thread maintains its own MDC, which loggers use to append diagnostic information to log outputs.
+// Note: it is not supported in asynchronous mode due to its reliance on thread-local storage.
+#include "spdlog/mdc.h"
+void mdc_example()
+{
+    spdlog::mdc::put("key1", "value1");
+    spdlog::mdc::put("key2", "value2");
+    // if not using the default format, use the %& formatter to print mdc data
+    // spdlog::set_pattern("[%H:%M:%S %z] [%^%L%$] [%&] %v");
+}
+```
 ---
 ## Benchmarks
 

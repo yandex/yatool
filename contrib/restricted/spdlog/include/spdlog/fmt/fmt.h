@@ -20,7 +20,7 @@
     #ifndef FMT_USE_WINDOWS_H
         #define FMT_USE_WINDOWS_H 0
     #endif
-    
+
     #error #include <spdlog/fmt/bundled/core.h>
     #error #include <spdlog/fmt/bundled/format.h>
 
