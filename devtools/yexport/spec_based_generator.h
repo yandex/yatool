@@ -41,8 +41,6 @@ public:
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";
     static constexpr const char* GENERATOR_TEMPLATES_PREFIX = "[generator]/";
     static constexpr const char* YEXPORT_FILE = "yexport.toml";
-    static constexpr const char* DEBUG_SEMS_ATTR = "dump_sems";
-    static constexpr const char* DEBUG_ATTRS_ATTR = "dump_attrs";
     static constexpr const char* EMPTY_TARGET = "EMPTY";///< Magic target for use in directory without any targets
 
     TSpecBasedGenerator() noexcept = default;
@@ -68,13 +66,17 @@ public:
 
     TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name) const;
     bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
+    void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
 
 protected:
     void CopyFilesAndResources();
     std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplateSpec>& templateSpecs) const;
-    void RenderJinjaTemplates(TAttrsPtr valuesMap, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
-    void MergePlatforms(const std::vector<TJinjaTemplate>& dirTemplates, std::vector<TJinjaTemplate>& commonTemplates) const;
-    static void InsertPlatforms(jinja2::ValuesMap& valuesMap, const std::vector<TPlatformPtr>& platforms);
+    void RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
+    void MergePlatforms();
+    static void InsertPlatformNames(TAttrsPtr& attrs, const std::vector<TPlatformPtr>& platforms);
+    void InsertPlatformConditions(TAttrsPtr& attrs, bool addDeprecated = false);
+    void InsertPlatformAttrs(TAttrsPtr& attrs);
+    void CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::ValuesMap& addAttrs);
 
     using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
     using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;
@@ -91,6 +93,12 @@ protected:
     TTargetReplacements TargetReplacements_;///< Patches for semantics by path
     TDumpOpts DumpOpts_;///< Dump options for semantics and template attributes
     TDebugOpts DebugOpts_;///< Debug options for semantics and template attributes
+
+    std::vector<TJinjaTemplate> RootTemplates;
+    THashMap<std::string, std::vector<TJinjaTemplate>> TargetTemplates;
+    THashMap<std::string, std::vector<TJinjaTemplate>> MergePlatformTargetTemplates;
+
+    TAttrsPtr RootAttrs;
 
     TYexportSpec ReadYexportSpec(fs::path configDir = "");
 

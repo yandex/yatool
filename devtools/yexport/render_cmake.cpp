@@ -3,6 +3,7 @@
 #include "std_helpers.h"
 #include "project.h"
 #include "graph_visitor.h"
+#include "internal_attributes.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
@@ -150,7 +151,7 @@ namespace {
             targetAttrs->SetAttrValue("is_interface", tgt->InterfaceTarget ? jinja2::ValuesList{"true"} : jinja2::ValuesList{"false"}, name);
 
             {
-                const auto [_, inserted] = targetMap.emplace("macro_args", jinja2::ValuesList(tgt->MacroArgs.begin(), tgt->MacroArgs.end()));
+                const auto [_, inserted] = NInternalAttrs::EmplaceAttr(targetMap, NInternalAttrs::MacroArgs, jinja2::ValuesList(tgt->MacroArgs.begin(), tgt->MacroArgs.end()));
                 Y_ASSERT(inserted);
             }
 
@@ -238,7 +239,7 @@ namespace {
 
             // add subdirectories that contain targets inside (possibly several levels lower)
             {
-                auto [subdirsIt, inserted] = dirMap.emplace("subdirs", jinja2::ValuesList());
+                auto [subdirsIt, inserted] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Subdirs, jinja2::ValuesList());
                 Y_ASSERT(inserted);
                 auto& subdirs = subdirsIt->second.asList();
                 for (const auto& dir: data.SubdirectoriesToAdd) {
@@ -250,7 +251,7 @@ namespace {
             Y_ASSERT(inserted);
 
             {
-                auto [extraTargetsIt, inserted] = dirMap.emplace("extra_targets", jinja2::ValuesList());
+                auto [extraTargetsIt, inserted] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList(), false);
                 Y_ASSERT(inserted);
                 auto& extraTargets = extraTargetsIt->second.asList();
                 for (auto tgt: data.Targets) {
@@ -261,7 +262,7 @@ namespace {
                         cmakeTarget->Macro == "add_swig_jni_library") {
                         extraTargets.emplace_back(targetAttrs);
                     } else {
-                        dirMap.emplace("target", targetAttrs);
+                        NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Target, targetAttrs);
                     }
                 }
             }
@@ -996,6 +997,7 @@ namespace {
 
 bool AnalizePlatformSemGraph(const TPlatformPtr platform, TGlobalProperties& globalProperties, TCMakeGenerator* cmakeGenerator) {
     TCmakeRenderingVisitor visitor(platform, globalProperties, cmakeGenerator);
+    visitor.FillPlatformName(platform->Name);
     IterateAll(*platform->Graph, platform->StartDirs, visitor);
     platform->Project = visitor.TakeFinalizedProject();
     return !visitor.HasErrors();

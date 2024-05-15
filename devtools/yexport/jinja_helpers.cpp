@@ -1,8 +1,26 @@
 #include "jinja_helpers.h"
 
+#include <contrib/libs/jinja2cpp/include/jinja2cpp/generic_list_iterator.h>
+
 #include <util/string/builder.h>
 
+#include <spdlog/spdlog.h>
+
 namespace NYexport {
+    void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree) {
+        for (const auto& [attrName, attrValue]: tree) {
+            if (attrValue.isMap()) {
+                auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
+                MergeTree(attrIt->second.asMap(), attrValue.asMap());
+            } else {
+                if (attrs.contains(attrName)) {
+                    spdlog::error("overwrite dict element {}", attrName);
+                }
+                attrs[attrName] = attrValue;
+            }
+        }
+    }
+
     void Dump(IOutputStream& out, const jinja2::Value& value, int depth, bool isLastItem) {
         auto Indent = [](int depth) {
             return std::string(depth * 4, ' ');
@@ -10,32 +28,53 @@ namespace NYexport {
         if (value.isMap()) {
             if (!depth) out << Indent(depth);
             out << "{\n";
-            const auto& map = value.asMap();
-            if (!map.empty()) {
-                // Sort map keys before dumping
-                TVector<std::string> keys;
-                keys.reserve(map.size());
+            const auto* genMap = value.getPtr<jinja2::GenericMap>();
+            TVector<std::string> keys;
+            if (genMap) {// workaround for GenericMap, asMap generate bad_variant_access for it
+                auto genkeys = genMap->GetKeys();
+                keys.insert(keys.end(), genkeys.begin(), genkeys.end());
+            } else {
+                const auto& map = value.asMap();
                 for (const auto& [key, _] : map) {
                     keys.emplace_back(key);
                 }
+            }
+            if (!keys.empty()) {
+                // Sort map keys before dumping
                 Sort(keys);
                 for (const auto& key : keys) {
                     out << Indent(depth + 1) << key << ": ";
-                    const auto it = map.find(key);
-                    Dump(out, it->second, depth + 1, &key == &keys.back());
+                    if (genMap) {
+                        Dump(out, genMap->GetValueByName(key), depth + 1, &key == &keys.back());
+                    } else {
+                        Dump(out, value.asMap().at(key), depth + 1, &key == &keys.back());
+                    }
                 }
             }
             out << Indent(depth) << "}";
         } else if (value.isList()) {
             out << "[\n";
-            const auto& vals = value.asList();
-            for (const auto& val : vals) {
-                out << Indent(depth + 1);
-                Dump(out, val, depth + 1, &val == &vals.back());
+            const auto* genList = value.getPtr<jinja2::GenericList>();
+            if (genList) {// workaround for GenericList
+                auto size = genList->GetSize();
+                size_t last = size.has_value() ? size.value() : 0;
+                size_t i = 0;
+                std::for_each(genList->begin(), genList->end(), [&](const auto& val) {
+                    out << Indent(depth + 1);
+                    Dump(out, val, depth + 1, ++i == last);
+                });
+            } else {
+                const auto& vals = value.asList();
+                for (const auto& val : vals) {
+                    out << Indent(depth + 1);
+                    Dump(out, val, depth + 1, &val == &vals.back());
+                }
             }
             out << Indent(depth) << "]";
         }  else if (value.isString()) {
             out << '"' << value.asString() << '"';
+        }  else if (value.isWString()) {
+            out << '"' << value.asWString() << '"';
         } else if (value.isEmpty()) {
             out << "EMPTY";
         } else {
@@ -45,6 +84,10 @@ namespace NYexport {
                 out << value.get<int64_t>();
             } else if (std::holds_alternative<double>(value.data())) {
                 out << value.get<double>();
+            } else if (std::holds_alternative<std::string_view>(value.data())) {
+                out << value.get<std::string_view>();
+            } else if (std::holds_alternative<std::wstring_view>(value.data())) {
+                out << value.get<std::wstring_view>();
             } else {
                 out << "???";
             }

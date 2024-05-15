@@ -22,14 +22,6 @@
 #include <fstream>
 #include <vector>
 
-namespace {
-    const std::string ATTRNAME_SUBDIRS = "subdirs";
-    const std::string ATTRNAME_TARGET = "target";
-    const std::string ATTRNAME_EXTRA_TARGETS = "extra_targets";
-    const std::string ATTRNAME_HAS_TEST = "hasTest";
-    const std::string ATTRNAME_PROJECT_NAME = "projectName";
-}
-
 namespace NYexport {
 
 TJinjaProject::TJinjaProject() {
@@ -95,20 +87,6 @@ bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const 
     return false;
 }
 
-void TJinjaProject::TBuilder::MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree) {
-    for (auto& [attrName, attrValue]: tree) {
-        if (attrValue.isMap()) {
-            auto [attrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
-            MergeTree(attrIt->second.asMap(), attrValue.asMap());
-        } else {
-            if (attrs.contains(attrName)) {
-                spdlog::error("overwrite dict element {}", attrName);
-            }
-            attrs[attrName] = attrValue;
-        }
-    }
-}
-
 class TJinjaGeneratorVisitor: public TGraphVisitor {
 public:
     TJinjaGeneratorVisitor(TJinjaGenerator* generator, TAttrsPtr rootAttrs, const TGeneratorSpec& generatorSpec)
@@ -116,7 +94,6 @@ public:
     {
         JinjaProjectBuilder_ = MakeSimpleShared<TJinjaProject::TBuilder>(generator, rootAttrs);
         ProjectBuilder_ = JinjaProjectBuilder_;
-
         if (const auto* tests = generatorSpec.Merge.FindPtr("test")) {
             for (const auto& item : *tests) {
                 TestSubdirs_.push_back(item.c_str());
@@ -145,12 +122,14 @@ public:
         curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name);
         auto& attrs = curTarget->Attrs->GetWritableMap();
         curTarget->Name = semArgs[1];
-        attrs.emplace("name", curTarget->Name);
+        NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Name, curTarget->Name);
         curTarget->Macro = semName;
-        attrs.emplace("macro", curTarget->Macro);
-        curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
-        attrs.emplace("macroArgs", jinja2::ValuesList(curTarget->MacroArgs.begin(), curTarget->MacroArgs.end()));
-        attrs.emplace("isTest", isTestTarget);
+        NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Macro, curTarget->Macro);
+        if (!macroArgs.empty()) {
+            curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
+            NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::MacroArgs, jinja2::ValuesList(curTarget->MacroArgs.begin(), curTarget->MacroArgs.end()));
+        }
+        NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::IsTest, isTestTarget);
         const auto* jinjaTarget = dynamic_cast<const TProjectTarget*>(JinjaProjectBuilder_->CurrentTarget());
         Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
     }
@@ -159,6 +138,8 @@ public:
         const TSemNodeData& data = state.TopNode().Value();
         if (semNameType == ESNT_RootAttr) {
             JinjaProjectBuilder_->SetRootAttr(semName, semArgs, data.Path);
+        } else if (semNameType == ESNT_PlatformAttr) {
+            JinjaProjectBuilder_->SetPlatformAttr(semName, semArgs, data.Path);
         } else if (semNameType == ESNT_DirectoryAttr) {
             JinjaProjectBuilder_->SetDirectoryAttr(semName, semArgs, data.Path);
         } else if (semNameType == ESNT_TargetAttr) {
@@ -270,10 +251,10 @@ public:
                         // For each induced attribute in map format add submap with excludes
                         jinja2::ValuesMap valueWithDepAttrs = value.asMap();
                         if (!excludes.empty()) {
-                            valueWithDepAttrs.emplace(TJinjaGenerator::EXCLUDES_ATTR, excludes);
+                            NInternalAttrs::EmplaceAttr(valueWithDepAttrs, NInternalAttrs::Excludes, excludes);
                         }
                         if (isTestDep) {
-                            valueWithDepAttrs.emplace(TJinjaGenerator::TESTDEP_ATTR, toTarget->TestModDir);
+                            NInternalAttrs::EmplaceAttr(valueWithDepAttrs, NInternalAttrs::Testdep, toTarget->TestModDir);
                         }
                         JinjaProjectBuilder_->AddToTargetInducedAttr(attrName, valueWithDepAttrs, data.Path);
                     } else {
@@ -348,6 +329,7 @@ void TJinjaGenerator::LoadSemGraph(const std::string& platformName, const fs::pa
 
 TProjectPtr TJinjaGenerator::AnalizeSemGraph(const TPlatform& platform) {
     TJinjaGeneratorVisitor visitor(this, RootAttrs, GeneratorSpec);
+    visitor.FillPlatformName(platform.Name);
     IterateAll(*platform.Graph, platform.StartDirs, visitor);
     return visitor.TakeFinalizedProject();
 }
@@ -412,7 +394,7 @@ void TJinjaGenerator::RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanI
     }
 
     FinalizeSubdirsAttrs(platform);
-    auto rootSubdirs = jinja2::ValuesList();
+    auto rootSubdirs = jinja2::ValuesList{};
     for (auto subdir: platform->Project->GetSubdirs()) {
         Y_ASSERT(subdir);
         if (subdir->IsTopLevel()) {
@@ -423,16 +405,16 @@ void TJinjaGenerator::RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanI
 
     if (TargetTemplates.contains(EMPTY_TARGET)) {// root of export always without targets
         TAttrsPtr rootdirAttrs = MakeAttrs(EAttrGroup::Directory, "rootdir");
-        const auto [_, inserted] = rootdirAttrs->GetWritableMap().emplace(ATTRNAME_SUBDIRS, rootSubdirs);
+        const auto [_, inserted] = NInternalAttrs::EmplaceAttr(rootdirAttrs->GetWritableMap(), NInternalAttrs::Subdirs, rootSubdirs);
         Y_ASSERT(inserted);
-        CommonFinalizeAttrs(*rootdirAttrs, YexportSpec.AddAttrsDir);
+        if (!IgnorePlatforms()) {
+            InsertPlatformNames(rootdirAttrs, Platforms);
+            InsertPlatformConditions(rootdirAttrs);
+        }
+        CommonFinalizeAttrs(rootdirAttrs, YexportSpec.AddAttrsDir);
         SetCurrentDirectory(ArcadiaRoot);
         RenderJinjaTemplates(rootdirAttrs, TargetTemplates[EMPTY_TARGET], "", platform->Name);
     }
-}
-
-void TJinjaGenerator::MergePlatforms() {
-    // TODO
 }
 
 void TJinjaGenerator::RenderRoot() {
@@ -455,12 +437,12 @@ void TJinjaGenerator::RenderSubdir(TPlatformPtr platform, TProjectSubdirPtr subd
 const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
     YEXPORT_VERIFY(!Platforms.empty(), "Cannot finalize root attrs because project was not yet loaded");
     auto& attrs = RootAttrs->GetWritableMap();
-    if (attrs.contains(ATTRNAME_PROJECT_NAME)) { // already finalized
+    if (attrs.contains(NInternalAttrs::ProjectName)) { // already finalized
         return attrs;
     }
-    attrs.emplace(ATTRNAME_PROJECT_NAME, ProjectName);
+    NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::ProjectName, ProjectName);
     std::unordered_set<std::string> existsSubdirs;
-    auto [subdirsIt, subdirsInserted] = attrs.emplace(ATTRNAME_SUBDIRS, jinja2::ValuesList{});
+    auto [subdirsIt, subdirsInserted] = NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Subdirs, jinja2::ValuesList{});
     auto& subdirs = subdirsIt->second.asList();
     for (const auto& platform : Platforms) {
         for (const auto& subdir: platform->Project->GetSubdirs()) {
@@ -474,16 +456,18 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
             }
         }
     }
-    CommonFinalizeAttrs(*RootAttrs, YexportSpec.AddAttrsRoot);
+    if (!IgnorePlatforms()) {
+        InsertPlatformNames(RootAttrs, Platforms);
+        InsertPlatformConditions(RootAttrs);
+        InsertPlatformAttrs(RootAttrs);
+    }
+    CommonFinalizeAttrs(RootAttrs, YexportSpec.AddAttrsRoot);
     if (DebugOpts_.DebugSems) {
         auto& map = RootAttrs->GetWritableMap();
+        auto [debugSemsIt, _] = NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpSems, "", false);
+        auto& debugSems = debugSemsIt->second.asString();
         for (const auto& platform : Platforms) {
-            if (IgnorePlatforms()) {
-                map.emplace(DEBUG_SEMS_ATTR, platform->Project->SemsDump);
-            } else {
-                auto [debugSemsIt, _] = map.emplace(DEBUG_SEMS_ATTR, jinja2::ValuesMap{});
-                debugSemsIt->second.asMap().emplace(platform->Name, platform->Project->SemsDump);
-            }
+            debugSems += platform->Project->SemsDump;
         }
     }
     return RootAttrs->GetMap();
@@ -514,16 +498,16 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
         }
         auto& dirMap = dir->Attrs->GetWritableMap();
         if (!dir->Subdirs.empty()) {
-            auto [subdirsIt, _] = dirMap.emplace(ATTRNAME_SUBDIRS, jinja2::ValuesList{});
+            auto [subdirsIt, _] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Subdirs, jinja2::ValuesList{});
             for (const auto& subdir : dir->Subdirs) {
                 subdirsIt->second.asList().emplace_back(subdir->Path.filename());
             }
         }
         for (auto& target: dir->Targets) {
             Y_ASSERT(target->Attrs);
-            CommonFinalizeAttrs(*target->Attrs, YexportSpec.AddAttrsTarget);
+            CommonFinalizeAttrs(target->Attrs, YexportSpec.AddAttrsTarget);
             if (DebugOpts_.DebugSems) {
-                target->Attrs->GetWritableMap().emplace(DEBUG_SEMS_ATTR, target->SemsDump);
+                NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::DumpSems, target->SemsDump, false);
             }
             const auto& targetMacro = target->Macro;
             Y_ASSERT(GeneratorSpec.Targets.contains(targetMacro));
@@ -531,33 +515,34 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
             const auto& targetSpec = GeneratorSpec.Targets[targetMacro];
             auto isTest = targetSpec.IsTest || target->IsTest();
             if (isTest) {
-                dirMap.insert_or_assign(ATTRNAME_HAS_TEST, true);
+                auto [hasTestIt, _] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::HasTest, true);
+                hasTestIt->second = true; // emulate insert or_assign
             }
             auto isExtraTarget = targetSpec.IsExtraTarget || isTest;// test always is extra target
             const auto& targetAttrs = target->Attrs->GetMap();
             if (isExtraTarget) {
-                auto& extra_targets = dirMap.emplace(ATTRNAME_EXTRA_TARGETS, jinja2::ValuesList{}).first->second.asList();
+                auto& extra_targets = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList{}, false).first->second.asList();
                 extra_targets.emplace_back(targetAttrs);
             } else {
-                if (dirMap.contains(ATTRNAME_TARGET)) {// main target already exists
-                    const auto curTargetName = dirMap[ATTRNAME_TARGET].asMap().at("name").asString();
-                    const auto newTargetName = targetAttrs.at("name").asString();
+                if (dirMap.contains(NInternalAttrs::Target)) {// main target already exists
+                    const auto curTargetName = dirMap[NInternalAttrs::Target].asMap().at(NInternalAttrs::Name).asString();
+                    const auto newTargetName = targetAttrs.at(NInternalAttrs::Name).asString();
                     if (curTargetName <= newTargetName) {
                         spdlog::error("Skip main target {}, already exists main target {} at {}", newTargetName, curTargetName, dir->Path.string() + platformSuf());
                     } else {
                         spdlog::error("Overwrote main target {} by main target {} at {}", curTargetName, newTargetName, dir->Path.string() + platformSuf());
-                        dirMap.insert_or_assign(ATTRNAME_TARGET, targetAttrs);
+                        dirMap.insert_or_assign(NInternalAttrs::Target, targetAttrs);
                         dir->MainTargetMacro = targetMacro;
                     }
                 } else {
-                    dirMap.emplace(ATTRNAME_TARGET, targetAttrs);
+                    dirMap.emplace(NInternalAttrs::Target, targetAttrs);
                     dir->MainTargetMacro = targetMacro;
                 }
             }
         }
-        CommonFinalizeAttrs(*dir->Attrs, YexportSpec.AddAttrsDir);
+        CommonFinalizeAttrs(dir->Attrs, YexportSpec.AddAttrsDir);
         if (DebugOpts_.DebugSems) {
-            dirMap.emplace(DEBUG_SEMS_ATTR, dir->SemsDump);
+            NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, dir->SemsDump, false);
         }
         if (dir->MainTargetMacro.empty() && !dir->Targets.empty()) {
             spdlog::error("Only {} extra targets without main target in directory {}", dir->Targets.size(), dir->Path.string() + platformSuf());
@@ -567,33 +552,19 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
     return subdirsAttrs;
 }
 
-void TJinjaGenerator::CommonFinalizeAttrs(TAttrs& attrs, const jinja2::ValuesMap& addAttrs) {
-    auto& map = attrs.GetWritableMap();
-    map.emplace("arcadiaRoot", ArcadiaRoot);
-    if (ExportFileManager) {
-        map.emplace("exportRoot", ExportFileManager->GetExportRoot());
-    }
-    if (!addAttrs.empty()) {
-        TJinjaProject::TBuilder::MergeTree(map, addAttrs);
-    }
-    if (DebugOpts_.DebugAttrs) {
-        map.emplace(DEBUG_ATTRS_ATTR, ::NYexport::Dump(attrs.GetMap()));
-    }
-}
-
 jinja2::ValuesMap TJinjaGenerator::FinalizeAttrsForDump() {
     // disable creating debug template attributes
     DebugOpts_.DebugSems = false;
     DebugOpts_.DebugAttrs = false;
     jinja2::ValuesMap allAttrs;
-    allAttrs.emplace("root", FinalizeRootAttrs());
+    NInternalAttrs::EmplaceAttr(allAttrs, NInternalAttrs::RootAttrs, FinalizeRootAttrs());
     if (IgnorePlatforms()) {
-        allAttrs.emplace(ATTRNAME_SUBDIRS, FinalizeSubdirsAttrs(Platforms[0], DumpOpts_.DumpPathPrefixes));
+        NInternalAttrs::EmplaceAttr(allAttrs, NInternalAttrs::Subdirs, FinalizeSubdirsAttrs(Platforms[0], DumpOpts_.DumpPathPrefixes));
     } else {
         for (auto& platform : Platforms) {
             auto platformSubdirs = FinalizeSubdirsAttrs(platform, DumpOpts_.DumpPathPrefixes);
             if (!platformSubdirs.empty()) {
-                auto [allSubdirsIt, _] = allAttrs.emplace(ATTRNAME_SUBDIRS, jinja2::ValuesMap{});
+                auto [allSubdirsIt, _] = NInternalAttrs::EmplaceAttr(allAttrs, NInternalAttrs::Subdirs, jinja2::ValuesMap{});
                 allSubdirsIt->second.asMap().emplace(platform->Name, std::move(platformSubdirs));
             }
         }
@@ -620,23 +591,5 @@ THashMap<fs::path, TVector<TProjectTarget>> TJinjaGenerator::GetSubdirsTargets()
     }
     return res;
 }
-
-void TJinjaGenerator::SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile) {
-    GeneratorSpec = spec;
-    if (GeneratorSpec.Root.Templates.empty() && !generatorFile.empty()) {
-        throw TBadGeneratorSpec("[error] No root templates exists in the generator file: " + generatorFile);
-    }
-    if (GeneratorSpec.Targets.empty()) {
-        std::string message = "[error] No targets exists in the generator file: ";
-        throw TBadGeneratorSpec(message.append(generatorFile));
-    }
-    RootTemplates = LoadJinjaTemplates(GeneratorSpec.Root.Templates);
-    for (const auto& [targetName, target]: GeneratorSpec.Targets) {
-        TargetTemplates[targetName] = LoadJinjaTemplates(target.Templates);
-        if (!target.MergePlatformTemplates.empty()) {
-            MergePlatformTargetTemplates[targetName] = LoadJinjaTemplates(target.MergePlatformTemplates);
-        }
-    }
-};
 
 }

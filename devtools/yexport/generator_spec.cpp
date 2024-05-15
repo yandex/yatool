@@ -44,9 +44,10 @@ namespace NKeys {
 
     static const THashMap<std::string, EAttrGroup> StringToAttributeGroup = {
         {"root", EAttrGroup::Root},
+        {"platform", EAttrGroup::Platform},
+        {"dir", EAttrGroup::Directory},
         {"target", EAttrGroup::Target},
         {"induced", EAttrGroup::Induced},
-        {"dir", EAttrGroup::Directory},
     };
 
     THashSet<std::string> CopyLocationSet() {
@@ -243,7 +244,7 @@ namespace {
         return ParseSomeTemplates(target, NKeys::MergePlatformTemplate, NKeys::MergePlatformTemplates, true);
     }
 
-    TTargetSpec ParseTargetSpec(const toml::value& target, bool mayBeExtraTarget = false) {
+    TTargetSpec ParseTargetSpec(const toml::value& target, bool ignorePlatforms, bool mayBeExtraTarget = false) {
         VERIFY_GENSPEC(target.is_table(), target, NGeneratorSpecError::WrongFieldType, "Should be a table");
 
         TTargetSpec targetSpec;
@@ -253,21 +254,25 @@ namespace {
         if (targetSpec.IsExtraTarget) {
             VerifyFields(target, {}, {NKeys::Copy, NKeys::IsExtraTarget, NKeys::IsTest});
             targetSpec.IsTest = toml::get<bool>(toml::find_or<toml::value>(target, NKeys::IsTest, toml::boolean{false}));
-        } else {
+        } else if (ignorePlatforms) {
             VerifyFields(target, {}, {NKeys::Template, NKeys::Templates, NKeys::Copy});
+        } else {
+            VerifyFields(target, {}, {NKeys::Template, NKeys::Templates, NKeys::MergePlatformTemplate, NKeys::MergePlatformTemplates, NKeys::Copy});
         }
 
         if (!targetSpec.IsExtraTarget) {
             targetSpec.Templates = ParseTemplates(target);
-            targetSpec.MergePlatformTemplates = ParseMergePlatformTemplates(target);
-            if (!targetSpec.MergePlatformTemplates.empty() && targetSpec.Templates.size() != targetSpec.MergePlatformTemplates.size()) {
-                throw TBadGeneratorSpec{
-                    toml::format_error(
-                        "[error] invalid attributes",
-                        target,
-                        "must contains equal count of template(s) and merge_platform_template(s)"
-                    )
-                };
+            if (!ignorePlatforms) {
+                targetSpec.MergePlatformTemplates = ParseMergePlatformTemplates(target);
+                if (!targetSpec.MergePlatformTemplates.empty() && targetSpec.Templates.size() != targetSpec.MergePlatformTemplates.size()) {
+                    throw TBadGeneratorSpec{
+                        toml::format_error(
+                            "[error] invalid attributes",
+                            target,
+                            "must contains equal count of template(s) and merge_platform_template(s)"
+                        )
+                    };
+                }
             }
         }
         if (target.contains(NKeys::Copy)) {
@@ -381,30 +386,37 @@ namespace {
             ParseAttr(*attrName, attrsGroup, attrsTable.at(*attrName), spec);
         }
         // By default all list/set/sorted_set items are strings
+        TAttrGroup resAttrsGroup;
         for (const auto& [attrName, attrType]: attrsGroup) {
+            resAttrsGroup.emplace(attrName, attrType);
             if (attrType != EAttrTypes::List && attrType != EAttrTypes::Set && attrType != EAttrTypes::SortedSet) {
                 continue;
             }
             auto attrNameItem = attrName.str() + ITEM_SUFFIX;
             if (!attrsGroup.contains(attrNameItem)){
-                attrsGroup.emplace(attrNameItem, EAttrTypes::Str);
+                resAttrsGroup.emplace(attrNameItem, EAttrTypes::Str);
             } else if (attrType == EAttrTypes::Set || attrType == EAttrTypes::SortedSet) {
                 auto curType = attrsGroup[attrNameItem];
                 if (curType != EAttrTypes::Str) {
                     throw TBadGeneratorSpec(
-                        toml::format_error("[error] invalid item type " + ToString<EAttrTypes>(curType) + " of " + attrName + " in attrs section", attrs, " now set and sotred_set supports only string items")
+                        toml::format_error("[error] invalid item type " + ToString<EAttrTypes>(curType) + " of " + attrName + " in attrs section", attrs, " now set and sorted_set supports only string items")
                     );
                 }
             }
         }
-        return attrsGroup;
+        return resAttrsGroup;
     }
 
-    TGeneratorRule ParseRule(const toml::value& value) {
+    TGeneratorRule ParseRule(const toml::value& value, bool ignorePlatforms) {
         VerifyFields(value, {}, {NKeys::Attrs, NKeys::Platforms, NKeys::Copy, NKeys::AddValues});
 
         const auto* attrs = Find(&value, NKeys::Attrs);
         const auto* platforms = Find(&value, NKeys::Platforms);
+        if (ignorePlatforms && platforms) {
+            throw TBadGeneratorSpec(
+                toml::format_error("Rule for platforms can't be defined with enabled " + std::string{NKeys::IgnorePlatforms}, *platforms, " remove rule for platforms or disable " + std::string{NKeys::IgnorePlatforms})
+            );
+        }
         VERIFY_GENSPEC(/* XOR */(bool)attrs != (bool)platforms, value, NGeneratorSpecError::SpecificationError, "Rule should have one of attrs or platforms conditions");
 
         TGeneratorRule rule;
@@ -467,19 +479,40 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
 
         TGeneratorSpec genspec;
 
-        genspec.Root = ParseTargetSpec(root);
+        genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
+        genspec.IgnorePlatforms = toml::get<bool>(find_or<toml::value>(doc, NKeys::IgnorePlatforms, toml::boolean{false}));
+
+        genspec.Root = ParseTargetSpec(root, genspec.IgnorePlatforms);
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
-            genspec.Targets[name] = ParseTargetSpec(tgtspec, true);
+            genspec.Targets[name] = ParseTargetSpec(tgtspec, genspec.IgnorePlatforms, true);
         }
 
-        const auto& platforms = find_or<toml::table>(doc, NKeys::Platforms, toml::table{});
-        genspec.Platforms = ParsePlatformsSpec(platforms);
+        if (genspec.IgnorePlatforms) {
+            if (doc.contains(NKeys::Platforms)) {
+                throw TBadGeneratorSpec(
+                    toml::format_error("If enabled " + std::string{NKeys::IgnorePlatforms} + ", can't be defined " + NKeys::Platforms, doc, " disable " + std::string{NKeys::IgnorePlatforms} + " or remove " + std::string{NKeys::Platforms})
+                );
+            }
+        } else {
+            if (!doc.contains(NKeys::Platforms)) {
+                throw TBadGeneratorSpec(
+                    toml::format_error("Section " + std::string{NKeys::Platforms} + " required when disabled " + std::string{NKeys::IgnorePlatforms}, doc, " add " + std::string{NKeys::Platforms} + " or enable " + std::string{NKeys::IgnorePlatforms})
+                );
+            }
+            const auto& platforms = find<toml::table>(doc, NKeys::Platforms);
+            genspec.Platforms = ParsePlatformsSpec(platforms);
+        }
 
         auto& attrGroups = genspec.AttrGroups;
         for (const auto& [name, attrspec] : find_or<toml::table>(doc, NKeys::Attrs, toml::table{})) {
             auto attrGroupIt = NKeys::StringToAttributeGroup.find(name);
             VERIFY_GENSPEC(attrGroupIt != NKeys::StringToAttributeGroup.end(), attrspec, NGeneratorSpecError::SpecificationError,
                     "Unknown attribute group [" + name + "]. Attribute group should be one of the following " + NKeys::GetAttrGroupList());
+            if (attrGroupIt->second == EAttrGroup::Platform && genspec.IgnorePlatforms) {
+                throw TBadGeneratorSpec(
+                    toml::format_error("If enabled " + std::string{NKeys::IgnorePlatforms} + ", can't be defined attrs for " + attrGroupIt->first, doc, " disable " + std::string{NKeys::IgnorePlatforms} + " or attrs for " + attrGroupIt->first)
+                );
+            }
             attrGroups[attrGroupIt->second] = ParseAttrGroup(attrspec, genspec);
         }
 
@@ -523,11 +556,9 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
         }
 
         for (const auto& value : find_or<toml::array>(doc, NKeys::Rules, toml::array{})) {
-            AddRule(genspec, ParseRule(value));
+            AddRule(genspec, ParseRule(value, genspec.IgnorePlatforms));
         }
 
-        genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
-        genspec.IgnorePlatforms = toml::get<bool>(find_or<toml::value>(doc, NKeys::IgnorePlatforms, toml::boolean{false}));
         return genspec;
     } catch (const toml::exception& err) {
         throw TBadGeneratorSpec{err.what()};

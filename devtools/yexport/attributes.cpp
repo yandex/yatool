@@ -46,6 +46,9 @@ void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jin
                 auto [dictAttrIt, _] = attrs.emplace(attrName, jinja2::ValuesMap{});
                 AppendToDictAttr(dictAttrIt->second.asMap(), attr, values, getDebugStr);
             }; break;
+            case EAttrTypes::Skip:{
+                // Known, but skip it silently
+            }; break;
             default:
                 spdlog::error("Skipped unknown {}", getDebugStr());
         }
@@ -186,12 +189,18 @@ EAttrTypes TAttrs::GetItemAttrType(const std::string_view attrName) const {
 
 jinja2::Value TAttrs::GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
     switch (attrType) {
-        case EAttrTypes::Str:
+        case EAttrTypes::Str:{
             if (values.size() > 1) {
                 spdlog::error("trying to add {} elements to 'str' type {}, type 'str' should have only 1 element", values.size(), getDebugStr());
                 // but continue and use first item
             }
-            return values.empty() ? std::string{} : values[0].asString();
+            static const std::string EmptyString;
+            const auto& s = values.empty() ? std::string{} : values[0].asString();
+            if (auto len = s.size(); len >= 2 && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))) {
+                return jinja2::Value{s.substr(1, len - 2)};
+            }
+            return jinja2::Value{s};
+        }
         case EAttrTypes::Bool:
             if (values.size() > 1) {
                 spdlog::error("trying to add {} elements to 'bool' type {}, type 'bool' should have only 1 element", values.size(), getDebugStr());

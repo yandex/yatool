@@ -17,7 +17,12 @@ THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& ar
     const std::optional<TDumpOpts> dumpOpts, const std::optional<TDebugOpts> debugOpts
 ) {
     if (generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
+#ifdef CMAKE_AS_HARDCODED_CMAKE
+        spdlog::warn("Use generator 'cmake' as 'hardcoded-cmake'");
+        return TJinjaGenerator::Load(arcadiaRoot, "cmake", configDir, dumpOpts, debugOpts);
+#else
         return TCMakeGenerator::Load(arcadiaRoot, generator, configDir);
+#endif
     }
     if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py3);

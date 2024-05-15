@@ -6,6 +6,7 @@
 #include "std_helpers.h"
 #include "project.h"
 #include "yexport_generator.h"
+#include "internal_attributes.h"
 
 #include <devtools/ymake/dependency_management.h>
 
@@ -40,8 +41,6 @@ using TJinjaProjectPtr = TSimpleSharedPtr<TJinjaProject>;
 class TJinjaGenerator : public TSpecBasedGenerator {
 public:
     class TBuilder;
-    static constexpr std::string_view EXCLUDES_ATTR = "excludes"; // Lists of excludes induced attributes
-    static constexpr std::string_view TESTDEP_ATTR = "testdep";   // Dependency to test, if not empty, attr has path to library with test inside
 
     static THolder<TJinjaGenerator> Load(
         const fs::path& arcadiaRoot,
@@ -50,7 +49,6 @@ public:
         const std::optional<TDumpOpts> dumpOpts = {},
         const std::optional<TDebugOpts> debugOpts = {}
     );
-    void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
@@ -64,23 +62,15 @@ private:
 
     void Render(ECleanIgnored cleanIgnored) override;
     void RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanIgnored);
-    void MergePlatforms();
     void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
     void RenderRoot();
     void RenderSubdir(TPlatformPtr platform, TProjectSubdirPtr subdir);
 
     const jinja2::ValuesMap& FinalizeRootAttrs();
     jinja2::ValuesMap FinalizeSubdirsAttrs(TPlatformPtr platform, const std::vector<std::string>& pathPrefixes = {});
-    void CommonFinalizeAttrs(TAttrs& attrs, const jinja2::ValuesMap& addAttrs);
     jinja2::ValuesMap FinalizeAttrsForDump();
 
     std::string ProjectName;
-
-    std::vector<TJinjaTemplate> RootTemplates;
-    THashMap<std::string, std::vector<TJinjaTemplate>> TargetTemplates;
-    THashMap<std::string, std::vector<TJinjaTemplate>> MergePlatformTargetTemplates;
-
-    TAttrsPtr RootAttrs;
 
 public: // for tests only
     THashMap<fs::path, TVector<TProjectTarget>> GetSubdirsTargets() const;
@@ -94,6 +84,16 @@ public:
     void SetRootAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
         Y_ASSERT(RootAttrs);
         RootAttrs->SetAttrValue(attrName, values, nodePath);
+    }
+
+    template<IterableValues Values>
+    void SetPlatformAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
+        if (!Project_) {
+            spdlog::error("attempt to add platform attribute '{}' while there is no active project at node {}", attrName, nodePath);
+            return;
+        }
+        Y_ASSERT(Project_->PlatformAttrs);
+        Project_->PlatformAttrs->SetAttrValue(attrName, values, nodePath);
     }
 
     template<IterableValues Values>
@@ -119,8 +119,6 @@ public:
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
     void OnAttribute(const std::string& attribute);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
-
-    static void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
 
 private:
     static bool ValueInList(const jinja2::ValuesList& list, const jinja2::Value& val);

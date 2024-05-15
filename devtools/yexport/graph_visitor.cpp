@@ -7,6 +7,7 @@ namespace NYexport {
 
     static const THashMap<EAttrGroup, TGraphVisitor::ESemNameType> UsedAttrGroups = {
         {EAttrGroup::Root, TGraphVisitor::ESNT_RootAttr},
+        {EAttrGroup::Platform, TGraphVisitor::ESNT_PlatformAttr},
         {EAttrGroup::Directory, TGraphVisitor::ESNT_DirectoryAttr},
         {EAttrGroup::Target, TGraphVisitor::ESNT_TargetAttr},
         {EAttrGroup::Induced, TGraphVisitor::ESNT_InducedAttr},
@@ -15,17 +16,20 @@ namespace NYexport {
     TArgsConstraint AtLeast(size_t count) {
         return {
             .Type = EConstraintType::AtLeast,
-            .Count = count};
+            .Count = count,
+        };
     }
     TArgsConstraint MoreThan(size_t count) {
         return {
             .Type = EConstraintType::MoreThan,
-            .Count = count};
+            .Count = count,
+        };
     }
     TArgsConstraint Exact(size_t count) {
         return {
             .Type = EConstraintType::Exact,
-            .Count = count};
+            .Count = count,
+        };
     }
 
     TGraphVisitor::TGraphVisitor(TSpecBasedGenerator* generator)
@@ -34,6 +38,16 @@ namespace NYexport {
         YEXPORT_VERIFY(Generator_, "Absent generator in graph visitor");
 
         SetupSemanticMapping(Generator_->GetGeneratorSpec());
+    }
+
+    void TGraphVisitor::FillPlatformName(const std::string& platformName) {
+        if (!Generator_->IgnorePlatforms()) {
+            ProjectBuilder_->CurrentProject()->PlatformAttrs = Generator_->MakeAttrs(EAttrGroup::Platform, "platform " + platformName);
+            if ((Generator_->DumpOpts().DumpSems || Generator_->DebugOpts().DebugSems)) {
+                auto* project = ProjectBuilder_->CurrentProject();
+                project->SemsDump += "--- PLATFORM " + platformName + "\n";
+            }
+        }
     }
 
     bool TGraphVisitor::Enter(TState& state) {
@@ -49,15 +63,15 @@ namespace NYexport {
             return onEnterRes.value();
         }
 
-        if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
-            currentProject->SemsDumpDepth++;
-        }
-        if (auto* currentSubdir = ProjectBuilder_->CurrentSubdir(); currentSubdir) {
-            currentSubdir->SemsDumpDepth++;
-        }
-        if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
-            currentTarget->SemsDumpDepth++;
-        }
+        auto incSemsDepth = [](TSemsDump* semsDump) {
+            if (!semsDump) {
+                return;
+            }
+            ++semsDump->SemsDumpDepth;
+        };
+        incSemsDepth(ProjectBuilder_->CurrentProject());
+        incSemsDepth(ProjectBuilder_->CurrentSubdir());
+        incSemsDepth(ProjectBuilder_->CurrentTarget());
 
         const TSemNodeData& data = state.TopNode().Value();
         if (data.Sem.empty() || data.Sem.front().empty()) {
@@ -133,6 +147,27 @@ namespace NYexport {
             TBase::Leave(state);
             return;
         }
+
+        auto decSemsDepth = [](TSemsDump* semsDump) {
+            if (!semsDump) {
+                return;
+            }
+            if (semsDump->SemsDumpDepth > 0) {
+                --semsDump->SemsDumpDepth;
+            }
+            if (semsDump->SemsDumpEmptyDepth > 0) {
+                --semsDump->SemsDumpEmptyDepth;
+                auto pos = semsDump->SemsDump.rfind('\n', semsDump->SemsDump.size() - 2);// skip last \n, search before last \n
+                if (pos != std::string::npos) {
+                    semsDump->SemsDump.resize(pos + 1);// safe before last \n (cut one line at the end of dump)
+                }
+            }
+        };
+        decSemsDepth(ProjectBuilder_->CurrentProject());
+        decSemsDepth(ProjectBuilder_->CurrentSubdir());
+        decSemsDepth(ProjectBuilder_->CurrentTarget());
+
+
         const TSemNodeData& data = state.TopNode().Value();
         if (data.Sem.empty() || data.Sem.front().empty()) {
             TBase::Leave(state);
@@ -146,22 +181,6 @@ namespace NYexport {
             const auto semArgs = std::span{sem}.subspan(1);
 
             OnNodeSemanticPostOrder(state, semName, semNameType, semArgs);
-        }
-
-        if (auto* currentProject = ProjectBuilder_->CurrentProject(); currentProject) {
-            if (currentProject->SemsDumpDepth > 0) {
-                currentProject->SemsDumpDepth--;
-            }
-        }
-        if (auto* currentSubdir = ProjectBuilder_->CurrentSubdir(); currentSubdir) {
-            if (currentSubdir->SemsDumpDepth > 0) {
-                currentSubdir->SemsDumpDepth--;
-            }
-        }
-        if (auto* currentTarget = ProjectBuilder_->CurrentTarget(); currentTarget) {
-            if (currentTarget->SemsDumpDepth > 0) {
-                currentTarget->SemsDumpDepth--;
-            }
         }
 
         TBase::Leave(state);
@@ -276,9 +295,6 @@ namespace NYexport {
         if (!Generator_->DumpOpts().DumpSems && !Generator_->DebugOpts().DebugSems) {
             return;
         }
-        auto Indent = [&](int depth) {
-            return std::string(depth * 4, ' ');
-        };
         auto semDump = [&](const TNodeSemantic& sem) {
             std::string dump;
             for (const auto& s: sem) {
@@ -290,9 +306,20 @@ namespace NYexport {
             return dump;
         };
         auto maxSize = std::max(graphSems.size(), appliedSems.size());
+        auto renderNodePath = [&](TSemsDump* semsDump) {
+            if (semsDump) {
+                semsDump->SemsDump += Indent(semsDump->SemsDumpDepth) + "[ " + nodePath + " ]\n";
+            }
+        };
         auto* currentProject = ProjectBuilder_->CurrentProject();
+        renderNodePath(currentProject);
+        auto projectEmpty = true;
         auto* currentSubdir = ProjectBuilder_->CurrentSubdir();
+        renderNodePath(currentSubdir);
+        auto subdirEmpty = true;
         auto* currentTarget = ProjectBuilder_->CurrentTarget();
+        renderNodePath(currentTarget);
+        auto targetEmpty = true;
         for (size_t i = 0; i < maxSize; ++i) {
             std::string graphSemDump;
             ESemNameType graphSemType = ESNT_Unknown;
@@ -313,33 +340,54 @@ namespace NYexport {
             };
             auto renderSemsDump = [&](TSemsDump* semsDump) {
                 Y_ASSERT(semsDump);
-                auto indent = Indent(semsDump->SemsDumpDepth);
-                if (!semsDump->SemsPathAdded) {
-                    semsDump->SemsDump += indent + "[ " + nodePath + " ]\n";
-                    semsDump->SemsPathAdded = true;
-                }
-                semsDump->SemsDump += indent + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
+                semsDump->SemsDump += Indent(semsDump->SemsDumpDepth) + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
             };
             auto isRootAttr = isType(ESNT_RootAttr);
             auto isDirAttr = isType(ESNT_DirectoryAttr);
             auto isTarget = isType(ESNT_Target);
             if (isRootAttr || !currentTarget) { // all root semantics or without target add to Project
                 renderSemsDump(currentProject);
+                projectEmpty = false;
             }
             if (isDirAttr || isTarget || !currentTarget) { // all directory semantics or without target add to Subdir
                 renderSemsDump(currentSubdir);
+                subdirEmpty = false;
             }
             if (!isRootAttr && !isDirAttr && !isTarget && currentTarget) {
                 renderSemsDump(currentTarget);
+                targetEmpty = false;
             }
         }
-        auto clearPathAdded = [&](TSemsDump* semsDump) {
-            if (semsDump) {
-                semsDump->SemsPathAdded = false;
+        if (currentProject) {
+            if (projectEmpty) {
+                ++currentProject->SemsDumpEmptyDepth;
+            } else {
+                currentProject->SemsDumpEmptyDepth = 0;
             }
-        };
-        clearPathAdded(currentProject);
-        clearPathAdded(currentSubdir);
-        clearPathAdded(currentTarget);
+        }
+        if (currentSubdir) {
+            if (subdirEmpty) {
+                ++currentSubdir->SemsDumpEmptyDepth;
+            } else {
+                currentSubdir->SemsDumpEmptyDepth = 0;
+            }
+        }
+        if (currentTarget) {
+            if (targetEmpty) {
+                ++currentTarget->SemsDumpEmptyDepth;
+            } else {
+                currentTarget->SemsDumpEmptyDepth = 0;
+            }
+        }
+    }
+
+    std::string TGraphVisitor::Indent(size_t depth) {
+        static constexpr size_t maxIndent = 64;
+        auto indent = depth * 2;
+        if (indent <= maxIndent) {
+            return std::string(indent, ' ');
+        } else {
+            return std::string(maxIndent - 2, ' ') + "~>";
+        }
     }
 }

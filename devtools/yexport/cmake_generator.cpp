@@ -4,6 +4,7 @@
 #include "read_sem_graph.h"
 #include "render_cmake.h"
 #include "generator_spec.h"
+#include "internal_attributes.h"
 
 #include <library/cpp/digest/md5/md5.h>
 
@@ -42,15 +43,16 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     }
 
     THolder<TCMakeGenerator> result = MakeHolder<TCMakeGenerator>();
-    auto& generatorSpec = result->GeneratorSpec = ReadGeneratorSpec(generatorFile);
-
-    if (!generatorSpec.Targets.contains(EMPTY_TARGET)) {
-        throw yexception() << fmt::format("[error] targets.{} section required for generator {}, but not found in {}", EMPTY_TARGET, generator, generatorFile.c_str());
-    }
 
     result->GeneratorDir = generatorDir;
     result->SetArcadiaRoot(arcadiaRoot);
     result->SetupJinjaEnv();
+
+    result->SetSpec(ReadGeneratorSpec(generatorFile), generatorFile.string());
+
+    if (!result->GeneratorSpec.Targets.contains(EMPTY_TARGET)) {
+        throw yexception() << fmt::format("[error] targets.{} section required for generator {}, but not found in {}", EMPTY_TARGET, generator, generatorFile.c_str());
+    }
 
     result->YexportSpec = result->ReadYexportSpec(configDir);
     return result;
@@ -72,7 +74,8 @@ void TCMakeGenerator::LoadSemGraph(const std::string& platform, const fs::path& 
     OnPlatform(platform);
 }
 
-void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTemplate>& dirJinjaTemplates) {
+void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
+    auto& dirJinjaTemplates = TargetTemplates[EMPTY_TARGET];
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
         Cleaner.CollectDirs(*platform->Graph, platform->StartDirs);
     }
@@ -92,8 +95,10 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform, std::vector<TJinjaTe
     }
 
     TAttrsPtr rootdirAttrs = MakeAttrs(EAttrGroup::Directory, "rootdir");
-    const auto [_, inserted] = rootdirAttrs->GetWritableMap().emplace("subdirs", topLevelSubdirs);
-    Y_ASSERT(inserted);
+    InsertPlatformNames(rootdirAttrs, Platforms);
+    InsertPlatformConditions(rootdirAttrs, true);
+    auto& rootdirMap = rootdirAttrs->GetWritableMap();
+    NInternalAttrs::EmplaceAttr(rootdirMap, NInternalAttrs::Subdirs, topLevelSubdirs);
     SetCurrentDirectory(ArcadiaRoot);
     RenderJinjaTemplates(rootdirAttrs, dirJinjaTemplates, "", platform->Name);
 }
@@ -122,12 +127,14 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
 }
 
 void TCMakeGenerator::RenderPlatforms() {
-    auto dirJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Targets[EMPTY_TARGET].Templates);
     for (auto& platform : Platforms) {
-        RenderPlatform(platform, dirJinjaTemplates);
+        RenderPlatform(platform);
     }
     CopyFilesAndResources();
-    MergePlatforms(dirJinjaTemplates);
+    if (!IgnorePlatforms()) {
+
+        MergePlatforms();
+    }
     CopyArcadiaScripts();
 }
 
@@ -139,18 +146,6 @@ void TCMakeGenerator::RenderRoot() {
     ApplyRules(rootAttrs);
     SetCurrentDirectory(ArcadiaRoot);
     RenderJinjaTemplates(rootAttrs, rootJinjaTemplates);
-}
-
-void TCMakeGenerator::InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const {
-    auto& platformNames = valuesMap.insert_or_assign("platform_names", jinja2::ValuesList()).first->second.asList();
-    for (const auto& platform : platforms) {
-        platformNames.emplace_back(platform->Name);
-    }
-}
-
-void TCMakeGenerator::MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const {
-    auto mergePlatformJinjaTemplates = LoadJinjaTemplates(GeneratorSpec.Targets.at(EMPTY_TARGET).MergePlatformTemplates);
-    TSpecBasedGenerator::MergePlatforms(dirJinjaTemplates, mergePlatformJinjaTemplates);
 }
 
 jinja2::ValuesList TCMakeGenerator::GetAdjustedLanguagesList() const {
@@ -183,10 +178,10 @@ void TCMakeGenerator::CopyArcadiaScripts() const {
     }
 }
 
-void TCMakeGenerator::PrepareRootCMakeList(TAttrsPtr rootValueMap) const {
-    auto& rootMap = rootValueMap->GetWritableMap();
-    rootMap["platforms"] = GeneratorSpec.Platforms;
-    InsertPlatforms(rootMap, Platforms);
+void TCMakeGenerator::PrepareRootCMakeList(TAttrsPtr rootAttrs) {
+    auto& rootMap = rootAttrs->GetWritableMap();
+    InsertPlatformNames(rootAttrs, Platforms);
+    InsertPlatformConditions(rootAttrs, true);
 
     jinja2::ValuesList globalVars;
     for (const auto &platform: Platforms) {

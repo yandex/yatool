@@ -7,6 +7,8 @@
 #include <util/stream/output.h>
 
 namespace NYexport {
+    void MergeTree(jinja2::ValuesMap& attrs, const jinja2::ValuesMap& tree);
+
     void Dump(IOutputStream& out, const jinja2::Value& value, int depth = 0, bool isLastItem = true);
     std::string Dump(const jinja2::Value& value, int depth = 0);
 

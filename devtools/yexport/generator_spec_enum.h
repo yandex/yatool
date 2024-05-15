@@ -10,6 +10,7 @@ enum class EAttrTypes {
     Set /* "set" */,
     SortedSet /* "sorted_set" */,
     Dict /* "dict" */,
+    Skip /* "skip" */,
     Unknown /* "unknown" */,
 };
 
@@ -20,10 +21,11 @@ enum class ECopyLocation {
 
 enum class EAttrGroup {
     Unknown = 0,
-    Root,      // Root of all targets attribute
-    Target,    // Target for generator attribute
-    Induced,   // Target for generator induced attribute (add to list for parent node in graph)
-    Directory, // Attributes of subdirectory
+    Root,      // Root of export
+    Platform,  // Current platform
+    Directory, // Current directory
+    Target,    // Current target
+    Induced,   // Childs of current target
 };
 
 }

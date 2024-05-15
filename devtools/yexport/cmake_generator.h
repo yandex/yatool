@@ -43,15 +43,13 @@ private:
 
     void RenderPlatforms();
     void RenderRoot();
-    void InsertPlatforms(jinja2::ValuesMap& valuesMap, const TVector<TPlatformPtr> platforms) const;
-    void MergePlatforms(const std::vector<TJinjaTemplate>& dirJinjaTemplates) const;
     jinja2::ValuesList GetAdjustedLanguagesList() const;
     void CopyArcadiaScripts() const;
 
     void SetArcadiaRoot(const fs::path& arcadiaRoot);
-    void RenderPlatform(const TPlatformPtr platform, std::vector<TJinjaTemplate>& dirJinjaTemplates);
+    void RenderPlatform(const TPlatformPtr platform);
 
-    void PrepareRootCMakeList(TAttrsPtr rootValueMap) const;
+    void PrepareRootCMakeList(TAttrsPtr rootValueMap);
     void PrepareConanRequirements(TAttrsPtr rootValueMap) const;
 
     void Render(ECleanIgnored cleanIgnored) override;

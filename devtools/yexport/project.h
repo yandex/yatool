@@ -32,7 +32,7 @@ namespace NYexport {
     public:
         std::string SemsDump;///< Semantic dumps, collected during dispatch graph
         size_t SemsDumpDepth{0};///< Current depth of semantics for SemsDump
-        bool SemsPathAdded{false};///< Is current path in graph added to dump
+        size_t SemsDumpEmptyDepth{0};///< How many empty depth (cut off on leave)
     };
 
     class TProjectTarget : public TSemsDump {
@@ -70,6 +70,8 @@ namespace NYexport {
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
         TVector<TProjectSubdirPtr>& GetSubdirs();
+
+        TAttrsPtr PlatformAttrs;
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>
