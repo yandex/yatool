@@ -146,7 +146,7 @@ public:
 private:
     void PrepareBuildDir() const;
     void GenerateCustomData(const TStringBuf genCustomData);
-    void LoadSystemHeaders(MD5& confData);
+    void LoadSystemHeaders();
     void LoadLicenses();
     void LoadPeersRules(MD5& confData);
     void LoadBlackLists(MD5& confData);

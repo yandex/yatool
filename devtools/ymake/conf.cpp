@@ -160,7 +160,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     CompleteModules();
     VerifyModuleConfs();
     confWoRulesData = confData;
-    LoadSystemHeaders(confData);
+    LoadSystemHeaders();
     LoadPeersRules(confData);
     if (Diag()->BlckLst) {
         LoadBlackLists(confData);
@@ -198,13 +198,13 @@ void TBuildConfiguration::GenerateCustomData(const TStringBuf genCustomData) {
     }
 }
 
-void TBuildConfiguration::LoadSystemHeaders(MD5& confData) {
+void TBuildConfiguration::LoadSystemHeaders() {
     TString sysinclVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("SYSINCL"), CommandConf);
     TVector<TFsPath> sysinclFiles;
     for (const auto& it : StringSplitter(sysinclVar).Split(' ').SkipEmpty()) {
         sysinclFiles.emplace_back(SourceRoot / it.Token());
     }
-    Sysincl = LoadSystemIncludes(sysinclFiles, confData);
+    Sysincl = ::LoadSystemIncludes(sysinclFiles);
 }
 
 void TBuildConfiguration::LoadLicenses() {
