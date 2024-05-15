@@ -29,10 +29,12 @@ class Ya(LoggerCounter):
         name,  # type: str
         env=None,  # type: tp.Optional[dict]
         cwd=None,  # type: tp.Optional[str]
+        create_new_pgrp=False,  # type: bool
     ):
         self.options = options
         self._original_env = env
         self.cwd = cwd
+        self.process_group = 0 if create_new_pgrp else None
 
         self.name = name
 
@@ -75,7 +77,9 @@ class Ya(LoggerCounter):
             raise RuntimeError("This instance has already been launched")
 
         try:
-            result = run_subprocess(self.cmd, self.env, original_env=False, cwd=self.cwd)
+            result = run_subprocess(
+                self.cmd, self.env, original_env=False, cwd=self.cwd, process_group=self.process_group
+            )
             self.returncode = result.returncode
             self.stdout = result.stdout
             self.stderr = result.stderr
