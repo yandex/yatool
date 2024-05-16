@@ -302,65 +302,6 @@
 #
 # Mаксимальный размер кэша инструментов (–tools-cache-size)
 # tools_cache_size = 32212254720
-
-# ========== YT кэш ===========================================================
-#
-# Базовый URI bazel-remote (–bazel-remote-base-uri)
-# bazel_remote_baseuri = “http://[::1]:8080/”
-#
-# Файл пароля bazel-remote (–bazel-remote-password-file)
-# bazel_remote_password_file = “None”
-#
-# Использовать хранилище bazel-remote (–bazel-remote-store)
-# bazel_remote_store = false
-#
-# Имя пользователя bazel-remote (–bazel-remote-username)
-# bazel_remote_username = “None”
-#
-# Удалить все неинструментальные двоичные файлы из результатов сборки. Работает только в режиме --bazel-remote-put (–dist-cache-evict-bins)
-# dist_cache_evict_binaries = false
-#
-# Не собирать или загружать результаты сборки, если они присутствуют в dist кэше (–dist-cache-evict-cached)
-# dist_cache_evict_cached = false
-#
-# Путь к каталогу хранилища YT (–yt-dir)
-# yt_dir = “//home/devtools/cache”
-#
-# Прокси сервер YT (–yt-proxy)
-# yt_proxy = “hahn.yt.yandex.net”
-#
-# Использовать хранилище YT (–yt-store)
-# yt_store = true
-#
-# При чтении обновлять элементы кэша как свежие (симуляция LRU) (–yt-store-refresh-on-read)
-# yt_store_refresh_on_read = false
-#
-# Максимальное количество потоков хранилища YT (–yt-store-threads)
-# yt_store_threads = 1
-#
-# Путь к токену YT (–yt-token-path)
-# yt_token_path = “/home/mtv2000/.yt/token”
-
-# ========== YT кэш, загрузка =================================================
-#
-# Фильтр хранилища YT (–yt-store-filter)
-# yt_cache_filter = “None”
-#
-# Максимальный размер хранилища YT (–yt-max-store-size)
-# yt_max_cache_size = “None”
-#
-# Загрузка в хранилище YT (–yt-put)
-# yt_readonly = true
-#
-# Кодек хранилища YT (–yt-store-codec)
-# yt_store_codec = “None”
-#
-# TTL хранилища YT в часах(0 для бесконечности) (–yt-store-ttl)
-# yt_store_ttl = 24
-#
-# Обновлять локальный кэш во время загрузки в хранилище YT (–yt-write-through)
-# yt_store_wt = true
-
 # ========== Генерация графа ==================================================
 #
 # Сжать вывод ymake для снижения максимального использования памяти (–compress-ymake-output)
