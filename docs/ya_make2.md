@@ -124,7 +124,7 @@
 
 Режим отключается опцией `--no-content-uids` или настройкой `content_uids = false` в `ya.conf`.
 
-[О генерация конфигурационного файла инструмента](https://github.com/mtv2000/yatool/blob/newstyle/docs/ya_conf.md)
+[О генерации конфигурационного файла инструмента](https://github.com/mtv2000/yatool/blob/newstyle/docs/ya_conf.md)
 
 Использование контентных uid-ов видно в запуске с `--stat`
 
