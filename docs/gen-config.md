@@ -205,11 +205,6 @@ ya gen-config [OPTION]… [ya.conf]…
 # Use clonefile instead of hardlink on macOS (--use-clonefile)
 # use_clonefile = true
 #
-# ========== Selective checkout ===============================================
-#
-# Prefetch directories needed for build (--prefetch)
-# prefetch = false
-#
 # ========== Build output =====================================================
 #
 # Process selected host build output as a result (--add-host-result)
@@ -267,7 +262,7 @@ ya gen-config [OPTION]… [ya.conf]…
 #
 # ========== Platform/build configuration =====================================
 #
-# Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type (--build)
+# Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug)
 # build_type = "release"
 #
 # Host platform (--host-platform)
@@ -325,64 +320,6 @@ ya gen-config [OPTION]… [ya.conf]…
 #
 # Max tool cache size (--tools-cache-size)
 # tools_cache_size = 32212254720
-#
-# ========== YT cache =========================================================
-#
-# Bazel-remote base URI (--bazel-remote-base-uri)
-# bazel_remote_baseuri = "http://[::1]:8080/"
-#
-# Bazel-remote password file (--bazel-remote-password-file)
-# bazel_remote_password_file = "None"
-#
-# Use Bazel-remote storage (--bazel-remote-store)
-# bazel_remote_store = false
-#
-# Bazel-remote username (--bazel-remote-username)
-# bazel_remote_username = "None"
-#
-# Remove all non-tool binaries from build results. Works only with --bazel-remote-put mode (--dist-cache-evict-bins)
-# dist_cache_evict_binaries = false
-#
-# Don't build or download build results if they are present in the dist cache (--dist-cache-evict-cached)
-# dist_cache_evict_cached = false
-#
-# YT storage cypress directory pass (--yt-dir)
-# yt_dir = "//home/devtools/cache"
-#
-# YT storage proxy (--yt-proxy)
-# yt_proxy = "hahn.yt.yandex.net"
-#
-# Use YT storage (--yt-store)
-# yt_store = true
-#
-# On read mark cache items as fresh (simulate LRU) (--yt-store-refresh-on-read)
-# yt_store_refresh_on_read = false
-#
-# YT store max threads (--yt-store-threads)
-# yt_store_threads = 1
-#
-# YT token path (--yt-token-path)
-# yt_token_path = "/home/mtv2000/.yt/token"
-#
-# ========== YT cache put =====================================================
-#
-# YT store filter (--yt-store-filter)
-# yt_cache_filter = "None"
-#
-# YT storage max size (--yt-max-store-size)
-# yt_max_cache_size = "None"
-#
-# Upload to YT store (--yt-put)
-# yt_readonly = true
-#
-# YT store codec (--yt-store-codec)
-# yt_store_codec = "None"
-#
-# YT store ttl in hours(0 for infinity) (--yt-store-ttl)
-# yt_store_ttl = 24
-#
-# Populate local cache while updating YT store (--yt-write-through)
-# yt_store_wt = true
 #
 # ========== Graph generation =================================================
 #
@@ -539,11 +476,6 @@ ya gen-config [OPTION]… [ya.conf]…
 # Validate build root content by cached hash in content_uids mode (--validate-build-root-content)
 # validate_build_root_content = false
 #
-# ========== Upload to mds ====================================================
-#
-# Upload to MDS (--mds)
-# mds = false
-#
 # ========== Authorization ====================================================
 #
 # oAuth token (--token)
@@ -586,16 +518,13 @@ ya gen-config [OPTION]… [ya.conf]…
 - `build_threads`, `continue_on_fail`: настройки для процесса сборки.
 - `auto_clean_results_cache`, `build_cache`: настройки локального кэша результатов сборки.
 
-5. YT и Bazel кэш:
-- `yt_store`, `bazel_remote_store`: использование удаленного кэширования для ускорения сборки.
-
-6. Настройки вывода:
+5. Настройки вывода:
 - `mask_roots`, `output_style`: настройки для управления выводом информации во время сборки.
 
-7. Параметры платформы/конфигурации сборки:
+6. Параметры платформы/конфигурации сборки:
 - `build_type`, `target_platforms`: настройки для определения типа сборки и целевых платформ.
 
-8. Опции для разработчиков:
+7. Опции для разработчиков:
 - `use_json_cache`, `validate_build_root_content`: параметры для ускорения разработки и проверки корректности сборки.
 
 Каждый параметр в файле начинается с ключа, за которым следует равно (`=`) и значение параметра. Значения могут быть логическими (`true` или `false`), строковыми (заключенными в кавычки) или списочными (заключенными в квадратные скобки).
@@ -615,7 +544,7 @@ ya gen-config [OPTION]… [ya.conf]…
  Вот возможные места:
 
 1. `$repo/ya.conf` - общие настройки для проекта.
-2. `$repo/junk/${USER}/ya.conf` - пользовательские настройки в рамках одного проекта.
+2. `$repo/${USER}/ya.conf` - пользовательские настройки в рамках одного проекта.
 3. `$repo/../ya.conf` - если требуется иметь разные настройки для разных репозиториев.
 4. `~/.ya/ya.conf` - глобальные пользовательские настройки на уровне системы.
 5. Переменные окружения.
