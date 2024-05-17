@@ -38,7 +38,7 @@ INTERNAL_ERROR_EXIT_CODE = 3
 _MISSING_INPUTS = [  # TODO: fix all
     '$S/contrib/tools/python/src/Include/longintrepr.h',
     '$S/contrib/tools/flex-old/FlexLexer.h',  # for kernel/remorph/tokenlogic
-    '$S/contrib/tools/bison/bison/data',
+    '$S/contrib/tools/bison/data',
     '$S/contrib/tools/python/src/Lib',
     '$S/contrib/python/lxml/lxml',
     '$S/contrib/tools/cython',
