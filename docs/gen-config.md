@@ -6,13 +6,13 @@
 
 ya gen-config [OPTION]… [ya.conf]…
 
-- ya gen-config path/${USER}/ya.conf генерирует пользовательский конфигурационный файл в указанном месте. Если конфигурация уже существует, новая конфигурация сохраняет и учитывает ранее заданные параметры.
+- ya gen-config path_proect/${USER}/ya.conf генерирует пользовательский конфигурационный файл в указанном месте. Если конфигурация уже существует, новая конфигурация сохраняет и учитывает ранее заданные параметры.
 
 - Если пользователь поместит конфигурацию в свой каталог с именем ya.conf, она будет автоматически использоваться для определения параметров работы ya.
 
 - Значения в ya.conf имеют наименьший приоритет и могут быть переопределены через переменные окружения или аргументы командной строки.
 
-- Если каталог junk отсутствует, можно сохранить конфигурацию в ~/.ya/ya.conf.
+- Если каталог проекта (path_proect) отсутствует, можно сохранить конфигурацию в ~/.ya/ya.conf.
 
 ### Опции
 
@@ -28,7 +28,7 @@ ya gen-config [OPTION]… [ya.conf]…
 
 ## Пример ya.conf 
 ```
-# Save config to the junk/{USER}/ya.conf or to the ~/.ya/ya.conf
+# Save config to the path_proect/{USER}/ya.conf or to the ~/.ya/ya.conf
 #
 # Add all symlink-dirs in modules to exclude dirs (--auto-exclude-symlinks)
 # auto_exclude_symlinks = false
@@ -637,7 +637,7 @@ ya make path/to/project --replace-result --add-result=.go --no-output-for=.cgo1.
 
 ##### Конфигурация alias-а в ya.make.conf:
 ```
-# junk/<username>/ya.make.conf
+# path_proect/<username>/ya.make.conf
 replace_result = true  # --replace-result
 add_result_extend = [“.go”]  # --add-result=.go
 suppress_outputs = [“.cgo1”, “.res.go”, “_cgo_gotypes.go”]  # --no-output-for options
@@ -645,7 +645,7 @@ suppress_outputs = [“.cgo1”, “.res.go”, “_cgo_gotypes.go”]  # --no-o
 ##### Создание alias-а в ya.conf:
 
 ```
-# junk/<username>/ya.conf
+# path_proect/<username>/ya.conf
 
 [alias]
 replace_result = true
@@ -703,7 +703,7 @@ name = “disable_prebuild_tools”
 # Переменная окружения:
   `YA_DISABLE_PREBUILD_TOOLS=yes ya make path/to/project`
 # Значение в конфиге:
-  echo “\ndisable_prebuild_tools=true\n” >> junk/$USER/ya.conf
+  echo “\ndisable_prebuild_tools=true\n” >> path_proect/$USER/ya.conf
   ya make path/to/project
 ```
 ## Работа с несколькими Alias-ами
