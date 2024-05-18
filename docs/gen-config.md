@@ -156,7 +156,7 @@ ya gen-config [OPTION]… [ya.conf]…
 # Hostname associated with remote server configuration (--remote-host)
 # remote_deploy_host = "None"
 #
-# Path to the arc repository at the remote host (--remote-repo-path)
+# Path to the remote repository at the remote host (--remote-repo-path)
 # remote_repo_path = "None"
 #
 # Generate configurations for remote toolchain with this name (--remote-toolchain)
@@ -349,11 +349,6 @@ ya gen-config [OPTION]… [ya.conf]…
 # Disable dir_outputs support in runner (--disable-runner-dir-outputs)
 # runner_dir_outputs = true
 #
-# ========== Bullet-proof options =============================================
-#
-# Setup default arcadia's clang-tidy config in a project (--setup-tidy)
-# setup_tidy = false
-#
 # ========== Testing ==========================================================
 #
 # Use FS cache instead memory cache (only read) (--cache-fs-read)
@@ -543,8 +538,8 @@ ya gen-config [OPTION]… [ya.conf]…
 
  Вот возможные места:
 
-1. `$repo/ya.conf` - общие настройки для проекта.
-2. `$repo/${USER}/ya.conf` - пользовательские настройки в рамках одного проекта.
+1. `$path_proect/ya.conf` - общие настройки для проекта.
+2. `$path_proect/${USER}/ya.conf` - пользовательские настройки в рамках одного проекта.
 3. `$repo/../ya.conf` - если требуется иметь разные настройки для разных репозиториев.
 4. `~/.ya/ya.conf` - глобальные пользовательские настройки на уровне системы.
 5. Переменные окружения.
