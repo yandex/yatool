@@ -50,6 +50,7 @@ class TermView(object):
         distbuild=False,
         output_replacements=None,
         patterns=None,
+        use_roman_numerals=False,
     ):
         self._status = status
         self._display = display
@@ -64,6 +65,7 @@ class TermView(object):
         self._default_status = (
             '[[c:yellow]]NO ACTIVE DISTBUILD TASKS[[rst]]' if distbuild else '[[c:yellow]]NO ACTIVE LOCAL TASKS[[rst]]'
         )
+        self._roman_numerals = use_roman_numerals
         self._last_status = self._default_status_configuration()
         # TODO get rid of output_replacements and merge it with patterns
         self._output_replacements = output_replacements
@@ -120,7 +122,11 @@ class TermView(object):
         if not tag:
             tag = self._default_status
         return (
-            ['|[[unimp]]{}[[rst]]|'.format(helpers.percent_to_string(100.0 * self._status.progress()))],
+            [
+                '|[[unimp]]{}[[rst]]|'.format(
+                    helpers.percent_to_string(100.0 * self._status.progress(), self._roman_numerals)
+                )
+            ],
             tag,
             post or [],
         )
@@ -146,7 +152,9 @@ class TermView(object):
                 else:
                     pre.append(
                         '|[[unimp]]{}[[rst]]|'.format(
-                            helpers.percent_to_string(100.0 * self._last_id / max(1, self._status.count))
+                            helpers.percent_to_string(
+                                100.0 * self._last_id / max(1, self._status.count), self._roman_numerals
+                            )
                         )
                     )
                 if self._extra_progress:
@@ -162,7 +170,11 @@ class TermView(object):
             if not task_status:
                 continue
 
-            pre = ['|[[unimp]]{}[[rst]]|'.format(helpers.percent_to_string(100.0 * self._status.progress()))]
+            pre = [
+                '|[[unimp]]{}[[rst]]|'.format(
+                    helpers.percent_to_string(100.0 * self._status.progress(), self._roman_numerals)
+                )
+            ]
             post = []
             if tm > 10:
                 post.extend([2, '[[bad]]{0:.1f}s[[rst]]'.format(tm)])

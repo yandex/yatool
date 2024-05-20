@@ -133,6 +133,7 @@ class OutputStyleOptions(Options):
         self.status_refresh_interval = 0.1
         self.do_emit_status = True
         self.do_not_emit_nodes = []
+        self.use_roman_numerals = False
 
     @staticmethod
     def consumer():
@@ -182,6 +183,7 @@ class OutputStyleOptions(Options):
             ),
             ConfigConsumer('output_style'),
             ConfigConsumer('mask_roots'),
+            ConfigConsumer('use_roman_numerals'),
         ]
 
     def postprocess2(self, params):

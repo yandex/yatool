@@ -360,7 +360,13 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
     queue_status = status_view.Status()
     term_view = status_view.TermView(
-        queue_status, display, ninja, opts.ext_progress, False, output_replacements=output_replacements
+        queue_status,
+        display,
+        ninja,
+        opts.ext_progress,
+        False,
+        output_replacements=output_replacements,
+        use_roman_numerals=opts.use_roman_numerals,
     )
     ticker = status_view.TickThrottle(term_view.tick, 0.1)
 

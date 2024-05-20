@@ -3,7 +3,9 @@ PY23_LIBRARY()
 PEERDIR(
     devtools/ya/test/const
     devtools/ya/yalibrary/display
+    devtools/ya/yalibrary/roman
     library/python/strings
+    library/python/func
 )
 
 IF (PYTHON2)

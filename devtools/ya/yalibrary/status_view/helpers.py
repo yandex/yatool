@@ -4,6 +4,10 @@ import string
 
 import test.const
 
+import yalibrary.roman as roman
+import library.python.func as func
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +25,41 @@ class NodeView(object):
                 yield ' '.join([_f for _f in [self.type, t, x, y] if _f])
 
 
-def percent_to_string(p):
+def to_roman(x):
+    if x == 0:
+        return 'N'
+
+    return roman.to_roman(x)
+
+
+def percent_to_roman(d):
+    d = min(int(d * 10), 999)
+
+    p1 = d // 10
+    p2 = d % 10
+
+    return to_roman(p1) + '.' + to_roman(p2)
+
+
+def max_roman_range_len(a, b):
+    r = 0
+
+    for i in range(a, b):
+        r = max(r, len(to_roman(i)))
+
+    return r
+
+
+@func.lazy
+def max_roman_len():
+    return 1 + max_roman_range_len(1, 99) + max_roman_range_len(1, 9)
+
+
+def percent_to_string(p, use_roman_numerals=False):
+    if use_roman_numerals:
+        r = percent_to_roman(min(p, 99.9))
+
+        return ' ' * (max_roman_len() - len(r)) + r + '%'
     return "%4.1f%%" % min(p, 99.9)
 
 
