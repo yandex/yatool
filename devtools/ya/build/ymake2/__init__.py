@@ -537,14 +537,16 @@ def _run_ymake(**kwargs):
 
     prefetcher = None
     if app_ctx:
-        prefetcher = prefetch.ArcPrefetchSubscriber.get_subscriber(
+        if prefetch.prefetch_condition(
             getattr(app_ctx.params, 'arc_root', None),
             getattr(app_ctx.params, 'prefetch', False),
             getattr(app_ctx, 'vcs_type', ''),
-            _ymake_unique_run_id,
-        )
-        if prefetcher:
-            app_ctx.event_queue.subscribe(prefetcher)
+        ):
+            prefetcher = prefetch.ArcPrefetchSubscriber.get_subscriber(
+                getattr(app_ctx.params, 'arc_root', None),
+            )
+
+            prefetcher.subscribe_to(app_ctx.event_queue)
 
     try:
         with tmp.temp_file() as temp_meta:
@@ -631,7 +633,7 @@ def _run_ymake(**kwargs):
         raise
     finally:
         if app_ctx and prefetcher is not None:
-            app_ctx.event_queue.unsubscribe(prefetcher)
+            prefetcher.unsubscribe_from(app_ctx.event_queue)
 
         if _stat_info_postprocessing.get('start'):
             _stat_info_postprocessing['finish'] = time.time()
