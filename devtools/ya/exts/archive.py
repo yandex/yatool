@@ -18,9 +18,11 @@ from library.python.archive import (  # noqa
 )  # noqa
 
 
-def extract_from_tar(tar_file_path, output_dir, strip_components=None):
+def extract_from_tar(tar_file_path, output_dir, strip_components=None, apply_mtime=False, entry_filter=None):
     exts.fs.create_dirs(output_dir)
-    archive.extract_tar(tar_file_path, output_dir, strip_components=strip_components)
+    archive.extract_tar(
+        tar_file_path, output_dir, strip_components=strip_components, apply_mtime=apply_mtime, entry_filter=entry_filter
+    )
 
 
 def create_tar(
@@ -95,8 +97,12 @@ def is_tar(filename):
     with open(filename, 'rb') as afile:
         header = afile.read(size)
 
-    return len(header) == 262 and header.endswith(six.ensure_binary('ustar', encoding='ascii'))
+    return len(header) == size and header.endswith(six.ensure_binary('ustar', encoding='ascii'))
 
 
 def is_archive_type(filename):
     return is_tar(filename) or get_filter_type(filename)
+
+
+def get_archive_filenames(filename):
+    return archive.get_archive_filenames(filename)

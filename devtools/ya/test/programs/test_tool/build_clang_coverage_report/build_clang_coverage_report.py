@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 import subprocess
-import tarfile
 import json
 
 import six
@@ -131,7 +130,7 @@ def main():
     # test might be skipped by filter and there will be no coverage data
     if not cov_profiles:
         logger.debug("No cov_profiles available")
-        tarfile.open(args.output, "w").close()
+        exts.archive.create_tar([], args.output)
         return
 
     cmd = [args.llvm_profdata_tool, "merge", "-sparse", "-o", indexed_profile] + cov_profiles

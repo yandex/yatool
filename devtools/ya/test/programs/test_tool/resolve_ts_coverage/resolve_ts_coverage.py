@@ -3,9 +3,12 @@
 import argparse
 import logging
 import os
-import tarfile
 import ujson as json
+
+import exts.archive as archive
+
 from test.util import shared
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,7 @@ def _makedirs(dir_path):
 def extract(archive_filename):
     tmpdir = "tmp"
     _makedirs(tmpdir)
-    with tarfile.open(archive_filename, "r") as fh:
-        fh.extractall(tmpdir)
+    archive.extract_from_tar(archive_filename, tmpdir)
     return tmpdir
 
 

@@ -3,8 +3,8 @@
 import argparse
 import logging
 import os
+import shutil
 import exts.archive
-import tarfile
 import sys
 from test.util import shared
 from yatest.common import process
@@ -31,24 +31,23 @@ def _makedirs(dir_path):
         pass
 
 
-def _tar_extract_file(tar_fp, filename_in_tar, target_filename):
-    open(target_filename, 'wb').write(tar_fp.extractfile(filename_in_tar).read())
-
-
 def extract_coverage_final_files(coverage_tars, target_directory):
     cov_file_index = 0
     for cov_resolve_result in coverage_tars:
         if not cov_resolve_result.endswith(".tar"):
             continue
-        with tarfile.open(cov_resolve_result) as tar:
-            for member in tar.members:
-                logger.debug("member filename: {}".format(member.name))
-                if member.name != "coverage-final.json":
-                    continue
-                tmp_filename = os.path.join(target_directory, "{}.json".format(cov_file_index))
-                logger.debug("tmp_filename: {}".format(tmp_filename))
-                _tar_extract_file(tar, member.name, tmp_filename)
-                cov_file_index += 1
+
+        def _entry_filter(entry):
+            logger.debug("member filename: {}".format(entry.pathname))
+            return entry.pathname == "coverage-final.json"
+
+        exts.archive.extract_from_tar(cov_resolve_result, target_directory, entry_filter=_entry_filter)
+        extracted_filename = os.path.join(target_directory, "coverage-final.json")
+        if os.path.exists(extracted_filename):
+            tmp_filename = os.path.join(target_directory, "{}.json".format(cov_file_index))
+            shutil.move(extracted_filename, tmp_filename)
+            logger.debug("tmp_filename: {}".format(tmp_filename))
+            cov_file_index += 1
 
 
 def build_report(params):

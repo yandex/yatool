@@ -18,7 +18,6 @@ import six
 import socket
 import stat
 import sys
-import tarfile
 import time
 import traceback
 
@@ -940,7 +939,7 @@ def create_empty_outputs(params, overwrite=True):
     ]:
         if filename and (overwrite or not os.path.exists(filename)):
             exts.fs.ensure_dir(os.path.dirname(filename))
-            tarfile.open(filename, 'w:').close()
+            exts.archive.create_tar([], filename)
 
 
 def process_execute(tags, stage, rs, *args, **kwargs):
