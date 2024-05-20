@@ -75,8 +75,6 @@ import build.stat.statistics as bs
 from build import build_facade, frepkage, test_results_console_printer
 from build.reports import build_reports as build_report
 from build.evlog.progress import (
-    ModulesFilesStatistic,
-    PrintProgressSubscriber,
     get_print_status_func,
     YmakeTimeStatistic,
 )
@@ -293,8 +291,8 @@ def _checkout(opts, display=None):
         break
 
 
-def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
-    # type: (tp.Any, tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
+def _build_graph_and_tests(opts, app_ctx, ymake_stats):
+    # type: (tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
     display = getattr(app_ctx, 'display', None)
     _checkout(opts, display)
 
@@ -302,7 +300,6 @@ def _build_graph_and_tests(opts, app_ctx, modules_files_stats, ymake_stats):
     errors_collector = PrintMessageSubscriber()
 
     configure_time_subscribers = [
-        PrintProgressSubscriber(modules_files_stats),
         DisplayMessageSubscriber(opts, display, printed),
         ymake_stats,
         errors_collector,
@@ -828,11 +825,6 @@ class Context(object):
         display = getattr(app_ctx, 'display', None)
         print_status = get_print_status_func(opts, display, logger)
 
-        self.modules_files_stats = ModulesFilesStatistic(
-            stream=print_status,
-            is_rewritable=opts.output_style == 'ninja',
-        )
-
         self.ymake_stats = YmakeTimeStatistic()
         self.configure_errors = {}
         self.lite_graph = None
@@ -858,7 +850,7 @@ class Context(object):
                 self.stripped_tests,
                 self.configure_errors,
                 self.make_files,
-            ) = _build_graph_and_tests(self.opts, app_ctx, self.modules_files_stats, self.ymake_stats)
+            ) = _build_graph_and_tests(self.opts, app_ctx, self.ymake_stats)
             timer.show_step("graph_and_tests finished")
 
             if self.configure_errors and not opts.continue_on_fail:

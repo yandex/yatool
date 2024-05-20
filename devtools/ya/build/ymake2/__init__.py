@@ -36,6 +36,8 @@ from build.ymake2 import consts
 from build.ymake2 import run_ymake
 from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 
+from build.evlog.progress import PrintProgressSubscriber, ModulesFilesStatistic, get_print_status_func
+
 
 logger = logging.getLogger(__name__)
 
@@ -548,6 +550,12 @@ def _run_ymake(**kwargs):
 
             prefetcher.subscribe_to(app_ctx.event_queue)
 
+        display = getattr(app_ctx, 'display', None)
+        print_status = get_print_status_func(app_ctx.params, display, logger)
+        modules_files_stats = ModulesFilesStatistic(
+            stream=print_status, is_rewritable=getattr(app_ctx.params, "output_style", "") == "ninja"
+        )
+        app_ctx.event_queue.subscribe(PrintProgressSubscriber(modules_files_stats))
     try:
         with tmp.temp_file() as temp_meta:
             binary = kwargs.pop('ymake_bin', None) or _mine_ymake_binary()

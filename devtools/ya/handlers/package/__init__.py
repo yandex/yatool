@@ -82,6 +82,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 test_opts.TestToolOptions(),
                 test_opts.UidCalculationOptions(cache_tests=False),
                 core.common_opts.YaBin3Options(),
+                core.common_opts.OutputStyleOptions(),
             ]
             + build.build_opts.distbs_options()
             + build.build_opts.checkout_options()

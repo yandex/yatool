@@ -150,6 +150,7 @@ def ide_minimal_opts(targets_free=False, prefetch=False):
         core.common_opts.ShowHelpOptions(),
         core.common_opts.DumpDebugOptions(),
         core.common_opts.AuthOptions(),
+        core.common_opts.OutputStyleOptions(),
     ]
 
 

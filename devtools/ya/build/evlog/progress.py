@@ -256,7 +256,7 @@ class PrintProgressSubscriber(event_handling.SubscriberExcludedTopics):
 
 def get_print_status_func(opts, display, logger):
     if display:
-        _fprint = display.emit_status if opts.output_style == 'ninja' else display.emit_message
+        _fprint = display.emit_status if getattr(opts, "output_style", "") == "ninja" else display.emit_message
     else:
         _fprint = logger.debug
 
