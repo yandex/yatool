@@ -23,7 +23,7 @@ ya dump --help
 ```
 ### Анализ зависимостей
 
-Управление зависимостями является одной из ключевых задач в процессе разработки проектов. [Правильное определение и анализ зависимостей](yadump_dependency.md) позволяет обеспечивать корректную сборку проекта, избегая проблем, связанных с несовместимостями библиотек, повторяющимися зависимостями и другими распространёнными проблемами.
+Управление зависимостями является одной из ключевых задач в процессе разработки проектов. Правильное определение и [анализ зависимостей](yadump_dependency.md) позволяет обеспечивать корректную сборку проекта, избегая проблем, связанных с несовместимостями библиотек, повторяющимися зависимостями и другими распространёнными проблемами.
 
 ### Подкоманды `<subcommand>`
 
@@ -31,14 +31,14 @@ ya dump --help
 
 Первая группа подкоманд может быть полезна для анализа зависимостей между модулями, а также для поиска проблем. К ней относятся:
 
-- `ya dump modules` – список зависимых модулей.
-- `ya dump relation` – зависимость между двумя модулями.
-- `ya dump all-relations` – все зависимости между двумя модулями.
-- `ya dump dot-graph` – граф всех межмодульных зависимостей данного проекта.
-- `ya dump dep-graph`, `ya dump json-dep-graph` – граф зависимостей системы сборки.
-- `ya dump build-plan` – граф сборочных команд.
-- `ya dump loops`, `ya dump peerdir-loops` – информация о циклах в графе зависимостей.
-- `ya dump compile-commands`, `ya dump compilation-database` – информация о сборочных командах (compilation database).
+- [`ya dump modules`](#ya-dump-modules) – список зависимых модулей.
+- [`ya dump relation`](#ya-dump-relation) – зависимость между двумя модулями.
+- [`ya dump all-relations`](#ya-dump-all-relations) – все зависимости между двумя модулями.
+- [`ya dump dot-graph`](#ya-dump-dot-graph) – граф всех межмодульных зависимостей данного проекта.
+- [`ya dump dep-graph`](#ya-dump-dep-graph), `ya dump json-dep-graph` – граф зависимостей системы сборки.
+- [`ya dump build-plan`](#ya-dump-build-plan) – граф сборочных команд.
+- [`ya dump loops`, `ya dump peerdir-loops`](#ya-dump-loops/peerdir-loops) – информация о циклах в графе зависимостей.
+- [`ya dump compile-commands`, `ya dump compilation-database`](#ya-dump-compile-commands/compilation-database) – информация о сборочных командах (compilation database).
 
 По умолчанию вывод этих подкоманд основан на графе обычной сборки без тестов.  
 
@@ -46,11 +46,11 @@ ya dump --help
 
 Вторая группа - это различная информация от системы сборки. К ней относятся:
 
-- ya dump groups – группы владельцев проектов.
-- ya dump json-test-list – информация о тестах.
-- ya dump recipes – информация о поднимаемых рецептах.
-- ya dump conf-docs - документация по макросам и модулям.
-- ya dump debug — сборка отладочного bundle.
+- [`ya dump groups`](#ya-dump-groups) – группы владельцев проектов.
+- [`ya dump json-test-list`](#ya-dump-json-test-list) – информация о тестах.
+- [`ya dump recipes`](#ya-dump-recipes) – информация о поднимаемых рецептах.
+- [`ya dump conf-docs`](#ya-dump-conf-docs) - документация по макросам и модулям.
+- [`ya dump debug`](#ya-dump-debug) — сборка отладочного bundle.
 
 #### ya dump modules
 
