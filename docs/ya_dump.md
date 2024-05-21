@@ -253,7 +253,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 * `--groups_with_users` - только информация об участниках
 * `--mailing_lists` - только списки рассылки
 
-### ya dump json-test-list – информация о тестах 
+### ya dump json-test-list
 
 Выводит форматированный JSON с информацией о тестах.
 
