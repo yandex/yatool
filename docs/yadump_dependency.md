@@ -13,7 +13,7 @@
 4. BUNDLE: Зависимость от модуля как от файла.
 5. DEPENDS: Зависимость для исполнения, результат сборки модуля нужен для запуска теста.
 
-Основные цели и задачи использования `ya dump`:
+Основные цели и задачи использования `ya dump` при анализе зависимостей:
 
 1. Анализ зависимостей между модулями и программами:
 `ya dump` позволяет выявить, какие модули зависят друг от друга, и каким образом эти зависимости влияют на процесс сборки.
@@ -47,64 +47,65 @@ module: Program devtools/ymake/bin $B/devtools/ymake/bin/ymake <++ RECURSEs
 module: Program contrib/tools/py3cc $B/tools/py3cc/py3cc   <++ TOOLs
 ...
 ```
+Если вы хотите включить в анализ зависимости тесты, используйте опцию `-t` или `--force-build-depends`.
+```
+~/yatool$ ya dump modules devtools/ymake | wc -l
+861
+~/yatool$ ya dump modules devtools/ymake -t | wc -l
+1040
+```
 
+#### Фильтрация зависимостей по директории
 
+Если вам нужно узнать зависимости только для определенной директории `<dir>` в проекте, можно воспользоваться фильтрацией:
+`ya dump modules <path_to_project> | grep <dir>`
 
-2. Фильтрация зависимостей по директории
+```
+~/yatool$ ya dump modules devtools/ymake | grep mapreduce/
+module: Library mapreduce/yt/unwrapper $B/mapreduce/yt/unwrapper/libpymapreduce-yt-unwrapper.a
+module: Library mapreduce/yt/interface $B/mapreduce/yt/interface/libmapreduce-yt-interface.a
+module: Library mapreduce/yt/interface/protos $B/mapreduce/yt/interface/protos/libyt-interface-protos.a
+module: Library mapreduce/yt/interface/logging $B/mapreduce/yt/interface/logging/libyt-interface-logging.a
+module: Library mapreduce/yt/client $B/mapreduce/yt/client/libmapreduce-yt-client.a
+module: Library mapreduce/yt/http $B/mapreduce/yt/http/libmapreduce-yt-http.a
+module: Library mapreduce/yt/common $B/mapreduce/yt/common/libmapreduce-yt-common.a
+module: Library mapreduce/yt/io $B/mapreduce/yt/io/libmapreduce-yt-io.a
+module: Library mapreduce/yt/raw_client $B/mapreduce/yt/raw_client/libmapreduce-yt-raw_client.a
+module: Library mapreduce/yt/skiff $B/mapreduce/yt/skiff/libmapreduce-yt-skiff.a
+module: Library mapreduce/yt/library/table_schema $B/mapreduce/yt/library/table_schema/libyt-library-table_schema.a
 
-   Если вам нужно узнать зависимости только для определенной директории в проекте, можно воспользоваться фильтрацией:
-
-
-   ya dump modules <path_to_project> | grep <dir>
-
-
-   Пример:
-
-
-   ya dump modules devtools/bmake | grep mapreduce/
-
-
-
-3. Фильтрация зависимости по типам компонентов
-
-   Чтобы получить список всех модулей, включая зависимости тестов, используйте опцию -t или --force-build-depends:
-
-
-   ya dump modules <path_to_project> -t
-
+```
+Этот подход полезен, если точные зависимости неизвестны. Команда `ya dump modules` включает модули самого проекта, поэтому указав путь до проекта в `<dir>`, можно определить, как называются модули в мультимодуле.
 
 
 #### Анализ зависимостей между модулями
 
-1. Определение зависимости от модуля
+Чтобы узнать, каким образом проект зависит от конкретного модуля, используйте команду: `ya dump relation <module_name>`
 
-   Чтобы узнать, каким образом проект зависит от конкретного модуля, используйте команду:
+Команду следует запускать в директории проекта, от которого необходимо найти путь.
 
+`module_name` — имя модуля, как указано в выводе команды `ya dump modules`, либо директория, содержащая проект этого модуля.
 
-   ya dump relation <module_name>
+Команда покажет один из возможных путей.
 
+```
+~/yatool$ cd devtools/ymake
+~/yatool/devtools/ymake$ ya dump relation mapreduce/yt/interface
+Directory (Start): $S/devtools/ymake/tests/dep_mng ->
+Program (Include): $B/devtools/ymake/tests/dep_mng/devtools-ymake-tests-dep_mng ->
+Library (BuildFrom): $B/devtools/ya/test/tests/lib/libpytest-tests-lib.a ->
+Library (Include): $B/devtools/ya/lib/libya-lib.a ->
+Library (Include): $B/devtools/ya/yalibrary/store/yt_store/libpyyalibrary-store-yt_store.a ->
+Library (Include): $B/mapreduce/yt/unwrapper/libpymapreduce-yt-unwrapper.a ->
+Directory (Include): $S/mapreduce/yt/interface
+```
+Если требуется найти зависимость от конкретного модуля в мультимодуле, проверьте полное имя модуля с помощью `ya dump modules` и передайте его параметром `--from`.
 
-   Пример:
-
-
-   ya dump relation mapreduce/yt/interface
-
-
-
-2. Нахождение всех путей зависимости до модуля
-
-   Для поиска всех возможных путей зависимости до модуля можно использовать команду:
-
-
-   ya dump all-relations <module_name>
-
-
-   Пример:
+Если нужно найти зависимость от неизвестного модуля в директории <dir>, можно использовать метод описанный [выше](#Фильтрация-зависимостей-по-директории), чтобы определить зависимости модулей в этой директории.
 
 
-   ya dump all-relations mapreduce/yt/interface
-
-
+Для поиска всех возможных путей зависимости проекта от модуля можно использовать команду: `ya dump all-relations <module_name>`
+На выходе вы получите граф в формате dot, отображающий все пути в интересующий модуль.
 
 #### Что будет собираться через библиотеку (RECURSE)
 
