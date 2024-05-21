@@ -1007,7 +1007,7 @@ endif()
             for x in sorted(self.ide_graph.inc_dirs):
                 emit('include_directories({})'.format(subst(x)))
             emit()
-            cmake_defines = [x for x in self.ide_graph.defines.copy() if not x.startswith('FAKEID')]
+            cmake_defines = [x for x in sorted(self.ide_graph.defines) if not x.startswith('FAKEID')]
             emit('add_definitions({})'.format(' '.join(['-D' + subst(x) for x in cmake_defines])))
             emit()
 
