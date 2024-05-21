@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import os
 import xml.etree.ElementTree as eTree
 import sys
+import six
 
 from exts import fs
 
@@ -500,7 +501,7 @@ def gen_idea_prj(
             import __res
 
             script = (
-                __res.find('/clion/sync.py')
+                six.ensure_str(__res.find('/clion/sync.py'))
                 .replace('<<host>>', remote_host)
                 .replace('<<remote_repo>>', ide_common.fix_win_path(remote_repo_path))
                 .replace('<<remote_build>>', ide_common.fix_win_path(remote_build_path))
