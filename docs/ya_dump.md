@@ -35,10 +35,10 @@ ya dump --help
 - [`ya dump relation`](#ya-dump-relation) – зависимость между двумя модулями.
 - [`ya dump all-relations`](#ya-dump-all-relations) – все зависимости между двумя модулями.
 - [`ya dump dot-graph`](#ya-dump-dot-graph) – граф всех межмодульных зависимостей данного проекта.
-- [`ya dump dep-graph`](#dep-graph/json-dep-graph), `ya dump json-dep-graph` – граф зависимостей системы сборки.
+- [`ya dump dep-graph`](#dep-graph-и-json-dep-graph), `ya dump json-dep-graph` – граф зависимостей системы сборки.
 - [`ya dump build-plan`](#ya-dump-build-plan) – граф сборочных команд.
-- [`ya dump loops`, `ya dump peerdir-loops`](#ya-dump-loops-or-peerdir-loops) – информация о циклах в графе зависимостей.
-- [`ya dump compile-commands`, `ya dump compilation-database`](#ya-dump-compile-commands/compilation-database) – информация о сборочных командах (compilation database).
+- [`ya dump loops`, `ya dump peerdir-loops`](#ya-dump-loops-и-peerdir-loops) – информация о циклах в графе зависимостей.
+- [`ya dump compile-commands`, `ya dump compilation-database`](#ya-dump-compile-commands-и-compilation-database) – информация о сборочных командах (compilation database).
 
 По умолчанию вывод этих подкоманд основан на графе обычной сборки без тестов.  
 
@@ -182,7 +182,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 Команда: `ya dump dot-graph [OPTION]... [TARGET]...`
 
 
-### ya dump dep-graph/json-dep-graph 
+### ya dump dep-graph и json-dep-graph 
 
 Выводит во внутреннем формате (с отступами) или в форматированный JSON граф зависимостей.
 
@@ -204,7 +204,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 Многие опции фильтрации не применимы к графу сборочных команд и поэтому не поддерживаются.
 
-### ya dump loops or peerdir-loops
+### ya dump loops и peerdir-loops
 
 Команды выводят циклы по зависимостям между файлами или проектами.
 
@@ -214,7 +214,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 `ya dump loops [OPTION]... [TARGET]...`
 `ya dump peerdir-loops [OPTION]... [TARGET]...`
 
-### ya dump compile-commands/compilation-database 
+### ya dump compile-commands и compilation-database 
 
 Выводит список JSON-описаний сборочных команд через запятую. Каждая команда включает три свойства: `"command"`, `"directory"` и `"file"`.
 
