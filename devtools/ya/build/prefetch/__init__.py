@@ -41,7 +41,7 @@ def _join_thread(thr, name):
 class ArcPrefetchSubscriber(event_handling.SubscriberSpecifiedTopics):
     topics = {"NEvent.TNeedDirHint"}
 
-    _instance = None
+    _instance = None  # type: tp.Optional[ArcPrefetchSubscriber]
 
     @classmethod
     def get_subscriber(cls, arc_root):
