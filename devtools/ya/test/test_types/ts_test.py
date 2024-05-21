@@ -256,7 +256,7 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
         return os.path.relpath(path, prefix) if path.startswith(prefix) else path
 
     def get_test_dependencies(self):
-        return list(
+        return sorted(
             set(
                 [x for x in self.dart_info.get("CUSTOM-DEPENDENCIES", "").split(" ") if x]
                 + [self._abs_build_path("pre.pnpm-lock.yaml")]
@@ -265,7 +265,7 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
 
     def get_run_cmd_inputs(self, opts):
         source_inputs = self._get_config_files() + ["package.json", "pnpm-lock.yaml"]
-        return list(
+        return sorted(
             set(
                 [self._abs_source_path(f) for f in source_inputs + self._files]
                 + [self._abs_build_path("pre.pnpm-lock.yaml")]

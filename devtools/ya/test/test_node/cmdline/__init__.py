@@ -2,6 +2,12 @@ import devtools.ya.test.dependency.testdeps as testdeps
 
 import test.const
 
+import typing as tp
+
+if tp.TYPE_CHECKING:
+    from devtools.ya.test.test_types.common import AbstractTestSuite  # noqa
+
+
 CMD_FILE_START_MARKER = "--ya-start-command-file"
 CMD_FILE_END_MARKER = "--ya-end-command-file"
 
@@ -20,6 +26,7 @@ def get_base_environment_relative_options(suite):
 
 
 def get_environment_relative_options(suite, opts):
+    # type: (AbstractTestSuite, tp.Any) -> list[str]
     options = get_base_environment_relative_options(suite)
 
     for path in testdeps.get_test_related_paths(suite, "$(SOURCE_ROOT)", opts):
