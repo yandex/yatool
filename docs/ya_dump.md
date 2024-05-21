@@ -204,7 +204,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 Многие опции фильтрации не применимы к графу сборочных команд и поэтому не поддерживаются.
 
-### ya dump loops/peerdir-loops 
+### ya dump loops / peerdir-loops 
 
 Команды выводят циклы по зависимостям между файлами или проектами.
 
