@@ -222,7 +222,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 `ya dump compile-commands [OPTION]... [TARGET]...`
 
 Опции:
-* `-q, --quiet` - ничего не выводить. Можно использовать для селективного чекаута в svn.
+* `-q, --quiet` - ничего не выводить.
 * `--files-in=FILE_PREFIXES` - выдать только команды с подходящими префиксом относительно корня репозитория у `"file"`
 * `--files-in-targets=PREFIX` - фильтровать по префиксу `"directory"`
 * `--no-generated` - исключить команды обработки генерированных файлов
