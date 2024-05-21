@@ -31,36 +31,22 @@
 3. `RECURSE` от зависимых модулей в сборке не участвуют.
 4. С опцией `-t` или `--force-build-depends` к целям сборки добавятся тесты, достижимые по `RECURSE_FOR_TESTS`, а также `DEPENDS` - зависимости ваших тестов.
 
+Ниже описаны наиболее распространённые сценарии для управления зависимостями в проектах с помощью фильтров в командах `ya dump modules` и `ya dump relation`.
 
-#### Основные команды
+#### Список всех зависимостей проекта
 
-- ya dump modules:
-Позволяет получить список всех зависимостей для заданного модуля или директории проекта. Можно настроить фильтрацию, чтобы отобразить только интересующие зависимости.
-
-- ya dump relation:
-Помогает понять, каким образом один модуль зависит от другого, показывая один из возможных путей зависимости.
-
-- ya dump all-relations:
-Похожая команда, но имеет более детализированный выход в виде графа, показывающего все возможные пути зависимости.
-
-### Сценарии использования
-
-Использование утилиты ya dump включает несколько типичных сценариев, которые помогут вам эффективно анализировать и управлять зависимостями в ваших проектах. Ниже описаны наиболее распространённые сценарии, начиная с базовых команд и фильтрации зависимостей, и заканчивая более сложными анализами.
-
-#### Анализ зависимостей проекта
-
-1. Список всех зависимостей проекта
-
-Для получения полного списка всех зависимостей проекта можно использовать команду:
-
-
-   ya dump modules <path_to_project>
-
-
-   Пример:
-
-
-   ya dump modules devtools/bmake
+Для получения полного списка всех зависимостей проекта можно использовать команду: `ya dump modules <path_to_project>`
+```
+~/yatool$ ya dump modules devtools/ymake
+module: Library devtools/ymake $B/devtools/ymake/libdevtools-ymake.a <++ SELF
+...
+module: Library util $B/util/libyutil.a <++ PEERDIRs
+...
+module: Program devtools/ymake/bin $B/devtools/ymake/bin/ymake <++ RECURSEs
+...
+module: Program contrib/tools/py3cc $B/tools/py3cc/py3cc   <++ TOOLs
+...
+```
 
 
 
@@ -334,7 +320,7 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 1. Список всех зависимостей для проекта: `ya dump modules`
    ```
-   ~/ws/arcadia$ ya dump modules devtools/ymake
+   ~/yatool$ ya dump modules devtools/ymake
    module: Library devtools/ymake $B/devtools/ymake/libdevtools-ymake.a <++ SELF
    ...
    module: Library util $B/util/libyutil.a <++ PEERDIRs
@@ -349,9 +335,9 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
    Если хочется видеть и зависимости тестов тоже, используйте `-t` или `--force-build-depends`
 
    ```
-   ~/ws/arcadia$ ya dump modules devtools/ymake | wc -l
+   ~/yatool$ ya dump modules devtools/ymake | wc -l
    861
-   ~/ws/arcadia$ ya dump modules devtools/ymake -t | wc -l
+   ~/yatool$ ya dump modules devtools/ymake -t | wc -l
    1040
    ```
 
@@ -359,7 +345,7 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 2. Список всех зависимостей для проекта в директории `<dir>`: `ya dump modules | grep <dir> `
    ```
-   ~/ws/arcadia$ ya dump modules devtools/ymake | grep mapreduce/
+   ~/yatool$ ya dump modules devtools/ymake | grep mapreduce/
    module: Library mapreduce/yt/unwrapper $B/mapreduce/yt/unwrapper/libpymapreduce-yt-unwrapper.a
    module: Library mapreduce/yt/interface $B/mapreduce/yt/interface/libmapreduce-yt-interface.a
    module: Library mapreduce/yt/interface/protos $B/mapreduce/yt/interface/protos/libyt-interface-protos.a
@@ -377,8 +363,8 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 3. Каким образом проект зависит от модуля: `ya dump relation '<module_name>'`
    ```
-   ~/ws/arcadia$ cd devtools/ymake
-   ~/ws/arcadia/devtools/ymake$ ya dump relation mapreduce/yt/interface
+   ~/yatool$ cd devtools/ymake
+   ~/yatool/devtools/ymake$ ya dump relation mapreduce/yt/interface
    Directory (Start): $S/devtools/ymake/tests/dep_mng ->
    Program (Include): $B/devtools/ymake/tests/dep_mng/devtools-ymake-tests-dep_mng ->
    Library (BuildFrom): $B/devtools/ya/test/tests/lib/libpytest-tests-lib.a ->
@@ -411,12 +397,12 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 1. список для проекта: `ya dump modules --ignore-recurses`
    ```
-   ~/ws/arcadia$ ya dump modules devtools/ymake | wc -l
+   ~/yatool$ ya dump modules devtools/ymake | wc -l
    861
-   ~/ws/arcadia$ ya dump modules devtools/ymake --ignore-recurses | wc -l
+   ~/yatool$ ya dump modules devtools/ymake --ignore-recurses | wc -l
    222
-   ~/ws/arcadia$ ./ya dump modules devtools/ymake --ignore-recurses | grep mapreduce
-   ~/ws/arcadia$ ./ya dump modules devtools/ymake --ignore-recurses | grep python
+   ~/yatool$ ./ya dump modules devtools/ymake --ignore-recurses | grep mapreduce
+   ~/yatool$ ./ya dump modules devtools/ymake --ignore-recurses | grep python
    module: Library contrib/libs/python $B/contrib/libs/python/libpycontrib-libs-python.a
    module: Library contrib/libs/python/Include $B/contrib/libs/python/Include/libpylibs-python-Include.a
    module: Library contrib/tools/python/lib $B/contrib/tools/python/lib/libtools-python-lib.a
@@ -434,10 +420,10 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 2. путь непосредственно от проекта в директории, до другого модуля  `ya dump relation --ignore-recurses <module_name>`
    ```
-   ~/ws/arcadia$ cd devtools/ymake
-   ~/ws/arcadia/devtools/ymake$ ya dump relation --ignore-recurses mapreduce/yt/interface
+   ~/yatool$ cd devtools/ymake
+   ~/yatool/devtools/ymake$ ya dump relation --ignore-recurses mapreduce/yt/interface
    Target 'mapreduce/yt/interface' is not found in build graph.
-   ~/ws/arcadia/devtools/ymake$ ya dump relation --ignore-recurses contrib/tools/python/bootstrap
+   ~/yatool/devtools/ymake$ ya dump relation --ignore-recurses contrib/tools/python/bootstrap
    Directory (Start): $S/devtools/ymake ->
    Library (Include): $B/devtools/ymake/libdevtools-ymake.a ->
    Library (Include): $B/contrib/libs/python/libpycontrib-libs-python.a ->
@@ -464,11 +450,11 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 1. список для проекта: `ya dump modules --ignore-recurses --no-tools`
    ```
-   ~/ws/arcadia$ ya dump modules devtools/ymake --ignore-recurses | wc -l
+   ~/yatool$ ya dump modules devtools/ymake --ignore-recurses | wc -l
    222
-   ~/ws/arcadia$ ya dump modules devtools/ymake --ignore-recurses --no-tools | wc -l
+   ~/yatool$ ya dump modules devtools/ymake --ignore-recurses --no-tools | wc -l
    198
-   ~/ws/arcadia$ ya dump modules devtools/ymake --ignore-recurses --no-tools | grep python
+   ~/yatool$ ya dump modules devtools/ymake --ignore-recurses --no-tools | grep python
    module: Library contrib/libs/python $B/contrib/libs/python/libpycontrib-libs-python.a
    module: Library contrib/libs/python/Include $B/contrib/libs/python/Include/libpylibs-python-Include.a
    module: Library contrib/tools/python/lib $B/contrib/tools/python/lib/libtools-python-lib.a
@@ -485,10 +471,10 @@ Ymake умеет делать `DEPENDENCY_MANAGAMENT` для Java на осно�
 
 2. путь непосредственно от проекта в директории, до другого модуля: `ya dump relation --no-all-recurses --no-tools <module_name>`
    ```
-   ~/ws/arcadia$ cd devtools/ymake
-   ~/ws/arcadia/devtools/ymake$ ya dump relation --ignore-recurses --no-tools contrib/tools/python/bootstrap
+   ~/yatool$ cd devtools/ymake
+   ~/yatool/devtools/ymake$ ya dump relation --ignore-recurses --no-tools contrib/tools/python/bootstrap
    Sorry, path not found
-   ~/ws/arcadia/devtools/ymake$ ya dump relation --ignore-recurses --no-tools contrib/tools/python/lib
+   ~/yatool/devtools/ymake$ ya dump relation --ignore-recurses --no-tools contrib/tools/python/lib
    Directory (Start): $S/devtools/ymake ->
    Library (Include): $B/devtools/ymake/libdevtools-ymake.a ->
    Library (Include): $B/contrib/libs/python/libpycontrib-libs-python.a ->
