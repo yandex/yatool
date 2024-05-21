@@ -37,7 +37,7 @@ ya dump --help
 - [`ya dump dot-graph`](#ya-dump-dot-graph) – граф всех межмодульных зависимостей данного проекта.
 - [`ya dump dep-graph`](#dep-graph/json-dep-graph), `ya dump json-dep-graph` – граф зависимостей системы сборки.
 - [`ya dump build-plan`](#ya-dump-build-plan) – граф сборочных команд.
-- [`ya dump loops`, `ya dump peerdir-loops`](#ya-dump-loops/peerdir-loops) – информация о циклах в графе зависимостей.
+- [`ya dump loops`, `ya dump peerdir-loops`](#ya-dump-loops-/-peerdir-loops) – информация о циклах в графе зависимостей.
 - [`ya dump compile-commands`, `ya dump compilation-database`](#ya-dump-compile-commands/compilation-database) – информация о сборочных командах (compilation database).
 
 По умолчанию вывод этих подкоманд основан на графе обычной сборки без тестов.  
