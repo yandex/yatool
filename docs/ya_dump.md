@@ -48,11 +48,7 @@ ya dump --help
 - ya dump conf-docs - документация по макросам и модулям.
 - ya dump debug — сборка отладочного bundle.
 
-
-
-
-
-### ya dump modules {#modules}
+#### ya dump modules
 
 Показывает список всех зависимостей для цели *target* (текущий каталог, если не задана явно).
 
@@ -60,7 +56,7 @@ ya dump --help
 
 **Пример:**
 ```
-spreis@starship:~/ws/arcadia$ ./ya dump modules devtools/ymake | grep sky
+spreis@starship:~/yatool$ ./ya dump modules devtools/ymake | grep sky
 module: Library devtools/ya/yalibrary/yandex/skynet $B/devtools/ya/yalibrary/yandex/skynet/libpyyalibrary-yandex-skynet.a
 module: Library infra/skyboned/api $B/infra/skyboned/api/libpyinfra-skyboned-api.a
 module: Library skynet/kernel $B/skynet/kernel/libpyskynet-kernel.a
@@ -83,8 +79,7 @@ module: Library skynet/api/yp $B/skynet/api/yp/libpyskynet-api-yp.a
 module: Library skynet/library/auth $B/skynet/library/auth/libpyskynet-library-auth.a
 module: Library skynet/api/config $B/skynet/api/config/libpyskynet-api-config.a
 ```
-
-### ya dump relation {#relation}
+### ya dump relation
 
 Находит и показывает зависимость между модулем из **текущего каталога** и *target*-модулем. 
 
@@ -98,30 +93,21 @@ module: Library skynet/api/config $B/skynet/api/config/libpyskynet-api-config.a
 * `--recursive` - позволяет показать зависимости до какой-то произвольной директории/модуля/файла из *target*-директории
 * `-t`, `--force-build-depends` - при вычислении цепочки зависимостей учитывает зависимости тестов (`DEPENDS` и `RECURSE_FOR_TESTS`)
 * `--ignore-recurses` - при вычислении зависимостей исключает зависимости по `RECURSE`
-* `--no-tools` - при вычислении зависимостей исключает зависимости от тулов
+* `--no-tools` - при вычислении зависимостей исключает зависимости от инструментов сборки
 * `--no-addincls` - при вычислении зависимостей исключает зависимости по `ADDINCL`
 
-{% note info %}
-
+Стоит отметить, что:
 * Граф зависимостей строится для проекта в текущей директории. Это можно поменять опцией `-С`, опция `--from` только выбирает стартовую точку в этом графе.
 * `target` - имя модуля как пишет `ya dump modules` или директория проекта этого модуля.
 * Флаг `--recursive` позволяет показать путь до одного произвольного модуля/директории/файла, находящегося в *target*-директории.
 
-{% endnote %}
-
-
-{% note warning %}
-
-Между модулями путей в графе зависимостей может быть несколько. Утилита находит и показывает один из них (произвольный).
-
-{% endnote %}
+Стоит учитывать, что между модулями путей в графе зависимостей может быть несколько. Утилита находит и показывает один из них (произвольный).
 
 **Примеры:**
 
 Найти путь до директории `contrib/libs/libiconv`:
-
 ```
-~/arcadia/devtools/ymake$ ya dump relation contrib/libs/libiconv
+~/yatool/devtools/ymake$ ya dump relation contrib/libs/libiconv
 Directory (Start): $S/devtools/ymake ->
 Library (Include): $B/devtools/ymake/libdevtools-ymake.a ->
 Library (Include): $B/devtools/ymake/include_parsers/libdevtools-ymake-include_parsers.a ->
@@ -133,17 +119,16 @@ Directory (Include): $S/contrib/libs/libiconv
 ```
 
 Найти путь до произвольной файловой ноды из `contrib/libs`:
-
 ```
-~/arcadia/devtools/ymake$ ya dump relation contrib/libs --recursive
+~/yatool/devtools/ymake$ ya dump relation contrib/libs --recursive
 Directory (Start): $S/devtools/ymake ->
 Library (Include): $B/devtools/ymake/libdevtools-ymake.a ->
 Directory (Include): $S/contrib/libs/linux-headers
 ```
 
-### ya dump all-relations {#all-relations}
+### ya dump all-relations
 
-Выводит в формате dot или json все зависимости во внутреннем графе между *source* (по умолчанию – всеми целями из текущего каталога) и *target*.
+Выводит в формате `dot` или `json` все зависимости во внутреннем графе между *source* (по умолчанию – всеми целями из текущего каталога) и *target*.
 
 Команда: `ya dump all-relations [option]... [--from <source>] --to <target>`
 
@@ -151,7 +136,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 * `--from` - стартовый таргет, от которого будет показан граф
 * `--to` - имя модуля или директория проекта этого модуля
-* `--recursive` - позволяет показать зависимости до всех модулей из *target*-директории
+* `--recursive` - позволяет показать зависимости до всех модулей из *target*-директории. Показывает пути до всех модулей, доступных по `RECURSE` из `target`, если `target` - это директория.
 * `--show-targets-deps` - при включенной опции `-recursive` также показывает зависимости между всеми модулями из *target*-директории
 * `-t`, `--force-build-depends` - при вычислении зависимостей учитывает зависимости тестов (`DEPENDS` и `RECURSE_FOR_TESTS`)
 * `--ignore-recurses` - при вычислении зависимостей исключает зависимости по `RECURSE`
@@ -159,102 +144,67 @@ Directory (Include): $S/contrib/libs/linux-headers
 * `--no-addincls` - при вычислении зависимостей исключает зависимости по `ADDINCL`
 * `--json` - выводит все зависимости в формате *json*
 
-{% note info %}
-
-* Граф зависимостей строится для проекта в текущей директории. Это можно поменять опцией `-С`, опция `--from` только выбирает стартовую точку в этом графе.
-* `target` - имя модуля как пишет `ya dump modules` или директория проекта этого модуля.
-* Флаг `--recursive` позволяет показать пути до всех модулей, доступных по `RECURSE` из `target`, если `target` - это директория.
-
-{% endnote %}
-
 **Пример:**
 
 ```
-~/arcadia/devtools/ymake/bin$ ya dump all-relations --to contrib/libs/libiconv | dot -Tpng > graph.png
+~/yatool/devtools/ymake/bin$ ya dump all-relations --to contrib/libs/libiconv | dot -Tpng > graph.png
 ```
 ![graph](../assets/all-relations-graph1.png "Граф зависимостей" =558x536)
 
 С помощью опции `--from` можно поменять начальную цель:
 
 ```
-~/arcadia/devtools/ymake/bin$ ya dump all-relations --from library/cpp/xml/document/libcpp-xml-document.a --to contrib/libs/libiconv | dot -Tpng > graph.png
+~/yatool/devtools/ymake/bin$ ya dump all-relations --from library/cpp/xml/document/libcpp-xml-document.a --to contrib/libs/libiconv | dot -Tpng > graph.png
 ```
-
-![graph](../assets/all-relations-graph2.png "Граф зависимостей" =300x268)
 
 Опции `--from` и `--to` можно указывать по несколько раз. Так можно посмотреть на фрагмент внутреннего графа, а не рисовать его целиком с `ya dump dot-graph`.
 
 С помощью опции `--json` можно изменить формат вывода:
 
 ```
-~/arcadia/devtools/ymake/bin$ ya dump all-relations --from library/cpp/xml/document/libcpp-xml-document.a --to contrib/libs/libiconv --json > graph.json
+~/yatool/devtools/ymake/bin$ ya dump all-relations --from library/cpp/xml/document/libcpp-xml-document.a --to contrib/libs/libiconv --json > graph.json
 ```
-
-Получившийся граф: [https://paste.yandex-team.ru/11356389](https://paste.yandex-team.ru/11356389)
 
 С помощью опции `--recursive` можно вывести все зависимости до всех модулей из *target*-директории:
 
 ```
-~/arcadia/devtools/ymake/symbols$ ya dump all-relations --to library/cpp/on_disk --recursive | dot -Tpng > graph2.png
+~/yatool/devtools/ymake/symbols$ ya dump all-relations --to library/cpp/on_disk --recursive | dot -Tpng > graph2.png
 ```
 
-![graph](../assets/all-relations-graph3.png "Граф зависимостей" =657x327)
+### ya dump dot-graph
 
-{% note info %}
-
-Опцию `--recursive` можно использовать, чтобы получить все проекты из arcadia, которые зависят от вашего. Для этого, нужно запустить ya dump all-relations из директории `autocheck`. Эта процедура займет время, так как нужно будет сконфигурировать всю аркадию.
-
-Пример:
-
-```
-~/arcadia/autocheck$ ya dump all-relations --to kikimr --recursive --json > graph.json
-
-```
-
-{% endnote %}
-
-
-### ya dump dot-graph {#dot-graph}
-
-Выводит в формате dot все зависимости данного проекта. Это аналог `ya dump modules` c нарисованными зависимости между модулями.
+Выводит в формате `dot` все зависимости данного проекта. Это аналог `ya dump modules` c нарисованными зависимости между модулями.
 
 Команда: `ya dump dot-graph [OPTION]... [TARGET]...`
 
 
-### ya dump dep-graph/json-dep-graph {#dep-graph}
+### ya dump dep-graph/json-dep-graph 
 
-Выводит во внутреннем формате (с отступами) или в форматированный JSON граф зависимостей ymake.
+Выводит во внутреннем формате (с отступами) или в форматированный JSON граф зависимостей.
 
 Команда:
 `ya dump dep-graph [OPTION]... [TARGET]...`
 `ya dump json-dep-graph [OPTION]... [TARGET]...`
 
 Для `ya dump dep-graph` доступны опции `--flat-json` и `--flat-json-files`. С помощью этих опций можно получить json-формат dep графа. Он выглядит как плоский список дуг и список вершин.
+
 Граф зависимостей обычно содержит файловые ноды и ноды команд. Опция `--flat-json-files` позволяет вывести только файловые ноды и зависимости между ними.
 
-### ya dump build-plan {#build-plan}
+### ya dump build-plan
 
-Выводит в форматированный JSON граф сборочных команд примерно соответствующий тому, что будет исполняться при запуске команды [ya make](https://wiki.yandex-team.ru/yatool/make/).
+Выводит в форматированный JSON граф сборочных команд примерно соответствующий тому, что будет исполняться при запуске команды [ya make](ya_make2.md).
 Более точный граф можно получить запустив `ya make -j0 -k -G`
 
 Команда:
 `ya dump build-plan [OPTION]... [TARGET]...`
 
-{% note warning %}
+Многие опции фильтрации не применимы к графу сборочных команд и поэтому не поддерживаются.
 
-Многие опции фильтрации не имеют смысла для графа сборочных команд и тут не поддерживаются.
+### ya dump loops/peerdir-loops 
 
-{% endnote %}
+Команды выводят циклы по зависимостям между файлами или проектами.
 
-### ya dump loops/peerdir-loops {#loops}
-
-Выводит циклы по зависимостям между файлами или проектами. ya dump peerdir-loops - только зависимости по PEERDIR между проектами, ya dump loops - любые зависимости включая циклы по инклудам между хедерами.
-
-{% note alert %}
-
-Циклы по PEERDIR в Аркадии запрещены и в здоровом репозитории их быть не должно.
-
-{% endnote %}
+`ya dump peerdir-loops` - отображает только зависимости по `PEERDIR` между проектами, а `ya dump loops` - показывает любые зависимости, включая циклы по включениям (инклудам) между заголовочными файлами.
 
 Команда:
 `ya dump loops [OPTION]... [TARGET]...`
@@ -278,12 +228,12 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 **Пример:**
 ```
-~/ws/arcadia$ ya dump compilation-database devtools/ymake/bin
+~/yatool$ ya dump compilation-database devtools/ymake/bin
 ...
 {
-    "command": "clang++ --target=x86_64-linux-gnu --sysroot=/home/spreis/.ya/tools/v4/244387436 -B/home/spreis/.ya/tools/v4/244387436/usr/bin -c -o /home/spreis/ws/arcadia/library/cpp/json/fast_sax/parser.rl6.cpp.o /home/spreis/ws/arcadia/library/cpp/json/fast_sax/parser.rl6.cpp -I/home/spreis/ws/arcadia -I/home/spreis/ws/arcadia -I/home/spreis/ws/arcadia/contrib/libs/linux-headers -I/home/spreis/ws/arcadia/contrib/libs/linux-headers/_nf -I/home/spreis/ws/arcadia/contrib/libs/cxxsupp/libcxx/include -I/home/spreis/ws/arcadia/contrib/libs/cxxsupp/libcxxrt -I/home/spreis/ws/arcadia/contrib/libs/zlib/include -I/home/spreis/ws/arcadia/contrib/libs/double-conversion/include -I/home/spreis/ws/arcadia/contrib/libs/libc_compat/include/uchar -fdebug-prefix-map=/home/spreis/ws/arcadia=/-B -Xclang -fdebug-compilation-dir -Xclang /tmp -pipe -m64 -g -ggnu-pubnames -fexceptions -fstack-protector -fuse-init-array -faligned-allocation -W -Wall -Wno-parentheses -Werror -DFAKEID=5020880 -DARCADIA_ROOT=/home/spreis/ws/arcadia -DARCADIA_BUILD_ROOT=/home/spreis/ws/arcadia -D_THREAD_SAFE -D_PTHREADS -D_REENTRANT -D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES -D_LARGEFILE_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -UNDEBUG -D__LONG_LONG_SUPPORTED -DSSE_ENABLED=1 -DSSE3_ENABLED=1 -DSSSE3_ENABLED=1 -DSSE41_ENABLED=1 -DSSE42_ENABLED=1 -DPOPCNT_ENABLED=1 -DCX16_ENABLED=1 -D_libunwind_ -nostdinc++ -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mpopcnt -mcx16 -std=c++17 -Woverloaded-virtual -Wno-invalid-offsetof -Wno-attributes -Wno-dynamic-exception-spec -Wno-register -Wimport-preprocessor-directive-pedantic -Wno-c++17-extensions -Wno-exceptions -Wno-inconsistent-missing-override -Wno-undefined-var-template -Wno-return-std-move -nostdinc++",
-    "directory": "/home/spreis/ws/arcadia",
-    "file": "/home/spreis/ws/arcadia/library/cpp/json/fast_sax/parser.rl6.cpp"
+    "command": "clang++ --target=x86_64-linux-gnu --sysroot=/home/spreis/.ya/tools/v4/244387436 -B/home/spreis/.ya/tools/v4/244387436/usr/bin -c -o /home/spreis/yatool/library/cpp/json/fast_sax/parser.rl6.cpp.o /home/spreis/yatool/library/cpp/json/fast_sax/parser.rl6.cpp -I/home/spreis/yatool -I/home/spreis/yatool -I/home/spreis/yatool/contrib/libs/linux-headers -I/home/spreis/yatool/contrib/libs/linux-headers/_nf -I/home/spreis/yatool/contrib/libs/cxxsupp/libcxx/include -I/home/spreis/yatool/contrib/libs/cxxsupp/libcxxrt -I/home/spreis/yatool/contrib/libs/zlib/include -I/home/spreis/yatool/contrib/libs/double-conversion/include -I/home/spreis/yatool/contrib/libs/libc_compat/include/uchar -fdebug-prefix-map=/home/spreis/yatool=/-B -Xclang -fdebug-compilation-dir -Xclang /tmp -pipe -m64 -g -ggnu-pubnames -fexceptions -fstack-protector -fuse-init-array -faligned-allocation -W -Wall -Wno-parentheses -Werror -DFAKEID=5020880 -Dyatool_ROOT=/home/spreis/yatool -Dyatool_BUILD_ROOT=/home/spreis/yatool -D_THREAD_SAFE -D_PTHREADS -D_REENTRANT -D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES -D_LARGEFILE_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -UNDEBUG -D__LONG_LONG_SUPPORTED -DSSE_ENABLED=1 -DSSE3_ENABLED=1 -DSSSE3_ENABLED=1 -DSSE41_ENABLED=1 -DSSE42_ENABLED=1 -DPOPCNT_ENABLED=1 -DCX16_ENABLED=1 -D_libunwind_ -nostdinc++ -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mpopcnt -mcx16 -std=c++17 -Woverloaded-virtual -Wno-invalid-offsetof -Wno-attributes -Wno-dynamic-exception-spec -Wno-register -Wimport-preprocessor-directive-pedantic -Wno-c++17-extensions -Wno-exceptions -Wno-inconsistent-missing-override -Wno-undefined-var-template -Wno-return-std-move -nostdinc++",
+    "directory": "/home/spreis/yatool",
+    "file": "/home/spreis/yatool/library/cpp/json/fast_sax/parser.rl6.cpp"
 },
 ...
 ```
@@ -325,8 +275,8 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 Документация автоматически генерируется и коммитится раз в день в Аркадию по адресам:
 
-* [arcadia/build/docs/readme.md](https://a.yandex-team.ru/arc/trunk/arcadia/build/docs/readme.md) - публичные макросы и модули
-* [arcadia/build/docs/all.md](https://a.yandex-team.ru/arc/trunk/arcadia/build/docs/all.md) - все макросы и модули
+* [yatool/build/docs/readme.md](https://a.yandex-team.ru/arc/trunk/yatool/build/docs/readme.md) - публичные макросы и модули
+* [yatool/build/docs/all.md](https://a.yandex-team.ru/arc/trunk/yatool/build/docs/all.md) - все макросы и модули
 
 Команда: `ya dump conf-docs [OPTIONS]... [TARGET]...`
 
@@ -350,19 +300,19 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 **Пример:**
 ```
-┬─[v-korovin@v-korovin-osx:~/a/arcadia]─[11:50:28]
+┬─[v-korovin@v-korovin-osx:~/a/yatool]─[11:50:28]
 ╰─>$ ./ya dump debug
 
-10: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:16:24 (v1)
-9: `ya-bin make devtools/dummy_arcadia/hello_world/ --stat`: 2021-06-17 20:17:06 (v1)
-8: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:17:32 (v1)
-7: `ya-bin make devtools/dummy_arcadia/hello_world/ --stat`: 2021-06-17 20:18:14 (v1)
-6: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:28:15 (v1)
-5: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:35:17 (v1)
+10: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:16:24 (v1)
+9: `ya-bin make devtools/dummy_yatool/hello_world/ --stat`: 2021-06-17 20:17:06 (v1)
+8: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:17:32 (v1)
+7: `ya-bin make devtools/dummy_yatool/hello_world/ --stat`: 2021-06-17 20:18:14 (v1)
+6: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:28:15 (v1)
+5: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:35:17 (v1)
 4: `ya-bin make -A devtools/ya/yalibrary/ggaas/tests/test_like_autocheck -F test_subtract.py::test_subtract_full[linux-full]`: 2021-06-18 12:51:51 (v1)
 3: `ya-bin make -A devtools/ya/yalibrary/ggaas/tests/test_like_autocheck -F test_subtract.py::test_subtract_full[linux-full]`: 2021-06-18 13:04:08 (v1)
-2: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:26:31 (v1)
-1: `ya-bin make -r /Users/v-korovin/arc/arcadia/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:36:21 (v1)
+2: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:26:31 (v1)
+1: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:36:21 (v1)
 ```
 
 
