@@ -70,4 +70,4 @@ h, --help          Print help. Use -hh for more options and -hhh for even more.
 * Опция `--cuda=CUDA_PLATFORM` позволяет управлять интеграцией и использованием технологии NVIDIA CUDA при построения сборочного графа.
 * Опция `--tools-cache-size=TOOLS_CACHE_SIZE` используется для задания ограничения на максимальный размер кэша инструментов.
 
-Помимо расширенных опций, команды поддерживают и большинство других, в том числе, экспертных сборочных опций [ya make](ya_make2.md). 
+Помимо расширенных опций, команды также поддерживают большинство других опций, включая экспертные [сборочные опции системы сборки](ya_make2.md), например: `--target-platform-tests`, `--target-platform-regular-tests`, `--target-platform-ignore-recurses`, `--sanitize-coverage=SANITIZE_COVERAGE`.
