@@ -229,7 +229,7 @@ Directory (Include): $S/contrib/libs/linux-headers
 * `--cmd-build-root=CMD_BUILD_ROOT` - использьзовать путь как сборочную директорию в командах
 * `--cmd-extra-args=CMD_EXTRA_ARGS` - добавить опции в команды
 
-Поддержано большинство сборочных опций `ya make`(ссылка на файл)
+Поддержано большинство сборочных опций [`ya make`](yadump_compile.md)
 
 **Пример:**
 ```
