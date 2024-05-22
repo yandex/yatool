@@ -240,7 +240,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         }
     }
 
-    if (UseFileId(CurrNode->NodeType)) {
+    if (UseFileId(CurrNode->NodeType) || CurrNode->NodeType == EMNT_BuildCommand) {
         CurrData->NewUids()->SetContentUid(CurrState->Hash->New()->GetContentMd5());
         CurrData->NewUids()->SetIncludeContentUid(CurrState->Hash->New()->GetIncludeContentMd5());
     }
@@ -283,11 +283,13 @@ void TJSONVisitorNew::PassToParent(TState& state) {
     // late globs
     if (*Edge == EDT_BuildFrom && CurrNode->NodeType == EMNT_BuildCommand) {
         UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include late glob hash to parent structure hash");
+        PrntState->Hash->New()->ContentMd5Update(CurrData->NewUids()->GetIncludeContentUid(), "Add late glob include content hash"_sb);
     }
 
     if (*Edge == EDT_Property && IsFileType(CurrNode->NodeType)) {
         TString nodeName = Graph->ToString(CurrNode);
         UpdateParent(state, nodeName, "Include file names to late glob structure hash");
+        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->NewUids()->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
     }
 
     if (IsFileType(CurrNode->NodeType) && IsFileType(PrntState->Node()->NodeType)) {
