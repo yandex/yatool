@@ -261,7 +261,7 @@ def gen_conf(
     build_type,
     use_local_conf,
     local_conf_path,
-    extra_flags,
+    extra_flags,  # type: dict
     tool_chain,
     local_distbuild=False,
     conf_debug=None,
@@ -337,9 +337,13 @@ def gen_conf(
     def subset(dct, white_list):
         return {k: v for k, v in six.iteritems(dct) if k in white_list}
 
-    data = [14, json.dumps(tool_chain, sort_keys=True), extra_flags, build_type, arc_dir] + [
-        exts.fs.read_file(x) for x in sorted(iter_conf_files())
-    ]
+    data = [
+        "14",
+        json.dumps(tool_chain, sort_keys=True),
+        json.dumps(extra_flags, sort_keys=True),
+        build_type,
+        arc_dir,
+    ] + [exts.fs.read_text(x) for x in sorted(iter_conf_files())]
     first_conf, _ = uniq_conf(data, [build_type])
 
     conf_debug = conf_debug or {}
@@ -369,11 +373,11 @@ def gen_conf(
 
         def iter_all_flags():
             for local_ymake in iter_local_ymakes():
-                for k, v in check_local_ymake(local_ymake).get('kv', {}).items():
+                for k, v in sorted(check_local_ymake(local_ymake).get('kv', {}).items()):
                     yield k, v
 
             if extra_flags:
-                for k, v in extra_flags.items():
+                for k, v in sorted(extra_flags.items()):
                     yield k, v
 
         def iter_flags():

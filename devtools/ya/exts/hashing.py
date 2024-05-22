@@ -59,14 +59,13 @@ def git_like_hash(filepath):
 def sum_hashes(hashes):
     """
     Calculate sum of hashes
-    type: (list[str]) -> bytes
     """
-    sha = md5()
+    current_hash = md5()
 
     for hash_ in hashes:
-        sha.update(six.ensure_binary(hash_) + b'#')
+        current_hash.update(six.ensure_binary(hash_) + b'#')
 
-    return sha.hexdigest()
+    return six.ensure_str(current_hash.hexdigest())
 
 
 def md5_value(string):
