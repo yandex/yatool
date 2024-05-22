@@ -1013,6 +1013,8 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->ReportMakeCommandStats();
 
+    yMake->Conf.SourceRoot = "$(SOURCE_ROOT)";
+    yMake->Conf.BuildRoot = "$(BUILD_ROOT)";
     if (!conf.WriteTestDart.empty()) {
         THolder<IOutputStream> dartOut;
         dartOut.Reset(new TFileOutput(conf.WriteTestDart));
