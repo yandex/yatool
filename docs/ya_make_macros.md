@@ -530,8 +530,7 @@ RUN_PYTHON3(${BUILD_ROOT}/devtools/dummy/includes/gen.py
 
 ```
 
-#### PREPARE_INDUCED_DEPS { #prepare_indiced_deps }
-
+#### PREPARE_INDUCED_DEPS
 ```
 PREPARE_INDUCED_DEPS(VAR Type Files...)
 ```
