@@ -895,22 +895,22 @@ RESOURCE_FILES([PREFIX {prefix}] [STRIP prefix_to_strip] {path})
 - `resfs_read('bb/c/d')` = `'e'`
 - `resfs_src('bb/c/d', resfs_file=True)` = `'aa/c/d'`
 - `resfs_src('resfs/file/bb/c/d')` = `'aa/c/d'`
-- `resfs_resolve('aa/c/d')` = `'/home/user/arc/aa/c/d'`, если этот файл существует при env `Y_PYTHON_SOURCE_ROOT=/home/user/arc`, иначе None
+- `resfs_resolve('aa/c/d')` = `'/home/user/project/aa/c/d'`, если этот файл существует при env `Y_PYTHON_SOURCE_ROOT=/home/user/project`, иначе None
 
-приложениям на Python не надо использовать это API, если подходят стандартные pkgutil.get_data](https://docs.python.org/2/library/pkgutil.html#pkgutil.get_data) и [pkg_resources](https://setuptools.readthedocs.io/en/latest/pkg_resources.html#resourcemanager-api).
+Приложениям на Python не надо использовать это API, если подходят стандартные [pkgutil.get_data](https://docs.python.org/2/library/pkgutil.html#pkgutil.get_data) и [pkg_resources](https://setuptools.readthedocs.io/en/latest/pkg_resources.html#resourcemanager-api).
 
-Сейчас pkg_resources api считается [Deprecated](https://setuptools.pypa.io/en/latest/pkg_resources.html), python сообщество настоятельно рекомендует использовать вместо него [importlib.resources](https://docs.python.org/3.11/library/importlib.resources.html#module-importlib.resources)
+Сейчас `pkg_resources api` считается [Deprecated](https://setuptools.pypa.io/en/latest/pkg_resources.html), python сообщество настоятельно рекомендует использовать вместо него [importlib.resources](https://docs.python.org/3.11/library/importlib.resources.html#module-importlib.resources)
 
 
 ##### Пример использования `library.python.resource`
 
-Допустим у нас есть python программа (`PY3_PROGRAM`), единственная задачей которой - вывести содержимое ресурсных файлов на стандартный выход.
+Предположим, есть Python программа (PY3_PROGRAM), единственной задачей которой является вывод содержимого ресурсных файлов на стандартный вывод.
 
 Структура каталога:
 
 ```
 $ tree $BUILD_ROOT/foo/bar/library_python_resource_example
-~/arcadia/foo/bar/library_python_resource_example
+~/project/foo/bar/library_python_resource_example
 ├── extra
 │   └── file.txt
 ├── __main__.py
@@ -920,7 +920,7 @@ $ tree $BUILD_ROOT/foo/bar/library_python_resource_example
 
 `__main__.py`:
 
-```python
+```
 import library.python.resource
 
 print(library.python.resource.resfs_read("extra/file.txt"))
@@ -963,7 +963,7 @@ b'Hello from file.txt\n'
 Структура каталога:
 ```
 $ tree $BUILD_ROOT/foo/bar/importlib_resources_example
-~/arcadia/foo/bar/importlib_resources_example
+~/project/foo/bar/importlib_resources_example
 ├── extra
 │   └── file.txt
 ├── __init__.py  # понадобился пустой __init__.py, даже для PY3_PROGRAM или PY3TEST
@@ -1014,20 +1014,20 @@ b'Hello from static.txt\n'
 
 #### Реализация PY_SRCS в Python 3
 
-Механизм `RESOURCE_FILES` используется в сборке питона в [исполняемые программы](../python/#python_program)
+Механизм `RESOURCE_FILES` используется для включения ресурсов в исполняемые Python программы.
 
 Для модуля `c.f` из файла `aa/bb/c/f.py`, создаётся:
 
 - resource file with key=`py/c/f.py`, value=содержимое `f.py`, src=`aa/bb/c/f.py`
 - resource file with key=`py/c/f.py.yapyc3`, value=байткод `f.py`, src=`aa/bb/c/f.py.yapyc3`
 
-(`aa/bb/c/f.py.yapyc3` это реальный файл в build root на выходе от прекомпилятора Python `pycc`.)
+(`aa/bb/c/f.py.yapyc3` это реальный файл в `build root` на выходе от прекомпилятора Python `pycc`.)
 
 #### Взаимодействие с pkgutil.get_data
 
 Пусть имеется `aa/ya.make` такого вида:
 
-```yamake
+```
 OWNER(the_owner)
 
 PY3_LIBRARY()
@@ -1043,7 +1043,7 @@ END()
 
 В репозитории лежат файлы `aa/bb/__init__.py`, `aa/bb/f.py`, и `aa/bb/c/d` с содержимым `e`. Тогда `f.py` может сделать `pkgutil.get_data(__package__, 'c/d')` и получить `e`, потому что:
 
-```python
+```
 __package__ == 'bb'
 bb.__file__ == 'aa/bb/__init__.py'
 resource_name = join(dirname(bb.__file__), 'c/d')
@@ -1052,13 +1052,13 @@ get_data = resfs_read # для относительных путей
 get_data('aa/bb/c/d') == 'e'
 ```
 
-С `Y_PYTHON_SOURCE_ROOT=/home/user/arc`:
+С `Y_PYTHON_SOURCE_ROOT=/home/user/project`:
 
-```python
-bb.__file__ == '/home/user/arc/aa/bb/__init__.py'
-resource_name == '/home/user/arc/aa/bb/c/d'
+```
+bb.__file__ == '/home/user/project/aa/bb/__init__.py'
+resource_name == '/home/user/project/aa/bb/c/d'
 get_data(path) = open(path).read # для абсолютных путей
-get_data('/home/user/arc/aa/bb/c/d') == 'e'
+get_data('/home/user/project/aa/bb/c/d') == 'e'
 ```
 
 ### ALL_RESOURCE_FILES {#all_resource_files}
