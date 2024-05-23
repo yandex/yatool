@@ -801,12 +801,13 @@ int main() {
 
 **Пример для Python**
 
-    В питоне нужно использовать `library/python/resource`
+В питоне нужно использовать `library/python/resource`
 
 ```
 PEERDIR(
-   library/python/resource
-    )
+    library/python/resource
+)
+
 ```
 
 В `source.py`:
@@ -815,6 +816,7 @@ PEERDIR(
 from library.python import resource
 r1 = resource.find("key/in/program/1")
 r1 = resource.find("key2")
+
 ```
 
 ***
@@ -826,32 +828,32 @@ r1 = resource.find("key2")
 Подгружать ресурс, когда вам нужно как-то парсить его данные можно, например, так:
 
 ```
-    var resourceParsedData ResourceType
-    var initResourceOnce = sync.Once{}
+var resourceParsedData ResourceType
+var initResourceOnce = sync.Once{}
 
-    func GetResource() ResourceType {
-        initResourceOnce.Do(parseResource)
+func GetResource() ResourceType {
+    initResourceOnce.Do(parseResource)
 
-        return resourceParsedData
+    return resourceParsedData
+}
+
+func parseResource() {
+    resourceParsedData = ResourceType{}
+
+    jsonData := resource.Get("/key2")
+    if jsonData == nil {
+        return
     }
 
-    func parseResource() {
-        resourceParsedData = ResourceType{}
+    _ = json.Unmarshal(jsonData, &resourceParsedData)
+}
 
-        jsonData := resource.Get("/key2")
-        if jsonData == nil {
-            return
-        }
-
-        _ = json.Unmarshal(jsonData, &resourceParsedData)
-    }
-    
 ```
-    1. Из-за особенностей инициализации ресурсов, нельзя просто так взять и создать свой собственный пакет, в котором подгружать содержимое ресурса в init'е пакета. Так вам стабильно будет возвращаться пустые данные (будто ресурса не существует)
+1. Из-за особенностей инициализации ресурсов, нельзя просто так взять и создать свой собственный пакет, в котором подгружать содержимое ресурса в init'е пакета. Так вам стабильно будет возвращаться пустые данные (будто ресурса не существует)
 
-    2. Механизмы включения ресурсов в код для С++/Python и Go не совместимы между собой. Ресурсы, включённые в код в C++ библиотеке и влинкованные через CGO, не будут доступны через go-библиотеку для доступа к ресурсам.
+2. Механизмы включения ресурсов в код для С++/Python и Go не совместимы между собой. Ресурсы, включённые в код в C++ библиотеке и влинкованные через CGO, не будут доступны через go-библиотеку для доступа к ресурсам.
 
-    3. Механизм включения ресурсов в код для Go макросом `RESOURCE` не совместим с `go embed`. Механизм `go embed` поддерживается системой сборки ya make.
+3. Механизм включения ресурсов в код для Go макросом `RESOURCE` не совместим с `go embed`. Механизм `go embed` поддерживается системой сборки ya make.
 
 ***
 
