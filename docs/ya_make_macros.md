@@ -754,9 +754,10 @@ RESOURCE(
 Содержимое файлов `path/to/file1` и `path/to/file2` будет включено в код программы и доступно по ключам `key/in/program/1` и `key2` соответственно. Файлы, указанные в первом параметре, могут быть как файлами в репозитории, так и генерируемыми. В случае генерации файлов рекомендуем использовать префиксы `${DIR_BUILD_ROOT}` или `${BINDIR}`, чтобы упростить понимание процесса.
 
 2. Включение строки как ресурса:
-   ```
+
+```
     RESOURCE(- my/key=my/value)
-   ```
+```
 Строка `my/value` будет включена в код программы и доступна по ключу `my/key`. Этот механизм особенно полезен для передачи информации из сборки в программу на `Python` и других языках.
 
 ```
@@ -767,59 +768,64 @@ ENDIF()
 В С++ того же можно было бы добиться через `CFLAGS(-DFEATURE_X)`, но в Python ничего подобного нет.
 
 ***
+
 **Пример для C++**
 
 Поддержка доступа к ресурсам реализована в `library/cpp/resource`.
 
-    В `ya.make`:
+В `ya.make`:
 
-    ```
-    PEERDIR(
-        library/cpp/resource
-    )
-    ```
+```
+PEERDIR(
+    library/cpp/resource
+)
 
-    В `source.cpp`:
+```
 
-    ```cpp
-    #include <library/cpp/resource/resource.h>
+В `source.cpp`:
 
-    #include <util/stream/ios.h>
+```
+#include <library/cpp/resource/resource.h>
 
-    int main() {
-        Cout << NResource::Find("key/in/program/1") << Endl;
-        Cout << NResource::Find("key2") << Endl;
-    }
-    ```
+#include <util/stream/ios.h>
+
+int main() {
+    Cout << NResource::Find("key/in/program/1") << Endl;
+    Cout << NResource::Find("key2") << Endl;
+}
+
+```
 `key/in/program/1` и `key2` не должны содержать названия файлов `path/to/file1` и `path/to/file2`.
 
 ***
+
 **Пример для Python**
 
     В питоне нужно использовать `library/python/resource`
 
-    ```
-    PEERDIR(
-        library/python/resource
+```
+PEERDIR(
+   library/python/resource
     )
-    ```
+```
 
-    В `source.py`:
+В `source.py`:
 
-    ```
-    from library.python import resource
-    r1 = resource.find("key/in/program/1")
-    r1 = resource.find("key2")
-    ```
+```
+from library.python import resource
+r1 = resource.find("key/in/program/1")
+r1 = resource.find("key2")
+```
 
 ***
+
 **Пример для Go**
 
-    В go для доступа к ресурсам используйте модуль `library/go/core/resource`.
+В go для доступа к ресурсам используйте модуль `library/go/core/resource`.
 
-    Подгружать ресурс, когда вам нужно как-то парсить его данные можно, например, так:
+Подгружать ресурс, когда вам нужно как-то парсить его данные можно, например, так:
 
-    ```
+```
     var resourceParsedData ResourceType
     var initResourceOnce = sync.Once{}
 
@@ -840,7 +846,7 @@ ENDIF()
         _ = json.Unmarshal(jsonData, &resourceParsedData)
     }
     
-    ```
+```
     1. Из-за особенностей инициализации ресурсов, нельзя просто так взять и создать свой собственный пакет, в котором подгружать содержимое ресурса в init'е пакета. Так вам стабильно будет возвращаться пустые данные (будто ресурса не существует)
 
     2. Механизмы включения ресурсов в код для С++/Python и Go не совместимы между собой. Ресурсы, включённые в код в C++ библиотеке и влинкованные через CGO, не будут доступны через go-библиотеку для доступа к ресурсам.
