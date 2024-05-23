@@ -27,7 +27,7 @@ Open about://tracing in Chromium and load 14-27-47.ndpzv5xlrled702w.evlog.json f
 ```
 ### Профиль сборки DistBuild
 
-Для анализа профиля сборки `DistBuild` можно использовать опцию `--distbuild-json-from-yt` и передать путь к `JSON` файлу, полученному с помощью скрипта `devtools/distbuild/sre/simple_build_simulator/yql`.
+Предусмотрена возможность анализа профиля распределенной сборки `DistBuild`. Для этого можно использовать опцию `--distbuild-json-from-yt` и передать путь к `JSON` файлу, полученному с помощью скрипта `devtools/distbuild/sre/simple_build_simulator/yql`.
 
 ## Анализ сборок из задач 
 
