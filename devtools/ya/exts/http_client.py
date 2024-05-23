@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import logging
 import os
@@ -10,6 +11,7 @@ from six.moves import urllib
 
 import exts.io2
 import exts.fs
+import exts.hashing
 import exts.retry
 import exts.process
 import library.python.func
@@ -18,6 +20,31 @@ import library.python.windows
 import typing as tp  # noqa
 
 logger = logging.getLogger(__name__)
+
+hasher_map = {
+    'md5': hashlib.md5,
+    'sha1': hashlib.sha1,
+    'sha512': hashlib.sha512,
+}
+
+integrity_encodings = {
+    'base64': lambda x: base64.b64encode(x.digest()).decode('utf-8'),
+    'hex': lambda x: six.ensure_str(x.hexdigest()),
+}
+
+
+class BadIntegrityAlgorithmException(Exception):
+    def __init__(self, alg):
+        # type: (str) -> None
+        msg = 'Integrity algorithm supports {0}, got {1}'.format(hasher_map.keys(), alg)
+        super(BadIntegrityAlgorithmException, self).__init__(msg)
+
+
+class BadIntegrityEncodingException(Exception):
+    def __init__(self, mode):
+        # type: (str) -> None
+        msg = 'Integrity encoding supports {0}, got {1}'.format(integrity_encodings.keys(), mode)
+        super(BadIntegrityEncodingException, self).__init__(msg)
 
 
 class BadMD5Exception(Exception):
@@ -42,15 +69,35 @@ def make_headers(headers=None):
     return result
 
 
-@exts.retry.retrying(max_times=7, retry_sleep=lambda i, t: i * 5)
 def download_file(url, path, mode=0, expected_md5=None, headers=None):
+    # type: (str, str, int, str, dict[str, str] | None) -> None
+    # This value emulates old logic when expected integrity is not provided
+    # but md5 sum has to be calculated
+    integrity = 'md5-'
+    if expected_md5:
+        integrity += expected_md5
+
+    download_file_with_integrity(url, path, integrity, 'hex', mode, headers)
+
+
+@exts.retry.retrying(max_times=7, retry_sleep=lambda i, t: i * 5)
+def download_file_with_integrity(url, path, integrity, integrity_encoding='base64', mode=0, headers=None):
+    # type: (str, str, str, str, int, dict[str, str] | None) -> None
+    alg, expected_integrity = integrity.split("-")
+
+    if alg not in hasher_map:
+        raise BadIntegrityAlgorithmException(alg)
+
+    if integrity_encoding not in integrity_encoding:
+        raise BadIntegrityEncodingException(integrity_encoding)
+
     exts.fs.ensure_removed(path)
     exts.fs.create_dirs(os.path.dirname(path))
 
-    file_md5 = hashlib.md5()
+    checksum = hasher_map.get(alg)()
     chunks_sizes = []
 
-    logger.debug('Downloading %s to %s, expect md5=%s', url, path, expected_md5)
+    logger.debug('Downloading %s to %s, expect %s', url, path, integrity)
     start_time = time.time()
     try:
         request = urllib.request.Request(url)
@@ -73,18 +120,21 @@ def download_file(url, path, mode=0, expected_md5=None, headers=None):
     logger.debug('Request to %s has headers %s', url, res.info())
 
     with open(path, 'wb') as dest_file:
-        exts.io2.copy_stream(res.read, dest_file.write, file_md5.update, lambda d: chunks_sizes.append(len(d)))
+        exts.io2.copy_stream(res.read, dest_file.write, checksum.update, lambda d: chunks_sizes.append(len(d)))
 
-    if expected_md5 and expected_md5 != file_md5.hexdigest():
-        raise BadMD5Exception('MD5 sum expected {}, but was {}'.format(expected_md5, file_md5.hexdigest()))
+    checksum_str = integrity_encodings.get(integrity_encoding)(checksum)
+
+    if expected_integrity and expected_integrity != checksum_str:
+        raise BadMD5Exception('{} sum expected {}, but was {}'.format(alg, expected_integrity, checksum_str))
 
     os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH | mode)
 
     logger.debug(
-        'Downloading finished %s to %s, md5=%s, size=%s, elapsed=%f',
+        'Downloading finished %s to %s, %s=%s, size=%s, elapsed=%f',
         url,
         path,
-        file_md5.hexdigest(),
+        alg,
+        checksum_str,
         str(sum(chunks_sizes)),
         time.time() - start_time,
     )

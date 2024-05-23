@@ -1,10 +1,13 @@
 #include "platform_map.h"
 #include "platform.h"
 
+#include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/json/json_reader.h>
 
 #include <util/generic/algorithm.h>
 #include <util/string/builder.h>
+#include <util/string/cast.h>
+#include <util/string/split.h>
 
 namespace NYa {
     TPlatformMap MappingFromJsonString(TStringBuf mapping) {
@@ -52,6 +55,34 @@ namespace NYa {
         return ResourceDirName(desc.Uri, desc.StripPrefix);
     }
 
+    TString HttpsResourceDirName(TStringBuf uri) {
+        constexpr TStringBuf integrityPrefix{"integrity="};
+
+        size_t hashIndex = uri.find('#');
+        if (hashIndex == std::string::npos) {
+            throw yexception() << "Wrong uri. No '#' symbol is found: " << uri;
+        } else if (hashIndex == uri.size() - 1) {
+            throw yexception() << "Wrong uri. '#' symbol must be followed by resource meta: " << uri;
+        }
+
+        TStringBuf metaStr = uri.substr(hashIndex + 1);
+        if (metaStr.find('=') == std::string::npos) {
+            // backward compatibility with old md5-scheme
+            return ToString(metaStr);
+        }
+
+        for (const auto& it : StringSplitter(metaStr).Split('&')) {
+            TStringBuf pair = it.Token();
+            if (!pair.StartsWith(integrityPrefix)) {
+                continue;
+            }
+            TStringBuf integrity = pair.substr(integrityPrefix.size());
+            return MD5::Calc(integrity);
+        }
+
+        throw yexception() << "Wrong uri. Meta should include integrity: " << uri;
+    }
+
     TString ResourceDirName(TStringBuf uri, ui32 stripPrefix) {
         constexpr TStringBuf sbrPrefix{"sbr:"};
         constexpr TStringBuf trsPrefix{"trs:"};
@@ -63,13 +94,7 @@ namespace NYa {
         } else if (uri.StartsWith(trsPrefix)) {
             dirName = uri.substr(trsPrefix.size());
         } else if (uri.StartsWith(httpPrefix)) {
-            size_t pos = uri.rfind('#');
-            if (pos == std::string::npos) {
-                throw yexception() << "Wrong uri. No '#' symbol is found: " << uri;
-            } else if (pos == uri.size() - 1) {
-                throw yexception() << "Wrong uri. '#' symbol must be followed by resource md5: " << uri;
-            }
-            dirName = uri.substr(pos + 1);
+            dirName = HttpsResourceDirName(uri);
         } else {
             throw yexception() << "Wrong uri. No known schema is found: " << uri;
         }
@@ -82,7 +107,6 @@ namespace NYa {
     TString ResourceVarName(TStringBuf baseName, const NYa::TResourceDesc& desc) {
         return ResourceVarName(baseName, desc.Uri, desc.StripPrefix);
     }
-
 
     namespace {
         TString EncodeUriForVar(TStringBuf uri) {

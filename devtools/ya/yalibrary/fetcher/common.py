@@ -1,17 +1,18 @@
 import logging
 import os
 import stat
+
 from collections import namedtuple
 from functools import wraps
 from toolz.functoolz import curry, memoize
 
-from exts import fs
+import exts.fs as fs
+import exts.hashing
 import exts.yjson as json
-
 
 logger = logging.getLogger(__name__)
 
-
+SUPPORTED_INTEGRITY_ALG = {'md5', 'sha1', 'sha512'}
 UNTAR = 0
 RENAME = 1
 FIXED_NAME = 2
@@ -69,10 +70,43 @@ def deploy_tool(archive, extract_to, post_process, resource_info, resource_uri, 
             f.write(resource_uri)
 
 
-ParsedResourceUri = namedtuple('ParsedResourceUri', 'resource_type, resource_uri, resource_id, resource_url')
+ParsedResourceUri = namedtuple(
+    'ParsedResourceUri', 'resource_type, resource_uri, resource_id, resource_url, fetcher_meta'
+)
 
 
-def parse_resource_uri(resource_uri, force_accepted_schemas=None):
+def validate_parsed_https_meta(meta):  # type: (dict[str,str]) -> None
+    integrity = meta.get('integrity', None)
+    if not integrity:
+        raise Exception('Integrity is required but not provided')
+    alg, _ = integrity.split('-', 1)
+    if alg not in SUPPORTED_INTEGRITY_ALG:
+        raise Exception('Integrity algorithm supports {0}, got {1}'.format(SUPPORTED_INTEGRITY_ALG, alg))
+
+
+def parse_https_uri_meta(meta_str):  # type: (str) -> tuple[dict[str, str], str]
+    pairs = meta_str.split('&')
+    meta_dict = {}  # type: dict[str,str]
+    for pair in pairs:
+        key, value = pair.split('=', 1)
+        meta_dict[key] = value.replace('%26', '&')
+
+    validate_parsed_https_meta(meta_dict)
+    resource_id = exts.hashing.md5_value(meta_dict.get('integrity'))
+    return meta_dict, resource_id
+
+
+def parse_https_uri(resource_uri):  # type: (str) -> ParsedResourceUri
+    resource_url, meta_str = resource_uri.split('#', 1)
+    if '=' not in meta_str:
+        # backward compatibility with old md5-scheme
+        return ParsedResourceUri('https', resource_uri, meta_str, resource_url, fetcher_meta=None)
+
+    meta, resource_id = parse_https_uri_meta(meta_str)
+    return ParsedResourceUri('https', resource_uri, resource_id, resource_url, fetcher_meta=meta)
+
+
+def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str, set[str]) -> ParsedResourceUri
     if not force_accepted_schemas:
         try:
             import app_ctx
@@ -85,13 +119,12 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):
 
     resource_type, rest = resource_uri.split(':', 1)
     if resource_type == 'https':
-        resource_url, resource_id = resource_uri.split('#')
-        return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url)
+        return parse_https_uri(resource_uri)
+    elif resource_type == 'base64':
+        return ParsedResourceUri(resource_type, resource_uri, resource_id=None, resource_url=rest, fetcher_meta=None)
     elif resource_type in accepted_schemas:
         resource_id = rest
-        return ParsedResourceUri(resource_type, resource_uri, resource_id, None)
-    elif resource_type == 'base64':
-        return ParsedResourceUri(resource_type, resource_uri, None, rest)
+        return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url=None, fetcher_meta=None)
     else:
         raise Exception('Unknown platform in uri: {}'.format(resource_uri))
 

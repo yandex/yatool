@@ -116,17 +116,24 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
         normal_fetched_schemas = {'sbr'}
 
     default_resource_info = {
-        "file_name": parsed_uri.resource_id[:20],
-        "id": parsed_uri.resource_id,
+        'file_name': parsed_uri.resource_id[:20],
+        'id': parsed_uri.resource_id,
     }
 
     if parsed_uri.resource_type == 'https':
-        return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, default_resource_info)
+        if parsed_uri.fetcher_meta:
+            default_resource_info['file_name'] = 'resource'
+            integrity = parsed_uri.fetcher_meta.get('integrity')
+            return _HttpDownloaderWithIntegrity(parsed_uri.resource_url, integrity, default_resource_info)
+        else:
+            return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, default_resource_info)
+
     elif parsed_uri.resource_type in normal_fetched_schemas:
         if config.has_mapping():
             return _HttpDownloaderWithConfigMapping(parsed_uri.resource_id, default_resource_info)
         else:
             return _DefaultDownloader(fetcher, parsed_uri.resource_id, progress_callback, state, keep_directory_packed)
+
     else:
         raise Exception('Unsupported resource_uri {}'.format(parsed_uri.resource_uri))
 
@@ -159,6 +166,18 @@ class _HttpDownloader(DownloaderBase):
 
     def __call__(self, download_to):
         http_client.download_file(url=self._url, path=download_to, expected_md5=self._md5)
+        return self._info
+
+
+class _HttpDownloaderWithIntegrity(DownloaderBase):
+    def __init__(self, resource_url, integrity, resource_info):
+        # type: (str, str, dict[str,str]) -> None
+        self._url = resource_url
+        self._integrity = integrity
+        self._info = resource_info
+
+    def __call__(self, download_to):
+        http_client.download_file_with_integrity(url=self._url, path=download_to, integrity=self._integrity)
         return self._info
 
 
