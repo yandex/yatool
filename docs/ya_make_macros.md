@@ -857,36 +857,35 @@ func parseResource() {
 
 ***
 
-По умолчанию, система сборки проверяет все входные файлы на зависимости от других файлов. Однако для файлов, используемых в качестве ресурсов, это обычно не требуется. Полное отключение анализа в данный момент слишком затратное. Чтобы отключить анализ, используйте параметр FORCE_TEXT, если хотите включить файл, для которого такой анализ выполняется.
+По умолчанию, система сборки проверяет все входные файлы на зависимости от других файлов. Однако для файлов, используемых в качестве ресурсов, это обычно не требуется. Полное отключение анализа в данный момент слишком затратное. Чтобы отключить анализ, используйте параметр `FORCE_TEXT`, если хотите включить файл, для которого такой анализ выполняется.
 
-Параметр `FORCE_TEXT` не доступен в макросе RESOURCE для go.
+Параметр `FORCE_TEXT` не доступен в макросе `RESOURCE` для `go`.
 
 Макрос `RESOURCE` позволяет включать файлы, доступные в сборке, а также строки.
 
 
-### RESOURCE_FILES {#resource_files}
+### RESOURCE_FILES 
 
 ```
 RESOURCE_FILES([PREFIX {prefix}] [STRIP prefix_to_strip] {path})
 
 ```
+Макрос `RESOURCE_FILES` представляет собой расширение макроса `RESOURCE` и имеет следующие особенности:
 
-Макрос `RESOURCE_FILES` — надстройка над макросом `RESOURCE` со следующими свойствами:
-
-- в `RESOURCE_FILES` можно просто перечислять файлы (в `RESOURCE` для каждого файла нужно указать, по какому ключу его сохранить);
+- В `RESOURCE_FILES` можно просто указывать файлы, в то время как в `RESOURCE` необходимо задавать ключ для каждого файла.
 - `RESOURCE_FILES` запоминает пути к файлам.
 
-Пути к файлам полезны для диагностики (программа может сказать, откуда взялся ресурс), для опционального чтения файлов с файловой системы (это используется с [Y_PYTHON_SOURCE_ROOT](../python/vars#y_python_source_root)), для распаковки ресурсов на файловую систему.
+Сохранение путей к файлам полезно для диагностики (программа может указать источник ресурса), для опционального чтения файлов с файловой системы (используется с `Y_PYTHON_SOURCE_ROOT`) и для распаковки ресурсов на файловую систему.
 
-Файлы будут хранится по ключу `resfs/src/{prefix}/{stripped path}`
+Файлы будут сохраняться с ключом `resfs/src/{prefix}/{stripped path}`.
 
 #### Реализация
 
-`RESOURCE_FILES` является пространством имён, вложенным в пространство имён `RESOURCE`. Если в `aa/ya.make` написано `RESOURCE_FILES(PREFIX bb/ c/d)` и существует файл `aa/c/d` с текстом `e`, то имеется:
+`RESOURCE_FILES` является подпространством в пределах пространства имён `RESOURCE`. Например, если в файле `aa/ya.make` указаны `RESOURCE_FILES(PREFIX bb/ c/d)`, и существует файл `aa/c/d` с содержимым `e`, то будут созданы следующие ресурсы:
 
-- resource file with key=`bb/c/d`, value=`e`, src=`aa/c/d`
-- resource with key=`resfs/file/bb/c/d`, value=`e`
-- resource with key=`resfs/src/resfs/file/bb/c/d`, value=`aa/c/d`
+- Файл ресурса с ключом `bb/c/d` (resource file with key=`bb/c/d`), значением `e` (value=`e`) и источником `aa/c/d` (src=`aa/c/d`).
+- Ресурс с ключом `resfs/file/bb/c/d` (resource with key=`resfs/file/bb/c/d`) и значением `e` (value=`e`).
+- Ресурс с ключом `resfs/src/resfs/file/bb/c/d` (resource with key=`resfs/src/resfs/file/bb/c/d`) и значением `aa/c/d` (value=`aa/c/d`).
 
 #### Python API
 
@@ -898,13 +897,10 @@ RESOURCE_FILES([PREFIX {prefix}] [STRIP prefix_to_strip] {path})
 - `resfs_src('resfs/file/bb/c/d')` = `'aa/c/d'`
 - `resfs_resolve('aa/c/d')` = `'/home/user/arc/aa/c/d'`, если этот файл существует при env `Y_PYTHON_SOURCE_ROOT=/home/user/arc`, иначе None
 
-{% note warning %}
-
-приложениям на Python не надо использовать это API, если подходят стандартные [pkgutil.get_data](https://docs.python.org/2/library/pkgutil.html#pkgutil.get_data) и [pkg_resources](https://setuptools.readthedocs.io/en/latest/pkg_resources.html#resourcemanager-api).
+приложениям на Python не надо использовать это API, если подходят стандартные pkgutil.get_data](https://docs.python.org/2/library/pkgutil.html#pkgutil.get_data) и [pkg_resources](https://setuptools.readthedocs.io/en/latest/pkg_resources.html#resourcemanager-api).
 
 Сейчас pkg_resources api считается [Deprecated](https://setuptools.pypa.io/en/latest/pkg_resources.html), python сообщество настоятельно рекомендует использовать вместо него [importlib.resources](https://docs.python.org/3.11/library/importlib.resources.html#module-importlib.resources)
 
-{% endnote %}
 
 ##### Пример использования `library.python.resource`
 
@@ -933,7 +929,7 @@ print(library.python.resource.resfs_read("static.txt"))
 
 `ya.make`:
 
-```yamake
+```
 PY3_PROGRAM()
 OWNER(the_owner)
 PEERDIR(
@@ -990,7 +986,7 @@ print((root_node / "static.txt").read_bytes())
 
 `ya.make`:
 
-```yamake
+```
 PY3_PROGRAM()
 OWNER(the_owner)
 PY_SRCS(
@@ -998,7 +994,7 @@ PY_SRCS(
     __main__.py
 )
 RESOURCE_FILES(
-    PREFIX foo/bar/importlib_resources_example/  # понадобился PREFIX, обратите внимание на замыкающий `/`, без него работать не будет. Prefix должен совпадать с аркадийным путем.
+    PREFIX foo/bar/importlib_resources_example/  # понадобился PREFIX, обратите внимание на замыкающий `/`, без него работать не будет. Prefix должен совпадать с репозиторииным путем.
     extra/file.txt
     static.txt
 )
@@ -1025,7 +1021,7 @@ b'Hello from static.txt\n'
 - resource file with key=`py/c/f.py`, value=содержимое `f.py`, src=`aa/bb/c/f.py`
 - resource file with key=`py/c/f.py.yapyc3`, value=байткод `f.py`, src=`aa/bb/c/f.py.yapyc3`
 
-(`aa/bb/c/f.py.yapyc3` это реальный файл в build root на выходе от [прекомпилятора Python pycc](https://a.yandex-team.ru/arc/trunk/arcadia/tools/py3cc).)
+(`aa/bb/c/f.py.yapyc3` это реальный файл в build root на выходе от прекомпилятора Python `pycc`.)
 
 #### Взаимодействие с pkgutil.get_data
 
@@ -1045,7 +1041,7 @@ RESOURCE_FILES(PREFIX aa/ bb/c/d)
 END()
 ```
 
-В Аркадии лежат файлы `aa/bb/__init__.py`, `aa/bb/f.py`, и `aa/bb/c/d` с содержимым `e`. Тогда `f.py` может сделать `pkgutil.get_data(__package__, 'c/d')` и получить `e`, потому что:
+В репозитории лежат файлы `aa/bb/__init__.py`, `aa/bb/f.py`, и `aa/bb/c/d` с содержимым `e`. Тогда `f.py` может сделать `pkgutil.get_data(__package__, 'c/d')` и получить `e`, потому что:
 
 ```python
 __package__ == 'bb'
@@ -1106,7 +1102,7 @@ LICENSE_RESTRICTION_EXCEPTIONS(LibPath...)
 Лицензии могут налагать разные ограничения на проекты, линкующиеся с лицензируемой библиотекой статически и динамически.
 При описании свойств лицензии указывается какие из них налагают требования на проект линкующийся с библиотекой статически, а какие ограничивают только тех, кто линкуется динамически.
 Ограничения, прописанные в макросе `LICENSE_RESTRICTION` автоматически учитывают тип линковки с используемой библиотекой правильно.
-Для разных языков программирования статическая и динамическая линковка (с учётом нюансов аркадийной сборки) понимается следующим образом:
+Для разных языков программирования статическая и динамическая линковка (с учётом нюансов репозиторииной сборки) понимается следующим образом:
 
  * Компилирующиеся в нативный код языки (C++, Go): обычным образом
  * Python: так как мы складываем питон код в ресурсы герметичного бинарного файла, то все PEERDIR зависимости между модулями на python считаются статической линковкой.
@@ -1126,7 +1122,7 @@ CHECK_DEPENDENT_DIRS(DENY [PEERDIRS|ALL] restrictions... EXCEPT exception)
 
 Данный макрос позволяет потребовать, чтобы среди прямых и транзитивных зависимостей модуля не было нежелательных библиотек либо не использовались нежелательные сборочные инструменты. В одном модуле можно задать либо чёрный список через `CHECK_DEPENDENT_DIRS(DENY ...)` либо белый список через `CHECK_DEPENDENT_DIRS(ALLOW_ONLY ...)`. Если в одном модуле макрос используется несколько раз, то тип ограничения во всех местах вызова должен быть одинаковым (либо везде `DENY` либо везде `ALLOW_ONLY`), нарушения данного правила диагностируются как ошибки конфигурации. Ограничения от всех вызовов суммируются.
 
-Сами ограничения можно задать двумя способами. Во-первых, это может быть путь в аркадии, тогда все модули, живущие в поддиректориях этого пути, подпадают под ограничение. Во-вторых, можно использовать ant-подобный шаблон пути, используя ключевое слово `GLOB`, и в этом случае ограничения действуют только на пути, полностью ему соответствующие, но не на их поддиректории. Например: `CHECK_DEPENDENT_DIRS(DENY some/nested/path/bad)` запретит зависимость как от `some/nested/path/bad` так и от `some/nested/path/bad/lib`, в то время как `CHECK_DEPENDENT_DIRS(DENY GLOB **/nes?ed/*/bad)` запретит от `some/nested/path/bad`, но не от `some/nested/path/bad/lib`. Ключевое слово `GLOB` действует только на следующий за ним аргумент.
+Сами ограничения можно задать двумя способами. Во-первых, это может быть путь в репозитории, тогда все модули, живущие в поддиректориях этого пути, подпадают под ограничение. Во-вторых, можно использовать ant-подобный шаблон пути, используя ключевое слово `GLOB`, и в этом случае ограничения действуют только на пути, полностью ему соответствующие, но не на их поддиректории. Например: `CHECK_DEPENDENT_DIRS(DENY some/nested/path/bad)` запретит зависимость как от `some/nested/path/bad` так и от `some/nested/path/bad/lib`, в то время как `CHECK_DEPENDENT_DIRS(DENY GLOB **/nes?ed/*/bad)` запретит от `some/nested/path/bad`, но не от `some/nested/path/bad/lib`. Ключевое слово `GLOB` действует только на следующий за ним аргумент.
 
 По умолчанию ограничения действуют как на `PEERDIR`, так и на `TOOL` зависимости. Поведение ограничений можно переключать, используя ключевые слова `PEERDIRS` и `ALL`. Эти ключевые слова действуют на все ограничения, следующие за ними. Например
 ```
