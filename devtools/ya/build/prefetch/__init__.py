@@ -58,7 +58,7 @@ class ArcPrefetchSubscriber(event_handling.SubscriberSpecifiedTopics):
 
     def __init__(self, arc_root):
         self._arc_root = arc_root
-        self._prefetcher = ArcStreamingPrefetcher.get_singletone(arc_root)
+        self._prefetcher = ArcStreamingPrefetcher.get_singleton(arc_root)
         self._subscribers = 0
         self._lock = threading.Lock()
 
@@ -92,7 +92,7 @@ class ArcStreamingPrefetcher:
     _instance = None
 
     @classmethod
-    def get_singletone(cls, arc_root):
+    def get_singleton(cls, arc_root):
         # type: (str, tp.Callable) -> ArcStreamingPrefetcher
         if cls._instance is None:
             cls._instance = cls(arc_root)
