@@ -576,7 +576,7 @@ ya project fix-peerdirs [OPTION]... [TARGET]...
 `ya project macro add <macro_string> [OPTIONS]`
 
 - <macro_string>: Строка макроса, которую необходимо добавить.
-- [OPTIONS]: Дополнительные параметры (см. ниже).
+- [OPTIONS]: Дополнительные параметры.
 
 **Опции для команды add**
 
