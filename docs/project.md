@@ -52,8 +52,6 @@ recurse | Создать `ya.make` для сборки вложенных цел
 -r, --recursive   создать проекты рекурсивно по дереву директорий
 ```
 
-#### Дополнительные функции
-
 Команда `ya project create` поддерживает расширяемую генерацию проектов по шаблонам, что позволяет пользователям создавать проекты с использованием собственных шаблонов.
 
 Чтобы начать использовать эту функцию, вам необходимо создать шаблон проекта и зарегистрировать его для использования с `ya project create`.
@@ -110,7 +108,7 @@ recurse | Создать `ya.make` для сборки вложенных цел
 
 ##### Добавление шаблона своего проекта  
 
-Шаблон проекта представляет собой две необязательные функции на `Python 2` и набор необязательных [jinja](https://ru.wikipedia.org/wiki/Jinja)-шаблонов.
+Шаблон проекта представляет собой две  функции на `Python 2` (`get_params(context)`, `postprocess(context, env)`)  и набор необязательных [jinja](https://ru.wikipedia.org/wiki/Jinja)-шаблонов.
 Шаблон должен находиться в поддиректории `devtools/ya/handlers/project/templates` и быть зарегистрирован в файле `devtools/ya/handlers/project/templates/templates.yaml`.
 
 Создать основу для шаблона проекта можно с помощью команды `ya project create project_template`, которая сама является примером использования шаблонной генерации.
@@ -133,7 +131,8 @@ devtools/ya/handlers/project/templates/my_project
 ```
 
 `template.py` будет содержать заготовки для двух функций:
-```python
+
+```
 def get_params(context):
     """
     Calculate all template parameters here and return them as dictionary.
@@ -148,16 +147,11 @@ def postprocess(context, env):
     pass
 ```
 
+##### Готовим параметры
 
+В функции `get_params` нужно получить данные, необходимые для создания шаблона проекта и сформировать словарь `env`, который будет использоваться для подстановки в [jinja](https://ru.wikipedia.org/wiki/Jinja)-шаблоны и передан в `prostprocess`. Параметры можно получить из переданного контекста (параметр `context`), разбором опций, переданных в контексте или интерактивным запросом у пользователя.
 
-
-#### Готовим параметры
-
-В функции `get_params` нужно получить данные, необходимые для создания шаблона проекта и сформировать словарик `env`, который будет использоваться для подстановки в [jinja](https://ru.wikipedia.org/wiki/Jinja)-шаблоны и передан в `prostprocess`.
-Параметры можно получить из переданного контекста (параметр `context`), разбором опций, переданных в контексте или интерактивным запросом у пользователя.
-
-Параметр `context` — это `namedtyple` типа `Context` из `template_tools.common`.
-В нём доступно 5 свойств:
+Параметр `context` — это `namedtuple` типа `Context` из `template_tools.common`. В нём доступно 5 свойств:
 * **`path`** - относительный путь от корня репозитория до создаваемого проекта
 * **`root`** - абсолютный путь корня репозитория
 * **`owner`** - значение, переданное параметром `--set-owner`
@@ -179,17 +173,17 @@ def get_params(context):
     """
     print("Generating sample project")
 
-    path_in_arcadia = Path(context.path)
+    path_in_project = Path(context.path)
     env = {
         "user": context.owner or get_current_user(),
-        "project_name": str(path_in_arcadia.parts[-1]),
+        "project_name": str(path_in_project.parts[-1]),
     }
     return env
 ```
 
 Для аккуратного выхода из генерации во время подготовки параметров вместо `env` можно вернуть объект класса `template_tools.common.ExitSetup`
 
-#### Пишем шаблоны
+##### Пишем шаблоны
 
 В поддиректории `template` нужно разместить [jinja](https://ru.wikipedia.org/wiki/Jinja)-шаблоны генерируемых файлов. В них можно использовать подстановку из `env`.
 По шаблонам будут генерироваться одноимённые файлы в целевой директории. Обычно среди шаблонов будет один для `ya.make` и, возможно, ещё несколько для исходного кода.
