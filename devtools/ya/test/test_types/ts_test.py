@@ -13,6 +13,22 @@ HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
 
 
+def get_nodejs_res(dart_info):  # type: (dict[str,str]) -> str
+    var_name = dart_info.get("NODEJS-ROOT-VAR-NAME")
+
+    if not var_name:
+        raise Exception("Suite cannot find NODEJS-ROOT-VAR-NAME in DART_DATA. Check configuration errors.")
+
+    resource = dart_info.get(var_name)
+
+    if not resource:
+        raise Exception(
+            "NodeJs resource is configured to be {}, but is not provided. Check configuration errors.".format(var_name)
+        )
+
+    return resource
+
+
 class BaseTestSuite(common_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
@@ -65,7 +81,7 @@ class BaseTestSuite(common_types.AbstractTestSuite):
             "--node-path",
             node_path,
             "--nodejs",
-            self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME")),
+            get_nodejs_res(self.dart_info),
         ]
 
         if test_data_dirs:
@@ -344,7 +360,6 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             multi_target_platform_run=multi_target_platform_run,
         )
         self._eslint_config_path = self.dart_info.get("ESLINT_CONFIG_PATH")
-        self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._files = sorted(self.dart_info.get("TEST-FILES", []))
         self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
 
@@ -405,7 +420,7 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             "--source-folder-path",
             self.dart_info.get("SOURCE-FOLDER-PATH"),
             "--nodejs",
-            self._nodejs_resource,
+            get_nodejs_res(self.dart_info),
             "--eslint-config-path",
             self._eslint_config_path,
             "--tracefile",
@@ -435,7 +450,6 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
             multi_target_platform_run=multi_target_platform_run,
         )
         self._ts_config_path = self.dart_info.get("TS_CONFIG_PATH")
-        self._nodejs_resource = self.dart_info.get(self.dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._files = [
             f.replace("$S/", jbuild.gen.consts.SOURCE_ROOT + "/") for f in sorted(self.dart_info.get("TEST-FILES", []))
         ]
@@ -478,7 +492,7 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
             "--source-folder-path",
             self.dart_info.get("SOURCE-FOLDER-PATH"),
             "--nodejs",
-            self._nodejs_resource,
+            get_nodejs_res(self.dart_info),
             "--ts-config-path",
             self._ts_config_path,
             "--tracefile",
