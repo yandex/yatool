@@ -20,7 +20,7 @@ namespace NFlatJsonGraph {
     }
 
     TNodeWriter TWriter::AddNode(TConstDepNodeRef node) {
-        return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).GetNameFast(node), EIDFormat::Simple);
+        return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).ToTargetStringBuf(node), EIDFormat::Simple);
     }
 
     TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, EIDFormat format) {

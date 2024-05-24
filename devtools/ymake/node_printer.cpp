@@ -716,7 +716,6 @@ static void DumpGraphInternal(TYMake& yMake) {
     }
     std::sort(NodesByDepth.begin(), NodesByDepth.end());
     for (auto&& i : NodesByDepth) {
-        TString name = yMake.Graph.ToString(yMake.Graph.Get(i.second));
         if (renderCmd) {
             TSubst2Shell cmdImage;
             TMakeCommand mkCmd(yMake);
@@ -725,11 +724,11 @@ static void DumpGraphInternal(TYMake& yMake) {
                 mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second], ECF_Make);
                 cmdImage.PrintAsLine(yMake.Conf.Cmsg()) << Endl;
             } catch (yexception& e) {
-                yMake.Conf.Cmsg() << "#Error: " << name << ": " << e.what() << "\n";
+                yMake.Conf.Cmsg() << "#Error: " << yMake.Graph.ToString(yMake.Graph.Get(i.second)) << ": " << e.what() << "\n";
             }
         }
         if (listBuildables) {
-            yMake.Conf.Cmsg() << name << " depth = " << i.first << "\n";
+            yMake.Conf.Cmsg() << yMake.Graph.ToString(yMake.Graph.Get(i.second)) << " depth = " << i.first << "\n";
         }
     }
 
@@ -965,7 +964,7 @@ public:
         } else if (CurEnt->IsInRelation && !AlreadyPrintedNodes.contains(state.TopNode()->ElemId)) {
             auto node = state.TopNode();
 
-            TStringBuf name = TDepGraph::Graph(node).GetNameFast(node);
+            TStringBuf name = TDepGraph::Graph(node).ToTargetStringBuf(node);
             if (name.size() > DOT_STRING_SIZE_LIMIT) {
                 name = name.SubStr(0, DOT_STRING_SIZE_LIMIT);
             }
@@ -1108,7 +1107,7 @@ namespace {
                 return false;
             }
             if (restoreContext.Conf.DumpRelationsByPrefix) {
-                TStringBuf targetStr = NPath::CutAllTypes(restoreContext.Graph.GetNameFast(node));
+                TStringBuf targetStr = NPath::CutAllTypes(restoreContext.Graph.ToTargetStringBuf(node));
                 for (const auto& prefix : destData.DestList) {
                     if (targetStr.StartsWith(prefix)) {
                         return true;
@@ -1612,12 +1611,12 @@ public:
 
                 for (TNodeId mod : fileModules) {
                     if (modErrMsg) {
-                        modErrMsg = TString::Join(modErrMsg, ", [[imp]]",  graph.GetNameFast(mod), "[[rst]]");
+                        modErrMsg = TString::Join(modErrMsg, ", [[imp]]",  graph.ToTargetStringBuf(mod), "[[rst]]");
                     } else {
                         const auto mod2fileIt = CurEnt->Module2File.find(mod);
                         modErrMsg = TString::Join("used a file [[imp]]",
                                                   mod2fileIt ? graph.GetFileName(graph.Get(mod2fileIt->second)).GetTargetStr() : "",
-                                                  "[[rst]] belonging to modules ([[imp]]", graph.GetNameFast(mod), "[[rst]]");
+                                                  "[[rst]] belonging to modules ([[imp]]", graph.ToTargetStringBuf(mod), "[[rst]]");
                     }
                 }
 

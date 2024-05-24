@@ -375,12 +375,15 @@ public:
         return TString{GetCmdName(node).GetStr()};
     }
 
-    TStringBuf GetNameFast(TConstNodeRef node) const {
-        return UseFileId(node->NodeType) ? GetFileName(node).GetTargetStr() : GetCmdName(node).GetStr();
+    TStringBuf ToTargetStringBuf(const TDepTreeNode& node) const {
+        if (UseFileId(node.NodeType)) {
+            return GetFileName(node).GetTargetStr();
+        }
+        return GetCmdName(node).GetStr();
     }
 
-    TStringBuf GetNameFast(TNodeId nodeId) const {
-        return GetNameFast(Get(nodeId));
+    TStringBuf ToTargetStringBuf(TNodeId nodeId) const {
+        return ToTargetStringBuf(Get(nodeId));
     }
 
     const TFileView GetFileNameByCacheId(TDepsCacheId cacheId) const {
@@ -545,6 +548,14 @@ public:
             return "<invalid node>";
         }
         return Graph(node).ToString(*node);
+    }
+
+    template <bool IsConst>
+    static inline TStringBuf ToTargetStringBuf(const TAnyNodeRef<IsConst>& node) {
+        if (!node.IsValid()) {
+            return "<invalid node>";
+        }
+        return Graph(node).ToTargetStringBuf(*node);
     }
 
     /// Inplace replacement NodeIds to ElemIds

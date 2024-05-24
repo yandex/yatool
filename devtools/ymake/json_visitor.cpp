@@ -246,7 +246,7 @@ bool TJSONVisitor::Enter(TState& state) {
     if (fresh) {
         TNodeDebugOnly nodeDebug{graph, node.Id()};
         if (!currState.Hash) {
-            currState.Hash = new TJsonMd5Old(nodeDebug, graph.ToString(node), graph.Names());
+            currState.Hash = new TJsonMd5Old(nodeDebug, TString(graph.ToTargetStringBuf(node)), graph.Names());
         }
 
         if (nodeType == EMNT_File || nodeType == EMNT_MakeFile) {
@@ -382,7 +382,7 @@ bool TJSONVisitor::Enter(TState& state) {
 
     if (fresh) {
         if (!currState.Hash) {
-            currState.Hash = new TJsonMd5Old(TNodeDebugOnly{graph, node.Id()}, graph.ToString(node), graph.Names());
+            currState.Hash = new TJsonMd5Old(TNodeDebugOnly{graph, node.Id()}, TString(graph.ToTargetStringBuf(node)), graph.Names());
         }
 
         if (IsModuleType(nodeType)) {
@@ -651,7 +651,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                         const auto& managedPeers = (varName == "MANAGED_PEERS"sv) ? ids.ManagedDirectPeers : ids.UniqPeers;
                         for (TNodeId peer : lists.GetList(managedPeers)) {
                             const auto peerNode = RestoreContext.Graph.Get(peer);
-                            const auto name = RestoreContext.Graph.GetNameFast(peerNode);
+                            const auto name = RestoreContext.Graph.ToTargetStringBuf(peerNode);
                             currState.Hash->Old()->IncludesMd5Update(name.data(), name.size());
                             currData.IncludesMd5Started = true;
                             currState.Hash->Old()->ContextMd5Update(name.data(), name.size());
@@ -785,7 +785,7 @@ void TJSONVisitor::Left(TState& state) {
     const auto& graph = TDepGraph::Graph(dep);
     TNodeId chldNode = dep.To().Id();
 
-    const TString depName = graph.ToString(dep.To());
+    const TStringBuf depName = graph.ToTargetStringBuf(dep.To());
     YDIAG(Dev) << "JSON: Left from " << depName << " to " << currState.Print() << Endl;
     if (!currDone && currData.WasFresh) {
         const TMd5SigValue* dependencySign = nullptr;
@@ -888,7 +888,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     if (*dep == EDT_OutTogetherBack) {
         if (NewUids) {
             if (!currDone) {
-                TString additionalOutputName = graph.ToString(dep.To());
+                TStringBuf additionalOutputName = graph.ToTargetStringBuf(dep.To());
                 currState.Hash->New()->StructureMd5Update(additionalOutputName, additionalOutputName);
             }
         }
@@ -1023,7 +1023,7 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
             loopMd5.AddSign(LoopCnt[dependencyData.LoopId].Sign, NUidDebug::LoopNodeName(dependencyData.LoopId), false);
             selfLoopMd5.AddSign(LoopCnt[dependencyData.LoopId].SelfSign, NUidDebug::LoopNodeName(dependencyData.LoopId), false);
         } else {
-            TString nodeName = graph.ToString(graph.Get(dependency));
+            TStringBuf nodeName = graph.ToTargetStringBuf(graph.Get(dependency));
             loopMd5.AddSign(dependencyData.OldUids()->GetIncludedContextSign(), nodeName, false);
             if (!IsOutputType(graph.Get(dependency)->NodeType)) {
                 selfLoopMd5.AddSign(dependencyData.OldUids()->GetIncludedSelfContextSign(), nodeName, false);
@@ -1046,7 +1046,7 @@ void TJSONVisitor::CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& l
         }
 
         const TJSONEntryStats& nodeData = nodeDataIt->second;
-        TString nodeName = graph.ToString(graph.Get(nodeId));
+        TStringBuf nodeName = graph.ToTargetStringBuf(graph.Get(nodeId));
         loopMd5.AddSign(nodeData.OldUids()->GetContextSign(), nodeName, true);
         selfLoopMd5.AddSign(nodeData.OldUids()->GetSelfContextSign(), nodeName, true);
     }

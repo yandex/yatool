@@ -168,7 +168,7 @@ namespace {
                 for (auto pathId = dep.PathId;; ++pathId) {
                     auto nodeId = Paths_[pathId];
                     auto nodeRef = Graph_.Get(nodeId & 0x7fffffff);
-                    TStringBuf name = Graph_.GetNameFast(nodeRef);
+                    TStringBuf name = Graph_.ToTargetStringBuf(nodeRef);
                     if (nodeRef->NodeType == EMNT_BuildCommand) {
                         name = SkipId(name);
                     }

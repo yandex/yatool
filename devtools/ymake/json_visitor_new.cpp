@@ -146,7 +146,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
     }
 
     if (CurrNode->NodeType == EMNT_NonParsedFile) {
-        TString nodeName = Graph->ToString(CurrNode);
+        TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         TMd5Value md5{TNodeDebugOnly{*Graph, CurrNode.Id()}, "TJSONVisitorNew::Enter::<md5#2>"sv};
         md5.Update(nodeName, "TJSONVisitorNew::Enter::<nodeName>"sv);
         CurrState->Hash->New()->ContentMd5Update(nodeName, "Update content hash by current file name");
@@ -156,7 +156,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
     // include extra output names to parent entry
     for (auto dep : CurrNode.Edges()) {
         if (*dep == EDT_OutTogetherBack) {
-            TString depName = Graph->ToString(dep.To());
+            TStringBuf depName = Graph->ToTargetStringBuf(dep.To());
             UpdateCurrent(state, depName, "Include extra output name to structure uid");
         }
     }
@@ -188,7 +188,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         if (CurrState->Module->IsDependencyManagementApplied() && CurrData->NodeDeps) {
             for (TNodeId nodeId : *CurrData->NodeDeps) {
                 const auto depNode = RestoreContext.Graph.Get(nodeId);
-                const auto name = RestoreContext.Graph.GetNameFast(depNode);
+                const auto name = RestoreContext.Graph.ToTargetStringBuf(depNode);
                 UpdateCurrent(state, name, "Include managed peer name to structure hash");
 
                 const TNodeData* chldState = Nodes.FindPtr(nodeId);
@@ -218,13 +218,13 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         // will change too, specifically theirs "inputs" sections.
         // TODO: This is a workaround, and should be removed when "inputs" sections
         // no more contain spurious dependency main outputs.
-        TString mainOutputName = Graph->ToString(Graph->Get(CurrData->OutTogetherDependency));
+        TStringBuf mainOutputName = Graph->ToTargetStringBuf(Graph->Get(CurrData->OutTogetherDependency));
         CurrState->Hash->New()->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
     }
 
     // Node name will be in $AUTO_INPUT for the consumer of this node.
     if (IsFileType(CurrNode->NodeType)) {
-        CurrState->Hash->New()->IncludeStructureMd5Update(Graph->ToString(CurrNode), "Node name for $AUTO_INPUT");
+        CurrState->Hash->New()->IncludeStructureMd5Update(Graph->ToTargetStringBuf(CurrNode), "Node name for $AUTO_INPUT");
     }
 
     // There is no JSON node for current DepGraph node
@@ -235,7 +235,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
 
         // include main output name to cur entry
         if (IsFileType(CurrNode->NodeType)) {
-            TString nodeName = Graph->ToString(CurrNode);
+            TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
             UpdateCurrent(state, nodeName, "Include node name to current structure hash");
         }
     }
@@ -253,7 +253,7 @@ void TJSONVisitorNew::PassToParent(TState& state) {
     // include inputs name
     bool isBuildFromDep = *Edge == EDT_BuildFrom && IsFileType(CurrNode->NodeType);
     if (isBuildFromDep && CurrNode->NodeType != EMNT_File) {
-        TString nodeName = Graph->ToString(CurrNode);
+        TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         UpdateParent(state, nodeName, "Include input name to parent structure hash");
     }
 
@@ -264,7 +264,7 @@ void TJSONVisitorNew::PassToParent(TState& state) {
 
     // tool dep
     if (CurrNode->NodeType == EMNT_Program && IsDirectToolDep(Edge)) {
-        TString nodeName = Graph->ToString(CurrNode);
+        TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         UpdateParent(state, nodeName, "Include tool node name to parent structure hash");
     }
 
@@ -287,7 +287,7 @@ void TJSONVisitorNew::PassToParent(TState& state) {
     }
 
     if (*Edge == EDT_Property && IsFileType(CurrNode->NodeType)) {
-        TString nodeName = Graph->ToString(CurrNode);
+        TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         UpdateParent(state, nodeName, "Include file names to late glob structure hash");
         PrntState->Hash->New()->IncludeContentMd5Update(CurrData->NewUids()->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
     }
@@ -314,7 +314,7 @@ void TJSONVisitorNew::PassToParent(TState& state) {
     }
 
     if (IsGlobalSrcDep(Edge)) {
-        TString globalSrcName = Graph->ToString(CurrNode);
+        TStringBuf globalSrcName = Graph->ToTargetStringBuf(CurrNode);
         PrntState->Hash->New()->IncludeStructureMd5Update(globalSrcName, "Add GlobalSrc name"sv);
 
         PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Add IncludeStructure from GlobalSrc"sv);
@@ -344,7 +344,7 @@ void TJSONVisitorNew::UpdateParent(TState& state, const TMd5SigValue& value, TSt
     const auto& parentState = *state.Parent();
     const auto& graph = TDepGraph::Graph(state.TopNode());
 
-    TString nodeName = graph.ToString(state.TopNode());
+    TStringBuf nodeName = graph.ToTargetStringBuf(state.TopNode());
 
     YDIAG(Dev) << description << ": " << nodeName << " " << graph.ToString(parentState.Node()) << Endl;
     parentState.Hash->New()->StructureMd5Update(value, nodeName);
@@ -464,7 +464,7 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
         }
 
         const TJSONEntryStats& nodeData = nodeDataIt->second;
-        TString nodeName = Graph->ToString(Graph->Get(nodeId));
+        TStringBuf nodeName = Graph->ToTargetStringBuf(Graph->Get(nodeId));
         structureLoopHash.AddSign(nodeData.NewUids()->GetStructureUid(), nodeName, true);
         includeStructureLoopHash.AddSign(nodeData.NewUids()->GetIncludeStructureUid(), nodeName, true);
         contentLoopHash.AddSign(nodeData.NewUids()->GetContentUid(), nodeName, true);
@@ -497,7 +497,7 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
         } else {
             TMd5Value structureHash{"Loop structure hash with name"sv};
             structureHash.Update(structureLoopUid, "Common loop structure hash"sv);
-            TString mainOutputName = Graph->ToString(Graph->Get(node));
+            TStringBuf mainOutputName = Graph->ToTargetStringBuf(Graph->Get(node));
             structureHash.Update(mainOutputName, "Main output name"sv);
 
             TMd5SigValue structureUid{"Loop structure uid with name"sv};

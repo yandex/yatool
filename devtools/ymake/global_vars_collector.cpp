@@ -21,7 +21,6 @@ bool TGlobalVarsCollector::Start(const TStateItem& parentItem) {
 
 void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData* parentData) {
     auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
-    TString parentName = TDepGraph::Graph(parentItem.Node()).ToString(parentItem.Node());
     for (const auto& dep : parentItem.Node().Edges()) {
         if (!IsBuildCmdInclusion(dep)) {
             continue;

@@ -441,7 +441,7 @@ namespace {
         // To make it possible, use partial rendering and calculation of RenderId.
 
         renderer.RenderNodeDelayed();
-        const auto nodeName = yMake.Graph.GetNameFast(nodeId);
+        const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
 
         TString renderId{};
 
