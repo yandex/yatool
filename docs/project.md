@@ -361,3 +361,115 @@ int main() {
 - Чтобы добавить в проект файл `x.template`, положите для него шаблон с именем `x.template.template`.
 - Чтобы добавить в проект файл `x.notemplate`, положите для него шаблон с именем `x.notemplate.template`.
 
+### update
+
+Команда `ya project update` предназначена для обновления типового проекта. Она может создавать и изменять как файлы описания сборки `ya.make`, так и любые другие файлы, включая исходный код и/или документацию. В отличие от команды `ya project create`, команда `ya project update` предназначена для дополнения или актуализации существующего проекта.
+
+`ya project update [project-type] [dest_path] [options]`
+
+- `project-type`: Тип проекта, который необходимо обновить.
+- `dest_path`: Путь к директории проекта, который необходимо обновить.
+- `options`: Дополнительные параметры для команды.
+
+#### Поддерживаемые функции
+
+`ya project update` поддерживает небольшой набор встроенных типов проектов и расширяемое обновление проектов по шаблонам. Чтобы увидеть полный список доступных типов проектов (включая шаблонные), используйте команду:
+
+`ya project update --help`
+
+Некоторые типы проектов можно использовать как в командах `ya project create`, так и `ya project update`, в то время как другие подходят только для одной из этих команд.
+
+#### Основные виды встроенных проектов
+
+Доступно обновление для следующих встроенных типов проектов:
+
+Имя | Описание
+:--- | :---
+`recurce` | Дописать в `ya.make` недостающие `RECURSE` на дочерние проекты
+`resources` | Обновить информацию об автообновляемых ресурсах
+
+#### Опции для встроенных проектов
+
+- `-h`, `--help`: Справка по опциям для конкретного проекта
+- `-`r, `--recursive`: Обновить проекты рекурсивно по дереву директорий
+- `--dry-run`: Для `resources` не делать обновление, а лишь показать, что будет обновлено
+
+#### Дефолтный файл проекта
+
+Если тип проекта не указан, `ya project update` попробует найти файл с именем `.ya_project.default`. Это файл в формате `yaml`, в котором команда будет искать ключ `name`. Значение этого ключа будет использовано как тип проекта. Такой файл может создавать команда `ya project create`.
+
+**Примеры использования**
+```
+project/user/libX
+├── bin
+│   ├── __main__.py
+│   └── ya.make
+├── dummy
+│   └── file.X
+├── lib
+│   ├── tests
+│   │   ├── test.py
+│   │   └── ya.make
+│   ├── app.py
+│   └── ya.make
+└── ya.make
+```
+
+Предположим, что в двух файлах не хватает `RECURSE`.
+
+`project/user/libX/ya.make`
+
+```
+OWNER(user)
+
+RECURSE(
+    bin
+)
+```
+
+project/user/libX/lib/ya.make
+```
+OWNER(user)
+
+PY3_LIBRARY()
+
+PY_SRCS(app.py)
+
+END()
+```
+При запуске
+
+```
+ya project update recurse project/user/libX  --recursive
+
+Warn: No suitable directories in project/user/libX/dummy
+Info: project/user/libX/lib/ya.make, RECURSE was updated
+Info: project/user/libX/ya.make, RECURSE was updated
+```
+
+При проверке:
+
+project/user/libX/ya.make (заметим, что `RECURSE` на `dummy` не нужен, там нет `ya.make`)
+```
+OWNER(user)
+
+RECURSE(
+    bin
+    lib
+)
+```
+
+`project/user/libX/lib/ya.make`
+```
+OWNER(user)
+
+PY3_LIBRARY()
+
+PY_SRCS(app.py)
+
+END()
+
+RECURSE(
+    tests
+)
+```
