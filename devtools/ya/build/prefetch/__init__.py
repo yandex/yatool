@@ -138,7 +138,8 @@ class ArcStreamingPrefetcher:
             return
 
         logger.debug('Starting arc prefetch-files')
-        cmd = [self._arc_tool, 'prefetch-files', '--read-paths-from', '-']
+        # Ignoring not found items for handlers like `ya py`, that create temp dirs in junk
+        cmd = [self._arc_tool, 'prefetch-files', '--read-paths-from', '-', '--ignore-not-found']
         self._arc_process = exts.process.popen(
             cmd, stdout=None, stderr=subprocess.PIPE, stdin=subprocess.PIPE, **({'text': True} if six.PY3 else {})
         )
@@ -157,7 +158,14 @@ class ArcStreamingPrefetcher:
             _join_thread(self._writer_thread, "stdin_writer")
 
             logger.debug('Finishing arc prefetch-files [pid: %d]', self._arc_process.pid)
-            self._arc_process.stdin.close()
+            try:
+                self._arc_process.stdin.close()
+            except Exception:
+                logger.debug(
+                    "Exception during closing STDIN of arc prefetch-files [pid: %d].",
+                    self._arc_process.pid,
+                    exc_info=True,
+                )
 
     def _run_write_loop(self):
         while True:
@@ -171,9 +179,17 @@ class ArcStreamingPrefetcher:
             if self._stop_requested:
                 break
 
-            for target in self._dedup_targets(targets):
-                self._arc_process.stdin.write(os.path.join(self._arc_root, target) + '\n')
-            self._arc_process.stdin.flush()
+            try:
+                for target in self._dedup_targets(targets):
+                    self._arc_process.stdin.write(os.path.join(self._arc_root, target) + '\n')
+                self._arc_process.stdin.flush()
+            except Exception:
+                logger.debug(
+                    "Exception during writing to STDIN of arc prefetch-files [pid: %d].",
+                    self._arc_process.pid,
+                    exc_info=True,
+                )
+                self._stop_requested = True
 
     def _run_read_loop(self):
         stderr = []
