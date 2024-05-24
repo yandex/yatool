@@ -1,6 +1,6 @@
 ## ya project
 
-Создать или изменить файл ya.make проекта.
+Создать или изменить файл `ya.make` проекта.
 
 `ya project <subcommand>`
 
@@ -10,12 +10,6 @@
  fix-peerdirs      Add missing and delete unused peerdirs to the project
  macro             Add or delete macro in ya.make
  owner             Process owners
-```
-
-### Примеры
-```
-  ya project macro add "MACRO_NAME(VALUE1 VALUE2 ...)"                               Insert macro MACRO_NAME in top of the makelist
-  ya project macro add --set_after=AFTER_MACRO_NAME "MACRO_NAME(VALUE1 VALUE2 ...)"  Insert macro MACRO_NAME after AFTER_MACRO_NAME in top of the makelist
 ```
 
 ### create
@@ -583,6 +577,13 @@ ya project fix-peerdirs [OPTION]... [TARGET]...
 - `--after`=`SET_AFTER`: Добавить макрос после указанного макроса.
 - `--append`: Добавить аргументы к существующему макросу.
 
+**Примеры**
+
+```
+  ya project macro add "MACRO_NAME(VALUE1 VALUE2 ...)"                               Вставить макрос MACRO_NAME в начало списка макросов
+  ya project macro add --set_after=AFTER_MACRO_NAME "MACRO_NAME(VALUE1 VALUE2 ...)"  Вставить макрос MACRO_NAME после AFTER_MACRO_NAME в начало списка макросов
+```
+
 #### Удаление макроса
 
 `ya project macro remove <macro_name>`
@@ -634,7 +635,7 @@ SRCS(
 END()
 ```
 
-ya project owners replace user^g:users - Заменить владельца *"user"* на группу пользователей *"users"*
+`ya project owners replace user^g:users` - Заменить владельца *"user"* на группу пользователей *"users"*
 
 ```
 LIBRARY()
