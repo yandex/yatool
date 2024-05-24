@@ -34,11 +34,13 @@ def _set_value(k, v):
     if STAGES_FILE:
         with _lock():
             try:
-                data = json.load(open(STAGES_FILE))
+                with open(STAGES_FILE) as afile:
+                    data = json.load(afile)
             except IOError:
                 data = {}
             data[k] = v
-            json.dump(data, open(STAGES_FILE, 'w'), indent=4, sort_keys=True)
+            with open(STAGES_FILE, 'w') as afile:
+                json.dump(data, afile, indent=4, sort_keys=True)
 
 
 def stage_started(name, ts=None):

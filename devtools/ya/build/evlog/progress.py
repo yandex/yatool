@@ -313,7 +313,7 @@ class YmakeTimeStatistic(event_handling.SubscriberSpecifiedTopics):
                 self.min_timestamp_ms = event["_timestamp"] / 1000
 
         elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
-            thread_name = threading.current_thread().getName()
+            thread_name = threading.current_thread().name
             self.max_timestamp_ms = event["_timestamp"] / 1000
             self.threads_time.append(
                 ConfigureTask(

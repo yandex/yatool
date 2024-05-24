@@ -1048,7 +1048,8 @@ def load_package(arcadia_root, package_file, included=None):
     included.append(package_file)
 
     try:
-        parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
+        with open(_get_package_file(arcadia_root, package_file)) as afile:
+            parsed_package = json.load(afile)
     except ValueError as e:
         raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
 
@@ -1459,7 +1460,8 @@ def do_package(params):
             continue
 
     if packages_meta_info:
-        json.dump(packages_meta_info, open('packages.json', 'w'), indent=4)
+        with open('package.json', 'w') as afile:
+            json.dump(packages_meta_info, afile, indent=4)
 
     stage_finished("do_package")
 
@@ -1674,7 +1676,8 @@ def _get_all_includes(arcadia_root, package_file, included=None):
         raise YaPackageException('Include loop detected: {}'.format(' -> '.join(included)))
 
     try:
-        parsed_package = json.load(open(_get_package_file(arcadia_root, package_file)))
+        with open(_get_package_file(arcadia_root, package_file)) as afile:
+            parsed_package = json.load(afile)
     except ValueError as e:
         raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
     included.append(package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file)

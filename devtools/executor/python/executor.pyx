@@ -139,6 +139,7 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False):
         def shutdown():
             if proc.poll() is None:
                 proc.terminate()
+                proc.wait()
 
         atexit.register(shutdown)
 
