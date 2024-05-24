@@ -556,7 +556,7 @@ optional arguments:
 ya project fix-peerdirs [OPTION]... [TARGET]...
 ```
 
-**Опции**
+#### Опции
 ```
     -h, --help          Справка
     -a                  Только добавить недостающие PEERDIR
