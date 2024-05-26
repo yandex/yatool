@@ -68,7 +68,7 @@
 - `--overwrite-read-only-files`: Перезаписывать файлы с правами только на чтение в пакете.
 - `--ensure-package-published`: Убедиться, что пакет доступен в репозитории.
 
-### Начало работы
+### Принцип работы
 
 Для сборки пакета нужно запустить команду с указанием пути к `JSON`-описанию и необходимого формата. Пакет будет собран в текущей директории. Если формат пакетирования не указан, будет создан `tar`-архив.
 
@@ -120,55 +120,54 @@ drwxrwxr-x 0/0 0 2021-03-11 06:58 some_package_dir/
 
 По умолчанию `ya package` создаёт пакет в текущем каталоге. С помощью опций `-O/--package-output` вы можете переопределить каталог, куда `ya package` сохранит создаваемые пакеты.
 
+####  Содержимое файла package.json
 
-ya package, являясь надстройкой над системой сборки, стремится к тем же идеалам, что и ya make — предоставляя герметичную воспроизводимую (не бинарно) сборку артефактов с минимально необходимым набором CLI параметров для сборки пакета.
+`ya package` является надстройкой над системой сборки и придерживается тех же принципов, что и `ya make`. Она предоставляет герметичную и воспроизводимую сборку целей с минимально необходимым набором параметров командной строки.
 
-Описание package.json включает в себя все, что относится к:
-- Конфигурации сборки: целевые программы, сборочные флаги, платформы и прочее
-- Зависимостям из репозитория и ресурсам Sandbox
-- Способам раскладки артефактов внутри пакета, права доступа, имена файлов/каталогов
-- Метаданным, относящимся к пакету и его сборке
-- Параметрам пакетирования, которые неразрывно связаны с описываемым пакетом
-### Основные опции
-```
-    -d                  Debug build
-    -r                  Release build
-    --sanitize=SANITIZE Sanitizer type(address, memory, thread, undefined, leak)
-    --sanitizer-flag=SANITIZER_FLAGS
-                        Additional flag for sanitizer
-    --lto               Build with LTO
-    --thinlto           Build with ThinLTO
-    --sanitize-coverage=SANITIZE_COVERAGE
-                        Enable sanitize coverage
-    --afl               Use AFL instead of libFuzzer
-    --musl              Build with musl-libc
-    --pch               Build with Precompiled Headers
-    --hardening         Build with hardening
-    --race              Build Go projects with race detector
-    --cuda=CUDA_PLATFORM
-                        Cuda platform(optional, required, disabled) (default: optional)
-    -j=BUILD_THREADS, --threads=BUILD_THREADS
-                        Build threads count (default: 32)
-    --checkout          Checkout missing dirs
-    --report-config=REPORT_CONFIG_PATH
-                        Set path to TestEnvironment report config
-    -h, --help          Print help
-    -v, --verbose       Be verbose
-    --ttl=TTL           Resource TTL in days (pass 'inf' - to mark resource not removable) (default: 14)
-```
-### Опции запуска тестов"
-```
-    -t, --run-tests     Run tests (-t runs only SMALL tests, -tt runs SMALL and MEDIUM tests, -ttt runs SMALL, MEDIUM and FAT tests)
-    -A, --run-all-tests Run test suites of all sizes
-    --add-peerdirs-tests=PEERDIRS_TEST_TYPE
-                        Peerdirs test types (none, gen, all) (default: none)
-    --test-tool-bin=TEST_TOOL_BIN
-                        Path to test_tool binary
-    --test-tool3-bin=TEST_TOOL3_BIN
-                        Path to test_tool3 binary
-    --profile-test-tool=PROFILE_TEST_TOOL
-                        Profile specified test_tool calls
-```
+Файл `package.json` содержит информацию о:
 
-## Пример
-`ya package <path to json description>  Create tarball package from json description`
+- Конфигурации сборки: целевых программах, сборочных флагах, платформах и прочем.
+- Зависимостях из репозитория и ресурсах.
+- Способах раскладки артефактов внутри пакета, правах доступа, именах файлов и каталогов.
+- Метаданных, относящихся к пакету и его сборке.
+- Параметрах пакетирования, непосредственно связанных с описываемым пакетом.
+
+В большинстве случаев для сборки пакета определенной версии достаточно запустить команду `ya package <package-path>` в контексте конкретной ревизии репозитория. Подробнее в разделе [формат описания пакетов](ya_package_format.md).
+
+### Дополнительные параметры
+
+#### Основные опции сборки
+- `-d`: Сборка в режиме отладки.
+- `-r`: Сборка в режиме релиза. (по умолчанию)
+- `--sanitize=SANITIZE`: Тип санитайзера (address, memory, thread, undefined, leak)
+- `--sanitizer-flag=SANITIZER_FLAGS`: Дополнительные флаги для санитайзера.
+- `--lto`: Сборка с использованием Link Time Optimization (`LTO`).
+- `--thinlto`: Сборка с использованием `ThinLTO`.
+- `--musl`: Сборка с использованием библиотеки `musl-lib`c.
+- `--afl`: Использовать `AFL` вместо `libFuzzer`.
+
+Поддерживается большинство опций системы сборки [ya make](ya_make2.md).
+
+#### Запуск тестов
+
+- `-A`, `--run-all-tests`: запускать все тесты при сборке целей из секции build
+- `-t`, `--run-tests`: запускать только быстрые тесты при сборке целей из секции build
+- `--ignore-fail-tests`: игнорировать падения тестов при сборке пакетов (иначе сборка пакета будет прервана)
+- `--add-peerdirs-tests=PEERDIRS_TEST_TYPE`: Типы тестов `peerdirs` (none, gen, all) (по умолчанию: none).
+- `--test-tool-bin=TEST_TOOL_BIN`: Путь к исполняемому файлу `test_tool`.
+- `--test-tool3-bin=TEST_TOOL3_BIN`: Путь к исполняемому файлу `test_tool3`.
+
+#### Публикация и загрузка результатов пакетирования
+
+Полученный пакет можно сразу опубликовать в пакетном репозитории/
+
+- `--publish-to=<repo_url>` опубликовать пакет в соотвествующем пакетном репозитории.
+- `--ensure-package-published` проверить доступность пакета после публикации.
+- `--upload-resource-type` тип загружаемого ресурса (по умолчанию `YA_PACKAGE`)
+- `--owner` владелец (Owner) ресурса
+- `--ssh-key` путь к приватной части ключа для получения токена для заливки пакета на удаленный ресурс.
+- `--token OAuth`-токен для авторизации  (можно указывать напрямую без --ssh-key).
+- `--user` имя пользователя для авторизации (по умолчанию – текущий пользователь)
+- `--artifactory` опубликовать пакет в `artifactory` (системе хранения собранных бинарных версий компонент и продуктов).
+
+Помимо перечисленных выше параметров, команда `ya package` поддерживает [множество других опций](ya_package_help.md), детали которых можно узнать, запустив `ya package --help`.
