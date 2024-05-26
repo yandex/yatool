@@ -1,3 +1,4 @@
+```
 Build package using json package description in the release build type by default.
 
 Usage:
@@ -232,26 +233,11 @@ Options:
   Upload
     Expert options
     --ttl=TTL           Resource TTL in days (pass 'inf' - to mark resource not removable) (default: 14)
-  Upload to sandbox
-    --owner=RESOURCE_OWNER
-                        User name to own data saved to sandbox. Required in case of inf ttl of resources in mds.
-    --sandbox-url=SANDBOX_URL
-                        sandbox url to use for storing canonical file (default: https://sandbox.yandex-team.ru)
-    --task-kill-timeout=TASK_KILL_TIMEOUT
-                        Timeout in seconds for sandbox uploading task
-    --sandbox           Upload to Sandbox
-  Upload to mds
-    Advanced options
-    --mds               Upload to MDS
-    --mds-host=MDS_HOST MDS Host (default: storage.yandex-team.ru)
-    --mds-port=MDS_PORT MDS Port (default: 80)
-    --mds-namespace=MDS_NAMESPACE
-                        MDS namespace (default: devtools)
-    --mds-token=MDS_TOKEN
-                        MDS Basic Auth token
+  
   Authorization
     --ssh-key=SSH_KEYS  Path to private ssh key to exchange for OAuth token
     --token=OAUTH_TOKEN oAuth token
-    --user=USERNAME     Custom user name for authorization (default: mtv2000)
+    --user=USERNAME     Custom user name for authorization (default: user)
     Advanced options
     --ssh-key=SSH_KEYS  Path to private ssh key to exchange for OAuth token
+```
