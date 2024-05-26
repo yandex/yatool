@@ -1,4 +1,4 @@
-uild package using json package description in the release build type by default.
+Build package using json package description in the release build type by default.
 
 Usage:
   ya package [OPTION]... [Package description file name(s)]...
@@ -50,7 +50,7 @@ Options:
   Platform/build configuration
     -d                  Debug build
     -r                  Release build
-    --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type (default: release)
+    --build=BUILD_TYPE  Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) 
     --sanitize=SANITIZE Sanitizer type(address, memory, thread, undefined, leak)
     --race              Build Go projects with race detector
     --host-platform-flag=HOST_PLATFORM_FLAGS
@@ -71,7 +71,7 @@ Options:
     --cuda=CUDA_PLATFORM
                         Cuda platform(optional, required, disabled) (default: optional)
     --host-build-type=HOST_BUILD_TYPE
-                        Host platform build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type (default: release)
+                        Host platform build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) (default: release)
     --host-platform=HOST_PLATFORM
                         Host platform
     --c-compiler=C_COMPILER
@@ -121,58 +121,7 @@ Options:
                         Cache codec
     --auto-clean=AUTO_CLEAN_RESULTS_CACHE
                         Auto clean results cache (default: True)
-  YT cache
-    --no-yt-store       Disable YT storage
-    Advanced options
-    --dist-cache-evict-bins
-                        Remove all non-tool binaries from build results. Works only with --bazel-remote-put mode
-    --dist-cache-evict-cached
-                        Don't build or download build results if they are present in the dist cache
-    --dist-store-threads=DIST_STORE_THREADS
-                        dist store max threads (default: 4)
-    --bazel-remote-store
-                        Use Bazel-remote storage
-    --no-bazel-remote-store
-                        Disable Bazel-remote storage
-    --bazel-remote-base-uri=BAZEL_REMOTE_BASEURI
-                        Bazel-remote base URI (default: http://cachesrv.ydb.tech:8081)
-    --bazel-remote-username=BAZEL_REMOTE_USERNAME
-                        Bazel-remote username
-    --bazel-remote-password=BAZEL_REMOTE_PASSWORD
-                        Bazel-remote password
-    --bazel-remote-password-file=BAZEL_REMOTE_PASSWORD_FILE
-                        Bazel-remote password file
-    --yt-store          Use YT storage
-    --yt-store-threads=YT_STORE_THREADS
-                        YT store max threads (default: 1)
-    Expert options
-    --yt-token-path=YT_TOKEN_PATH
-                        YT token path (default: /home/mtv2000/.yt/token)
-  YT cache put
-    Expert options
-    --yt-put            Upload to YT store
-    --yt-max-store-size=YT_MAX_CACHE_SIZE
-                        YT storage max size
-    --yt-store-ttl=YT_STORE_TTL
-                        YT store ttl in hours(0 for infinity) (default: 24)
-    --bazel-remote-put  Upload to Bazel-remote store
-    --yt-write-through=YT_STORE_WT
-                        Populate local cache while updating YT store (default: True)
-    --yt-create-tables  Create YT storage tables
-    --yt-store-filter=YT_CACHE_FILTER
-                        YT store filter
-    --yt-store-codec=YT_STORE_CODEC
-                        YT store codec
-    --yt-store-exclusive
-                        Use YT storage exclusively (fail build if required data is not presented in the YT store)
-    --yt-replace-result Build only targets that need to be uploaded to the YT store
-    --yt-replace-result-add-objects
-                        Tune yt-replace-result option: add objects (.o) files to build results. Useless without --yt-replace-result
-    --yt-replace-result-rm-binaries
-                        Tune yt-replace-result option: remove all non-tool binaries from build results. Useless without --yt-replace-result
-    --yt-replace-result-yt-upload-only
-                        Tune yt-replace-result option: put only yt upload nodes into results. Useless without --yt-replace-result
-  Feature flags
+ Feature flags
     Expert options
     --no-local-executor Use Popen instead of local executor
     --dir-outputs-test-mode
