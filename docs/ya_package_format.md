@@ -419,8 +419,8 @@ force_dupload | bool | `--force-dupload` | Добавляет опцию `--forc
 full_strip | bool | `--full-strip` | Выполняет `strip` для бинарей | true/false
 overwrite_read_only_files | bool | `--overwrite-read-only-files` | Разрешить перезаписывать read-only файлы при сборке пакета (error prone) | true/false
 raw_package | bool | `--raw-package` | Отключает упаковку пакета в tar | true/false
-resource_attrs | dict<str, str> | `--upload-resource-attr` | Добавляет указанные атрибуты к ресурсу sandbox |
-resource_type | string | `--upload-resource-type=X` | Тип создаваемого ресурса | Например "YA_PACKAGE"
+resource_attrs | dict<str, str> | `--upload-resource-attr` | Добавляет указанные атрибуты к ресурсу |
+resource_type | string | `--upload-resource-type=X` | Тип создаваемого ресурса | 
 sign | bool | `--not-sign-debian` | Отключает подпись deb пакета | true/false
 sloppy_deb | bool | `--sloppy-and-fast-debian` | Fewer checks and no compression when building debian package (error prone) | true/false
 store_debian | bool | `--dont-store-debian` | Отключает сохранение deb файла в отдельном архиве | true/false
