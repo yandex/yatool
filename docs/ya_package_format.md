@@ -392,7 +392,9 @@
 Все опции, указанные в этом разделе, могут быть переопределены через соответствующие параметры командной строки `cli` при запуске команды `ya package`.
 Название параметра | Тип | Cli аналог | Описание | Допустимые значения
 :--- | :-- | :--- | :--- | :--- 
-format | string | `--tar`/`--debian`/`--rpm`/etc | Позволяет указать конкретный формат сборки пакета | "debian" \ "tar" \ "docker"\"rpm"\"wheel"\"aar"\"npm" 
+format | string | `--tar`/`--debian`/`--rpm`/etc | Позволяет указать конкретный формат сборки пакета | "debian"  
+"tar"  "docker" 
+ "rpm"  "wheel"  "aar"  "npm" 
 arch_all | bool | `--arch-all` | Указывает "Architecture: all" при сборке debian. | true/false 
 artifactory | bool | `--artifactory` | Собирает пакет, загружая в artifactory при указании `--publish-to <settings.xml>`  | true/false |
 compress_archive | bool | `--no-compression` | Позволяет отключить сжатие tar архивов | true/false |
