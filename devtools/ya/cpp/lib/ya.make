@@ -12,6 +12,7 @@ PEERDIR(
     library/cpp/logger/global
     library/cpp/resource
     devtools/libs/yaplatform
+    devtools/ya/app_config/lib
 )
 
 END()

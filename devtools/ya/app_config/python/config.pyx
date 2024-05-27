@@ -2,13 +2,13 @@ from libcpp cimport bool
 from util.generic.string cimport TString
 
 cdef extern from "devtools/ya/app_config/lib/config.h" namespace "NYa::NConfig" nogil:
-    cpdef TString Description
-    cpdef bool HasMapping
-    cpdef bool InHouse
-    cpdef bool HaveSandboxFetcher
-    cpdef bool HaveOAuthSupport
-    cpdef TString JunkRoot
-    cpdef TString ExtraConfRoot
+    cdef TString Description
+    cdef bool HasMapping
+    cdef bool InHouse
+    cdef bool HaveSandboxFetcher
+    cdef bool HaveOAuthSupport
+    cdef TString JunkRoot
+    cdef TString ExtraConfRoot
 
 
 description = Description.decode()

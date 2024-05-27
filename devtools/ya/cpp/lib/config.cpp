@@ -2,6 +2,8 @@
 #include "logger.h"
 #include "ya_conf_json_loaders.h"
 
+#include <devtools/ya/app_config/lib/config.h>
+
 #include <library/cpp/resource/resource.h>
 
 #include <util/folder/path.h>
@@ -29,7 +31,8 @@ struct THash<TFsPath> {
 };
 
 namespace NYa {
-    const TFsPath YA_CONF_JSON_PATH = TFsPath("build") / "ya.conf.json";
+    const TString YA_CONF_JSON_FILE = "ya.conf.json";
+    const TFsPath YA_CONF_JSON_PATH = TFsPath("build") / YA_CONF_JSON_FILE;
     const TString RES_FS_ROOT = "resfs/file";
     const TString YA_CONF_JSON_RESOURCE_KEY = RES_FS_ROOT + "/ya.conf.json";
 
@@ -65,7 +68,7 @@ namespace NYa {
                 ToolRoot_ = [this]() {return ToolRootImpl();};
                 ToolCacheVersion_ = [this]() {return ToolCacheVersionImpl();};
                 ArcadiaRoot_ = [this]() {return ArcadiaRootImpl();};
-                YaConf_ = [this]() {return ConfigImpl<NYaConfJson::TYaConf>(YA_CONF_JSON_PATH, YA_CONF_JSON_RESOURCE_KEY);};
+                YaConf_ = [this]() { return YaConfImpl();};
             }
 
             TFsPath HomeDir() const override  {
@@ -186,26 +189,52 @@ namespace NYa {
                 return {};
             }
 
+            NYaConfJson::TYaConf YaConfImpl() {
+                TVector<TFsPath> configDirs{};
+                if (TFsPath yaToolConf = GetEnv("YA_TOOLS_CONFIG_PATH")) {
+                    configDirs.push_back(yaToolConf / YA_CONF_JSON_FILE);
+                }
+
+                if (TFsPath extraPath = NConfig::ExtraConfRoot) {
+                    configDirs.push_back(extraPath / YA_CONF_JSON_FILE);
+                }
+                configDirs.push_back(YA_CONF_JSON_PATH);
+                return ConfigImpl<NYaConfJson::TYaConf>(configDirs, YA_CONF_JSON_RESOURCE_KEY);
+            }
+
             template <class T>
-            T ConfigImpl(const TFsPath& arcadiaPath, const TString& resourcePath) const {
+            T ConfigImpl(const TVector<TFsPath> arcadiaPaths, const TString& resourcePath) const {
                 TFsPath arcadiaRoot = ArcadiaRoot();
                 T value{};
-                if (arcadiaRoot) {
-                    const TFsPath path = arcadiaRoot / arcadiaPath;
-                    DEBUG_LOG << "Load config from: " << path << "\n";
-                    NJsonLoad::LoadFromFile(value, path);
-                } else {
+
+                if (!arcadiaRoot) {
                     const TString resFsPath = RES_FS_ROOT + "/" + resourcePath;
                     DEBUG_LOG << "Load config from resource: " << resourcePath << "\n";
                     TString data = NResource::Find(resourcePath);
                     NJsonLoad::LoadFromBuffer(value, data);
+                    return value;
                 }
-                return value;
+
+                for (const auto& arcadiaPath : arcadiaPaths) {
+                    const TFsPath path = arcadiaRoot / arcadiaPath;
+
+                    if (!path.Exists()) {
+                        DEBUG_LOG << "Cannot load config (file doesn't exist): " << path << "\n";
+                        continue;
+                    }
+
+                    DEBUG_LOG << "Load config from: " << path << "\n";
+                    NJsonLoad::LoadFromFile(value, path);
+                    return value;
+                }
+
+                throw yexception() << "Cannot find config " << YA_CONF_JSON_FILE;
             }
 
             template <class T>
             T ConfigImpl(const TFsPath& arcadiaPath) const {
-                return ConfigImpl<T>(arcadiaPath, arcadiaPath.GetPath());
+                TVector<TFsPath> arcadiaPaths = {arcadiaPath};
+                return ConfigImpl<T>(arcadiaPaths, arcadiaPath.GetPath());
             }
         private:
             TLazyValue<TFsPath> HomeDir_;
