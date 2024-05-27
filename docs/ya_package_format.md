@@ -1,4 +1,4 @@
-# Формат описания пакетов
+## Формат описания пакетов
 Описание пакета состоит из следующих секций:
 - [meta](#meta)
 - [include](#include)
@@ -8,15 +8,13 @@
 - [userdata](#userdata)
 - [postprocess](#postprocess)
 
-Полный формат json-описания можно посмотреть в [схеме](https://a.yandex-team.ru/arc/trunk/arcadia/devtools/ya/package/package.schema.json).
-
-## meta { #meta }
-Секция с мета-информацией содержит имя, версию, описание пакета, а также другие поля, которые используются для различных форматов пакетирования.
+### meta
+Раздел с метаинформацией включает в себя название, версию, описание пакета и прочие поля, которые применяются для различных форматов упаковки.
 
 ```json
 {
-    "name": "yandex-some-package-name",
-    "maintainer": "Vasya Pupkin <vasya.pupkin@yandex-team.ru>",
+    "name": "project-some-package-name",
+    "maintainer": "programmers <user@mail>",
     "description": "Some package description",
     "version": "Version with templates from {revision}, {branch}, {sandbox_task_id}, {changelog_version}",
     "pre-depends": ["package1", "package2"],
@@ -25,7 +23,7 @@
     "conflicts": ["package6", "package7"],
     "replaces": ["package8"],
     "build-depends": ["package"],
-    "homepage": "https://wiki.yandex-team.ru/yatool/",
+    "homepage": "https://<homepage>",
     "rpm_release": "The number of times this version of the software was released",
     "rpm_license": "The license of the software being packaged"
 }
@@ -48,10 +46,8 @@
 
 Поддерживаемые подстановки для полей мета-инофрмации:
 * `revision` – текущая ревизия, берется от корня репозитория
-* `svn_revision` – текущая svn-ревизия. Для svn то же, что `revision`, для arc берётся svn ревизия соответствующая ревизии в arc. В пользовательских ветках в arc обычно значением будет `undefined`.
 * `branch` – имя текущей ветки
-* `sandbox_task_id` – ID Сандбокс-задачи. Подстановка доступна при сборке пакета через задачу YA_PACKAGE
-* `changelog_version` – версия из changelog-файла. Подстановка доступна при сборке deb-пакета с указанием пути до changelog через ключ команды ```--change-log```
+* `changelog_version` – версия из changelog-файла. Подстановка доступна при сборке deb-пакета с указанием пути до `changelog` через ключ команды ```--change-log```
 
 ## include { #include }
 Содержит список путей пакетов (относительно корня Аркадии), содержимое которых нужно включить: включаются все секции, при этом поля из секции `meta` переопределяются в порядке следования записей секции `include` (последним ее переписывает `meta` текущего пакета).
