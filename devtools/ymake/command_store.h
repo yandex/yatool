@@ -121,10 +121,11 @@ public:
     TCompiledCommand Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam = EOutputAccountingMode::Default);
     ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
+    TString PrintExpr(const NCommands::TSyntax& expr) const;
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr) const;
     void StreamCmdRepr(const NPolexpr::TExpression& cmdExpr, std::function<void(const char* data, size_t size)> sink) const;
 
-    TCompiledCommand Preevaluate(const NPolexpr::TExpression& expr, const TVars& vars, EOutputAccountingMode oam);
+    TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
 
     void WriteShellCmd(
         ICommandSequenceWriter* writer,
@@ -158,6 +159,8 @@ private:
     TVector<TString> InputToStringArray(const TMacroValues::TInput& input, const NCommands::TEvalCtx& ctx) const;
     TString PrintRawCmdNode(NPolexpr::TConstId node) const;
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
+    void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
+    TString PrintConst(NPolexpr::TConstId id) const;
 
     using TMinedVars = THashMap<
         TStringBuf, // name

@@ -20,7 +20,7 @@ namespace NCommands {
                 using TValueTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId>;
                 using TValue = TVector<TValueTerm>;
                 using TValues = TVector<TValue>;
-                TString Name;
+                EMacroFunctions Name;
                 TValues Values;
             };
             TVector<TModifier> Mods;
