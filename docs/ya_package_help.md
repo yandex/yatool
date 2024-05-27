@@ -27,11 +27,7 @@ Options:
                         Custom build directory (autodetected by default)
     --fetcher-params=FETCHER_PARAMS_STR
                         Fetchers priorities and params
-  Selective checkout
-    Advanced options
-    --prefetch          Prefetch directories needed for build
-    --no-prefetch       Do not prefetch directories needed for build
-  Build output
+   Build output
     -o=OUTPUT_ROOT, --output=OUTPUT_ROOT
                         Directory with build results
     --force-build-depends
