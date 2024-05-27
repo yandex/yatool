@@ -151,7 +151,7 @@ class ArcStreamingPrefetcher:
 
         logger.debug('Starting arc prefetch-files')
         # Ignoring not found items for handlers like `ya py`, that create temp dirs in junk
-        cmd = [self._arc_tool, 'prefetch-files', '--read-paths-from', '-', '--ignore-not-found']
+        cmd = [self._arc_tool, 'prefetch-files', '--read-paths-from', '-', '--ignore-not-found', '--disable-priorities']
         self._arc_process = exts.process.popen(
             cmd, stdout=None, stderr=subprocess.PIPE, stdin=subprocess.PIPE, **({'text': True} if six.PY3 else {})
         )
