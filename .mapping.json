@@ -3,6 +3,7 @@
   "CONTRIBUTING.md":"devtools/ya/opensource/github/CONTRIBUTING.md",
   "LICENSE":"devtools/ya/opensource/github/LICENSE",
   "README.md":"devtools/ya/opensource/github/README.md",
+  "build/docs/readme.md":"build/docs/public/readme.md",
   "build/mapping.conf.json":"devtools/ya/opensource/mapping.conf.json",
   "build/ya.conf.json":"devtools/ya/opensource/ya.conf.json",
   "ya":"devtools/ya/opensource/ya",
