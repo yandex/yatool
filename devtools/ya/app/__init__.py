@@ -131,6 +131,7 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
         ctx = yalibrary.app_ctx.get_app_ctx()
         modules = [
             ('params', params.configure(parameters, with_respawn, handler_python_major_version)),
+            ('vcs_type', configure_vcs_type(ctx)),
             ('hide_token', token_suppressions.configure(ctx)),
             ('state', configure_active_state(ctx)),
             ('display', configure_display(ctx)),
@@ -585,8 +586,13 @@ def configure_vcs_info():
     yield revision
 
 
-def configure_vcs_type():
-    vcs_type = vcs.detect_vcs_type(cwd=os.getcwd())
+def configure_vcs_type(ctx=None):
+    if ctx is None:
+        cwd = os.getcwd()
+    else:
+        cwd = getattr(ctx.params, 'arc_root', os.getcwd())
+
+    vcs_type = vcs.detect_vcs_type(cwd=cwd)
     logging.debug('vcs type: %s', vcs_type)
     yield vcs_type
 

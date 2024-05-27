@@ -25,7 +25,7 @@ def prefetch_condition(arc_root, prefetch_enabled, vcs_type):
         logger.debug("prefetch disabled")
         return False
     if vcs_type != 'arc':
-        logger.warning("Prefetch is only available on arc repostiory, %s detected", vcs_type)
+        logger.debug("Prefetch is only available on arc repostiory, %s detected", vcs_type)
         return False
     return True
 
