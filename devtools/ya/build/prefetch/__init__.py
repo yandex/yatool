@@ -5,11 +5,13 @@ import threading
 import six
 import subprocess
 
+import app_config
 import yalibrary.vcs
 import yalibrary.tools
 import exts.process
 import exts.asyncthread
 import core.event_handling as event_handling
+import core.gsid
 
 import typing as tp  # noqa
 
@@ -27,6 +29,16 @@ def prefetch_condition(arc_root, prefetch_enabled, vcs_type):
     if vcs_type != 'arc':
         logger.debug("Prefetch is only available on arc repostiory, %s detected", vcs_type)
         return False
+
+    if not app_config.in_house:
+        return False
+    else:
+        from devtools.distbuild.libs.gsid_classifier.python import gsid_classifier
+
+        if not gsid_classifier.is_user_build(core.gsid.flat_session_id()):
+            logger.debug("Prefetch disabled due to non-local run")
+            return False
+
     return True
 
 

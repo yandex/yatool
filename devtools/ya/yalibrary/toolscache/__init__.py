@@ -300,7 +300,7 @@ class _Server(object):
         else:
             from devtools.distbuild.libs.gsid_classifier.python import gsid_classifier
 
-            return gsid_classifier.USER_BUILD == gsid_classifier.classify_gsid(core.gsid.flat_session_id())
+            return gsid_classifier.is_user_build(core.gsid.flat_session_id())
 
     @classmethod
     def _run_tc_binary(cls, thr_ident):

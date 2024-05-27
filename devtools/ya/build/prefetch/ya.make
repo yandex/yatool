@@ -6,11 +6,19 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/app_config
+    devtools/ya/core/gsid
+    devtools/ya/core/event_handling
+    devtools/ya/exts
     devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/tools
-    devtools/ya/exts
-    devtools/ya/core/event_handling
 )
+
+IF (NOT YA_OPENSOURCE)
+    PEERDIR(
+        devtools/distbuild/libs/gsid_classifier/python
+    )
+ENDIF()
 
 END()
 
