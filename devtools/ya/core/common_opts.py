@@ -191,6 +191,9 @@ class OutputStyleOptions(Options):
             return
         params.mask_roots = getattr(params, "use_distbuild", False)
 
+        if config.is_developer_ya_version():
+            params.use_roman_numerals = True
+
 
 class ProfileOptions(Options):
     def __init__(self):
