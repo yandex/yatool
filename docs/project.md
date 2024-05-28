@@ -590,6 +590,12 @@ ya project fix-peerdirs [OPTION]... [TARGET]...
 
 - `<macro_name>`: Имя макроса, который необходимо удалить.
 
+### owner
+
+Работа с владельцами в `ya.make`.
+```
+ya project owner [<subcommand>] [OPTION]... [TARGET]...
+```
 #### Доступные команды
 
 | Подкоманда | Описание |
