@@ -76,7 +76,7 @@ public:
     void ContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
     void ContextMd5Update(const char* data, size_t len);
 
-    void IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
+    void IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName, TStringBuf description);
     void IncludesMd5Update(const char* data, size_t len);
 
     void SelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);

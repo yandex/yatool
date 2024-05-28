@@ -735,7 +735,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         const auto incDep = prntState->CurDep();
 
         if (!prntDone && IsModule(*prntState) && IsGlobalSrcDep(incDep)) {
-            prntState->Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), Name);
+            prntState->Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), Name, "TJSONVisitor::PrepareLeaving::<1>"_sb);
             prntState->Hash->Old()->ContextMd5Update(currData.OldUids()->GetContextSign(), Name);
             prntState->Hash->Old()->RenderMd5Update(Name.data(), Name.size());
             if (!IsOutputType(currNode->NodeType)) {
@@ -792,9 +792,20 @@ void TJSONVisitor::Left(TState& state) {
         const TMd5SigValue* selfDependencySign = nullptr;
 
         if (!NewUids) {
-            dependencySign = chldData->LoopId ? &LoopCnt[chldData->LoopId].Sign : *dep == EDT_OutTogether ? &chldData->OldUids()->GetContextSign() : &chldData->OldUids()->GetIncludedContextSign();
-            selfDependencySign = chldData->LoopId ? &LoopCnt[chldData->LoopId].SelfSign : *dep == EDT_OutTogether ? &chldData->OldUids()->GetSelfContextSign() : &chldData->OldUids()->GetIncludedSelfContextSign();
+            if (chldData->LoopId) {
+                dependencySign = &LoopCnt[chldData->LoopId].Sign;
+                selfDependencySign = &LoopCnt[chldData->LoopId].SelfSign;
+            } else {
+                if (*dep == EDT_OutTogether) {
+                    dependencySign = &chldData->OldUids()->GetContextSign();
+                    selfDependencySign = &chldData->OldUids()->GetSelfContextSign();
+                } else {
+                    dependencySign = &chldData->OldUids()->GetIncludedContextSign();
+                    selfDependencySign = &chldData->OldUids()->GetIncludedSelfContextSign();
+                }
+            }
         }
+
         bool isALiftedVariable = currData.StructCmdDetected && *dep == EDT_Include && dep.To()->NodeType == EMNT_BuildCommand;
         if (!NewUids && currData.IsFile && (*dep == EDT_BuildFrom || *dep == EDT_BuildCommand || isALiftedVariable)) {
             if (!chldData->LoopId && *dep == EDT_BuildFrom) {
@@ -839,7 +850,11 @@ void TJSONVisitor::Left(TState& state) {
             if (!NewUids) {
                 // When we have no children (IncludesMd5Started) we'll just use original file's md5 value
                 if (!currData.IncludesMd5Started) {
-                    currState.Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), currState.Hash->Old()->GetName());
+                    currState.Hash->Old()->IncludesMd5Update(
+                        currData.OldUids()->GetContextSign(),
+                        currState.Hash->Old()->GetName(),
+                        "TJSONVisitor::Left::<1>"_sb
+                    );
                     if (!IsOutputType(currState.Node()->NodeType)) {
                         currState.Hash->Old()->IncludesSelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), currState.Hash->Old()->GetName());
                     } else {
@@ -850,10 +865,13 @@ void TJSONVisitor::Left(TState& state) {
                 // Unlike loops case, we don't need to bother about order and uniq'ness of children,
                 // because when set of children changes, even their order, our own md5 changes, too.
                 if (chldData->LoopId) {
-                    currState.Hash->Old()->IncludesMd5Update(*dependencySign,
-                                                        NUidDebug::LoopNodeName(chldData->LoopId));
+                    currState.Hash->Old()->IncludesMd5Update(
+                        *dependencySign,
+                        NUidDebug::LoopNodeName(chldData->LoopId),
+                        "TJSONVisitor::Left::<2>"_sb
+                    );
                 } else {
-                    currState.Hash->Old()->IncludesMd5Update(*dependencySign, depName);
+                    currState.Hash->Old()->IncludesMd5Update(*dependencySign, depName, "TJSONVisitor::Left::<3>"_sb);
                 }
                 if (!IsOutputType(currState.Node()->NodeType) || (*dep != EDT_BuildFrom && *dep != EDT_BuildCommand && *dep != EDT_OutTogether)) {
                     currState.Hash->Old()->IncludesSelfContextMd5Update(*selfDependencySign, depName);
@@ -960,7 +978,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                     // Btw let's check it:
                     Y_ASSERT(dependencyDataIt->second.HasBuildCmd && dependencyDataIt->second.HasBuildFrom);
                     mainDepSig.MoveFrom(std::move(mainDepCopy));
-                    currState.Hash->Old()->IncludesMd5Update(mainDepSig, resIt->Hash->Old()->GetName());
+                    currState.Hash->Old()->IncludesMd5Update(mainDepSig, resIt->Hash->Old()->GetName(), "TJSONVisitor::AcceptDep"_sb);
                     if (!CurEnt->IncludesMd5Started) {
                         CurEnt->IncludesMd5Started = true; // Don't miss Includes hash
                     }

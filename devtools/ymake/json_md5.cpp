@@ -133,9 +133,9 @@ void TJsonMd5Old::ContextMd5Update(const char* data, size_t len) {
     }
 }
 
-void TJsonMd5Old::IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName) {
+void TJsonMd5Old::IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName, TStringBuf description) {
     const TMd5Value oldMd5 = IncludesMd5;
-    IncludesMd5.Update(md5Sig, "TJsonMd5::IncludesMd5Update::md5Sig"sv);
+    IncludesMd5.Update(md5Sig, description);
     YDIAG(Dev)
         << "Update IncludesMd5, " << NodeName << " += " << md5Sig.ToBase64() << " (was " << oldMd5.ToBase64()
         << ", become " << IncludesMd5.ToBase64() << ")" << Endl;
