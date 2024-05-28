@@ -19,6 +19,12 @@ FIXED_NAME = 2
 BINARY = 3
 
 
+class InvalidHttpUriException(Exception):
+    def __init__(self, reason, uri):  # type: (str, str) -> None
+        msg = 'Wrong uri. {0}: {1}'.format(reason, uri)
+        super(InvalidHttpUriException, self).__init__(msg)
+
+
 def clean_dir(dir):
     try:
         os.unlink(dir)
@@ -75,35 +81,47 @@ ParsedResourceUri = namedtuple(
 )
 
 
-def validate_parsed_https_meta(meta):  # type: (dict[str,str]) -> None
+def validate_parsed_http_meta(meta, resource_uri):  # type: (dict[str,str], str) -> None
     integrity = meta.get('integrity', None)
     if not integrity:
-        raise Exception('Integrity is required but not provided')
+        raise InvalidHttpUriException('Integrity is required but not provided', resource_uri)
+    if '-' not in integrity:
+        raise InvalidHttpUriException('Integrity should be in form {alg}-{data}', resource_uri)
     alg, _ = integrity.split('-', 1)
     if alg not in SUPPORTED_INTEGRITY_ALG:
-        raise Exception('Integrity algorithm supports {0}, got {1}'.format(SUPPORTED_INTEGRITY_ALG, alg))
+        algorithms = ", ".join(sorted(SUPPORTED_INTEGRITY_ALG))
+        raise InvalidHttpUriException(
+            'Integrity algorithm supports {0}, got \'{1}\''.format(algorithms, alg), resource_uri
+        )
 
 
-def parse_https_uri_meta(meta_str):  # type: (str) -> tuple[dict[str, str], str]
+def parse_http_uri_meta(meta_str, resource_uri):  # type: (str,str) -> tuple[dict[str, str], str]
     pairs = meta_str.split('&')
     meta_dict = {}  # type: dict[str,str]
     for pair in pairs:
         key, value = pair.split('=', 1)
         meta_dict[key] = value.replace('%26', '&')
 
-    validate_parsed_https_meta(meta_dict)
+    validate_parsed_http_meta(meta_dict, resource_uri)
     resource_id = exts.hashing.md5_value(meta_dict.get('integrity'))
     return meta_dict, resource_id
 
 
-def parse_https_uri(resource_uri):  # type: (str) -> ParsedResourceUri
+def parse_http_uri(resource_uri):  # type: (str) -> ParsedResourceUri
+    if '#' not in resource_uri:
+        raise InvalidHttpUriException('No \'#\' symbol is found', resource_uri)
+
     resource_url, meta_str = resource_uri.split('#', 1)
+
+    if not meta_str:
+        raise InvalidHttpUriException('\'#\' symbol must be followed by resource meta', resource_uri)
+
     if '=' not in meta_str:
         # backward compatibility with old md5-scheme
-        return ParsedResourceUri('https', resource_uri, meta_str, resource_url, fetcher_meta=None)
+        return ParsedResourceUri('http', resource_uri, meta_str, resource_url, fetcher_meta=None)
 
-    meta, resource_id = parse_https_uri_meta(meta_str)
-    return ParsedResourceUri('https', resource_uri, resource_id, resource_url, fetcher_meta=meta)
+    meta, resource_id = parse_http_uri_meta(meta_str, resource_uri)
+    return ParsedResourceUri('http', resource_uri, resource_id, resource_url, fetcher_meta=meta)
 
 
 def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str, set[str]) -> ParsedResourceUri
@@ -118,8 +136,8 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
         accepted_schemas = force_accepted_schemas
 
     resource_type, rest = resource_uri.split(':', 1)
-    if resource_type == 'https':
-        return parse_https_uri(resource_uri)
+    if resource_type in ('http', 'https'):
+        return parse_http_uri(resource_uri)
     elif resource_type == 'base64':
         return ParsedResourceUri(resource_type, resource_uri, resource_id=None, resource_url=rest, fetcher_meta=None)
     elif resource_type in accepted_schemas:

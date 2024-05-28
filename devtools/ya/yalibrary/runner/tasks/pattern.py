@@ -64,14 +64,16 @@ class PreparePattern(object):
         resource_desc = resource_fetcher.select_resource(item, platform)
         resource = resource_desc['resource']
         resource_type, resource_id = resource.split(':', 1)
-        accepted_resource_types = {'file', 'https', 'base64'} | self._fetchers_storage.accepted_schemas()
+        if resource_type == 'https':
+            resource_type = 'http'
+        accepted_resource_types = {'file', 'http', 'base64'} | self._fetchers_storage.accepted_schemas()
 
         assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
             resource_type, ', '.join(sorted(accepted_resource_types))
         )
         strip_prefix = resource_desc.get('strip_prefix')
 
-        if resource_type in ({'https'} | self._fetchers_storage.accepted_schemas()):
+        if resource_type in ({'http'} | self._fetchers_storage.accepted_schemas()):
 
             def progress_callback(percent):
                 self._ctx.state.check_cancel_state()

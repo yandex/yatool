@@ -120,7 +120,7 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
         'id': parsed_uri.resource_id,
     }
 
-    if parsed_uri.resource_type == 'https':
+    if parsed_uri.resource_type == 'http':
         if parsed_uri.fetcher_meta:
             default_resource_info['file_name'] = 'resource'
             integrity = parsed_uri.fetcher_meta.get('integrity')

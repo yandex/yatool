@@ -55,7 +55,7 @@ namespace NYa {
         return ResourceDirName(desc.Uri, desc.StripPrefix);
     }
 
-    TString HttpsResourceDirName(TStringBuf uri) {
+    TString HttpResourceDirName(TStringBuf uri) {
         constexpr TStringBuf integrityPrefix{"integrity="};
 
         size_t hashIndex = uri.find('#');
@@ -86,15 +86,16 @@ namespace NYa {
     TString ResourceDirName(TStringBuf uri, ui32 stripPrefix) {
         constexpr TStringBuf sbrPrefix{"sbr:"};
         constexpr TStringBuf trsPrefix{"trs:"};
-        constexpr TStringBuf httpPrefix{"https:"};
+        constexpr TStringBuf httpPrefix{"http:"};
+        constexpr TStringBuf httpsPrefix{"https:"};
 
         TString dirName;
         if (uri.StartsWith(sbrPrefix)) {
             dirName = uri.substr(sbrPrefix.size());
         } else if (uri.StartsWith(trsPrefix)) {
             dirName = uri.substr(trsPrefix.size());
-        } else if (uri.StartsWith(httpPrefix)) {
-            dirName = HttpsResourceDirName(uri);
+        } else if (uri.StartsWith(httpPrefix) || uri.StartsWith(httpsPrefix)) {
+            dirName = HttpResourceDirName(uri);
         } else {
             throw yexception() << "Wrong uri. No known schema is found: " << uri;
         }

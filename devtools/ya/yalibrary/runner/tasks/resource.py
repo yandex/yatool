@@ -100,7 +100,11 @@ class PrepareResource(object):
     def fetch(self):
         uri = self._uri_description['uri']
         resource_type, address = uri.split(':', 1)
+        if resource_type == 'https':
+            resource_type = 'http'
         accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
+
+        logging.debug("accepted_resource_types={}".format(repr(accepted_resource_types)))
 
         assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
             resource_type, ', '.join(sorted(accepted_resource_types))
