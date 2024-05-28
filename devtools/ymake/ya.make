@@ -78,6 +78,7 @@ SRCS(
     flat_json_graph.cpp
     general_parser.cpp
     global_vars_collector.cpp
+    graph_changes_predictor.cpp
     incl_fixer.cpp
     include_processors/base.cpp
     include_processors/cfgproto_processor.cpp

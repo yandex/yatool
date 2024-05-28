@@ -74,6 +74,8 @@ private:
     bool JSONCacheLoaded_{false};
     bool UidsCacheLoaded_{false};
 
+    bool HasGraphStructuralChanges_{false};
+
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
     bool TryLoadUids(TUidsCachable* uidsCachable);

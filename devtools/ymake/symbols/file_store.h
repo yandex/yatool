@@ -353,7 +353,8 @@ enum class EPathKind {
 };
 
 enum class EChangeType {
-    CreateOrModify,
+    Modify, // only for arc changelist
+    Create,
     Remove
 };
 

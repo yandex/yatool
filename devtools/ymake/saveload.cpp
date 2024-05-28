@@ -1,6 +1,7 @@
 #include "saveload.h"
 #include <cstdlib>
 
+#include "graph_changes_predictor.h"
 #include "ymake.h"
 
 #include <devtools/ymake/diag/display.h>
@@ -124,7 +125,7 @@ namespace {
             auto handleEntry = [&](const NZipatch::TReader::TEvent& event) {
                 switch (event.Action) {
                     case NZipatch::TReader::MkDir:
-                        Changes.push_back(TChangeInfo{TString(event.Path), 0, EChangeType::CreateOrModify});
+                        Changes.push_back(TChangeInfo{TString(event.Path), 0, EChangeType::Create});
                         if (auto [_, ok] = BlobMap.emplace(event.Path, 0); !ok) {
                             ythrow yexception() << "file [" << event.Path << "] have been already seen in zipatch.";
                         }
@@ -143,7 +144,7 @@ namespace {
                                 ythrow yexception() << "file [" << event.Path << "] have been already seen in zipatch.";
                             }
                         }
-                        Changes.push_back(TChangeInfo{TString(event.Path), index, EChangeType::CreateOrModify});
+                        Changes.push_back(TChangeInfo{TString(event.Path), index, EChangeType::Create});
                         break;
                     }
                     case NZipatch::TReader::Copy:
@@ -175,8 +176,10 @@ namespace {
     }
 
     EChangeType GetChangeType(TStringBuf type) {
-        if (EqualToOneOf(type, "modified", "new file")) {
-            return EChangeType::CreateOrModify;
+        if (type == "modified") {
+            return EChangeType::Modify;
+        } else if (type == "new_file") {
+            return EChangeType::Create;
         }
         return EChangeType::Remove;
     }
@@ -639,6 +642,12 @@ bool TYMake::LoadPatch() {
     }
     auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
     if (changes) {
+        if (!HasGraphStructuralChanges_) {
+            TGraphChangesPredictor predictor(*changes);
+            predictor.AnalyzeChanges();
+            HasGraphStructuralChanges_ = predictor.HasChanges();
+        }
+
         Names.FileConf.UseExternalChanges(std::move(changes));
     }
     return true;
@@ -776,7 +785,7 @@ void TYMake::DepsCacheMonEvent() const {
 
 void TYMake::GraphChangesPredictionEvent() const {
     NEvent::TGraphChangesPrediction ev;
-    ev.SetPredictsStructuralChanges(true);
+    ev.SetPredictsStructuralChanges(HasGraphStructuralChanges_);
     FORCE_TRACE(U, ev);
 }
 
