@@ -1460,7 +1460,7 @@ def do_package(params):
             continue
 
     if packages_meta_info:
-        with open('package.json', 'w') as afile:
+        with open('packages.json', 'w') as afile:
             json.dump(packages_meta_info, afile, indent=4)
 
     stage_finished("do_package")
