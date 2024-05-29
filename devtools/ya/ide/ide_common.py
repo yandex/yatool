@@ -51,6 +51,12 @@ RE_PROJECT_TITLE = re.compile('[a-z0-9_]+', re.I)
 RE_ESCAPE_IN_UNQUOTED = re.compile(r'[ ()#"\\]')
 
 
+class IdeOutputStyle(core.common_opts.OutputStyleOptions):
+    @staticmethod
+    def additional_style_opts():
+        return []
+
+
 class FakeAppCtx(object):
     display = yalibrary.display.DevNullDisplay()
 
@@ -150,7 +156,7 @@ def ide_minimal_opts(targets_free=False, prefetch=False):
         core.common_opts.ShowHelpOptions(),
         core.common_opts.DumpDebugOptions(),
         core.common_opts.AuthOptions(),
-        core.common_opts.OutputStyleOptions(),
+        IdeOutputStyle(),
     ]
 
 

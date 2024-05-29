@@ -136,7 +136,7 @@ class OutputStyleOptions(Options):
         self.use_roman_numerals = False
 
     @staticmethod
-    def consumer():
+    def additional_style_opts():
         return [
             ArgConsumer(
                 ['-T'],
@@ -145,6 +145,11 @@ class OutputStyleOptions(Options):
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),
+        ]
+
+    @staticmethod
+    def common_style_opts():
+        return [
             ArgConsumer(
                 ['--no-emit-status'],
                 help='Do not emit status',
@@ -185,6 +190,10 @@ class OutputStyleOptions(Options):
             ConfigConsumer('mask_roots'),
             ConfigConsumer('use_roman_numerals'),
         ]
+
+    @classmethod
+    def consumer(cls):
+        return cls.additional_style_opts() + cls.common_style_opts()
 
     def postprocess2(self, params):
         if params.mask_roots is not None:
