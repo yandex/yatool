@@ -227,7 +227,7 @@ class BuildRoot(object):
             return path
         return None
 
-    def read_hashes(self, force_recalc=False):
+    def read_hashes(self, force_recalc=False, write_if_absent=False):
         """
         Returns sum of outputs hashes
         """
@@ -245,7 +245,10 @@ class BuildRoot(object):
                 hashes.append(hashing.git_like_hash(output))
             else:
                 return None
-        return hashing.sum_hashes(hashes)
+        res = hashing.sum_hashes(hashes)
+        if write_if_absent:
+            self.write_hashes(res)
+        return res
 
     def create(self):
         self._created = True

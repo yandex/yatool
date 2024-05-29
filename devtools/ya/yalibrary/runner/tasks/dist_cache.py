@@ -113,6 +113,11 @@ class RestoreFromDistCacheTask(object):
         self._build_root.create()
 
         if self._dist_cache.try_restore(self._node.uid, self._build_root.path, self._filter):
+            if self._ctx.content_uids:
+                # If hashes file is not cached remotely it will be recomputed and cached locally
+                # otherwise it assumed to be among outputs and will be processed as such
+                self._node.outputs_uid = self._build_root.read_hashes(write_if_absent=True)
+
             self._build_root.validate()
             # if _dist_cache is not read-only, i.e. we are heating it, then do not pollute local cache
             if self._ctx.opts.yt_store_wt or self._dist_cache.readonly():
@@ -120,8 +125,6 @@ class RestoreFromDistCacheTask(object):
                 if self._ctx.opts.dir_outputs_test_mode and self._node.dir_outputs:
                     self._build_root.extract_dir_outputs()
                 self._ctx.runq.add(self._ctx.put_in_cache(self._node, self._build_root), deps=[])
-
-            self._node.outputs_uid = self._build_root.read_hashes()
 
             self._ctx.eager_result(self)
         else:
