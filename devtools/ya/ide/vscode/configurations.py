@@ -1,3 +1,4 @@
+import copy
 import os
 from collections import OrderedDict
 
@@ -6,6 +7,16 @@ import exts.fs as fs
 import yalibrary.platform_matcher as pm
 from ide import ide_common
 from . import common, consts, dump, tasks
+
+
+def create_python_wrapper(wrapper_dir, template, arguments):
+    fs.ensure_dir(wrapper_dir)
+    wrapper_path = os.path.join(wrapper_dir, "python")
+    wrapper_content = template.format(**arguments)
+    with open(wrapper_path, "w") as f:
+        f.write(wrapper_content)
+    fs.set_execute_bits(wrapper_path)
+    return wrapper_path
 
 
 def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool_fetcher, python_wrappers_dir, goroot):
@@ -102,7 +113,6 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
 
         if module_lang == "PY3":
             wrapper_dir = os.path.join(python_wrappers_dir, os.path.basename(module["path"]))
-            wrapper_path = os.path.join(wrapper_dir, "python")
 
             configuration = OrderedDict(
                 (
@@ -112,14 +122,17 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                     ("args", []),
                     ("env", {"PYDEVD_USE_CYTHON": "NO"}),  # FIXME Workaround for pydevd not supporting Python 3.11
                     ("justMyCode", True),
-                    ("python", wrapper_path),
                 )
             )
 
             if module_type in consts.PROGRAM_MODULE_TYPES:
-                wrapper_content = consts.RUN_WRAPPER_TEMPLATE.format(
-                    arc_root=arc_root,
-                    path=os.path.join(arc_root, module["path"]),
+                configuration["python"] = create_python_wrapper(
+                    wrapper_dir,
+                    consts.RUN_WRAPPER_TEMPLATE,
+                    {
+                        "arc_root": arc_root,
+                        "path": os.path.join(arc_root, module["path"]),
+                    },
                 )
                 py_main = module.get("py_main")
                 if isinstance(py_main, dump.PyMain):
@@ -129,22 +142,42 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                 else:
                     ide_common.emit_message("Cannot create run configuration for module \"%s\"" % name)
                     continue
+
                 configuration["cwd"] = arc_root
                 configuration["preLaunchTask"] = tasks.build_task_name(name, module_lang)
                 configuration["presentation"] = {"group": "Run"}
 
+                # ---- configuration without rebuild task
+                configuration_no_rebuild = copy.deepcopy(configuration)
+                configuration_no_rebuild["python"] = create_python_wrapper(
+                    wrapper_dir + "-no-rebuild",
+                    consts.RUN_WRAPPER_TEMPLATE_SOURCE,
+                    {
+                        "arc_root": arc_root,
+                        "path": os.path.join(arc_root, module["path"]),
+                    },
+                )
+                configuration_no_rebuild["name"] = conf_name + " (no rebuild)"
+                del configuration_no_rebuild["preLaunchTask"]
+                configurations.append(configuration_no_rebuild)
+                # ---------------------------------------
+
             elif module_type in consts.TEST_MODULE_TYPES:
-                wrapper_content = consts.TEST_WRAPPER_TEMPLATE.format(
-                    arc_root=arc_root,
-                    path=os.path.join(arc_root, module["path"]),
-                    test_context=os.path.join(
-                        arc_root, module["module_path"], "test-results", "py3test", "test.context"
-                    ),
+                configuration["python"] = create_python_wrapper(
+                    wrapper_dir,
+                    consts.TEST_WRAPPER_TEMPLATE,
+                    {
+                        "arc_root": arc_root,
+                        "path": os.path.join(arc_root, module["path"]),
+                        "test_context": os.path.join(
+                            arc_root, module["module_path"], "test-results", "py3test", "test.context"
+                        ),
+                    },
                 )
                 configuration["module"] = "library.python.pytest.main"
-                configuration[
-                    "cwd"
-                ] = arc_root  # FIXME This should be module["TEST_CWD"], but pydebug resolves relative paths of test srcs from CWD
+
+                # FIXME This should be module["TEST_CWD"], but pydebug resolves relative paths of test srcs from CWD
+                configuration["cwd"] = arc_root
                 configuration["preLaunchTask"] = tasks.prepare_task_name(name, module_lang)
                 configuration["presentation"] = {"group": "Tests"}
             else:
@@ -153,10 +186,6 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                 )
                 continue
 
-            fs.ensure_dir(wrapper_dir)
-            with open(wrapper_path, "w") as f:
-                f.write(wrapper_content)
-            fs.set_execute_bits(wrapper_path)
         elif module_lang == "CPP":
             if not cpp_debug_params:
                 continue

@@ -44,6 +44,12 @@ export Y_PYTHON_ENTRY_POINT=:main
 exec '{path}' \"$@\"
 """
 
+RUN_WRAPPER_TEMPLATE_SOURCE = """#!/bin/sh
+export Y_PYTHON_ENTRY_POINT=:main
+export Y_PYTHON_SOURCE_ROOT='{arc_root}'
+exec '{path}' \"$@\"
+"""
+
 TEST_WRAPPER_TEMPLATE = """#!/bin/sh
 export Y_PYTHON_ENTRY_POINT=:main
 export Y_PYTHON_CLEAR_ENTRY_POINT=1

@@ -13,6 +13,8 @@ import yalibrary.makelists
 
 from ide import ide_common
 
+from . import consts
+
 
 def module_info(params):
     import handlers.dump
@@ -72,11 +74,12 @@ def get_modules(module_info_res, rel_targets=None):
     return modules
 
 
-def filter_run_modules(modules, rel_targets):
+def filter_run_modules(modules, rel_targets, tests_enabled):
     return {
         shorten_module_name(name, rel_targets): module
         for name, module in modules.items()
         if module.get("NodeType") == "Program"
+        and (tests_enabled or module.get("MANGLED_MODULE_TYPE") not in consts.TEST_MODULE_TYPES)
         and any(module["module_path"].startswith(prefix) for prefix in rel_targets)
     }
 

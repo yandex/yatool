@@ -194,7 +194,7 @@ class PyProject(object):
         self.write_pyrightconfig(srcdirs, extraPaths)
 
         ide_common.emit_message('Generating debug configurations')
-        run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets)
+        run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets, self.params.tests_enabled)
         self.mine_py_main(run_modules)
         tasks, configurations = self.gen_run_configurations(run_modules)
         workspace['tasks']['tasks'].extend(tasks)

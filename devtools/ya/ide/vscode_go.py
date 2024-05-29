@@ -543,7 +543,7 @@ def gen_vscode_workspace(params):
 
     dump_module_info_res = vscode.dump.module_info(params)
     modules = vscode.dump.get_modules(dump_module_info_res)
-    run_modules = vscode.dump.filter_run_modules(modules, params.rel_targets)
+    run_modules = vscode.dump.filter_run_modules(modules, params.rel_targets, params.tests_enabled)
     if params.tests_enabled:
         vscode.dump.mine_test_cwd(params, run_modules)
     tasks, configurations = gen_run_configurations(params, run_modules, COMMON_ARGS, YA_PATH)

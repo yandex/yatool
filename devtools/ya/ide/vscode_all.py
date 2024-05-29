@@ -374,7 +374,7 @@ class VSCodeProject(object):
             )
             for key, value in pyright_config.items():
                 workspace["settings"]["python.analysis.%s" % key] = value
-        run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets)
+        run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets, self.params.tests_enabled)
         if self.params.debug_enabled:
             if self.params.tests_enabled:
                 vscode.dump.mine_test_cwd(self.params, run_modules)

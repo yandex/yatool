@@ -9,17 +9,29 @@ from . import common, consts
 
 
 def build_task_name(name, module_lang):
-    name = "Build: %s (Debug)" % name
+    name = "Build: %s" % name
+    if module_lang == "PY3":
+        name += " (Release)"
+    else:
+        name += " (Debug)"
     return common.pretty_name(name)
 
 
 def test_task_name(name, module_lang):
-    name = "Test: %s (Debug)" % name
+    name = "Test: %s" % name
+    if module_lang == "PY3":
+        name += " (Release)"
+    else:
+        name += " (Debug)"
     return common.pretty_name(name)
 
 
 def prepare_task_name(name, module_lang):
-    name = "Prepare test: %s (Debug)" % name
+    name = "Prepare test: %s" % name
+    if module_lang == "PY3":
+        name += " (Release)"
+    else:
+        name += " (Debug)"
     return common.pretty_name(name)
 
 
