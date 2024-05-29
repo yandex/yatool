@@ -9,7 +9,6 @@ import exts.fs
 import shutil
 import socket
 import logging
-import tarfile
 import tempfile
 
 if sys.version[0] == "3":
@@ -223,8 +222,7 @@ class SandboxStorage(object):
             #     └── resource_info.json
             os.mkdir(dir_output_path)
             open(os.path.join(dir_output_path, "empty"), 'w').close()
-            with tarfile.open(dir_output_tared_path, 'w') as empty_dir_output:
-                empty_dir_output.add(dir_output_path)
+            exts.archive.create_tar(dir_output_path, dir_output_tared_path)
         with open(resource_info_path, 'w') as afile:
             json.dump(resource_info, afile)
 
@@ -332,8 +330,7 @@ class SandboxStorage(object):
             rename_to_path = self._get_resource_path(resource_id, rename_to)
             rename_from_path = os.path.join(resource_info["path"], resource_info["file_name"])
             if resource_info.get("multifile") and os.path.isdir(rename_from_path):
-                with tarfile.open(rename_to_path, mode="w") as tar:
-                    tar.add(rename_from_path, os.path.basename(rename_from_path))
+                exts.archive.create_tar([(rename_from_path, os.path.basename(rename_from_path))], rename_to_path)
                 exts.fs.remove_tree(rename_from_path)
             else:
                 if not external_file:
