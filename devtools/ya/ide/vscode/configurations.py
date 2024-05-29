@@ -129,7 +129,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                 else:
                     ide_common.emit_message("Cannot create run configuration for module \"%s\"" % name)
                     continue
-                configuration["cwd"] = os.path.join(arc_root, module["module_path"])
+                configuration["cwd"] = arc_root
                 configuration["preLaunchTask"] = tasks.build_task_name(name, module_lang)
                 configuration["presentation"] = {"group": "Run"}
 
