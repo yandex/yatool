@@ -5,6 +5,7 @@ SRCS(
     logger.cpp
     logger_filter.cpp
     process.cpp
+    pgroup.cpp
 )
 
 PEERDIR(

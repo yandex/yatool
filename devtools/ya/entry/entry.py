@@ -140,6 +140,13 @@ def main(args):
     p.add_argument(
         '--no-logs', action='store_const', const=True, default=True if os.environ.get('YA_NO_LOGS') else False
     )
+    p.add_argument(
+        '--no-new-pgroup',
+        action='store_const',
+        const=True,
+        default=os.environ.get('YA_NEW_PGROUP') in ("0", "no"),
+        help='make ya inherit process group id',
+    )
     # Disable reports for opensource by default
     p.add_argument(
         '--no-report',

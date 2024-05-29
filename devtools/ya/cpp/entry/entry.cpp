@@ -2,6 +2,7 @@
 #include <devtools/ya/cpp/lib/config.h>
 #include <devtools/ya/cpp/lib/ya_handler.h>
 #include <devtools/ya/cpp/lib/logger.h>
+#include <devtools/ya/cpp/lib/pgroup.h>
 #include <devtools/ya/cpp/entry/watchdog.h>
 
 #include <util/generic/hash.h>
@@ -51,6 +52,7 @@ namespace NYa {
         }
 
         int Entry(int argc, char** argv) {
+            SetOwnProcessGroupId(argc, argv);
             InitWatchdogFromEnv();
 
             const auto factory = TSingletonClassFactory<IYaHandler>::Get();
