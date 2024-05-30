@@ -493,29 +493,6 @@ class EventLogFileOptions(Options):
             self.dump_platform_to_evlog = True
 
 
-class ShallNotPassError(Exception):
-    mute = True
-
-
-class TheyShallNotPassOptions(Options):
-    def __init__(self):
-        import datetime as dt
-
-        self.shall_pass = dt.datetime.now() < dt.datetime(2015, 11, 18)
-
-    @staticmethod
-    def consumer():
-        return ArgConsumer(
-            ['--i-cant-use-ya-make'],
-            help="If you can't use ya make",
-            hook=SetConstValueHook('shall_pass', const=True),
-        )
-
-    def postprocess(self):
-        if not self.shall_pass:
-            raise ShallNotPassError('This handler is deprecated, please specify --i-cant-use-ya-make argument.')
-
-
 class StdoutOptions(Options):
     def __init__(self):
         self.stdout = None

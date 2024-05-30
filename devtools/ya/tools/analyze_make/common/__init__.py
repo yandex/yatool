@@ -1,4 +1,3 @@
-import json
 import logging
 
 
@@ -18,21 +17,18 @@ class Node(object):
         self.has_detailed = has_detailed
 
 
-def load_from_file(fname, mode, detailed=False):
+def load_from_file(evlog_reader, mode, detailed=False):
     if mode == 'evlog':
-        return load_from_evlog(fname, detailed)
+        return load_from_evlog(evlog_reader, detailed)
     elif mode == 'distbuild':
-        return load_from_distbuild(fname)
+        return load_from_distbuild(evlog_reader)
 
 
-def load_from_distbuild(fname):
+def load_from_distbuild(evlog_reader):
     n = []
-    cntNode = 0
-    with open(fname) as file:
-        for line in file.readlines():
-            n.append(json.loads(line))
-            n[cntNode]['index'] = cntNode
-            cntNode += 1
+    for i, record in enumerate(evlog_reader):
+        record['index'] = i
+        n.append(record)
 
     # assign virtual threads
     actions = []
@@ -70,7 +66,7 @@ def load_from_distbuild(fname):
         )
 
 
-def load_from_evlog(fname, detailed=False):
+def load_from_evlog(evlog_reader, detailed=False):
     ymake_stage_started = 'NEvent.TStageStarted'
     ymake_stage_finished = 'NEvent.TStageFinished'
 
@@ -84,13 +80,7 @@ def load_from_evlog(fname, detailed=False):
     opened_ymake_stages = {}
     ymake_nodes = []
 
-    for nline, x in enumerate(open(fname), start=1):
-        try:
-            v = json.loads(x)
-        except json.JSONDecodeError as e:
-            logger.warning("Skip broken entry at %d line: %s. Data snippet: %s", nline, e, x[e.pos - 30 : e.pos + 30])
-            continue
-
+    for v in evlog_reader:
         if v['event'] in events_to_check:
             tm = v['value']['time']
             if tm:

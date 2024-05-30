@@ -15,6 +15,7 @@ PEERDIR(
     devtools/ya/app/modules/token_suppressions
     devtools/ya/app_config
     devtools/ya/handlers/analyze_make/timeline
+    devtools/ya/yalibrary/evlog
 )
 
 

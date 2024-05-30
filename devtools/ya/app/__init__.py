@@ -298,7 +298,7 @@ def configure_debug(app_ctx):
             AppEvLogStore.logger.debug("While store tools cache: %s", e)
 
         try:
-            dump_store_obj['evlog_file'] = app_ctx.evlog.path
+            dump_store_obj['evlog_file'] = app_ctx.evlog.filepath
         except Exception as e:
             AppEvLogStore.logger.debug("While store evlog: %s", e)
 

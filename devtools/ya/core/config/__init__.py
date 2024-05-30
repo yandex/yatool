@@ -54,6 +54,11 @@ def logs_root():
         return os.path.join(misc_root(), 'logs')
 
 
+@func.lazy
+def evlogs_root():
+    return os.path.join(misc_root(), 'evlogs')
+
+
 # no caching to make testing possible
 def _guess_tool_root(version):
     dir_name = os.getenv('YA_CACHE_DIR_TOOLS') or os.path.join(_guess_misc_root(), 'tools')

@@ -1,20 +1,32 @@
+import contextlib
 import datetime
+import io
 import logging
 import os
-import six
 import sys
 import threading
 import time
+
+import six
 import zstandard as zstd
+import base64
 
 from exts import fs
 from exts import os2
 from exts import yjson
 
-
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
-_EVLOG_SUFFIX = '.evlog'
+
+
+class EvlogSuffix:
+    ZST = '.evlog.zst'
+    ZSTD = '.evlog.zstd'
+    JSON = '.evlog'
+
+    @classmethod
+    def all(cls):
+        return cls.ZST, cls.ZSTD, cls.JSON
 
 
 def _fix_non_utf8(data):
@@ -35,6 +47,37 @@ def _fix_non_utf8(data):
     return res
 
 
+def is_compressed(filepath):
+    return filepath.endswith(('.zstd', '.zst'))
+
+
+class EvlogReader:
+    def __init__(self, filepath):
+        self.filepath = filepath
+
+    @contextlib.contextmanager
+    def _get_stream(self):
+        if is_compressed(self.filepath):
+            dctx = zstd.ZstdDecompressor()
+
+            with open(self.filepath, 'rb') as afile:
+                stream_reader = dctx.stream_reader(afile)
+                text_stream = io.TextIOWrapper(stream_reader, encoding='utf-8')
+                yield text_stream
+        else:
+            with open(self.filepath, 'rt') as afile:
+                yield afile
+
+    def __iter__(self):
+        with self._get_stream() as stream:
+            for line in stream:
+                try:
+                    yield yjson.loads(line)
+                except Exception as e:
+                    logging.warning("Skipped broken event: '%s' Content (base64): %s", e, base64.b64encode(line))
+                    continue
+
+
 class EmptyEvlogListException(Exception):
     mute = True
 
@@ -50,60 +93,48 @@ class DummyEvlog(object):
         return self
 
 
-class Evlog(object):
-    def __init__(self, evlog_dir, chunk_name, filename, replacements=None):
-        self._evlog_dir = evlog_dir
-        self._chunk_name = chunk_name
-        self._filename = filename
-        fs.create_dirs(os.path.join(evlog_dir, chunk_name))
-        self.path = os.path.join(evlog_dir, chunk_name, filename)
-        if filename.endswith(('.zstd', '.zst')):
+class EvlogWriter(object):
+    def __init__(self, filepath, replacements=None):
+        self.filepath = filepath
+        self._fileobj = self._open_file(filepath)
+        self._lock = threading.Lock()
+        self._replacements = self._get_replacements(replacements)
+
+    @staticmethod
+    def _open_file(filepath):
+        if is_compressed(filepath):
             if six.PY3:
-                self._fileobj = zstd.open(filename, 'w', cctx=zstd.ZstdCompressor(level=1))
+                return zstd.open(filepath, 'w', cctx=zstd.ZstdCompressor(level=1))
             # XXX Remove when YA-261 is done
             else:
-                self._fileobj = zstd.ZstdCompressor(level=1).stream_writer(open(filename, 'w'))
-        else:
-            self._fileobj = open(self.path, 'w')
-        self._lock = threading.Lock()
+                return zstd.ZstdCompressor(level=1).stream_writer(open(filepath, 'w'))
 
-        self._replacements = []
+        return open(filepath, 'w')
+
+    @classmethod
+    def _get_replacements(cls, replacements):
+        new_replacements = []
+
         if not replacements:
             for k, v in six.iteritems(os.environ):
-                if k.endswith('TOKEN') and Evlog.__json_safe(v) and v:
-                    self._replacements.append(v)
+                if k.endswith('TOKEN') and cls.__json_safe(v) and v:
+                    new_replacements.append(v)
         else:
             for v in replacements:
-                if Evlog.__json_safe(v) and v:
-                    self._replacements.append(v)
+                if cls.__json_safe(v) and v:
+                    new_replacements.append(v)
 
-        self._replacements = sorted(self._replacements)
+        new_replacements.sort()
+        return new_replacements
 
     @staticmethod
     def __json_safe(s):
-        if any(
-            [
-                i in s
-                for i in (
-                    '"',
-                    "[",
-                    "]",
-                    "{",
-                    "}",
-                    "\\",
-                    ",",
-                    ":",
-                )
-            ]
-        ):
+        falsy = frozenset(['"', "[", "]", "{", "}", "\\", ",", ":"])
+
+        if any([char in s for char in falsy]):
             return False
-        if s in (
-            "true",
-            "false",
-            "null",
-        ):
-            return False
-        return True
+
+        return s not in frozenset(["true", "false", "null"])
 
     def _remove_secrets(self, s):
         for r in self._replacements:
@@ -137,12 +168,6 @@ class Evlog(object):
                 else:
                     raise e
 
-    def get_writer(self, namespace):
-        def inner(event, **kwargs):
-            self.write(namespace, event, **kwargs)
-
-        return inner
-
     def close(self):
         self._fileobj.close()
 
@@ -150,10 +175,22 @@ class Evlog(object):
     def closed(self):
         return self._fileobj.closed
 
+    def get_writer(self, namespace):
+        def inner(event, **kwargs):
+            self.write(namespace, event, **kwargs)
+
+        return inner
+
+
+class EvlogFileFinder(object):
+    def __init__(self, evlog_dir, filter_func=lambda x: True):
+        self._evlog_dir = evlog_dir
+        self._filter_func = filter_func
+
     def __iter__(self):
         for root, dirs, files in os2.fastwalk(self._evlog_dir):
             for f in files:
-                if f.endswith(_EVLOG_SUFFIX) and f != self._filename:
+                if f.endswith(EvlogSuffix.all()) and self._filter_func(f):
                     yield os.path.join(root, f)
 
     def get_latest(self):
@@ -163,6 +200,38 @@ class Evlog(object):
         return evlogs[-1]
 
 
+class EvlogFacade(object):
+    def __init__(self, evlog_dir, chunk_name, filename, replacements=None):
+        filepath = os.path.join(evlog_dir, chunk_name, filename)
+
+        self.writer = EvlogWriter(filepath, replacements)
+        self.file_finder = EvlogFileFinder(evlog_dir, lambda f: f != filename)
+
+    @property
+    def filepath(self):
+        return self.writer.filepath
+
+    def write(self, namespace, event, **kwargs):
+        return self.writer.write(namespace, event, **kwargs)
+
+    def get_writer(self, namespace):
+        return self.writer.get_writer(namespace)
+
+    def close(self):
+        self.writer.close()
+
+    @property
+    def closed(self):
+        return self.writer.closed
+
+    def __iter__(self):
+        for f in self.file_finder:
+            yield f
+
+    def get_latest(self):
+        return self.file_finder.get_latest()
+
+
 def with_evlog(params, evlog_dir, days_to_save, now_time, run_uid, hide_token):
     def parse_log_dir(x):
         return datetime.datetime.strptime(x, _LOG_DIR_NAME_FMT)
@@ -170,6 +239,7 @@ def with_evlog(params, evlog_dir, days_to_save, now_time, run_uid, hide_token):
     def older_than(x):
         return now_time - x > datetime.timedelta(days=days_to_save)
 
+    # prepare fs
     fs.create_dirs(evlog_dir)
     for x in os.listdir(evlog_dir):
         try:
@@ -180,11 +250,13 @@ def with_evlog(params, evlog_dir, days_to_save, now_time, run_uid, hide_token):
 
     log_chunk = now_time.strftime(_LOG_DIR_NAME_FMT)
     filename = (
-        getattr(params, 'evlog_file', None) or now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + _EVLOG_SUFFIX
+        getattr(params, 'evlog_file', None) or now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + EvlogSuffix.ZST
     )
     logging.debug('Event log file is %s', filename)
 
-    evlog = Evlog(evlog_dir, log_chunk, filename, replacements=hide_token)
+    fs.create_dirs(os.path.join(evlog_dir, log_chunk))
+
+    evlog = EvlogFacade(evlog_dir, log_chunk, filename, hide_token)
     evlog.write('init', 'init', args=sys.argv, env=os.environ.copy())
 
     try:

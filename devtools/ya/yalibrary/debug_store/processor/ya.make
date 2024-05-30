@@ -21,6 +21,7 @@ PEERDIR(
     contrib/python/Jinja2
     devtools/ya/core/config
     devtools/ya/exts
+    devtools/ya/yalibrary/evlog
 )
 
 RESOURCE_FILES(

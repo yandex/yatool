@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 
 import itertools
 
-import base64
 import json
 import logging
 import os
@@ -24,6 +23,7 @@ except ImportError:
 from exts import yjson
 import exts.fs
 import exts.windows
+import yalibrary.evlog as evlog_lib
 
 
 class JsonEncoder(json.JSONEncoder):
@@ -258,45 +258,24 @@ class DumpItem(BaseDumpItem):
         super(DumpItem, self).__init__(None if workdir is None else workdir / self.path.name)
 
     def _lazy_read(self):
-        with self.path.open('rt') as f:
-            index = 0
+        filepath = str(self.path)
+        evlog_reader = evlog_lib.EvlogReader(filepath)
+        for i, record in enumerate(evlog_reader):
+            yield filepath, i, record
 
-            lines = [None]
-            while lines:
-                lines = f.readlines(1)
-                for line in lines:
-                    index += 1
-                    yield str(self.path), index, line
+    def _filter_line(self, record, keys):
+        # type: (dict, tp.Sequence[str]) -> tp.Tuple[tp.Optional[str], tp.Optional[tp.Any]]
 
-    def _filter_line(self, line, keys):
-        # type: (tp.Union[str, dict], tp.Sequence[str]) -> tp.Tuple[tp.Optional[str], tp.Optional[tp.Any]]
-
-        if isinstance(line, six.string_types):
-            line = line
-            ev = None
-        elif isinstance(line, dict):
-            line = str(line)
-            ev = line
-        else:
-            raise NotImplementedError(type(line))
-
-        if "dump_debug" not in line:
+        if "dump_debug" not in str(record):
             return None, None
 
-        if ev is None:
-            try:
-                ev = yjson.loads(line)
-            except Exception as e:
-                logging.warning("Skipped broken event: '%s' Content (base64): %s", e, base64.b64encode(line))
-                return None, None
-
-        if ev['namespace'] != self.EVLOG_NAMESPACE:
+        if record['namespace'] != self.EVLOG_NAMESPACE:
             return None, None
 
-        if ev['event'] != "log":
+        if record['event'] != "log":
             return None, None
 
-        data = ev['value']
+        data = record['value']
 
         return super(DumpItem, self)._filter_line(data, keys)
 
@@ -350,7 +329,7 @@ class DumpProcessor(BaseDumpProcessor):
     def __init__(self, path=None, evlog=None):
         self.evlog = evlog
 
-        self._file_list = sorted(self.evlog)
+        self._file_list = sorted(self.evlog) if self.evlog else []
 
         super(DumpProcessor, self).__init__(path)
 
