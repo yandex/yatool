@@ -44,9 +44,9 @@ namespace NYexport {
         return {*this, dir, target};
     }
 
-    void TProject::TBuilder::OnAttribute(const std::string& attribute) {
-        Generator_->OnAttribute(attribute);
-        CustomOnAttribute(attribute);
+    void TProject::TBuilder::OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue) {
+        Generator_->OnAttribute(attrName, attrValue);
+        CustomOnAttribute(attrName, attrValue);
     }
 
     TProjectSubdirPtr TProject::TBuilder::CreateDirectories(const fs::path& dir) {
@@ -59,6 +59,7 @@ namespace NYexport {
         while (!subdirs.contains(currDir)) {
             auto subdir = Project_->Factory_->CreateSubdir();
             subdir->Path = currDir;
+            subdir->Attrs = Generator_->MakeAttrs(EAttrGroup::Directory, "dir " + currDir.string());
             subdirs[currDir] = subdir;
             subdirsOrder.push_back(subdir);
             createDirectories.push_back(subdir);

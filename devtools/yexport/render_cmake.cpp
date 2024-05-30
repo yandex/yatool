@@ -251,7 +251,7 @@ namespace {
             Y_ASSERT(inserted);
 
             {
-                auto [extraTargetsIt, inserted] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList(), false);
+                auto [extraTargetsIt, inserted] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList());
                 Y_ASSERT(inserted);
                 auto& extraTargets = extraTargetsIt->second.asList();
                 for (auto tgt: data.Targets) {
@@ -292,8 +292,8 @@ namespace {
             }
         }
 
-        void CustomOnAttribute(const std::string& semantica) override {
-            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetAttrRules(semantica)) {
+        void CustomOnAttribute(const std::string& attrName, const std::span<const std::string>& /*attrValue*/) override {
+            for (const auto& rulePtr : CMakeGenerator->GetGeneratorSpec().GetAttrRules(attrName)) {
                 const auto& addValues = rulePtr->AddValues;
                 if (auto valuesIt = addValues.find("includes"); valuesIt != addValues.end()) {
                     for (const auto& value : valuesIt->second) {

@@ -30,9 +30,10 @@ namespace NKeys {
     constexpr const char* Attr = "attr";
     constexpr const char* Attrs = "attrs";
     constexpr const char* Merge = "merge";
-    constexpr const char* Type = "type";
     constexpr const char* UseManagedPeersClosure = "use_managed_peers_closure";
     constexpr const char* IgnorePlatforms = "ignore_platforms";
+    constexpr const char* SourceRootReplacer = "source_root_replacer";
+    constexpr const char* BinaryRootReplacer = "binary_root_replacer";
     constexpr const char* Rules = "rules";
     constexpr const char* AddValues = "add_values";
     constexpr const char* Values = "values";
@@ -291,23 +292,6 @@ namespace {
         return platformSpec;
     }
 
-    std::tuple<std::string, std::optional<TCopySpec>> GetAttrTypeCopy(const toml::value& attrDesc) {
-        std::tuple<std::string, std::optional<TCopySpec>> result;
-        auto& attrType = std::get<0>(result);
-        auto& copySpec = std::get<1>(result);
-        if (attrDesc.is_table()) {
-            const auto& attrTable = attrDesc.as_table();
-            const auto typeIt = attrTable.find(NKeys::Type);
-            attrType = typeIt != attrTable.end() ? typeIt->second.as_string() : "";
-            if (const auto* valuePtr = Find(&attrDesc, NKeys::Copy)) {
-                copySpec = ParseCopySpec(*valuePtr);
-            }
-        } else {
-            attrType = AsString(&attrDesc);
-        }
-        return result;
-    }
-
     void AddRule(TGeneratorSpec& spec, const TGeneratorRule& rule) {
         if (rule.Useless()) {
             return;
@@ -315,22 +299,26 @@ namespace {
         auto& rules = spec.Rules;
         const auto& ruleId = rules.emplace(rules.size(), rule).first->first;
 
-        for(const auto& attr : rule.AttrNames) {
-            spec.AttrToRuleIds[attr].emplace_back(ruleId);
+        for(const auto& attrName : rule.AttrNames) {
+            spec.AttrToRuleIds[attrName].emplace_back(ruleId);
         }
 
-        for(const auto& platform : rule.PlatformNames) {
-            spec.PlatformToRuleIds[platform].emplace_back(ruleId);
+        for(const auto& attrWithValue : rule.AttrWithValues) {
+            spec.AttrWithValuesToRuleIds[attrWithValue].emplace_back(ruleId);
+        }
+
+        for(const auto& platformName : rule.PlatformNames) {
+            spec.PlatformToRuleIds[platformName].emplace_back(ruleId);
         }
     }
 
-    void ParseAttr(const std::string& attrName, TAttrGroup& attrGroup, const toml::value& attrDesc, TGeneratorSpec& spec) {
-        auto [attrType, copy] = GetAttrTypeCopy(attrDesc);
+    void ParseAttr(const std::string& attrName, TAttrGroup& attrGroup, const toml::value& attrDesc) {
+        auto attrType = AsString(&attrDesc);
         EAttrTypes eattrType = EAttrTypes::Unknown;
         std::string_view curAttrType = attrType;
-        TAttr attribute(attrName);
-        for (i32 i = (i32)attribute.Size() - 1; i >= 0; --i) {
-            std::string curAttrName(attribute.GetFirstParts(i));
+        TAttr attr(attrName);
+        for (i32 i = (i32)attr.Size() - 1; i >= 0; --i) {
+            std::string curAttrName(attr.GetFirstParts(i));
             if (!attrGroup.contains(curAttrName)) { // don't overwrite already defined attributes
                 if (TryFromString(curAttrType, eattrType)) {
                     attrGroup[curAttrName] = eattrType;
@@ -359,16 +347,9 @@ namespace {
             }
             curAttrType = "dict"; // all upper attributes are dicts (if not predefined another)
         }
-
-        if (copy) {
-            TGeneratorRule rule;
-            rule.AttrNames.insert(attrName);
-            rule.Copy = *copy;
-            AddRule(spec, rule);
-        }
     }
 
-    TAttrGroup ParseAttrGroup(const toml::value& attrs, TGeneratorSpec& spec) {
+    TAttrGroup ParseAttrGroup(const toml::value& attrs) {
         TAttrGroup attrsGroup;
         const auto& attrsTable = attrs.as_table();
         // We must parse attributes from small length to long length
@@ -383,7 +364,7 @@ namespace {
             return *l < *r;
         });
         for (auto attrName : attrNames) {
-            ParseAttr(*attrName, attrsGroup, attrsTable.at(*attrName), spec);
+            ParseAttr(*attrName, attrsGroup, attrsTable.at(*attrName));
         }
         // By default all list/set/sorted_set items are strings
         TAttrGroup resAttrsGroup;
@@ -425,7 +406,12 @@ namespace {
             VERIFY_GENSPEC(!attrArray.empty(), *attrs, NGeneratorSpecError::SpecificationError, "Rule should have one or more attributes");
 
             for(const auto& attr : attrArray){
-                rule.AttrNames.insert(AsString(&attr));
+                auto attrItem = AsString(&attr);
+                if (attrItem.find('=') == std::string::npos) {
+                    rule.AttrNames.insert(attrItem);
+                } else {
+                    rule.AttrWithValues.insert(attrItem);
+                }
             }
         }
         if (platforms) {
@@ -481,6 +467,8 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
 
         genspec.UseManagedPeersClosure = toml::get<bool>(find_or<toml::value>(doc, NKeys::UseManagedPeersClosure, toml::boolean{false}));
         genspec.IgnorePlatforms = toml::get<bool>(find_or<toml::value>(doc, NKeys::IgnorePlatforms, toml::boolean{false}));
+        genspec.SourceRootReplacer = toml::get<std::string>(find_or<toml::value>(doc, NKeys::SourceRootReplacer, toml::string{}));
+        genspec.BinaryRootReplacer = toml::get<std::string>(find_or<toml::value>(doc, NKeys::BinaryRootReplacer, toml::string{}));
 
         genspec.Root = ParseTargetSpec(root, genspec.IgnorePlatforms);
         for (const auto& [name, tgtspec] : find_or<toml::table>(doc, NKeys::Targets, toml::table{})) {
@@ -513,7 +501,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
                     toml::format_error("If enabled " + std::string{NKeys::IgnorePlatforms} + ", can't be defined attrs for " + attrGroupIt->first, doc, " disable " + std::string{NKeys::IgnorePlatforms} + " or attrs for " + attrGroupIt->first)
                 );
             }
-            attrGroups[attrGroupIt->second] = ParseAttrGroup(attrspec, genspec);
+            attrGroups[attrGroupIt->second] = ParseAttrGroup(attrspec);
         }
 
         const auto inducedIt = attrGroups.find(EAttrGroup::Induced);
@@ -524,7 +512,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
                 if (attrName.IsItem()) {
                     continue; // skip item descriptions in inducing attributes
                 }
-                const std::string targetAttrName(attrName.GetPart(0));
+                const std::string targetAttrName(attrName.GetPart(0));// induce always first part of attribute
                 auto targetAttrNameIt = targetItems.find(targetAttrName);
                 if (targetAttrNameIt == targetItems.end()) {
                     targetItems[targetAttrName] = EAttrTypes::List; // induced attributes are always list in target attributes
@@ -536,7 +524,9 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
                     }
                 }
 
-                EAttrTypes targetAttrItemType = attrName.Size() > 1 ? EAttrTypes::Dict : attrType;
+                auto inducedAttrItemIt = inducedIt->second.find(std::string{attrName.GetPart(0)} + ITEM_SUFFIX);
+                // If first part of induced has defined ITEM type, use it, else use Dict (if parts > 1) or attrType (if parts == 1)
+                EAttrTypes targetAttrItemType = inducedAttrItemIt != inducedIt->second.end() ? inducedAttrItemIt->second : (attrName.Size() > 1 ? EAttrTypes::Dict : attrType);
                 auto targetAttrItem = targetAttrName + ITEM_SUFFIX;
                 auto targetAttrItemIt = targetItems.find(targetAttrItem);
                 if (targetAttrItemIt == targetItems.end()) {
@@ -544,7 +534,7 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
                 } else {
                     auto& curTargetAttrItemType = targetAttrItemIt->second;
                     if (curTargetAttrItemType != targetAttrItemType) {
-                        spdlog::error("induced attribute item {} type {}, overwritten to {}", targetAttrItem, ToString<EAttrTypes>(curTargetAttrItemType), ToString<EAttrTypes>(targetAttrItemType));
+                        spdlog::error("induced attribute item {} type {}, overwritten to {} [ by inducing {} ]", targetAttrItem, ToString<EAttrTypes>(curTargetAttrItemType), ToString<EAttrTypes>(targetAttrItemType), attrName.str());
                         curTargetAttrItemType = targetAttrItemType;
                     }
                 }
@@ -585,7 +575,7 @@ void TCopySpec::Append(const TCopySpec& copySpec) {
 }
 
 bool TGeneratorRule::Useless() const {
-    if (AttrNames.empty() && PlatformNames.empty()) {
+    if (AttrNames.empty() && AttrWithValues.empty() && PlatformNames.empty()) {
         return true;
     }
     if (!Copy.Useless()) {
@@ -599,8 +589,8 @@ bool TGeneratorRule::Useless() const {
     return true;
 }
 
-TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string_view attr) const {
-    if (auto it = AttrToRuleIds.find(attr); it != AttrToRuleIds.end()) {
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string& attrName) const {
+    if (auto it = AttrToRuleIds.find(attrName); it != AttrToRuleIds.end()) {
         TRuleSet result;
         for (const auto& id : it->second) {
             result.insert(&Rules.at(id));
@@ -610,8 +600,28 @@ TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrRules(const std::string_view att
     return {};
 }
 
-TGeneratorSpec::TRuleSet TGeneratorSpec::GetPlatformRules(const std::string_view platform) const {
-    if (auto it = PlatformToRuleIds.find(platform); it != PlatformToRuleIds.end()) {
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetAttrWithValueRules(const std::string& attrName, const std::span<const std::string>& attrValue) const {
+    std::string attrWithValue = attrName;
+    std::string eq = "=";
+    std::string space = " ";
+    std::string& glue = eq;
+    for (const auto& attrValueItem: attrValue) {
+        attrWithValue += glue;
+        attrWithValue += attrValueItem;
+        glue = space;
+    }
+    if (auto it = AttrWithValuesToRuleIds.find(attrWithValue); it != AttrWithValuesToRuleIds.end()) {
+        TRuleSet result;
+        for (const auto& id : it->second) {
+            result.insert(&Rules.at(id));
+        }
+        return result;
+    }
+    return {};
+}
+
+TGeneratorSpec::TRuleSet TGeneratorSpec::GetPlatformRules(const std::string& platformName) const {
+    if (auto it = PlatformToRuleIds.find(platformName); it != PlatformToRuleIds.end()) {
         TRuleSet result;
         for (const auto& id : it->second) {
             result.insert(&Rules.at(id));

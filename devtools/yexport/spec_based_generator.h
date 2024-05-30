@@ -54,8 +54,8 @@ public:
     void SetCurrentDirectory(const fs::path& dir) const;
 
     void SetupJinjaEnv();
-    void OnAttribute(const TAttr& attribute);
-    void OnPlatform(const std::string_view& platform);
+    void OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue);
+    void OnPlatform(const std::string& platformName);
 
     const TDumpOpts& DumpOpts() const {
         return DumpOpts_;
@@ -64,20 +64,12 @@ public:
         return DebugOpts_;
     }
 
-    TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name) const;
+    TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter = nullptr) const;
     bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
     void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
+    virtual const TAttrs::TReplacer* GetToolGetter() const { return nullptr; }
 
 protected:
-    void CopyFilesAndResources();
-    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplateSpec>& templateSpecs) const;
-    void RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
-    void MergePlatforms();
-    static void InsertPlatformNames(TAttrsPtr& attrs, const std::vector<TPlatformPtr>& platforms);
-    void InsertPlatformConditions(TAttrsPtr& attrs, bool addDeprecated = false);
-    void InsertPlatformAttrs(TAttrsPtr& attrs);
-    void CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::ValuesMap& addAttrs);
-
     using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
     using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;
 
@@ -100,14 +92,29 @@ protected:
 
     TAttrsPtr RootAttrs;
 
+    void CopyFilesAndResources();
+    std::vector<TJinjaTemplate> LoadJinjaTemplates(const std::vector<TTemplateSpec>& templateSpecs) const;
+    void RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname = {}, const std::string& platformName = {});
+    void MergePlatforms();
+    static void InsertPlatformNames(TAttrsPtr& attrs, const std::vector<TPlatformPtr>& platforms);
+    void InsertPlatformConditions(TAttrsPtr& attrs, bool addDeprecated = false);
+    void InsertPlatformAttrs(TAttrsPtr& attrs);
+    void CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::ValuesMap& addAttrs, bool doDebug = true);
     TYexportSpec ReadYexportSpec(fs::path configDir = "");
+
+    TAttrs::TReplacer* Replacer_{nullptr};
+    mutable std::string ReplacerBuffer_;
+    const std::string& RootReplacer(const std::string& s) const;
+    void InitReplacer();
 
 private:
     TJinjaFileSystemPtr SourceTemplateFs;
     TJinjaEnvPtr JinjaEnv;
 
+    void SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv);
     fs::path PathByCopyLocation(ECopyLocation location) const;
     TCopySpec CollectFilesToCopy() const;
+
 };
 
 }

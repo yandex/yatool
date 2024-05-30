@@ -11,6 +11,7 @@
 
 #include <string>
 #include <filesystem>
+#include <span>
 
 namespace NYexport {
 
@@ -115,7 +116,7 @@ namespace NYexport {
 
         TProjectPtr Finalize();
         TTargetHolder CreateTarget(const fs::path& targetDir);
-        void OnAttribute(const std::string& attribute);
+        void OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue);
 
         const TProjectTarget* CurrentTarget() const noexcept;
         const TProjectSubdir* CurrentSubdir() const noexcept;
@@ -126,7 +127,7 @@ namespace NYexport {
 
     protected:
         virtual void CustomFinalize() {};
-        virtual void CustomOnAttribute(const std::string&) {}
+        virtual void CustomOnAttribute(const std::string& /*attrName*/, const std::span<const std::string>& /*attrValue*/) {}
 
         TProjectSubdirPtr CreateDirectories(const fs::path& dir);
 

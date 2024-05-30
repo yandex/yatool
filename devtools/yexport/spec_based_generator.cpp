@@ -4,14 +4,15 @@
 
 #include <spdlog/spdlog.h>
 
+#include <regex>
+
 namespace {
 
     class TPrefixedFileSystem: public jinja2::IFilesystemHandler {
     public:
         TPrefixedFileSystem(const std::string& prefix)
             : Prefix_(prefix)
-        {
-        }
+        {}
 
         jinja2::CharFileStreamPtr OpenStream(const std::string& name) const override {
             std::string realName(CutPrefix(name));
@@ -58,17 +59,24 @@ const fs::path& TSpecBasedGenerator::GetGeneratorDir() const {
     return GeneratorDir;
 }
 
-void TSpecBasedGenerator::OnAttribute(const TAttr& attribute) {
-    for (size_t i = 0; i < attribute.Size(); ++i) {
-        std::string attr(attribute.GetFirstParts(i));
-        UsedAttributes.emplace(attr);
-        auto rules = GeneratorSpec.GetAttrRules(attr);
-        UsedRules.insert(rules.begin(), rules.end());
+void TSpecBasedGenerator::OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue) {
+    TAttr attr{attrName};
+    for (size_t i = 0; i < attr.Size(); ++i) {
+        std::string attrName(attr.GetFirstParts(i));
+        UsedAttributes.emplace(attrName);
+        auto attrRules = GeneratorSpec.GetAttrRules(attrName);
+        if (!attrRules.empty()) {
+            UsedRules.insert(attrRules.begin(), attrRules.end());
+        }
+    }
+    auto attrWithValueRules = GeneratorSpec.GetAttrWithValueRules(attrName, attrValue);
+    if (!attrWithValueRules.empty()) {
+        UsedRules.insert(attrWithValueRules.begin(), attrWithValueRules.end());
     }
 }
 
-void TSpecBasedGenerator::OnPlatform(const std::string_view& platform) {
-    auto rules = GeneratorSpec.GetPlatformRules(platform);
+void TSpecBasedGenerator::OnPlatform(const std::string& platformName) {
+    auto rules = GeneratorSpec.GetPlatformRules(platformName);
     UsedRules.insert(rules.begin(), rules.end());
 }
 
@@ -96,45 +104,145 @@ void TSpecBasedGenerator::SetupJinjaEnv() {
     JinjaEnv->AddFilesystemHandler(GENERATOR_TEMPLATES_PREFIX, GeneratorTemplateFs);
     JinjaEnv->AddFilesystemHandler({}, SourceTemplateFs);
 
+    SetupHandmadeFunctions(JinjaEnv);
+}
+
+void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
+    auto onHandmadeException = [](const std::string& function, const jinja2::ValuesMap& args, const std::exception& e) {
+        spdlog::error("Handmade function '{}({})' exception: '{}', return empty result", function, NYexport::Dump(args), e.what());
+    };
+
     // Handmade split function
-    JinjaEnv->AddGlobal("split", jinja2::UserCallable{
-        /*fptr=*/[](const jinja2::UserCallableParams& params) -> jinja2::Value {
-            Y_ASSERT(params["str"].isString());
-            auto str = params["str"].asString();
-            Y_ASSERT(params["delimeter"].isString());
-            auto delimeter = params["delimeter"].asString();
-            jinja2::ValuesList list;
+    auto splitFunction = [](const std::string& str, const std::string& delimeter, int count) {
+        jinja2::ValuesList list;
+        if (!str.empty()) {
             size_t bpos = 0;
             size_t dpos;
-            while ((dpos = str.find(delimeter, bpos)) != std::string::npos) {
+            while (((dpos = str.find(delimeter, bpos)) != std::string::npos) && (!count || count > 1)) {
                 list.emplace_back(str.substr(bpos, dpos - bpos));
                 bpos = dpos + delimeter.size();
+                if (count > 0) {
+                    --count;
+                }
             }
             list.emplace_back(str.substr(bpos));
-            return list;
+        }
+        return list;
+    };
+
+    auto rsplitFunction = [](const std::string& str, const std::string& delimeter, int count) {
+        jinja2::ValuesList list;
+        if (!str.empty()) {
+            size_t bpos = str.size() - 1;
+            size_t dpos;
+            while (((dpos = str.rfind(delimeter, bpos)) != std::string::npos) && (!count || count > 1)) {
+                list.insert(list.begin(), str.substr(dpos + 1, bpos - dpos));
+                bpos = dpos - delimeter.size();
+                if (count > 0) {
+                    --count;
+                }
+            }
+            list.insert(list.begin(), str.substr(0, bpos + 1));
+        }
+        return list;
+    };
+
+    static const std::string STR = "str";
+    static const std::string DELIMETER = "delimeter";
+    static const std::string COUNT = "count";
+    static const std::vector<jinja2::ArgInfo>& splitArgs = {
+        jinja2::ArgInfo{STR},
+        jinja2::ArgInfo{DELIMETER, false, " "},
+        jinja2::ArgInfo{COUNT, false, 0/*all items*/},
+    };
+
+    auto splitBody = [&](const std::string& function, const jinja2::UserCallableParams& params, std::function<jinja2::ValuesList(const std::string& str, const std::string& delimeter, int count)> splitFunc) {
+        try {
+            const auto paramStr = params[STR];
+            std::string str;
+            if (paramStr.isString()) {
+                str = paramStr.asString();
+            } else if (std::holds_alternative<std::string_view>(paramStr.data())) {
+                str = paramStr.get<std::string_view>();
+            } else {
+                throw std::runtime_error(STR + " is not a string");
+            }
+            const auto paramDelimeter = params[DELIMETER];
+            std::string delimeter;
+            if (paramDelimeter.isString()) {
+                delimeter = paramDelimeter.asString();
+            } else if (std::holds_alternative<std::string_view>(paramDelimeter.data())) {
+                delimeter = paramDelimeter.get<std::string_view>();
+            } else {
+                throw std::runtime_error(DELIMETER + " is not a string");
+            }
+            const auto paramCount = params[COUNT];
+            if (!std::holds_alternative<int64_t>(paramCount.data())) {
+                throw std::runtime_error(COUNT + " is not an integer");
+            }
+            int count = paramCount.get<int64_t>();
+            return splitFunc(str, delimeter, count);
+        } catch (const std::exception& e) {
+            onHandmadeException(function, params.args,  e);
+            return jinja2::ValuesList{};
+        }
+    };
+
+    static const std::string SPLIT = "split";
+    JinjaEnv->AddGlobal(SPLIT, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            return splitBody(SPLIT, params, splitFunction);
         },
-        /*argsInfos=*/ { jinja2::ArgInfo{"str"}, jinja2::ArgInfo{"delimeter", false, " "} }
+        /*argsInfos=*/ splitArgs
+    });
+    static const std::string RSPLIT = "rsplit";
+    JinjaEnv->AddGlobal(RSPLIT, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            return splitBody(RSPLIT, params, rsplitFunction);
+        },
+        /*argsInfos=*/ splitArgs
     });
 
-    // Handmade map keys function
-    JinjaEnv->AddGlobal("keys", jinja2::UserCallable{
-        /*fptr=*/[](const jinja2::UserCallableParams& params) -> jinja2::Value {
-            jinja2::ValuesList list;
-            const auto arg = params["map"];
-            if (arg.isMap()) {
-                const auto* genMap = arg.getPtr<jinja2::GenericMap>();
+    // Handmade map keys function (for iterate by map)
+    static const std::string KEYS = "keys";
+    static const std::string MAP = "map";
+    JinjaEnv->AddGlobal(KEYS, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {\
+            try {
+                jinja2::ValuesList list;
+                const auto map = params[MAP];
+                Y_ASSERT(map.isMap());
+                const auto* genMap = map.getPtr<jinja2::GenericMap>();
                 if (genMap) {// workaround for GenericMap, asMap generate bad_variant_access for it
                     auto keys = genMap->GetKeys();
                     list.insert(list.end(), keys.begin(), keys.end());
                 } else {
-                    for (const auto& [key, _] : arg.asMap()) {
+                    for (const auto& [key, _] : map.asMap()) {
                         list.emplace_back(key);
                     }
                 }
+                return list;
+            } catch (const std::exception& e) {
+                onHandmadeException(KEYS, params.args, e);
+                return jinja2::ValuesList{};
             }
-            return list;
         },
-        /*argsInfos=*/ { jinja2::ArgInfo{"map"} }
+        /*argsInfos=*/ { jinja2::ArgInfo{MAP} }
+    });
+
+    // Handmade dump any variable function for debug jinja2 code
+    static const std::string DUMP = "dump";
+    static const std::string VAR = "var";
+    JinjaEnv->AddGlobal("dump", jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            try {
+                return jinja2::Value{NYexport::Dump(params[VAR])};
+            } catch (const std::exception& e) {
+                onHandmadeException(DUMP, params.args, e);
+                return jinja2::Value{""};
+            }
+        },
+        /*argsInfos=*/ { jinja2::ArgInfo{VAR} }
     });
 }
 
@@ -159,14 +267,14 @@ TYexportSpec TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     return {};
 }
 
-TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::string& name) const {
+TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter) const {
     const auto attrGroupIt = GeneratorSpec.AttrGroups.find(eattrGroup);
     if (attrGroupIt != GeneratorSpec.AttrGroups.end()) {
-        return TAttrs::Create(attrGroupIt->second, name);
+        return TAttrs::Create(attrGroupIt->second, name, Replacer_, toolGetter);
     } else {
         static const TAttrGroup EMPTY_ATTR_GROUP;
         spdlog::error("No attribute specification for {}", ToString<EAttrGroup>(eattrGroup));
-        return TAttrs::Create(EMPTY_ATTR_GROUP, name);
+        return TAttrs::Create(EMPTY_ATTR_GROUP, name, Replacer_);
     }
 }
 
@@ -296,7 +404,7 @@ void TSpecBasedGenerator::InsertPlatformAttrs(TAttrsPtr& attrs) {
     NInternalAttrs::EmplaceAttr(attrs->GetWritableMap(), NInternalAttrs::PlatformAttrs, std::move(platformAttrs));
 }
 
-void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::ValuesMap& addAttrs) {
+void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::ValuesMap& addAttrs, bool doDebug) {
     Y_ASSERT(attrs);
     auto& map = attrs->GetWritableMap();
     NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ArcadiaRoot, ArcadiaRoot);
@@ -306,8 +414,8 @@ void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::Va
     if (!addAttrs.empty()) {
         NYexport::MergeTree(map, addAttrs);
     }
-    if (DebugOpts_.DebugAttrs) {
-        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpAttrs, ::NYexport::Dump(attrs->GetMap()), false);
+    if (doDebug && DebugOpts_.DebugAttrs) {
+        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpAttrs, ::NYexport::Dump(attrs->GetMap()));
     }
 }
 
@@ -328,5 +436,32 @@ void TSpecBasedGenerator::SetSpec(const TGeneratorSpec& spec, const std::string&
         }
     }
 };
+
+void TSpecBasedGenerator::InitReplacer() {
+    if (!GeneratorSpec.SourceRootReplacer.empty() || !GeneratorSpec.BinaryRootReplacer.empty()) {
+        static TAttrs::TReplacer REPLACER([this](const std::string& s) -> const std::string& {
+            return RootReplacer(s);
+        });
+        Replacer_ = &REPLACER;
+    }
+}
+
+const std::string& TSpecBasedGenerator::RootReplacer(const std::string& s) const {
+    if ((s.size() < 2) || (GeneratorSpec.SourceRootReplacer.empty() && GeneratorSpec.BinaryRootReplacer.empty())) {
+        return s;
+    }
+    ReplacerBuffer_ = s;
+    if (!GeneratorSpec.SourceRootReplacer.empty()) {
+        static const std::regex SOURCE_ROOT_RE("(^|\\W)\\$S($|\\W)");
+        static const std::string SOURCE_ROOT_REPLACE("$1" + GeneratorSpec.SourceRootReplacer + "$2");
+        ReplacerBuffer_ = std::regex_replace(ReplacerBuffer_, SOURCE_ROOT_RE, SOURCE_ROOT_REPLACE);
+    }
+    if (!GeneratorSpec.BinaryRootReplacer.empty()) {
+        static const std::regex BINARY_ROOT_RE("(^|\\W)\\$B($|\\W)");
+        static const std::string BINARY_ROOT_REPLACE("$1" + GeneratorSpec.BinaryRootReplacer + "$2");
+        ReplacerBuffer_ = std::regex_replace(ReplacerBuffer_, BINARY_ROOT_RE, BINARY_ROOT_REPLACE);
+    }
+    return ReplacerBuffer_;
+}
 
 }

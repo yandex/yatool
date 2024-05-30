@@ -1,4 +1,5 @@
 #include "attributes.h"
+#include "internal_attributes.h"
 
 #include <spdlog/spdlog.h>
 
@@ -7,16 +8,18 @@
 
 namespace NYexport {
 
-TAttrsPtr TAttrs::Create(const TAttrGroup& attrGroup, const std::string& name) {
-    return MakeSimpleShared<TAttrs>(attrGroup, name);
+TAttrsPtr TAttrs::Create(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter) {
+    return MakeSimpleShared<TAttrs>(attrGroup, name, replacer, toolGetter);
 }
 
-TAttrs::TAttrs(const TAttrGroup& attrGroup, const std::string& name)
+TAttrs::TAttrs(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter)
     : AttrGroup_(attrGroup)
     , Name_(name)
+    , Replacer_(replacer)
+    , ToolGetter_(toolGetter)
 {}
 
-void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jinja2::ValuesList& values, size_t atPos, TGetDebugStr getDebugStr) const {
+void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jinja2::ValuesList& values, size_t atPos, TGetDebugStr getDebugStr) {
     if (atPos == (attr.Size() - 1)) {// last item - append complex attribute or set simple attribute
         auto attrType = GetAttrType(attr.GetFirstParts(atPos));
         auto attrName = attr.GetPart(atPos);
@@ -108,7 +111,7 @@ void TAttrs::SetFlagAttr(jinja2::ValuesMap& attrs, const std::string_view attrNa
     attrs.insert_or_assign(std::string{attrName}, value);
 }
 
-void TAttrs::AppendToListAttr(jinja2::ValuesList& listAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+void TAttrs::AppendToListAttr(jinja2::ValuesList& listAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
     auto itemAttrType = GetItemAttrType(attr.str());
     for (const auto& value : values) {
         auto item = GetSimpleAttrValue(itemAttrType, jinja2::ValuesList{value}, getDebugStr);
@@ -119,7 +122,7 @@ void TAttrs::AppendToListAttr(jinja2::ValuesList& listAttr, const TAttr& attr, c
     }
 }
 
-void TAttrs::AppendToSetAttr(jinja2::ValuesList& setAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+void TAttrs::AppendToSetAttr(jinja2::ValuesList& setAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
     auto itemAttrType = GetItemAttrType(attr.str());
     for (const auto& value : values) {
         auto item = GetSimpleAttrValue(itemAttrType, jinja2::ValuesList{value}, getDebugStr);
@@ -138,7 +141,7 @@ void TAttrs::AppendToSetAttr(jinja2::ValuesList& setAttr, const TAttr& attr, con
     }
 }
 
-void TAttrs::AppendToSortedSetAttr(jinja2::ValuesList& sortedSetAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+void TAttrs::AppendToSortedSetAttr(jinja2::ValuesList& sortedSetAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
     auto itemAttrType = GetItemAttrType(attr.str());
     std::set<std::string> set;
     if (!sortedSetAttr.empty()) {
@@ -159,7 +162,7 @@ void TAttrs::AppendToSortedSetAttr(jinja2::ValuesList& sortedSetAttr, const TAtt
     }
 }
 
-void TAttrs::AppendToDictAttr(jinja2::ValuesMap& dictAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) const {
+void TAttrs::AppendToDictAttr(jinja2::ValuesMap& dictAttr, const TAttr& attr, const jinja2::ValuesList& values, TGetDebugStr getDebugStr) {
     for (const auto& value : values) {
         auto keyval = std::string_view(value.asString());
         if (auto pos = keyval.find_first_of('='); pos == std::string_view::npos) {
@@ -194,10 +197,26 @@ jinja2::Value TAttrs::GetSimpleAttrValue(const EAttrTypes attrType, const jinja2
                 spdlog::error("trying to add {} elements to 'str' type {}, type 'str' should have only 1 element", values.size(), getDebugStr());
                 // but continue and use first item
             }
-            static const std::string EmptyString;
-            const auto& s = values.empty() ? std::string{} : values[0].asString();
+            if (values.empty()) {
+                return jinja2::Value{std::string{}};
+            }
+            const auto& value0 = values[0].asString();
+            if (ToolGetter_) {
+                const auto& tool = (*ToolGetter_)(value0);
+                if (!tool.empty()) {
+                    auto [toolsIt, _] = NInternalAttrs::EmplaceAttr(Attrs_, NInternalAttrs::Tools, jinja2::ValuesList{});
+                    auto& tools = toolsIt->second.asList();
+                    if (std::find(tools.begin(),tools.end(), tool) == tools.end()) {
+                        tools.emplace_back(tool);
+                    }
+                    auto slash_pos = tool.rfind('/');
+                    Y_ASSERT(slash_pos != std::string::npos);
+                    return jinja2::Value{"${TOOL_" + tool.substr(slash_pos + 1)/*toolName*/ + "_bin}"};
+                }
+            }
+            const auto& s = Replacer_ ? (*Replacer_)(value0) : value0;
             if (auto len = s.size(); len >= 2 && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))) {
-                return jinja2::Value{s.substr(1, len - 2)};
+                return jinja2::Value{s.substr(1, len - 2)};// remove quotes "..." => ... or '...' => ...
             }
             return jinja2::Value{s};
         }

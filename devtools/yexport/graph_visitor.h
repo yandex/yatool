@@ -64,6 +64,8 @@ namespace NYexport {
         void Leave(TState& state);
         void Left(TState& state);
 
+        TProjectBuilderPtr GetProjectBuilder() const { return ProjectBuilder_; }
+
     protected:
         virtual void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) = 0;
         virtual void OnNodeSemanticPreOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/) {};
@@ -82,6 +84,7 @@ namespace NYexport {
         TSpecBasedGenerator* Generator_;
 
     private:
+        void MineSubdirTools(const TSemGraph::TConstNodeRef& node);
         void SetupSemanticMapping(const TGeneratorSpec& genspec);
         void EnsureReady();
         void FillSemsDump(const std::string& nodePath, const TNodeSemantics& graphSems, const TNodeSemantics& appliedSems);

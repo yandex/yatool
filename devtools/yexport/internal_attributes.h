@@ -14,6 +14,7 @@ namespace NInternalAttrs {
     inline static const std::string Target = "target";///< Main target of directory
     inline static const std::string ExtraTargets = "extra_targets";///< Extra targets of directory
     inline static const std::string HasTest = "has_test";///< Extra targets of directory has at least one test
+    inline static const std::string Tools = "tools";///< Relative paths to tool binaries
     inline static const std::string ProjectName = "project_name";///< Project name of export
     inline static const std::string ArcadiaRoot = "arcadia_root";///< Full path to arcadia root
     inline static const std::string ExportRoot = "export_root";///< Full path to export root
@@ -58,13 +59,7 @@ namespace NInternalAttrs {
         return camelCase;
     }
 
-    inline static auto EmplaceAttr(jinja2::ValuesMap& map, const std::string snakeCaseName, jinja2::Value&& value, bool addCamelCaseVar = true/*DEPRECATED*/) {
-        if (addCamelCaseVar) {
-            auto camelCaseName = CamelCase(snakeCaseName);
-            if (!camelCaseName.empty()) {
-                map.emplace(camelCaseName, value);
-            }
-        }
+    inline static auto EmplaceAttr(jinja2::ValuesMap& map, const std::string snakeCaseName, jinja2::Value&& value) {
         return map.emplace(snakeCaseName, std::move(value));
     }
 }

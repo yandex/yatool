@@ -4,26 +4,26 @@
 
 namespace NYexport {
 
-    TAttr::TAttr(const char* attr)
-        : TAttr(std::string_view(attr))
+    TAttr::TAttr(const char* attrName)
+        : TAttr(std::string_view(attrName))
     {}
 
-    TAttr::TAttr(const std::string& attr)
-        : TAttr(std::string_view(attr))
+    TAttr::TAttr(const std::string& attrName)
+        : TAttr(std::string_view(attrName))
     {}
 
-    TAttr::TAttr(std::string_view attr)
-        : Attr_(attr)
+    TAttr::TAttr(std::string_view attrName)
+        : Attr_(attrName)
     {
-        YEXPORT_VERIFY(!attr.empty(), "Cannot create empty attribute");
+        YEXPORT_VERIFY(!attrName.empty(), "Cannot create empty attribute");
         size_t startPos = 0;
         size_t dividerPos = 0;
-        while ((dividerPos = attr.find(ATTR_DIVIDER, startPos)) != std::string::npos) {
-            YEXPORT_VERIFY(startPos != dividerPos, "Attribute contains empty part: " << attr);
+        while ((dividerPos = attrName.find(ATTR_DIVIDER, startPos)) != std::string::npos) {
+            YEXPORT_VERIFY(startPos != dividerPos, "Attribute contains empty part: " << attrName);
             Dividers_.push_back(dividerPos);
             startPos = dividerPos + 1;
         }
-        YEXPORT_VERIFY(startPos != attr.size(), "Attribute contains empty part: " << attr);
+        YEXPORT_VERIFY(startPos != attrName.size(), "Attribute contains empty part: " << attrName);
     }
 
 

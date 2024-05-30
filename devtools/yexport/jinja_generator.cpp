@@ -21,6 +21,7 @@
 
 #include <fstream>
 #include <vector>
+#include <regex>
 
 namespace NYexport {
 
@@ -62,8 +63,8 @@ bool TJinjaProject::TBuilder::AddToTargetInducedAttr(const std::string& attrName
     return AddValueToJinjaList(list, value);
 }
 
-void TJinjaProject::TBuilder::OnAttribute(const std::string& attribute) {
-    Generator->OnAttribute(attribute);
+void TJinjaProject::TBuilder::OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue) {
+    Generator->OnAttribute(attrName, attrValue);
 }
 
 const TNodeSemantics& TJinjaProject::TBuilder::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
@@ -119,7 +120,7 @@ public:
         if (isTestTarget) {
             curTarget->TestModDir = modDir;
         }
-        curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name);
+        curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name, Generator_->GetToolGetter());
         auto& attrs = curTarget->Attrs->GetWritableMap();
         curTarget->Name = semArgs[1];
         NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Name, curTarget->Name);
@@ -136,18 +137,29 @@ public:
 
     void OnNodeSemanticPostOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs) override {
         const TSemNodeData& data = state.TopNode().Value();
-        if (semNameType == ESNT_RootAttr) {
+        switch (semNameType) {
+        case ESNT_RootAttr:
             JinjaProjectBuilder_->SetRootAttr(semName, semArgs, data.Path);
-        } else if (semNameType == ESNT_PlatformAttr) {
+            break;
+        case ESNT_PlatformAttr:
             JinjaProjectBuilder_->SetPlatformAttr(semName, semArgs, data.Path);
-        } else if (semNameType == ESNT_DirectoryAttr) {
+            break;
+        case ESNT_DirectoryAttr:
             JinjaProjectBuilder_->SetDirectoryAttr(semName, semArgs, data.Path);
-        } else if (semNameType == ESNT_TargetAttr) {
+            break;
+        case ESNT_TargetAttr:
             JinjaProjectBuilder_->SetTargetAttr(semName, semArgs, data.Path);
-        } else if (semNameType == ESNT_InducedAttr) {
+            break;
+        case ESNT_InducedAttr:
             StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
-        } else if (semNameType == ESNT_Unknown) {
+            break;
+        case ESNT_Unknown:
             spdlog::error("Skip unknown semantic '{}' for file '{}'", semName, data.Path);
+            break;
+        case ESNT_Ignored:
+        case ESNT_Target:
+            // skip in post-order flow
+            break;
         }
     }
 
@@ -307,6 +319,8 @@ THolder<TJinjaGenerator> TJinjaGenerator::Load(
     result->SetupJinjaEnv();
     result->SetSpec(ReadGeneratorSpec(generatorFile), generatorFile.string());
     result->YexportSpec = result->ReadYexportSpec(configDir);
+    result->InitReplacer();
+    result->InitToolGetter();
     return result;
 }
 
@@ -330,6 +344,7 @@ void TJinjaGenerator::LoadSemGraph(const std::string& platformName, const fs::pa
 TProjectPtr TJinjaGenerator::AnalizeSemGraph(const TPlatform& platform) {
     TJinjaGeneratorVisitor visitor(this, RootAttrs, GeneratorSpec);
     visitor.FillPlatformName(platform.Name);
+    ProjectBuilder_ = visitor.GetProjectBuilder();
     IterateAll(*platform.Graph, platform.StartDirs, visitor);
     return visitor.TakeFinalizedProject();
 }
@@ -464,7 +479,7 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
     CommonFinalizeAttrs(RootAttrs, YexportSpec.AddAttrsRoot);
     if (DebugOpts_.DebugSems) {
         auto& map = RootAttrs->GetWritableMap();
-        auto [debugSemsIt, _] = NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpSems, "", false);
+        auto [debugSemsIt, _] = NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpSems, "");
         auto& debugSems = debugSemsIt->second.asString();
         for (const auto& platform : Platforms) {
             debugSems += platform->Project->SemsDump;
@@ -477,7 +492,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
     YEXPORT_VERIFY(!Platforms.empty(), "Cannot finalize subdirs attrs because project was not yet loaded");
     jinja2::ValuesMap subdirsAttrs;
     auto platformSuf = [&]() {
-        return platform->Name.empty() ? std::string{} : " [ platform " + platform->Name + "]";
+        return platform->Name.empty() ? std::string{} : " [ platform " + platform->Name + " ]";
     };
     for (auto& dir: platform->Project->GetSubdirs()) {
         if (!pathPrefixes.empty()) {
@@ -499,15 +514,16 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
         auto& dirMap = dir->Attrs->GetWritableMap();
         if (!dir->Subdirs.empty()) {
             auto [subdirsIt, _] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Subdirs, jinja2::ValuesList{});
+            auto& subdirs = subdirsIt->second.asList();
             for (const auto& subdir : dir->Subdirs) {
-                subdirsIt->second.asList().emplace_back(subdir->Path.filename());
+                subdirs.emplace_back(subdir->Path.filename());
             }
         }
         for (auto& target: dir->Targets) {
             Y_ASSERT(target->Attrs);
-            CommonFinalizeAttrs(target->Attrs, YexportSpec.AddAttrsTarget);
+            CommonFinalizeAttrs(target->Attrs, YexportSpec.AddAttrsTarget, false);
             if (DebugOpts_.DebugSems) {
-                NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::DumpSems, target->SemsDump, false);
+                NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::DumpSems, target->SemsDump);
             }
             const auto& targetMacro = target->Macro;
             Y_ASSERT(GeneratorSpec.Targets.contains(targetMacro));
@@ -521,7 +537,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
             auto isExtraTarget = targetSpec.IsExtraTarget || isTest;// test always is extra target
             const auto& targetAttrs = target->Attrs->GetMap();
             if (isExtraTarget) {
-                auto& extra_targets = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList{}, false).first->second.asList();
+                auto& extra_targets = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::ExtraTargets, jinja2::ValuesList{}).first->second.asList();
                 extra_targets.emplace_back(targetAttrs);
             } else {
                 if (dirMap.contains(NInternalAttrs::Target)) {// main target already exists
@@ -542,7 +558,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
         }
         CommonFinalizeAttrs(dir->Attrs, YexportSpec.AddAttrsDir);
         if (DebugOpts_.DebugSems) {
-            NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, dir->SemsDump, false);
+            NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, dir->SemsDump);
         }
         if (dir->MainTargetMacro.empty() && !dir->Targets.empty()) {
             spdlog::error("Only {} extra targets without main target in directory {}", dir->Targets.size(), dir->Path.string() + platformSuf());
@@ -590,6 +606,54 @@ THashMap<fs::path, TVector<TProjectTarget>> TJinjaGenerator::GetSubdirsTargets()
         }
     }
     return res;
+}
+
+const std::string& TJinjaGenerator::ToolGetter(const std::string& s) const {
+    ToolGetterBuffer_.clear();
+    do {
+        Y_ASSERT(ProjectBuilder_);
+        auto* currentSubdir = ProjectBuilder_->CurrentSubdir();
+        if (!currentSubdir) {
+            break;// no subdir (and tools in it too)
+        }
+        if (s.find('/') == std::string::npos) {
+            break;// can't be tool, must be path
+        }
+        const auto& subdirAttrs = currentSubdir->Attrs->GetMap();
+        const auto subdirToolsIt = subdirAttrs.find(NInternalAttrs::Tools);
+        if (subdirToolsIt == subdirAttrs.end()) {
+            break;// no tools attribute in subdir, s can't be tool
+        }
+        const auto& subdirTools = subdirToolsIt->second.asList();
+        if (subdirTools.empty()) {
+            break;// empty tools in subdir, s can't be tool
+        }
+        std::string maybeTool = s;
+        static const std::regex SOURCE_ROOT_RE("^\\$S/");
+        maybeTool = std::regex_replace(maybeTool, SOURCE_ROOT_RE, "");
+        static const std::regex BINARY_ROOT_RE("^\\$B/");
+        maybeTool = std::regex_replace(maybeTool, BINARY_ROOT_RE, "");
+        static const std::regex ESCAPING_RE("(\\$|\\{|\\})");
+        static const std::string ESCAPING_REPLACE("\\$1");
+        if (!GeneratorSpec.SourceRootReplacer.empty()) {
+            maybeTool = std::regex_replace(maybeTool, std::regex(std::string{"^"} + std::regex_replace(GeneratorSpec.SourceRootReplacer, ESCAPING_RE, ESCAPING_REPLACE) + "/"), "");
+        }
+        if (!GeneratorSpec.BinaryRootReplacer.empty()) {
+            maybeTool = std::regex_replace(maybeTool, std::regex(std::string{"^"} + std::regex_replace(GeneratorSpec.BinaryRootReplacer, ESCAPING_RE, ESCAPING_REPLACE) + "/"), "");
+        }
+        if (std::find(subdirTools.begin(), subdirTools.end(), maybeTool) == subdirTools.end()) {
+            break;// not tool
+        }
+        ToolGetterBuffer_ = maybeTool;
+    } while (0);
+    return ToolGetterBuffer_;
+}
+
+void TJinjaGenerator::InitToolGetter() {
+    static TAttrs::TReplacer TOOL_GETTER([this](const std::string& s) -> const std::string& {
+        return ToolGetter(s);
+    });
+    ToolGetter_ = &TOOL_GETTER;
 }
 
 }

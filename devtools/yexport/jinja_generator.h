@@ -57,8 +57,13 @@ public:
     void DumpSems(IOutputStream& out) const override; ///< Get dump of semantics tree with values for testing or debug
     void DumpAttrs(IOutputStream& out) override; ///< Get dump of attributes tree with values for testing or debug
 
+public: // for tests only
+    THashMap<fs::path, TVector<TProjectTarget>> GetSubdirsTargets() const;
+
 private:
     friend class TJinjaProject::TBuilder;
+
+    std::string ProjectName;
 
     void Render(ECleanIgnored cleanIgnored) override;
     void RenderPlatform(TPlatformPtr platform, ECleanIgnored cleanIgnored);
@@ -70,10 +75,12 @@ private:
     jinja2::ValuesMap FinalizeSubdirsAttrs(TPlatformPtr platform, const std::vector<std::string>& pathPrefixes = {});
     jinja2::ValuesMap FinalizeAttrsForDump();
 
-    std::string ProjectName;
-
-public: // for tests only
-    THashMap<fs::path, TVector<TProjectTarget>> GetSubdirsTargets() const;
+    TAttrs::TReplacer* ToolGetter_{nullptr};
+    mutable std::string ToolGetterBuffer_;
+    TProjectBuilderPtr ProjectBuilder_;
+    const std::string& ToolGetter(const std::string& s) const;
+    void InitToolGetter();
+    const TAttrs::TReplacer* GetToolGetter() const override { return ToolGetter_; }
 };
 
 class TJinjaProject::TBuilder : public TProject::TBuilder {
@@ -117,7 +124,7 @@ public:
     }
 
     bool AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath);
-    void OnAttribute(const std::string& attribute);
+    void OnAttribute(const std::string& attrName, const std::span<const std::string>& attrValue);
     const TNodeSemantics& ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const;
 
 private:

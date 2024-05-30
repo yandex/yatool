@@ -55,6 +55,7 @@ THolder<TCMakeGenerator> TCMakeGenerator::Load(const fs::path& arcadiaRoot, cons
     }
 
     result->YexportSpec = result->ReadYexportSpec(configDir);
+    result->InitReplacer();
     return result;
 }
 

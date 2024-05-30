@@ -16,9 +16,9 @@ namespace NYexport {
     class TAttr {
     public:
         TAttr() = default;
-        TAttr(const char* attribute);
-        TAttr(const std::string& attribute);
-        TAttr(std::string_view attribute);
+        TAttr(const char* attrName);
+        TAttr(const std::string& attrName);
+        TAttr(std::string_view attrName);
 
         bool IsItem() const;
         size_t Size() const;

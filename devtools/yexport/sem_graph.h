@@ -1,17 +1,18 @@
 #pragma once
 
-#include <string>
-
 #include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/compact_graph/graph.h>
 #include <devtools/ymake/compact_graph/iter.h>
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template.h>
 
+#include <string>
+#include <vector>
+
 namespace NYexport {
 
-using TNodeSemantic = TVector<std::string>; ///< One semantic function: *name, args...
-using TNodeSemantics = TVector<TNodeSemantic>; ///< List of semantic functions
+using TNodeSemantic = std::vector<std::string>; ///< One semantic function: *name, args...
+using TNodeSemantics = std::vector<TNodeSemantic>; ///< List of semantic functions
 
 struct TSemNodeData {
     TString Path;

@@ -57,12 +57,14 @@ namespace NYexport {
             const auto* genList = value.getPtr<jinja2::GenericList>();
             if (genList) {// workaround for GenericList
                 auto size = genList->GetSize();
-                size_t last = size.has_value() ? size.value() : 0;
-                size_t i = 0;
-                std::for_each(genList->begin(), genList->end(), [&](const auto& val) {
-                    out << Indent(depth + 1);
-                    Dump(out, val, depth + 1, ++i == last);
-                });
+                if (size.has_value()) {
+                    size_t last = size.value();
+                    size_t i = 0;
+                    for(const auto& val: *genList) {
+                        out << Indent(depth + 1);
+                        Dump(out, val, depth + 1, ++i == last);
+                    }
+                }
             } else {
                 const auto& vals = value.asList();
                 for (const auto& val : vals) {
@@ -74,7 +76,7 @@ namespace NYexport {
         }  else if (value.isString()) {
             out << '"' << value.asString() << '"';
         }  else if (value.isWString()) {
-            out << '"' << value.asWString() << '"';
+            out << '"' << value.asWString() << "\"ws";
         } else if (value.isEmpty()) {
             out << "EMPTY";
         } else {
@@ -85,9 +87,9 @@ namespace NYexport {
             } else if (std::holds_alternative<double>(value.data())) {
                 out << value.get<double>();
             } else if (std::holds_alternative<std::string_view>(value.data())) {
-                out << value.get<std::string_view>();
+                out << '"' << value.get<std::string_view>() << "\"sv";
             } else if (std::holds_alternative<std::wstring_view>(value.data())) {
-                out << value.get<std::wstring_view>();
+                out << '"' << value.get<std::wstring_view>() << "\"wsv";
             } else {
                 out << "???";
             }

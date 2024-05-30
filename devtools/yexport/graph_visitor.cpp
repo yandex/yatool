@@ -1,5 +1,6 @@
 #include "graph_visitor.h"
 #include "diag/exception.h"
+#include "internal_attributes.h"
 
 #include <spdlog/spdlog.h>
 
@@ -80,16 +81,16 @@ namespace NYexport {
         }
 
         bool isIgnored = false;
-        const auto& semantics = Generator_->ApplyReplacement(data.Path, data.Sem);
+        const auto& sems = Generator_->ApplyReplacement(data.Path, data.Sem);
         const TNodeSemantic* targetSemantic = nullptr;
-        for (const auto& sem : semantics) {
+        for (const auto& sem : sems) {
             YEXPORT_VERIFY(!sem.empty(), "Empty semantic item on node '" << data.Path << "'");
 
             const auto& semName = sem[0];
             const auto semNameType = SemNameToType(semName);
             const auto semArgs = std::span{sem}.subspan(1);
 
-            ProjectBuilder_->OnAttribute(semName);
+            ProjectBuilder_->OnAttribute(semName, semArgs);
 
             if (semNameType == ESNT_Ignored) {
                 isIgnored = true;
@@ -106,17 +107,20 @@ namespace NYexport {
             }
         }
 
-        if (!isIgnored && targetSemantic) {
-            const auto& sem = *targetSemantic;
-            const auto& semName = sem[0];
-            const auto semArgs = std::span{sem}.subspan(1);
+        if (!isIgnored){
+            if (targetSemantic) {
+                const auto& sem = *targetSemantic;
+                const auto& semName = sem[0];
+                const auto semArgs = std::span{sem}.subspan(1);
 
-            OnTargetNodeSemantic(state, semName, semArgs);
+                OnTargetNodeSemantic(state, semName, semArgs);
+            }
+            MineSubdirTools(state.TopNode());
         }
 
-        FillSemsDump(data.Path, data.Sem, semantics);
+        FillSemsDump(data.Path, data.Sem, sems);
 
-        for (const auto& sem : semantics) {
+        for (const auto& sem : sems) {
             const auto& semName = sem[0];
             const auto semNameType = SemNameToType(semName);
             const auto semArgs = std::span{sem}.subspan(1);
@@ -127,6 +131,7 @@ namespace NYexport {
 
             OnNodeSemanticPreOrder(state, semName, semNameType, semArgs);
         }
+
         return !isIgnored;
     }
 
@@ -195,6 +200,36 @@ namespace NYexport {
     void TGraphVisitor::OnError() {
         HasError_ = true;
     }
+
+    void TGraphVisitor::MineSubdirTools(const TSemGraph::TConstNodeRef& node) {
+        Y_ASSERT(ProjectBuilder_);
+        auto* currentSubdir = ProjectBuilder_->CurrentSubdir();
+        if (!currentSubdir) {
+            return;// no place for tools, no need to search tools
+        }
+        Y_ASSERT(currentSubdir->Attrs);
+        auto& currentSubdirAttrs = currentSubdir->Attrs->GetWritableMap();
+        jinja2::ValuesList* tools = nullptr;
+        for (const auto& dep: node.Edges()) {
+            if (!IsBuildCommandDep(dep) || (dep.To()->Path != TOOL_NODES_FAKE_PATH) || IsIgnored(dep.To())) {
+                continue;
+            }
+            for (const auto& tool: dep.To().Edges()) {
+                if (IsIgnored(tool.To())) {
+                    continue;
+                }
+                if (!tools) {
+                    auto [toolsIt, _] = NInternalAttrs::EmplaceAttr(currentSubdirAttrs, NInternalAttrs::Tools, jinja2::ValuesList{});
+                    tools = &toolsIt->second.asList();
+                }
+                auto toolRelPath = NPath::CutType(tool.To()->Path);
+                if (std::find(tools->begin(), tools->end(), toolRelPath) == tools->end()) {
+                    tools->emplace_back(std::string{toolRelPath});
+                }
+            }
+        }
+    }
+
 
     void TGraphVisitor::AddSemanticMapping(const std::string& semName, ESemNameType type) {
         auto [it, created] = SemNameToType_.emplace(semName, type);
