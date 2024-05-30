@@ -25,9 +25,9 @@ KTLINT_TEST_TYPE = "ktlint"
 class JavaStyleTestSuite(test_types.StyleTestSuite):
     JSTYLE_MIGRATIONS_FILE = "build/rules/jstyle/migrations.yaml"
 
-    def __init__(self, dart_info, target_platform_descriptor=None, multi_target_platform_run=False):
+    def __init__(self, meta, target_platform_descriptor=None, multi_target_platform_run=False):
         super(JavaStyleTestSuite, self).__init__(
-            dart_info,
+            meta,
             target_platform_descriptor=target_platform_descriptor,
             multi_target_platform_run=multi_target_platform_run,
         )
@@ -35,7 +35,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         self.deps = None
         self.my_sources = []
         self.config_xml = ''
-        for f in dart_info['FILES']:
+        for f in self.meta.files:
             if '.srclst::' in f:
                 self.my_sources.append(f)
             else:
@@ -54,7 +54,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
     @property
     def latest_jdk_version(self):
-        return self.dart_info.get('JDK_LATEST_VERSION', None)
+        return self.meta.jdk_latest_version
 
     def support_splitting(self, opts=None):
         return False
@@ -173,10 +173,10 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
 class KtlintTestSuite(LintTestSuite):
     def __init__(
-        self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
+        self, meta, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
     ):
         super(KtlintTestSuite, self).__init__(
-            dart_info,
+            meta,
             modulo,
             modulo_index,
             target_platform_descriptor,
@@ -202,13 +202,13 @@ class KtlintTestSuite(LintTestSuite):
         return [self._source_folder_path(arc_root), os.path.join(arc_root, ".editorconfig")]
 
     def _ktlint_folder_name(self):
-        if "USE_KTLINT_OLD" in self.dart_info and self.dart_info['USE_KTLINT_OLD'] == 'yes':
+        if self.meta.use_ktlint_old is not None and self.meta.use_ktlint_old == 'yes':
             return "ktlint_old"
         return "ktlint"
 
     def _ktlint_baseline_path(self):
-        if "KTLINT_BASELINE_FILE" in self.dart_info:
-            return os.path.join(SOURCE_ROOT, self.project_path, self.dart_info['KTLINT_BASELINE_FILE'])
+        if self.meta.ktlint_baseline_file is not None:
+            return os.path.join(SOURCE_ROOT, self.project_path, self.meta.ktlint_baseline_file)
         return None
 
     def get_resource_tools(self):
@@ -231,7 +231,7 @@ class KtlintTestSuite(LintTestSuite):
             "--srclist-path",
             self._get_files()[0],
             "--binary",
-            self.dart_info["KTLINT_BINARY"],
+            self.meta.ktlint_binary,
             "--trace-path",
             os.path.join(work_dir, test.const.TRACE_FILE_NAME),
             "--source-root",

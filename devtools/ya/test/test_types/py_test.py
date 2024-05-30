@@ -34,10 +34,10 @@ class PyTestSuite(common.PythonTestSuite):
     Support for pytest framework http://pytest.org/
     """
 
-    def __init__(self, dart_info, *args, **kwargs):
-        super(PyTestSuite, self).__init__(dart_info, *args, **kwargs)
-        if 'SOURCE-FOLDER-PATH' in dart_info:
-            self.pytest_output_dir_deps = {dart_info['SOURCE-FOLDER-PATH']}
+    def __init__(self, meta, *args, **kwargs):
+        super(PyTestSuite, self).__init__(meta, *args, **kwargs)
+        if self.meta.source_folder_path is not None:
+            self.pytest_output_dir_deps = {self.meta.source_folder_path}
         else:
             self.pytest_output_dir_deps = set()
 
@@ -265,7 +265,7 @@ class PyTestSuite(common.PythonTestSuite):
 
     @property
     def _old_pytest(self):
-        return self.dart_info.get('OLD_PYTEST', 'no') == 'yes'
+        return (self.meta.old_pytest or 'no') == 'yes'
 
     @property
     def setup_pythonpath_env(self):
@@ -282,10 +282,11 @@ class PyTestSuite(common.PythonTestSuite):
 
 
 class PyTestBinSuite(PyTestSuite):
-    def __init__(self, dart_info, *args, **kwargs):
-        super(PyTestBinSuite, self).__init__(dart_info, *args, **kwargs)
-        if dart_info.get("BINARY-PATH"):
-            dart_info["TEST-NAME"] = self.get_type()
+    def __init__(self, meta, *args, **kwargs):
+        super(PyTestBinSuite, self).__init__(meta, *args, **kwargs)
+        if self.meta.binary_path:
+            # FIXME meta must be read only
+            self.meta.test_name = self.get_type()
 
     def binary_path(self, root):
         return common.AbstractTestSuite.binary_path(self, root)
@@ -301,7 +302,7 @@ class PyTestBinSuite(PyTestSuite):
         if self.wine_path:
             cmd = [self.wine_path] + cmd + ["--assert=plain"]
 
-        runner_bin = self.dart_info.get('TEST-RUNNER-BIN')
+        runner_bin = self.meta.test_runner_bin
 
         if runner_bin is not None:
             cmd = [runner_bin] + cmd
@@ -407,7 +408,7 @@ class ExecTest(PyTestBinSuite):
         env["PATH"] = os.path.pathsep.join(sorted(dep_dirs))
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
-        cmd = ["--test-param", "commands={}".format(self.dart_info.get("BLOB", ""))]
+        cmd = ["--test-param", "commands={}".format(self.meta.blob)]
         cmd += test.util.tools.get_test_tool_cmd(
             opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True
         )
@@ -422,7 +423,7 @@ class ExecTest(PyTestBinSuite):
 
 class LintTestSuite(common.StyleTestSuite):
     def get_suite_files(self):
-        files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.dart_info.get("FILES", []) if _f]]
+        files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.meta.files if _f]]
         return sorted(files)
 
     def support_retries(self):
@@ -465,10 +466,10 @@ class LintTestSuite(common.StyleTestSuite):
 
 class PyLintTestSuite(LintTestSuite):
     def __init__(
-        self, dart_info, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
+        self, meta, modulo=1, modulo_index=0, target_platform_descriptor=None, multi_target_platform_run=False
     ):
         super(PyLintTestSuite, self).__init__(
-            dart_info,
+            meta,
             modulo,
             modulo_index,
             target_platform_descriptor,
@@ -557,7 +558,7 @@ class CheckImportsTestSuite(PyLintTestSuite):
     def get_checker(self, opts, dist_build, out_path):
         cmd = 'run_pyimports --markup'
 
-        skips_list = self.dart_info.get('NO-CHECK', [])
+        skips_list = self.meta.no_check
         if skips_list:
             for s in skips_list:
                 cmd += " --skip {}".format(s)
@@ -690,21 +691,19 @@ class GoVetTestSuite(PyLintTestSuite):
 
 
 class ClasspathClashTestSuite(PyLintTestSuite):
-    def __init__(self, dart_info, target_platform_descriptor=None, multi_target_platform_run=False):
+    def __init__(self, meta, target_platform_descriptor=None, multi_target_platform_run=False):
         super(ClasspathClashTestSuite, self).__init__(
-            dart_info,
+            meta,
             target_platform_descriptor=target_platform_descriptor,
             multi_target_platform_run=multi_target_platform_run,
         )
-        self.test_name = dart_info["TEST-NAME"]
-        self.ignored = sorted(
-            {('ignore_class:' + i) for i in dart_info.get("IGNORE_CLASSPATH_CLASH", "").split(" ") if i}
-        )
-        self.strict = "STRICT_CLASSPATH_CLASH" in self.dart_info
+        self.test_name = self.meta.test_name
+        self.ignored = sorted({('ignore_class:' + i) for i in self.meta.ignore_classpath_clash.split(" ") if i})
+        self.strict = self.meta.strict_classpath_clash is not None
 
         paths = [
             item[len(consts.BUILD_ROOT_SHORT) + 1 :] if item.startswith(consts.BUILD_ROOT_SHORT) else item
-            for item in self.dart_info.get('CLASSPATH').split()
+            for item in self.meta.classpath.split()
         ]
 
         self.classpath = ["{}/{}".format(consts.BUILD_ROOT, p) for p in paths]

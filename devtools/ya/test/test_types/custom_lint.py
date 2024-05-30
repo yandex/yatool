@@ -11,14 +11,14 @@ from yalibrary.graph.const import BUILD_ROOT, SOURCE_ROOT
 
 
 class CustomLintTestSuite(LintTestSuite):
-    def __init__(self, dart_info, **kwargs):
-        super(CustomLintTestSuite, self).__init__(dart_info, **kwargs)
+    def __init__(self, meta, **kwargs):
+        super(CustomLintTestSuite, self).__init__(meta, **kwargs)
         self._files = self.get_suite_files()
-        self._configs = dart_info.get("LINT-CONFIGS") or []
-        self._lint_name = dart_info["LINT-NAME"]
-        self._linter = dart_info["LINTER"]
-        self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
-        self._extra_params = dart_info.get("LINT-EXTRA-PARAMS") or []
+        self._configs = self.meta.lint_configs
+        self._lint_name = self.meta.lint_name
+        self._linter = self.meta.linter
+        self._file_processing_time = float(self.meta.lint_file_processing_time or "0.0")
+        self._extra_params = self.meta.lint_extra_params
 
     def support_splitting(self, opts=None):
         return self._file_processing_time > 0
@@ -105,4 +105,4 @@ class CustomLintTestSuite(LintTestSuite):
         return data + self._configs
 
     def get_test_dependencies(self):
-        return list(set([x for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ') if x]))
+        return list(set([x for x in self.meta.custom_dependencies.split(' ') if x]))

@@ -82,7 +82,7 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         # return True
 
     def binary_path(self, root):
-        return os.path.splitext(self.dart_info['BINARY-PATH'])[0] + ".tidyjson"
+        return os.path.splitext(self.meta.binary_path)[0] + ".tidyjson"
 
     def get_run_cmd_inputs(self, opts):
         return self.clang_tidy_inputs
@@ -121,5 +121,5 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         return CLANG_TIDY_TEST_TYPE
 
     def global_tidy_library(self):
-        library_path = self.dart_info["GLOBAL-LIBRARY-PATH"].replace("$B", "$(BUILD_ROOT)")
+        library_path = self.meta.global_library_path.replace("$B", "$(BUILD_ROOT)")
         return library_path if library_path.endswith(".tidyjson") else ""

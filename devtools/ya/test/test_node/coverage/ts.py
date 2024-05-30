@@ -50,8 +50,8 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     for suite in suites:
         all_resources.update(suite.global_resources)
 
-    nodejs_resource = suite.dart_info.get(suite.dart_info.get("NODEJS-ROOT-VAR-NAME"))
-    nyc_resource = suite.dart_info.get(suite.dart_info.get("NYC-ROOT-VAR-NAME"))
+    nodejs_resource = suite.meta.nodejs_resource
+    nyc_resource = suite.meta.nyc_resource
 
     cmd = util_tools.get_test_tool_cmd(opts, "build_ts_coverage_report", all_resources) + [
         "--output",
@@ -109,7 +109,7 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
 
     cmd = util_tools.get_test_tool_cmd(opts, "resolve_ts_coverage", suite.global_resources) + [
         "--project-path",
-        suite.dart_info.get("TS-TEST-FOR-PATH"),
+        suite.meta.ts_test_for_path,
         "--coverage-path",
         coverage_tar_path,
         "--output",

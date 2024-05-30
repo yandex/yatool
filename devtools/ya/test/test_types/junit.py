@@ -37,9 +37,9 @@ class JavaTestSuite(test_types.AbstractTestSuite):
 
     runner_path = graph_base.hacked_normpath(consts.T_RUNNER_PATH)
 
-    def __init__(self, dart_info, target_platform_descriptor=None, multi_target_platform_run=False):
+    def __init__(self, meta, target_platform_descriptor=None, multi_target_platform_run=False):
         super(JavaTestSuite, self).__init__(
-            dart_info,
+            meta,
             target_platform_descriptor=target_platform_descriptor,
             multi_target_platform_run=multi_target_platform_run,
         )
@@ -50,27 +50,25 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         self.init_props()
 
         self.initialized = False
-        self.classpath_cmd_type = dart_info[consts.T_JAVA_CLASSPATH_CMD_TYPE]
+        self.classpath_cmd_type = self.meta.java_classpath_cmd_type
 
         self.default_vars = mp2.default_vars(graph_base.hacked_normpath(self.project_path))
         self.jdk_resource = None
         self.jdk_for_tests_resource = None
         self.jacoco_agent_resource = None
-        self.jdk_resource_prefix = dart_info.get(consts.JDK_RESOURCE_PREFIX, 'JDK_NOT_FOUND')
-        self.jdk_for_tests_resource_prefix = dart_info.get(
-            consts.JDK_FOR_TESTS_RESOURCE_PREFIX, 'JDK_FOR_TESTS_NOT_FOUND'
-        )
+        self.jdk_resource_prefix = self.meta.jdk_resource_prefix or 'JDK_NOT_FOUND'
+        self.jdk_for_tests_resource_prefix = self.meta.jdk_for_tests_resource_prefix or 'JDK_FOR_TESTS_NOT_FOUND'
 
-        test_classpath = [strip_root(p) for p in self.dart_info['TEST_CLASSPATH'].split()]
+        test_classpath = [strip_root(p) for p in self.meta.test_classpath.split()]
         self.classpath = [os.path.join(consts.BUILD_ROOT, p) for p in test_classpath]
         self.deps = test_classpath[:]
         self.classpath_package_files = self.get_classpath_package_files(test_classpath)
 
-        test_libpath = [strip_root(p) for p in self.dart_info['TEST_CLASSPATH_DEPS'].split()]
+        test_libpath = [strip_root(p) for p in self.meta.test_classpath_deps.split()]
         self.libpath = [os.path.join(consts.BUILD_ROOT, os.path.dirname(p)) for p in test_libpath]
         self.deps += test_libpath
 
-        self.tests_jar = os.path.join('$(BUILD_ROOT)', self.dart_info['TEST_JAR'])
+        self.tests_jar = os.path.join('$(BUILD_ROOT)', self.meta.test_jar)
         self.classpath_file = os.path.splitext(self.tests_jar)[0] + '.test.cpf'
 
     def init_from_opts(self, opts):
@@ -105,8 +103,8 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         return [os.path.splitext(jar_file)[0] + ".cpsf" for jar_file in deps]
 
     def init_props(self):
-        if self.dart_info.get(consts.T_SYSTEM_PROPERTIES):
-            self.props = json.loads(base64.b64decode(self.dart_info[consts.T_SYSTEM_PROPERTIES]))
+        if self.meta.t_system_properties:
+            self.props = json.loads(base64.b64decode(self.meta.t_system_properties))
 
     def init_jvm_args(self):
         # Default JVM args
@@ -115,7 +113,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
             self.jvm_args.append('-D{}={}'.format(k, v))
 
         # args from JVM_ARGS
-        self.jvm_args.extend(self.dart_info.get(consts.T_JVM_ARGS) or [])
+        self.jvm_args.extend(self.meta.t_jvm_args)
 
     def get_cmd_jvm_args(self, opts):
         jvm_args = self.jvm_args[:]

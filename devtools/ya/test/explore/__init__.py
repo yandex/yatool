@@ -96,14 +96,16 @@ def generate_tests_by_dart(
     return suites_dict.values()
 
 
-def gen_suite(dart_info, target_platform_descriptor=None, multi_target_platform_run=False, with_wine=None):
-    script_rel_path = dart_info['SCRIPT-REL-PATH']
+def gen_suite(meta, target_platform_descriptor=None, multi_target_platform_run=False, with_wine=None):
+    # we must have a field 'SCRIPT-REL-PATH' to be able to get a suite
+    # regardless of type of meta (dart etc)
+    script_rel_path = meta['SCRIPT-REL-PATH']
     suite = SUITE_MAP.get(script_rel_path)
 
     if suite:
         try:
             _suite = suite(
-                dart_info,
+                meta,
                 target_platform_descriptor=target_platform_descriptor,
                 multi_target_platform_run=multi_target_platform_run,
             )

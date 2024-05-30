@@ -153,7 +153,7 @@ class GoBenchSuite(GoTestSuite):
         return True
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
-        go_bench_timeout = self.dart_info.get('GO_BENCH_TIMEOUT')
+        go_bench_timeout = self.meta.go_bench_timeout
         cmd = super(GoBenchSuite, self).get_run_cmd(opts, retry, for_dist_build) + ["--bench-run"]
         if go_bench_timeout:
             cmd += ["--benchmark-timeout", go_bench_timeout]

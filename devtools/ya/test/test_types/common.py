@@ -30,6 +30,7 @@ import test.const
 import test.util.tools
 import build.plugins.lib._metric_resolvers as mr
 
+
 ATTRS_TO_STATE_HASH = [
     '_modulo',
     'project_path',
@@ -64,6 +65,9 @@ class AbstractTestSuite(facility.Suite):
         """
         raise NotImplementedError()
 
+    def _get_meta_info_parser(self):
+        return facility.DartInfo
+
     @classmethod
     def get_ci_type_name(cls):
         return "test"
@@ -76,7 +80,7 @@ class AbstractTestSuite(facility.Suite):
 
     def __init__(
         self,
-        dart_info,
+        meta_dict,
         modulo=1,
         modulo_index=0,
         target_platform_descriptor=None,
@@ -84,9 +88,10 @@ class AbstractTestSuite(facility.Suite):
         multi_target_platform_run=False,
     ):
         """
-        :param dart_info: dart info the `test.dart` file
+        :param meta: meta info like `test.dart` file
         """
         super(AbstractTestSuite, self).__init__()
+        self.meta = self._get_meta_info_parser()(meta_dict)
         self.run_result = None
         self._result_uids = []
         self._output_uids = []
@@ -100,11 +105,10 @@ class AbstractTestSuite(facility.Suite):
         self._pretest_uid = None
 
         # TODO only PerformedTestSuite may have empty dart. remove 'if' after removing inheritance
-        if 'SOURCE-FOLDER-PATH' in dart_info:
-            assert not dart_info['SOURCE-FOLDER-PATH'].startswith(
-                "/"
-            ), 'Source folder path must be relative ({})'.format(dart_info['SOURCE-FOLDER-PATH'])
-        self.dart_info = dart_info
+        if self.meta.source_folder_path is not None:
+            assert not self.meta.source_folder_path.startswith("/"), 'Source folder path must be relative ({})'.format(
+                self.meta.source_folder_path
+            )
         self.symlinks_dir = None  # TODO: only for fleur tests, fix and remove
         self._work_dir = None
         self._specified_timeout = None
@@ -123,10 +127,7 @@ class AbstractTestSuite(facility.Suite):
 
         self.wine_path = None
 
-        self.global_resources = {}
-        for k, v in dart_info.items():
-            if k.endswith('_RESOURCE_GLOBAL'):
-                self.global_resources[k] = v
+        self.global_resources = self.meta.global_resources
 
         self.special_runner = ''
         if test.const.YaTestTags.YtRunner in self.tags:
@@ -147,7 +148,7 @@ class AbstractTestSuite(facility.Suite):
     def save(self):
         #  needed for ya dump
         return {
-            'dart_info': self.dart_info,
+            'dart_info': self.meta.meta_dict,
             'tests': self.tests,
             'result_uids': self._result_uids,
             'output_uids': self._output_uids,
@@ -254,7 +255,7 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def name(self):
-        val = self.dart_info['TEST-NAME']
+        val = self.meta.test_name
         if val == ".":
             val = os.path.basename(self._source_folder_path(''))
         return val
@@ -268,10 +269,11 @@ class AbstractTestSuite(facility.Suite):
         return self._multi_target_platform_run
 
     def binary_path(self, root):
-        if self.dart_info['BINARY-PATH'] == 'python':
+        if self.meta.binary_path == 'python':
             binary = 'python'  # hack to make USE_ARCADIA_PYTHON=no work
         else:
-            binary = os.path.join(root, self.dart_info['BINARY-PATH'])
+            # is binary_path always present here?
+            binary = os.path.join(root, self.meta.binary_path)
         if exts.windows.on_win():
             if not binary.endswith('.exe'):
                 yatest_logger.debug('Missed binary .exe suffix')
@@ -280,21 +282,21 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def _use_arcadia_python(self):
-        return self.dart_info.get('USE_ARCADIA_PYTHON', 'yes') == 'yes'
+        return (self.meta.use_arcadia_python or 'yes') == 'yes'
 
     @property
     def _script_rel_path(self):
-        return self.dart_info['SCRIPT-REL-PATH']
+        return self.meta.script_rel_path
 
     def _source_folder_path(self, root):
-        return os.path.join(root, self.dart_info['SOURCE-FOLDER-PATH'])
+        return os.path.join(root, self.meta.source_folder_path)
 
     @property
     def declared_timeout(self):
         """
         :return: declared timeout in ya.make
         """
-        timeout = self.dart_info.get('TEST-TIMEOUT')
+        timeout = self.meta.test_timeout
         if timeout is not None and isinstance(timeout, six.string_types):
             timeout = timeout.strip()
         if timeout and int(timeout):
@@ -314,31 +316,27 @@ class AbstractTestSuite(facility.Suite):
         self._specified_timeout = value
 
     def _tested_file_rel_path(self):
-        return os.path.join(self.dart_info['BUILD-FOLDER-PATH'], self.test_project_filename)
+        return os.path.join(self.meta.build_folder_path, self.test_project_filename)
 
     @property
     def test_project_filename(self):
-        return self.dart_info.get('TESTED-PROJECT-FILENAME') or self.dart_info['TESTED-PROJECT-NAME']
+        return self.meta.tested_project_filename or self.meta.tested_project_name
 
     @property
     def project_path(self):
-        project_path = self.dart_info['SOURCE-FOLDER-PATH']
+        project_path = self.meta.source_folder_path
         return project_path
 
     @property
     def test_size(self):
-        tsize = self.dart_info.get('SIZE', test.const.TestSize.Small)
+        tsize = self.meta.size or test.const.TestSize.Small
         return tsize.lower()
 
     @property
     def _custom_dependencies(self):
         return list(
             set(
-                [
-                    x
-                    for x in self.dart_info.get('CUSTOM-DEPENDENCIES', '').split(' ')
-                    if x and not x == "$TEST_DEPENDS_VALUE"
-                ]
+                [x for x in self.meta.custom_dependencies.split(' ') if x and not x == "$TEST_DEPENDS_VALUE"]
                 + [self.project_path]
             )
         )
@@ -346,13 +344,13 @@ class AbstractTestSuite(facility.Suite):
     @property
     def recipes(self):
         if self.support_recipes():
-            return self.dart_info.get('TEST-RECIPES')
+            return self.meta.test_recipes
         else:
             return None
 
     @property
     def env(self):
-        return self.dart_info.get('TEST-ENV')
+        return self.meta.test_env
 
     @property
     def setup_pythonpath_env(self):
@@ -360,11 +358,11 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def preserve_env(self):
-        return self.dart_info.get('TEST-PRESERVE-ENV')
+        return self.meta.test_preserve_env
 
     @property
     def yt_spec_files(self):
-        return self.dart_info.get('YT-SPEC', [])
+        return self.meta.yt_spec
 
     @property
     def requires_test_data(self):
@@ -385,7 +383,7 @@ class AbstractTestSuite(facility.Suite):
         if self._test_data_map is None:
             self._test_data_map = collections.defaultdict(set)
 
-            for entry in [_f for _f in self.dart_info.get('TEST-DATA', []) if _f]:
+            for entry in [_f for _f in self.meta.test_data if _f]:
                 for prefix, dtype, remove_prefix in types:
                     if entry.startswith(prefix):
                         if remove_prefix:
@@ -401,14 +399,14 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def python_paths(self):
-        return [_f for _f in self.dart_info.get('PYTHON-PATHS', []) if _f]
+        return [_f for _f in self.meta.python_paths if _f]
 
     @property
     def test_run_cwd(self):
         # Cwd can only be used only when test data is required
         # Otherwise, there might be no target directory
         if self.requires_test_data:
-            cwd = self.dart_info.get('TEST-CWD', None)
+            cwd = self.meta.test_cwd
             if cwd:
                 cwd = "$(SOURCE_ROOT)/" + cwd
             return cwd
@@ -755,16 +753,16 @@ class AbstractTestSuite(facility.Suite):
         return self._modulo, self._modulo_index, self._split_file_name
 
     def get_fork_mode(self):
-        return self.dart_info.get('FORK-MODE')
+        return self.meta.fork_mode
 
     def fork_test_files_requested(self, opts):
-        fork_test_files = self.dart_info.get('FORK-TEST-FILES', "off") == "on"
+        fork_test_files = (self.meta.fork_test_files or 'off') == "on"
         # TODO remove when DEVTOOLS-6560 is dones
         # test_files_filter option implies FORK_TEST_FILES()
         return fork_test_files or (self.supports_fork_test_files and opts.test_files_filter)
 
     def get_fork_partition_mode(self):
-        return self.dart_info.get('TEST_PARTITION', 'SEQUENTIAL')
+        return self.meta.test_partition or 'SEQUENTIAL'
 
     def get_test_files(self, opts=None):
         file_filters = set(getattr(opts, 'test_files_filter', []))
@@ -775,16 +773,16 @@ class AbstractTestSuite(facility.Suite):
         # This suite contains at least one file for sure, because it was discovered
         # and passed suite filtering.
         if file_filters:
-            return [f for f in self.dart_info.get('TEST-FILES') if f in file_filters]
+            return [f for f in self.meta.test_files if f in file_filters]
         else:
-            return self.dart_info.get('TEST-FILES')
+            return self.meta.test_files
 
     def get_computed_test_names(self, opts):
         return []
 
     @property
     def tags(self):
-        return sorted(set([_f for _f in self.dart_info.get('TAG', []) if _f]))
+        return sorted(set([_f for _f in self.meta.tag if _f]))
 
     @property
     def default_requirements(self):
@@ -803,7 +801,7 @@ class AbstractTestSuite(facility.Suite):
             return self._requirements_map
 
         req = {}
-        for entry in [_f for _f in self.dart_info.get('REQUIREMENTS', []) if _f]:
+        for entry in [_f for _f in self.meta.requirements if _f]:
             if ":" not in entry:
                 yatest_logger.warning("Bad requirement syntax: %s in %s", entry, self.project_path)
                 continue
@@ -912,13 +910,10 @@ class AbstractTestSuite(facility.Suite):
         if opts and opts.testing_split_factor:
             return opts.testing_split_factor
         default_split_factor = 10 if self.get_fork_mode() in ["tests", "subtests"] else 1
-        split_test_factor = self.dart_info.get('SPLIT-FACTOR')
-        if split_test_factor:
-            return int(split_test_factor)
-        return default_split_factor
+        return int(self.meta.split_factor) if self.meta.split_factor else default_split_factor
 
     def get_skipped_reason(self):
-        reason = self.dart_info.get("SKIP_TEST")
+        reason = self.meta.skip_test
         if reason:
             return "skipped for reason '{}'".format(reason)
 
@@ -926,16 +921,16 @@ class AbstractTestSuite(facility.Suite):
         return set()
 
     def get_global_resources(self):
-        return sorted('::'.join(i) for i in self.dart_info.items() if i[0].endswith('_RESOURCE_GLOBAL'))
+        return sorted('::'.join(i) for i in self.global_resources.items())
 
     def get_ios_runtime(self):
-        return self.dart_info.get('TEST_IOS_RUNTIME_TYPE', '')
+        return self.meta.test_ios_runtime_type
 
     def get_ios_device_type(self):
-        return self.dart_info.get('TEST_IOS_DEVICE_TYPE', '')
+        return self.meta.test_ios_device_type
 
     def get_android_apk_activity(self):
-        return self.dart_info.get('ANDROID_APK_TEST_ACTIVITY', '')
+        return self.meta.android_apk_test_activity
 
     def get_python_bin(self, opts=None):
         return external_tools.ToolsResolver.get_python_bin(opts, self.global_resources)
@@ -958,7 +953,7 @@ class PythonTestSuite(AbstractTestSuite):
         File with tests
         :return:
         """
-        return os.path.join(self._source_folder_path(root), self.dart_info['TESTED-PROJECT-NAME'])
+        return os.path.join(self._source_folder_path(root), self.meta.tested_project_name)
 
     def _tested_file_rel_path(self):
         return self.binary_path('')
@@ -1168,7 +1163,7 @@ class SkippedTestSuite(object):
         return cmd
 
     def fork_test_files_requested(self, opts):
-        return self.dart_info.get('FORK-TEST-FILES', "off") == "on"
+        return (self.meta.fork_test_files or 'off') == "on"
 
     def supports_canonization(self):
         return False

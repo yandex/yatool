@@ -13,20 +13,18 @@ HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
 
 
-def get_nodejs_res(dart_info):  # type: (dict[str,str]) -> str
-    var_name = dart_info.get("NODEJS-ROOT-VAR-NAME")
+def get_nodejs_res(meta):
+    if not meta.nodejs_root_var_name:
+        raise Exception("Suite cannot find nodejs_root_var_name in metadata. Check configuration errors.")
 
-    if not var_name:
-        raise Exception("Suite cannot find NODEJS-ROOT-VAR-NAME in DART_DATA. Check configuration errors.")
-
-    resource = dart_info.get(var_name)
-
-    if not resource:
+    if not meta.nodejs_resource:
         raise Exception(
-            "NodeJs resource is configured to be {}, but is not provided. Check configuration errors.".format(var_name)
+            "NodeJs resource is configured to be {}, but is not provided. Check configuration errors.".format(
+                meta.nodejs_root_var_name
+            )
         )
 
-    return resource
+    return meta.nodejs_resource
 
 
 class BaseTestSuite(common_types.AbstractTestSuite):
@@ -43,7 +41,7 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
     @property
     def test_for_path(self):
-        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.dart_info.get("TS-TEST-FOR-PATH"))
+        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.meta.ts_test_for_path)
 
     def _get_run_cmd_opts(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -59,8 +57,8 @@ class BaseTestSuite(common_types.AbstractTestSuite):
             remove_tos=opts.remove_tos,
         )
 
-        test_data_dirs = self.dart_info.get("TS-TEST-DATA-DIRS")
-        test_data_dirs_rename = self.dart_info.get("TS-TEST-DATA-DIRS-RENAME")
+        test_data_dirs = self.meta.ts_test_data_dirs
+        test_data_dirs_rename = self.meta.ts_test_data_dirs_rename
         node_path = os.path.join(self.test_for_path, "node_modules")
 
         opts = [
@@ -81,7 +79,7 @@ class BaseTestSuite(common_types.AbstractTestSuite):
             "--node-path",
             node_path,
             "--nodejs",
-            get_nodejs_res(self.dart_info),
+            get_nodejs_res(self.meta),
         ]
 
         if test_data_dirs:
@@ -118,7 +116,7 @@ class JestTestSuite(BaseTestSuite):
             + common_cmd_opts
             + [
                 "--config",
-                self.dart_info.get("CONFIG-PATH"),
+                self.meta.config_path,
                 "--timeout",
                 str(self.timeout),
                 "--verbose",
@@ -149,7 +147,7 @@ class HermioneTestSuite(BaseTestSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
-        test_files = sorted(self.dart_info.get("TEST-FILES")) or []
+        test_files = sorted(self.meta.test_files)
         generic_cmd = test_tools.get_test_tool_cmd(
             opts,
             "run_hermione",
@@ -163,7 +161,7 @@ class HermioneTestSuite(BaseTestSuite):
             + common_cmd_opts
             + [
                 "--config",
-                self.dart_info.get("CONFIG-PATH"),
+                self.meta.config_path,
             ]
         )
 
@@ -176,7 +174,7 @@ class HermioneTestSuite(BaseTestSuite):
             specified_test_paths = [os.path.normpath(f) for f in files_filter]
             cmd += specified_test_paths
         else:
-            test_for_path = self.dart_info.get("TS-TEST-FOR-PATH")
+            test_for_path = self.meta.ts_test_for_path
             cmd += [os.path.relpath(f, test_for_path) for f in test_files]
 
         if self._modulo > 1:
@@ -216,7 +214,7 @@ class PlaywrightTestSuite(BaseTestSuite):
             + common_cmd_opts
             + [
                 "--config",
-                self.dart_info.get("CONFIG-PATH"),
+                self.meta.config_path,
                 "--timeout",
                 str(self.timeout),
                 "--verbose",
@@ -274,7 +272,7 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
     def get_test_dependencies(self):
         return sorted(
             set(
-                [x for x in self.dart_info.get("CUSTOM-DEPENDENCIES", "").split(" ") if x]
+                [x for x in self.meta.custom_dependencies.split(" ") if x]
                 + [self._abs_build_path("pre.pnpm-lock.yaml")]
             )
         )
@@ -345,23 +343,23 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
 class EslintTestSuite(AbstractFrontendStyleSuite):
     def __init__(
         self,
-        dart_info,
+        meta,
         modulo=1,
         modulo_index=0,
         target_platform_descriptor=None,
         multi_target_platform_run=False,
     ):
         super(EslintTestSuite, self).__init__(
-            dart_info,
+            meta,
             modulo,
             modulo_index,
             target_platform_descriptor,
             split_file_name=None,
             multi_target_platform_run=multi_target_platform_run,
         )
-        self._eslint_config_path = self.dart_info.get("ESLINT_CONFIG_PATH")
-        self._files = sorted(self.dart_info.get("TEST-FILES", []))
-        self._file_processing_time = float(dart_info.get("LINT-FILE-PROCESSING-TIME") or "0.0")
+        self._eslint_config_path = self.meta.eslint_config_path
+        self._files = sorted(self.meta.test_files)
+        self._file_processing_time = float(self.meta.lint_file_processing_time or "0.0")
 
     @classmethod
     def get_type_name(cls):
@@ -418,9 +416,9 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             "--build-root",
             jbuild.gen.consts.BUILD_ROOT,
             "--source-folder-path",
-            self.dart_info.get("SOURCE-FOLDER-PATH"),
+            self.meta.source_folder_path,
             "--nodejs",
-            get_nodejs_res(self.dart_info),
+            get_nodejs_res(self.meta),
             "--eslint-config-path",
             self._eslint_config_path,
             "--tracefile",
@@ -435,24 +433,22 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
 
     def __init__(
         self,
-        dart_info,
+        meta,
         modulo=1,
         modulo_index=0,
         target_platform_descriptor=None,
         multi_target_platform_run=False,
     ):
         super(TscTypecheckTestSuite, self).__init__(
-            dart_info,
+            meta,
             modulo,
             modulo_index,
             target_platform_descriptor,
             split_file_name=None,
             multi_target_platform_run=multi_target_platform_run,
         )
-        self._ts_config_path = self.dart_info.get("TS_CONFIG_PATH")
-        self._files = [
-            f.replace("$S/", jbuild.gen.consts.SOURCE_ROOT + "/") for f in sorted(self.dart_info.get("TEST-FILES", []))
-        ]
+        self._ts_config_path = self.meta.ts_config_path
+        self._files = [f.replace("$S/", jbuild.gen.consts.SOURCE_ROOT + "/") for f in sorted(self.meta.test_files)]
 
     @classmethod
     def get_type_name(cls):
@@ -490,9 +486,9 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
             "--build-root",
             jbuild.gen.consts.BUILD_ROOT,
             "--source-folder-path",
-            self.dart_info.get("SOURCE-FOLDER-PATH"),
+            self.meta.source_folder_path,
             "--nodejs",
-            get_nodejs_res(self.dart_info),
+            get_nodejs_res(self.meta),
             "--ts-config-path",
             self._ts_config_path,
             "--tracefile",

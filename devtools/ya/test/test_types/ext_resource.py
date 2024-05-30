@@ -46,7 +46,7 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
 
 class CheckResourceTestSuite(ExtResourceAbstractSuite):
     def get_sandbox_uid_extension(self):
-        return self.dart_info.get('SBR-UID-EXT')
+        return self.meta.sbr_uid_ext
 
     def get_checker(self, opts, dist_build, out_path):
         cmd = ["check_resource"]

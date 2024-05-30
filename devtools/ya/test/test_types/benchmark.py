@@ -39,7 +39,7 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
         raise NotImplementedError
 
     def get_extra_cmd_args(self):
-        return self.dart_info.get('BENCHMARK-OPTS') or []
+        return self.meta.benchmark_opts
 
     @classmethod
     def list(cls, cmd, cwd):

@@ -137,13 +137,13 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
         return paths + [tools.get_corpus_data_path(self.project_path, root)]
 
     def get_fuzz_dicts(self):
-        return self.dart_info.get('FUZZ-DICTS', [])
+        return self.meta.fuzz_dicts
 
     def get_fuzz_opts(self, opts):
         parts = []
         if opts and getattr(opts, "fuzz_opts", False):
             parts.append(opts.fuzz_opts)
-        for option in self.dart_info.get('FUZZ-OPTS', []):
+        for option in self.meta.fuzz_opts:
             parts.append(option)
         return " ".join([_f for _f in parts if _f])
 

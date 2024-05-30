@@ -767,9 +767,8 @@ def create_test_node(
     if add_list_node(opts, suite):
         runner_cmd += ["--test-list-path", suite.work_dir(test.const.TEST_LIST_FILE)]
 
-    sub_path = suite.dart_info.get('CANONIZE_SUB_PATH', '')
-    if sub_path:
-        runner_cmd += ["--sub-path", sub_path]
+    if suite.meta.canonize_sub_path:
+        runner_cmd += ["--sub-path", suite.meta.canonize_sub_path]
     if suite.special_runner == 'yt' and opts.run_tagged_tests_on_yt:
         runner_cmd += ["--space-to-reserve", str(100 * 1024 * 1024)]
     tared_outputs = []
@@ -2232,9 +2231,8 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     if not opts.sandbox:
         node_cmd += ["--mds"]
 
-    sub_path = suite.dart_info.get('CANONIZE_SUB_PATH', '')
-    if sub_path:
-        node_cmd += ["--sub-path", sub_path]
+    if suite.meta.canonize_sub_path:
+        node_cmd += ["--sub-path", suite.meta.canonize_sub_path]
 
     if suite.save_old_canondata:
         node_cmd += ["--save-old-canondata"]
