@@ -114,7 +114,6 @@ void TModuleDirBuilder::AddIncdir(const TStringBuf& dir, EIncDirScope scope, boo
 
     TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);
     Module.IncDirs.Add(dirEnt, scope, langId);
-    FORCE_UNIQ_CONFIGURE_TRACE(dirEnt, H, NEvent::TNeedDirHint(TString{NPath::CutType(dir)}));
 }
 
 void TModuleDirBuilder::AddPeerdir(const TStringBuf& dir, TFlags<EPeerOption> addFlags) {
