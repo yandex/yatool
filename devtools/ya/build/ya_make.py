@@ -518,6 +518,14 @@ def load_configure_errors(errors):
         return loaded_errors
 
 
+def prepare_local_change_list(app_ctx, opts):
+    if app_ctx.vcs_type != 'arc':
+        return
+
+    if build_graph_cache:
+        opts.build_graph_cache_cl = build_graph_cache.prepare_local_change_list(opts)
+
+
 def configure_build_graph_cache_dir(app_ctx, opts):
     if opts.build_graph_cache_heater:
         return

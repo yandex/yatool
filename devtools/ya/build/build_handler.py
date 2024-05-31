@@ -60,6 +60,10 @@ def do_ya_make(params):
         with stager.scope("build_graph_cache_configuration"):
             ya_make.configure_build_graph_cache_dir(app_ctx, params)
 
+    if getattr(params, 'build_graph_cache_force_local_cl', False):
+        with stager.scope("force_changelist_creation"):
+            ya_make.prepare_local_change_list(app_ctx, params)
+
     # XXX
     if getattr(params, 'make_context_on_distbuild_only', False) or getattr(params, 'make_context_only', False):
         from devtools.ya.build.remote import remote_graph_generator
