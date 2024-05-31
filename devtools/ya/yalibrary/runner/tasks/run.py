@@ -569,9 +569,7 @@ class RunNodeTask(object):
 
         if not self._exit_code and self._ctx.content_uids:
             # Read if from '.content_hash.md5' file or calculate it
-            self._node.outputs_uid = self._build_root.read_hashes()
-            if self._node.outputs_uid is not None:
-                self._build_root.write_hashes(self._node.outputs_uid)
+            self._node.outputs_uid = self._build_root.read_hashes(write_if_absent=True)
 
         self._execution_log[self._node.uid]['timing'] = timing
         if self._exit_code and not have_broken:
