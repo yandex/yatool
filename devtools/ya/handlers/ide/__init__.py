@@ -172,7 +172,7 @@ class CLionOptions(core.yarg.Options):
 
 class IdeaOptions(core.yarg.Options):
     IDEA_OPT_GROUP = core.yarg.Group('Idea project options', 0)
-    IDE_PLUGIN_INTEGRATION_GROUP = core.yarg.Group('Integration wuth IDE plugin', 1)
+    IDE_PLUGIN_INTEGRATION_GROUP = core.yarg.Group('Integration with IDE plugin', 1)
 
     def __init__(self):
         self.idea_project_root = None
