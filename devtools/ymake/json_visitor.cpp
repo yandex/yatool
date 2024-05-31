@@ -416,9 +416,10 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
     const auto currNode = currState.Node();
     const auto& graph = TDepGraph::Graph(currNode);
     TJSONEntryStats& currData = *CurEnt;
-    Name = currState.Print();
     bool currDone = currData.Completed;
     bool prntDone = false;
+
+    const TStringBuf name = TDepGraph::ToTargetStringBuf(currState.Node());
 
     TStateItem* prntState = nullptr;
     TJSONEntryStats* prntData = nullptr;
@@ -442,14 +443,14 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         TNodeId tool = 0;
         bool bundle = false;
 
-        YDIAG(Dev) << "JSON: PrepareLeaving " << Name << "; isParentBuildEntry = " << isParentBuildEntry << Endl;
+        YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; isParentBuildEntry = " << isParentBuildEntry << Endl;
         if (currData.IsFile && (currData.HasBuildCmd || currData.OutTogetherDependency != 0)) {
             if (IsModuleType(currNode->NodeType) && IsDirectToolDep(incDep)) {
                 auto name = prntState->GetCmdName();
                 tool = currNode.Id();
                 bundle = graph.Names().CommandConf.GetById(name.GetCmdId()).KeepTargetPlatform;
             } else if (!currData.Fake) {
-                YDIAG(Dev) << "JSON: PrepareLeaving " << Name << "; add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
+                YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
                 if (!prntDone)
                     AddTo(currNode.Id(), prntDestSet);
                 if (!currDone)
@@ -470,9 +471,9 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 if (!moduleDone && NeedAddToOuts(state, *currNode) && !currData.Fake) {
                     AddTo(currNode.Id(), moduleData->ExtraOuts);
                     if (!NewUids) {
-                        moduleState->Hash->Old()->ContextMd5Update(Name.data(), Name.size()); // only once, because we set Node2Module once.
-                        moduleState->Hash->Old()->RenderMd5Update(Name.data(), Name.size());
-                        moduleState->Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+                        moduleState->Hash->Old()->ContextMd5Update(name.data(), name.size()); // only once, because we set Node2Module once.
+                        moduleState->Hash->Old()->RenderMd5Update(name.data(), name.size());
+                        moduleState->Hash->Old()->SelfContextMd5Update(name.data(), name.size());
                     }
                     if (outTogetherDependencyId) {
                         AddTo(outTogetherDependencyId, moduleData->NodeDeps);
@@ -521,7 +522,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
 
             if (!prntDone && outTogetherDependencyId && !currData.Fake) {
-                YDIAG(Dev) << "JSON: PrepareLeaving " << Name << "; as AlsoBuilt add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
+                YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; as AlsoBuilt add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
                 AddTo(outTogetherDependencyId, prntDestSet);
             }
         }
@@ -667,10 +668,10 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
     if (currData.WasFresh) {
         currData.WasFresh = false;
         if (!currDone && !NewUids && currData.HasBuildCmd) {
-            currState.Hash->Old()->ContextMd5Update(Name.data(), Name.size());
+            currState.Hash->Old()->ContextMd5Update(name.data(), name.size());
             currData.OldUids()->SetContextSign(currState.Hash->Old()->GetContextMd5(), currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
-            currState.Hash->Old()->RenderMd5Update(Name.data(), Name.size());
-            currState.Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+            currState.Hash->Old()->RenderMd5Update(name.data(), name.size());
+            currState.Hash->Old()->SelfContextMd5Update(name.data(), name.size());
             currData.OldUids()->SetSelfContextSign(currState.Hash->Old()->GetSelfContextMd5(), currState.Hash->Old()->GetId(), RestoreContext.Conf.GetUidsSalt());
         }
 
@@ -708,7 +709,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     if (!IsOutputType(currNode->NodeType)) {
                         currData.OldUids()->SetIncludedSelfContextSign(currData.OldUids()->GetSelfContextSign());
                     } else {
-                        currState.Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
+                        currState.Hash->Old()->SelfContextMd5Update(name.data(), name.size());
                         currData.OldUids()->SetIncludedSelfContextSign(currState.Hash->Old()->GetIncludesSelfContextMd5());
                     }
                 }
@@ -735,15 +736,15 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         const auto incDep = prntState->CurDep();
 
         if (!prntDone && IsModule(*prntState) && IsGlobalSrcDep(incDep)) {
-            prntState->Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), Name, "TJSONVisitor::PrepareLeaving::<1>"_sb);
-            prntState->Hash->Old()->ContextMd5Update(currData.OldUids()->GetContextSign(), Name);
-            prntState->Hash->Old()->RenderMd5Update(Name.data(), Name.size());
+            prntState->Hash->Old()->IncludesMd5Update(currData.OldUids()->GetContextSign(), name, "TJSONVisitor::PrepareLeaving::<1>"_sb);
+            prntState->Hash->Old()->ContextMd5Update(currData.OldUids()->GetContextSign(), name);
+            prntState->Hash->Old()->RenderMd5Update(name.data(), name.size());
             if (!IsOutputType(currNode->NodeType)) {
-                prntState->Hash->Old()->SelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), Name);
-                prntState->Hash->Old()->IncludesSelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), Name);
+                prntState->Hash->Old()->SelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), name);
+                prntState->Hash->Old()->IncludesSelfContextMd5Update(currData.OldUids()->GetSelfContextSign(), name);
             } else {
-                prntState->Hash->Old()->SelfContextMd5Update(Name.data(), Name.size());
-                prntState->Hash->Old()->IncludesSelfContextMd5Update(Name.data(), Name.size());
+                prntState->Hash->Old()->SelfContextMd5Update(name.data(), name.size());
+                prntState->Hash->Old()->IncludesSelfContextMd5Update(name.data(), name.size());
             }
         }
     }

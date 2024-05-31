@@ -49,8 +49,6 @@ private:
 
     autoarray<TLoopCnt> LoopCnt;
 
-    TString Name; //for debug
-
     TCommands& Commands;
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;
