@@ -1,8 +1,5 @@
-# Сообщения об ошибках системы сборки
+## Сообщения об ошибках системы сборки
 
-# Сообщения `ymake` конфигурации (построения) сборочного графа
-
-- [BadAuto](#badauto)
 - [BadDir](#baddir)
 - [BadFile](#badfile)
 - [BadIncl](#badincl)
@@ -19,16 +16,11 @@
 - [UserErr](#usererr)
 - [UserWarn](#userwarn)
 
-
-## BadAuto
-
-***TBD***
-
-## BadDir
+### BadDir
 
 Ошибка `BadDir` выдаётся в тех случаях, когда в макросы, обрабатывающие пути директорий (такие как `ADDINCL`, `PEERDIR`, `SRCDIR` etc), передаются невалидные пути (путь не является директорий или использование директории ограничено из-за контекста использования или политик использования директории в Аркадии).
 
-Пример 1 (Несуществующая директория [devtools/examples/diag/ymake/bad_dir_missing_dir/](https://a.yandex-team.ru/arc/trunk/arcadia/devtools/examples/diag/ymake/bad_dir_missing_dir/)):
+Пример 1 (Несуществующая директория devtools/examples/diag/ymake/bad_dir_missing_dir/):
 
 {% code '/devtools/examples/diag/ymake/bad_dir_missing_dir/ya.make' %}
 
@@ -39,7 +31,7 @@ Configure error (use -k to proceed)
 $
 ```
 
-Пример 2 (Ограниченная к использованию библиотека [devtools/examples/diag/ymake/bad_dir_peerdir_policy/](https://a.yandex-team.ru/arc/trunk/arcadia/devtools/examples/diag/ymake/bad_dir_peerdir_policy/)):
+Пример 2 (Ограниченная к использованию библиотека devtools/examples/diag/ymake/bad_dir_peerdir_policy/):
 
 {% code '/devtools/examples/diag/ymake/bad_dir_peerdir_policy/ya.make' %}
 
