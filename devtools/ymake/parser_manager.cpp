@@ -105,7 +105,7 @@ namespace {
         // ATTN! Do not change order of elements in this collection and add new elements only to the end.
         static auto languages_and_extensions = {
                 std::make_tuple("other", TVector<TStringBuf>({"fml", "fml2", "fml3", "pln", "info", "a", "lua", "sh"}), ParserConstructor<MakeEmptyParser>(false)),
-                std::make_tuple("other", TVector<TStringBuf>({"bin", "py", "pysrc"}), ParserConstructor<MakeEmptyParser>(true)),
+                std::make_tuple("other", TVector<TStringBuf>({"bin", "py", "pyi", "pysrc"}), ParserConstructor<MakeEmptyParser>(true)),
                 std::make_tuple("c", TVector<TStringBuf>({"cpp", "cc", "cxx", "c", "C", "auxcpp"}), ParserConstructor<MakeCLikeParser>()),
                 std::make_tuple("c", TVector<TStringBuf>({"h", "hh", "hpp", "cuh", "H", "hxx", "xh", "ipp", "ixx"}), ParserConstructor<MakeCHeaderParser>()),
                 std::make_tuple("c", TVector<TStringBuf>({"cu", "S", "s", "sfdl", "m", "mm"}), ParserConstructor<MakeCppParser>()),
