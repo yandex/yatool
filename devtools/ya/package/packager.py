@@ -828,6 +828,7 @@ def create_package(package_context, output_root, builds):
                     except KeyError:
                         data_files.append(elem['destination']['archive'])
                 data_files = '\n'.join(data_files) or '/*'
+                data_files = data_files.format(**formatters)
                 logger.debug("files for 'files' section in spec file: %s", data_files)
                 spec_file = package.rpm.create_spec_file(
                     temp_work_dir,
