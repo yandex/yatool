@@ -12,7 +12,7 @@ class MetaInfo(object):
 
     @property
     def benchmark_opts(self):
-        return self._benchmark_opts or ()
+        return self._benchmark_opts or []
 
     @property
     def binary_path(self):
