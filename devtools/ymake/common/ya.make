@@ -5,7 +5,6 @@ SRCS(
     cyclestimer.cpp
     iterable_tuple.cpp
     iter_pair.cpp
-    md5sig.cpp
     memory_pool.cpp
     npath.cpp
     split_string.cpp

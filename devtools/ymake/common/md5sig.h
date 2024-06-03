@@ -35,4 +35,8 @@ struct TMd5Sig {
     Y_SAVELOAD_DEFINE(RawData);
 };
 
-TString Md5SignatureAsBase64(const TMd5Sig& s);
+inline TString Md5SignatureAsBase64(const TMd5Sig& s) {
+    TString r = TString::Uninitialized(22);
+    Base64EncodeUrlNoPadding(r.begin(), s.RawData, sizeof(s.RawData));
+    return r;
+}
