@@ -358,6 +358,7 @@ class ConsoleReportOptions(core.yarg.Options):
         self.show_passed_tests = False
         self.show_skipped_tests = False
         self.test_console_report = test_console_report
+        self.show_final_ok = True  # for internal usage by `ya run`
 
     def consumer(self):
         return [

@@ -1707,7 +1707,7 @@ class YaMake(object):
                 self.app_ctx.display.emit_message("[[bad]]Failed - No tests collected[[rst]]")
             elif self.exit_code:
                 self.app_ctx.display.emit_message('[[bad]]Failed[[rst]]')
-            else:
+            elif self.opts.show_final_ok:
                 self.app_ctx.display.emit_message('[[good]]Ok[[rst]]')
 
             if self.ctx.create_symlinks:
