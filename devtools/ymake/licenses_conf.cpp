@@ -120,14 +120,16 @@ void LoadLicenses(const NJson::TJsonValue& json, THashMap<TString, TLicenseGroup
     }
 }
 
-THashMap<TString, TLicenseGroup> LoadLicenses(const TVector<TFsPath>& configs) {
+THashMap<TString, TLicenseGroup> LoadLicenses(const TVector<TFsPath>& configs, MD5& confData) {
     THashMap<TString, TLicenseGroup> licenseGroups;
     for (const TFsPath& path : configs) {
         YDIAG(Conf) << "Reading license conf file: " << path << Endl;
         try {
             TFileInput fileInput(path);
+            const auto content = fileInput.ReadAll();
+            confData.Update(content.data(), content.size());
             NJson::TJsonValue json;
-            ReadJsonTree(&fileInput, true, &json, true);
+            ReadJsonTree(content, true, &json, true);
             LoadLicenses(json, licenseGroups);
         } catch (const TFileError& e) {
             YConfErr(BadFile) << "Error while reading license config " << path << ": " << e.what() << Endl;

@@ -223,6 +223,7 @@ struct TYmakeConfig {
 
     TMd5Sig YmakeConfMD5;
     TMd5Sig YmakeConfWoRulesMD5;
+    TMd5Sig YmakeExtraConfMD5;
 
     THashSet<TString> ReservedNames;
     THashSet<TString> ResourceNames; // Strictly speaking these are not part of Ymake config hence arriving late

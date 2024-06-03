@@ -15,13 +15,16 @@ class IBlobSaverBase;
 TFsPath MakeTempFilename(const TString& basePath);
 
 TMd5Sig DefaultConfHash(const TBuildConfiguration& conf);
+TMd5Sig ExtraConfHash(const TBuildConfiguration& conf);
 
 using TConfHash = std::function<TMd5Sig(const TBuildConfiguration&)>;
 class TCacheFileReader {
 private:
     const TBuildConfiguration& Conf;
     const bool ForceLoad;
+    const bool UseExtraConf;
     TConfHash Hash;
+    TConfHash ExtraHash;
 
     THolder<TSubBlobs> SubBlobs;
     TSubBlobs::iterator SubBlobsIt;
@@ -32,10 +35,11 @@ public:
         Exception,
         IncompatibleFormat,
         UpdatedBinary,
-        ChangedConfig
+        ChangedConfig,
+        ChangedExtraConfig
     };
 
-    TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, TConfHash confHash = DefaultConfHash);
+    TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash = DefaultConfHash, TConfHash extraConf = ExtraConfHash);
 
     EReadResult Read(const TFsPath& file);
 
@@ -51,11 +55,12 @@ private:
     const TBuildConfiguration& Conf;
     TFsPath Path;
     TConfHash Hash;
+    TConfHash ExtraHash;
 
     TMultiBlobBuilder Builder;
 
 public:
-    TCacheFileWriter(const TBuildConfiguration& conf, const TFsPath& path, TConfHash confHash = DefaultConfHash);
+    TCacheFileWriter(const TBuildConfiguration& conf, const TFsPath& path, TConfHash confHash = DefaultConfHash, TConfHash extraConf = ExtraConfHash);
 
     TFsPath Flush(bool delayed);
 

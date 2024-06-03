@@ -1,5 +1,7 @@
 #pragma once
 
+#include <devtools/ymake/conf.h>
+
 #include <devtools/ymake/symbols/file_store.h>
 
 class TGraphChangesPredictor {
@@ -17,5 +19,6 @@ public:
 
 private:
     IChanges& Changes_;
+
     bool HasChanges_;
 };

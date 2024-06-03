@@ -252,7 +252,7 @@ bool TMakePlanCache::LoadFromFile() {
         return false;
     }
 
-    TCacheFileReader cacheReader(Conf, false, JsonConfHash);
+    TCacheFileReader cacheReader(Conf, false, false, JsonConfHash);
     if (cacheReader.Read(CachePath) != TCacheFileReader::EReadResult::Success) {
         return false;
     }

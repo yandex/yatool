@@ -374,10 +374,16 @@ TMd5Sig DefaultConfHash(const TBuildConfiguration& conf) {
     return conf.YmakeConfMD5;
 }
 
-TCacheFileReader::TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, TConfHash confHash)
+TMd5Sig ExtraConfHash(const TBuildConfiguration& conf) {
+    return conf.YmakeExtraConfMD5;
+}
+
+TCacheFileReader::TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash, TConfHash extraConfHash)
     : Conf(conf)
     , ForceLoad(forceLoad)
+    , UseExtraConf(useExtraConf)
     , Hash(confHash)
+    , ExtraHash(extraConfHash)
 {
 }
 
@@ -410,13 +416,14 @@ TCacheFileReader::EReadResult TCacheFileReader::CheckVersionInfo() {
     TSubBlobs& blobs = *SubBlobs.Get();
 
     // ImageVersion, binary version and hash(config)
-    if (blobs.size() < 3) {
+    if (blobs.size() < 4) {
         return EReadResult::IncompatibleFormat;
     }
 
     TBlob& oldImageVersion = GetNextBlob();
     TBlob& oldVersionIdBlob = GetNextBlob();
     TBlob& oldConfSignBlob = GetNextBlob();
+    TBlob& oldExtraConfSignBlob = GetNextBlob();
 
     if (oldImageVersion.Size() != sizeof(ui64) || *(ui64*)oldImageVersion.Begin() != ImageVersion) {
         return EReadResult::IncompatibleFormat;
@@ -449,13 +456,22 @@ TCacheFileReader::EReadResult TCacheFileReader::CheckVersionInfo() {
         }
     }
 
+    if (UseExtraConf) {
+        TMd5Sig extraConfMd5;
+        memcpy(extraConfMd5.RawData, oldExtraConfSignBlob.Begin(), oldExtraConfSignBlob.Size());
+        if (ExtraHash(Conf) != extraConfMd5) {
+            return EReadResult::ChangedExtraConfig;
+        }
+    }
+
     return status;
 }
 
-TCacheFileWriter::TCacheFileWriter(const TBuildConfiguration& conf, const TFsPath& path, TConfHash confHash)
+TCacheFileWriter::TCacheFileWriter(const TBuildConfiguration& conf, const TFsPath& path, TConfHash confHash, TConfHash extraConfHash)
     : Conf(conf)
     , Path(path)
     , Hash(confHash)
+    , ExtraHash(extraConfHash)
 {
     SaveVersionInfo();
 }
@@ -493,6 +509,9 @@ void TCacheFileWriter::SaveVersionInfo() {
 
     const TMd5Sig currentConfMD5 = Hash(Conf);
     Builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(currentConfMD5.RawData, sizeof(currentConfMD5.RawData))));
+
+    const TMd5Sig currentExtraConfMD5 = Hash(Conf);
+    Builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(currentExtraConfMD5.RawData, sizeof(currentExtraConfMD5.RawData))));
 }
 
 namespace {
@@ -526,7 +545,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
 
     bool useYmakeCache = !Conf.CachePath.Empty();
     auto forceLoad = useYmakeCache || Conf.ReadFsCache && !Conf.ReadDepsCache;
-    TCacheFileReader cacheReader(Conf, forceLoad);
+    TCacheFileReader cacheReader(Conf, forceLoad, true);
 
     auto readResult = cacheReader.Read(file);
 
@@ -578,6 +597,13 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             if (useYmakeCache) {
                 info = "Graph is readonly loaded from cache.";
             }
+            break;
+        case TCacheFileReader::EReadResult::ChangedExtraConfig:
+            if (useYmakeCache) {
+                info = "Graph is readonly loaded from cache.";
+            }
+            HasGraphStructuralChanges_ = true;
+            YDebug() << "Graph maybe has structural changes because extra conf is changed" << Endl;
             break;
         case TCacheFileReader::EReadResult::IncompatibleFormat:
             info = "Incompatible ymake.cache format, graph will be rebuilt...";
@@ -642,6 +668,10 @@ bool TYMake::LoadPatch() {
     }
     auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
     if (changes) {
+        if (!DepsCacheLoaded_) {
+            HasGraphStructuralChanges_ = true;
+            YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
+        }
         if (!HasGraphStructuralChanges_) {
             TGraphChangesPredictor predictor(*changes);
             predictor.AnalyzeChanges();

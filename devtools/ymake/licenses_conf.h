@@ -16,6 +16,6 @@ struct TLicenseGroup {
 };
 
 /// @brief loads all licenses configuration for current build
-THashMap<TString, TLicenseGroup> LoadLicenses(const TVector<TFsPath>& configs);
+THashMap<TString, TLicenseGroup> LoadLicenses(const TVector<TFsPath>& configs, MD5& confData);
 
 void LoadLicenses(const NJson::TJsonValue& json, THashMap<TString, TLicenseGroup>& licenseGroups);

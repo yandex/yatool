@@ -127,7 +127,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         GenerateCustomData(CustomData);
     }
 
-    MD5 confData, confWoRulesData;
+    MD5 confData, confWoRulesData, rulesData, extraData;
 
     SetGlobalConf(this);
 
@@ -160,20 +160,28 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     CompleteModules();
     VerifyModuleConfs();
     confWoRulesData = confData;
-    LoadSystemHeaders();
-    LoadPeersRules(confData);
+
+    // next conf files don't influence on dep cache
+    LoadSystemHeaders(extraData);
+    LoadPeersRules(rulesData);
     if (Diag()->BlckLst) {
-        LoadBlackLists(confData);
+        LoadBlackLists(rulesData);
     }
     if (Diag()->IslPrjs) {
-        LoadIsolatedProjects(confData);
+        LoadIsolatedProjects(rulesData);
     }
-    LoadLicenses();
+    LoadLicenses(extraData);
+    TMd5Sig rules;
+    rulesData.Final(rules.RawData);
+    extraData.Update(rules.RawData);
+    confData.Update(rules.RawData);
+
     FillMiscValues();
     InitExcludedPeerdirs();
 
     confData.Final(YmakeConfMD5.RawData);
     confWoRulesData.Final(YmakeConfWoRulesMD5.RawData);
+    extraData.Final(YmakeExtraConfMD5.RawData);
 }
 
 void TBuildConfiguration::PrepareBuildDir() const {
@@ -198,22 +206,22 @@ void TBuildConfiguration::GenerateCustomData(const TStringBuf genCustomData) {
     }
 }
 
-void TBuildConfiguration::LoadSystemHeaders() {
+void TBuildConfiguration::LoadSystemHeaders(MD5& confData) {
     TString sysinclVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("SYSINCL"), CommandConf);
     TVector<TFsPath> sysinclFiles;
     for (const auto& it : StringSplitter(sysinclVar).Split(' ').SkipEmpty()) {
         sysinclFiles.emplace_back(SourceRoot / it.Token());
     }
-    Sysincl = ::LoadSystemIncludes(sysinclFiles);
+    Sysincl = ::LoadSystemIncludes(sysinclFiles, confData);
 }
 
-void TBuildConfiguration::LoadLicenses() {
+void TBuildConfiguration::LoadLicenses(MD5& confData) {
     TString licenses = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("LICENSES"), CommandConf);
     TVector<TFsPath> licensesFiles;
     for (const auto& it : StringSplitter(licenses).Split(' ').SkipEmpty()) {
         licensesFiles.emplace_back(SourceRoot / it.Token());
     }
-    Licenses = ::LoadLicenses(licensesFiles);
+    Licenses = ::LoadLicenses(licensesFiles, confData);
 }
 
 void TBuildConfiguration::LoadPeersRules(MD5& confData) {

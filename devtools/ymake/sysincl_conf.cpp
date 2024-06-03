@@ -55,13 +55,14 @@ namespace {
     }
 }
 
-TSysinclRules LoadSystemIncludes(const TVector<TFsPath>& configs) {
+TSysinclRules LoadSystemIncludes(const TVector<TFsPath>& configs, MD5& confData) {
     TSysinclConfig config;
     for (const TFsPath& path : configs) {
         YDIAG(Conf) << "Reading sysincl file: " << path << Endl;
         try {
             TFileInput fileInput(path);
             TString content = fileInput.ReadAll();
+            confData.Update(content.data(), content.size());
             config.LoadConfigContent(content, path.GetPath());
         } catch (const TFileError& e) {
             YConfErr(BadFile) << "Error while reading sysincl config " << path << ": " << e.what() << Endl;

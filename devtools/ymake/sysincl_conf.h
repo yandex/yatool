@@ -10,7 +10,7 @@
 class MD5;
 
 /// @brief loads all sysincl configuration for current build
-TSysinclRules LoadSystemIncludes(const TVector<TFsPath>& configs);
+TSysinclRules LoadSystemIncludes(const TVector<TFsPath>& configs, MD5& confData);
 
 /// @brief loads config from provided content
 TSysinclRules LoadSystemIncludes(const TString& content);
