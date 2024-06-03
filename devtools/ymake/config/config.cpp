@@ -210,6 +210,11 @@ void TModuleConf::Inherit(const TModuleConf& parent) {
         }
         GlobalCmd = parent.GlobalCmd;
     }
+
+    if (!StructCmd && parent.StructCmd) {
+        StructCmd = parent.StructCmd;
+    }
+
     if (!NodeType && parent.NodeType) {
         NodeType = parent.NodeType;
     }
