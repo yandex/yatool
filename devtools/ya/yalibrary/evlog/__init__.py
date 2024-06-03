@@ -1,3 +1,4 @@
+import base64
 import contextlib
 import datetime
 import io
@@ -6,10 +7,11 @@ import os
 import sys
 import threading
 import time
+import core.config
+import core.gsid
 
 import six
 import zstandard as zstd
-import base64
 
 from exts import fs
 from exts import os2
@@ -17,6 +19,7 @@ from exts import yjson
 
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
+DAYS_TO_SAVE = 10
 
 
 class EvlogSuffix:
@@ -201,11 +204,17 @@ class EvlogFileFinder(object):
 
 
 class EvlogFacade(object):
-    def __init__(self, evlog_dir, chunk_name, filename, replacements=None):
-        filepath = os.path.join(evlog_dir, chunk_name, filename)
+    def __init__(self, evlog_dir, filename=None, replacements=None):
+        fs.create_dirs(evlog_dir)
+
+        self._evlog_dir = evlog_dir
+        self._now_time = datetime.datetime.now()
+
+        filepath = filename or self._gen_default_filepath()
+        logging.debug('Event log file is %s', filepath)
 
         self.writer = EvlogWriter(filepath, replacements)
-        self.file_finder = EvlogFileFinder(evlog_dir, lambda f: f != filename)
+        self.file_finder = EvlogFileFinder(evlog_dir, lambda f: f != os.path.basename(filepath))
 
     @property
     def filepath(self):
@@ -231,32 +240,32 @@ class EvlogFacade(object):
     def get_latest(self):
         return self.file_finder.get_latest()
 
+    def _gen_default_filepath(self):
+        run_uid = core.gsid.uid()
+        default_filename = self._now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + EvlogSuffix.ZST
+        chunk_name = self._now_time.strftime(_LOG_DIR_NAME_FMT)
+        fs.create_dirs(os.path.join(self._evlog_dir, chunk_name))
+        return os.path.join(self._evlog_dir, chunk_name, default_filename)
 
-def with_evlog(params, evlog_dir, days_to_save, now_time, run_uid, hide_token):
-    def parse_log_dir(x):
-        return datetime.datetime.strptime(x, _LOG_DIR_NAME_FMT)
+    def cleanup_old_dirs(self):
+        def parse_log_dir(x):
+            return datetime.datetime.strptime(x, _LOG_DIR_NAME_FMT)
 
-    def older_than(x):
-        return now_time - x > datetime.timedelta(days=days_to_save)
+        def older_than(x):
+            return self._now_time - x > datetime.timedelta(days=DAYS_TO_SAVE)
 
-    # prepare fs
-    fs.create_dirs(evlog_dir)
-    for x in os.listdir(evlog_dir):
-        try:
-            if older_than(parse_log_dir(x)):
-                fs.remove_tree_safe(os.path.join(evlog_dir, x))
-        except Exception:
-            logging.debug("While analysing %s:", x, exc_info=sys.exc_info())
+        for _dir in os.listdir(self._evlog_dir):
+            try:
+                if older_than(parse_log_dir(_dir)):
+                    fs.remove_tree_safe(os.path.join(self._evlog_dir, _dir))
+            except Exception:
+                logging.debug("While analysing %s:", _dir, exc_info=sys.exc_info())
 
-    log_chunk = now_time.strftime(_LOG_DIR_NAME_FMT)
-    filename = (
-        getattr(params, 'evlog_file', None) or now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + EvlogSuffix.ZST
-    )
-    logging.debug('Event log file is %s', filename)
 
-    fs.create_dirs(os.path.join(evlog_dir, log_chunk))
-
-    evlog = EvlogFacade(evlog_dir, log_chunk, filename, hide_token)
+def with_evlog(params, evlog_dir, hide_token):
+    filename = getattr(params, 'evlog_file', None)
+    evlog = EvlogFacade(evlog_dir, filename, hide_token)
+    evlog.cleanup_old_dirs()
     evlog.write('init', 'init', args=sys.argv, env=os.environ.copy())
 
     try:

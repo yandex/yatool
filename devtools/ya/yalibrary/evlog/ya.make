@@ -4,6 +4,8 @@ STYLE_PYTHON()
 
 PEERDIR(
     contrib/python/zstandard
+    devtools/ya/core/config
+    devtools/ya/core/gsid
 )
 
 PY_SRCS(
@@ -12,3 +14,7 @@ PY_SRCS(
 )
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)
