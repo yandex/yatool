@@ -18,6 +18,7 @@ import core.report
 from humanfriendly import format_size
 
 from core import profiler, stage_tracer
+import test.const as test_const
 from build.stat.graph import CopyTask, get_critical_path
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log
 from functools import cmp_to_key
@@ -833,7 +834,32 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     for name, stat in stage_tracer.get_stat('graph').items():
         stats.setdefault('gg_stages', {})[name] = stat.duration
 
+    stats['module_lang_stat'], stats['module_lang'] = _get_lang_statistics(graph)
     return stats
+
+
+def _get_lang_statistics(graph):
+    lang_stat = collections.defaultdict(int)
+    graph_results = set(graph.graph_json.get("result", []))
+    for node in graph.graph_json['graph']:
+        if node["uid"] not in graph_results:
+            continue
+
+        lang = node.get("target_properties", {}).get("module_lang", None)
+        if not lang:
+            lang = test_const.ModuleLang.UNKNOWN
+        elif lang in ["py2", "py3"]:
+            lang = test_const.ModuleLang.PY
+
+        lang_stat[lang] += 1
+
+    if not lang_stat:
+        main_lang = test_const.ModuleLang.ABSENT
+    elif len(lang_stat) == 1:
+        main_lang = lang_stat.popitem()[0]
+    else:
+        main_lang = test_const.ModuleLang.NUMEROUS
+    return lang_stat, main_lang
 
 
 def report_coverage_upload_status(graph, report_file, fail_report_file):

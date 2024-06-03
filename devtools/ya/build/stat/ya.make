@@ -14,6 +14,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/status_view
     devtools/ya/core
+    devtools/ya/test/const
 )
 
 STYLE_PYTHON()
