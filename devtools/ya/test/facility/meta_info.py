@@ -315,7 +315,8 @@ class MetaInfo(object):
 
 class DartInfo(MetaInfo):
     def __init__(self, dart_info):
-        self._meta_dict = dart_info
+        # copy to prevent arbitrary modification of the origin
+        self._meta_dict = dart_info.copy()
 
         self._android_apk_test_activity = dart_info.get('ANDROID_APK_TEST_ACTIVITY')
         self._benchmark_opts = dart_info.get('BENCHMARK-OPTS')

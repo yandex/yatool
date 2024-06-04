@@ -127,7 +127,7 @@ class AbstractTestSuite(facility.Suite):
 
         self.wine_path = None
 
-        self.global_resources = self.meta.global_resources
+        self.global_resources = self.meta.global_resources.copy()
 
         self.special_runner = ''
         if test.const.YaTestTags.YtRunner in self.tags:
@@ -921,7 +921,7 @@ class AbstractTestSuite(facility.Suite):
         return set()
 
     def get_global_resources(self):
-        return sorted('::'.join(i) for i in self.global_resources.items())
+        return sorted('::'.join(i) for i in self.meta.global_resources.items())
 
     def get_ios_runtime(self):
         return self.meta.test_ios_runtime_type
