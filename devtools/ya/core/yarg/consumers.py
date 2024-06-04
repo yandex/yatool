@@ -10,12 +10,6 @@ from core.yarg.hooks import SetValueHook
 from exts.strtobool import strtobool
 
 
-def get_default_option_visibility():
-    import app_config
-
-    return HelpLevel.BASIC if app_config.in_house else HelpLevel.NONE
-
-
 def return_true_if_enabled(x):
     try:
         return bool(strtobool(x))
@@ -112,7 +106,7 @@ class ArgConsumer(BaseArgConsumer):
         self.deprecated = deprecated  # type: bool
 
         if visible is None:
-            visible = get_default_option_visibility()
+            visible = HelpLevel.BASIC
 
         if visible is True:
             self.visible = HelpLevel.BASIC
