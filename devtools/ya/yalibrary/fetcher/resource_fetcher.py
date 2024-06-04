@@ -10,13 +10,14 @@ from devtools.libs.yaplatform.python.platform_map import get_resource_dir_name
 
 from core import config
 
+from yalibrary.fetcher.uri_parser import parse_resource_uri
+
 from .common import (
     RENAME,
     UNTAR,
     ProgressPrinter,
     clean_dir,
     deploy_tool,
-    parse_resource_uri,
 )
 
 from .cache_helper import install_resource

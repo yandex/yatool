@@ -15,9 +15,10 @@ from yalibrary import toolscache
 
 from core import config
 
+from yalibrary.fetcher.uri_parser import parse_resource_uri
+
 from .common import (
     BINARY,
-    parse_resource_uri,
     stringify_memoize,
     ProgressPrinter,
 )
