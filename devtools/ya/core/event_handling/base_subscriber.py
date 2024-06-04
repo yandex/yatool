@@ -1,3 +1,5 @@
+import six
+
 from abc import ABCMeta
 import logging
 
@@ -5,9 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class BaseSubscriber(object):
-    __metaclass__ = ABCMeta
-
+class BaseSubscriber(six.with_metaclass(ABCMeta, object)):
     def __init__(self):
         # type: () -> None
         pass

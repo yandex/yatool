@@ -8,4 +8,8 @@ PY_SRCS(
     progress.py
 )
 
+PEERDIR(
+    devtools/ya/exts
+)
+
 END()

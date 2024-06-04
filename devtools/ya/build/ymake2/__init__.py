@@ -36,7 +36,7 @@ from build.ymake2 import consts
 from build.ymake2 import run_ymake
 from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 
-from build.evlog.progress import PrintProgressSubscriber, ModulesFilesStatistic, get_print_status_func
+from build.evlog.progress import PrintProgressSubscriber
 
 
 logger = logging.getLogger(__name__)
@@ -550,12 +550,8 @@ def _run_ymake(**kwargs):
 
             prefetcher.subscribe_to(app_ctx.event_queue)
 
-        display = getattr(app_ctx, 'display', None)
-        print_status = get_print_status_func(app_ctx.params, display, logger)
-        modules_files_stats = ModulesFilesStatistic(
-            stream=print_status, is_rewritable=getattr(app_ctx.params, "output_style", "") == "ninja"
-        )
-        app_ctx.event_queue.subscribe(PrintProgressSubscriber(modules_files_stats))
+        progress_subscriber = PrintProgressSubscriber(app_ctx.params, getattr(app_ctx, 'display', None), logger)
+        progress_subscriber.subscribe_to(app_ctx.event_queue)
     try:
         with tmp.temp_file() as temp_meta:
             binary = kwargs.pop('ymake_bin', None) or _mine_ymake_binary()
@@ -642,7 +638,8 @@ def _run_ymake(**kwargs):
     finally:
         if app_ctx and prefetcher is not None:
             prefetcher.unsubscribe_from(app_ctx.event_queue)
-
+        if app_ctx and progress_subscriber is not None:
+            progress_subscriber.unsubscribe_from(app_ctx.event_queue)
         if _stat_info_postprocessing.get('start'):
             _stat_info_postprocessing['finish'] = time.time()
             _stat_info_postprocessing['duration'] = (

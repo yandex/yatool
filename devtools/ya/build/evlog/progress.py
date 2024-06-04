@@ -1,7 +1,9 @@
 from enum import Enum
 import threading
 import collections
+import six
 
+import exts.func as func
 import core.event_handling as event_handling
 
 
@@ -200,7 +202,11 @@ class ModulesFilesStatistic:
                 self._try_print_message(timestamp)
 
 
-class PrintProgressSubscriber(event_handling.SubscriberExcludedTopics):
+class MixedProgressMeta(type(event_handling.SubscriberExcludedTopics), func.Singleton):
+    pass
+
+
+class PrintProgressSubscriber(six.with_metaclass(MixedProgressMeta, event_handling.SubscriberExcludedTopics)):
     topics = {"NEvent.TNeedDirHint"}
 
     class YmakeLastState:
@@ -211,12 +217,26 @@ class PrintProgressSubscriber(event_handling.SubscriberExcludedTopics):
             self.modules_done = 0
             self.modules_total = 0
 
-    def __init__(
-        self,
-        modules_files_stats,  # type: ModulesFilesStatistic
-    ):
+    def __init__(self, params, display, logger):
+        print_status = get_print_status_func(params, display, logger)
+        self.modules_files_stats = ModulesFilesStatistic(
+            stream=print_status, is_rewritable=getattr(params, "output_style", "") == "ninja"
+        )
         self.ymake_states = collections.defaultdict(PrintProgressSubscriber.YmakeLastState)
-        self.modules_files_stats = modules_files_stats
+        self._subscribers_count = 0
+        self._lock = threading.Lock()
+
+    def subscribe_to(self, q):
+        with self._lock:
+            self._subscribers_count += 1
+            if self._subscribers_count == 1:
+                q.subscribe(self)
+
+    def unsubscribe_from(self, q):
+        with self._lock:
+            self._subscribers_count -= 1
+            if self._subscribers_count == 0:
+                q.unsubscribe(self)
 
     def _action(self, event):
         # type: (dict) -> None
