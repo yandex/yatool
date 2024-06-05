@@ -1709,6 +1709,8 @@ class YaMake(object):
                 self.app_ctx.display.emit_message('[[bad]]Failed[[rst]]')
             elif self.opts.show_final_ok:
                 self.app_ctx.display.emit_message('[[good]]Ok[[rst]]')
+            else:
+                self.app_ctx.display.emit_message('')  # clear stderr
 
             if self.ctx.create_symlinks:
                 self._setup_repo_state()
