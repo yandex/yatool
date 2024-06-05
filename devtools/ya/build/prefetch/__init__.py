@@ -50,48 +50,33 @@ def _join_thread(thr, name):
         logger.exception("Exception occured during execution of %s thread", name, exc_info=exc)
 
 
-class ArcPrefetchSubscriber(event_handling.SubscriberSpecifiedTopics):
-    topics = {"NEvent.TNeedDirHint"}
+class MixedPrefetchMeta(type(event_handling.SubscriberSpecifiedTopics), type(event_handling.SingletonSubscriber)):
+    pass
 
-    _instance = None  # type: tp.Optional[ArcPrefetchSubscriber]
+
+class ArcPrefetchSubscriber(
+    six.with_metaclass(MixedPrefetchMeta, event_handling.SubscriberSpecifiedTopics, event_handling.SingletonSubscriber)
+):
+    topics = {"NEvent.TNeedDirHint"}
 
     @classmethod
     def get_subscriber(cls, arc_root):
         # type: (str) -> ArcPrefetchSubscriber
-        if cls._instance is None:
-            cls._instance = ArcPrefetchSubscriber(arc_root)
+        prefetch_subscriber = ArcPrefetchSubscriber(arc_root)
 
-        if cls._instance._arc_root != arc_root:
+        if prefetch_subscriber._arc_root != arc_root:
             logger.warning(
-                "Arc root mismatch at subscriber creation. Requested: %s, Actual: %s", arc_root, cls._instance._arc_root
+                "Arc root mismatch at subscriber creation. Requested: %s, Actual: %s", arc_root, prefetch_subscriber._arc_root
             )
 
-        return cls._instance
+        return prefetch_subscriber
 
     def __init__(self, arc_root):
         self._arc_root = arc_root
         self._prefetcher = ArcStreamingPrefetcher.get_singleton(arc_root)
-        self._subscribers = 0
-        self._lock = threading.Lock()
 
     def _action(self, event):
         self._prefetcher.add_target(event['Dir'])
-
-    def subscribe_to(self, q):
-        # type: (event_handling.EventQueue) -> None
-        with self._lock:
-            self._subscribers += 1
-            if self._subscribers == 1:
-                logger.debug("Subscribing to event_queue")
-                q.subscribe(self)
-
-    def unsubscribe_from(self, q):
-        # type: (event_handling.EventQueue) -> None
-        with self._lock:
-            self._subscribers -= 1
-            if self._subscribers == 0:
-                logger.debug("Unsubscribing from event_queue")
-                q.unsubscribe(self)
 
     def on_subscribe(self):
         self._prefetcher.start()

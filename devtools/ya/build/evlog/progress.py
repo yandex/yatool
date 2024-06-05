@@ -3,7 +3,6 @@ import threading
 import collections
 import six
 
-import exts.func as func
 import core.event_handling as event_handling
 
 
@@ -202,11 +201,13 @@ class ModulesFilesStatistic:
                 self._try_print_message(timestamp)
 
 
-class MixedProgressMeta(type(event_handling.SubscriberExcludedTopics), func.Singleton):
+class MixedProgressMeta(type(event_handling.SubscriberExcludedTopics), type(event_handling.SingletonSubscriber)):
     pass
 
 
-class PrintProgressSubscriber(six.with_metaclass(MixedProgressMeta, event_handling.SubscriberExcludedTopics)):
+class PrintProgressSubscriber(
+    six.with_metaclass(MixedProgressMeta, event_handling.SubscriberExcludedTopics, event_handling.SingletonSubscriber)
+):
     topics = {"NEvent.TNeedDirHint"}
 
     class YmakeLastState:
@@ -225,18 +226,6 @@ class PrintProgressSubscriber(six.with_metaclass(MixedProgressMeta, event_handli
         self.ymake_states = collections.defaultdict(PrintProgressSubscriber.YmakeLastState)
         self._subscribers_count = 0
         self._lock = threading.Lock()
-
-    def subscribe_to(self, q):
-        with self._lock:
-            self._subscribers_count += 1
-            if self._subscribers_count == 1:
-                q.subscribe(self)
-
-    def unsubscribe_from(self, q):
-        with self._lock:
-            self._subscribers_count -= 1
-            if self._subscribers_count == 0:
-                q.unsubscribe(self)
 
     def _action(self, event):
         # type: (dict) -> None
