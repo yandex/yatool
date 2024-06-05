@@ -21,42 +21,63 @@ def get_app_ctx():
 
 # Subclassing a private class definitely doesn't look like a good idea, but neither does the copying of it's code
 class GeneratorModuleWrapper(contextlib2._GeneratorContextManager):
-    def __init__(self, name, gen):
+    def __init__(self, name, gen, stager):
         self._name = name
+        self._stager = stager
+        self._stage_name_enter = 'module-lifecycle-{}-enter'.format(self._name)
+        self._stage_name_exit = 'module-lifecycle-{}-exit'.format(self._name)
         super(GeneratorModuleWrapper, self).__init__(lambda: gen, [], {})
 
     def __enter__(self):
-        st = time.time()
-        value = super(GeneratorModuleWrapper, self).__enter__()
-        logger.debug('Module "%s" initialized in %f', self._name, time.time() - st)
-        return value
+        start_time = time.time()
+        try:
+            value = super(GeneratorModuleWrapper, self).__enter__()
+        except Exception as e:
+            logger.warning('Exception during module "%s" initialization: %s', self._name, e)
+            from traceback import format_exc
+
+            logger.debug("%s", format_exc())
+            raise
+        else:
+            stop_time = time.time()
+            logger.debug('Module "%s" initialized in %f', self._name, stop_time - start_time)
+            if self._stager is not None:
+                stage = self._stager.start(self._stage_name_enter, start_time=start_time)
+                stage.finish(finish_time=stop_time)
+            return value
 
     def __exit__(self, type, value, traceback):
-        st = time.time()
+        start_time = time.time()
         try:
-            return super(GeneratorModuleWrapper, self).__exit__(type, value, traceback)
+            value = super(GeneratorModuleWrapper, self).__exit__(type, value, traceback)
         except Exception as e:
             logger.warning('Exception during module "%s" stopping: %s', self._name, e)
             from traceback import format_exc
 
             logger.debug("%s", format_exc())
-        finally:
-            logger.debug('Module "%s" stopped in %f', self._name, time.time() - st)
+        else:
+            stop_time = time.time()
+            logger.debug('Module "%s" stopped in %f', self._name, stop_time - start_time)
+            if self._stager is not None:
+                stage = self._stager.start(self._stage_name_exit, start_time=start_time)
+                stage.finish(finish_time=stop_time)
+            return value
 
 
 class AppCtxStack(contextlib2.ExitStack):
-    def __init__(self, kv, modules):
+    def __init__(self, kv, modules, stager):
         super(AppCtxStack, self).__init__()
         self._kv = kv
         self._prev = {}
         self._modules = modules
+        self._stager = stager
 
     def __enter__(self):
         logger.debug('Add %s to ctx %s', self._modules, self._kv.keys())
         for k, v in self._modules:
             if k in self._kv:
                 self._prev[k] = self._kv[k]
-            self._kv[k] = self.enter_context(GeneratorModuleWrapper(k, v))
+            self._kv[k] = self.enter_context(GeneratorModuleWrapper(k, v, self._stager))
 
         return self
 
@@ -82,8 +103,8 @@ class AppCtx(object):
     def __init__(self, **kwargs):
         self._kv = kwargs
 
-    def configure(self, modules):
-        return AppCtxStack(self._kv, modules)
+    def configure(self, modules, stager=None):
+        return AppCtxStack(self._kv, modules, stager)
 
     def __getattr__(self, item):
         try:

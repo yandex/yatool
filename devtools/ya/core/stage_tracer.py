@@ -14,40 +14,73 @@ from . import profiler
 logger = logging.getLogger(__name__)
 
 
+class StagerGroups:
+    OVERALL_EXECUTION = 'overall-execution'
+    MODULE_LIFECYCLE = 'module-lifecycle'
+
+
 class Consumer:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def start(self, name, start_time):
-        # type: (str, float) -> None
+    def filter(self, event):
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> bool
+        """Filter event based on its properties"""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def start(self, event):
+        # type: (StageTracer._StartEvent) -> None
         """Start stage with name at the start_time"""
         raise NotImplementedError()
 
     @abstractmethod
-    def finish(self, name, start_time, finish_time):
-        # type: (str, float | None, float) -> None
+    def finish(self, event):
+        # type: (StageTracer._FinishEvent) -> None
         """finish stage with name started at the start_time and finished at the finish_time"""
         raise NotImplementedError()
 
 
 class StagesProfilerConsumer(Consumer):
-    def start(self, name, start_time):
-        # type: (str, float) -> None
-        stages_profiler.stage_started(name, start_time)
+    def filter(self, event):
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> bool
+        return event.group != StagerGroups.MODULE_LIFECYCLE
 
-    def finish(self, name, start_time, finish_time):
-        # type: (str, float | None, float) -> None
-        stages_profiler.stage_finished(name, finish_time)
+    def start(self, event):
+        # type: (StageTracer._StartEvent) -> None
+        stages_profiler.stage_started(event.name, event.time)
+
+    def finish(self, event):
+        # type: (StageTracer._FinishEvent) -> None
+        stages_profiler.stage_finished(event.name, event.time)
 
 
 class ProfilerConsumer(Consumer):
-    def start(self, name, start_time):
-        # type: (str, float) -> None
-        profiler.profile_step_started(name, start_time)
+    def filter(self, event):
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> bool
+        return event.group != StagerGroups.MODULE_LIFECYCLE
 
-    def finish(self, name, start_time, finish_time):
-        # type: (str, float | None, float) -> None
-        profiler.profile_step_finished(name, finish_time)
+    def start(self, event):
+        # type: (StageTracer._StartEvent) -> None
+        profiler.profile_step_started(event.name, event.time)
+
+    def finish(self, event):
+        # type: (StageTracer._FinishEvent) -> None
+        profiler.profile_step_finished(event.name, event.time)
+
+
+class LoggerConsumer(Consumer):
+    def filter(self, event):
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> bool
+        return event.group != StagerGroups.MODULE_LIFECYCLE
+
+    def start(self, event):
+        # type: (StageTracer._StartEvent) -> None
+        logger.debug("Start stage name={}, group={}, time={}".format(event.name, event.group, event.time))
+
+    def finish(self, event):
+        # type: (StageTracer._FinishEvent) -> None
+        logger.debug("Finish stage name={}, group={}, time={}".format(event.name, event.group, event.time))
 
 
 class EvLogConsumer(Consumer):
@@ -56,19 +89,23 @@ class EvLogConsumer(Consumer):
         self.__evlog = evlog
         self.__evlog_writer = evlog.get_writer("stages")
 
-    def start(self, name, start_time):
-        # type: (str, float) -> None
+    def filter(self, event):
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> bool
+        return True
+
+    def start(self, event):
+        # type: (StageTracer._StartEvent) -> None
         pass
 
-    def finish(self, name, start_time, finish_time):
-        # type: (str, float | None, float) -> None
-        if start_time and not self.__evlog.closed:
+    def finish(self, event):
+        # type: (StageTracer._FinishEvent) -> None
+        if event.start_time and not self.__evlog.closed:
             event = {
                 '_typename': 'stage-finished',
-                '_timestamp': finish_time,
-                'name': name,
-                'time': (start_time, finish_time),
-                'tag': name,
+                '_timestamp': event.time,
+                'name': event.name,
+                'time': (event.start_time, event.time),
+                'tag': event.name,
             }
             self.__evlog_writer(event['_typename'], **event)
 
@@ -136,7 +173,6 @@ class StageTracer(object):
     def start(self, name, group=DEFAULT_GROUP, start_time=None):
         # type: (str, str, float) -> StageTracer.Stage
         start_time = start_time or time.time()
-        logger.debug("Start stage name={}, group={}, time={}".format(name, group, start_time))
         with self.__lock:
             event = self._StartEvent(name, group, start_time)
             self._add_event(event)
@@ -146,7 +182,6 @@ class StageTracer(object):
     def finish(self, name, group=DEFAULT_GROUP, finish_time=None):
         # type: (str, str, float) -> None
         finish_time = finish_time or time.time()
-        logger.debug("Finish stage name={}, group={}, time={}".format(name, group, finish_time))
         with self.__lock:
             start_time = self.__started.pop((name, group), None)
             event = self._FinishEvent(name, group, finish_time, start_time)
@@ -180,7 +215,7 @@ class StageTracer(object):
     _FinishEvent = collections.namedtuple("Event", ["name", "group", "time", "start_time"])
 
     def _add_event(self, event):
-        # type: (StageTracer.StartEvent | StageTracer.FinishEvent) -> None
+        # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> None
         self.__events.append(event)
         self._consume_event(event, self.__consumers)
 
@@ -188,15 +223,22 @@ class StageTracer(object):
     def _consume_event(event, consumers):
         # type: (StageTracer._StartEvent | StageTracer._FinishEvent, list[Consumer]) -> None
         for consumer in consumers:
-            if isinstance(event, StageTracer._StartEvent):
-                consumer.start(event.name, event.time)
-            elif isinstance(event, StageTracer._FinishEvent):
-                consumer.finish(event.name, event.start_time, event.time)
-            else:
-                raise ValueError("Invalid event %s", event)
+            if consumer.filter(event):
+                if isinstance(event, StageTracer._StartEvent):
+                    consumer.start(event)
+                elif isinstance(event, StageTracer._FinishEvent):
+                    consumer.finish(event)
+                else:
+                    raise ValueError("Invalid event %s", event)
 
 
-stage_tracer = StageTracer([StagesProfilerConsumer(), ProfilerConsumer()])
+stage_tracer = StageTracer(
+    [
+        LoggerConsumer(),
+        StagesProfilerConsumer(),
+        ProfilerConsumer(),
+    ]
+)
 
 
 # useful wrappers

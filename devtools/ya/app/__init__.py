@@ -29,7 +29,8 @@ import devtools.ya.app.modules.token_suppressions as token_suppressions
 
 
 logger = logging.getLogger(__name__)
-stager = stage_tracer.get_tracer("overall-execution")
+stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.OVERALL_EXECUTION)
+modules_stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.MODULE_LIFECYCLE)
 # mlockall is called too early, w/ no logging
 MLOCK_STATUS_MESSAGE = ""
 
@@ -65,6 +66,8 @@ def execute_early(action):
         modules_initialization_early_stage = stager.start("modules-initialization-early")
         ctx = yalibrary.app_ctx.get_app_ctx()
 
+        fill_tracer_with_environ_stages()
+
         modules = []
 
         if no_logs or is_sensitive(args):
@@ -84,7 +87,6 @@ def execute_early(action):
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
                 ('vcs_type', configure_vcs_type()),
-                ('aggregated_stages', configure_aggregated_stages()),
             ]
         )
 
@@ -107,12 +109,9 @@ def execute_early(action):
         if diag:
             modules.append(('diag', configure_diag_interceptor()))
 
-        with ctx.configure(modules):
-            try:
-                modules_initialization_early_stage.finish()
-                return action(args, **kwargs)
-            finally:
-                dump_aggregated_stages(ctx)
+        with ctx.configure(modules, modules_stager):
+            modules_initialization_early_stage.finish()
+            return action(args, **kwargs)
 
     return helper
 
@@ -152,7 +151,7 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
 
         modules.append(('dump_debug', configure_debug(ctx)))
 
-        with ctx.configure(modules):
+        with ctx.configure(modules, modules_stager):
             el = getattr(ctx, "evlog", None)
             if el:
                 stage_tracer.stage_tracer.add_consumer(stage_tracer.EvLogConsumer(el))
@@ -178,7 +177,7 @@ def configure_self_info():
 def _get_bootstrap_intervals():
     aggregator = stage_aggregator.BootstrapAggregator()
     start, end = time.time(), 0
-    events = list(aggregator.applicable_events(stage_tracer.get_stat("overall-execution")))
+    events = list(aggregator.applicable_events(stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION)))
     if len(events) == 0:
         return None, None
 
@@ -191,7 +190,7 @@ def _get_bootstrap_intervals():
     return start, end
 
 
-def _fill_tracer_with_environ_stages():
+def fill_tracer_with_environ_stages():
     last_environ_stage_tstamp = time.time()
     stages = os.environ.pop('YA_STAGES', '')
     if stages:
@@ -212,19 +211,20 @@ def _fill_tracer_with_environ_stages():
         bootstrap.finish(end)
 
 
-def configure_aggregated_stages():
-    _fill_tracer_with_environ_stages()
-    yield dict()
-
-
-def dump_aggregated_stages(app_ctx):
+def aggregate_stages():
+    aggregated_stages = {}
     try:
-        stages = stage_tracer.get_stat("overall-execution")
+        stages = stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION)
         for aggregator in stage_aggregator.get_aggregators():
-            app_ctx.aggregated_stages.update(aggregator.aggregate(stages))
+            aggregated_stages.update(aggregator.aggregate(stages))
 
+        stages = stage_tracer.get_stat(stage_tracer.StagerGroups.MODULE_LIFECYCLE)
+        aggregator = stage_aggregator.ModuleLifecycleAggregator()
+        aggregated_stages.update(aggregator.aggregate(stages))
     except Exception:
         logger.exception("While aggregating stages")
+
+    return aggregated_stages
 
 
 def report_params(app_ctx):
@@ -617,7 +617,7 @@ def check_and_respawn_if_possible(handler_python_major_version=None):
 
 
 def _ya_downloads_report():
-    stages = stage_tracer.get_stat("overall-execution")
+    stages = stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION)
     aggregator = stage_aggregator.YaScriptDownloadsAggregator()
     return aggregator.aggregate(stages)
 
@@ -694,6 +694,7 @@ def configure_report_interceptor(ctx, report_events):
 
         additional_fields = _resources_report()
         additional_fields.update(_ya_downloads_report())
+
         telemetry.report(
             ReportTypes.TIMEIT,
             dict(
@@ -704,7 +705,7 @@ def configure_report_interceptor(ctx, report_events):
                 exit_code=exit_code,
                 prefix=core.yarg.OptsHandler.latest_handled_prefix(),
                 version=ctx.revision,
-                total_walltimes=ctx.aggregated_stages,
+                total_walltimes=aggregate_stages(),
                 **additional_fields
             ),
         )
