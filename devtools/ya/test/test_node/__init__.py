@@ -809,6 +809,9 @@ def create_test_node(
 
     node = {
         "backup": backup,
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "broadcast": False,
         "cache": _should_cache_suite(suite, opts),
         "cmds": node_cmds,
@@ -1393,6 +1396,9 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
 
     node = {
         "node-type": "test",
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "cache": _should_cache_suite(suite, opts),
         "backup": backup,
         "broadcast": False,

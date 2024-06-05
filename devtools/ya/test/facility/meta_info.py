@@ -1,4 +1,5 @@
 import jbuild.gen.consts
+import test.const
 
 
 class MetaInfo(object):
@@ -141,6 +142,10 @@ class MetaInfo(object):
         if self._lint_name is None:
             raise ValueError('lint_name cannot be None')
         return self._lint_name
+
+    @property
+    def module_lang(self):
+        return self._module_lang or test.const.ModuleLang.UNKNOWN
 
     @property
     def no_check(self):
@@ -349,6 +354,7 @@ class DartInfo(MetaInfo):
         self._lint_extra_params = dart_info.get("LINT-EXTRA-PARAMS")
         self._lint_file_processing_time = dart_info.get("LINT-FILE-PROCESSING-TIME")
         self._lint_name = dart_info.get("LINT-NAME")
+        self._module_lang = dart_info.get("MODULE_LANG")
         self._no_check = dart_info.get('NO-CHECK')
         self._nodejs_resource = dart_info.get(dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._nodejs_root_var_name = dart_info.get("NODEJS-ROOT-VAR-NAME")
