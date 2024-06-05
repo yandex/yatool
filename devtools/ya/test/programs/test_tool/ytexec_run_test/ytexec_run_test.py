@@ -437,9 +437,12 @@ def generate_config_sections(args):
 
     build_root_files = discover_build_root_files(args)
     upload_structure = get_dirs_structure(args)
-    upload_data = remove_nested_dirs(build_root_files + args.test_related_paths + global_resources_paths)
+    test_tool_bin_path = args.run_test_command[0]
+    upload_data = remove_nested_dirs(
+        build_root_files + args.test_related_paths + global_resources_paths + [test_tool_bin_path]
+    )
     upload_dirs = list(extra_inputs)
-    upload_files = [args.run_test_command[0]]  # test_tool binary
+    upload_files = []
     for data in upload_data:
         if os.path.isdir(data):
             upload_dirs.append(data)
