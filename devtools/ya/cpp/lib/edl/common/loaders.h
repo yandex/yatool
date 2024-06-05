@@ -30,7 +30,7 @@ namespace NYa::NEdl {
     }
 
     struct TBaseLoader {
-        virtual void SetValue(nullptr_t val);
+        virtual void SetValue(std::nullptr_t val);
         virtual void SetValue(bool val);
         virtual void SetValue(long long val);
         virtual void SetValue(unsigned long long val);
@@ -48,7 +48,7 @@ namespace NYa::NEdl {
     // Useful to skip useless json subtrees
     struct TBlackHoleLoader : public TBaseLoader {
     public:
-        void SetValue(nullptr_t) override;
+        void SetValue(std::nullptr_t) override;
         void SetValue(bool) override;
         void SetValue(long long) override;
         void SetValue(unsigned long long) override;
@@ -315,7 +315,7 @@ namespace NYa::NEdl {
     public:
         using TLoaderForRef<NJson::TJsonValue>::TLoaderForRef;
 
-        inline void SetValue(nullptr_t) override {
+        inline void SetValue(std::nullptr_t) override {
             this->ValueRef_ = NJson::TJsonValue(NJson::JSON_NULL);
         }
 

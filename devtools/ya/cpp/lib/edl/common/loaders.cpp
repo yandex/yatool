@@ -8,7 +8,7 @@ namespace NYa::NEdl {
         }
     }
 
-    void TBaseLoader::SetValue(nullptr_t) {
+    void TBaseLoader::SetValue(std::nullptr_t) {
         ythrow TLoaderError() <<  "value 'null' is not expected";
     }
 
@@ -51,7 +51,7 @@ namespace NYa::NEdl {
     void TBaseLoader::Finish() {
     }
 
-    void TBlackHoleLoader::SetValue(nullptr_t) {
+    void TBlackHoleLoader::SetValue(std::nullptr_t) {
     }
 
     void TBlackHoleLoader::SetValue(bool) {
