@@ -347,7 +347,14 @@ cdef inline int pystring_to_cstring(
     cdef int result = -1
     cstring[0] = NULL
     size[0] = 0
-    if PyObject_CheckBuffer(pystring) == 1:  # new-style Buffer interface
+    if PY2:
+        # Although the new-style buffer interface was backported to Python 2.6,
+        # some modules, notably mmap, only support the old buffer interface.
+        # Cf. http://bugs.python.org/issue9229
+        if PyObject_CheckReadBuffer(pystring) == 1:
+            result = PyObject_AsReadBuffer(
+                    pystring, <const void **>cstring, size)
+    elif PyObject_CheckBuffer(pystring) == 1:  # new-style Buffer interface
         result = PyObject_GetBuffer(pystring, buf, PyBUF_SIMPLE)
         if result == 0:
             cstring[0] = <char *>buf.buf

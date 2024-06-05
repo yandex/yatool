@@ -18,12 +18,10 @@ NO_COMPILER_WARNINGS()
 
 NO_LINT()
 
-SRCDIR(contrib/python/pyre2/py3/src)
-
 PY_SRCS(
     TOP_LEVEL
     CYTHON_CPP
-    re2.pyx
+    src/re2.pyx=re2
 )
 
 RESOURCE_FILES(
