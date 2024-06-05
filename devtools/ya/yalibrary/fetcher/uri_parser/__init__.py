@@ -10,6 +10,12 @@ class InvalidHttpUriException(Exception):
         super(InvalidHttpUriException, self).__init__(msg)
 
 
+class InvalidUriSchemaException(Exception):
+    def __init__(self, allowed_schemas, uri):  # type: (set[str], str) -> None
+        msg = 'Unsupported URI schema: expected one of ({}), got {}'.format(', '.join(sorted(allowed_schemas)), uri)
+        super(InvalidUriSchemaException, self).__init__(msg)
+
+
 ParsedResourceUri = namedtuple(
     'ParsedResourceUri', 'resource_type, resource_uri, resource_id, resource_url, fetcher_meta'
 )
@@ -82,4 +88,4 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
         resource_id = rest
         return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url=None, fetcher_meta=None)
     else:
-        raise Exception('Unknown platform in uri: {}'.format(resource_uri))
+        raise InvalidUriSchemaException(accepted_schemas, resource_uri)

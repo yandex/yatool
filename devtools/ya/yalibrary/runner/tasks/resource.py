@@ -5,6 +5,7 @@ import time
 
 import core.error
 
+from yalibrary.fetcher.uri_parser import parse_resource_uri
 from yalibrary.fetcher import common as fetcher_common
 from yalibrary.active_state import Cancelled
 import yalibrary.worker_threads as worker_threads
@@ -99,10 +100,9 @@ class PrepareResource(object):
 
     def fetch(self):
         uri = self._uri_description['uri']
-        resource_type, address = uri.split(':', 1)
-        if resource_type == 'https':
-            resource_type = 'http'
         accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
+        parsed_uri = parse_resource_uri(uri, accepted_resource_types)
+        resource_type = parsed_uri.resource_type
 
         logging.debug("accepted_resource_types={}".format(repr(accepted_resource_types)))
 
@@ -116,18 +116,18 @@ class PrepareResource(object):
 
         if resource_type in self._fetchers_storage.accepted_schemas():
             cacheable = not self._ctx.opts.clear_build
-            resource_root_sbr = os.path.join(self._resource_root, resource_type)
+            resource_type_root = os.path.join(self._resource_root, resource_type)
 
             found_in_local_cache = cacheable and self._cache.has(self.uid)
             if found_in_local_cache:
-                result_path = os.path.join(resource_root_sbr, address)
+                result_path = os.path.join(resource_type_root, parsed_uri.resource_id)
                 if self._cache.try_restore(self.uid, result_path):
                     return result_path
 
             result = os.path.abspath(
                 self._fetch_resource_if_need(
                     self._fetchers_storage.get_by_type(resource_type),
-                    resource_root_sbr,
+                    resource_type_root,
                     uri,
                     progress_callback,
                     self._ctx.state,
@@ -149,7 +149,7 @@ class PrepareResource(object):
 
             sb_out = os.path.join(self._resource_root, 'sbr', str(sb_resource_id))
 
-            dest_file_name, _ = os.path.splitext(address)
+            dest_file_name, _ = os.path.splitext(parsed_uri.resource_id)
             final_dest = os.path.join(self._resource_root, resource_type, dest_file_name)
             logging.debug("Copy sbr: file {} to ext: {}".format(os.path.join(sb_out, 'resource'), final_dest))
 
