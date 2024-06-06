@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def _run_process(command, args, cwd=None, env=None, add_line_timestamps=False, tee=False):
     # TODO: extend exts/process.py
-    logger.debug('Running command: %s %s', command, args)
+    logger.debug('Running command: %s\nARGS: %s\nENV: %s', command, args, env)
     package.display.emit_message('Running command: [[imp]]\'{}\'[[rst]] with args [[imp]]{}'.format(command, args))
 
     if add_line_timestamps or tee:
