@@ -84,6 +84,7 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
         if test_data_dirs:
             opts += ["--test-data-dirs"] + test_data_dirs
+        if test_data_dirs_rename:
             opts += ["--test-data-dirs-rename", test_data_dirs_rename]
 
         return opts
