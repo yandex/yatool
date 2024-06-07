@@ -439,7 +439,7 @@ namespace {
             static const TString delim{"____"};
 
             auto macroIter = Macros.find(name);
-            // Check if this macro definition is partial macro specialization. Specilazation
+            // Check if this macro definition is partial macro specialization. Specialization
             // parameters are needed to create a mangled name for this specialized macro and
             // to create a corresponding BlockData
             TVector<TString> specArgs = CollectSpecArgNames(arguments);
@@ -538,8 +538,8 @@ namespace {
             }
 
             // Add "guard" for conditions. All conditions defined inside the macro are prepended
-            // with the gaurd condition $<macro service var> == "yes" && ... , where macro service
-            // variable is spelled as follows: "env" + <macro name>. Macro service varaibale will
+            // with the guard condition $<macro service var> == "yes" && ... , where macro service
+            // variable is spelled as follows: "env" + <macro name>. Macro service variable will
             // be set to "yes" just before macro invocation.
             PushConditionVars();
             EnterCondition();
@@ -554,7 +554,7 @@ namespace {
                 return;
             }
 
-            // OK. We are currently processing partial macro specialization definition
+            // OK. We are currently processing partial macro specialization definition.
             // Let's check the signature of this partial macro specialization and corresponding
             // generic macro definition
             if (!IsCompatibleSpecSignature(arguments, macroIter->second)) {

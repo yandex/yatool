@@ -268,7 +268,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     if (blockData && blockData->StructCmd) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
-        auto compiled = CommandSink->Compile(command, Module->Vars, ownVars, true);
+        auto compiled = CommandSink->Compile(command, Conf, Module->Vars, ownVars, true);
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
@@ -407,7 +407,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
                     TStringBuf cmdName;
                     TStringBuf cmdValue;
                     ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
-                    auto compiled = commands.Compile(cmdValue, varDefinitionSources, varDefinitionSources, false);
+                    auto compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
                     // TODO: there's no point in allocating cmdElemId for expressions
                     // that do _not_ have directly corresponding nodes
                     // (and are linked as "0:VARNAME=S:123" instead)
@@ -426,7 +426,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         auto& subBinding = it->second;
 
         auto val = EvalAll(var);
-        auto compiled = commands.Compile(val, Module->Vars, varDefinitionSources, false);
+        auto compiled = commands.Compile(val, Conf, Module->Vars, varDefinitionSources, false);
         const ui32 subExpr = commands.Add(*Graph, std::move(compiled.Expression));
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
 

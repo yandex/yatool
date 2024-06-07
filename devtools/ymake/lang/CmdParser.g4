@@ -2,36 +2,43 @@ parser grammar CmdParser;
 
 options { tokenVocab = CmdLexer; }
 
-main: argSep? cmds? EOF;
-cmds: cmd (cmdSep cmd)* cmdSep?;
-cmd: arg (argSep arg)* argSep?;
-arg: (termsR | termsSQ | termsDQ)+; // Raw, Single-Quoted, Double-Quoted
+main: argSep* cmdSep* scr? EOF;
+scr: cmd (cmdSep+ cmd)* cmdSep*;
+cmd: arg (argSep+ arg)* argSep*;
+arg: (termsRO | termsSQ | termsDQ)+;
+callArg: (termsRA | termsSQ | termsDQ)+;
 
 argSep: ARG_SEP;
 cmdSep: CMD_SEP ARG_SEP?;
 
-termsR: (termR | termV | termS)+;
-termsSQ: SQSTR_BEGIN (termSQR | termSQV | termSQS)* SQSTR_END;
-termsDQ: DQSTR_BEGIN (termDQR | termDQV | termDQS)* DQSTR_END;
+// raw command sub-argument, raw call sub-argument, single-quoted string, double-quoted string
+termsRO: (termO | termC | termV | termX)+;
+termsRA: (termA | termC | termV | termX)+;
+termsSQ: SQSTR_BEGIN (termSQR | termSQV | termSQX)* SQSTR_END;
+termsDQ: DQSTR_BEGIN (termDQR | termDQV | termDQX)* DQSTR_END;
 
-termR: TEXT_RAW | TEXT_NOP;
+// a term for a...
+// raw command argument, raw call argument, call, variable, transformation
+termO: (TEXT_RAW | TEXT_NOP | LPAREN | RPAREN)+;
+termA: (TEXT_RAW | TEXT_NOP)+;
+termC: TEXT_VAR LPAREN argSep? (callArg (argSep callArg)*)? argSep? RPAREN;
 termV: TEXT_VAR;
-termS: TEXT_EVL ((subModifier MOD_SEP)* subModifier MOD_END)? subBody EVL_END;
+termX: TEXT_XFM ((xModifier MOD_SEP)* xModifier MOD_END)? xBody XFM_END;
 
 termSQR: SQSTR_RAW | SQSTR_NOP;
 termSQV: SQSTR_VAR;
-termSQS: SQSTR_EVL ((subModifier MOD_SEP)* subModifier MOD_END)? subBody EVL_END;
+termSQX: SQSTR_XFM ((xModifier MOD_SEP)* xModifier MOD_END)? xBody XFM_END;
 
 termDQR: DQSTR_RAW | DQSTR_NOP;
 termDQV: DQSTR_VAR;
-termDQS: DQSTR_EVL ((subModifier MOD_SEP)* subModifier MOD_END)? subBody EVL_END;
+termDQX: DQSTR_XFM ((xModifier MOD_SEP)* xModifier MOD_END)? xBody XFM_END;
 
-subModifier: subModKey (MOD_ARG subModValue)?;
-subModKey: IDENTIFIER;
-subModValue: (subModValueT | subModValueV | subModValueE)*;
-subModValueT: MOD_ARG_VALUE_TEXT;
-subModValueV: MOD_ARG_VALUE_VARIABLE;
-subModValueE: MOD_ARG_VALUE_EVALUATION;
-subBody: subBodyIdentifier | subBodyString;
-subBodyIdentifier: IDENTIFIER;
-subBodyString: STRING;
+xModifier: xModKey (MOD_ARG xModValue)?;
+xModKey: IDENTIFIER;
+xModValue: (xModValueT | xModValueV | xModValueE)*;
+xModValueT: MOD_ARG_VALUE_TEXT;
+xModValueV: MOD_ARG_VALUE_VARIABLE;
+xModValueE: MOD_ARG_VALUE_EVALUATION;
+xBody: xBodyIdentifier | xBodyString;
+xBodyIdentifier: IDENTIFIER;
+xBodyString: STRING;

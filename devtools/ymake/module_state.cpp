@@ -351,7 +351,7 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
     if (conf.HasSemantics && !conf.CmdIgnore.empty()) {
         auto dummyCommandStore = TCommands();
         auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
-        auto compiled = dummyCommandStore.Compile(conf.CmdIgnore, Vars, Vars, false, EOutputAccountingMode::Module);
+        auto compiled = dummyCommandStore.Compile(conf.CmdIgnore, nullptr, Vars, Vars, false, EOutputAccountingMode::Module);
         auto ignore = TCommands::SimpleCommandSequenceWriter()
             .Write(dummyCommandStore, compiled.Expression, Vars, {}, dummyCmdInfo, nullptr)
             .Extract();

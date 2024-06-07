@@ -360,7 +360,7 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
         ParseCommandLikeVariable(Vars.Get1(varName), id, cmdName, cmdValue);
         const TString res = [&]() {
             if (structCmd) {
-                auto compiled = Commands.Compile(cmdValue, Vars, Vars, false);
+                auto compiled = Commands.Compile(cmdValue, &Conf, Vars, Vars, false);
                 // TODO: there's no point in allocating cmdElemId for expressions
                 // that do _not_ have directly corresponding nodes
                 // (and are linked as "0:VARNAME=S:123" instead)
@@ -407,7 +407,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     }
 
     if (GetModuleConf().StructCmd && cmdKind == EModuleCmdKind::Default) {
-        auto compiled = Commands.Compile(command, Vars, Vars, true, EOutputAccountingMode::Module);
+        auto compiled = Commands.Compile(command, &Conf, Vars, Vars, true, EOutputAccountingMode::Module);
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);

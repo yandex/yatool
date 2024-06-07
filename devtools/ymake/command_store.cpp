@@ -13,6 +13,7 @@
 #include <fmt/format.h>
 #include <fmt/args.h>
 #include <util/generic/overloaded.h>
+#include <util/generic/scope.h>
 #include <util/string/escape.h>
 #include <ranges>
 
@@ -110,6 +111,15 @@ namespace {
                     for (auto& mod : std::ranges::reverse_view(sub.Mods))
                         val = ApplyMod(mod, val);
                     return val;
+                },
+                [&](const NCommands::TSyntax::TCall&) -> NPolexpr::TConstId {
+                    Y_ABORT();
+                },
+                [&](const NCommands::TSyntax::TIdOrString&) -> NPolexpr::TConstId {
+                    Y_ABORT();
+                },
+                [&](const NCommands::TSyntax::TUnexpanded&) -> NPolexpr::TConstId {
+                    Y_ABORT();
                 }
             }, term);
         }
@@ -332,11 +342,12 @@ namespace {
 
 }
 
-struct TCounterBump {
-    explicit TCounterBump(size_t& counter): Counter(counter) { ++Counter; }
-    ~TCounterBump() { --Counter; }
-    private:
-        size_t& Counter;
+struct TCommands::TInliner::TScope {
+    explicit TScope(const TScope *base): Base(base) {}
+public:
+    const TScope* Base;
+    using TVarDefinitions = THashMap<TStringBuf, NCommands::TSyntax>;
+    TVarDefinitions VarDefinitions;
 };
 
 static inline ui64 GoodHash(const NPolexpr::TExpression& expr) noexcept {
@@ -356,23 +367,126 @@ const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *con
     return subExpr;
 }
 
-const NCommands::TSyntax& TCommands::Parse(TMacroValues& values, TString src) {
+const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, TString src) {
     auto result = ParserCache.find(src);
     if (result == ParserCache.end())
-        result = ParserCache.emplace(src, NCommands::Parse(values, src)).first;
+        result = ParserCache.emplace(src, NCommands::Parse(conf, values, src)).first;
     return result->second;
 }
 
-TCommands::TCommandCompiler::TVarDefinitions* TCommands::TCommandCompiler::ParseVariable(NPolexpr::EVarId id) {
+TCommands::TInliner::TVarDefinition
+TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     auto name = Commands.Values.GetVarName(id);
+
+    if (auto var = VarLookup(name))
+        return {var, false};
+
+    // legacy lookup
+
     if (name.ends_with("__NOINLINE__") || name.ends_with("__NO_UID__"))
-        return nullptr;
+        return {};
+
     auto buildConf = GlobalConf();
     auto blockData = buildConf->BlockData.find(name);
     if (blockData != buildConf->BlockData.end())
         if (blockData->second.IsUserMacro || blockData->second.IsGenericMacro || blockData->second.IsFileGroupMacro)
-            return nullptr; // TODO how do we _actually_ detect non-vars?
+            return {}; // TODO how do we _actually_ detect non-vars?
 
+    auto var = LegacyVars.VarLookup(name, buildConf);
+    if (!var)
+        return {};
+
+    // check recursion
+
+    auto depth = LegacyVars.RecursionDepth.try_emplace(id, 0).first;
+    for (size_t i = 0; i != depth->second; ++i) {
+        var = var->BaseVal;
+        if (!var || var->DontExpand || var->IsReservedName)
+            ythrow TError() << "self-contradictory variable definition (" << name << ")";
+    }
+
+    // validate contents
+
+    if (var->size() != 1)
+        ythrow TNotImplemented() << "unexpected variable size " << var->size() << " (" << name << ")";
+    auto& val = var->at(0);
+    if (!val.HasPrefix)
+        ythrow TError() << "unexpected variable format";
+
+    // check the parser cache
+
+    auto defs = LegacyVars.DefinitionCache.find(name);
+    if (defs == LegacyVars.DefinitionCache.end())
+        defs = LegacyVars.DefinitionCache.try_emplace(name, MakeHolder<TLegacyVars::TDefinitions>()).first;
+    else
+        if (depth->second < defs->second->size())
+            return {(*defs->second)[depth->second].Get(), true}; // already processed
+    Y_ASSERT(defs->second->size() == depth->second);
+
+    // do the thing
+
+    ui64 scopeId;
+    TStringBuf cmdName;
+    TStringBuf cmdValue;
+    ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
+    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Values, TString(cmdValue))));
+    return {defs->second->back().Get(), true};
+}
+
+const NCommands::TSyntax*
+TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
+    auto name = Commands.Values.GetVarName(id);
+
+    // TODO preliminary validation
+
+    // legacy lookup
+
+    auto buildConf = GlobalConf();
+    auto var = LegacyVars.VarLookup(name, buildConf);
+
+    // check recursion
+
+    Y_ASSERT(!LegacyVars.RecursionDepth.contains(id)); // it's a variable-only feature
+
+    // validate contents
+
+    Y_ASSERT(var);
+    Y_ASSERT(var->size() == 1);
+    Y_ASSERT(var->front().HasPrefix);
+    ui64 subId;
+    TStringBuf subName, subValue;
+    ParseLegacyCommandOrSubst(var->front().Name, subId, subName, subValue);
+    Y_ASSERT(name == subName);
+    Y_ASSERT(GetMacroType(subValue) == EMT_MacroDef);
+
+    // check the parser cache
+
+    auto defs = LegacyVars.DefinitionCache.find(name);
+    if (defs == LegacyVars.DefinitionCache.end())
+        defs = LegacyVars.DefinitionCache.try_emplace(name, MakeHolder<TLegacyVars::TDefinitions>()).first;
+    else {
+        Y_ASSERT(defs->second->size() == 1);
+        return defs->second->back().Get(); // already processed
+    }
+    Y_ASSERT(defs->second->empty());
+
+    // do the thing
+
+    auto defBody = MacroDefBody(subValue);
+    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Values, TString(defBody))));
+    return defs->second->back().Get();
+}
+
+const NCommands::TSyntax* TCommands::TInliner::VarLookup(TStringBuf name) {
+    for (auto scope = Scope; scope; scope = scope->Base) {
+        auto it = scope->VarDefinitions.find(name);
+        if (it != scope->VarDefinitions.end())
+            return &it->second;
+    }
+    return {};
+}
+
+const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const TBuildConfiguration* conf) {
     // do not expand vars that have been overridden
     // (e.g., ignore the global `SRCFLAGS=` from `ymake.core.conf`
     // while dealing with the `SRCFLAGS` parameter in `_SRC()`)
@@ -380,140 +494,167 @@ TCommands::TCommandCompiler::TVarDefinitions* TCommands::TCommandCompiler::Parse
         if (macroVars == &InlineVars)
             break;
         if (macroVars->Contains(name))
-            return nullptr;
+            return {};
     }
 
     auto var = InlineVars.Lookup(name);
     if (!var || var->DontExpand)
-        return nullptr;
+        return {};
     Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
-    if (buildConf->CommandConf.IsReservedName(name))
-        return nullptr;
+    if (conf->CommandConf.IsReservedName(name))
+        return {};
 
-    auto depth = VarRecursionDepth.try_emplace(id, 0).first;
-    for (size_t i = 0; i != depth->second; ++i) {
-        var = var->BaseVal;
-        if (!var || var->DontExpand || var->IsReservedName)
-            ythrow TError() << "self-contradictory variable definition (" << name << ")";
-    }
-    auto defs = VarCache.find(name);
-    if (defs != VarCache.end() && defs->second->size() > depth->second)
-        return defs->second.Get(); // already processed
-
-    if (var->size() != 1)
-        ythrow TNotImplemented() << "unexpected variable size " << var->size() << " (" << name << ")";
-
-    auto& val = var->at(0);
-    if (!val.HasPrefix)
-        ythrow TError() << "unexpected variable format";
-
-    if (defs == VarCache.end())
-        defs = VarCache.try_emplace(name, MakeHolder<TVarDefinitions>()).first;
-    Y_ASSERT(defs->second->size() == depth->second);
-
-    ui64 scopeId;
-    TStringBuf cmdName;
-    TStringBuf cmdValue;
-    ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
-    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Commands.Values, TString(cmdValue))));
-    return defs->second.Get();
+    return var;
 }
 
 struct TCommands::TCmdWriter {
     // TODO .reserve hints
-    TCmdWriter(NCommands::TSyntax& s): S(s) {}
+    TCmdWriter(NCommands::TSyntax& s, bool argMode): S(s), ArgMode(argMode) {}
     void BeginCommand()  { S.Commands.emplace_back(); }
     void BeginArgument() { S.Commands.back().emplace_back(); }
     template<typename T>
-    void WriteTerm(T t)  { S.Commands.back().back().emplace_back(std::move(t)); }
+    void WriteTerm(T t)  {
+        if constexpr (std::is_same_v<T, NPolexpr::EVarId>) {
+            if (ArgMode) {
+                S.Commands.back().back().emplace_back(NCommands::TSyntax::TUnexpanded(t));
+                return;
+            }
+        }
+        S.Commands.back().back().emplace_back(std::move(t));
+    }
     void EndArgument()   { if (S.Commands.back().back().empty()) S.Commands.back().pop_back(); }
     void EndCommand()    { if (S.Commands.back().empty()) S.Commands.pop_back(); }
 private:
     NCommands::TSyntax& S;
+    bool ArgMode;
 };
 
-void TCommands::TCommandCompiler::InlineModValueTerm(
+void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst) {
+    auto macroName = Commands.Values.GetVarName(src.Function);
+
+    Y_ASSERT(Conf);
+    auto blockDataIt = Conf->BlockData.find(macroName);
+    const TBlockData* blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
+    Y_ASSERT(blockData); // TODO handle unknown macros
+
+    Y_ASSERT(blockData->CmdProps->ArgNames.size() == src.Arguments.size());
+    auto argCnt = src.Arguments.size();
+    for (size_t i = 0; i != argCnt; ++i) {
+        auto argName = TStringBuf(blockData->CmdProps->ArgNames[i]);
+        if (argName.EndsWith(NStaticConf::ARRAY_SUFFIX))
+            argName.Chop(strlen(NStaticConf::ARRAY_SUFFIX));
+        auto writer = TCmdWriter(dst.VarDefinitions[argName], true);
+        InlineCommands(src.Arguments[i].Commands, writer);
+    }
+}
+
+void TCommands::TInliner::InlineModValueTerm(
     const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term,
     NCommands::TSyntax::TSubstitution::TModifier::TValue& writer
 ) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
     std::visit(TOverloaded{
         [&](NPolexpr::TConstId id) {
             writer.push_back(id);
         },
         [&](NPolexpr::EVarId id) {
-                auto thatVar = ParseVariable(id);
-                if (!thatVar) {
-                    writer.push_back(id);
-                    return;
-                }
-                auto depth = VarRecursionDepth.try_emplace(id, 0).first;
-                auto& thatDef = *(*thatVar)[depth->second];
-                if (thatDef.Commands.size() == 0)
-                    return;
-                if (thatDef.Commands.size() != 1)
-                    ythrow TError() << "unexpected multicommand substitution";
-                if (thatDef.Commands[0].size() == 0)
-                    return;
-                if (thatDef.Commands[0].size() != 1) {
-                    if (depth->second == 0) {
-                        // leave it for the actual evaluation to expand
-                        writer.push_back(id);
-                        return;
-                    }
+            auto def = GetVariableDefinition(id);
+            if (!def.Definition) {
+                writer.push_back(id);
+                return;
+            }
+            if (def.Definition->Commands.size() == 0)
+                return;
+            if (def.Definition->Commands.size() != 1)
+                ythrow TError() << "unexpected multicommand substitution";
+            if (def.Definition->Commands[0].size() == 0)
+                return;
+            if (def.Definition->Commands[0].size() != 1) {
+                if (def.Legacy && LegacyVars.RecursionDepth[id] != 0)
                     ythrow TError() << "unexpected multiargument substitution";
-                }
-                for (auto&& thatTerm : thatDef.Commands[0][0]) {
-                    std::visit(TOverloaded{
-                        [&](NPolexpr::TConstId id) {
-                            auto bump = TCounterBump(depth->second);
-                            InlineModValueTerm(id, writer);
-                        },
-                        [&](NPolexpr::EVarId id) {
-                            auto bump = TCounterBump(depth->second);
-                            InlineModValueTerm(id, writer);
-                        },
-                        [&](const NCommands::TSyntax::TSubstitution&) {
-                            ythrow TError() << "cannot sub-substitute";
-                        },
-                    }, thatTerm);
-                }
+                // leave it for the actual evaluation to expand
+                writer.push_back(id);
+                return;
+            }
+            for (auto&& thatTerm : def.Definition->Commands[0][0]) {
+                std::visit(TOverloaded{
+                    [&](NPolexpr::TConstId subId) {
+                        if (def.Legacy) {
+                            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
+                            ++LegacyVars.RecursionDepth[id];
+                            Y_DEFER {--LegacyVars.RecursionDepth[id];};
+                            InlineModValueTerm(subId, writer);
+                        } else
+                            InlineModValueTerm(subId, writer);
+                    },
+                    [&](NPolexpr::EVarId subId) {
+                        if (def.Legacy) {
+                            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
+                            ++LegacyVars.RecursionDepth[id];
+                            Y_DEFER {--LegacyVars.RecursionDepth[id];};
+                            InlineModValueTerm(subId, writer);
+                        } else
+                            InlineModValueTerm(subId, writer);
+                    },
+                    [&](const NCommands::TSyntax::TSubstitution&) {
+                        ythrow TError() << "cannot sub-substitute";
+                    },
+                    [&](const NCommands::TSyntax::TCall&) {
+                        throw TNotImplemented();
+                    },
+                    [&](const NCommands::TSyntax::TIdOrString&) {
+                        Y_ABORT();
+                    },
+                    [&](const NCommands::TSyntax::TUnexpanded&) {
+                        Y_ABORT();
+                    },
+                }, thatTerm);
+            }
         },
     }, term);
 }
 
-void TCommands::TCommandCompiler::InlineScalarTerms(
+void TCommands::TInliner::InlineScalarTerms(
     const NCommands::TSyntax::TArgument& arg,
     TCmdWriter& writer
 ) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
     for (auto& term : arg) {
         std::visit(TOverloaded{
             [&](NPolexpr::TConstId id) {
                 writer.WriteTerm(id);
             },
             [&](NPolexpr::EVarId var) {
-                auto thatVar = ParseVariable(var);
-                if (!thatVar) {
+                auto def = GetVariableDefinition(var);
+                if (!def.Definition) {
                     writer.WriteTerm(var);
                     return;
                 }
-                auto depth = VarRecursionDepth.try_emplace(var, 0).first;
-                auto& thatDef = *(*thatVar)[depth->second];
-                if (thatDef.Commands.size() == 0)
+                if (def.Definition->Commands.size() == 0)
                     return;
-                if (thatDef.Commands.size() != 1)
+                if (def.Definition->Commands.size() != 1)
                     ythrow TError() << "unexpected multicommand substitution";
-                if (thatDef.Commands[0].size() == 0)
+                if (def.Definition->Commands[0].size() == 0)
                     return;
-                if (thatDef.Commands[0].size() != 1) {
-                    if (depth->second == 0) {
-                        // leave it for the actual evaluation to expand
-                        writer.WriteTerm(var);
-                        return;
-                    }
-                    ythrow TError() << "unexpected multiargument substitution";
+                if (def.Definition->Commands[0].size() != 1) {
+                    // TODO just disallow this?
+                    if (!def.Legacy || LegacyVars.RecursionDepth[var] != 0)
+                        ythrow TError() << "unexpected multiargument substitution";
+                    // leave it for the actual evaluation to expand
+                    writer.WriteTerm(var);
+                    return;
                 }
-                auto bump = TCounterBump(depth->second);
-                InlineScalarTerms(thatDef.Commands[0][0], writer);
+                if (def.Legacy) {
+                    Y_ASSERT(LegacyVars.RecursionDepth.contains(var));
+                    ++LegacyVars.RecursionDepth[var];
+                    Y_DEFER {--LegacyVars.RecursionDepth[var];};
+                    InlineScalarTerms(def.Definition->Commands[0][0], writer);
+                } else
+                    InlineScalarTerms(def.Definition->Commands[0][0], writer);
             },
             [&](const NCommands::TSyntax::TSubstitution& sub) {
                 auto newSub = NCommands::TSyntax::TSubstitution();
@@ -533,19 +674,22 @@ void TCommands::TCommandCompiler::InlineScalarTerms(
                 bool bodyInlined = [&](){
                     if (sub.Body.size() == 1 && sub.Body.front().size() == 1) {
                         if (auto var = std::get_if<NPolexpr::EVarId>(&sub.Body.front().front()); var) {
-                            auto thatVar = ParseVariable(*var);
-                            if (!thatVar)
+                            auto def = GetVariableDefinition(*var);
+                            if (!def.Definition)
                                 return false;
-                            auto depth = VarRecursionDepth.try_emplace(*var, 0).first;
-                            auto& thatDef = *(*thatVar)[depth->second];
-                            if (thatDef.Commands.size() == 0)
+                            if (def.Definition->Commands.size() == 0)
                                 return true;
-                            if (thatDef.Commands.size() != 1)
+                            if (def.Definition->Commands.size() != 1)
                                 ythrow TError() << "unexpected multicommand in a substitution";
                             NCommands::TSyntax newBody;
-                            TCmdWriter newWriter(newBody);
-                            auto bump = TCounterBump(depth->second);
-                            InlineCommands(thatDef.Commands, newWriter);
+                            TCmdWriter newWriter(newBody, false);
+                            if (def.Legacy) {
+                                Y_ASSERT(LegacyVars.RecursionDepth.contains(*var));
+                                ++LegacyVars.RecursionDepth[*var];
+                                Y_DEFER {--LegacyVars.RecursionDepth[*var];};
+                                InlineCommands(def.Definition->Commands, newWriter);
+                            } else
+                                InlineCommands(def.Definition->Commands, newWriter);
                             if (newBody.Commands.size() != 1)
                                 ythrow TError() << "totally unexpected multicommand in a substitution";
                             newSub.Body = std::move(newBody.Commands[0]);
@@ -558,97 +702,185 @@ void TCommands::TCommandCompiler::InlineScalarTerms(
                     newSub.Body = sub.Body;
                 writer.WriteTerm(std::move(newSub));
             },
+            [&](const NCommands::TSyntax::TCall& call) {
+                auto def = GetMacroDefinition(call.Function);
+                if (!def)
+                    ythrow TError() << "unknown macro call";
+                TScope scope(Scope);
+                FillMacroArgs(call, scope);
+                Scope = &scope;
+                Y_DEFER {Scope = scope.Base;};
+                if (def->Commands.size() == 0)
+                    return;
+                if (def->Commands.size() != 1)
+                    ythrow TError() << "unexpected multicommand call";
+                if (def->Commands[0].size() == 0)
+                    return;
+                if (def->Commands[0].size() != 1)
+                    ythrow TError() << "unexpected multiargument call";
+                InlineScalarTerms(def->Commands[0][0], writer);
+            },
+            [&](const NCommands::TSyntax::TIdOrString&) {
+                Y_ABORT();
+            },
+            [&](const NCommands::TSyntax::TUnexpanded& x) {
+                writer.WriteTerm(x.Variable);
+            },
         }, term);
     }
 }
 
-void TCommands::TCommandCompiler::InlineArguments(
+void TCommands::TInliner::InlineArguments(
     const NCommands::TSyntax::TCommand& cmd,
     TCmdWriter& writer
 ) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
     auto doAVariable = [&](NPolexpr::EVarId id) {
-        auto thatVar = ParseVariable(id);
-        if (!thatVar)
+        auto def = GetVariableDefinition(id);
+        if (!def.Definition)
             return false;
-        auto depth = VarRecursionDepth.try_emplace(id, 0).first;
-        auto& thatDef = *(*thatVar)[depth->second];
-        if (thatDef.Commands.size() == 0)
+        if (def.Definition->Commands.size() == 0)
             return true;
-        if (thatDef.Commands.size() != 1)
+        if (def.Definition->Commands.size() != 1)
             ythrow TError() << "unexpected multicommand substitution";
-        auto bump = TCounterBump(depth->second);
-        InlineArguments(thatDef.Commands[0], writer);
+        if (def.Legacy) {
+            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
+            ++LegacyVars.RecursionDepth[id];
+            Y_DEFER {--LegacyVars.RecursionDepth[id];};
+            InlineArguments(def.Definition->Commands[0], writer);
+        } else
+            InlineArguments(def.Definition->Commands[0], writer);
         return true;
     };
+    auto doACall = [&](const NCommands::TSyntax::TCall& call) {
+        auto def = GetMacroDefinition(call.Function);
+        if (!def)
+            return false;
+        TScope scope(Scope);
+        FillMacroArgs(call, scope);
+        Scope = &scope;
+        Y_DEFER {Scope = scope.Base;};
+        if (def->Commands.size() == 0)
+            return true;
+        if (def->Commands.size() != 1)
+            ythrow TError() << "unexpected multicommand call";
+        InlineArguments(def->Commands[0], writer);
+        return true;
+    };
+    auto tryStandalone = [&](const NCommands::TSyntax::TTerm& term) {
+        if (auto var = std::get_if<NPolexpr::EVarId>(&term))
+            if (doAVariable(*var))
+                return true;
+        if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&term))
+            if (sub->Mods.empty())
+                if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
+                    if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()))
+                        if (doAVariable(*var))
+                            return true;
+        if (auto call = std::get_if<NCommands::TSyntax::TCall>(&term))
+            if (doACall(*call))
+                return true;
+        return false;
+    };
     for (auto& arg : cmd) {
-        if (arg.size() == 1) {
-            if (auto var = std::get_if<NPolexpr::EVarId>(&arg[0]); var)
-                if (doAVariable(*var))
-                    continue;
-            if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&arg[0]); sub)
-                if (sub->Mods.empty())
-                    if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
-                        if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()); var)
-                            if (doAVariable(*var))
-                                continue;
-        }
+        if (arg.size() == 1)
+            if (tryStandalone(arg[0]))
+                continue;
         writer.BeginArgument();
         InlineScalarTerms(arg, writer);
         writer.EndArgument();
     }
 }
 
-void TCommands::TCommandCompiler::InlineCommands(
+void TCommands::TInliner::InlineCommands(
     const NCommands::TSyntax::TCommands& cmds,
     TCmdWriter& writer
 ) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
     auto doAVariable = [&](NPolexpr::EVarId id) {
-        auto thatVar = ParseVariable(id);
-        if (!thatVar)
+        auto def = GetVariableDefinition(id);
+        if (!def.Definition)
             return false;
-        auto depth = VarRecursionDepth.try_emplace(id, 0).first;
-        auto& thatDef = *(*thatVar)[depth->second];
-        auto bump = TCounterBump(depth->second);
-        InlineCommands(thatDef.Commands, writer);
+        if (def.Legacy) {
+            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
+            ++LegacyVars.RecursionDepth[id];
+            Y_DEFER {--LegacyVars.RecursionDepth[id];};
+            InlineCommands(def.Definition->Commands, writer);
+        } else
+            InlineCommands(def.Definition->Commands, writer);
         return true;
     };
+    auto doACall = [&](const NCommands::TSyntax::TCall& call) {
+        auto def = GetMacroDefinition(call.Function);
+        if (!def)
+            return false;
+        TScope scope(Scope);
+        FillMacroArgs(call, scope);
+        Scope = &scope;
+        Y_DEFER {Scope = scope.Base;};
+        InlineCommands(def->Commands, writer);
+        return true;
+    };
+    auto tryStandalone = [&](const NCommands::TSyntax::TTerm& term) {
+        if (auto var = std::get_if<NPolexpr::EVarId>(&term); var)
+            if (doAVariable(*var))
+                return true;
+        if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&term); sub)
+            if (sub->Mods.empty())
+                if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
+                    if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()); var)
+                        if (doAVariable(*var))
+                            return true;
+        if (auto call = std::get_if<NCommands::TSyntax::TCall>(&term))
+            if (doACall(*call))
+                return true;
+        return false;
+    };
     for (auto& cmd : cmds) {
-        if (cmd.size() == 1 && cmd[0].size() == 1) {
-            if (auto var = std::get_if<NPolexpr::EVarId>(&cmd[0][0]); var)
-                if (doAVariable(*var))
-                    continue;
-            if (auto sub = std::get_if<NCommands::TSyntax::TSubstitution>(&cmd[0][0]); sub)
-                if (sub->Mods.empty())
-                    if (sub->Body.size() == 1 && sub->Body.front().size() == 1)
-                        if (auto var = std::get_if<NPolexpr::EVarId>(&sub->Body.front().front()); var)
-                            if (doAVariable(*var))
-                                continue;
-        }
+        if (cmd.size() == 1 && cmd[0].size() == 1)
+            if (tryStandalone(cmd[0][0]))
+                continue;
         writer.BeginCommand();
         InlineArguments(cmd, writer);
         writer.EndCommand();
     }
 }
 
-NCommands::TSyntax TCommands::TCommandCompiler::Inline(const NCommands::TSyntax& ast) {
+NCommands::TSyntax TCommands::TInliner::Inline(const NCommands::TSyntax& ast) {
     auto checkRecursionStuff = [&]() {
 #ifndef NDEBUG
-        for (auto& [k, v] : VarRecursionDepth)
+        for (auto& [k, v] : LegacyVars.RecursionDepth)
             Y_ASSERT(v == 0);
 #endif
     };
     auto result = NCommands::TSyntax();
-    auto writer = TCmdWriter(result);
+    auto writer = TCmdWriter(result, false);
     checkRecursionStuff();
     InlineCommands(ast.Commands, writer);
     checkRecursionStuff();
     return result;
 }
 
-TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam) {
-    auto cc = TCommandCompiler(*this, inlineVars, allVars);
-    auto& cachedAst = Parse(Values, TString(cmd));
-    auto ast = cc.Inline(cachedAst);
+void TCommands::TInliner::CheckDepth() {
+    if (Depth > 50)
+        throw TError() << "inlining too deep";
+}
+
+TCommands::TCompiledCommand TCommands::Compile(
+    TStringBuf cmd,
+    const TBuildConfiguration* conf,
+    const TVars& inlineVars,
+    const TVars& allVars,
+    bool preevaluate,
+    EOutputAccountingMode oam
+) {
+    auto inliner = TInliner(conf, *this, inlineVars, allVars);
+    auto& cachedAst = Parse(conf, Values, TString(cmd));
+    auto ast = inliner.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate)
         return Preevaluate(ast, allVars, oam);
@@ -730,6 +962,21 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
                         os << ": ";
                     PrintCmd(sub.Body, os);
                     os << "}";
+                },
+                [&](const NCommands::TSyntax::TCall& call) {
+                    os << Values.GetVarName(call.Function) << "(";
+                    for (auto& x : call.Arguments) {
+                        if (&x != &call.Arguments.front())
+                            os << ", ";
+                        os << PrintExpr(x);
+                    }
+                    os << ")";
+                },
+                [&](const NCommands::TSyntax::TIdOrString& x) {
+                    os << "~" << x.Value;
+                },
+                [&](const NCommands::TSyntax::TUnexpanded& x) {
+                    os << "!" << Values.GetVarName(x.Variable);
                 }
             }, term);
         }

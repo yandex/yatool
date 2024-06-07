@@ -2,10 +2,12 @@
 
 #include <devtools/ymake/lang/CmdLexer.h>
 #include <devtools/ymake/lang/CmdParserBaseVisitor.h>
+#include <devtools/ymake/conf.h>
 
 #include <devtools/ymake/polexpr/variadic_builder.h>
 
 #include <util/generic/overloaded.h>
+#include <util/generic/scope.h>
 
 using namespace NCommands;
 
@@ -43,8 +45,9 @@ namespace {
 
     public:
 
-        TCmdParserVisitor_Polexpr(TMacroValues& values)
-            : Values(values)
+        TCmdParserVisitor_Polexpr(const TBuildConfiguration* conf, TMacroValues& values)
+            : Conf(conf)
+            , Values(values)
         {
         }
 
@@ -58,69 +61,78 @@ namespace {
 
         std::any visitCmd(CmdParser::CmdContext *ctx) override {
             Syntax.Commands.emplace_back();
+            CmdStack.push_back(&Syntax.Commands.back());
+            Y_DEFER {CmdStack.pop_back();};
             return visitChildren(ctx);
         }
 
         std::any visitArg(CmdParser::ArgContext *ctx) override {
-            Syntax.Commands.back().emplace_back();
+            GetCurrentCommand().emplace_back();
+            return visitChildren(ctx);
+        }
+
+        std::any visitCallArg(CmdParser::CallArgContext *ctx) override {
+            GetCurrentCommand().emplace_back();
             return visitChildren(ctx);
         }
 
         // plaintext terms
 
-        std::any visitTermR(CmdParser::TermRContext *ctx) override { return doVisitTermR(ctx); }
+        std::any visitTermO(CmdParser::TermOContext *ctx) override { return doVisitTermR(ctx); }
+        std::any visitTermA(CmdParser::TermAContext *ctx) override { return doVisitTermR(ctx); }
+        std::any visitTermC(CmdParser::TermCContext *ctx) override { return doVisitTermC(ctx); }
         std::any visitTermV(CmdParser::TermVContext *ctx) override { return doVisitTermV(ctx); }
-        std::any visitTermS(CmdParser::TermSContext *ctx) override { return doVisitTermS(ctx); }
+        std::any visitTermX(CmdParser::TermXContext *ctx) override { return doVisitTermX(ctx); }
 
         // single-quoted terms
 
         std::any visitTermSQR(CmdParser::TermSQRContext *ctx) override { return doVisitTermR(ctx); }
         std::any visitTermSQV(CmdParser::TermSQVContext *ctx) override { return doVisitTermV(ctx); }
-        std::any visitTermSQS(CmdParser::TermSQSContext *ctx) override { return doVisitTermS(ctx); }
+        std::any visitTermSQX(CmdParser::TermSQXContext *ctx) override { return doVisitTermX(ctx); }
 
         // double-quoted terms
 
         std::any visitTermDQR(CmdParser::TermDQRContext *ctx) override { return doVisitTermR(ctx); }
         std::any visitTermDQV(CmdParser::TermDQVContext *ctx) override { return doVisitTermV(ctx); }
-        std::any visitTermDQS(CmdParser::TermDQSContext *ctx) override { return doVisitTermS(ctx); }
+        std::any visitTermDQX(CmdParser::TermDQXContext *ctx) override { return doVisitTermX(ctx); }
 
-        // substitution pieces
+        // transformation pieces
 
-        std::any visitSubModKey(CmdParser::SubModKeyContext *ctx) override {
+        std::any visitXModKey(CmdParser::XModKeyContext *ctx) override {
             GetCurrentSubst().Mods.push_back({CompileFnName(ctx->getText()), {}});
             return visitChildren(ctx);
         }
 
-        std::any visitSubModValue(CmdParser::SubModValueContext *ctx) override {
+        std::any visitXModValue(CmdParser::XModValueContext *ctx) override {
             GetCurrentSubst().Mods.back().Values.emplace_back();
             return visitChildren(ctx);
         }
 
-        std::any visitSubModValueT(CmdParser::SubModValueTContext *ctx) override {
+        std::any visitXModValueT(CmdParser::XModValueTContext *ctx) override {
             GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertStr(ctx->getText()));
             return visitChildren(ctx);
         }
 
-        std::any visitSubModValueV(CmdParser::SubModValueVContext *ctx) override {
+        std::any visitXModValueV(CmdParser::XModValueVContext *ctx) override {
             GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertVar(Unvariable(ctx->getText())));
             return visitChildren(ctx);
         }
 
-        std::any visitSubModValueE(CmdParser::SubModValueEContext *ctx) override {
-            std::string s = ctx->getText();
-            if (!(s.size() > 3 && s.starts_with("${") && s.ends_with("}")))
-                throw yexception() << "bad variable name " << s;
-            std::string_view sv(s.begin() + 2, s.end() - 1);
+        std::any visitXModValueE(CmdParser::XModValueEContext *ctx) override {
+            std::string text = ctx->getText();
+            if (!(text.size() > 3 && text.starts_with("${") && text.ends_with("}")))
+                throw yexception() << "bad variable name " << text;
+            std::string_view sv(text.begin() + 2, text.end() - 1);
             GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertVar(sv));
             return visitChildren(ctx);
         }
 
-        std::any visitSubBodyIdentifier(CmdParser::SubBodyIdentifierContext *ctx) override {
+        std::any visitXBodyIdentifier(CmdParser::XBodyIdentifierContext *ctx) override {
             GetCurrentSubst().Body = {{Values.InsertVar(ctx->getText())}};
             return visitChildren(ctx);
         }
 
-        std::any visitSubBodyString(CmdParser::SubBodyStringContext *ctx) override {
+        std::any visitXBodyString(CmdParser::XBodyStringContext *ctx) override {
             GetCurrentSubst().Body = {{Values.InsertStr(UnquoteDouble(ctx->getText()))}};
             return visitChildren(ctx);
         }
@@ -128,18 +140,108 @@ namespace {
     private:
 
         std::any doVisitTermR(antlr4::RuleContext *ctx) {
-            Syntax.Commands.back().back().emplace_back(Values.InsertStr(Unescape(ctx->getText())));
+            auto& arg = GetCurrentArgument();
+            if (MacroCallDepth == 0)
+                arg.emplace_back(Values.InsertStr(Unescape(ctx->getText())));
+            else
+                arg.emplace_back(TSyntax::TIdOrString{Unescape(ctx->getText())});
             return visitChildren(ctx);
+        }
+
+        std::any doVisitTermC(CmdParser::TermCContext *ctx) {
+            auto rawArgs = TSyntax::TCommand();
+            auto result = std::any();
+            {
+                CmdStack.push_back(&rawArgs);
+                Y_DEFER {CmdStack.pop_back();};
+                ++MacroCallDepth;
+                Y_DEFER {--MacroCallDepth;};
+                result = visitChildren(ctx);
+            }
+            auto text = ctx->TEXT_VAR()->getText();
+            auto macroName = Unvariable(text);
+            GetCurrentArgument().emplace_back(TSyntax::TCall{
+                .Function = Values.InsertVar(macroName),
+                .Arguments = CollectArgs(macroName, std::move(rawArgs))
+            });
+            return result;
         }
 
         std::any doVisitTermV(antlr4::RuleContext *ctx) {
-            Syntax.Commands.back().back().emplace_back(Values.InsertVar(Unvariable(ctx->getText())));
+            GetCurrentArgument().emplace_back(Values.InsertVar(Unvariable(ctx->getText())));
             return visitChildren(ctx);
         }
 
-        std::any doVisitTermS(antlr4::RuleContext *ctx) {
-            Syntax.Commands.back().back().emplace_back(TSyntax::TSubstitution{});
+        std::any doVisitTermX(antlr4::RuleContext *ctx) {
+            GetCurrentArgument().emplace_back(TSyntax::TSubstitution{});
             return visitChildren(ctx);
+        }
+
+    private:
+
+        TVector<TSyntax> CollectArgs(TStringBuf macroName, TSyntax::TCommand rawArgs) {
+            //
+            // block data representations:
+            // `macro FOOBAR(A, B[], C...) {...}`  -->  ArgNames == {"B...", "A", "C..."}, Keywords = {"B"}
+            //
+            // cf. ConvertArgsToPositionalArrays() and MapMacroVars()
+            //
+            // the resulting collection follows the ordering in ArgNames
+            //
+
+            Y_ASSERT(Conf);
+            auto blockDataIt = Conf->BlockData.find(macroName);
+            auto blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
+            Y_ASSERT(blockData); // TODO handle unknown macros
+
+            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size(), {{TSyntax::TCommand()}});
+            TSyntax* namedArg = nullptr;
+
+            auto kwArgCnt = blockData->CmdProps->Keywords.size();
+            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->Keywords.size();
+            auto hasVarArg = blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+            for (auto rawArg = rawArgs.begin(); rawArg != rawArgs.end(); ++rawArg) {
+
+                if (rawArg->size() == 1)
+                    if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front()))
+                        if (blockData->CmdProps->HasKeyword(kw->Value)) {
+                            namedArg = &args[blockData->CmdProps->Key2ArrayIndex(kw->Value)];
+                            continue;
+                        }
+
+                for (auto& term : *rawArg)
+                    if (auto str = std::get_if<TSyntax::TIdOrString>(&term))
+                        term = Values.InsertStr(str->Value);
+
+                if (namedArg) {
+                    namedArg->Commands.back().push_back(std::move(*rawArg));
+                    continue;
+                }
+
+                size_t rawPos = rawArg - rawArgs.begin();
+                if (rawPos < posArgCnt)
+                    args[kwArgCnt + rawPos].Commands.back().push_back(std::move(*rawArg));
+                else if (hasVarArg)
+                    args[kwArgCnt + posArgCnt - 1].Commands.back().push_back(std::move(*rawArg));
+                else
+                    throw TError()
+                        << "Macro " << macroName
+                        << " called with too many positional arguments"
+                        << " (" << posArgCnt << " expected)";
+
+            }
+
+            return args;
+        }
+
+    private:
+
+        TSyntax::TCommand& GetCurrentCommand() {
+            return *CmdStack.back();
+        }
+
+        TSyntax::TArgument& GetCurrentArgument() {
+            return CmdStack.back()->back();
         }
 
         TSyntax::TSubstitution& GetCurrentSubst() {
@@ -176,8 +278,11 @@ namespace {
 
     private:
 
+        const TBuildConfiguration* Conf;
         TMacroValues& Values;
         TSyntax Syntax;
+        TVector<TSyntax::TCommand*> CmdStack;
+        int MacroCallDepth = 0;
 
     };
 
@@ -205,7 +310,7 @@ namespace {
 //
 //
 
-TSyntax NCommands::Parse(TMacroValues& values, TStringBuf src) {
+TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, TStringBuf src) {
 
     antlr4::ANTLRInputStream input(src);
     TCmdParserErrorListener errorListener(src);
@@ -219,7 +324,7 @@ TSyntax NCommands::Parse(TMacroValues& values, TStringBuf src) {
     CmdParser parser(&tokens);
     parser.addErrorListener(&errorListener);
 
-    TCmdParserVisitor_Polexpr visitor(values);
+    TCmdParserVisitor_Polexpr visitor(conf, values);
     visitor.visit(parser.main());
 
     return visitor.Extract();
@@ -294,7 +399,16 @@ namespace {
                         } else {
                             CompileArgs(values, s.Body, termsBuilder);
                         }
-                    }
+                    },
+                    [&](const TSyntax::TCall&) {
+                        Y_ABORT();
+                    },
+                    [&](const TSyntax::TIdOrString&) {
+                        Y_ABORT();
+                    },
+                    [&](const TSyntax::TUnexpanded&) {
+                        Y_ABORT();
+                    },
                 }, cmd[arg][term]);
             }
             termsBuilder.Build();

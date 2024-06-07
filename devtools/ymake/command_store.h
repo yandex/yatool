@@ -11,6 +11,7 @@
 #include <util/generic/strbuf.h>
 #include <util/generic/deque.h>
 
+class TBuildConfiguration;
 class TAddDepAdaptor;
 class TDepGraph;
 
@@ -118,7 +119,14 @@ public:
         }
         return &Commands[static_cast<ui32>(fres->second)];
     }
-    TCompiledCommand Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam = EOutputAccountingMode::Default);
+    TCompiledCommand Compile(
+        TStringBuf cmd,
+        const TBuildConfiguration* conf,
+        const TVars& inlineVars,
+        const TVars& allVars,
+        bool preevaluate,
+        EOutputAccountingMode oam = EOutputAccountingMode::Default
+    );
     ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
     TString PrintExpr(const NCommands::TSyntax& expr) const;
@@ -162,31 +170,57 @@ private:
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
 
-    const NCommands::TSyntax& Parse(TMacroValues& values, TString src);
+    const NCommands::TSyntax& Parse(const TBuildConfiguration* conf, TMacroValues& values, TString src);
 
     struct TCmdWriter;
-    struct TCommandCompiler {
-        TCommandCompiler(TCommands& commands, const TVars& inlineVars, const TVars& allVars):
-            Commands(commands), InlineVars(inlineVars), AllVars(allVars)
+    struct TInliner {
+        TInliner(
+            const TBuildConfiguration* conf,
+            TCommands& commands,
+            const TVars& inlineVars,
+            const TVars& allVars
+        ):
+            Conf(conf),
+            Commands(commands),
+            LegacyVars{
+                .InlineVars = inlineVars,
+                .AllVars = allVars
+            }
         {}
     public:
         NCommands::TSyntax Inline(const NCommands::TSyntax& ast);
     private:
-        using TVarDefinitions = TVector<THolder<NCommands::TSyntax>>; // indexed by recursion depth
-        using TVarCache = THashMap<TStringBuf, THolder<TVarDefinitions>>;
-    private:
-        TVarDefinitions* ParseVariable(NPolexpr::EVarId id);
+        struct TVarDefinition {
+            const NCommands::TSyntax* Definition = nullptr;
+            bool Legacy = false;
+        };
+        struct TScope;
+        TVarDefinition GetVariableDefinition(NPolexpr::EVarId id);
+        const NCommands::TSyntax* GetMacroDefinition(NPolexpr::EVarId id);
+        void FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst);
         void InlineModValueTerm(const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term, NCommands::TSyntax::TSubstitution::TModifier::TValue& writer);
         void InlineScalarTerms(const NCommands::TSyntax::TArgument& arg, TCmdWriter& writer);
         void InlineArguments(const NCommands::TSyntax::TCommand& cmd, TCmdWriter& writer);
         void InlineCommands(const NCommands::TSyntax::TCommands& cmds, TCmdWriter& writer);
-    private:
+    private: // context
+        const TBuildConfiguration* Conf;
         TCommands& Commands;
-        const TVars& InlineVars;
-        const TVars& AllVars;
-    private:
-        TVarCache VarCache;
-        THashMap<NPolexpr::EVarId, size_t> VarRecursionDepth;
+    private: // variable layers (note that macros are variables, too)
+        const NCommands::TSyntax* VarLookup(TStringBuf name);
+        const TScope* Scope = nullptr;
+        struct TLegacyVars {
+            using TDefinitions = TVector<THolder<NCommands::TSyntax>>; // indexed by recursion depth
+            using TDefinitionCache = THashMap<TStringBuf, THolder<TDefinitions>>;
+            using TRecursionDepth = THashMap<NPolexpr::EVarId, size_t>;
+            const TVars& InlineVars;
+            const TVars& AllVars;
+            TDefinitionCache DefinitionCache = {};
+            TRecursionDepth RecursionDepth = {};
+            const TYVar* VarLookup(TStringBuf name, const TBuildConfiguration* conf);
+        } LegacyVars;
+    private: // misc
+        int Depth = 0;
+        void CheckDepth();
     };
 
 private:
