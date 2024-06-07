@@ -243,6 +243,8 @@ class TestFramer(object):
             ctx_str = json.dumps(context, indent=2, sort_keys=True, separators=(",", ": "))
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
+            tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
+
             node = {
                 'uid': uid,
                 'broadcast': False,
@@ -264,6 +266,8 @@ class TestFramer(object):
                 'requirements': gen_plan.get_requirements(self.opts, {'network': 'restricted'}),
                 'cache': True,
                 'type': 2,
+                'tags': tags,
+                'platform': platform,
             }
 
             self.graph.append_node(node, add_to_result=False)

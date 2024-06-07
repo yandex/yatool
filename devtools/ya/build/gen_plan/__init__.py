@@ -15,12 +15,16 @@ from subprocess import CalledProcessError
 
 import build.ymake2 as ymake2
 import core.gsid
+from exts.strtobool import strtobool
+import yalibrary.platform_matcher as pm
 import yalibrary.vcs.vcsversion as vcsversion
 from yalibrary.yandex.distbuild import distbs_consts
 import yalibrary.tools as tools
 import core.config as config
 import core.patch_tools as patch_tools
 from devtools.ya.test.dependency.uid import TestUidGenerator
+
+import six
 
 logger = logging.getLogger(__name__)
 TRUNK_PATH = '/arc/trunk/arcadia'
@@ -617,3 +621,75 @@ def get_requirements(opts, extra_reqs=None):
     if extra_reqs:
         reqs.update(extra_reqs)
     return reqs
+
+
+def real_build_type(tc, opts):
+    return tc.get('build_type') or opts.build_type
+
+
+PLATFORM_FLAGS = set(['MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'])
+
+
+def _fmt_tag(k, v):
+    if k == 'SANITIZER_TYPE':
+        return v[0] + 'san'
+
+    try:
+        yes = strtobool(v)
+    except ValueError:
+        yes = 0
+
+    if k == 'USE_LTO':
+        return 'lto' if yes else None
+
+    if k == 'USE_THINLTO':
+        return 'thinlto' if yes else None
+
+    if k == 'MUSL':
+        return 'musl' if yes else None
+
+    if k == 'USE_AFL':
+        return 'AFL' if yes else None
+
+    if k == 'RACE':
+        return 'race' if yes else None
+
+    return '{k}={v}'.format(k=k, v=v)
+
+
+# See build_graph_and_tests::iter_target_flags
+def prepare_tags(tc, extra_flags, opts):
+    tags = []
+
+    flags = copy.deepcopy(tc.get('flags', {}))
+
+    flags.update({k: v for k, v in six.iteritems(extra_flags) if k in PLATFORM_FLAGS})
+
+    platform = pm.stringize_platform(tc['platform']['target']).lower()
+
+    tags.append(platform)
+    tags.append(real_build_type(tc, opts))
+
+    if flags:
+        tags.extend(sorted([_f for _f in [_fmt_tag(k, v) for k, v in six.iteritems(flags)] if _f]))
+
+    return tags, platform
+
+
+def _calculate_stats_uid(node):
+    return hashing.md5_value(
+        str(
+            [
+                node.get('platform', ''),
+                str(sorted(node.get('tags', []))),
+                node.get('kv', {}).get('p', ''),
+                str(sorted(node.get('outputs', []))),
+            ]
+        )
+    )
+
+
+def inject_stats_uid(graph):
+    for node in graph['graph']:
+        if 'stats_uid' not in node:
+            node['stats_uid'] = _calculate_stats_uid(node)

@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/core
     devtools/ya/exts
     devtools/ya/test/dependency
+    devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/vcs/vcsversion

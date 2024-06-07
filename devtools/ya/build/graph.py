@@ -93,7 +93,6 @@ ALLOWED_EXTRA_RESOURCES = {
     'KTLINT_OLD': 'ktlint_old',
 }
 
-PLATFORM_FLAGS = set(['MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'])
 GRAPH_STAT_VERSION = 1
 EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value
 
@@ -717,25 +716,6 @@ def _inject_default_requirements(graph, tests, reqs):
     _substitute_uids(graph, tests, old_to_new_uids)
 
 
-def _inject_stats_uid(graph):
-    for node in graph['graph']:
-        if 'stats_uid' not in node:
-            node['stats_uid'] = _calculate_stats_uid(node)
-
-
-def _calculate_stats_uid(node):
-    return hashing.md5_value(
-        str(
-            [
-                node.get('platform', ''),
-                str(sorted(node.get('tags', []))),
-                node.get('kv', {}).get('p', ''),
-                str(sorted(node.get('outputs', []))),
-            ]
-        )
-    )
-
-
 def _propagate_cache_false_from_kv(graph):
     for n in graph['graph']:
         if n.get('kv', {}).get('disable_cache'):
@@ -779,33 +759,6 @@ def _strip_tags(nodes):
 
 
 # See build_graph_and_tests::iter_target_flags
-def _fmt_tag(k, v):
-    if k == 'SANITIZER_TYPE':
-        return v[0] + 'san'
-
-    try:
-        yes = strtobool(v)
-    except ValueError:
-        yes = 0
-
-    if k == 'USE_LTO':
-        return 'lto' if yes else None
-
-    if k == 'USE_THINLTO':
-        return 'thinlto' if yes else None
-
-    if k == 'MUSL':
-        return 'musl' if yes else None
-
-    if k == 'USE_AFL':
-        return 'AFL' if yes else None
-
-    if k == 'RACE':
-        return 'race' if yes else None
-
-    return '{k}={v}'.format(k=k, v=v)
-
-
 def _remap_graph(graph, mapper):
     for node in graph.get('graph', []):
         node['uid'] = mapper(node['uid'])
@@ -1486,7 +1439,7 @@ class _GraphMaker(object):
         if cache_dir:
             cache_subdir = cache_dir if extra_tag is None else os.path.join(cache_dir, extra_tag)
             exts.fs.ensure_dir(cache_subdir)
-        tags, platform = _prepare_tags(target_tc, flags, self._opts)
+        tags, platform = gen_plan.prepare_tags(target_tc, flags, self._opts)
         with self._ya_sem, stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
             result = self._gen_graph(
                 flags,
@@ -1658,7 +1611,7 @@ class _GraphMaker(object):
             flags['TRAVERSE_RECURSE'] = 'no'
             flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'no'
 
-        build_type = _real_build_type(tc, self._opts)
+        build_type = gen_plan.real_build_type(tc, self._opts)
         conf_path, _ = bg.gen_conf(
             self._src_dir,
             self._conf_dir,
@@ -2174,7 +2127,7 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
     bg_cache.archive_cache_dir(opts)
 
     with stager.scope('inject_stats_uid'):
-        _inject_stats_uid(graph)
+        gen_plan.inject_stats_uid(graph)
 
     with stager.scope("strip-tags"):
         graph['graph'] = _strip_tags(graph['graph'])
@@ -2298,10 +2251,6 @@ def _iter_target_flags(opts):
         yield 'WITH_CREDITS', 'yes'
 
 
-def _real_build_type(tc, opts):
-    return tc.get('build_type') or opts.build_type
-
-
 def _needs_wine_for_tests(test_target_platforms, archs=None):
     for test_target_platform in test_target_platforms:
         if (
@@ -2316,26 +2265,8 @@ def _needs_wine_for_tests(test_target_platforms, archs=None):
 
 
 # See build_graph_and_tests::iter_target_flags
-def _prepare_tags(tc, extra_flags, opts):
-    tags = []
-
-    flags = copy.deepcopy(tc.get('flags', {}))
-
-    flags.update({k: v for k, v in six.iteritems(extra_flags) if k in PLATFORM_FLAGS})
-
-    platform = pm.stringize_platform(tc['platform']['target']).lower()
-
-    tags.append(platform)
-    tags.append(_real_build_type(tc, opts))
-
-    if flags:
-        tags.extend(sorted([_f for _f in [_fmt_tag(k, v) for k, v in six.iteritems(flags)] if _f]))
-
-    return tags, platform
-
-
 def _get_target_platform_descriptor(target_tc, opts):
-    tags, platform = _prepare_tags(target_tc, {}, opts)
+    tags, platform = gen_plan.prepare_tags(target_tc, {}, opts)
     return "-".join(tags) if tags else platform
 
 
@@ -2955,7 +2886,7 @@ def _build_merged_graph(
             except Exception as e:
                 logger.debug("Dlv will not be available for tests: %s", e)
 
-        if any(tc for tc in target_tcs if 'valgrind' in _real_build_type(tc, opts)):
+        if any(tc for tc in target_tcs if 'valgrind' in gen_plan.real_build_type(tc, opts)):
             try:
                 merged_graph['conf']['resources'].append(host_tool_resolver.resolve('valgrind', 'VALGRIND'))
             except Exception as e:
