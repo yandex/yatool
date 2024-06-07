@@ -1,4 +1,3 @@
-import base64
 import contextlib
 import datetime
 import io
@@ -7,12 +6,12 @@ import os
 import sys
 import threading
 import time
-import core.config
-import core.gsid
 
 import six
 import zstandard as zstd
 
+import core.config
+import core.gsid
 from exts import fs
 from exts import os2
 from exts import yjson
@@ -73,11 +72,11 @@ class EvlogReader:
 
     def __iter__(self):
         with self._get_stream() as stream:
-            for line in stream:
+            for nline, line in enumerate(stream):
                 try:
                     yield yjson.loads(line)
-                except Exception as e:
-                    logging.warning("Skipped broken event: '%s' Content (base64): %s", e, base64.b64encode(line))
+                except Exception:
+                    logging.warning("Skip broken entry at %s line", nline + 1)
                     continue
 
 
