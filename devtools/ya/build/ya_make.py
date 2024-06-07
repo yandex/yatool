@@ -409,6 +409,7 @@ def init_bazel_remote_cache(opts):
                 username=getattr(opts, 'bazel_remote_username', None),
                 password=password,
                 readonly=getattr(opts, 'bazel_remote_readonly', True),
+                max_file_size=getattr(opts, 'dist_cache_max_file_size', 0),
                 max_connections=getattr(opts, 'dist_store_threads', 24),
                 fits_filter=fits_filter,
             )
@@ -454,6 +455,7 @@ def init_yt_dist_cache(opts):
         token=token,
         readonly=opts.yt_readonly,
         create_tables=opts.yt_create_tables,
+        max_file_size=getattr(opts, 'dist_cache_max_file_size', 0),
         max_cache_size=opts.yt_max_cache_size,
         ttl=opts.yt_store_ttl,
     )

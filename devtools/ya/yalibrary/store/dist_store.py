@@ -1,5 +1,6 @@
 import six
 import time
+import os
 
 from core import report
 from exts.timer import AccumulateTime
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class DistStore(object):
-    def __init__(self, name, stats_name, tag, readonly, fits_filter=None):
+    def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None):
         self._readonly = readonly
         self._timers = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
         self._time_intervals = {'has': [], 'put': [], 'get': [], 'get-meta': []}
@@ -23,6 +24,7 @@ class DistStore(object):
         self._stats_name = stats_name
         self._tag = tag
         self._fits_filter = fits_filter
+        self._exclude_filter = self._gen_exclude_filter(max_file_size)
 
     def _inc_time(self, x, tag):
         cur_time = time.time()
@@ -35,6 +37,17 @@ class DistStore(object):
 
     def _inc_data_size(self, size, tag):
         self._data_size[tag] += size
+
+    def _gen_exclude_filter(self, limit):
+        if limit:
+
+            def exclude_filter(files):
+                # There is no point in uploading all the files if at least one exceeds the limit
+                return any(os.stat(x).st_size > limit for x in files)
+
+            return exclude_filter
+        else:
+            return lambda x: False
 
     def fits(self, node):
         raise NotImplementedError()
@@ -52,9 +65,13 @@ class DistStore(object):
     def _do_put(self, uid, root_dir, files, codec=None):
         raise NotImplementedError()
 
-    def put(self, *args, **kwargs):
+    def put(self, uid, root_dir, files, codec=None):
+        if self._exclude_filter and self._exclude_filter(files):
+            logger.debug("%s is excluded", uid)
+            return False
+
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
-            return self._do_put(*args, **kwargs)
+            return self._do_put(uid, root_dir, files, codec)
 
     def _do_try_restore(self, uid, into_dir, filter_func=None):
         raise NotImplementedError()

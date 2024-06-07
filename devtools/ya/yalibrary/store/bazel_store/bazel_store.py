@@ -252,8 +252,9 @@ class BazelStore(DistStore):
             name='bazel-store',
             stats_name='bazel_store_status',
             tag='BAZEL',
-            readonly=kwargs.pop('readonly'),
+            readonly=kwargs.pop('readonly', True),
             fits_filter=kwargs.pop('fits_filter', None),
+            max_file_size=kwargs.pop('max_file_size', 0),
         )
         self._client = BazelStoreClient(*args, **kwargs)
         self._disabled = False

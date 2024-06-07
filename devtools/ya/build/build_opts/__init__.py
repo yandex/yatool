@@ -2491,6 +2491,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         # XXX see YA-1354
         self.dist_cache_evict_binaries = False
         self.dist_cache_evict_cached = False
+        self.dist_cache_max_file_size = 0
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
         self.yt_store = True
         self.yt_create_tables = False
@@ -2538,6 +2539,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
                 ),
+                ArgConsumer(
+                    ['--dist-cache-max-file-size'],
+                    help='Sets the maximum size in bytes of a single file stored in the dist cache. Use 0 for no limit',
+                    hook=SetValueHook('dist_cache_max_file_size'),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ConfigConsumer('dist_cache_max_file_size'),
                 ArgConsumer(
                     ['--bazel-remote-store'],
                     help='Use Bazel-remote storage',
