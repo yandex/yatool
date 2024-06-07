@@ -1051,6 +1051,14 @@ size_t TFileContentHolder::Size() const {
     return ContentReady_ ? Content_.Size() : 0;
 }
 
+void TFileContentHolder::ValidateUtf8(const TStringBuf fileName) {
+    if (WasRead() && Size()) {
+        if (!IsUtf(GetContent())) {
+            throw yexception() << "File '" << fileName << "' has non-UTF8 symbols";
+        }
+    }
+}
+
 void TFileView::GetStr(TString& name) const {
     if (!Table) {
         name = {};

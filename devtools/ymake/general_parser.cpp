@@ -73,7 +73,9 @@ namespace {
             } else {
                 elemId = incView.GetElemId();
             }
-            fileConf.GetFileById(elemId)->UpdateContentHash();
+            auto fileContentHolder = fileConf.GetFileById(elemId);
+            fileContentHolder->UpdateContentHash();
+            fileContentHolder->ValidateUtf8(incView.GetTargetStr());
         } else {
             // We already reported BadFile error in DirParser::OnInclude
             type = EMNT_MissingFile;

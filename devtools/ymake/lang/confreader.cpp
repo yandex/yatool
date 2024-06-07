@@ -425,6 +425,7 @@ namespace {
             }
 
             TString importContent = TFileInput{importFileName}.ReadAll();
+            ValidateUtf8(importContent, importFileName);
 
             ParseConfig(*this, importFileName, importContent);
 
@@ -1050,6 +1051,12 @@ namespace {
             CompileConditions();
         }
 
+        static void ValidateUtf8(const TStringBuf content, const TStringBuf fileName) {
+            if (!IsUtf(content)) {
+                ReportConfigError("Non-UTF8 symbols in file", fileName);
+            }
+        }
+
     private:
         static TString MakeFullCommand(const TString args, const TString& command) {
             return TString::Join("(", args, ")", command);
@@ -1644,10 +1651,12 @@ namespace {
 void TYmakeConfig::LoadConfig(TStringBuf path, TStringBuf sourceRoot, TStringBuf buildRoot, MD5& confData) {
     TIFStream is{TString(path)};
     TString content = is.ReadAll();
+    TConfBuilder::ValidateUtf8(content, path);
 
     ::LoadConfig(path, content, sourceRoot, buildRoot, *this, &confData);
 }
 
 void TYmakeConfig::LoadConfigFromContext(TStringBuf context) {
+    TConfBuilder::ValidateUtf8(context, "<context>"sv);
     ::LoadConfig(""sv, context, ""sv, ""sv, *this, nullptr);
 }

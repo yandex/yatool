@@ -12,6 +12,7 @@
 #include <util/generic/hash_set.h>
 #include <util/datetime/base.h>
 #include <util/string/builder.h>
+#include "util/charset/utf8.h"
 
 class TTimeStamps;
 class TFileConf;
@@ -337,6 +338,8 @@ public:
     bool WasRead() const;
     size_t Size() const;
 
+    void ValidateUtf8(const TStringBuf fileName);
+
 private:
     TFileContentHolder(TFileConf& fileConf, ui32 targetId, TString&& absName);
 
@@ -613,6 +616,7 @@ public:
             Y_ASSERT(holder->WasRead());
             const auto& fileData = holder->GetFileData();
             if (!fileData.CantRead) {
+                holder->ValidateUtf8(file.GetTargetStr());
                 ReadSize_ += holder->Size();
                 FillSize_ += holder->Size();
                 ++FillCount_;
