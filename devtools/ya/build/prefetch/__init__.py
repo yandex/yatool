@@ -207,12 +207,11 @@ class ArcStreamingPrefetcher:
             )
 
         logger.debug(
-            'arc prefetch-files [pid: %d] finished with rc %s. stderr:',
+            'arc prefetch-files [pid: %d] finished with rc %s. stderr: %s',
             self._arc_process.pid,
             self._arc_process.returncode,
+            '\n'.join(stderr),
         )
-        for line in stderr:
-            logger.debug("%s", line.strip())
 
     def _is_known(self, target):
         while target:
