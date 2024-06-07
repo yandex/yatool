@@ -197,8 +197,14 @@ class ArcStreamingPrefetcher:
                 if err.closed:
                     break
 
-        if self._stop_requested:
-            self._arc_process.wait()
+        self._arc_process.wait()
+
+        if self._arc_process.returncode != 0:
+            logger.warning(
+                'arc prefetch-files [pid: %d] died with rc %s. Configuration may be slower. See logs for more info',
+                self._arc_process.pid,
+                self._arc_process.returncode,
+            )
 
         logger.debug(
             'arc prefetch-files [pid: %d] finished with rc %s. stderr:',
