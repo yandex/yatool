@@ -162,24 +162,38 @@ private:
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
 
-    using TMinedVars = THashMap<
-        TStringBuf, // name
-        TVector<THolder<NCommands::TSyntax>> // definitions indexed by recursion depth
-    >;
-    struct TCmdWriter;
     const NCommands::TSyntax& Parse(TMacroValues& values, TString src);
-    void Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, const TVars& allVars, TMinedVars& newVars);
-    void InlineModValueTerm(const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term, const TMinedVars& vars, NCommands::TSyntax::TSubstitution::TModifier::TValue& writer);
-    void InlineScalarTerms(const NCommands::TSyntax::TArgument& arg, const TMinedVars& vars, TCmdWriter& writer);
-    void InlineArguments(const NCommands::TSyntax::TCommand& cmd, const TMinedVars& vars, TCmdWriter& writer);
-    void InlineCommands(const NCommands::TSyntax::TCommands& cmds, const TMinedVars& vars, TCmdWriter& writer);
-    NCommands::TSyntax Inline(const NCommands::TSyntax& ast, const TMinedVars& vars);
 
+    struct TCmdWriter;
+    struct TCommandCompiler {
+        TCommandCompiler(TCommands& commands, const TVars& inlineVars, const TVars& allVars):
+            Commands(commands), InlineVars(inlineVars), AllVars(allVars)
+        {}
+    public:
+        NCommands::TSyntax Inline(const NCommands::TSyntax& ast);
+    private:
+        using TVarDefinitions = TVector<THolder<NCommands::TSyntax>>; // indexed by recursion depth
+        using TVarCache = THashMap<TStringBuf, THolder<TVarDefinitions>>;
+    private:
+        TVarDefinitions* ParseVariable(NPolexpr::EVarId id);
+        void InlineModValueTerm(const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term, NCommands::TSyntax::TSubstitution::TModifier::TValue& writer);
+        void InlineScalarTerms(const NCommands::TSyntax::TArgument& arg, TCmdWriter& writer);
+        void InlineArguments(const NCommands::TSyntax::TCommand& cmd, TCmdWriter& writer);
+        void InlineCommands(const NCommands::TSyntax::TCommands& cmds, TCmdWriter& writer);
+    private:
+        TCommands& Commands;
+        const TVars& InlineVars;
+        const TVars& AllVars;
+    private:
+        TVarCache VarCache;
+        THashMap<NPolexpr::EVarId, size_t> VarRecursionDepth;
+    };
+
+private:
     TDeque<NPolexpr::TExpression> Commands;
     THashMap<ui64, ECmdId> Command2Id;
     THashMap<ui32, ECmdId> Elem2Cmd;
     TMacroValues Values;
 
     THashMap<TString, NCommands::TSyntax> ParserCache;
-    THashMap<TStringBuf, size_t> VarRecursionDepth;
 };

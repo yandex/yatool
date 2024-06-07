@@ -363,91 +363,60 @@ const NCommands::TSyntax& TCommands::Parse(TMacroValues& values, TString src) {
     return result->second;
 }
 
-void TCommands::Premine(const NCommands::TSyntax& ast, const TVars& inlineVars, const TVars& allVars, TMinedVars& newVars) {
+TCommands::TCommandCompiler::TVarDefinitions* TCommands::TCommandCompiler::ParseVariable(NPolexpr::EVarId id) {
+    auto name = Commands.Values.GetVarName(id);
+    if (name.ends_with("__NOINLINE__") || name.ends_with("__NO_UID__"))
+        return nullptr;
+    auto buildConf = GlobalConf();
+    auto blockData = buildConf->BlockData.find(name);
+    if (blockData != buildConf->BlockData.end())
+        if (blockData->second.IsUserMacro || blockData->second.IsGenericMacro || blockData->second.IsFileGroupMacro)
+            return nullptr; // TODO how do we _actually_ detect non-vars?
 
-    auto processVar = [&](NPolexpr::EVarId id) {
+    // do not expand vars that have been overridden
+    // (e.g., ignore the global `SRCFLAGS=` from `ymake.core.conf`
+    // while dealing with the `SRCFLAGS` parameter in `_SRC()`)
+    for (auto macroVars = &AllVars; macroVars; macroVars = macroVars->Base) {
+        if (macroVars == &InlineVars)
+            break;
+        if (macroVars->Contains(name))
+            return nullptr;
+    }
 
-        auto name = Values.GetVarName(id);
-        if (name.ends_with("__NOINLINE__") || name.ends_with("__NO_UID__"))
-            return;
-        auto buildConf = GlobalConf();
-        auto blockData = buildConf->BlockData.find(name);
-        if (blockData != buildConf->BlockData.end())
-            if (blockData->second.IsUserMacro || blockData->second.IsGenericMacro || blockData->second.IsFileGroupMacro)
-                return; // TODO how do we _actually_ detect non-vars?
+    auto var = InlineVars.Lookup(name);
+    if (!var || var->DontExpand)
+        return nullptr;
+    Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
+    if (buildConf->CommandConf.IsReservedName(name))
+        return nullptr;
 
-        // do not expand vars that have been overridden
-        // (e.g., ignore the global `SRCFLAGS=` from `ymake.core.conf`
-        // while dealing with the `SRCFLAGS` parameter in `_SRC()`)
-        for (auto macroVars = &allVars; macroVars; macroVars = macroVars->Base) {
-            if (macroVars == &inlineVars)
-                break;
-            if (macroVars->Contains(name))
-                return;
-        }
+    auto depth = VarRecursionDepth.try_emplace(id, 0).first;
+    for (size_t i = 0; i != depth->second; ++i) {
+        var = var->BaseVal;
+        if (!var || var->DontExpand || var->IsReservedName)
+            ythrow TError() << "self-contradictory variable definition (" << name << ")";
+    }
+    auto defs = VarCache.find(name);
+    if (defs != VarCache.end() && defs->second->size() > depth->second)
+        return defs->second.Get(); // already processed
 
-        auto var = inlineVars.Lookup(name);
-        if (!var || var->DontExpand)
-            return;
-        Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
-        if (buildConf->CommandConf.IsReservedName(name))
-            return;
+    if (var->size() != 1)
+        ythrow TNotImplemented() << "unexpected variable size " << var->size() << " (" << name << ")";
 
-        auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-        for (size_t i = 0; i != depth->second; ++i) {
-            var = var->BaseVal;
-            if (!var || var->DontExpand || var->IsReservedName)
-                ythrow TError() << "self-contradictory variable definition (" << name << ")";
-        }
-        auto newVar = newVars.find(name);
-        if (newVar != newVars.end() && newVar->second.size() > depth->second)
-            return; // already processed
+    auto& val = var->at(0);
+    if (!val.HasPrefix)
+        ythrow TError() << "unexpected variable format";
 
-        if (var->size() != 1)
-            ythrow TNotImplemented() << "unexpected variable size " << var->size() << " (" << name << ")";
+    if (defs == VarCache.end())
+        defs = VarCache.try_emplace(name, MakeHolder<TVarDefinitions>()).first;
+    Y_ASSERT(defs->second->size() == depth->second);
 
-        auto& val = var->at(0);
-        if (!val.HasPrefix)
-            ythrow TError() << "unexpected variable format";
-
-        if (newVar == newVars.end())
-            newVar = newVars.try_emplace(name).first;
-        Y_ASSERT(newVar->second.size() == depth->second);
-
-        ui64 scopeId;
-        TStringBuf cmdName;
-        TStringBuf cmdValue;
-        ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
-        newVar->second.push_back(MakeHolder<NCommands::TSyntax>(Parse(Values, TString(cmdValue))));
-
-        auto bump = TCounterBump(depth->second);
-        Premine(*newVar->second.back(), inlineVars, allVars, newVars);
-    };
-
-    for (auto& cmd : ast.Commands)
-        for (auto& arg : cmd)
-            for (auto& term : arg)
-                std::visit(
-                    TOverloaded{
-                        [&](NPolexpr::TConstId) {
-                        },
-                        [&](NPolexpr::EVarId id) {
-                            processVar(id);
-                        },
-                        [&](const NCommands::TSyntax::TSubstitution& sub) {
-                            for (auto& mod : sub.Mods)
-                                for (auto& val : mod.Values)
-                                    for (auto& term : val)
-                                        if (auto var = std::get_if<NPolexpr::EVarId>(&term); var)
-                                            processVar(*var);
-                            for (auto& subArg : sub.Body)
-                                for (auto& subTerm : subArg)
-                                    if (auto var = std::get_if<NPolexpr::EVarId>(&subTerm); var)
-                                        processVar(*var);
-                        },
-                    },
-                    term
-                );
+    ui64 scopeId;
+    TStringBuf cmdName;
+    TStringBuf cmdValue;
+    ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
+    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Commands.Values, TString(cmdValue))));
+    return defs->second.Get();
 }
 
 struct TCommands::TCmdWriter {
@@ -463,9 +432,8 @@ private:
     NCommands::TSyntax& S;
 };
 
-void TCommands::InlineModValueTerm(
+void TCommands::TCommandCompiler::InlineModValueTerm(
     const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term,
-    const TMinedVars& vars,
     NCommands::TSyntax::TSubstitution::TModifier::TValue& writer
 ) {
     std::visit(TOverloaded{
@@ -473,14 +441,13 @@ void TCommands::InlineModValueTerm(
             writer.push_back(id);
         },
         [&](NPolexpr::EVarId id) {
-                auto name = Values.GetVarName(id);
-                auto thatVar = vars.find(name);
-                if (thatVar == vars.end()) {
+                auto thatVar = ParseVariable(id);
+                if (!thatVar) {
                     writer.push_back(id);
                     return;
                 }
-                auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                auto& thatDef = *thatVar->second[depth->second];
+                auto depth = VarRecursionDepth.try_emplace(id, 0).first;
+                auto& thatDef = *(*thatVar)[depth->second];
                 if (thatDef.Commands.size() == 0)
                     return;
                 if (thatDef.Commands.size() != 1)
@@ -499,11 +466,11 @@ void TCommands::InlineModValueTerm(
                     std::visit(TOverloaded{
                         [&](NPolexpr::TConstId id) {
                             auto bump = TCounterBump(depth->second);
-                            InlineModValueTerm(id, vars, writer);
+                            InlineModValueTerm(id, writer);
                         },
                         [&](NPolexpr::EVarId id) {
                             auto bump = TCounterBump(depth->second);
-                            InlineModValueTerm(id, vars, writer);
+                            InlineModValueTerm(id, writer);
                         },
                         [&](const NCommands::TSyntax::TSubstitution&) {
                             ythrow TError() << "cannot sub-substitute";
@@ -514,9 +481,8 @@ void TCommands::InlineModValueTerm(
     }, term);
 }
 
-void TCommands::InlineScalarTerms(
+void TCommands::TCommandCompiler::InlineScalarTerms(
     const NCommands::TSyntax::TArgument& arg,
-    const TMinedVars& vars,
     TCmdWriter& writer
 ) {
     for (auto& term : arg) {
@@ -525,14 +491,13 @@ void TCommands::InlineScalarTerms(
                 writer.WriteTerm(id);
             },
             [&](NPolexpr::EVarId var) {
-                auto name = Values.GetVarName(var);
-                auto thatVar = vars.find(name);
-                if (thatVar == vars.end()) {
+                auto thatVar = ParseVariable(var);
+                if (!thatVar) {
                     writer.WriteTerm(var);
                     return;
                 }
-                auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                auto& thatDef = *thatVar->second[depth->second];
+                auto depth = VarRecursionDepth.try_emplace(var, 0).first;
+                auto& thatDef = *(*thatVar)[depth->second];
                 if (thatDef.Commands.size() == 0)
                     return;
                 if (thatDef.Commands.size() != 1)
@@ -548,7 +513,7 @@ void TCommands::InlineScalarTerms(
                     ythrow TError() << "unexpected multiargument substitution";
                 }
                 auto bump = TCounterBump(depth->second);
-                InlineScalarTerms(thatDef.Commands[0][0], vars, writer);
+                InlineScalarTerms(thatDef.Commands[0][0], writer);
             },
             [&](const NCommands::TSyntax::TSubstitution& sub) {
                 auto newSub = NCommands::TSyntax::TSubstitution();
@@ -561,19 +526,18 @@ void TCommands::InlineScalarTerms(
                         auto& newVal = newMod.Values.emplace_back();
                         newVal.reserve(val.size());
                         for (auto& term : val) {
-                            InlineModValueTerm(term, vars, newVal);
+                            InlineModValueTerm(term, newVal);
                         }
                     }
                 }
                 bool bodyInlined = [&](){
                     if (sub.Body.size() == 1 && sub.Body.front().size() == 1) {
                         if (auto var = std::get_if<NPolexpr::EVarId>(&sub.Body.front().front()); var) {
-                            auto name = Values.GetVarName(*var);
-                            auto thatVar = vars.find(name);
-                            if (thatVar == vars.end())
+                            auto thatVar = ParseVariable(*var);
+                            if (!thatVar)
                                 return false;
-                            auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-                            auto& thatDef = *thatVar->second[depth->second];
+                            auto depth = VarRecursionDepth.try_emplace(*var, 0).first;
+                            auto& thatDef = *(*thatVar)[depth->second];
                             if (thatDef.Commands.size() == 0)
                                 return true;
                             if (thatDef.Commands.size() != 1)
@@ -581,7 +545,7 @@ void TCommands::InlineScalarTerms(
                             NCommands::TSyntax newBody;
                             TCmdWriter newWriter(newBody);
                             auto bump = TCounterBump(depth->second);
-                            InlineCommands(thatDef.Commands, vars, newWriter);
+                            InlineCommands(thatDef.Commands, newWriter);
                             if (newBody.Commands.size() != 1)
                                 ythrow TError() << "totally unexpected multicommand in a substitution";
                             newSub.Body = std::move(newBody.Commands[0]);
@@ -598,24 +562,22 @@ void TCommands::InlineScalarTerms(
     }
 }
 
-void TCommands::InlineArguments(
+void TCommands::TCommandCompiler::InlineArguments(
     const NCommands::TSyntax::TCommand& cmd,
-    const TMinedVars& vars,
     TCmdWriter& writer
 ) {
     auto doAVariable = [&](NPolexpr::EVarId id) {
-        auto name = Values.GetVarName(id);
-        auto thatVar = vars.find(name);
-        if (thatVar == vars.end())
+        auto thatVar = ParseVariable(id);
+        if (!thatVar)
             return false;
-        auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-        auto& thatDef = *thatVar->second[depth->second];
+        auto depth = VarRecursionDepth.try_emplace(id, 0).first;
+        auto& thatDef = *(*thatVar)[depth->second];
         if (thatDef.Commands.size() == 0)
             return true;
         if (thatDef.Commands.size() != 1)
             ythrow TError() << "unexpected multicommand substitution";
         auto bump = TCounterBump(depth->second);
-        InlineArguments(thatDef.Commands[0], vars, writer);
+        InlineArguments(thatDef.Commands[0], writer);
         return true;
     };
     for (auto& arg : cmd) {
@@ -631,25 +593,23 @@ void TCommands::InlineArguments(
                                 continue;
         }
         writer.BeginArgument();
-        InlineScalarTerms(arg, vars, writer);
+        InlineScalarTerms(arg, writer);
         writer.EndArgument();
     }
 }
 
-void TCommands::InlineCommands(
+void TCommands::TCommandCompiler::InlineCommands(
     const NCommands::TSyntax::TCommands& cmds,
-    const TMinedVars& vars,
     TCmdWriter& writer
 ) {
     auto doAVariable = [&](NPolexpr::EVarId id) {
-        auto name = Values.GetVarName(id);
-        auto thatVar = vars.find(name);
-        if (thatVar == vars.end())
+        auto thatVar = ParseVariable(id);
+        if (!thatVar)
             return false;
-        auto depth = VarRecursionDepth.try_emplace(name, 0).first;
-        auto& thatDef = *thatVar->second[depth->second];
+        auto depth = VarRecursionDepth.try_emplace(id, 0).first;
+        auto& thatDef = *(*thatVar)[depth->second];
         auto bump = TCounterBump(depth->second);
-        InlineCommands(thatDef.Commands, vars, writer);
+        InlineCommands(thatDef.Commands, writer);
         return true;
     };
     for (auto& cmd : cmds) {
@@ -665,31 +625,30 @@ void TCommands::InlineCommands(
                                 continue;
         }
         writer.BeginCommand();
-        InlineArguments(cmd, vars, writer);
+        InlineArguments(cmd, writer);
         writer.EndCommand();
     }
 }
 
-NCommands::TSyntax TCommands::Inline(const NCommands::TSyntax& ast, const TMinedVars& vars) {
-    auto result = NCommands::TSyntax();
-    auto writer = TCmdWriter(result);
-    InlineCommands(ast.Commands, vars, writer);
-    return result;
-}
-
-TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam) {
+NCommands::TSyntax TCommands::TCommandCompiler::Inline(const NCommands::TSyntax& ast) {
     auto checkRecursionStuff = [&]() {
 #ifndef NDEBUG
         for (auto& [k, v] : VarRecursionDepth)
             Y_ASSERT(v == 0);
 #endif
     };
+    auto result = NCommands::TSyntax();
+    auto writer = TCmdWriter(result);
+    checkRecursionStuff();
+    InlineCommands(ast.Commands, writer);
+    checkRecursionStuff();
+    return result;
+}
+
+TCommands::TCompiledCommand TCommands::Compile(TStringBuf cmd, const TVars& inlineVars, const TVars& allVars, bool preevaluate, EOutputAccountingMode oam) {
+    auto cc = TCommandCompiler(*this, inlineVars, allVars);
     auto& cachedAst = Parse(Values, TString(cmd));
-    auto newVars = TMinedVars();
-    Premine(cachedAst, inlineVars, allVars, newVars);
-    checkRecursionStuff();
-    auto ast = Inline(cachedAst, newVars);
-    checkRecursionStuff();
+    auto ast = cc.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate)
         return Preevaluate(ast, allVars, oam);
