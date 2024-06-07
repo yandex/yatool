@@ -227,7 +227,7 @@ class CompositeHandler(BaseHandler):
             elif EMPTY_KEY in handlers:
                 return handlers[EMPTY_KEY].handle(self, args, prefix)
             elif len(args) == 0:
-                print_formatted(self.format_help(prefix))
+                print_formatted(self.format_help(prefix, examples=False))
             else:
                 raise ArgsBindingException("Can't handle args: " + str(' '.join(args)))
 
@@ -345,10 +345,12 @@ class OptsHandler(BaseHandler):
         examples=None,
         unknown_args_as_free=False,
         use_simple_args=False,
+        extra_help=None,
     ):
         self._action = action
         self._opt = merge_opts(opts)  # type: Options
         self._description = description
+        self._extra_help = extra_help
         self._unknown_args_as_free = unknown_args_as_free
         self._examples = examples or []
         self._visible = visible
@@ -408,6 +410,8 @@ class OptsHandler(BaseHandler):
             # XXX: remove copy/paste
             usage = self._description + '\n\n'
             usage += 'Usage:\n' + '  ' + ' '.join(prefix) + ' ' + self.format_usage() + '\n\n'
+            if self._extra_help:
+                usage += self._extra_help + '\n\n'
             usage += format_examples(self.opts_recursive(tuple(prefix)))
             usage += '\n' + self.format_help(exc.help_level)
             print_formatted(usage)
