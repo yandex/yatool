@@ -1,6 +1,6 @@
 # expected lite: expected objects for C++11 and later
 
-[![Language](https://img.shields.io/badge/C%2B%2B-11-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization) [![License](https://img.shields.io/badge/license-BSL-blue.svg)](https://opensource.org/licenses/BSL-1.0) [![Build Status](https://github.com/martinmoene/expected-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/martinmoene/expected-lite/actions/workflows/ci.yml) [![Build status](https://ci.appveyor.com/api/projects/status/sle31w7obrm8lhe1?svg=true)](https://ci.appveyor.com/project/martinmoene/expected-lite) [![Version](https://badge.fury.io/gh/martinmoene%2Fexpected-lite.svg)](https://github.com/martinmoene/expected-lite/releases) [![download](https://img.shields.io/badge/latest-download-blue.svg)](https://raw.githubusercontent.com/martinmoene/expected-lite/master/include/nonstd/expected.hpp) [![Conan](https://img.shields.io/badge/on-conan-blue.svg)](https://conan.io/center/expected-lite) [![Try it online](https://img.shields.io/badge/on-wandbox-blue.svg)](https://wandbox.org/permlink/MnnwqOtE8ZQ4rRsv) [![Try it on godbolt online](https://img.shields.io/badge/on-godbolt-blue.svg)](https://godbolt.org/z/9BuMZx)
+[![Language](https://img.shields.io/badge/C%2B%2B-11-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization) [![License](https://img.shields.io/badge/license-BSL-blue.svg)](https://opensource.org/licenses/BSL-1.0) [![Build Status](https://github.com/martinmoene/expected-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/martinmoene/expected-lite/actions/workflows/ci.yml) [![Build status](https://ci.appveyor.com/api/projects/status/sle31w7obrm8lhe1?svg=true)](https://ci.appveyor.com/project/martinmoene/expected-lite) [![Version](https://badge.fury.io/gh/martinmoene%2Fexpected-lite.svg)](https://github.com/martinmoene/expected-lite/releases) [![download](https://img.shields.io/badge/latest-download-blue.svg)](https://raw.githubusercontent.com/martinmoene/expected-lite/master/include/nonstd/expected.hpp) [![Conan](https://img.shields.io/badge/on-conan-blue.svg)](https://conan.io/center/expected-lite) [![Vcpkg](https://img.shields.io/badge/on-vcpkg-blue.svg)](https://vcpkg.link/ports/expected-lite) [![Try it online](https://img.shields.io/badge/on-wandbox-blue.svg)](https://wandbox.org/permlink/MnnwqOtE8ZQ4rRsv) [![Try it on godbolt online](https://img.shields.io/badge/on-godbolt-blue.svg)](https://godbolt.org/z/9BuMZx)
 
 *expected lite* is a single-file header-only library for objects that either represent a valid value or an error that you can pass by value. It is intended for use with C++11 and later. The library is based on the [std:&#58;expected](http://wg21.link/p0323) proposal [1] .
 
@@ -62,6 +62,8 @@ prompt> g++ -std=c++14 -Wall -I../include -o 01-basic.exe 01-basic.cpp && 01-bas
 **expected lite** is a single-file header-only library to represent value objects that either contain a valid value or an error. The library is a partly implementation of the  proposal for [std:&#58;expected](http://wg21.link/p0323) [1,2,3] for use with C++11 and later.
 
 **Some Features and properties of expected lite** are ease of installation (single header), default and explicit construction of an expected, construction and assignment from a value that is convertible to the underlying type, copy- and move-construction and copy- and move-assignment from another expected of the same type, testing for the presence of a value, operators for unchecked access to the value or the error (pointer or reference), value() and value_or() for checked access to the value, relational operators, swap() and various factory functions.
+
+Version 0.7.0 introduces the monadic operations of propsoal [p2505](http://wg21.link/p2505).
 
 *expected lite* shares the approach to in-place tags with [any-lite](https://github.com/martinmoene/any-lite), [optional-lite](https://github.com/martinmoene/optional-lite) and with [variant-lite](https://github.com/martinmoene/variant-lite) and these libraries can be used together.
 
@@ -127,6 +129,16 @@ Define this to 1 or 0 to control the use of SEH when C++ exceptions are disabled
 \-D<b>nsel\_CONFIG\_CONFIRMS\_COMPILATION\_ERRORS</b>=0  
 Define this macro to 1 to experience the by-design compile-time errors of the library in the test suite. Default is 0.
 
+#### Configure P2505 monadic operations
+
+By default, *expected lite* provides monadic operations as described in [P2505R5](http://wg21.link/p2505r5). You can disable these operations by defining the following macro.
+
+-D<b>nsel\_P2505R</b>=0
+
+You can use the R3 revision of P2505, which lacks `error_or`, and uses `remove_cvref` for transforms, by defining the following macro.
+
+-D<b>nsel\_P2505R</b>=3
+
 ### Types in namespace nonstd
 
 | Purpose         | Type | Note / Object |
@@ -182,6 +194,24 @@ Define this macro to 1 to experience the by-design compile-time errors of the li
 | &nbsp;       | template&lt;typename Ex><br>bool **has_exception**() const               | true of contains exception (as base) |
 | &nbsp;       | value_type **value_or**( U && v ) const &                               | value or move from v |
 | &nbsp;       | value_type **value_or**( U && v ) &&                                    | move from value or move from v |
+| &nbsp;       | constexpr error_type **error_or**( G && e ) const &                     | return current error or v [requires nsel_P2505R >= 4] |
+| &nbsp;       | constexpr error_type **error_or**( G && e ) &&                          | move from current error or from v [requires nsel_P2505R >=4] |
+| Monadic operations<br>(requires nsel_P2505R >= 3) | constexpr auto **and_then**( F && f ) & G| return f(value()) if has value, otherwise the error |
+| &nbsp;       | constexpr auto **and_then**( F && f ) const &                           | return f(value()) if has value, otherwise the error |
+| &nbsp;       | constexpr auto **and_then**( F && f ) &&                                | return f(std::move(value())) if has value, otherwise the error |
+| &nbsp;       | constexpr auto **and_then**( F && f ) const &&                          | return f(std::move(value())) if has value, otherwise the error |
+| &nbsp;       | constexpr auto **or_else**( F && f ) &                                  | return the value, or f(error()) if there is no value |
+| &nbsp;       | constexpr auto **or_else**( F && f ) const &                            | return the value, or f(error()) if there is no value |
+| &nbsp;       | constexpr auto **or_else**( F && f ) &&                                 | return the value, or f(std::move(error())) if there is no value |
+| &nbsp;       | constexpr auto **or_else**( F && f ) const &&                           | return the value, or f(std::move(error())) if there is no value |
+| &nbsp;       | constexpr auto **transform**( F && f ) &                                | return f(value()) wrapped if has value, otherwise the error |
+| &nbsp;       | constexpr auto **transform**( F && f ) const &                          | return f(value()) wrapped if has value, otherwise the error |
+| &nbsp;       | constexpr auto **transform**( F && f ) &&                               | return f(std::move(value())) wrapped if has value, otherwise the error |
+| &nbsp;       | constexpr auto **transform**( F && f ) const &&                         | return f(std::move(value())) wrapped if has value, otherwise the error |
+| &nbsp;       | constexpr auto **transform_error**( F && f ) &                          | return the value if has value, or f(error()) otherwise |
+| &nbsp;       | constexpr auto **transform_error**( F && f ) const &                    | return the value if has value, or f(error()) otherwise |
+| &nbsp;       | constexpr auto **transform_error**( F && f ) &&                         | return the value if has value, or f(std::move(error())) otherwise |
+| &nbsp;       | constexpr auto **transform_error**( F && f ) const &&                   | return the value if has value, or f(std::move(error())) otherwise |
 | &nbsp;       | ... | &nbsp; |
 
 <a id="note1"></a>Note 1: checked access: if no content, for std::exception_ptr rethrows error(), otherwise throws bad_expected_access(error()).
@@ -224,8 +254,10 @@ Define this macro to 1 to experience the by-design compile-time errors of the li
 | Construction | **unexpected_type**() = delete;                           | no default construction |
 | &nbsp;       | constexpr explicit **unexpected_type**( E const & error ) | copy-constructed from an E |
 | &nbsp;       | constexpr explicit **unexpected_type**( E && error )      | move-constructed from an E |
-| Observers    | constexpr error_type const & **value**() const            | can observe contained error |
-| &nbsp;       | error_type & **value**()                                  | can modify contained error |
+| Observers    | constexpr error_type const & **error**() const            | can observe contained error |
+| &nbsp;       | error_type & **error**()                                  | can modify contained error |
+| deprecated   | constexpr error_type const & **value**() const            | can observe contained error |
+| deprecated   | error_type & **value**()                                  | can modify contained error |
 
 ### Algorithms for unexpected_type
 
@@ -268,7 +300,7 @@ Define this macro to 1 to experience the by-design compile-time errors of the li
 |                      |             |               |               |                  |                |               |                |               |
 |Proxy (rel.ops)       | no          | yes           | yes           | yes              | yes            | no            | no             | no            |
 |References            | no          | yes           | no/not yet    | no/not yet       | no/not yet     | yes           | no             | no            |
-|Chained visitor(s)    | no          | no            | yes           | maybe            | yes            | no            | no             | no            |
+|Chained visitor(s)    | no          | no            | yes           | yes              | yes            | no            | no             | no            |
 
 Note 1: std:&#58;*experimental*:&#58;expected
 
@@ -323,6 +355,8 @@ TBD
 
 [16] Niall Douglas. [p0762 - Concerns about expected&lt;T, E> from the Boost.Outcome peer review](http://wg21.link/p0762). 15 October 2017.
 
+[17] Jeff Garland. [p2505 - Monadic Functions for `std::expected`](http://wg21.link/p2505) (HTML). ([r0](http://wg21.link/p2505r0), [r1](http://wg21.link/p2505r1), [r2](http://wg21.link/p2505r2), [r3](http://wg21.link/p2505r3), [r4](http://wg21.link/p2505r4), [r5](http://wg21.link/p2505r5)).
+
 ## Appendix
 
 ### A.1 Compile-time information
@@ -371,6 +405,8 @@ bad_expected_access: Allows to observe its error
 bad_expected_access: Allows to change its error
 bad_expected_access: Provides non-empty what()
 expected: Allows to default construct
+expected: Allows to default construct from noncopyable, noncopyable value type
+expected: Allows to default construct from noncopyable, noncopyable error type
 expected: Allows to copy-construct from expected: value
 expected: Allows to copy-construct from expected: error
 expected: Allows to move-construct from expected: value
@@ -423,6 +459,11 @@ expected: Allows to query if it contains an exception of a specific base type
 expected: Allows to observe its value if available, or obtain a specified value otherwise
 expected: Allows to move its value if available, or obtain a specified value otherwise
 expected: Throws bad_expected_access on value access when disengaged
+expected: Allows to observe its unexpected value, or fallback to the specified value with error_or [monadic p2505r4]
+expected: Allows to map value with and_then [monadic p2505r3]
+expected: Allows to map unexpected with or_else [monadic p2505r3]
+expected: Allows to transform value [monadic p2505r3]
+expected: Allows to map errors with transform_error [monadic p2505r3]
 expected<void>: Allows to default-construct
 expected<void>: Allows to copy-construct from expected<void>: value
 expected<void>: Allows to copy-construct from expected<void>: error
@@ -449,6 +490,11 @@ expected<void>: Allows to move its error
 expected<void>: Allows to observe its error as unexpected
 expected<void>: Allows to query if it contains an exception of a specific base type
 expected<void>: Throws bad_expected_access on value access when disengaged
+expected<void>: Allows to observe unexpected value, or fallback to a default value with error_or [monadic p2505r4]
+expected<void>: Allows to call argless functions with and_then [monadic p2505r3]
+expected<void>: Allows to map to expected or unexpected with or_else [monadic p2505r3]
+expected<void>: Allows to assign a new expected value using transform [monadic p2505r3]
+expected<void>: Allows to map unexpected error value via transform_error [monadic p2505r3]
 operators: Provides expected relational operators
 operators: Provides expected relational operators (void)
 swap: Allows expected to be swapped
