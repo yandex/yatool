@@ -50,8 +50,7 @@ def extract_digest(data):
 def create_package(
     registry,
     repository,
-    package_name,
-    package_version,
+    package_context,
     docker_root,
     result_dir,
     save_docker_image,
@@ -68,6 +67,8 @@ def create_package(
     docker_secret,
     labels=None,
 ):
+    package_name = package_context.package_name
+    package_version = package_context.version
     image_full_name = get_image_name(registry, repository, package_name, package_version)
 
     buildx_required = False
@@ -160,7 +161,7 @@ def create_package(
                 data=json.dumps(data),
             )
     with exts.tmp.temp_dir() as temp_dir:
-        base_result_name = "{}.{}".format(package_name, package_version)
+        base_result_name = package_context.resolve_filename(extra={"pattern": "{package_name}.{package_version}"})
         out_file = os.path.join(temp_dir, "build_docker_package.out.txt")
         with open(out_file, "w") as f:
             f.write("\n".join(out))
@@ -169,7 +170,8 @@ def create_package(
             exts.fs.ensure_dir(os.path.dirname(image_file))
             package.process.run_process(get_docker_binary(), ["save", "-o", image_file, image_full_name])
 
-        result_file = os.path.join(result_dir, base_result_name + ".tar.gz")
+        package_filename = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
+        result_file = os.path.join(result_dir, package_filename)
         exts.fs.ensure_dir(os.path.dirname(result_file))
         exts.archive.create_tar(
             temp_dir, result_file, exts.archive.GZIP, exts.archive.Compression.Default, fixed_mtime=None

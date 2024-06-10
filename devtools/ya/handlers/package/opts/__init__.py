@@ -359,6 +359,7 @@ class PackageCustomizableOptions(core.yarg.Options):
         self.strip = False
         self.wheel_platform = ""
         self.wheel_python3 = False
+        self.package_filename = None
 
     @staticmethod
     def consumer():
@@ -654,6 +655,13 @@ class PackageCustomizableOptions(core.yarg.Options):
                 names=['--ensure-package-published'],
                 help='Ensure that package is available in the repository',
                 hook=core.yarg.SetConstValueHook('ensure_package_published', True),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--package-filename'],
+                help="Specify custom package filename with pattern. For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package/json#params",
+                hook=core.yarg.SetValueHook('package_filename'),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),

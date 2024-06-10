@@ -76,7 +76,8 @@ def publish_package(path_to_package, publish_to, key_user):
         package.process.run_process(SSH, [key_user + "@" + publish_to.split(':')[0]] + prepare_install_cmd(publish_to))
 
 
-def create_rpm_package(temp_dir, package_name, package_version, rpmbuild_dir, publish_to_list, key_user):
+def create_rpm_package(temp_dir, package_context, rpmbuild_dir, publish_to_list, key_user):
+    package_name = package_context.package_name
     args = [
         '--define',
         '_topdir {}'.format(os.path.join(temp_dir, "rpmbuild")),
@@ -84,7 +85,7 @@ def create_rpm_package(temp_dir, package_name, package_version, rpmbuild_dir, pu
         os.path.join(rpmbuild_dir, "SPECS", package_name + '.spec'),
     ]
     package.process.run_process(RPMBUILD_COMMAND, args)
-    tar_gz_file = '.'.join([package_name, package_version, 'tar.gz'])
+    tar_gz_file = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
     if publish_to_list:
         packages_dir = os.path.join(rpmbuild_dir, "RPMS")
         for publish_to in publish_to_list:
@@ -99,6 +100,7 @@ def create_rpm_package(temp_dir, package_name, package_version, rpmbuild_dir, pu
             os.path.join(rpmbuild_dir, "RPMS"),
             temp_file,
         )
+
     return tar_gz_file
 
 
@@ -195,11 +197,13 @@ def create_spec_file(
     return spec_file
 
 
-def create_gz_file(package_name, package_version, temp_work_dir, package_data_path, threads=None):
+def create_gz_file(package_context, temp_work_dir, package_data_path, threads=None):
+    package_name = package_context.package_name
+    package_version = package_context.version
+
     dir_to_arch = os.path.join(temp_work_dir, "dir_to_arch")
     content_dir = os.path.join(dir_to_arch, package_name) + '-{}'.format(package_version)
     exts.fs.copytree3(package_data_path, content_dir, symlinks=True)
 
-    return package.tarball.create_tarball_package(
-        os.getcwd(), dir_to_arch, package_name, package_version, threads=threads
-    )
+    package_filename = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
+    return package.tarball.create_tarball_package(os.getcwd(), dir_to_arch, package_filename, threads=threads)

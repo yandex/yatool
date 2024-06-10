@@ -6,14 +6,26 @@ import logging
 import os
 import random
 import re
-import six
 import sys
 import time
 import traceback
-from jsonschema import Draft4Validator, ValidationError
 
 import library.python.resource as rs
+import six
+from jsonschema import Draft4Validator, ValidationError
 
+import app_config
+import build.build_handler
+import build.build_opts
+import build.targets_deref
+import build.ya_make
+import core.common_opts
+import core.config
+import core.error
+import core.profiler
+import core.yarg
+import devtools.ya.handlers.package.opts as package_opts
+import devtools.ya.test.opts as test_opts
 import exts.archive
 import exts.fs
 import exts.func
@@ -23,24 +35,6 @@ import exts.path2
 import exts.timer
 import exts.tmp
 import exts.yjson as json
-
-import core.config
-import core.error
-import core.yarg
-import core.profiler
-import build.ya_make
-import build.targets_deref
-import build.build_opts
-import build.build_handler
-
-import core.common_opts
-
-import devtools.ya.test.opts as test_opts
-
-from yalibrary import find_root
-
-from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
-
 import package
 import package.aar
 import package.artifactory
@@ -55,9 +49,9 @@ import package.source
 import package.tarball
 import package.vcs
 import package.wheel
-import devtools.ya.handlers.package.opts as package_opts
 from devtools.ya.package import const
-import app_config
+from yalibrary import find_root
+from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
 
 if app_config.in_house or app_config.have_sandbox_fetcher:
     import package.sandbox_source
@@ -546,16 +540,12 @@ def is_old_format(package_data):
 
 
 def verify_rpm_package_meta(package_meta):
-    if 'name' not in package_meta:
-        raise KeyError("'name' is mandatory field in meta section for building rpm package")
-    if 'version' not in package_meta:
-        raise KeyError("'version' is mandatory field in meta section for building rpm package")
-    if 'homepage' not in package_meta:
-        raise KeyError("'homepage' is mandatory field in meta section for building rpm package")
-    if 'rpm_license' not in package_meta:
-        raise KeyError("'rpm_license' is mandatory field in meta section for building rpm package")
-    if 'rpm_release' not in package_meta:
-        raise KeyError("'rpm_release' is mandatory field in meta section for building rpm package")
+    required_keys = ('name', 'version', 'homepage', 'rpm_license', 'rpm_release')
+    missing_keys = [key for key in required_keys if key not in package_meta]
+
+    if missing_keys:
+        err_msg = "The following fields: {fields} are mandatory in meta section for building rpm package."
+        raise KeyError(err_msg.format(fields=", ".join(missing_keys)))
 
 
 def format_package_meta(meta_value, formatters):
@@ -575,13 +565,14 @@ def create_package(package_context, output_root, builds):
     formatters = package_context.formatters
 
     package_meta = parsed_package['meta']
-    package_version = package_meta['version']
-    package_name = package_meta['name']
     package_data = parsed_package['data']
 
     for field in REQUIRED_META_FIELDS:
         if field not in package_meta:
             raise YaPackageException('Meta field {} is required'.format(field))
+
+    package_version = package_context.version
+    package_name = package_context.package_name
 
     for key, value in six.iteritems(package_meta):
         if isinstance(value, six.string_types):
@@ -643,9 +634,8 @@ def create_package(package_context, output_root, builds):
                 strip_binaries(temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
                 if params.create_dbg:
                     debug_dir = os.path.join(debug_dir, '.content')
-                    if os.path.exists(debug_dir):
-                        create_dbg = True
-                    else:
+                    create_dbg = os.path.exists(debug_dir)
+                    if not create_dbg:
                         logger.debug("Debug content dir for %s does not exist", package_name)
 
             package.display.emit_message(
@@ -655,23 +645,11 @@ def create_package(package_context, output_root, builds):
             )
 
             timestamp_started = time.time()
-            if params.artifactory and params.publish_to:
-                artifactory_settings = params.publish_to
-                if len(artifactory_settings) > 1:
-                    raise ValueError("Use unique settings file for artifactory")
-                if len(artifactory_settings) == 0:
-                    raise ValueError("Settings file for artifactory not specified")
-                artifactory_settings = artifactory_settings[0]
-                if os.path.isabs(artifactory_settings):
-                    if not os.path.exists(artifactory_settings):
-                        raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
-                else:
-                    if os.path.exists(artifactory_settings):
-                        artifactory_settings = os.path.abspath(artifactory_settings)
-                    elif os.path.exists(os.path.join(arcadia_root, artifactory_settings)):
-                        artifactory_settings = os.path.join(arcadia_root, artifactory_settings)
-                    else:
-                        raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
+            should_push_to_artifactory = params.artifactory and params.publish_to
+            if should_push_to_artifactory:
+                artifactory_settings = package.artifactory.get_artifactory_settings(
+                    package_context.arcadia_root, package_context.params.publish_to
+                )
                 package.artifactory.publish_to_artifactory(
                     content_dir,
                     package_version,
@@ -682,10 +660,7 @@ def create_package(package_context, output_root, builds):
             if package_format == const.PackageFormat.TAR:
                 package.display.emit_message('Package version: [[imp]]{}'.format(package_version))
                 if build_raw_package:
-                    if params.raw_package_path:
-                        package_path = params.raw_package_path
-                    else:
-                        package_path = '.'.join([package_name, package_version])
+                    package_path = package_context.get_raw_package_path()
                     exts.fs.ensure_removed(package_path)
                     exts.fs.copytree3(content_dir, package_path, symlinks=True)
                     package.display.emit_message(
@@ -696,8 +671,7 @@ def create_package(package_context, output_root, builds):
                     package_path = package.tarball.create_tarball_package(
                         result_dir,
                         content_dir,
-                        package_name,
-                        package_version,
+                        package_context.resolve_filename(extra={"package_ext": "tar"}),
                         compress=params.compress_archive,
                         codec=params.codec,
                         threads=params.build_threads,
@@ -707,13 +681,15 @@ def create_package(package_context, output_root, builds):
                     stage_finished("create_tarball_package")
 
                 if create_dbg:
-                    debug_package_name = package_name + '-dbg' if create_dbg else None
+                    package_filename = package_context.resolve_filename(
+                        extra={"package_ext": "tar", "package_name": package_context.package_name + '-dbg'}
+                    )
+
                     stage_started("create_tarball_package-dbg")
                     debug_package_path = package.tarball.create_tarball_package(
                         result_dir,
                         debug_dir,
-                        debug_package_name,
-                        package_version,
+                        package_filename,
                         compress=params.compress_archive,
                         codec=params.codec,
                         threads=params.build_threads,
@@ -726,8 +702,7 @@ def create_package(package_context, output_root, builds):
                 package_path = package.aar.create_aar_package(
                     result_dir,
                     content_dir,
-                    package_name,
-                    package_version,
+                    package_context,
                     compress=params.compress_archive,
                     publish_to_list=params.publish_to,
                 )
@@ -799,8 +774,7 @@ def create_package(package_context, output_root, builds):
 
                 package_path = package.debian.create_debian_package(
                     temp_work_dir,
-                    package_name,
-                    package_version,
+                    package_context,
                     params.arch_all,
                     params.sign,
                     params.key,
@@ -843,18 +817,22 @@ def create_package(package_context, output_root, builds):
                     package_meta.get("provides"),
                     package_meta.get("conflicts"),
                     package_meta.get("replaces"),
-                    ['.'.join((package_name, package_version, "tar.gz"))],
+                    [package_context.resolve_filename(extra={"package_ext": "tar.gz"})],
                     package_meta['description'],
                     package_meta["rpm_license"],
                     data_files,
                     abs_package_root,
                 )
                 gz_file = package.rpm.create_gz_file(
-                    package_name, package_version, temp_work_dir, content_dir, threads=params.build_threads
+                    package_context, temp_work_dir, content_dir, threads=params.build_threads
                 )
                 rpmbuild_dir = package.rpm.prepare_rpm_folder_structure(temp_work_dir, spec_file, gz_file)
                 package_path = package.rpm.create_rpm_package(
-                    temp_work_dir, package_name, package_version, rpmbuild_dir, params.publish_to, params.key
+                    temp_work_dir,
+                    package_context,
+                    rpmbuild_dir,
+                    params.publish_to,
+                    params.key,
                 )
                 package_version = "{0}-{1}".format(package_version, package_meta["rpm_release"])
 
@@ -862,8 +840,7 @@ def create_package(package_context, output_root, builds):
                 package_path, info = package.docker.create_package(
                     params.docker_registry,
                     params.docker_repository,
-                    package_name,
-                    package_version,
+                    package_context,
                     content_dir,
                     result_dir,
                     params.docker_save_image,
@@ -886,7 +863,10 @@ def create_package(package_context, output_root, builds):
 
             elif package_format == const.PackageFormat.NPM:
                 package_path = package.npm.create_npm_package(
-                    content_dir, result_dir, params.publish_to, package_version
+                    content_dir,
+                    result_dir,
+                    params.publish_to,
+                    package_context,
                 )
 
             elif package_format == const.PackageFormat.WHEEL:
@@ -1140,6 +1120,7 @@ class PackageContext:
         self._branch = None
         self._package_name = None
         self._package_path = None
+        self._package_filename = None
 
         self._build_context(package_file)
 
@@ -1157,6 +1138,9 @@ class PackageContext:
 
         self._branch = str(package.vcs.Branch(self._arcadia_root, self._params.arc_revision_means_trunk))
         self._package_name = self._read_spec_safe('meta', 'name', 'package_name')
+        # package_filename has patterns in brackets {}
+        # so format_package_meta wants to format it but we don't have package_ext yet
+        self._package_filename = self._params.package_filename or self._spec['meta'].pop("package_filename", None)
 
         # Setup formatters, which are not part of context
         change_log = self._params.change_log or os.path.join(
@@ -1233,6 +1217,10 @@ class PackageContext:
         return self._package_name
 
     @property
+    def package_filename(self):
+        return self._package_filename
+
+    @property
     def arcadia_root(self):
         return self._arcadia_root
 
@@ -1248,6 +1236,83 @@ class PackageContext:
     @property
     def package_path(self):
         return self._package_path
+
+    @property
+    def should_use_package_filename(self):
+        return self.package_filename is not None
+
+    def resolve_filename(self, extra):
+        filename_pattern = extra.get('pattern', self.package_filename)
+        if not filename_pattern:
+            filename_pattern = "{package_name}.{package_version}.{package_ext}"
+
+        package_name = extra.get('package_name', self.package_name)
+        package_version = extra.get('package_version', self.version)
+        package_ext = extra.get('package_ext', '')
+
+        return filename_pattern.format(
+            package_name=package_name, package_version=package_version, package_ext=package_ext
+        )
+
+    def get_raw_package_path(self):
+        if self.params.raw_package_path:
+            return self.params.raw_package_path
+        return '.'.join([self.package_name, self.version])
+
+
+def _get_arcadia_root(params):
+    arcadia_root = params.custom_source_root
+    if arcadia_root and os.path.exists(os.path.join(arcadia_root, 'arcadia')):
+        # support old style root
+        arcadia_root = os.path.join(arcadia_root, 'arcadia')
+    if not arcadia_root and os.path.exists(params.packages[0]):
+        arcadia_root = find_root.detect_root(params.packages[0])
+    if not arcadia_root:
+        arcadia_root = core.config.find_root()
+    arcadia_root = exts.path2.abspath(arcadia_root)
+    package.display.emit_message('Source root: [[imp]]{}'.format(arcadia_root))
+    if not os.path.exists(arcadia_root):
+        raise YaPackageException('Arcadia root {} does not exist'.format(arcadia_root))
+    return arcadia_root
+
+
+def validate_package_filename(package_filename):
+    if not package_filename:
+        return True
+
+    stack = []
+    seen = {"package_name": False, "package_version": False, "package_ext": False}
+
+    for idx, char in enumerate(package_filename):
+        if char == '{':
+            stack.append(idx)
+        elif char == '}':
+            if not stack:
+                raise YaPackageException("{0} has invalid brackets.".format(package_filename))
+
+            start_idx = stack.pop()
+            package_part = package_filename[start_idx + 1 : idx]
+
+            if package_part not in seen:
+                raise YaPackageException(
+                    "--package-filename arg doesn't have an option to pass {0}. "
+                    "See docs for more info.".format(package_part)
+                )
+
+            if seen[package_part]:
+                raise YaPackageException(
+                    "There is no need to duplicate {0} in --package-filename arg.".format(package_part)
+                )
+
+            seen[package_part] = True
+
+    if stack:
+        raise YaPackageException("{0} has invalid brackets.".format(package_filename))
+
+    if seen["package_ext"] and not package_filename.endswith("{package_ext}"):
+        raise YaPackageException("{package_ext} option must be the last part of --package-filename arg.")
+
+    return True
 
 
 @timeit
@@ -1265,18 +1330,9 @@ def do_package(params):
     if not params.packages:
         raise YaPackageException('No packages to create')
 
-    arcadia_root = params.custom_source_root
-    if arcadia_root and os.path.exists(os.path.join(arcadia_root, 'arcadia')):
-        # support old style root
-        arcadia_root = os.path.join(arcadia_root, 'arcadia')
-    if not arcadia_root and os.path.exists(params.packages[0]):
-        arcadia_root = find_root.detect_root(params.packages[0])
-    if not arcadia_root:
-        arcadia_root = core.config.find_root()
-    arcadia_root = exts.path2.abspath(arcadia_root)
-    package.display.emit_message('Source root: [[imp]]{}'.format(arcadia_root))
-    if not os.path.exists(arcadia_root):
-        raise YaPackageException('Arcadia root {} does not exist'.format(arcadia_root))
+    validate_package_filename(params.package_filename)
+
+    arcadia_root = _get_arcadia_root(params)
 
     if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
         raise YaPackageException('Cannot use --run-all-tests with --dist')

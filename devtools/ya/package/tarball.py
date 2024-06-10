@@ -11,17 +11,17 @@ import exts.archive
 def create_tarball_package(
     result_dir,
     package_dir,
-    package_name,
-    package_version,
+    package_filename,
     compress=True,
     codec=None,
     threads=None,
     compression_filter=None,
     compression_level=None,
 ):
-    archive_file = '.'.join([package_name, package_version, 'tar'])
+    archive_file = package_filename
 
-    if compress and not codec:
+    is_compression_ext_passed_via_filename = archive_file.endswith(('.zst', '.gz'))
+    if compress and not codec and not is_compression_ext_passed_via_filename:
         if compression_filter == exts.archive.ZSTD:
             archive_file += '.zst'
         else:

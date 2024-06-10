@@ -3,8 +3,8 @@ import shutil
 import subprocess
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 
-import yalibrary.tools as tools
 import exts.tmp
+import yalibrary.tools as tools
 
 
 def get_publish_cmd(settings_path, filename, version):
@@ -18,8 +18,8 @@ def get_publish_cmd(settings_path, filename, version):
     ]
 
 
-def create_aar_package(result_dir, package_dir, package_name, package_version, compress=True, publish_to_list=None):
-    archive_file = '.'.join([package_name, package_version, 'aar'])
+def create_aar_package(result_dir, package_dir, package_context, compress=True, publish_to_list=None):
+    archive_file = package_context.resolve_filename(extra={"package_ext": "aar"})
 
     with exts.tmp.temp_dir() as temp_dir:
         zip_archive = os.path.join(temp_dir, archive_file)
@@ -35,5 +35,6 @@ def create_aar_package(result_dir, package_dir, package_name, package_version, c
         env = os.environ.copy()
         env["JAVA_HOME"] = str(os.path.abspath(os.path.join(tools.tool("java"), '..', '..')))
         for setting in publish_to_list:
-            subprocess.check_call(get_publish_cmd(setting, result_path, package_version), env=env)
+            cmd = get_publish_cmd(setting, result_path, package_context.version)
+            subprocess.check_call(cmd, env=env)
     return result_path

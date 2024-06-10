@@ -7,11 +7,16 @@ import package.process
 NPM_BINARY = "npm"
 
 
-def create_npm_package(content_dir, result_dir, publish_to, package_version):
-    set_package_version(content_dir, package_version)
-    tarball_name = pack(content_dir)
+def create_npm_package(content_dir, result_dir, publish_to, package_context):
+    set_package_version(content_dir, package_context.version)
+    tarball_name = mv_to = pack(content_dir)
 
-    tarball_path = move_package_to_result_dir(content_dir, result_dir, tarball_name)
+    if package_context.should_use_package_filename:
+        mv_to = package_context.resolve_filename(
+            extra={"package_ext": "tgz", "package_name": extract_package_name(tarball_name)}
+        )
+
+    tarball_path = move_package_to_result_dir(content_dir, result_dir, tarball_name, mv_to)
 
     if publish_to:
         publish(publish_to, tarball_path)
@@ -36,9 +41,19 @@ def get_tarball_name(pack_output):
     return six.ensure_str(pack_lines[-1])
 
 
-def move_package_to_result_dir(content_dir, result_dir, tarball_name):
+def extract_package_name(tarball_name):
+    """
+    Extract package name from tarball name
+    Npm docs says that they name it like that <name>-<version>.tgz
+    https://docs.npmjs.com/cli/v8/commands/npm-pack#description
+    """
+    assert '-' in tarball_name
+    return tarball_name.rsplit('-', 1)[0]
+
+
+def move_package_to_result_dir(content_dir, result_dir, tarball_name, mv_to):
     src = os.path.join(content_dir, tarball_name)
-    dst = os.path.join(result_dir, tarball_name)
+    dst = os.path.join(result_dir, mv_to)
     shutil.move(src, dst)
     return dst
 

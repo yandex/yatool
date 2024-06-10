@@ -470,6 +470,10 @@
                 "rpm_buildarch": {
                     "description": "build architecture",
                     "type": "string"
+                },
+                "package_filename": {
+                    "description": "Specify custom package filename with pattern. For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package/json#params",
+                    "type": "string"
                 }
             },
             "required": ["name", "maintainer"],

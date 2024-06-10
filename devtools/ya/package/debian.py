@@ -84,8 +84,7 @@ DCH_COMMAND = "dch"
 
 def create_debian_package(
     result_dir,
-    package_name,
-    package_version,
+    package_context,
     arch_all,
     sign,
     key,
@@ -100,7 +99,10 @@ def create_debian_package(
     debian_distribution,
     debian_upload_token,
 ):
+    package_name = package_context.package_name
+    package_version = package_context.version
     full_package_name = '_'.join([package_name, str(package_version)])
+
     with exts.tmp.temp_dir() as temp_dir:
         new_result_dir = os.path.join(temp_dir, 'result_dir')
 
@@ -169,7 +171,7 @@ def create_debian_package(
             shutil.move(new_result_dir, result_dir)
 
         if store_debian:
-            tar_gz_file = '.'.join([package_name, package_version, 'tar.gz'])
+            tar_gz_file = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
 
             with package.fs_util.AtomicPath(tar_gz_file) as temp_file:
                 exts.archive.create_tar(

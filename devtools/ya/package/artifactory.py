@@ -70,3 +70,23 @@ def publish_to_artifactory(package_dir, package_version, artifactory_settings, p
             logger.debug("maven settings.xml:\n{}".format(afile.read()))
         subprocess.check_call(get_publish_cmd(updated_settings), env=env)
         os.remove(updated_settings)
+
+
+def get_artifactory_settings(arcadia_root, artifactory_settings):
+    n = len(artifactory_settings)
+
+    if n > 1:
+        raise ValueError("Use unique settings file for artifactory")
+    if n == 0:
+        raise ValueError("Settings file for artifactory not specified")
+
+    artifactory_settings = artifactory_settings[0]
+    if os.path.isabs(artifactory_settings):
+        if not os.path.exists(artifactory_settings):
+            raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
+    else:
+        if os.path.exists(artifactory_settings):
+            return os.path.abspath(artifactory_settings)
+        elif os.path.exists(os.path.join(arcadia_root, artifactory_settings)):
+            return os.path.join(arcadia_root, artifactory_settings)
+        raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
