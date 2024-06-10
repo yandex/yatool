@@ -161,7 +161,7 @@ ya test -t --show-passed-tests --show-skipped-tests --show-metrics
 # Список всех пользовательских тестов (без тестов стиля, импортов и подобных проверок)
 ya test -AL --regular-tests devtools/examples/tutorials/python
 ```
-Команда `ya test` поддерживает [параллельный запуск тестов]
+Команда `ya test` поддерживает [параллельный запуск тестов]().
 
 ### Выборочное тестирование (фильтрация)
 
