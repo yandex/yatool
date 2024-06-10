@@ -58,9 +58,9 @@ ENV(ASAN_OPTIONS=detect_stack_use_after_return=1)
 ```
 ya test -A --sanitize=<SANITIZER_TYPE>
 ```
-Дополнительно может потребоваться повторить настройки оптимизации `--build=release`
+Дополнительно может потребоваться повторить настройки оптимизации `--build=release`.
 
-Для отладки под отладчиком следует добавить точку останова `br __msan_warning_with_origin_noreturn`
+Для отладки под отладчиком следует добавить точку останова `br __msan_warning_with_origin_noreturn`.
 
 Под отладчиком же можно посмотреть, что санитайзер думает про каждый бит используемой памяти: 
 `call (void)__msan_print_shadow(&myVar, sizeof(myVar))`
