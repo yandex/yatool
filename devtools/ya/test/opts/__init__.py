@@ -869,19 +869,23 @@ class DepsOptions(core.yarg.Options):
                 'YA_DROP_GRAPH_RESULT_BEFORE_TESTS',
                 hook=core.yarg.SetValueHook('drop_graph_result_before_tests', core.yarg.return_true_if_enabled),
             ),
+            # TODO remove this option, see https://st.yandex-team.ru/YA-1898
             TestArgConsumer(
                 ['--strip-idle-build-results'],
-                help="Remove all result nodes (including build nodes) that are not required for tests run",
+                help="Do not use this option, this is the default behavior",
                 hook=core.yarg.SetConstValueHook('strip_idle_build_results', True),
                 subgroup=DEPS_SUBGROUP,
-                visible=help_level.HelpLevel.EXPERT,
+                visible=False,
+                deprecated=True,
             ),
+            # TODO remove this option, see https://st.yandex-team.ru/YA-1898
             TestArgConsumer(
                 ['--no-strip-idle-build-results'],
-                help="Don't remove all result nodes (including build nodes) that are not required for tests run",
+                help="Use -b / --build-all instead of this option",
                 hook=core.yarg.SetConstValueHook('strip_idle_build_results', False),
                 subgroup=DEPS_SUBGROUP,
-                visible=help_level.HelpLevel.EXPERT,
+                visible=False,
+                deprecated=True,
             ),
             TestArgConsumer(
                 ['-b', '--build-all'],
@@ -890,6 +894,7 @@ class DepsOptions(core.yarg.Options):
                 subgroup=DEPS_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
             ),
+            # TODO remove this option, see https://st.yandex-team.ru/YA-1898
             core.yarg.EnvConsumer(
                 'YA_STRIP_IDLE_BUILD_RESULTS',
                 hook=core.yarg.SetValueHook('strip_idle_build_results', core.yarg.return_true_if_enabled),
