@@ -52,7 +52,7 @@ namespace NYa {
         }
 
         int Entry(int argc, char** argv) {
-            SetOwnProcessGroupId(argc, argv);
+            auto newPgid = SetOwnProcessGroupId(argc, argv);
             InitWatchdogFromEnv();
 
             const auto factory = TSingletonClassFactory<IYaHandler>::Get();
@@ -77,6 +77,11 @@ namespace NYa {
                     }
                     const IConfig& config = GetConfig();
                     InitLoggerRespectConfig(config.MiscRoot(), args, TLOG_DEBUG, verbose);
+
+                    if (newPgid != 0) {
+                        DEBUG_LOG << "Ya changed its pgid: " << newPgid << "\n";
+                    }
+
                     DEBUG_LOG << "Start handler " << handlerName << "\n";
                     // If handler has no fall back to python it just do exit() and doesn't return here.
                     handlerPtr->Run(args);

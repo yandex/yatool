@@ -1,5 +1,5 @@
 #pragma once
 
 namespace NYa {
-    void SetOwnProcessGroupId(int argc, char** argv);
+    int SetOwnProcessGroupId(int argc, char** argv);
 }
