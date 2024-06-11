@@ -1,13 +1,29 @@
+import enum
+import os
 import six
 import time
-import os
 
+import humanfriendly
 from core import report
 from exts.timer import AccumulateTime
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class Status(enum.Enum):
+    OK = 1
+    FAILED = 2
+    SKIPPED = 3
+
+    @property
+    def ok(self):
+        return self.value == Status.OK.value
+
+    @property
+    def skipped(self):
+        return self.value == Status.SKIPPED.value
 
 
 class DistStore(object):
@@ -43,7 +59,12 @@ class DistStore(object):
 
             def exclude_filter(files):
                 # There is no point in uploading all the files if at least one exceeds the limit
-                return any(os.stat(x).st_size > limit for x in files)
+                for filename in files:
+                    size = os.stat(filename).st_size
+                    if size > limit:
+                        return "{} ({}) exceeds max file size limit".format(
+                            os.path.basename(filename), humanfriendly.format_size(size, binary=True)
+                        )
 
             return exclude_filter
         else:
@@ -66,12 +87,16 @@ class DistStore(object):
         raise NotImplementedError()
 
     def put(self, uid, root_dir, files, codec=None):
-        if self._exclude_filter and self._exclude_filter(files):
-            logger.debug("%s is excluded", uid)
-            return False
+        if self._exclude_filter:
+            reason = self._exclude_filter(files)
+            if reason:
+                logger.debug("Skipping uploading of %s: %s", uid, reason)
+                return Status.SKIPPED
 
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
-            return self._do_put(uid, root_dir, files, codec)
+            if self._do_put(uid, root_dir, files, codec):
+                return Status.OK
+            return Status.FAILED
 
     def _do_try_restore(self, uid, into_dir, filter_func=None):
         raise NotImplementedError()

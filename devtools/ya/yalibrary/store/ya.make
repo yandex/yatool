@@ -14,12 +14,13 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/exts
+    contrib/python/humanfriendly
     devtools/ya/core/report
-    library/python/cityhash
-    library/python/compress
+    devtools/ya/exts
     devtools/ya/yalibrary/chunked_queue
     devtools/ya/yalibrary/store/hash_map
+    library/python/cityhash
+    library/python/compress
 )
 
 END()

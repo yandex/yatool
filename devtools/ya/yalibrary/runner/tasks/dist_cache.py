@@ -1,5 +1,6 @@
-import time
 import os
+import time
+
 import core.error
 import yalibrary.worker_threads as worker_threads
 
@@ -18,14 +19,19 @@ class PutInDistCacheTask(object):
         self._dist_cache_codec = dist_cache_codec
         self._fmt_node = fmt_node
         self._ok = True
+        self._skipped = False
         self._execution_log = execution_log
 
     def __call__(self, *args, **kwargs):
         start_time = time.time()
         try:
-            self._ok = self._dist_cache.put(
+            status = self._dist_cache.put(
                 self._node.uid, self._build_root.path, list(self._build_root.output), codec=self._dist_cache_codec
             )
+            if status.skipped:
+                self._skipped = True
+            else:
+                self._ok = status.ok
         finally:
             self._build_root.dec()
         self._execution_log[str(self)] = {
@@ -48,7 +54,9 @@ class PutInDistCacheTask(object):
 
     def status(self):
         tags = ['[[c:yellow]]{}_UPLOAD[[rst]]'.format(self._dist_cache.tag())]
-        if not self._ok:
+        if self._skipped:
+            tags.append('[[unimp]]SKIPPED[[rst]]')
+        elif not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
         return self._fmt_node(self._node, tags)
 
