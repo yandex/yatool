@@ -23,7 +23,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 35;
+    const ui64 ImageVersion = 36;
 
     template <size_t HashSize>
     class TVersionImpl {
