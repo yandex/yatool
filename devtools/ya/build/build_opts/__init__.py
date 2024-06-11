@@ -2542,7 +2542,7 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ArgConsumer(
                     ['--dist-cache-max-file-size'],
                     help='Sets the maximum size in bytes of a single file stored in the dist cache. Use 0 for no limit',
-                    hook=SetValueHook('dist_cache_max_file_size'),
+                    hook=SetValueHook('dist_cache_max_file_size', transform=int),
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
