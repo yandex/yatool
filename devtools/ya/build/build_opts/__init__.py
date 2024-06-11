@@ -1179,15 +1179,14 @@ class ForceDependsOptions(Options):
             ConfigConsumer('force_build_depends'),
             ArgConsumer(
                 ['--force-build-depends'],
-                help='Build by DEPENDS anyway',
+                help='Build targets reachable by RECURSE_FOR_TESTS and DEPENDS macros',
                 hook=SetConstValueHook('force_build_depends', True),
                 group=OUTPUT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),
             EnvConsumer(
                 'YA_FORCE_BUILD_DEPENDS',
-                help='Build by DEPENDS anyway',
-                hook=SetConstValueHook('force_build_depends', True),
+                hook=SetValueHook('force_build_depends', transform=return_true_if_enabled),
             ),
         ]
 
