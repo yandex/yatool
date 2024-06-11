@@ -76,10 +76,11 @@ class Ya(LoggerCounter):
             self.logger.error("This instance has already been launched")
             raise RuntimeError("This instance has already been launched")
 
+        # XXX: remove after CHANGES_DETECTOR migrate to py3
+        extra_opts = {'process_group': self.process_group} if six.PY3 else {}
+
         try:
-            result = run_subprocess(
-                self.cmd, self.env, original_env=False, cwd=self.cwd, process_group=self.process_group
-            )
+            result = run_subprocess(self.cmd, self.env, original_env=False, cwd=self.cwd, **extra_opts)
             self.returncode = result.returncode
             self.stdout = result.stdout
             self.stderr = result.stderr
