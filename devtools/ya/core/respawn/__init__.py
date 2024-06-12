@@ -143,7 +143,7 @@ def check_py23_respawn_reason(
             # Nothing to do here
         elif ya_pyver_require != ya_bin_version:
             # We remove ya-bin2, so just warning here
-            logger_pyver.warning("You asks for ya-bin on python2, but it didn't exist anymore. Will be run on python3")
+            logger_pyver.warning("You ask for ya-bin on python2, but it didn't exist anymore. Will be run on python3")
             ya_pyver_require = ya_bin_version
 
     # Nothing to do when we run `ya-bin/3` directly (`ya_pyver_require is None`)
