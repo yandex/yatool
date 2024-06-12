@@ -142,12 +142,10 @@ def check_py23_respawn_reason(
                 expected_ya_bin_python_version = handler_pyver
             # Nothing to do here
         elif ya_pyver_require != ya_bin_version:
-            # Something wrong happens in ya script
-            raise IncompatiblePythonMajorVersion(
-                "Incompatible required and ya-bin python major version: `{}` vs `{}`".format(
-                    ya_pyver_require, ya_bin_version
-                )
-            )
+            # We remove ya-bin2, so just warning here
+            logger_pyver.warning("You asks for ya-bin on python2, but it didn't exist anymore. Will be run on python3")
+            ya_pyver_require = ya_bin_version
+
     # Nothing to do when we run `ya-bin/3` directly (`ya_pyver_require is None`)
 
     if ya_bin_version != handler_pyver:
