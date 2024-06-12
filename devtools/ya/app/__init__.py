@@ -808,11 +808,12 @@ def configure_exit_interceptor(error_file):
 
         import app_config
 
-        if app_config.in_house and sys.version_info.major == 3:
+        if app_config.in_house:
             sys.stderr.write(
-                "If you have some troubles with ya-bin3, you can disable "
-                "all py3-handlers with `YA_DISABLE_PY3_HANDLERS` environment "
-                "or you can specify python version with `ya -2 ...` flag\n"
+                "If you have some troubles with ya-bin, you can send request "
+                "to our support: "
+                "https://st.yandex-team.ru/createTicket?queue=DEVTOOLSSUPPORT&_form=65090"
+                "\n"
             )
 
         error_code = 1
