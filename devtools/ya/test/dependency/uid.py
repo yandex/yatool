@@ -1,7 +1,6 @@
 import os
 import base64
 import logging
-import socket
 
 import exts.func
 import exts.tmp
@@ -88,18 +87,7 @@ class TestUidGenerator(object):
         :param graph: the build graph to take the test dependencies uids from
         :return: uid
         """
-
-        # XXX extra debug for a specific project, for more info see https://st.yandex-team.ru/DEVTOOLS-7588
-        logging_needed = (
-            test.project_path.startswith("web/app_host/conf/graph_generator/tests/light") and test._modulo_index == 0
-        )
-
-        def debug(*args):
-            if logging_needed:
-                logger.debug(*args)
-
         deps = list(test.get_build_dep_uids())
-        paths = []
         try:
             test_paths_hashes = test.test_paths_hashes
 
@@ -111,21 +99,9 @@ class TestUidGenerator(object):
                 ]
             )
             paths = testdeps.remove_redundant_paths(paths)
-            test_paths_hashes = imprint.generate_path_imprint(paths, log=logging_needed)
-            if logging_needed:
-                logger.info("!!!! Create clean Imprint")
-                test_paths_hashes_clean = None
-                try:
-                    from core.imprint import Imprint
+            test_paths_hashes = imprint.generate_path_imprint(paths)
 
-                    imprint_clean = Imprint()
-                    test_paths_hashes_clean = imprint_clean.generate_path_imprint(paths, log=logging_needed)
-                except Exception as e:
-                    logger.warning("!! Error while calculate clean imprint: %s", e)
-                logger.debug("!! Default test_path_hashes: %s", test_paths_hashes)
-                logger.debug("!! Clean   test_path_hashes: %s", test_paths_hashes_clean)
-
-        affecting_tags = sorted([t for t in test.tags if t.startswith(("ya:", "sb:"))])
+        affecting_tags = sorted(t for t in test.tags if t.startswith(("ya:", "sb:")))
 
         imprint_parts = (
             [
@@ -172,14 +148,6 @@ class TestUidGenerator(object):
         if test.recipes:
             imprint_parts.append(test.recipes)
 
-        debug(
-            "%s paths: %s, hashes: %s, imprints: %s (%s)",
-            test,
-            paths,
-            test_paths_hashes,
-            imprint_parts,
-            socket.gethostname(),
-        )
         return imprint.combine_imprints(*imprint_parts)
 
 

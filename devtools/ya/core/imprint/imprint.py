@@ -129,7 +129,7 @@ class YaStoredCache(BaseFileCache):
 
     def _invalidate(self, rel_paths):
         self.logger.debug("Start invalidation")
-        abs_paths = list(map(ArcPath.to_abs, rel_paths))
+        abs_paths = map(ArcPath.to_abs, rel_paths)
 
         self.logger.debug("Create sorted list of files (%s)", len(self._cache.keys()))
         sorted_items = tuple(sorted(self._with_parents()))
@@ -273,9 +273,11 @@ class Imprint:
             yield "excluded", True
 
     @staticmethod
+    @func.memoize()
     def _is_build_file(abs_p):
         return os.path.isfile(abs_p) and not os.path.islink(abs_p) and not abs_p.endswith('.pyc')
 
+    @func.memoize()
     def _is_build_dir(self, abs_p):
         return os.path.isdir(abs_p) and not os.path.islink(abs_p) and not os.path.basename(abs_p) in self._excluded_dirs
 
@@ -410,24 +412,4 @@ class Imprint:
         imprints_by_path = self(*paths)
         # For order
         imprints = (imprints_by_path[path] for path in sorted(paths))
-        if log:
-            imprints = list(imprints)
-            try:
-                self.logger.info("!!!! DUMP IMPRINTS generate_path_imprint")
-                self.logger.debug("!! Paths: %s", paths)
-                self.logger.debug("!! Imprints: %s", imprints)
-                self.logger.debug("!! Calculated imprints (sorted):")
-                for k in sorted(imprints_by_path):
-                    self.logger.debug("`%s`: `%s`", k, imprints_by_path[k])
-                self.logger.info("!!!! DUMP FINISHED generate_path_imprint")
-            except Exception as e:
-                self.logger.warning("Error while dump generate_path_imprint: %s", e)
-            self._dump_state(self._do_filter_path)
-
         return self.combine_imprints(*imprints)
-
-    def _dump_state(self, do_filter=None):
-        # self._rel_path._dump_state()
-        self._content_hash._dump_state(do_filter=do_filter)
-        # self._iter_files._dump_state()
-        # self._dir_cache._dump_state()

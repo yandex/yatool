@@ -178,25 +178,6 @@ class BaseCache(object):
         self._invalidate(items)
         self.disable_additional_check()
 
-    def _dump_state(self, do_filter=None):
-        try:
-            self.logger.info("!!!! DUMP STATE of %s: %s", self.__class__.__name__, self.name)
-            self.logger.debug("Method: %s", self.f)
-            self.logger.debug("Additional check: %s", self._additional_check_enabled)
-            self.logger.debug("Additional check method: %s", self._additional_check)
-            self.logger.info("!! Cache container (sorted):")
-
-            # _counter = 0
-
-            filtered = sorted((abs_path, self._cache[abs_path]) for abs_path in filter(do_filter, self._cache.keys()))
-            self.logger.debug("%s", filtered)
-
-            self.logger.info("!! Cache contains %d items, %d had shown", len(self._cache), len(filtered))
-            self.logger.info("!! Stats: %s", self.stats)
-            self.logger.info("!! FINISHED of dump %s", self.name)
-        except Exception as e:
-            self.logger.warning("!! Error while duping %s: %s", self.name, e)
-
 
 class BaseFileCache(BaseCache):
     """Cache which can store data into file.
