@@ -539,14 +539,13 @@ def _run_ymake(**kwargs):
 
     prefetcher = None
     if app_ctx:
+        real_arc_root = os.path.realpath(arc_root)
         if prefetch.prefetch_condition(
-            getattr(app_ctx.params, 'arc_root', None),
+            real_arc_root,
             getattr(app_ctx.params, 'prefetch', False),
             getattr(app_ctx, 'vcs_type', ''),
         ):
-            prefetcher = prefetch.ArcPrefetchSubscriber.get_subscriber(
-                getattr(app_ctx.params, 'arc_root', None),
-            )
+            prefetcher = prefetch.ArcPrefetchSubscriber.get_subscriber(real_arc_root)
 
             prefetcher.subscribe_to(app_ctx.event_queue)
 
