@@ -633,10 +633,12 @@ def print_summary_times(graph, tasks, display):
     ]
     time_by_type = dict()
     task_by_type = dict()
+    count_by_type = collections.Counter()
 
     def setup_time(type, time, task):
         time_by_type[type] = time_by_type.get(type, 0) + time
         task_by_type[type] = task
+        count_by_type[type] += 1
 
     # Introducing small lang here:
     # +<Type> means that node with type <Type> began executing
@@ -678,8 +680,13 @@ def print_summary_times(graph, tasks, display):
         display.emit_message('Total time by type:')
         for task_type in sorted(time_by_type, key=lambda x: time_by_type[x], reverse=True):
             display.emit_message(
-                '[[[c:%s]]%s[[rst]]] - %d ms.\n'
-                % (task_by_type[task_type].get_type_color(), task_type, time_by_type[task_type])
+                '[[[c:%s]]%s[[rst]]] - %d ms. (count: %d)\n'
+                % (
+                    task_by_type[task_type].get_type_color(),
+                    task_type,
+                    time_by_type[task_type],
+                    count_by_type[task_type],
+                )
             )
 
     copy_stages_times = {}
