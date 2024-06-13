@@ -128,7 +128,7 @@ ya test -AL --regular-tests devtools/examples/tutorials/python
 
 Фильтрация тестов:
 
-1 `-F=TESTS_FILTERS`, `--test-filter=TESTS_FILTERS`: Запуск только определенных тестов по имени, шаблону или фильтру.
+1. `-F=TESTS_FILTERS`, `--test-filter=TESTS_FILTERS`: Запуск только определенных тестов по имени, шаблону или фильтру.
 ```
 ya test -A -F "subname"
 ```
@@ -137,27 +137,27 @@ ya test -A -F "subname"
 ```
 $ ya test -t -F <file>.py::<ClassName>::*
 ```
-2 `--test-tag=TEST_TAGS_FILTER`: Запуск тестов, помеченных определенными тегами.
+2. `--test-tag=TEST_TAGS_FILTER`: Запуск тестов, помеченных определенными тегами.
 ```
 ya test -A --test-tag tag1+tag2-tag3
 ```
 Эта команда запустит все тесты, у которых есть теги tag1 и tag2 и нет тега tag3.
-3 `--test-size=TEST_SIZE_FILTERS`: Запуск тестов определенного размера (SMALL, MEDIUM, LARGE).
+3. `--test-size=TEST_SIZE_FILTERS`: Запуск тестов определенного размера (SMALL, MEDIUM, LARGE).
 ```
 ya test -A --test-size=MEDIUM
 ```
-4 `--test-type=TEST_TYPE_FILTERS`: Запуск тестов определенного типа (например, `UNITTEST`, `PYTEST`).
+4. `--test-type=TEST_TYPE_FILTERS`: Запуск тестов определенного типа (например, `UNITTEST`, `PYTEST`).
 ```
 ya test -tt --test-type unittest+gtest
 ```
 Эта команда запустит только тесты типов unittest и gtest.
-5 `--test-filename=TEST_FILES_FILTER`: Запуск тестов из указанного исходного файла.
+5. `--test-filename=TEST_FILES_FILTER`: Запуск тестов из указанного исходного файла.
 ```
 ya test -A --test-filename=test_example.py
 ```
-6 `-X`, `--last-failed-tests`: Запустить только тесты, упавшие в предыдущем запуске.
-7 `--regular-tests`: Запустить только пользовательские тесты.
-7 `--style`: Запустить только тесты стиля.
+6. `-X`, `--last-failed-tests`: Запустить только тесты, упавшие в предыдущем запуске.
+7. `--regular-tests`: Запустить только пользовательские тесты.
+7. `--style`: Запустить только тесты стиля.
 
 ### Проверки кода и корректности данных
 
