@@ -19,6 +19,7 @@
 #include <util/generic/vector.h>
 #include <util/generic/string.h>
 #include <util/generic/hash_set.h>
+#include <util/generic/set.h>
 #include <util/ysaveload.h>
 
 class TSymbols;
@@ -211,7 +212,7 @@ public:
     TModuleIncDirs IncDirs;
     THolder<TDirs> MissingDirs;     // Missing addincls and srcdir for proper work from cache
     THolder<TDirs> DataPaths;
-    THashSet<TString> ExternalResources;
+    TSet<TString> ExternalResources;
     TVars Vars;
     TPeersRestrictions PeersRestrictions;
     TVector<TString> Provides;

@@ -14,6 +14,7 @@
 #include <library/cpp/digest/md5/md5.h>
 
 #include <util/generic/hash_set.h>
+#include <util/generic/set.h>
 #include <util/generic/string.h>
 
 class TModule;
@@ -102,7 +103,7 @@ struct TModuleConf {
     THashSet<TString> Restricted;
     THashSet<TString> Ignored;
     THashSet<TString> Allowed;
-    THashSet<TString> Globals;
+    TSet<TString> Globals;
     THashMap<TString, TString> MacroAliases;
     TVector<TString>  SpecServiceVars;
     TTaggedModules    SubModules;

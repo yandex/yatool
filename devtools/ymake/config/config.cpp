@@ -117,8 +117,8 @@ namespace {
     }
 }
 
-
-inline void CopyParent(const THashSet<TString>& from, THashSet<TString>& to) {
+template<typename TInput, typename TOutput>
+inline void CopyParent(const TInput& from, TOutput& to) {
     to.insert(from.begin(), from.end());
 }
 
@@ -321,33 +321,34 @@ bool TModuleConf::AddSubmodule(const TString& tag, TModuleConf& sub) {
 
 bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, TVars& topVars, bool renderSemantics) {
     if (EqualToOneOf(name, NOptions::RESTRICTED, NOptions::IGNORED, NOptions::ALLOWED, NOptions::GLOBAL)) {
-        THashSet<TString>* collection = nullptr;
-        if (name == NOptions::RESTRICTED) {
-            collection = &Restricted;
-        } else if (name == NOptions::IGNORED) {
-            collection = &Ignored;
-        } else if (name == NOptions::ALLOWED) {
-            collection = &Allowed;
-        } else if (name == NOptions::GLOBAL) {
-            collection = &Globals;
-        }
-        Y_ASSERT(collection != nullptr);
-        for (const auto arg : StringSplitter(value).Split(' ').SkipEmpty()) {
-            collection->insert(TString(arg));
-            if (name == NOptions::GLOBAL) {
-                TString varName = TString::Join(arg, "_GLOBAL");
-                if (!topVars.Has(varName)) {
-                    topVars.SetValue(varName, "");
-                }
-                if (renderSemantics) {
-                    TString rawVarName = TString::Join(arg, "_GLOBAL_RAW");
-                    if (!topVars.Has(rawVarName)) {
-                        topVars.SetValue(rawVarName, "");
+        auto updateCollection = [value, renderSemantics, &topVars] (bool isGlobal, auto& collection) {
+            for (const auto arg : StringSplitter(value).Split(' ').SkipEmpty()) {
+                collection.insert(TString(arg));
+                if (isGlobal) {
+                    TString varName = TString::Join(arg, "_GLOBAL");
+                    if (!topVars.Has(varName)) {
+                        topVars.SetValue(varName, "");
                     }
-                    topVars[rawVarName].IsReservedName = true;
+                    if (renderSemantics) {
+                        TString rawVarName = TString::Join(arg, "_GLOBAL_RAW");
+                        if (!topVars.Has(rawVarName)) {
+                            topVars.SetValue(rawVarName, "");
+                        }
+                        topVars[rawVarName].IsReservedName = true;
+                    }
+                    topVars[varName].IsReservedName = true;
                 }
-                topVars[varName].IsReservedName = true;
             }
+        };
+
+        if (name == NOptions::RESTRICTED) {
+            updateCollection(false, Restricted);
+        } else if (name == NOptions::IGNORED) {
+            updateCollection(false, Ignored);
+        } else if (name == NOptions::ALLOWED) {
+            updateCollection(false, Allowed);
+        } else if (name == NOptions::GLOBAL) {
+            updateCollection(true, Globals);
         }
     } else if (name == NOptions::CMD) {
         if (!renderSemantics || !HasSemantics) {
