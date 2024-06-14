@@ -841,7 +841,7 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     for name, stat in stage_tracer.get_stat('graph').items():
         stats.setdefault('gg_stages', {})[name] = stat.duration
 
-    stats['module_lang_stat'], stats['module_lang'] = _get_lang_statistics(graph)
+    stats['graph_lang_usage'], stats['graph_lang'] = _get_lang_statistics(graph)
     return stats
 
 
@@ -863,7 +863,7 @@ def _get_lang_statistics(graph):
     if not lang_stat:
         main_lang = test_const.ModuleLang.ABSENT
     elif len(lang_stat) == 1:
-        main_lang = lang_stat.popitem()[0]
+        main_lang = list(lang_stat).pop()
     else:
         main_lang = test_const.ModuleLang.NUMEROUS
     return lang_stat, main_lang
