@@ -238,9 +238,8 @@ void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, con
             TargetProperties["module_tag"] = to_lower(TString{tag});
         }
 
-        bool isBinary = EqualToOneOf(renderModuleType, ERenderModuleType::Program, ERenderModuleType::Dll);
         TStringBuf lang = mod->GetLang();
-        if (isBinary && !lang.empty()) {
+        if (!lang.empty()) {
             TargetProperties["module_lang"] = to_lower(TString{lang});
         }
 
