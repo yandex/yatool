@@ -345,7 +345,7 @@ class PackageCustomizableOptions(core.yarg.Options):
         self.docker_target = None
         self.dupload_max_attempts = 1
         self.dupload_no_mail = False
-        self.ensure_package_published = False
+        self.ensure_package_published = True
         self.force_dupload = False
         self.format = None
         self.full_strip = False
@@ -655,6 +655,13 @@ class PackageCustomizableOptions(core.yarg.Options):
                 names=['--ensure-package-published'],
                 help='Ensure that package is available in the repository',
                 hook=core.yarg.SetConstValueHook('ensure_package_published', True),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--no-ensure-package-published'],
+                help='Do not check that package is available in the repository',
+                hook=core.yarg.SetConstValueHook('ensure_package_published', False),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
