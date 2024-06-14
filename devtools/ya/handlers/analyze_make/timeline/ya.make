@@ -8,8 +8,6 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/exts
     devtools/ya/tools/analyze_make/common
-    devtools/ya/yalibrary/display
-    devtools/ya/yalibrary/formatter
 )
 
 STYLE_PYTHON()

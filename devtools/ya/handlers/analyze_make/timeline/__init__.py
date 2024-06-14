@@ -1,12 +1,7 @@
 import sys
-import os
 
 import exts.yjson as json
-
 import devtools.ya.tools.analyze_make.common as common
-import yalibrary.display
-import yalibrary.formatter
-import yalibrary.evlog as evlog_lib
 
 
 def convert_to_chromium_trace(nodes):
@@ -38,35 +33,15 @@ def convert_to_chromium_trace(nodes):
         yield {'ph': 'M', 'pid': 1, 'tid': tid, 'name': 'thread_name', 'args': {'name': thread_name}}
 
 
-def get_display(stream):
-    formatter = yalibrary.formatter.new_formatter(is_tty=sys.stdout.isatty())
-    return yalibrary.display.Display(stream, formatter)
-
-
 def main(opts):
     import app_ctx
 
-    display = get_display(sys.stdout)
+    display = common.get_display(sys.stdout)
 
-    evlog_file = opts.analyze_evlog_file or app_ctx.evlog.get_latest()
-    distbuild_file = opts.analyze_distbuild_json_file
+    file_name, nodes = common.load_evlog(opts, display, app_ctx.evlog.get_latest, check_for_distbuild=True)
 
-    if not (evlog_file or distbuild_file):
-        display.emit_message('[[bad]]One of --evlog or --distbuild-json-from-yt is required.')
-        sys.exit(1)
-
-    filepath = distbuild_file or evlog_file
-    items = None
-    evlog_reader = evlog_lib.EvlogReader(filepath)
-    file_name = os.path.basename(filepath)
-
-    if distbuild_file is not None:
-        items = list(common.set_zero_start(common.load_from_file(evlog_reader, 'distbuild')))
-    if items is None:
-        items = list(common.set_zero_start(common.load_from_file(evlog_reader, 'evlog', opts.detailed)))
-
-    if items:
+    if nodes:
         fname = file_name + '.json'
         with open(fname, 'w') as fout:
-            json.dump(list(convert_to_chromium_trace(items)), fout)
+            json.dump(list(convert_to_chromium_trace(nodes)), fout)
         display.emit_message(f'[[imp]]Open about://tracing in Chromium and load {fname} file.')

@@ -3,6 +3,7 @@ import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
 import handlers.analyze_make.timeline as timeline
+import handlers.analyze_make.timebloat as timebloat
 import os
 import yalibrary.app_ctx
 import yalibrary.tools
@@ -77,18 +78,30 @@ def run_analyze_make_task_contention(params):
         os.execv(exe, cmd)
 
 
+def basic_options():
+    return [
+        core.yarg.help.ShowHelpOptions(),
+        EvlogFileOptions(),
+    ]
+
+
 class AnalyzeMakeYaHandler(core.yarg.CompositeHandler):
     def __init__(self):
         super(AnalyzeMakeYaHandler, self).__init__('Analysis tools for ya make')
         self['timeline'] = core.yarg.OptsHandler(
             action=execute(timeline.main),
             description='Timeline of build events',
-            opts=[core.yarg.help.ShowHelpOptions(), EvlogFileOptions()],
+            opts=basic_options(),
+        )
+        self['timebloat'] = core.yarg.OptsHandler(
+            action=execute(timebloat.main),
+            description='build events in bloat format',
+            opts=basic_options(),
         )
         if app_config.in_house:
             self['task-contention'] = core.yarg.OptsHandler(
                 action=run_analyze_make_task_contention,
                 description='Plot waiting processes with plotly',
-                opts=[AnalyzeYaMakeOpts()],
+                opts=basic_options() + [AnalyzeYaMakeOpts()],
                 unknown_args_as_free=True,
             )

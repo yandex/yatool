@@ -1,4 +1,13 @@
+import os
+import sys
 import logging
+
+
+import yalibrary.display
+import yalibrary.evlog
+import yalibrary.formatter
+
+import typing as tp
 
 
 logger = logging.getLogger(__name__)
@@ -15,6 +24,13 @@ class Node(object):
         self.is_critical = is_critical
         self.event = event
         self.has_detailed = has_detailed
+
+
+def get_cmd_from_evlog(filename: str) -> str:
+    reader = yalibrary.evlog.EvlogReader(filename)
+    for node in reader:
+        if node['event'] == 'init':
+            return ' '.join(node['value']['args'])
 
 
 def load_from_file(evlog_reader, mode, detailed=False):
@@ -130,3 +146,39 @@ def set_zero_start(nodes):
         x.start -= min_time
         x.end -= min_time
         yield x
+
+
+def load_evlog(
+    opts, display: yalibrary.display.Display, latest_evlog_loader: tp.Callable, check_for_distbuild=False
+) -> tuple[str, list[Node]]:
+    evlog_file = opts.analyze_evlog_file or latest_evlog_loader()
+    distbuild_file = opts.analyze_distbuild_json_file
+
+    if not (evlog_file or distbuild_file):
+        if check_for_distbuild:
+            display.emit_message('[[bad]]One of --evlog or --distbuild-json-from-yt is required.')
+        else:
+            display.emit_message('[[bad]]--evlog is required')
+        sys.exit(1)
+
+    if evlog_file:
+        display.emit_message(
+            f"Using evlog from this command: [[imp]]{get_cmd_from_evlog(evlog_file)}[[rst]] for analysis"
+        )
+
+    filepath = distbuild_file or evlog_file
+    items = None
+    evlog_reader = yalibrary.evlog.EvlogReader(filepath)
+    file_name = os.path.basename(filepath)
+
+    if check_for_distbuild and distbuild_file is not None:
+        items = list(set_zero_start(load_from_file(evlog_reader, 'distbuild')))
+    if items is None:
+        items = list(set_zero_start(load_from_file(evlog_reader, 'evlog', opts.detailed)))
+
+    return file_name, items
+
+
+def get_display(stream: tp.IO) -> yalibrary.display.Display:
+    formatter = yalibrary.formatter.new_formatter(is_tty=stream.isatty())
+    return yalibrary.display.Display(stream, formatter)
