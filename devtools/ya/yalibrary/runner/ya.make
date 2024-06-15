@@ -20,6 +20,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/libs/acdigest/python
     devtools/libs/limits/python
     devtools/executor/python
     devtools/ya/app_config

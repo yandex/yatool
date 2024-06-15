@@ -21,6 +21,7 @@ from exts import func
 from exts import retry
 from exts.timer import AccumulateTime
 
+from devtools.libs.acdigest.python import get_file_digest
 from yalibrary.evlog import _LOG_DIR_NAME_FMT, _LOG_FILE_NAME_FMT
 
 logger = logging.getLogger(__name__)
@@ -862,7 +863,14 @@ class ACCache(object):
         # Compute blob hashes on cache side.
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
             # Make sure files are unique
-            blobs = list(set((x, None) for x in files))
+            blobs = set()
+            for file in files:
+                fuid = None
+                digest = getattr(file, "digest", None)
+                if digest:
+                    fuid = digest.uid
+                blobs.add((file, fuid))
+            blobs = list(blobs)
             r, metadata = [None] * 2
             out = _SERVER.put_uid(uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None)
             if out:
@@ -916,22 +924,18 @@ class ACCache(object):
         if not os.path.exists(new_store_path):
             return
 
-        import hashlib
-
         try:
 
             def convert(uid, info):
                 blobs = []
                 file_names = []
                 for rel_path, info in six.iteritems(info):
-                    store_path, mode, fhash = info
+                    store_path, _, fhash = info
                     if not os.path.exists(store_path):
                         return
 
-                    sha = hashlib.sha1()
-                    sha.update('{fhash}mode: {hexmode}'.format(fhash=fhash, hexmode=hex(mode)))
-                    blobs.append((store_path, sha.hexdigest()))
-
+                    fuid = get_file_digest(store_path, fhash).uid
+                    blobs.append((store_path, fuid))
                     file_names.append(rel_path)
 
                 r, metadata = [None] * 2

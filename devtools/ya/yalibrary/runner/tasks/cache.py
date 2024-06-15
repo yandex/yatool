@@ -171,9 +171,15 @@ class PutInCacheTask(object):
                 caching_outputs = set(list(self._build_root.output) + self._build_root.dir_outputs_files)
             else:
                 caching_outputs = set(self._build_root.output)
-            self._cache.put(self._node.uid, self._build_root.path, caching_outputs, codec)
+            file_list = set()
+            digests = self._node.output_digests.file_digests if self._node.output_digests else {}
+            for output in caching_outputs:
+                fi = self._FileInfo(output)
+                fi.digest = digests.get(output)
+                file_list.add(fi)
+            self._cache.put(self._node.uid, self._build_root.path, file_list, codec)
             if self._node.content_uid is not None:
-                self._cache.put(self._node.content_uid, self._build_root.path, caching_outputs, codec)
+                self._cache.put(self._node.content_uid, self._build_root.path, file_list, codec)
             if hasattr(self._cache, 'put_dependencies'):
                 self._cache.put_dependencies(self._node.uid, self._node.deps)
         finally:
@@ -195,6 +201,9 @@ class PutInCacheTask(object):
 
     def short_name(self):
         return 'put_in_cache[{}]'.format(self._node.kv.get('p', '??'))
+
+    class _FileInfo(str):
+        pass
 
 
 class RestoreFromCacheTask(object):
@@ -234,7 +243,7 @@ class RestoreFromCacheTask(object):
             self._build_root.validate()
 
             if self._ctx.content_uids:
-                self._node.outputs_uid = self._build_root.read_hashes()
+                self._node.output_digests = self._build_root.read_output_digests()
 
             if self.should_put_in_dist_cache():
                 self._build_root.inc()

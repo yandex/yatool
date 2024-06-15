@@ -1,4 +1,5 @@
 #include "fs_blobs.h"
+#include <devtools/libs/acdigest/acdigest.h>
 #include "devtools/local_cache/common/fs-utils/stats.h"
 
 #include <library/cpp/digest/md5/md5.h>
@@ -15,27 +16,6 @@
 
 #include <errno.h>
 
-namespace {
-    bool Digest(IInputStream& ins, size_t chunkSize, NACCache::TCalcer& calc) {
-        TTempBuf buf;
-        size_t totalSize = 0;
-        while (auto size = ins.Read(buf.Data(), buf.Size())) {
-            auto updateSize = chunkSize == 0 || totalSize + size < chunkSize ? size : chunkSize - totalSize;
-            calc.Update(buf.Data(), updateSize);
-            totalSize += updateSize;
-            if (chunkSize != 0 && totalSize >= chunkSize) {
-                break;
-            }
-        }
-        if (chunkSize == 0) {
-            calc.Update("", 1);
-            TString fileSize(ToString(totalSize));
-            calc.Update(fileSize.c_str(), fileSize.Size());
-        }
-        return chunkSize == 0 || totalSize == chunkSize;
-    }
-}
-
 namespace NACCache {
     TFsBlobProcessor::TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode)
         : BlobInfo_(*blobInfo)
@@ -50,38 +30,7 @@ namespace NACCache {
         Y_ASSERT(Mode_ == Regular);
 
         auto fileName = GetFileName(placement);
-        stat_struct fileStat;
-        Zero(fileStat);
-        NFsPrivate::LStat(fileName, &fileStat);
-
-        TFsPath filePath(fileName);
-
-        THolder<IInputStream> input;
-        TString readlink;
-        if (NFsPrivate::IsLink(fileStat.st_mode)) {
-            readlink = filePath.ReadLink(); // Keep result persistent
-            input.Reset(new TStringInput(readlink));
-            fileStat.st_mode |= 0777;
-        } else {
-            input.Reset(new TFileInput(fileName));
-        }
-
-        TStringStream ss;
-        {
-            TCalcer calc;
-            Digest(*input, 0 /*compute for the whole file*/, calc);
-            auto digest = calc.Final();
-            ss << ToLowerUTF8(HexEncode(TStringBuf(reinterpret_cast<const char*>(digest.data()), DIGEST_LENGTH)));
-        }
-
-        ss << "mode: " << Hex(fileStat.st_mode);
-
-        // Git mixes-in permissions.
-        TCalcer calc;
-        Digest(ss, 0 /*compute for the whole string*/, calc);
-        auto digest = calc.Final();
-        auto s = ToLowerUTF8(HexEncode(TStringBuf(reinterpret_cast<const char*>(digest.data()), DIGEST_LENGTH)));
-        return s;
+        return NACDigest::GetFileDigest(fileName).Uid;
     }
 
     const TString& TFsBlobProcessor::GetUid() {
@@ -410,9 +359,10 @@ namespace NACCache {
             TFileInput outs(out);
             TStringInput ins(buf);
 
-            TCalcer inCalc, outCalc;
+            auto inDigest = NACDigest::GetStreamDigest(ins, checkSize);
+            auto outDigest = NACDigest::GetStreamDigest(outs, checkSize);
 
-            if (!Digest(ins, checkSize, inCalc) || !Digest(outs, checkSize, outCalc) || inCalc.Final() != outCalc.Final()) {
+            if (inDigest != outDigest) {
                 ythrow TIoException() << "Digest mismatch for file: " << fileName << ", at position: " << pos;
             }
         }
@@ -439,9 +389,10 @@ namespace NACCache {
 
             TFileInput ins(in), outs(out);
 
-            TCalcer inCalc, outCalc;
+            auto inDigest = NACDigest::GetStreamDigest(ins, checkSize);
+            auto outDigest = NACDigest::GetStreamDigest(outs, checkSize);
 
-            if (!Digest(ins, checkSize, inCalc) || !Digest(outs, checkSize, outCalc) || inCalc.Final() != outCalc.Final()) {
+            if (inDigest != outDigest) {
                 ythrow TIoException() << "Digest mismatch for files: " << fromFileName << ", " << toFileName << ", at position: " << pos;
             }
         }

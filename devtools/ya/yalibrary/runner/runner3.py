@@ -246,7 +246,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             # FIXME: we need separate property in the node for this
             self.hashable = True if self.self_uid else False
             self.content_uid = None
-            self.outputs_uid = None
+            self.output_digests = None
             self.inputs = kwargs.get('inputs')
             self.outputs = kwargs.get('outputs')
             self.resources = kwargs.get('resources', [])

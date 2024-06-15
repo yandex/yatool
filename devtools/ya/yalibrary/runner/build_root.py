@@ -22,9 +22,11 @@ from yalibrary.runner import fs as runner_fs
 from yalibrary.runner import worker_threads
 
 from devtools.libs.limits.python import limits
+import devtools.libs.acdigest.python as acdigest
 
 STAMP_FILE = 'STAMP'
 CONTENT_HASH_FILE_NAME = '.content_hash.md5'
+OUTPUT_DIGESTS_FILE_NAME = '.output_digests.json'
 EMPTY_DIR_OUTPUTS_META = '.empty_dir_outputs.json'
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,37 @@ class BuildRootIntegrityError(BuildRootError):
 
 class OutputsExceedLimitError(BuildRootError):
     pass
+
+
+class OutputDigests(object):
+    def __init__(self, root_path, version, file_digests, outputs_uid):
+        self._root_path = root_path
+        self.version = version
+        self.file_digests = file_digests
+        self.outputs_uid = outputs_uid
+
+    def to_json(self):
+        return {
+            "version": self.version,
+            "file_digests": {
+                os.path.relpath(fn, self._root_path): acdigest.FileDigest.to_json(v)
+                for fn, v in self.file_digests.items()
+            },
+            "outputs_uid": self.outputs_uid,
+        }
+
+    @staticmethod
+    def from_json(root_path, data):
+        version = data["version"]
+        file_digests = {
+            os.path.join(root_path, fn): acdigest.FileDigest.from_json(v) for fn, v in data["file_digests"].items()
+        }
+        outputs_uid = six.ensure_str(data["outputs_uid"])
+        return OutputDigests(root_path, version, file_digests, outputs_uid)
+
+    @staticmethod
+    def from_outputs_uid(outputs_uid):
+        return OutputDigests(None, acdigest.digest_git_like_version, {}, outputs_uid)
 
 
 class BuildRoot(object):
@@ -119,13 +152,14 @@ class BuildRoot(object):
                 raise BuildRootIntegrityError('Cannot find {} in build root'.format(x))
 
         if self._validate_content:
-            if self._compute_hash and self._hash_file():
-                cached_hash = self.read_hashes()
-                immediate_hash = self.read_hashes(force_recalc=True)
-                if cached_hash != immediate_hash:
-                    raise BuildRootIntegrityError(
-                        'Content hash mismatch in {}: {} != {}'.format(self.path, cached_hash, immediate_hash)
-                    )
+            if self._compute_hash and os.path.exists(self._output_digests_file()):
+                cached_hash = self.read_output_digests()
+                if cached_hash.version == acdigest.digest_current_version:
+                    immediate_hash = self.read_output_digests(force_recalc=True)
+                    if cached_hash.outputs_uid != immediate_hash.outputs_uid:
+                        raise BuildRootIntegrityError(
+                            'Content hash mismatch in {}: {} != {}'.format(self.path, cached_hash, immediate_hash)
+                        )
 
         if self._limit_output_size:
             self.validate_outputs_size()
@@ -213,42 +247,52 @@ class BuildRoot(object):
                 dir_outputs_archive_map[dir_out] = None
         return dir_outputs_archive_map
 
-    def write_hashes(self, hashes):
-        if not self._compute_hash:
-            return
-        raw_path = '$(BUILD_ROOT)/' + CONTENT_HASH_FILE_NAME
-        path = os.path.join(self.path, CONTENT_HASH_FILE_NAME)
-        self.add_output(raw_path)
-        runner_fs.write_into_file(path, hashes)
-
     def _hash_file(self):
-        path = os.path.join(self.path, CONTENT_HASH_FILE_NAME)
-        if os.path.exists(path):
-            return path
-        return None
+        return os.path.join(self.path, CONTENT_HASH_FILE_NAME)
 
-    def read_hashes(self, force_recalc=False, write_if_absent=False):
-        """
-        Returns sum of outputs hashes
-        """
-        if not force_recalc:
-            path = self._hash_file()
-            if path:
-                return runner_fs.read_from_file(path)
+    def _output_digests_file(self):
+        return os.path.join(self.path, OUTPUT_DIGESTS_FILE_NAME)
+
+    def read_output_digests(self, force_recalc=False, write_if_absent=False):
+        digests_file = self._output_digests_file()
+        content_hash_file = self._hash_file()
+        if not force_recalc and os.path.exists(digests_file):
+            try:
+                with open(digests_file) as f:
+                    data = json.load(f)
+                return OutputDigests.from_json(self.path, data)
+            except (KeyError, json.JSONDecodeError):
+                logger.exception("Cannot load digest file %s", digests_file)
+
+        # Use only legacy hash file if possible
+        if not write_if_absent and not force_recalc and os.path.exists(content_hash_file):
+            outputs_uid = runner_fs.read_from_file(content_hash_file)
+            return OutputDigests.from_outputs_uid(outputs_uid)
 
         if not self._compute_hash:
-            return "rndhash-{}".format(time.time())
+            return OutputDigests.from_outputs_uid("rndhash-{}".format(time.time()))
 
+        digests = {}
         hashes = []
         for output in self._outputs:
             if os.path.exists(output):
-                hashes.append(hashing.git_like_hash(output))
-            else:
-                return None
-        res = hashing.sum_hashes(hashes)
+                d = acdigest.get_file_digest(output)
+                digests[output] = d
+                hashes.append(d.content_digest)
+        outputs_uid = hashing.sum_hashes(hashes)
+
+        output_digests = OutputDigests(self.path, acdigest.digest_current_version, digests, outputs_uid)
+
         if write_if_absent:
-            self.write_hashes(res)
-        return res
+            self.add_output("$(BUILD_ROOT)/" + OUTPUT_DIGESTS_FILE_NAME)
+            with open(digests_file, "w") as f:
+                json.dump(output_digests.to_json(), f)
+
+            if not os.path.exists(content_hash_file):
+                self.add_output('$(BUILD_ROOT)/' + CONTENT_HASH_FILE_NAME)
+                runner_fs.write_into_file(content_hash_file, outputs_uid)
+
+        return output_digests
 
     def create(self):
         self._created = True

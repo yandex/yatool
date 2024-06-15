@@ -1,6 +1,7 @@
 LIBRARY()
 
 PEERDIR(
+    devtools/libs/acdigest
     devtools/local_cache/ac/proto
     devtools/local_cache/common/fs-utils
     library/cpp/digest/md5

@@ -522,9 +522,9 @@ class RunNodeTask(object):
                 for dep in deps:
                     if not hasattr(dep, '_node'):  # Because it can have not node object
                         continue
-                    outputs_uid = dep._node.outputs_uid
-                    if outputs_uid is not None:
-                        uids_hashes.append(outputs_uid)
+                    output_digests = dep._node.output_digests
+                    if output_digests is not None:
+                        uids_hashes.append(output_digests.outputs_uid)
                     else:
                         all_deps_have_outputs_uid = False
                         break
@@ -569,7 +569,7 @@ class RunNodeTask(object):
 
         if not self._exit_code and self._ctx.content_uids:
             # Read if from '.content_hash.md5' file or calculate it
-            self._node.outputs_uid = self._build_root.read_hashes(write_if_absent=True)
+            self._node.output_digests = self._build_root.read_output_digests(write_if_absent=True)
 
         self._execution_log[self._node.uid]['timing'] = timing
         if self._exit_code and not have_broken:

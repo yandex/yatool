@@ -124,7 +124,7 @@ class RestoreFromDistCacheTask(object):
             if self._ctx.content_uids:
                 # If hashes file is not cached remotely it will be recomputed and cached locally
                 # otherwise it assumed to be among outputs and will be processed as such
-                self._node.outputs_uid = self._build_root.read_hashes(write_if_absent=True)
+                self._node.output_digests = self._build_root.read_output_digests(write_if_absent=True)
 
             self._build_root.validate()
             # if _dist_cache is not read-only, i.e. we are heating it, then do not pollute local cache

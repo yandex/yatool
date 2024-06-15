@@ -1,6 +1,7 @@
 PY23_LIBRARY()
 
 PEERDIR(
+    devtools/libs/acdigest/python
     devtools/ya/app_config
     devtools/ya/core/config
     devtools/ya/core/report
