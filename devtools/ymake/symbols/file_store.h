@@ -37,6 +37,7 @@ struct TFileData {
             ui8 IsSource     : 1; // $S or $U
             ui8 Changed      : 1; // filled by last CheckFS or GetContent call
             ui8 CantRead     : 1; // ReadContent operation failed
+            ui8 IsMakeFile     : 1; // Make file or include from ya.make
         };
     };
 
@@ -473,6 +474,8 @@ public:
 
     /// Return file data with updated status. Stat or don't stat FS depending on `stat` argument
     const TFileData& GetFileDataByIdWithStatusUpdate(ui32 elemId, bool stat);
+
+    void MarkAsMakeFile(TFileView view);
 
     /// Get const full file metadata
     const TFileData& GetFileData(TFileView name) const;

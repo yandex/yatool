@@ -6,8 +6,9 @@
 
 class TGraphChangesPredictor {
 public:
-    TGraphChangesPredictor(IChanges& changes)
-    : Changes_(changes)
+    TGraphChangesPredictor(TFileConf& fileConf, IChanges& changes)
+    : FileConf(fileConf)
+    , Changes_(changes)
     , HasChanges_(false)
     {}
 
@@ -18,6 +19,7 @@ public:
     void AnalyzeChanges();
 
 private:
+    TFileConf& FileConf;
     IChanges& Changes_;
 
     bool HasChanges_;

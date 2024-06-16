@@ -634,6 +634,10 @@ TFileConf::EMarkAsChangedResult TFileConf::MarkFileAsChanged(const TString& file
     return needUpdateParent ? EMarkAsChangedResult::UPDATE_PARENT : EMarkAsChangedResult::DONE;
 }
 
+void TFileConf::MarkAsMakeFile(TFileView view) {
+    GetFileDataById(view.GetElemId()).IsMakeFile = true;
+}
+
 void TFileConf::UseExternalChanges(THolder<IChanges> changes) {
     UseExternalChangesSource = true;
 

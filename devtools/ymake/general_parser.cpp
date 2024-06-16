@@ -66,6 +66,7 @@ namespace {
         EMakeNodeType type;
         ui32 elemId;
         TFileView incView = fileConf.GetStoredName(incFile);
+        fileConf.MarkAsMakeFile(incView);
         if (fileConf.YPathExists(incView, EPathKind::File)) {
             type = EMNT_File;
             if (useTextContext) {
@@ -218,6 +219,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
             Y_ASSERT(name.GetContextType() == ELinkType::ELT_MKF);
             prev->Entry().SetReassemble(true);
             TFileView fileName = fileConf.ResolveLink(name);
+            fileConf.MarkAsMakeFile(fileName);
             YDIAG(Dev) << "parse set for " << name << Endl;
 
             if (fileNotFound) {

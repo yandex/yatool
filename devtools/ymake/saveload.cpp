@@ -510,7 +510,7 @@ void TCacheFileWriter::SaveVersionInfo() {
     const TMd5Sig currentConfMD5 = Hash(Conf);
     Builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(currentConfMD5.RawData, sizeof(currentConfMD5.RawData))));
 
-    const TMd5Sig currentExtraConfMD5 = Hash(Conf);
+    const TMd5Sig currentExtraConfMD5 = ExtraHash(Conf);
     Builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(currentExtraConfMD5.RawData, sizeof(currentExtraConfMD5.RawData))));
 }
 
@@ -673,7 +673,7 @@ bool TYMake::LoadPatch() {
             YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
         }
         if (!HasGraphStructuralChanges_) {
-            TGraphChangesPredictor predictor(*changes);
+            TGraphChangesPredictor predictor(Names.FileConf, *changes);
             predictor.AnalyzeChanges();
             HasGraphStructuralChanges_ = predictor.HasChanges();
         }
