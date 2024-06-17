@@ -134,7 +134,7 @@ class BuildRoot(object):
     @property
     def result_output(self):
         for x in self._original_outputs:
-            if not x.endswith((CONTENT_HASH_FILE_NAME, EMPTY_DIR_OUTPUTS_META)):
+            if not x.endswith((CONTENT_HASH_FILE_NAME, EMPTY_DIR_OUTPUTS_META, OUTPUT_DIGESTS_FILE_NAME)):
                 yield x
 
     @property
@@ -326,7 +326,7 @@ class BuildRoot(object):
                 if x.endswith(EMPTY_DIR_OUTPUTS_META):
                     # We need to restore empty dirs file structure for dir outputs
                     self.create_empty_dirs(into, x)
-                if x.endswith(CONTENT_HASH_FILE_NAME):
+                if x.endswith(CONTENT_HASH_FILE_NAME) or x.endswith(OUTPUT_DIGESTS_FILE_NAME):
                     # We don't need to copy file with hash info
                     continue
                 try:
