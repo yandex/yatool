@@ -476,6 +476,7 @@ def launch_fuzz(suite, corpus_dirs, logsdir, params, fuzz_options=None, fuzz_dic
                     "interrupted": 1,
                 }
                 # take most valuable [-1] filename [1] from list of files [0]
+                logger.debug("Found %d cases", len(cases))
                 baseunit = sorted(six.iteritems(cases), key=lambda x: priority.get(x[0], 0))[-1][1][0]
         else:
             if len(files) > 1:
@@ -483,24 +484,26 @@ def launch_fuzz(suite, corpus_dirs, logsdir, params, fuzz_options=None, fuzz_dic
             baseunit = files[0]
         if baseunit:
             filename = os.path.join(logsdir, baseunit)
+            logger.debug("Using %s as baseunit", baseunit)
             shutil.copyfile(os.path.join(output_corpus_dir, baseunit), os.path.join(logsdir, baseunit))
             logs['baseunit'] = filename
 
     if slow_units:
         with io.open(errfile, errors='ignore', encoding='utf-8') as afile:
             data = afile.read()
+        logger.debug("Searching for slow units")
         m = re.search(r".*Slowest unit.*?Test unit written to (.*?/(slow-unit-.*?))\n", data, flags=re.DOTALL)
         if m:
             filename = m.group(1)
             baseunit = m.group(2)
             slow_unit_filename = os.path.join(logsdir, baseunit)
+            logger.debug("Storing %s -> %s", filename, slow_unit_filename)
             shutil.copyfile(filename, slow_unit_filename)
             logs['slowest_baseunit'] = slow_unit_filename
         else:
             logging.warning("Failed to find slowest baseunit")
 
     stats = {}
-
     if params.fuzzing and os.path.exists(output_corpus_dir):
         remove_corpus_data_duplicates(output_corpus_dir, corpus_dirs)
 
