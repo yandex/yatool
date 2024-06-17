@@ -89,6 +89,7 @@ class VSCodeAllOptions(core.yarg.Options):
                 help="Build native Apple ARM64 binaries",
                 hook=core.yarg.SetConstValueHook("darwin_arm64_platform", True),
                 group=cls.GROUP,
+                visible=False,
             ),
             core.yarg.ArgConsumer(
                 ["--clang-format"],

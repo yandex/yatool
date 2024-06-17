@@ -75,6 +75,7 @@ class VSCodeGoOptions(core.yarg.Options):
                 help='Build native Apple ARM64 binaries',
                 hook=core.yarg.SetConstValueHook('darwin_arm64_platform', True),
                 group=cls.GROUP,
+                visible=False,
             ),
             core.yarg.ArgConsumer(
                 ['--patch-gopls'],
@@ -240,18 +241,11 @@ def gen_vscode_workspace(params):
     params.hide_arm64_host_warning = True
 
     if params.darwin_arm64_platform:
-        if params.host_platform is None:
-            params.ya_make_extra.append("--host-platform=%s" % "default-darwin-arm64")
-        params.host_platform = "default-darwin-arm64"
-        if not params.target_platforms:
-            params.ya_make_extra.append("--target-platform=%s" % "default-darwin-arm64")
-        params.target_platforms = [core.common_opts.CrossCompilationOptions.make_platform("default-darwin-arm64")]
+        ide_common.emit_message(termcolor.colored("Option '--apple-arm-platform' in no longer needed", 'yellow'))
 
     tool_platform = None
     if params.host_platform:
         tool_platform = params.host_platform.split('-', 1)[1]
-    elif params.darwin_arm64_platform:
-        tool_platform = 'darwin-arm64'
 
     if params.goroot:
         goroot = params.goroot
@@ -271,10 +265,6 @@ def gen_vscode_workspace(params):
                 ide_common.emit_message(
                     termcolor.colored("Using X86-64 Go toolchain. Debug will not work under Rosetta.", 'yellow')
                 )
-                if not params.goroot:
-                    ide_common.emit_message(
-                        termcolor.colored("Restart with '--apple-arm-platform' flag to use native tools", 'yellow')
-                    )
         except Exception:
             pass
 
@@ -341,7 +331,6 @@ def gen_vscode_workspace(params):
                         ("typescript.tsc.autoDetect", "off"),
                         ("forbeslindesay-taskrunner.separator", ": "),
                         ("go.goroot", goroot),
-                        ("go.logging.level", "verbose"),
                         ("go.testExplorer.enable", False),
                         ("go.toolsManagement.autoUpdate", False),
                         ("go.toolsManagement.checkForUpdates", "off"),

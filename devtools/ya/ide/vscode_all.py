@@ -68,12 +68,7 @@ class VSCodeProject(object):
             params.flags["CGO_ENABLED"] = "0"
 
         if params.darwin_arm64_platform:
-            if params.host_platform is None:
-                params.ya_make_extra.append("--host-platform=%s" % "default-darwin-arm64")
-            params.host_platform = "default-darwin-arm64"
-            if not params.target_platforms:
-                params.ya_make_extra.append("--target-platform=%s" % "default-darwin-arm64")
-            params.target_platforms = [core.common_opts.CrossCompilationOptions.make_platform("default-darwin-arm64")]
+            ide_common.emit_message("[[warn]]Option '--apple-arm-platform' in no longer needed[[rst]]")
 
         self.tool_platform = None
         if params.host_platform:
@@ -82,8 +77,6 @@ class VSCodeProject(object):
                 self.tool_platform = '-'.join(platform_parts[1:])
             else:
                 self.tool_platform = params.host_platform
-        elif params.darwin_arm64_platform:
-            self.tool_platform = "darwin-arm64"
 
         self.common_args = (
             params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
@@ -249,7 +242,6 @@ class VSCodeProject(object):
         if self.is_go:
             settings.update(
                 (
-                    ("go.logging.level", "verbose"),
                     (
                         "go.toolsEnvVars",
                         {
@@ -355,8 +347,7 @@ class VSCodeProject(object):
                     result = subprocess.check_output(["/usr/bin/file", gobin_path])
                     if result.strip().rsplit(" ", 1)[1] != "arm64":
                         ide_common.emit_message(
-                            "[[warn]]Using X86-64 Go toolchain. Debug will not work under Rosetta.\n"
-                            "Restart with \"--apple-arm-platform\" flag to use native tools[[rst]]",
+                            "[[warn]]Using X86-64 Go toolchain. Debug will not work under Rosetta.[[rst]]"
                         )
                 except Exception:
                     pass
