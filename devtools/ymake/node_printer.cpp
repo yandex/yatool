@@ -44,6 +44,7 @@
 #include <util/stream/str.h>
 #include <util/string/escape.h>
 #include <util/string/join.h>
+#include <util/string/type.h>
 #include <util/system/types.h>
 
 #include <algorithm>
@@ -385,6 +386,7 @@ private:
     bool WithYaMake = false;
     bool SkipMakeFiles = false;
     bool MarkMakeFiles = false;
+    bool NeedResolveLinks = false;
 
 public:
     using TNodes = typename TBase::TNodes; // MSVC2015 is not happy with just `using typename TBase::TNodes`
@@ -438,6 +440,9 @@ public:
         if (usedPaths) {
             SeenDataPaths = *usedPaths;
         }
+
+        auto& conf = RestoreContext.Conf.CommandConf;
+        NeedResolveLinks = EqualToOneOf(Mode, DM_Files, DM_SrcDeps) && !IsFalse(conf.EvalValue("DUMP_GRAPH_RESOLVE_LINKS"sv));
     }
 
     bool AcceptDep(TState& state);
@@ -494,14 +499,30 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
     }
 
     auto parent = state.Parent();
-    TString name = st.Print();
+    auto currNode = state.Top().Node();
+
+    auto resolveNodeName = [] (auto& graph, auto node, bool resolveLinks) {
+        if (UseFileId(node->NodeType)) {
+            if (resolveLinks) {
+                return TString{graph.GetFileName(node).GetTargetStr()};
+            } else {
+                TString name;
+                graph.GetFileName(node).GetStr(name);
+                return name;
+            }
+        } else {
+            return TString{graph.GetCmdName(node).GetStr()};
+        }
+    };
+
+    TString name = resolveNodeName(RestoreContext.Graph, currNode, NeedResolveLinks);
     TString parentName;
     ui32 parentId = 0;
     bool parentStructCmdDetected = false;
     EMakeNodeType parentType = EMakeNodeType::EMNT_Last;
     if (parent != state.end()) {
         if (TFormatter::NeedParentName) {
-            parentName = parent->Print();
+            parentName = resolveNodeName(RestoreContext.Graph, parent->Node(), NeedResolveLinks);
             parentId = parent->Node()->ElemId;
             parentType = parent->Node()->NodeType;
         }
