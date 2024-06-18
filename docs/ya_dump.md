@@ -1,4 +1,4 @@
-# ya dump
+## ya dump
 
 Команда `ya dump` разработана для извлечения и предоставления детализированной информации о различных аспектах системы сборки и репозитория. 
 
@@ -298,19 +298,19 @@ Directory (Include): $S/contrib/libs/linux-headers
 
 **Пример:**
 ```
-┬─[v-korovin@v-korovin-osx:~/a/yatool]─[11:50:28]
+┬─[user@linux:~/a/yatool]─[11:50:28]
 ╰─>$ ./ya dump debug
 
-10: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:16:24 (v1)
+10: `ya-bin make -r /Users/yatool/devtools/ya/bin -o /Users/build/ya --use-clonefile`: 2021-06-17 20:16:24 (v1)
 9: `ya-bin make devtools/dummy_yatool/hello_world/ --stat`: 2021-06-17 20:17:06 (v1)
-8: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-17 20:17:32 (v1)
+8: `ya-bin make -r /Users/yatool/devtools/ya/bin -o /Users/build/ya --use-clonefile`: 2021-06-17 20:17:32 (v1)
 7: `ya-bin make devtools/dummy_yatool/hello_world/ --stat`: 2021-06-17 20:18:14 (v1)
-6: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:28:15 (v1)
-5: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-18 12:35:17 (v1)
+6: `ya-bin make -r /Users/yatool/devtools/ya/bin -o /Users/build/ya --use-clonefile`: 2021-06-18 12:28:15 (v1)
+5: `ya-bin make -r /Users/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/build/ya --use-clonefile`: 2021-06-18 12:35:17 (v1)
 4: `ya-bin make -A devtools/ya/yalibrary/ggaas/tests/test_like_autocheck -F test_subtract.py::test_subtract_full[linux-full]`: 2021-06-18 12:51:51 (v1)
 3: `ya-bin make -A devtools/ya/yalibrary/ggaas/tests/test_like_autocheck -F test_subtract.py::test_subtract_full[linux-full]`: 2021-06-18 13:04:08 (v1)
-2: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:26:31 (v1)
-1: `ya-bin make -r /Users/v-korovin/arc/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/v-korovin/arc/build/ya --use-clonefile`: 2021-06-21 10:36:21 (v1)
+2: `ya-bin make -r /Users/yatool/devtools/ya/bin -o /Users/build/ya --use-clonefile`: 2021-06-21 10:26:31 (v1)
+1: `ya-bin make -r /Users/yatool/devtools/ya/test/programs/test_tool/bin -o /Users/build/ya --use-clonefile`: 2021-06-21 10:36:21 (v1)
 ```
 ### ya dump --help 
 
