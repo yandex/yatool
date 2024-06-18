@@ -279,6 +279,8 @@ class BuildRoot(object):
                 d = acdigest.get_file_digest(output)
                 digests[output] = d
                 hashes.append(d.content_digest)
+            else:
+                return None
         outputs_uid = hashing.sum_hashes(hashes)
 
         output_digests = OutputDigests(self.path, acdigest.digest_current_version, digests, outputs_uid)
