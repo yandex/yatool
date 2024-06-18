@@ -322,13 +322,15 @@ def gen_include_targets(
     build_root=None,
     build_type='release',
     build_targets=None,
-    debug_options=[],
-    flags=[],
+    debug_options=None,
+    flags=None,
     ymake_bin=None,
     platform=None,
     host_platform=None,
     target_platforms=None,
 ):
+    debug_options = debug_options or []
+    flags = flags or {}
     return _gen(
         custom_build_directory=build_root,
         build_type=build_type,
