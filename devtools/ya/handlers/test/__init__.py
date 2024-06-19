@@ -7,7 +7,7 @@ import core.yarg
 
 
 class YaTestYaHandler(core.yarg.OptsHandler):
-    description = 'Build and run all tests\n[[imp]]ya test[[rst]] is alias for [[imp]]ya make -A[[rst]]'
+    description = 'Build and run all tests\n[[imp]]ya test[[rst]] is an alias for [[imp]]ya make -A[[rst]]'
 
     def __init__(self):
         core.yarg.OptsHandler.__init__(
