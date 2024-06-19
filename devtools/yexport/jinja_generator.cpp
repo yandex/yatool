@@ -102,6 +102,13 @@ public:
         }
     }
 
+    std::optional<bool> OnEnter(TState& state) override {
+        if (state.TopNode()->NodeType != EMNT_File) {
+            return {};
+        }
+        return AddCopyIfNeed(state.TopNode().Value().Path);
+    }
+
     void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) override {
         bool isTestTarget = false;
         std::string modDir = semArgs[0].c_str();
@@ -114,18 +121,17 @@ public:
         }
         auto macroArgs = semArgs.subspan(2);
         state.Top().CurTargetHolder = ProjectBuilder_->CreateTarget(modDir);
-        auto* curSubdir = ProjectBuilder_->CurrentSubdir();
-        curSubdir->Attrs = Generator_->MakeAttrs(EAttrGroup::Directory, "dir " + curSubdir->Path.string());
+        Y_ASSERT(ProjectBuilder_->CurrentSubdir()->Attrs); // Attributes for all directories must be created at TProject::TBuilder::CreateDirectories (in CreateTarget)
         auto* curTarget = ProjectBuilder_->CurrentTarget();
         if (isTestTarget) {
             curTarget->TestModDir = modDir;
         }
+        curTarget->Macro = semName;
+        curTarget->Name = semArgs[1];
         curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name, Generator_->GetToolGetter());
         auto& attrs = curTarget->Attrs->GetWritableMap();
-        curTarget->Name = semArgs[1];
-        NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Name, curTarget->Name);
-        curTarget->Macro = semName;
         NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Macro, curTarget->Macro);
+        NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Name, curTarget->Name);
         if (!macroArgs.empty()) {
             curTarget->MacroArgs = {macroArgs.begin(), macroArgs.end()};
             NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::MacroArgs, jinja2::ValuesList(curTarget->MacroArgs.begin(), curTarget->MacroArgs.end()));
@@ -293,6 +299,17 @@ private:
     THashMap<TNodeId, const TProjectTarget*> Mod2Target_;
     THashMap<TNodeId, TAttrsPtr> InducedAttrs_;
     TVector<std::string> TestSubdirs_;
+
+    std::optional<bool> AddCopyIfNeed(const TStringBuf path) {
+        static constexpr std::string_view ARCADIA_SCRIPTS_RELPATH = "build/scripts";
+        static constexpr std::string_view EXPORT_SCRIPTS_RELPATH = "build/scripts";
+        const auto relPath = NPath::CutAllTypes(path);
+        if (NPath::IsPrefixOf(ARCADIA_SCRIPTS_RELPATH, relPath)) {
+            Generator_->Copy(relPath.data(), fs::path(EXPORT_SCRIPTS_RELPATH) / NPath::Basename(relPath).data());
+            return true;
+        }
+        return {};
+    }
 };
 
 THolder<TJinjaGenerator> TJinjaGenerator::Load(
@@ -399,7 +416,7 @@ void TJinjaGenerator::Render(ECleanIgnored cleanIgnored) {
     }
     RenderRoot();
     if (cleanIgnored == ECleanIgnored::Enabled) {
-        Cleaner.Clean(*ExportFileManager);
+        Cleaner.Clean(*ExportFileManager_);
     }
 }
 
@@ -508,9 +525,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
                 continue;
             }
         }
-        if (!dir->Attrs) {
-            dir->Attrs = MakeAttrs(EAttrGroup::Directory, "dir " + dir->Path.string());
-        }
+        Y_ASSERT(dir->Attrs); // Attributes for all directories must be created at TProject::TBuilder::CreateDirectories
         auto& dirMap = dir->Attrs->GetWritableMap();
         if (!dir->Subdirs.empty()) {
             auto [subdirsIt, _] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Subdirs, jinja2::ValuesList{});

@@ -307,7 +307,7 @@ void TSpecBasedGenerator::CopyFilesAndResources() {
     for (const auto& [location, files] : CollectFilesToCopy().Items) {
         auto dir = PathByCopyLocation(location);
         for (const auto& file : files) {
-            ExportFileManager->Copy(dir / file, file);
+            ExportFileManager_->Copy(dir / file, file);
         }
     }
 }
@@ -319,7 +319,7 @@ std::vector<TJinjaTemplate> TSpecBasedGenerator::LoadJinjaTemplates(const std::v
 void TSpecBasedGenerator::RenderJinjaTemplates(TAttrsPtr attrs, std::vector<TJinjaTemplate>& jinjaTemplates, const fs::path& relativeToExportRootDirname, const std::string& platformName) {
     for (auto& jinjaTemplate: jinjaTemplates) {
         jinjaTemplate.SetValueMap(attrs);
-        jinjaTemplate.RenderTo(*ExportFileManager, relativeToExportRootDirname, platformName);
+        jinjaTemplate.RenderTo(*ExportFileManager_, relativeToExportRootDirname, platformName);
     }
 }
 
@@ -349,9 +349,9 @@ void TSpecBasedGenerator::MergePlatforms() {
             auto& commonTemplate = mergePlatformTemplates[i];
             bool isDifferent = false;
             if (dirPlatforms.size() > 1) {
-                TString md5 = ExportFileManager->MD5(dirTemplate.RenderFilename(path, dirPlatforms[0]->Name));
+                TString md5 = ExportFileManager_->MD5(dirTemplate.RenderFilename(path, dirPlatforms[0]->Name));
                 for (size_t j = 1; j < dirPlatforms.size(); ++j) {
-                    TString otherMd5 = ExportFileManager->MD5(dirTemplate.RenderFilename(path, dirPlatforms[j]->Name));
+                    TString otherMd5 = ExportFileManager_->MD5(dirTemplate.RenderFilename(path, dirPlatforms[j]->Name));
                     if (isDifferent |= (md5 != otherMd5)) {
                         break;
                     }
@@ -364,12 +364,12 @@ void TSpecBasedGenerator::MergePlatforms() {
                 CommonFinalizeAttrs(dirAttrs, YexportSpec.AddAttrsDir);
                 SetCurrentDirectory(ArcadiaRoot / path);
                 commonTemplate.SetValueMap(dirAttrs);
-                commonTemplate.RenderTo(*ExportFileManager, path);
+                commonTemplate.RenderTo(*ExportFileManager_, path);
             } else {
                 auto finalPath = commonTemplate.RenderFilename(path, "");
-                ExportFileManager->CopyFromExportRoot(dirTemplate.RenderFilename(path, dirPlatforms[0]->Name), finalPath);
+                ExportFileManager_->CopyFromExportRoot(dirTemplate.RenderFilename(path, dirPlatforms[0]->Name), finalPath);
                 for (const auto& dirPlatform : dirPlatforms) {
-                    ExportFileManager->Remove(dirTemplate.RenderFilename(path, dirPlatform->Name));
+                    ExportFileManager_->Remove(dirTemplate.RenderFilename(path, dirPlatform->Name));
                 }
             }
         }
@@ -408,8 +408,8 @@ void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::Va
     Y_ASSERT(attrs);
     auto& map = attrs->GetWritableMap();
     NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ArcadiaRoot, ArcadiaRoot);
-    if (ExportFileManager) {
-        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ExportRoot, ExportFileManager->GetExportRoot());
+    if (ExportFileManager_) {
+        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ExportRoot, ExportFileManager_->GetExportRoot());
     }
     if (!addAttrs.empty()) {
         NYexport::MergeTree(map, addAttrs);
@@ -436,6 +436,15 @@ void TSpecBasedGenerator::SetSpec(const TGeneratorSpec& spec, const std::string&
         }
     }
 };
+
+void TSpecBasedGenerator::Copy(const fs::path& srcRelPath, const fs::path& dstRelPath) {
+    auto srcFullPath = ArcadiaRoot / srcRelPath;
+    if (ExportFileManager_) {
+        ExportFileManager_->Copy(srcFullPath, dstRelPath);
+    } else {
+        Copies_.emplace_back(std::make_pair(srcFullPath, dstRelPath));
+    }
+}
 
 void TSpecBasedGenerator::InitReplacer() {
     if (!GeneratorSpec.SourceRootReplacer.empty() || !GeneratorSpec.BinaryRootReplacer.empty()) {

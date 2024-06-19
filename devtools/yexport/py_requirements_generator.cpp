@@ -133,7 +133,7 @@ bool TPyRequirementsGenerator::IgnorePlatforms() const {
 
 void TPyRequirementsGenerator::Render(ECleanIgnored) {
     TFileInput in{PyDepsDumpPath_};
-    TFileOutput out = ExportFileManager->Open(REQUIRES_FILE);
+    TFileOutput out = ExportFileManager_->Open(REQUIRES_FILE);
     Render(in, out);
 }
 

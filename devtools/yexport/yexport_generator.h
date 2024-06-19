@@ -36,7 +36,8 @@ public:
 protected:
     virtual void Render(ECleanIgnored cleanIgnored) = 0;
 
-    THolder<TExportFileManager> ExportFileManager;
+    TVector<std::pair<fs::path, fs::path>> Copies_;///< Collect copies before ExportFileManager created
+    THolder<TExportFileManager> ExportFileManager_;
 };
 
 THolder<TYexportGenerator> Load(

@@ -123,7 +123,7 @@ void TCMakeGenerator::Render(ECleanIgnored cleanIgnored) {
     RenderPlatforms();
     RenderRoot();
     if (Conf.CleanIgnored == ECleanIgnored::Enabled) {
-        Cleaner.Clean(*ExportFileManager);
+        Cleaner.Clean(*ExportFileManager_);
     }
 }
 
@@ -175,7 +175,7 @@ jinja2::ValuesList TCMakeGenerator::GetAdjustedLanguagesList() const {
 void TCMakeGenerator::CopyArcadiaScripts() const {
     auto arcadiaScriptDir = Conf.ArcadiaRoot / ArcadiaScriptsRoot;
     for (const auto& script: GlobalProperties.ArcadiaScripts) {
-        ExportFileManager->Copy(arcadiaScriptDir / script, CmakeScriptsRoot / script);
+        ExportFileManager_->Copy(arcadiaScriptDir / script, CmakeScriptsRoot / script);
     }
 }
 

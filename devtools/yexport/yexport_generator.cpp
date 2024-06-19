@@ -34,16 +34,21 @@ THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& ar
 }
 
 void TYexportGenerator::RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored) {
-    ExportFileManager = MakeHolder<TExportFileManager>(exportRoot);
+    ExportFileManager_ = MakeHolder<TExportFileManager>(exportRoot);
+    if (!Copies_.empty()) {
+        for (const auto& [srcFullPath, dstRelPath] : Copies_) {
+            ExportFileManager_->Copy(srcFullPath, dstRelPath);
+        }
+    }
     // Prevents from exporting the root from the previous render, which failed due to an exception
     Y_DEFER {
-        ExportFileManager = nullptr;
+        ExportFileManager_ = nullptr;
     };
     Render(cleanIgnored);
 }
 
 TExportFileManager* TYexportGenerator::GetExportFileManager(){
-    return ExportFileManager.Get();
+    return ExportFileManager_.Get();
 }
 
 TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot) {

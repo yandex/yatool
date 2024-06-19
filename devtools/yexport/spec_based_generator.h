@@ -69,6 +69,8 @@ public:
     void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
     virtual const TAttrs::TReplacer* GetToolGetter() const { return nullptr; }
 
+    void Copy(const fs::path& srcPath, const fs::path& dstRelPath);
+
 protected:
     using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
     using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;

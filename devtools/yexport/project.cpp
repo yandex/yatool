@@ -40,6 +40,7 @@ namespace NYexport {
         YEXPORT_VERIFY(Project_->Factory_, "Creating project target without factory");
         auto dir = CreateDirectories(targetDir);
         auto target = Project_->Factory_->CreateTarget();
+        // We can't create target attributes here, because for attributes hint require Macro and Name, which absent at this moment
         dir->Targets.push_back(target);
         return {*this, dir, target};
     }

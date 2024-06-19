@@ -485,7 +485,7 @@ namespace {
 
         void Include(const std::string& mod) {
             if (!CurSubdir_) {
-                spdlog::error("attempt to add find_package macro while there is no active CMakeLists.txt");
+                spdlog::error("attempt to add include macro while there is no active CMakeLists.txt");
                 return;
             }
             CurSubdir_.As<TCMakeList>()->Includes.emplace_back(mod);
