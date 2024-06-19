@@ -7,6 +7,7 @@ SRCS(
     iter_pair.cpp
     memory_pool.cpp
     npath.cpp
+    json_writer.cpp
     split_string.cpp
     uniq_vector.cpp
 )

@@ -14,6 +14,7 @@
 
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/common/npath.h>
+#include <devtools/ymake/common/json_writer.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/iter.h>
 #include <devtools/ymake/diag/display.h>
@@ -25,7 +26,6 @@
 #include <devtools/ymake/symbols/symbols.h>
 
 #include <library/cpp/blockcodecs/codecs.h>
-#include <library/cpp/json/json_writer.h>
 #include <library/cpp/ucompress/writer.h>
 
 #include <util/folder/path.h>
@@ -388,8 +388,9 @@ namespace {
 
     TString RenderMakeNode(const TMakeNode& node) {
         TStringStream out;
-        NJson::TJsonWriter jsonWriter(&out, false, false);
+        NYMake::TJsonWriter jsonWriter(out);
         node.WriteAsJson(jsonWriter);
+        jsonWriter.Flush();
         return out.Str();
     };
 
@@ -653,6 +654,7 @@ namespace {
             TProgressManager::Instance()->ForceRenderModulesDone();
             tmpFile = cache.SaveToFile();
             cacheFile = cache.GetCachePath();
+            plan.Flush();
             YDebug() << cache.GetStatistics() << Endl;
         }
         // Release cache before rename: on Windows open cache file prevents renaming
@@ -678,11 +680,11 @@ namespace {
     public:
         TOutputStreamWrapper(const TString& outFile, const TString& compressionCodec) {
             if (outFile == "-") {
-                OutputStreamHolder_ = MakeHolder<TAdaptiveBufferedOutput>(&Cout);
+                OutputStreamPtr_ = &Cout;
             } else {
-                OutputStreamHolder_ = MakeHolder<TFileOutput>(outFile);
+                OutputStreamHolder_ = MakeHolder<TUnbufferedFileOutput>(outFile);
+                OutputStreamPtr_ = OutputStreamHolder_.Get();
             }
-            OutputStreamPtr_ = OutputStreamHolder_.Get();
 
             if (compressionCodec) {
                 CodecOutputPtr_ = MakeHolder<NUCompress::TCodedOutput>(OutputStreamPtr_, NBlockCodecs::Codec(compressionCodec));
@@ -718,7 +720,7 @@ void ExportJSON(TYMake& yMake) {
         NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
-        NJson::TJsonWriter jsonWriter(output.Get(), false);
+        NYMake::TJsonWriter jsonWriter(*output.Get());
         TMakePlan plan(jsonWriter);
 
         NYMake::TTraceStageWithTimer renderJsonTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));

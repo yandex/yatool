@@ -1,49 +1,46 @@
 #include "make_plan.h"
 
 #include <devtools/ymake/vars.h>
+#include <devtools/ymake/common/json_writer.h>
 
 #include <library/cpp/json/json_reader.h>
-#include <library/cpp/json/json_writer.h>
 #include <util/generic/overloaded.h>
 
 using namespace NJson;
 
 template <>
-void TMakeCmd::WriteAsJson(TJsonWriter& writer) const {
-    auto empty = std::visit(TOverloaded{
+bool TMakeCmd::Empty() const {
+    return std::visit(TOverloaded{
         [](const TString& args)          { return args.empty() || args == "[]"; },
         [](const TVector<TString>& args) { return args.empty(); }
     }, this->CmdArgs);
-    if (empty)
+}
+
+template <>
+void TMakeCmd::WriteAsJson(NYMake::TJsonWriter& writer) const {
+    if (Empty()) {
         return;
-    writer.OpenMap();
+    }
+    auto map = writer.OpenMap();
     std::visit(TOverloaded{
         [&](const TString& args) {
             Y_DEBUG_ABORT_UNLESS(ValidateJson(args), "%s", args.c_str());
-            writer.UnsafeWrite("cmd_args", args);
+            writer.WriteMapKeyJsonValue(map, "cmd_args", args);
         },
         [&](const TVector<TString>& args) {
-            writer.OpenArray("cmd_args");
-            for (const auto& arg : args) {
-                writer.Write(arg);
-            }
-            writer.CloseArray();
+            writer.WriteMapKeyValue(map, "cmd_args", args);
         }
     }, this->CmdArgs);
     if (this->Cwd) {
-        writer.Write("cwd", *this->Cwd);
+        writer.WriteMapKeyValue(map, "cwd", *this->Cwd);
     }
     if (this->StdOut) {
-        writer.Write("stdout", *this->StdOut);
+        writer.WriteMapKeyValue(map, "stdout", *this->StdOut);
     }
     if (this->Env) {
-        writer.OpenMap("env");
-        for (const auto& kv : this->Env) {
-            writer.Write(kv.first, kv.second);
-        }
-        writer.CloseMap();
+        writer.WriteMapKeyValue(map, "env", this->Env);
     }
-    writer.CloseMap();
+    writer.CloseMap(map);
 }
 
 template <>
@@ -57,43 +54,38 @@ bool TMakeCmd::operator!=(const TMakeCmd& rhs) const {
 }
 
 template <>
-void TMakeNode::WriteAsJson(TJsonWriter& writer) const {
-    writer.OpenMap();
+void TMakeNode::WriteAsJson(NYMake::TJsonWriter& writer) const {
+    auto map = writer.OpenMap();
 
-    writer.Write("uid", this->Uid);
+    writer.WriteMapKeyValue(map, "uid", this->Uid);
 
     Y_ASSERT(!this->SelfUid.empty());
-    writer.Write("self_uid", this->SelfUid);
+    writer.WriteMapKeyValue(map, "self_uid", this->SelfUid);
 
-    writer.OpenArray("cmds");
-    for (const auto& x : this->Cmds) {
-        x.WriteAsJson(writer);
+    {
+        writer.WriteMapKey(map, "cmds");
+        auto cmdArr = writer.OpenArray();
+        for (const auto& cmd: this->Cmds) {
+            if (cmd.Empty()) {
+                continue;
+            }
+            writer.WriteArrayValue(cmdArr, cmd);
+        }
+        writer.CloseArray(cmdArr);
     }
-    writer.CloseArray();
 
-    writer.OpenArray("inputs");
-    for (const auto& x : this->Inputs) {
-        writer.Write(x);
-    }
-    writer.CloseArray();
+    writer.WriteMapKeyValue(map, "inputs", this->Inputs);
 
     Y_DEBUG_ABORT_UNLESS(ValidateJson(this->Outputs), "%s", this->Outputs.c_str());
-    writer.UnsafeWrite("outputs", this->Outputs);
+    writer.WriteMapKeyJsonValue(map, "outputs", this->Outputs);
 
-    writer.OpenArray("deps");
-    for (const auto& x : this->Deps) {
-        writer.Write(x);
-    }
-    writer.CloseArray();
+    writer.WriteMapKeyValue(map, "deps", this->Deps);
 
     if (!this->ToolDeps.empty()) {
-        writer.OpenMap("foreign_deps");
-        writer.OpenArray("tool");
-        for (const auto& tool : this->ToolDeps) {
-            writer.Write(tool);
-        }
-        writer.CloseArray();
-        writer.CloseMap();
+        writer.WriteMapKey(map, "foreign_deps");
+        auto depsMap = writer.OpenMap();
+        writer.WriteMapKeyValue(depsMap, "tool", this->ToolDeps);
+        writer.CloseMap(depsMap);
     }
 
 #if !defined (NEW_UID_COMPARE)
@@ -108,57 +100,45 @@ void TMakeNode::WriteAsJson(TJsonWriter& writer) const {
     };
 #endif
 
-    writer.OpenMap("kv");
-    for (const auto& kv : prepareMap(this->KV)) {
-        writer.Write(kv.first, kv.second);
-    }
-    writer.CloseMap();
+    writer.WriteMapKeyValue(map, "kv", prepareMap(this->KV));
 
-    writer.OpenMap("requirements");
-    size_t value;
-    for (const auto& kv : prepareMap(this->Requirements)) {
-        if (TryFromString<size_t>(kv.second, value)) {
-            writer.Write(kv.first, value);
-        } else {
-            writer.Write(kv.first, kv.second);
+    {
+        writer.WriteMapKey(map, "requirements");
+        auto reqMap = writer.OpenMap();
+        const auto& mapRequirements = prepareMap(this->Requirements);
+        size_t value;
+        for (const auto& kv : mapRequirements) {
+            if (TryFromString<size_t>(kv.second, value)) {
+                writer.WriteMapKeyValue(reqMap, kv.first, value);
+            } else {
+                writer.WriteMapKeyValue(reqMap, kv.first, kv.second);
+            }
         }
+        writer.CloseMap(reqMap);
     }
-    writer.CloseMap();
 
     if (this->OldEnv) {
-        writer.OpenMap("env");
-        for (const auto& kv : prepareMap(this->OldEnv)) {
-            writer.Write(kv.first, kv.second);
-        }
-        writer.CloseMap();
+        writer.WriteMapKeyValue(map, "env", prepareMap(this->OldEnv));
     }
 
-    writer.OpenMap("target_properties");
-    for (const auto& kv : prepareMap(this->TargetProps)) {
-        writer.Write(kv.first, kv.second);
-    }
-    writer.CloseMap();
+    writer.WriteMapKeyValue(map, "target_properties", prepareMap(this->TargetProps));
 
     if (!this->ResourceUris.empty()) {
-        writer.OpenArray("resources");
+        writer.WriteMapKey(map, "resources");
+        auto resArr = writer.OpenArray();
         for (const auto& uri : this->ResourceUris) {
-            writer.OpenMap();
-            writer.Write("uri", uri);
-            writer.CloseMap();
+            auto uriMap = writer.OpenMap(resArr);
+            writer.WriteMapKeyValue(uriMap, "uri", uri);
+            writer.CloseMap(uriMap);
         }
-        writer.CloseArray();
+        writer.CloseArray(resArr);
     }
 
     if (!this->TaredOuts.empty()) {
-        writer.OpenArray("tared_outputs");
-        for (const auto& out : this->TaredOuts) {
-            writer.Write(out);
-        }
-        writer.CloseArray();
+        writer.WriteMapKeyValue(map, "tared_outputs", this->TaredOuts);
     }
 
-    writer.CloseMap();
-    writer.Flush();
+    writer.CloseMap(map);
 }
 
 template <>
@@ -183,30 +163,30 @@ bool TMakeNode::operator!=(const TMakeNode& rhs) const {
     return !(rhs == *this);
 }
 
-TMakePlan::TMakePlan(NJson::TJsonWriter& writer)
+TMakePlan::TMakePlan(NYMake::TJsonWriter& writer)
     : Writer(writer) {
 }
 
 TMakePlan::~TMakePlan() {
     Flush();
-    Writer.CloseArray();
+    Writer.CloseArray(NodesArr);
 
-    Writer.OpenArray("result");
-    for (const auto& x : this->Results) {
-        Writer.Write(x);
+    Writer.WriteMapKeyValue(Map, "result", this->Results);
+
+    {
+        Writer.WriteMapKey(Map, "inputs");
+        auto inputsMap = Writer.OpenMap();
+        for (const auto& input : Inputs) {
+            Writer.WriteMapKey(inputsMap, input.first);
+            auto inputArr = Writer.OpenArray();
+            Writer.WriteArrayValue(inputArr, input.second.D0);
+            Writer.WriteArrayValue(inputArr, input.second.D1);
+            Writer.CloseArray(inputArr);
+        }
+        Writer.CloseMap(inputsMap);
     }
-    Writer.CloseArray();
 
-    Writer.OpenMap("inputs");
-    for (const auto& input : Inputs) {
-        Writer.OpenArray(input.first);
-        Writer.Write(input.second.D0);
-        Writer.Write(input.second.D1);
-        Writer.CloseArray();
-    }
-    Writer.CloseMap();
-
-    Writer.CloseMap();
+    Writer.CloseMap(Map);
     Writer.Flush();
 }
 
@@ -214,28 +194,32 @@ void TMakePlan::Flush() {
     if (!ConfWritten) {
         WriteConf();
         ConfWritten = true;
+    } else {
     }
 
-    for (const auto& x : this->Nodes) {
-        x.WriteAsJson(Writer);
+    for (const auto& node : this->Nodes) {
+        Writer.WriteArrayValue(NodesArr, node);
     }
 
     Nodes.clear();
 }
 
 void TMakePlan::WriteConf() {
-    Writer.OpenMap();
+    Map = Writer.OpenMap();
 
-    Writer.OpenMap("conf");
-    Writer.OpenArray("resources");
+    Writer.WriteMapKey(Map, "conf");
+    auto confMap = Writer.OpenMap();
+    Writer.WriteMapKey(confMap, "resources");
+    auto resArr = Writer.OpenArray();
     for (const auto& kv : this->Resources) {
-        Writer.UnsafeWrite(kv.second);
+        Writer.WriteArrayJsonValue(resArr, kv.second);
     }
     for (const auto& resJson : this->HostResources) {
-        Writer.UnsafeWrite(resJson);
+        Writer.WriteArrayJsonValue(resArr, resJson);
     }
-    Writer.CloseArray();
-    Writer.CloseMap();
+    Writer.CloseArray(resArr);
+    Writer.CloseMap(confMap);
 
-    Writer.OpenArray("graph");
+    Writer.WriteMapKey(Map, "graph");
+    NodesArr = Writer.OpenArray();
 }

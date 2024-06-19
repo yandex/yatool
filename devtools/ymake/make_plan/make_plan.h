@@ -3,6 +3,7 @@
 #include "resource_section_params.h"
 
 #include <devtools/ymake/common/md5sig.h>
+#include "devtools/ymake/common/json_writer.h"
 
 #include <devtools/libs/yaplatform/platform_map.h>
 
@@ -11,10 +12,6 @@
 #include <util/generic/maybe.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
-
-namespace NJson {
-    class TJsonWriter;
-}
 
 namespace NCache {
     using TOriginal = TString;
@@ -44,7 +41,8 @@ struct TMakeCmdDescription {
     bool operator==(const TMakeCmdDescription& rhs) const;
     bool operator!=(const TMakeCmdDescription& rhs) const;
 
-    void WriteAsJson(NJson::TJsonWriter&) const;
+    bool Empty() const;
+    void WriteAsJson(NYMake::TJsonWriter&) const;
 };
 
 template <typename T, typename TJoined, typename TJoinedCommand>
@@ -69,14 +67,16 @@ struct TMakeNodeDescription {
     bool operator==(const TMakeNodeDescription& rhs) const;
     bool operator!=(const TMakeNodeDescription& rhs) const;
 
-    void WriteAsJson(NJson::TJsonWriter&) const;
+    void WriteAsJson(NYMake::TJsonWriter&) const;
 };
 
 using TMakeCmd = TMakeCmdDescription<NCache::TOriginal, NCache::TJoinedCommand>;
 using TMakeNode = TMakeNodeDescription<NCache::TOriginal, NCache::TJoinedOriginal, NCache::TJoinedCommand>;
 
 struct TMakePlan {
-    NJson::TJsonWriter& Writer;
+    NYMake::TJsonWriter& Writer;
+    mutable NYMake::TJsonWriter::TOpenedMap Map;
+    mutable NYMake::TJsonWriter::TOpenedArray NodesArr;
     THashMap<TString, TMd5Sig> Inputs;
     TVector<TMakeNode> Nodes;
     TVector<TMakeUid> Results;
@@ -87,7 +87,7 @@ private:
     bool ConfWritten = false;
 
 public:
-    explicit TMakePlan(NJson::TJsonWriter& writer);
+    explicit TMakePlan(NYMake::TJsonWriter& writer);
     ~TMakePlan();
 
     void Flush();
