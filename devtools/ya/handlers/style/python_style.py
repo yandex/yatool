@@ -109,7 +109,9 @@ def fix_python_with_ruff(data, path):
 
     ruff_config = get_ruff_config(path)
 
-    out = _launch_ruff(data, path, ruff_config.path, ['format'])
+    STDIN_FNAME = ['--stdin-filename', path]
+
+    out = _launch_ruff(data, path, ruff_config.path, ['format'] + STDIN_FNAME)
     # launch check fix to sort imports
-    out = _launch_ruff(out, path, ruff_config.path, ['check', '--fix'])
+    out = _launch_ruff(out, path, ruff_config.path, ['check', '--fix'] + STDIN_FNAME)
     return out
