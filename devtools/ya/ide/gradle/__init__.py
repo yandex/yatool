@@ -26,6 +26,7 @@ requires_props = [
 ]
 user_root = os.path.expanduser("~")
 gradle_props = os.path.join(user_root, '.gradle', 'gradle.properties')
+build_libs_subdir = '.hic_sunt_dracones'
 
 
 def in_rel_targets(rel_target, rel_targets_with_slash):
@@ -225,7 +226,7 @@ def apply_graph(params, sem_graph, gradle_project_root):
         if project_outside_arcadia:
             # Make symlinks to all built targets
             for build_rel_target in build_rel_targets:
-                dst = os.path.join(gradle_project_root, build_rel_target)
+                dst = os.path.join(os.path.join(gradle_project_root, build_libs_subdir), build_rel_target)
                 if os.path.exists(dst):
                     os.unlink(dst)
                 src = os.path.join(arcadia_root, build_rel_target)
