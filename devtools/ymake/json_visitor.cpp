@@ -47,6 +47,13 @@ namespace {
         }
         return props;
     }
+
+    EShowExpressionErrors ParseErrorMode(TStringBuf mode) {
+        return
+            mode == "all" ? EShowExpressionErrors::All :
+            mode == "one" ? EShowExpressionErrors::One :
+            EShowExpressionErrors::None;
+    }
 }
 
 inline bool NeedToPassInputs(const TConstDepRef& dep) {
@@ -61,6 +68,7 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     : TBase{restoreContext, commands, cmdConf, startDirs, newUids}
     , Commands{commands}
     , GlobalVarsCollector(restoreContext)
+    , ErrorShower(ParseErrorMode(restoreContext.Conf.ExpressionErrorDetails))
 {
     LoopCnt.resize(Loops.size());
 

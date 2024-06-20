@@ -162,7 +162,8 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
         MineVarsAndExtras(addInfo, nodeId, modId);
         CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(Graph[CmdNode]->ElemId).CmdId()).KeepTargetPlatform;
         if (!skipRender) {
-            RenderCmdStr(cmdFormat);
+            auto ignoreErrors = TErrorShowerState(EShowExpressionErrors::None);
+            RenderCmdStr(cmdFormat, &ignoreErrors);
         }
     }
 }
@@ -332,7 +333,7 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
     addInfo->LateOuts.insert(addInfo->LateOuts.end(), lateOuts.begin(), lateOuts.end());
 }
 
-void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
+void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorShower) {
     //recursively add command parts!
     if (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat()) {
         auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
@@ -343,7 +344,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat) {
         }
         auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
         Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf);
+        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, errorShower);
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";

@@ -15,7 +15,7 @@ void TCommandLineOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("keep-on", "deprecated alias to --keep-going").SetFlag(&KeepOn).NoArgument();
     opts.AddLongOption('v', "verbose", "display os commands before executing").SetFlag(&VerboseMake).NoArgument();
     opts.AddLongOption('d', "depends-like-recurse", "handle DEPENDS like RECURSEs").SetFlag(&DependsLikeRecurse).NoArgument();
-    opts.AddLongOption('g', "quiet", "disable human readable output").SetFlag(&DisableHumanReadableOutput).NoArgument();
+    opts.AddLongOption('g', "quiet", "disable human-readable output").SetFlag(&DisableHumanReadableOutput).NoArgument();
     opts.AddLongOption('G', "add-inputs-map", "dump inputs map into build plan").SetFlag(&DumpInputsMapInJSON).NoArgument();
     opts.AddLongOption('N', "add-inputs", "dump inputs for build plan nodes").SetFlag(&DumpInputsInJSON).NoArgument();
     opts.AddLongOption('e', "check-data-paths", "check paths in DATA section and emit configure error if they are absent on current filesystem").SetFlag(&CheckDataPaths).NoArgument();

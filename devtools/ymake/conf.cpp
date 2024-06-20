@@ -76,6 +76,7 @@ void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
     TDebugOptions::AddOptions(opts);
 
     opts.AddLongOption("sem-graph", "dump semantic graph instead of build plan").SetFlag(&RenderSemantics).NoArgument();
+    opts.AddLongOption('w', "warn-level", "level of human-readable messages to be shown (0 or more: none, error, warning, info, debug)").StoreResult(&WarnLevel);
     opts.AddLongOption('W', "warn", "warnings & messages to display").AppendTo(&WarnFlags);
     opts.AddLongOption('E', "events", "enable/set trace events").StoreResult(&Events);
     opts.AddLongOption('y', "plugins-root", "set plugins root").SplitHandler(&PluginsRoots, ',');
@@ -85,6 +86,11 @@ void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
 void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DisableHumanReadableOutput) {
         Display()->SetStream(LockedStream());
+    }
+    if (WarnLevel) {
+        auto warnLevel = static_cast<EConfMsgType>(*WarnLevel);
+        if (warnLevel >= EConfMsgType::Error && warnLevel <= EConfMsgType::Count)
+            Display()->SetCutoff(warnLevel);
     }
 
     if (!Events.empty()) {

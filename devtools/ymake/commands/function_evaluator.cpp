@@ -13,7 +13,10 @@ TTermValue NCommands::RenderArgs(std::span<const TTermValue> args) {
     TVector<TString> result;
     for (auto& arg : args)
         result.push_back(std::visit(TOverloaded{
-            [](std::monostate) -> TString {
+            [](TTermError) -> TString {
+                Y_ABORT();
+            },
+            [](TTermNothing) -> TString {
                 throw TNotImplemented();
             },
             [&](const TString& s) -> TString {
@@ -30,7 +33,10 @@ TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
     TString result;
     for (auto& arg : args)
         result += std::visit(TOverloaded{
-            [](std::monostate) -> TString {
+            [](TTermError) -> TString {
+                Y_ABORT();
+            },
+            [](TTermNothing) -> TString {
                 throw TNotImplemented();
             },
             [&](const TString& s) -> TString {
@@ -53,15 +59,18 @@ TTermValue NCommands::RenderClear(std::span<const TTermValue> args) {
         throw yexception() << "Clear requires 1 argument";
     }
     return std::visit(TOverloaded{
-        [](std::monostate) -> TTermValue {
-            return std::monostate();
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            return TTermNothing();
         },
         [&](const TString&) -> TTermValue {
             return TString();
         },
         [&](const TVector<TString>& v) -> TTermValue {
             if (v.empty())
-                return std::monostate();
+                return TTermNothing();
             return TString();
         }
     }, args[0]);
@@ -73,13 +82,20 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
     }
     return std::visit(TOverloaded{
 
-        [](std::monostate) -> TTermValue {
-            return std::monostate();
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+
+        [](TTermNothing) -> TTermValue {
+            return TTermNothing();
         },
 
         [&](const TString& body) {
             return std::visit(TOverloaded{
-                [](std::monostate) -> TTermValue {
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [](TTermNothing) -> TTermValue {
                     ythrow TNotImplemented() << "Unexpected empty prefix";
                 },
                 [&](const TString& prefix) -> TTermValue {
@@ -101,7 +117,10 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
 
         [&](const TVector<TString>& bodies) -> TTermValue {
             return std::visit(TOverloaded{
-                [](std::monostate) -> TTermValue {
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [](TTermNothing) -> TTermValue {
                     ythrow TNotImplemented() << "Unexpected empty prefix";
                 },
                 [&](const TString& prefix) -> TTermValue {
@@ -136,8 +155,11 @@ TTermValue NCommands::RenderSuf(std::span<const TTermValue> args) {
     }
     auto suffix = std::get<TString>(args[0]);
     return std::visit(TOverloaded{
-        [](std::monostate) -> TTermValue {
-            return std::monostate();
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            return TTermNothing();
         },
         [&](const TString& body) -> TTermValue {
             return body + suffix;
@@ -167,7 +189,10 @@ void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, s
         throw yexception() << "Env requires 1 argument";
     }
     std::visit(TOverloaded{
-        [](std::monostate) {
+        [](TTermError) {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
             throw TNotImplemented();
         },
         [&](const TString& s) {
@@ -189,7 +214,10 @@ void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> 
         throw yexception() << "KeyValue requires 1 argument";
     }
     std::visit(TOverloaded{
-        [](std::monostate) {
+        [](TTermError) {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
             throw TNotImplemented();
         },
         [&](const TString& s) {
@@ -231,7 +259,10 @@ TTermValue NCommands::RenderCutExt(std::span<const TTermValue> args) {
         return s;
     };
     return std::visit(TOverloaded{
-        [](std::monostate) -> TTermValue {
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
             throw TNotImplemented();
         },
         [&](TString s) -> TTermValue {
@@ -263,7 +294,10 @@ TTermValue NCommands::RenderLastExt(std::span<const TTermValue> args) {
         return s;
     };
     return std::visit(TOverloaded{
-        [](std::monostate) -> TTermValue {
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
             throw TNotImplemented();
         },
         [&](TString s) -> TTermValue {
@@ -283,11 +317,14 @@ TTermValue NCommands::RenderExtFilter(std::span<const TTermValue> args) {
     }
     auto ext = std::get<TString>(args[0]);
     return std::visit(TOverloaded{
-        [](std::monostate) -> TTermValue {
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
             throw TNotImplemented();
         },
         [&](TString s) -> TTermValue {
-            return s.EndsWith(ext) ? args[1] : std::monostate();
+            return s.EndsWith(ext) ? args[1] : TTermNothing();
         },
         [&](TVector<TString> v) -> TTermValue {
             v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return !s.EndsWith(ext); }), v.end());
@@ -301,7 +338,10 @@ TTermValue NCommands::RenderTODO1(std::span<const TTermValue> args) {
         throw yexception() << "TODO1 requires 1 argument";
     }
     auto arg0 = std::visit(TOverloaded{
-        [](std::monostate) {
+        [](TTermError) -> TString {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
             return TString("-");
         },
         [&](const TString& s) {
@@ -319,7 +359,10 @@ TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
         throw yexception() << "TODO2 requires 2 arguments";
     }
     auto arg0 = std::visit(TOverloaded{
-        [](std::monostate) {
+        [](TTermError) -> TString {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
             return TString("-");
         },
         [&](const TString& s) {
@@ -330,7 +373,10 @@ TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
         }
     }, args[0]);
     auto arg1 = std::visit(TOverloaded{
-        [](std::monostate) {
+        [](TTermError) -> TString {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
             return TString("-");
         },
         [&](const TString& s) {

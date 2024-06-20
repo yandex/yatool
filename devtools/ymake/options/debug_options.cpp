@@ -232,6 +232,9 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("dump-pretty", "additional formatting in dumps").SetFlag(&DumpPretty).NoArgument();
     opts.AddLongOption("xpatch-path", "use list of changes from patch (.zipatch) or from arc changelist (.cl)").StoreResult(&PatchPath2);
     opts.AddLongOption("xapply-zipatch", "read file content from zipatch").SetFlag(&ReadFileContentFromZipatch2).NoArgument();
+    opts.AddLongOption("xexpr-error-details", "show expressions in error messages")
+        .RequiredArgument("none|one|all")
+        .StoreResult(&ExpressionErrorDetails);
 
     auto dontWriteInternalCache = [this](){
         DontWriteInternalCache = true;
@@ -271,4 +274,13 @@ void TDebugOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
     DumpGraphStuff = DumpGraph | DumpRenderedCmds | DumpBuildables | DumpNames;
 
     SetupCaches(this);
+
+    if (!(
+        ExpressionErrorDetails == "none" ||
+        ExpressionErrorDetails == "one" ||
+        ExpressionErrorDetails == "all" ||
+        ExpressionErrorDetails == ""
+    )) {
+        throw std::runtime_error("unknown expression error detail mode requested");
+    }
 }

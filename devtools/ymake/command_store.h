@@ -29,6 +29,31 @@ enum class EOutputAccountingMode {
     Module // implicit main output
 };
 
+enum class EShowExpressionErrors {None, One, All};
+struct TErrorShowerState {
+    EShowExpressionErrors Mode;
+    size_t Depth = size_t(-1);
+    size_t Count = 0;
+    explicit TErrorShowerState(EShowExpressionErrors mode):
+        Mode(mode)
+    {
+    }
+    bool Accept(size_t curDepth) {
+        switch (Mode) {
+            case EShowExpressionErrors::None:
+                return false;
+            case EShowExpressionErrors::All:
+                return true;
+            case EShowExpressionErrors::One: {
+                auto result = Depth > curDepth;
+                if (result)
+                    Depth = curDepth;
+                return result;
+            }
+        }
+    }
+};
+
 class TCommands {
     friend NCommands::TScriptEvaluator;
 
@@ -70,7 +95,8 @@ public:
             TCommandInfo& cmd,
             const TCmdConf* cmdConf
         ) {
-            commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf);
+            auto ignoreErrors = TErrorShowerState(EShowExpressionErrors::None);
+            commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf, &ignoreErrors);
             return *this;
         }
         auto Extract() {
@@ -130,7 +156,7 @@ public:
     ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
     TString PrintExpr(const NCommands::TSyntax& expr) const;
-    TString PrintCmd(const NPolexpr::TExpression& cmdExpr) const;
+    TString PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlightBegin = -1, size_t highlightEnd = -1) const;
     void StreamCmdRepr(const NPolexpr::TExpression& cmdExpr, std::function<void(const char* data, size_t size)> sink) const;
 
     TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
@@ -141,7 +167,8 @@ public:
         const TVars& vars,
         const TVector<std::span<TVarStr>>& inputs,
         TCommandInfo& cmd,
-        const TCmdConf* cmdConf
+        const TCmdConf* cmdConf,
+        TErrorShowerState* errorShower
     ) const;
 
     // TODO collect vars and tools while compiling

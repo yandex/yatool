@@ -644,6 +644,7 @@ void TCommands::TInliner::InlineScalarTerms(
                     // TODO just disallow this?
                     if (!def.Legacy || LegacyVars.RecursionDepth[var] != 0)
                         ythrow TError() << "unexpected multiargument substitution";
+                    // TODO dev warning?
                     // leave it for the actual evaluation to expand
                     writer.WriteTerm(var);
                     return;
@@ -915,7 +916,7 @@ TString TCommands::PrintExpr(const NCommands::TSyntax& expr) const {
     return os.Str();
 }
 
-TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr) const {
+TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlightBegin, size_t highlightEnd) const {
     TStringStream dest;
     TString buf;
     NPolexpr::Print(dest, cmdExpr, TOverloaded{
@@ -930,7 +931,7 @@ TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr) const {
             buf = ToString(Values.Id2Func(id));
             return buf;
         }
-    });
+    }, highlightBegin, highlightEnd);
     return dest.Str();
 }
 
@@ -1048,11 +1049,13 @@ void TCommands::WriteShellCmd(
     const TVars& vars,
     const TVector<std::span<TVarStr>>& inputs,
     TCommandInfo& cmd,
-    const TCmdConf* cmdConf
+    const TCmdConf* cmdConf,
+    TErrorShowerState* errorShower
 ) const {
-    NCommands::TScriptEvaluator se{this, cmdConf, &vars, &inputs, &cmd};
+    NCommands::TScriptEvaluator se(this, cmdConf, &vars, &inputs, &cmd);
     writer->BeginScript();
-    se.DoScript(&cmdExpr, 0, writer);
+    auto result = se.DoScript(&cmdExpr, 0, errorShower, writer);
+    Y_DEBUG_ABORT_UNLESS(result.End == cmdExpr.GetNodes().size());
     writer->EndScript(cmd, vars);
     // TODO? `const TCommandInfo&`
 }

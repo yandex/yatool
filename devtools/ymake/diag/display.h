@@ -12,13 +12,14 @@ enum class EConfMsgType {
     Error,
     Warning,
     Info,
-    Debug
+    Debug,
+    Count
 };
 
 class TDisplay : private TNonCopyable {
 private:
     TLockedStream* Stream;
-    EConfMsgType MinHumanOutSeverity = EConfMsgType::Debug;
+    EConfMsgType Cutoff = EConfMsgType::Count;
     using TMsgType = std::pair<TStringBuf, TStringBuf>;
     static TMsgType msgTypesAsString[4];
 
@@ -27,7 +28,7 @@ public:
     TStreamMessage NewConfMsg(EConfMsgType type, TStringBuf msg, TStringBuf path = TStringBuf(), size_t row = 0, size_t column = 0);
 
     void SetStream(TLockedStream* stream = nullptr);
-    void SetMinHumanOutSeverity(EConfMsgType val) noexcept {MinHumanOutSeverity = val;}
+    void SetCutoff(EConfMsgType val) noexcept {Cutoff = val;}
 
 private:
     TStreamMessage PrepareStream(EConfMsgType msgType, TStringBuf sub, TStringBuf path, size_t row = 0, size_t column = 0);

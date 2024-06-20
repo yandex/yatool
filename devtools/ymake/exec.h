@@ -26,7 +26,7 @@ protected:
 };
 
 struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
-    virtual void WriteEnv(TStringBuf)          override { ythrow TNotImplemented(); }
+    virtual void WriteEnv(TStringBuf)          override { throw TNotImplemented() << "environment settings are not supported here"; }
     virtual void PostScript(TVars&)            override {  }
 protected:
     ~TCommandSequenceWriterStubs() = default;

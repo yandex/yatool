@@ -43,6 +43,7 @@ public:
     TString CustomData;
     TVector<TFsPath> PluginsRoots;
     TVector<TString> WarnFlags;
+    TMaybe<std::underlying_type_t<EConfMsgType>> WarnLevel;
 
     THashMap<TString, TFsPath> CustomDataGen;
     TParsersList ParserPlugins;

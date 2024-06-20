@@ -58,7 +58,7 @@ public:
         const TVars* base0 = nullptr);
 
     void GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFormat, TDumpInfoEx* addinfo = nullptr, bool skipRender = false, bool isGlobalNode = false);
-    void RenderCmdStr(ECmdFormat cmdFormat);
+    void RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorShower);
 
     static void ReportStats();
 

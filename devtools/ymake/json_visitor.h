@@ -86,6 +86,9 @@ public:
 
     void ReportCacheStats() { CacheStats.Report(); }
 
+public:
+    TErrorShowerState ErrorShower;
+
 protected:
     void PrepareLeaving(TState& state);
 

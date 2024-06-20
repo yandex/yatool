@@ -124,7 +124,7 @@ namespace {
 
         void CompleteRendering() {
             Y_ASSERT(RenderedWithoutSubst);
-            MakeCommand.RenderCmdStr(ECF_Json);
+            MakeCommand.RenderCmdStr(ECF_Json, &CmdBuilder.ErrorShower);
             RenderedWithoutSubst = false;
         }
 
@@ -674,6 +674,9 @@ namespace {
 
         yMake.SaveUids(&cmdbuilder);
         cmdbuilder.ReportCacheStats();
+        if (cmdbuilder.ErrorShower.Count != 0) {
+            YErr() << "Expression errors found: " << cmdbuilder.ErrorShower.Count << Endl;
+        }
     }
 
     class TOutputStreamWrapper {

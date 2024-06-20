@@ -111,6 +111,8 @@ struct TDebugOptions {
     TString PatchPath2;
     bool ReadFileContentFromZipatch2 = false;
 
+    TString ExpressionErrorDetails;
+
     // The Uids cache can be controlled by the Deps cache settings,
     // but this still could be overriden by --xCC=u and --xRC=u.
     void MakeDepsCacheControlUidsCache() {

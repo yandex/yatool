@@ -67,7 +67,7 @@ TStreamMessage TDisplay::PrepareStream(EConfMsgType msgType, TStringBuf sub, TSt
 
     TStreamMessage stream = new TChildOutputStream(
         [this, prefix, msgType, type = type, mod = mod, sub, path, row, column, where](const TString& s) {
-            if (this->Stream != nullptr && msgType <= MinHumanOutSeverity) {
+            if (this->Stream != nullptr && msgType < Cutoff) {
                 this->Stream->Emit(prefix + s);
             }
             NEvent::TDisplayMessage msg;

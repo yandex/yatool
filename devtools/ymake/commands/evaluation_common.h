@@ -10,6 +10,12 @@ namespace NCommands {
         const TVector<std::span<TVarStr>>& Inputs;
     };
 
-    using TTermValue = std::variant<std::monostate, TString, TVector<TString>>;
+    struct TTermError {
+        TTermError(TString msg, bool origin): Msg(msg), Origin(origin) {}
+        TString Msg;
+        bool Origin;
+    };
+    struct TTermNothing {};
+    using TTermValue = std::variant<TTermError, TTermNothing, TString, TVector<TString>>;
 
 }

@@ -94,7 +94,7 @@ namespace NPolexpr {
                 auto args = std::span{argStack}.subspan(firstArgPos);
                 funcStack.pop_back();
                 TValue res = eval(func, args);
-                argStack.resize(firstArgPos);
+                argStack.erase(argStack.begin() + firstArgPos, argStack.end());
                 argStack.push_back(std::move(res));
                 if (isReferenced) {
                     storesStack.push_back(argStack.back());
@@ -119,14 +119,46 @@ namespace NPolexpr {
         std::is_convertible_v<std::invoke_result_t<TGetNameFunc, EVarId>, std::string_view> &&
         std::is_convertible_v<std::invoke_result_t<TGetNameFunc, TFuncId>, std::string_view>
     )
-    void Print(IOutputStream& oss, const TExpression& expr, TGetNameFunc&& getName) {
+    void Print(IOutputStream& oss, const TExpression& expr, TGetNameFunc&& getName, size_t highlightBegin = -1, size_t highlightEnd = -1) {
         TVector<NDetail::TFuncFrame> funcStack;
         ui16 argsStack = 0;
         ui32 nextRefIdx = 0;
         TVector<ui32> refsStack;
         TVector<ui32> refsOrder;
 
+        // highlighter
+        struct THightlighter {
+            const char *Prefix = "    ";
+            const char *Indent = "  ";
+            int Level = 0;
+            size_t Pos = 0;
+            size_t Depth = 0;
+        };
+        THightlighter hl;
+        auto hlMaybeBegin = [&]() {
+            if (hl.Pos != size_t(-1) && hl.Pos++ == highlightBegin) {
+                oss << "[[bad]]";
+                hl.Depth = funcStack.size();
+            }
+        };
+        auto hlMaybeEnd = [&]() {
+            if (hl.Pos != size_t(-1) && hl.Pos == highlightEnd && hl.Depth == funcStack.size())
+                hl.Pos = size_t(-1), oss << "[[rst]]";
+        };
+        auto hlNewLine = [&]() {
+            oss << "\n" << hl.Prefix;
+            for (int i = 0; i != hl.Level; ++i)
+                oss << hl.Indent;
+        };
+
+        auto prettify = highlightBegin != highlightEnd;
+        if (prettify)
+            oss << hl.Prefix;
+
         for (TExpression::TNode node : expr.GetNodes()) {
+            if (prettify)
+                hlMaybeBegin();
+
             if (node.IsRefereced()) {
                 oss << "[$" << nextRefIdx++ << " = ";
             }
@@ -145,6 +177,12 @@ namespace NPolexpr {
                         {.FuncNode = node,
                          .FirstArg = argsStack,
                          .LastArg = static_cast<ui16>(argsStack + node.GetArity())});
+                    if (prettify) {
+                        if (funcStack.back().LastArg - funcStack.back().FirstArg > 1) {
+                            ++hl.Level;
+                            hlNewLine();
+                        }
+                    }
                     break;
                 case TExpression::TNode::EType::Backref:
                     oss << "$" << refsOrder[refsOrder.size() - static_cast<ui32>(node.GetIdx())];
@@ -161,6 +199,13 @@ namespace NPolexpr {
             }
 
             while (!funcStack.empty() && funcStack.back().LastArg == argsStack) {
+                if (prettify) {
+                    hlMaybeEnd();
+                    if (funcStack.back().LastArg - funcStack.back().FirstArg > 1) {
+                        --hl.Level;
+                        hlNewLine();
+                    }
+                }
                 argsStack = funcStack.back().FirstArg + 1;
                 const bool isReferenced = funcStack.back().FuncNode.IsRefereced();
                 funcStack.pop_back();
@@ -171,8 +216,15 @@ namespace NPolexpr {
                     refsStack.pop_back();
                 }
             }
-            if (!funcStack.empty() && funcStack.back().FirstArg != argsStack)
-                oss << ", ";
+            if (prettify)
+                hlMaybeEnd();
+            if (!funcStack.empty() && funcStack.back().FirstArg != argsStack) {
+                if (prettify) {
+                    oss << ",";
+                    hlNewLine();
+                } else
+                    oss << ", ";
+            }
         }
     }
 }

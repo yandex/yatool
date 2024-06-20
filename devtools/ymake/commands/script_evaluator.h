@@ -23,17 +23,45 @@ namespace NCommands {
         const TVector<std::span<TVarStr>>* Inputs;
         TCommandInfo* CmdInfo;
 
+        TScriptEvaluator(
+            const TCommands* commands,
+            const TCmdConf* cmdConf,
+            const TVars* vars,
+            const TVector<std::span<TVarStr>>* inputs,
+            TCommandInfo* cmdInfo
+        ):
+            Commands(commands),
+            CmdConf(cmdConf),
+            Vars(vars),
+            Inputs(inputs),
+            CmdInfo(cmdInfo)
+        {
+        }
+
     public:
 
-        size_t DoScript(const NPolexpr::TExpression* expr, size_t scrBegin, ICommandSequenceWriter* writer);
+        struct TResult {
+            size_t End;
+            //size_t ErrorCount;
+        };
+
+        TResult DoScript(const NPolexpr::TExpression* expr, size_t scrBegin, TErrorShowerState* errorShower, ICommandSequenceWriter* writer);
 
     private:
 
-        size_t DoTermAsScript(const NPolexpr::TExpression* /*expr*/, size_t begin, ICommandSequenceWriter* writer);
-        size_t DoCommand(const NPolexpr::TExpression* expr, size_t cmdBegin, ICommandSequenceWriter* writer);
-        size_t DoTermAsCommand(const NPolexpr::TExpression* expr, size_t termBegin, ICommandSequenceWriter* writer);
-        size_t DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer);
-        size_t DoTerm(const NPolexpr::TExpression* expr, size_t begin, TArgAccumulator* writer);
+        struct TSubResult {
+            size_t End;
+            bool Error;
+        };
+
+        TSubResult DoTermAsScript(const NPolexpr::TExpression* expr, size_t begin, ICommandSequenceWriter* writer);
+        TSubResult DoCommand(const NPolexpr::TExpression* expr, size_t cmdBegin, ICommandSequenceWriter* writer);
+        TSubResult DoTermAsCommand(const NPolexpr::TExpression* expr, size_t termBegin, ICommandSequenceWriter* writer);
+        TSubResult DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer);
+        TSubResult DoTerm(const NPolexpr::TExpression* expr, size_t begin, TArgAccumulator* writer);
+
+        TErrorShowerState* ErrorShower = nullptr;
+        size_t ErrorDepth = 0;
 
     private:
 

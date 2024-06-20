@@ -1,11 +1,21 @@
 #include "script_evaluator.h"
 #include "function_evaluator.h"
 #include <devtools/ymake/command_helpers.h>
+#include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/polexpr/evaluate.h>
 #include <fmt/format.h>
 #include <util/generic/overloaded.h>
 
 using namespace NCommands;
+
+namespace {
+    struct TCounterBump {
+        explicit TCounterBump(size_t& counter): Counter(counter) { ++Counter; }
+        ~TCounterBump() { --Counter; }
+    private:
+        size_t& Counter;
+    };
+}
 
 struct NCommands::TArgAccumulator: TCommandSequenceWriterStubs {
     virtual void BeginScript() {
@@ -32,49 +42,64 @@ auto TScriptEvaluator::GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, 
     return NPolexpr::GetFnArgs(expr, pos, Commands->Values.Func2Id(expected));
 }
 
-size_t TScriptEvaluator::DoScript(const NPolexpr::TExpression* expr, size_t scrBegin, ICommandSequenceWriter* writer) {
+TScriptEvaluator::TResult TScriptEvaluator::DoScript(
+    const NPolexpr::TExpression* expr,
+    size_t scrBegin,
+    TErrorShowerState* errorShower,
+    ICommandSequenceWriter* writer
+) {
+    ErrorShower = errorShower;
     auto [cmdBegin, cmdCnt] = GetFnArgs(*expr, scrBegin, EMacroFunctions::Cmds);
+    auto error = false;
     for (size_t cmd = 0; cmd != cmdCnt; ++cmd) {
         auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunctions::Args);
         if (argCnt == 1) {
             auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
             if (termCnt == 1) {
-                if (auto termEnd = DoTermAsScript(expr, termBegin, writer); termEnd != termBegin) {
-                    cmdBegin = termEnd;
+                if (auto subResult = DoTermAsScript(expr, termBegin, writer); subResult.End != termBegin) {
+                    cmdBegin = subResult.End;
+                    error |= subResult.Error;
                     continue;
                 }
             }
         }
         writer->BeginCommand();
-        cmdBegin = DoCommand(expr, cmdBegin, writer);
+        auto subResult = DoCommand(expr, cmdBegin, writer);
+        cmdBegin = subResult.End;
+        error |= subResult.Error;
         writer->EndCommand();
     }
     Y_ABORT_UNLESS(cmdBegin == expr->GetNodes().size());
-    return cmdBegin;
+    Y_UNUSED(error); // TODO report it?
+    return {cmdBegin};
 }
 
-size_t TScriptEvaluator::DoTermAsScript(const NPolexpr::TExpression* /*expr*/, size_t begin, ICommandSequenceWriter* /*writer*/) {
-    return begin; // NYI
+TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsScript(const NPolexpr::TExpression* /*expr*/, size_t begin, ICommandSequenceWriter* /*writer*/) {
+    return {begin, false}; // NYI
 }
 
-size_t TScriptEvaluator::DoCommand(const NPolexpr::TExpression* expr, size_t cmdBegin, ICommandSequenceWriter* writer) {
+TScriptEvaluator::TSubResult TScriptEvaluator::DoCommand(const NPolexpr::TExpression* expr, size_t cmdBegin, ICommandSequenceWriter* writer) {
     auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunctions::Args);
+    auto error = false;
     for (size_t arg = 0; arg != argCnt; ++arg) {
         auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
         if (termCnt == 1) {
-            if (auto termEnd = DoTermAsCommand(expr, termBegin, writer); termEnd != termBegin) {
-                argBegin = termEnd;
+            if (auto subResult = DoTermAsCommand(expr, termBegin, writer); subResult.End != termBegin) {
+                argBegin = subResult.End;
+                error |= subResult.Error;
                 continue;
             }
         }
-        argBegin = DoArgument(expr, argBegin, writer);
+        auto subResult = DoArgument(expr, argBegin, writer);
+        argBegin = subResult.End;
+        error |= subResult.Error;
     }
-    return argBegin;
+    return {argBegin, error};
 }
 
-size_t TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size_t termBegin, ICommandSequenceWriter* writer) {
+TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size_t begin, ICommandSequenceWriter* writer) {
     TEvalCtx ctx{*Vars, *CmdInfo, *Inputs};
-    auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, termBegin, TOverloaded{
+    auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, TOverloaded{
         [&](NPolexpr::TConstId id) -> TTermValue {
             auto val = Commands->Values.GetValue(id);
             if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
@@ -91,10 +116,12 @@ size_t TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size
             return TString(Commands->ConstToString(val, ctx));
         },
         [&](NPolexpr::EVarId id) -> TTermValue {
-            auto var = Vars->Lookup(Commands->Values.GetVarName(id));
+            auto varName = Commands->Values.GetVarName(id);
+            auto var = Vars->Lookup(varName);
             if (!var)
                 return TVector<TString>();
             TArgAccumulator subWriter;
+            bool error = false;
             for (auto& varStr : *var) {
                 auto val = varStr.HasPrefix ? GetCmdValue(varStr.Name) : varStr.Name;
                 if (!varStr.StructCmd) {
@@ -111,18 +138,31 @@ size_t TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size
                 if (cmdCnt == 0)
                     continue; // empty values are currently stored as `Cmds()`
                 Y_ABORT_UNLESS (cmdCnt == 1);
-                cmdBegin = DoCommand(subExpr, cmdBegin, &subWriter);
+                auto bump = TCounterBump(ErrorDepth);
+                auto subResult = DoCommand(subExpr, cmdBegin, &subWriter);
+                cmdBegin = subResult.End;
+                error |= subResult.Error;
                 Y_DEBUG_ABORT_UNLESS(cmdBegin == subExpr->GetNodes().size());
             }
-            return subWriter.Args;
+            return error ? TTermError(fmt::format("while substituting as {} into", varName), false) : TTermValue(subWriter.Args);
         },
         [&](NPolexpr::TFuncId id, std::span<const TTermValue> args) -> TTermValue {
             return EvalFn(id, args, ctx, expr, writer);
         },
     });
 
+    bool error = false;
     std::visit(TOverloaded{
-        [&](std::monostate) {
+        [&](const TTermError& e) {
+            if (ErrorShower->Accept(ErrorDepth)) {
+                (e.Origin ? YErr() : YInfo())
+                    << (e.Origin ? "Expression command term evaluation error: " : "")
+                    << e.Msg << "\n"
+                    << Commands->PrintCmd(*expr, begin, end) << "\n" << Endl;
+                error = true;
+            }
+        },
+        [&](TTermNothing) {
         },
         [&](TString& s) {
             writer->WriteArgument(s);
@@ -133,22 +173,25 @@ size_t TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size
         }
     }, term);
 
-    return end;
+    return {end, error};
 }
 
-size_t TScriptEvaluator::DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer) {
+TScriptEvaluator::TSubResult TScriptEvaluator::DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer) {
     TArgAccumulator args;
     auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
+    bool error = false;
     for (size_t term = 0; term != termCnt; ++term) {
-        termBegin = DoTerm(expr, termBegin, &args);
+        auto subResult = DoTerm(expr, termBegin, &args);
+        termBegin = subResult.End;
+        error |= subResult.Error;
     }
     for (auto&& arg : args.Args)
         if (!arg.empty())
             writer->WriteArgument(arg);
-    return termBegin;
+    return {termBegin, error};
 }
 
-size_t TScriptEvaluator::DoTerm(
+TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
     const NPolexpr::TExpression* expr,
     size_t begin,
     TArgAccumulator* writer
@@ -168,18 +211,23 @@ size_t TScriptEvaluator::DoTerm(
         }
         else if constexpr (std::is_same_v<decltype(id), NPolexpr::EVarId>) {
             static_assert(sizeof...(args) == 0);
-            auto var = Vars->Lookup(Commands->Values.GetVarName(id));
+            auto varName = Commands->Values.GetVarName(id);
+            auto var = Vars->Lookup(varName);
             auto subExpr = AsSubexpression(var);
             if (!subExpr)
                 return ::EvalAllSplit(var);
             TArgAccumulator subWriter;
             auto [cmdView, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunctions::Cmds);
+            auto error = false;
             if (cmdCnt == 1) {
                 auto [argView, argCnt] = GetFnArgs(*subExpr, cmdView, EMacroFunctions::Args);
                 for (size_t arg = 0; arg != argCnt; ++arg) {
                     auto [termView, termCnt] = GetFnArgs(*subExpr, argView, EMacroFunctions::Terms);
                     for (size_t term = 0; term != termCnt; ++term) {
-                        termView = DoTerm(subExpr, termView, &subWriter);
+                        auto bump = TCounterBump(ErrorDepth);
+                        auto subResult = DoTerm(subExpr, termView, &subWriter);
+                        termView = subResult.End;
+                        error |= subResult.Error;
                     }
                     argView = termView;
                 }
@@ -187,7 +235,7 @@ size_t TScriptEvaluator::DoTerm(
             }
             Y_DEBUG_ABORT_UNLESS(cmdView == subExpr->GetNodes().size());
 
-            return subWriter.Args;
+            return error ? TTermError(fmt::format("while substituting as {} into", varName), false) : TTermValue(subWriter.Args);
         }
         else if constexpr (std::is_same_v<decltype(id), NPolexpr::TFuncId>) {
             static_assert(sizeof...(args) == 1);
@@ -195,9 +243,19 @@ size_t TScriptEvaluator::DoTerm(
         }
     });
 
-    AppendTerm(std::move(term), writer);
+    if (auto e = std::get_if<TTermError>(&term)) {
+        if (ErrorShower->Accept(ErrorDepth)) {
+            (e->Origin ? YErr() : YInfo())
+                << (e->Origin ? "Expression term evaluation error: " : "")
+                << e->Msg << "\n"
+                << Commands->PrintCmd(*expr, begin, end) << "\n" << Endl;
+            return {end, true};
+        }
+    } else {
+        AppendTerm(std::move(term), writer);
+    }
 
-    return end;
+    return {end, false};
 }
 
 const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TStringBuf& val) {
@@ -217,34 +275,42 @@ TTermValue TScriptEvaluator::EvalFn(
     const TEvalCtx& ctx, const NPolexpr::TExpression* expr,
     ICommandSequenceWriter* writer
 ) {
-    switch (Commands->Values.Id2Func(id)) {
-        case EMacroFunctions::Args: return RenderArgs(args);
-        case EMacroFunctions::Terms: return RenderTerms(args);
-        case EMacroFunctions::Hide: return std::monostate();
-        case EMacroFunctions::Clear: return RenderClear(args);
-        case EMacroFunctions::Pre: return RenderPre(args);
-        case EMacroFunctions::Suf: return RenderSuf(args);
-        case EMacroFunctions::Quo: return RenderQuo(args);
-        case EMacroFunctions::SetEnv: RenderEnv(writer, ctx, args); return {};
-        case EMacroFunctions::CutExt: return RenderCutExt(args);
-        case EMacroFunctions::LastExt: return RenderLastExt(args);
-        case EMacroFunctions::ExtFilter: return RenderExtFilter(args);
-        case EMacroFunctions::KeyValue: RenderKeyValue(ctx, args); return {};
-        case EMacroFunctions::TODO1: return RenderTODO1(args);
-        case EMacroFunctions::TODO2: return RenderTODO2(args);
-        default:
-            break;
+    try {
+        switch (Commands->Values.Id2Func(id)) {
+            case EMacroFunctions::Args: return RenderArgs(args);
+            case EMacroFunctions::Terms: return RenderTerms(args);
+            case EMacroFunctions::Hide: return TTermNothing();
+            case EMacroFunctions::Clear: return RenderClear(args);
+            case EMacroFunctions::Pre: return RenderPre(args);
+            case EMacroFunctions::Suf: return RenderSuf(args);
+            case EMacroFunctions::Quo: return RenderQuo(args);
+            case EMacroFunctions::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
+            case EMacroFunctions::CutExt: return RenderCutExt(args);
+            case EMacroFunctions::LastExt: return RenderLastExt(args);
+            case EMacroFunctions::ExtFilter: return RenderExtFilter(args);
+            case EMacroFunctions::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
+            case EMacroFunctions::TODO1: return RenderTODO1(args);
+            case EMacroFunctions::TODO2: return RenderTODO2(args);
+            default:
+                break;
+        }
+        throw yexception()
+            << "Don't know how to render configure time modifier "
+            << Commands->Values.Id2Func(id)
+            << " in expression: " + Commands->PrintCmd(*expr);
+    } catch (yexception& e) {
+        ++ErrorShower->Count;
+        return TTermError(e.what(), true);
     }
-    throw yexception()
-        << "Don't know how to render configure time modifier "
-        << Commands->Values.Id2Func(id)
-        << " in expression: " + Commands->PrintCmd(*expr);
 }
 
 void TScriptEvaluator::AppendTerm(TTermValue&& term, TArgAccumulator* writer) {
     if (writer->Args.empty()) {
         std::visit(TOverloaded{
-            [&](std::monostate) {
+            [&](TTermError) {
+                Y_ABORT();
+            },
+            [&](TTermNothing) {
             },
             [&](TString&& s) {
                 writer->Args.push_back(std::move(s));
@@ -255,7 +321,10 @@ void TScriptEvaluator::AppendTerm(TTermValue&& term, TArgAccumulator* writer) {
         }, std::move(term));
     } else {
         std::visit(TOverloaded{
-            [&](std::monostate) {
+            [&](TTermError) {
+                Y_ABORT();
+            },
+            [&](TTermNothing) {
             },
             [&](TString&& s) {
                 for (auto& arg : writer->Args)
