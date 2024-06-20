@@ -75,6 +75,7 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     uid = uid_gen.get_uid(deps, "tscov-report")
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": inputs_for_node,
@@ -122,6 +123,7 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
     uid = uid_gen.get_uid(deps, "resolve_tscov")
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": [coverage_tar_path],
@@ -130,7 +132,9 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
         "priority": 0,
         "deps": testdeps.unique(deps),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         # Keep coverage_tar_path as could use it when building overall html report
         "outputs": [coverage_tar_path, output_path, log_path],
         "kv": {

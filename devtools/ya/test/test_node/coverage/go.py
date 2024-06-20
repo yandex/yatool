@@ -53,6 +53,7 @@ def inject_create_go_coverage_report_node(graph, suites, coverage_path, opts):
     uid = uid_gen.get_uid(deps, "gocov-report")
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid,
@@ -102,6 +103,7 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar_path, resolved_f
         cmd.extend(['--exclude-regexp', opts.coverage_exclude_regexp])
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [coverage_tar_path],
@@ -110,7 +112,9 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar_path, resolved_f
         "priority": 0,
         "deps": testdeps.unique(test_uid),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path, log_path],
         'kv': {
             # Resolve Go

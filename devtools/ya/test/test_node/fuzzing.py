@@ -102,6 +102,7 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
         node_cmd += ["--transport", opts.canonization_transport]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [input_path],
         "uid": uid_gen.get_uid(deps, "fuzz_upload"),
@@ -109,7 +110,9 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
         "priority": 0,
         "deps": testdeps.unique(deps),
         "cache": True,
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [node_log_path, node_output],
         "kv": {
             "p": "UL",
@@ -189,6 +192,7 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": testdeps.unique(inputs),
         "uid": uid_gen.get_uid(suite.result_uids, "fuzz_minimize"),
@@ -197,7 +201,9 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
         "priority": 0,
         "deps": testdeps.unique(deps),
         "cache": True,
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [node_log_path, output_corpus_path],
         "kv": {
             "p": "FZ",
@@ -264,6 +270,7 @@ def inject_fuzz_result_node(arc_root, graph, suites, upload_nodes, input_files, 
         node_cmd += ["--write-results-inplace"]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": input_files,
         "uid": node_uid,

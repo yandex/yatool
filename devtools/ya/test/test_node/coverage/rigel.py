@@ -70,6 +70,7 @@ def inject_coverage_merge_node(graph, tests, source_filename, result_filename, o
     result_cmd += ['-no-merge', 'report.exec']
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": cache_node,
         "broadcast": False,
         "inputs": [merge_coverage_script],
@@ -110,6 +111,7 @@ def inject_unified_coverage_merger_node(graph, suite, resolved_filename, opts):
     for cov_path in resolved_coverage_paths:
         cmd += ["--coverage-paths", cov_path]
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": resolved_coverage_paths,
@@ -118,7 +120,9 @@ def inject_unified_coverage_merger_node(graph, suite, resolved_filename, opts):
         "priority": 0,
         "deps": testdeps.unique(test_uid),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path],
         'kv': {
             "p": "RC",
@@ -167,6 +171,7 @@ def inject_inplace_coverage_merger_node(graph, coverage_uids, suites, opts):
     for cov_path in resolved_coverage_paths:
         cmd += ["--coverage-paths", cov_path]
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": resolved_coverage_paths,

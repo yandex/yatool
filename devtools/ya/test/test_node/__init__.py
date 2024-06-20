@@ -107,6 +107,7 @@ def inject_mds_resource_to_graph(graph, resource, opts):
         ]
 
         node = {
+            "node-type": test.const.NodeType.TEST_AUX,
             "broadcast": False,
             "inputs": [FETCH_FROM_MDS_SCRIPT, FETCH_FROM_SCRIPT],
             "uid": uid,
@@ -246,6 +247,7 @@ class TestFramer(object):
             tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
 
             node = {
+                "node-type": test.const.NodeType.TEST_AUX,
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
@@ -639,6 +641,7 @@ def create_test_node(
 
         if not graph.get_node_by_uid(uid):
             node = {
+                "node-type": test.const.NodeType.TEST_AUX,
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
@@ -826,7 +829,7 @@ def create_test_node(
         "env": env.dump(),
         "inputs": testdeps.unique(inputs),
         "kv": kv,
-        "node-type": "test",
+        "node-type": test.const.NodeType.TEST,
         "outputs": outputs,
         "priority": _get_suite_priority(suite),
         "requirements": requirements,
@@ -1068,8 +1071,11 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         runner_cmd += ['--node-timeout', str(timeout)]
 
     node = {
-        "node-type": "test",
+        "node-type": test.const.NodeType.TEST,
         "backup": False,
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "broadcast": False,
         "inputs": [frepkage_res_info],
         "uid": suite.uid,
@@ -1399,7 +1405,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
             cmds.append({'cmd_args': cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
-        "node-type": "test",
+        "node-type": test.const.NodeType.TEST,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
@@ -1506,8 +1512,11 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
         cmd += ["--output", work_dir]
 
     node = {
-        "node-type": "test",
+        "node-type": test.const.NodeType.TEST,
         "cache": _should_cache_suite(suite, opts),
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "backup": backup,
         "broadcast": False,
         "inputs": testdeps.unique(node_inputs),
@@ -1869,6 +1878,7 @@ def create_populate_token_to_sandbox_vault_node(global_resources, opts):
     ]
 
     return {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_random_uid("populate_token_2_sb_vault"),
@@ -1925,6 +1935,7 @@ def create_upload_frepkage_node(filename, global_resources, opts):
         node_cmd += ["--transport", opts.canonization_transport]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [filename],
         # Don't cache this node - it has external temporary file as input
@@ -1966,6 +1977,7 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
         cmd += ["--filter-description", filter_descr]
 
     canonization_result_node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
@@ -2068,6 +2080,7 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
         allure_cmd += ["--allure-tars", allure_tar]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": allure_tars,
@@ -2163,7 +2176,7 @@ def inject_result_node(
         result_cmd += ["--filter-description", tests_filter_descr]
 
     node = {
-        "node-type": "test-results",
+        "node-type": test.const.NodeType.TEST_RESULTS,
         "cache": opts.cache_tests if opts else True,
         "broadcast": False,
         "inputs": PROJECTS_FILE_INPUTS,
@@ -2262,7 +2275,10 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         "deps": testdeps.unique(suite.output_uids) + list(get_test_build_deps_or_throw(suite)),
         "env": sysenv.get_common_py_env().dump(),
         "cache": True,
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
+        "node-type": test.const.NodeType.TEST_AUX,
         "outputs": [node_log_path, node_result_path],
         'kv': {
             "p": "CANONIZE",
@@ -2550,7 +2566,9 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         "priority": _get_suite_priority(suite),
         "deps": testdeps.unique(deps),
         "env": env.dump(),
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": output,
         'kv': kv,
         "cmds": cmds,

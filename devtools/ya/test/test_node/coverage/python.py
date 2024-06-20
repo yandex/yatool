@@ -82,6 +82,7 @@ def inject_python_coverage_merge_node(graph, suites, source_filename, output_pat
     cmd += coverage_paths
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [],
@@ -134,6 +135,7 @@ def inject_create_python_coverage_report_node(graph, suites, py_bin_deps, merge_
     uid = uid_gen.get_uid(deps, "pycov-report")
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid,
@@ -187,6 +189,7 @@ def inject_python_coverage_resolve_nodes(
     uid = uid_gen.get_uid(deps, "resolve_pycov")
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [coverage_tar_path],
@@ -195,7 +198,9 @@ def inject_python_coverage_resolve_nodes(
         "priority": 0,
         "deps": testdeps.unique(deps),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path, log_path],
         'kv': {
             # Resolve Python coverage

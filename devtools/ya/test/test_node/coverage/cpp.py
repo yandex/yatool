@@ -147,6 +147,7 @@ def inject_calc_coverage_node(
         for arg in opts.sonar_java_args:
             sonar_cmd += ['--java-args', arg]
         node = {
+            "node-type": test.const.NodeType.TEST_AUX,
             "broadcast": False,
             "inputs": [gcov_report, sonar_script],
             "uid": uid_gen.get_random_uid("sonar"),
@@ -173,6 +174,7 @@ def inject_calc_coverage_node(
         graph.append_node(node, add_to_result=True)
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": inputs,
         "uid": uid,
@@ -218,6 +220,7 @@ def inject_collect_gcno_node(graph, opts=None):
     result_cmd = [find_and_tar_script, output_path, '.gcno']
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [find_and_tar_script],
         "uid": uid,
@@ -288,6 +291,7 @@ def inject_sancov_resolve_nodes(graph, suites, coverage_tar_name, result_filenam
                 inputs.add(output)
 
         node = {
+            "node-type": test.const.NodeType.TEST_AUX,
             "cache": True,
             "broadcast": False,
             "inputs": list(inputs),
@@ -296,7 +300,9 @@ def inject_sancov_resolve_nodes(graph, suites, coverage_tar_name, result_filenam
             "priority": 0,
             "deps": testdeps.unique(test_uids),
             "env": {},
-            "target_properties": {},
+            "target_properties": {
+                "module_lang": suite.meta.module_lang,
+            },
             "outputs": [output_path, log_path],
             'kv': {
                 "p": "RC",
@@ -329,6 +335,7 @@ def inject_create_sancov_coverage_report_node(graph, resolve_node_uids, inputs, 
         cmd += ["--coverage-path", coverage_path]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": inputs,
         "uid": uid,
@@ -387,6 +394,7 @@ def inject_clang_coverage_unify_node(graph, suite, clang_resolver_uid, raw_resol
     )
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [input_filename],
@@ -395,7 +403,9 @@ def inject_clang_coverage_unify_node(graph, suite, clang_resolver_uid, raw_resol
         "priority": 0,
         "deps": testdeps.unique(deps),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": testdeps.unique(outputs),
         'kv': {
             "p": "RC",
@@ -455,6 +465,7 @@ def inject_clang_coverage_resolve_node(
         cmd += ["--log-level", "DEBUG"]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [input_filename, binary_path],
@@ -463,7 +474,9 @@ def inject_clang_coverage_resolve_node(
         "priority": 0,
         "deps": testdeps.unique(deps),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path, log_path],
         'kv': {
             "p": "RC",
@@ -555,6 +568,7 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
     )
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": list(inputs),
         "uid": uid,
@@ -669,6 +683,7 @@ def inject_coverage_resolve_awaiting_node(graph, suite, deps, opts=None):
     ]
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [script_append_file],
@@ -677,7 +692,9 @@ def inject_coverage_resolve_awaiting_node(graph, suite, deps, opts=None):
         "priority": 0,
         "deps": deps,
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path],
         'kv': {
             "p": "RC",

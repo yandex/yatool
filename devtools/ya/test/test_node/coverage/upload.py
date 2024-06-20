@@ -55,6 +55,7 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
     ] + tables
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_uid([root_path], 'coverage_create_table'),
@@ -143,6 +144,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
         cmds.append({"cmd_args": pusher_cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [input_file],
         "uid": node_uid,
@@ -154,7 +156,9 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
         "priority": 0,
         "deps": testdeps.unique(deps),
         "cache": True,
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [node_log_path],
         "kv": {
             "p": "UL",

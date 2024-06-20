@@ -10,6 +10,7 @@ import six
 from six.moves import queue
 import sys
 import tempfile
+import test.const as test_consts
 import threading
 import traceback
 
@@ -2981,7 +2982,11 @@ def _strip_idle_build_results(graph, plan, tests):
         node = plan.get_node_by_uid(uid)
         # XXX Early stopping case to avoid traversing entire graph
         # Test node doesn't contain target_properties
-        if node.get("target_properties"):
+        if not node.get("node-type") in [
+            test_consts.NodeType.TEST,
+            test_consts.NodeType.TEST_RESULTS,
+            test_consts.NodeType.TEST_AUX,
+        ]:
             return False
 
         deps = set(node.get("deps", []))

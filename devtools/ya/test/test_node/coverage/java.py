@@ -34,6 +34,7 @@ def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_
             output_path,
         ]
         node = {
+            "node-type": test.const.NodeType.TEST_AUX,
             "cache": cache_nodes,
             "broadcast": False,
             "inputs": [script_path],
@@ -42,7 +43,9 @@ def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_
             "priority": 0,
             "deps": testdeps.unique(suite.result_uids),
             "env": {},
-            "target_properties": {},
+            "target_properties": {
+                "module_lang": suite.meta.module_lang,
+            },
             "outputs": [output_path],
             'kv': {
                 "p": "CV",
@@ -111,6 +114,7 @@ def inject_create_java_coverage_report_node(
     cmds.append({'cmd_args': create_report_cmd, 'cwd': '$(BUILD_ROOT)'})
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [CREATE_COVERAGE_REPORT_SCRIPT],
         "uid": uid,
@@ -298,6 +302,7 @@ def inject_java_coverage_resolve_node(
         node_cmds = extra_cmds + node_cmds
 
     node = {
+        "node-type": test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": inputs,
@@ -306,7 +311,9 @@ def inject_java_coverage_resolve_node(
         "priority": 0,
         "deps": testdeps.unique(test_uids),
         "env": {},
-        "target_properties": {},
+        "target_properties": {
+            "module_lang": suite.meta.module_lang,
+        },
         "outputs": [output_path, log_path],
         'kv': {
             # Resolve Java
