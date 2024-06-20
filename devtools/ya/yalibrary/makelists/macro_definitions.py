@@ -3,6 +3,8 @@ from . import mk_common
 import functools
 from collections import deque
 
+import typing as tp
+
 
 TYPE_UNKNOWN = -1
 TYPE_MACRO = 100
@@ -136,6 +138,7 @@ class Node(object):
         return nodes
 
     def find_siblings(self, name=None, names=None):
+        # type: (str, list[str]) -> list["Macro"]
         names = names or []
         if names and name:
             raise AssertionError("You can't request name and names simultaneously")
@@ -186,6 +189,12 @@ class Node(object):
     def dump(self):
         return '\n'.join(self._write()) + '\n'
 
+    def __repr__(self):
+        return "<{} {} {} with {} children>".format(
+            type(self).__name__, self.name, self.node_type,
+            len(self.children)
+        )
+
 
 class Macro(Node):
     def __init__(self, name):
@@ -211,6 +220,7 @@ class Macro(Node):
         return []
 
     def find_values(self, name):
+        # type: (str) -> list[Value]
         nodes = []
         for value_node in self.children:
             if value_node.node_type == TYPE_VALUE and value_node.name == name:
