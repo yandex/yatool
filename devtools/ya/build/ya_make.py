@@ -884,10 +884,13 @@ class Context(object):
             nodes_map[node['uid']] = node
 
         print_status("Configuring local and dist store caches")
-        self.dist_cache = make_dist_cache(
-            dist_cache_future, self.opts, nodes_map.keys(), heater_mode=not self.opts.yt_store_wt
-        )
-        self.cache = make_cache(self.opts, self.garbage_dir)
+
+        with stager.scope('configure-dist-store-cache'):
+            self.dist_cache = make_dist_cache(
+                dist_cache_future, self.opts, nodes_map.keys(), heater_mode=not self.opts.yt_store_wt
+            )
+        with stager.scope('configure-local-cache'):
+            self.cache = make_cache(self.opts, self.garbage_dir)
 
         print_status("Configuration done. Preparing for execution")
 
