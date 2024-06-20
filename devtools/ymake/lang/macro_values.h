@@ -52,28 +52,22 @@ public:
         ui32 Coord;
         bool operator==(const TOutput&) const = default;
     };
-    struct TCmdPattern {
-        std::string_view Data;
-        bool operator==(const TCmdPattern&) const = default;
-    };
     struct TGlobPattern {
         std::string_view Data;
         bool operator==(const TGlobPattern&) const = default;
     };
-    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TCmdPattern, TGlobPattern>;
+    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TGlobPattern>;
 
     enum EStorageType {
         ST_LITERALS,
         ST_TOOLS,
         ST_INPUTS,
         ST_OUTPUTS,
-        ST_PATTERN,
         ST_GLOB
     };
 
     NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }
     NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }
-    NPolexpr::TConstId InsertCmdPattern(std::string_view val) { return NPolexpr::TConstId(ST_PATTERN, CmdPattern.Add(val));}
 
     std::string_view GetVarName(NPolexpr::EVarId id) const;
     ui16 FuncArity(EMacroFunctions func) const noexcept;

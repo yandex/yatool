@@ -992,7 +992,6 @@ TString TCommands::PrintConst(NPolexpr::TConstId id) const {
         [](TMacroValues::TInput         val) { return fmt::format("Input{{{}}}", val.Coord); },
         [](TMacroValues::TInputs        val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TOutput        val) { return fmt::format("Output{{{}}}", val.Coord); },
-        [](TMacroValues::TCmdPattern    val) { return fmt::format("'{}'", val.Data); },
         [](TMacroValues::TGlobPattern   val) { return fmt::format("GlobPattern{{{}}}", val.Data); }
     }, Values.GetValue(id));
 }
@@ -1153,9 +1152,6 @@ TString TCommands::ConstToString(const TMacroValues::TValue& value, const NComma
         [&](TMacroValues::TOutput val) {
             return TString(ctx.Vars.at("OUTPUT").at(val.Coord).Name);
         },
-        [](TMacroValues::TCmdPattern val) {
-            return TString(val.Data);
-        },
         [](TMacroValues::TGlobPattern val) {
             return TString(val.Data);
         }
@@ -1177,7 +1173,6 @@ TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
         [](TMacroValues::TInput       val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TInputs      val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TOutput      val) { return TString(fmt::format("{}", val.Coord)); },
-        [](TMacroValues::TCmdPattern  val) { return TString(val.Data); },
         [](TMacroValues::TGlobPattern val) { return TString(val.Data); }
     }, Values.GetValue(node));
 }

@@ -83,8 +83,6 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
             return NPolexpr::TConstId(ST_INPUTS, Strings.Add(encoded) | COORD_ARRAY_FLAG);
         } else if constexpr (std::is_same_v<T, TOutput>)
             return NPolexpr::TConstId(ST_OUTPUTS, val.Coord);
-        else if constexpr (std::is_same_v<T, TCmdPattern>)
-            return NPolexpr::TConstId(ST_PATTERN, CmdPattern.Add(val.Data));
         else if constexpr (std::is_same_v<T, TGlobPattern>)
             return NPolexpr::TConstId(ST_GLOB, Strings.Add(val.Data));
     }, value);
@@ -108,8 +106,6 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
         }
         case ST_OUTPUTS:
             return TOutput {.Coord = id.GetIdx()};
-        case ST_PATTERN:
-            return TCmdPattern {.Data = CmdPattern.GetName<TCmdView>(id.GetIdx()).GetStr()};
         case ST_GLOB:
             return TGlobPattern {.Data = Strings.GetName<TCmdView>(id.GetIdx()).GetStr()};
         default:
