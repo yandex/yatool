@@ -125,6 +125,10 @@ public:
         return UseNewUids;
     }
 
+    bool ShouldUseGraphChangesPredictor() const noexcept {
+        return UseGraphChangesPredictor;
+    }
+
     bool MainOutputAsExtra() const noexcept {
         return MainOutputAsExtra_;
     }
@@ -169,6 +173,7 @@ private:
     bool ReportMissingAddincls = true;
     bool UseNewUids = UseNewUidsDefault;
     bool MainOutputAsExtra_ = false;
+    bool UseGraphChangesPredictor = false;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;

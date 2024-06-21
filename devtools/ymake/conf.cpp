@@ -289,6 +289,7 @@ void TBuildConfiguration::FillMiscValues() {
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
     UseNewUids = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_USE_NEW_UIDS"));
     MainOutputAsExtra_ = NYMake::IsTrue(CommandConf.EvalValue("MAIN_OUTPUT_AS_EXTRA"));
+    UseGraphChangesPredictor = NYMake::IsTrue(CommandConf.EvalValue("USE_GRAPH_CHANGES_PREDICTOR"));
 
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
         ReportMissingAddincls = !NYMake::IsTrue(val);
