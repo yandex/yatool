@@ -747,6 +747,9 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
 
     TInternalCacheSaver saver(*this, cacheWriter);
     DepCacheTempFile = saver.Save(delayed);
+    if (!delayed) {
+        Conf.OnDepsCacheSaved();
+    }
 
     FixStartTargets(stIds);
     IncParserManager.Cache.Clear();
@@ -764,7 +767,7 @@ void TYMake::SaveUids(TUidsCachable* uidsCachable) {
         uidsOutput.Write(CurrDepsFingerprint.Data(), size);
 
         uidsCachable->SaveCache(&uidsOutput, Graph);
-        YDebug() << "Deps cache has been saved..." << Endl;
+        YDebug() << "Uids cache has been saved..." << Endl;
 
         FORCE_TRACE(U, NEvent::TStageFinished("Save Uids cache"));
     }
@@ -777,6 +780,7 @@ void TYMake::CommitCaches() {
             Names.Clear(); // This will unlock any mapped data in graph cache
             DepCacheTempFile.RenameTo(Conf.YmakeCache);
             DepCacheTempFile = {};
+            Conf.OnDepsCacheSaved();
         }
     } else {
         Y_ASSERT(!DepCacheTempFile.IsDefined());

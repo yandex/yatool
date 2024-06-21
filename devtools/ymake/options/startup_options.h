@@ -14,6 +14,10 @@ struct TStartUpOptions: public TRootsOptions {
     TFsPath YmakeJsonCache;
     TFsPath ConfDir;
 
+    TFsPath CacheInfoFile;///< Fullname of cache info file for current ymake run
+    TFsPath CacheInfoName;///< Basename for cache info output file
+    TFsPath CacheInfoOutputFile;///< Fullname of cache info output file
+
     TVector<TFsPath> StartDirs;
     TVector<TFsPath> Targets;
 
@@ -21,4 +25,7 @@ struct TStartUpOptions: public TRootsOptions {
     void PostProcess(const TVector<TString>& freeArgs);
     void MineTargetsAndSourceRoot(const TVector<char*>& optPos);
     void MineTargetsAndSourceRoot(const TVector<TString>& optPos);
+
+    void OnDepsCacheEnabled() const;
+    void OnDepsCacheSaved() const;
 };
