@@ -38,7 +38,7 @@ public:
 };
 
 inline
-auto TScriptEvaluator::GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, EMacroFunctions expected) {
+auto TScriptEvaluator::GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, EMacroFunction expected) {
     return NPolexpr::GetFnArgs(expr, pos, Commands->Values.Func2Id(expected));
 }
 
@@ -49,12 +49,12 @@ TScriptEvaluator::TResult TScriptEvaluator::DoScript(
     ICommandSequenceWriter* writer
 ) {
     ErrorShower = errorShower;
-    auto [cmdBegin, cmdCnt] = GetFnArgs(*expr, scrBegin, EMacroFunctions::Cmds);
+    auto [cmdBegin, cmdCnt] = GetFnArgs(*expr, scrBegin, EMacroFunction::Cmds);
     auto error = false;
     for (size_t cmd = 0; cmd != cmdCnt; ++cmd) {
-        auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunctions::Args);
+        auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunction::Args);
         if (argCnt == 1) {
-            auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
+            auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunction::Terms);
             if (termCnt == 1) {
                 if (auto subResult = DoTermAsScript(expr, termBegin, writer); subResult.End != termBegin) {
                     cmdBegin = subResult.End;
@@ -79,10 +79,10 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsScript(const NPolexpr::TE
 }
 
 TScriptEvaluator::TSubResult TScriptEvaluator::DoCommand(const NPolexpr::TExpression* expr, size_t cmdBegin, ICommandSequenceWriter* writer) {
-    auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunctions::Args);
+    auto [argBegin, argCnt] = GetFnArgs(*expr, cmdBegin, EMacroFunction::Args);
     auto error = false;
     for (size_t arg = 0; arg != argCnt; ++arg) {
-        auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
+        auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunction::Terms);
         if (termCnt == 1) {
             if (auto subResult = DoTermAsCommand(expr, termBegin, writer); subResult.End != termBegin) {
                 argBegin = subResult.End;
@@ -102,7 +102,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, TOverloaded{
         [&](NPolexpr::TConstId id) -> TTermValue {
             auto val = Commands->Values.GetValue(id);
-            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
+            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val)) {
                 auto result = TVector<TString>();
                 for (auto& coord : inputs->Coords) {
                     auto inputResult = Commands->InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
@@ -110,7 +110,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                 }
                 return result;
             }
-            if (auto input = std::get_if<TMacroValues::TInput>(&val); input) {
+            if (auto input = std::get_if<TMacroValues::TInput>(&val)) {
                 return Commands->InputToStringArray(*input, ctx);
             }
             return TString(Commands->ConstToString(val, ctx));
@@ -134,7 +134,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                 auto subExpr = AsSubexpression(val);
                 if (!subExpr)
                     continue; // TODO?
-                auto [cmdBegin, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunctions::Cmds);
+                auto [cmdBegin, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunction::Cmds);
                 if (cmdCnt == 0)
                     continue; // empty values are currently stored as `Cmds()`
                 Y_ABORT_UNLESS (cmdCnt == 1);
@@ -178,7 +178,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
 
 TScriptEvaluator::TSubResult TScriptEvaluator::DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer) {
     TArgAccumulator args;
-    auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunctions::Terms);
+    auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunction::Terms);
     bool error = false;
     for (size_t term = 0; term != termCnt; ++term) {
         auto subResult = DoTerm(expr, termBegin, &args);
@@ -201,10 +201,10 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
         if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
             static_assert(sizeof...(args) == 0);
             auto val = Commands->Values.GetValue(id);
-            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val); inputs) {
+            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val)) {
                 ythrow TNotImplemented();
             }
-            if (auto input = std::get_if<TMacroValues::TInput>(&val); input) {
+            if (auto input = std::get_if<TMacroValues::TInput>(&val)) {
                 return Commands->InputToStringArray(*input, ctx);
             }
             return TString(Commands->ConstToString(val, ctx));
@@ -217,12 +217,12 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
             if (!subExpr)
                 return ::EvalAllSplit(var);
             TArgAccumulator subWriter;
-            auto [cmdView, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunctions::Cmds);
+            auto [cmdView, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunction::Cmds);
             auto error = false;
             if (cmdCnt == 1) {
-                auto [argView, argCnt] = GetFnArgs(*subExpr, cmdView, EMacroFunctions::Args);
+                auto [argView, argCnt] = GetFnArgs(*subExpr, cmdView, EMacroFunction::Args);
                 for (size_t arg = 0; arg != argCnt; ++arg) {
-                    auto [termView, termCnt] = GetFnArgs(*subExpr, argView, EMacroFunctions::Terms);
+                    auto [termView, termCnt] = GetFnArgs(*subExpr, argView, EMacroFunction::Terms);
                     for (size_t term = 0; term != termCnt; ++term) {
                         auto bump = TCounterBump(ErrorDepth);
                         auto subResult = DoTerm(subExpr, termView, &subWriter);
@@ -277,20 +277,20 @@ TTermValue TScriptEvaluator::EvalFn(
 ) {
     try {
         switch (Commands->Values.Id2Func(id)) {
-            case EMacroFunctions::Args: return RenderArgs(args);
-            case EMacroFunctions::Terms: return RenderTerms(args);
-            case EMacroFunctions::Hide: return TTermNothing();
-            case EMacroFunctions::Clear: return RenderClear(args);
-            case EMacroFunctions::Pre: return RenderPre(args);
-            case EMacroFunctions::Suf: return RenderSuf(args);
-            case EMacroFunctions::Quo: return RenderQuo(args);
-            case EMacroFunctions::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
-            case EMacroFunctions::CutExt: return RenderCutExt(args);
-            case EMacroFunctions::LastExt: return RenderLastExt(args);
-            case EMacroFunctions::ExtFilter: return RenderExtFilter(args);
-            case EMacroFunctions::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
-            case EMacroFunctions::TODO1: return RenderTODO1(args);
-            case EMacroFunctions::TODO2: return RenderTODO2(args);
+            case EMacroFunction::Args: return RenderArgs(args);
+            case EMacroFunction::Terms: return RenderTerms(args);
+            case EMacroFunction::Hide: return TTermNothing();
+            case EMacroFunction::Clear: return RenderClear(args);
+            case EMacroFunction::Pre: return RenderPre(args);
+            case EMacroFunction::Suf: return RenderSuf(args);
+            case EMacroFunction::Quo: return RenderQuo(args);
+            case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
+            case EMacroFunction::CutExt: return RenderCutExt(args);
+            case EMacroFunction::LastExt: return RenderLastExt(args);
+            case EMacroFunction::ExtFilter: return RenderExtFilter(args);
+            case EMacroFunction::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
+            case EMacroFunction::TODO1: return RenderTODO1(args);
+            case EMacroFunction::TODO2: return RenderTODO2(args);
             default:
                 break;
         }

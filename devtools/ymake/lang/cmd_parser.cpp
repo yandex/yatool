@@ -13,23 +13,23 @@ using namespace NCommands;
 
 namespace {
 
-    EMacroFunctions CompileFnName(TStringBuf key) {
-        static const THashMap<TStringBuf, EMacroFunctions> names = {
-            {"hide",    EMacroFunctions::Hide},
-            {"clear",   EMacroFunctions::Clear},
-            {"input",   EMacroFunctions::Input},
-            {"output",  EMacroFunctions::Output},
-            {"tool",    EMacroFunctions::Tool},
-            {"pre",     EMacroFunctions::Pre},
-            {"suf",     EMacroFunctions::Suf},
-            {"quo",     EMacroFunctions::Quo},
-            {"noext",   EMacroFunctions::CutExt},
-            {"lastext", EMacroFunctions::LastExt},
-            {"ext",     EMacroFunctions::ExtFilter},
-            {"env",     EMacroFunctions::SetEnv},
-            {"kv",      EMacroFunctions::KeyValue},
-            {"noauto",  EMacroFunctions::NoAutoSrc},
-            {"glob",    EMacroFunctions::Glob},
+    EMacroFunction CompileFnName(TStringBuf key) {
+        static const THashMap<TStringBuf, EMacroFunction> names = {
+            {"hide",    EMacroFunction::Hide},
+            {"clear",   EMacroFunction::Clear},
+            {"input",   EMacroFunction::Input},
+            {"output",  EMacroFunction::Output},
+            {"tool",    EMacroFunction::Tool},
+            {"pre",     EMacroFunction::Pre},
+            {"suf",     EMacroFunction::Suf},
+            {"quo",     EMacroFunction::Quo},
+            {"noext",   EMacroFunction::CutExt},
+            {"lastext", EMacroFunction::LastExt},
+            {"ext",     EMacroFunction::ExtFilter},
+            {"env",     EMacroFunction::SetEnv},
+            {"kv",      EMacroFunction::KeyValue},
+            {"noauto",  EMacroFunction::NoAutoSrc},
+            {"glob",    EMacroFunction::Glob},
         };
         auto it = names.find(key);
         if (it == names.end())
@@ -60,8 +60,8 @@ namespace {
         // structural elements
 
         std::any visitCmd(CmdParser::CmdContext *ctx) override {
-            Syntax.Commands.emplace_back();
-            CmdStack.push_back(&Syntax.Commands.back());
+            Syntax.Script.emplace_back();
+            CmdStack.push_back(&Syntax.Script.back());
             Y_DEFER {CmdStack.pop_back();};
             return visitChildren(ctx);
         }
@@ -99,22 +99,22 @@ namespace {
         // transformation pieces
 
         std::any visitXModKey(CmdParser::XModKeyContext *ctx) override {
-            GetCurrentSubst().Mods.push_back({CompileFnName(ctx->getText()), {}});
+            GetCurrentXfm().Mods.push_back({CompileFnName(ctx->getText()), {}});
             return visitChildren(ctx);
         }
 
         std::any visitXModValue(CmdParser::XModValueContext *ctx) override {
-            GetCurrentSubst().Mods.back().Values.emplace_back();
+            GetCurrentXfm().Mods.back().Values.emplace_back();
             return visitChildren(ctx);
         }
 
         std::any visitXModValueT(CmdParser::XModValueTContext *ctx) override {
-            GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertStr(ctx->getText()));
+            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertStr(ctx->getText()));
             return visitChildren(ctx);
         }
 
         std::any visitXModValueV(CmdParser::XModValueVContext *ctx) override {
-            GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertVar(Unvariable(ctx->getText())));
+            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertVar(Unvariable(ctx->getText())));
             return visitChildren(ctx);
         }
 
@@ -123,17 +123,17 @@ namespace {
             if (!(text.size() > 3 && text.starts_with("${") && text.ends_with("}")))
                 throw yexception() << "bad variable name " << text;
             std::string_view sv(text.begin() + 2, text.end() - 1);
-            GetCurrentSubst().Mods.back().Values.back().push_back(Values.InsertVar(sv));
+            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertVar(sv));
             return visitChildren(ctx);
         }
 
         std::any visitXBodyIdentifier(CmdParser::XBodyIdentifierContext *ctx) override {
-            GetCurrentSubst().Body = {{Values.InsertVar(ctx->getText())}};
+            GetCurrentXfm().Body = {{Values.InsertVar(ctx->getText())}};
             return visitChildren(ctx);
         }
 
         std::any visitXBodyString(CmdParser::XBodyStringContext *ctx) override {
-            GetCurrentSubst().Body = {{Values.InsertStr(UnquoteDouble(ctx->getText()))}};
+            GetCurrentXfm().Body = {{Values.InsertStr(UnquoteDouble(ctx->getText()))}};
             return visitChildren(ctx);
         }
 
@@ -173,7 +173,7 @@ namespace {
         }
 
         std::any doVisitTermX(antlr4::RuleContext *ctx) {
-            GetCurrentArgument().emplace_back(TSyntax::TSubstitution{});
+            GetCurrentArgument().emplace_back(TSyntax::TTransformation{});
             return visitChildren(ctx);
         }
 
@@ -214,15 +214,15 @@ namespace {
                         term = Values.InsertStr(str->Value);
 
                 if (namedArg) {
-                    namedArg->Commands.back().push_back(std::move(*rawArg));
+                    namedArg->Script.back().push_back(std::move(*rawArg));
                     continue;
                 }
 
                 size_t rawPos = rawArg - rawArgs.begin();
                 if (rawPos < posArgCnt)
-                    args[kwArgCnt + rawPos].Commands.back().push_back(std::move(*rawArg));
+                    args[kwArgCnt + rawPos].Script.back().push_back(std::move(*rawArg));
                 else if (hasVarArg)
-                    args[kwArgCnt + posArgCnt - 1].Commands.back().push_back(std::move(*rawArg));
+                    args[kwArgCnt + posArgCnt - 1].Script.back().push_back(std::move(*rawArg));
                 else
                     throw TError()
                         << "Macro " << macroName
@@ -244,8 +244,8 @@ namespace {
             return CmdStack.back()->back();
         }
 
-        TSyntax::TSubstitution& GetCurrentSubst() {
-            return std::get<TSyntax::TSubstitution>(Syntax.Commands.back().back().back());
+        TSyntax::TTransformation& GetCurrentXfm() {
+            return std::get<TSyntax::TTransformation>(Syntax.Script.back().back().back());
         }
 
         std::string_view Unvariable(std::string_view s) {
@@ -334,9 +334,9 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, 
 namespace {
 
     void CompileArgs(TMacroValues& values, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
-        NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, values.Func2Id(EMacroFunctions::Args));
+        NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, values.Func2Id(EMacroFunction::Args));
         for (size_t arg = 0; arg != cmd.size(); ++arg) {
-            NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, values.Func2Id(EMacroFunctions::Terms));
+            NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, values.Func2Id(EMacroFunction::Terms));
             for (size_t term = 0; term != cmd[arg].size(); ++term) {
                 std::visit(TOverloaded{
                     [&](NPolexpr::TConstId s) {
@@ -345,8 +345,8 @@ namespace {
                     [&](NPolexpr::EVarId v) {
                         termsBuilder.Append(v);
                     },
-                    [&](const TSyntax::TSubstitution& s) {
-                        for (auto&& m : s.Mods) {
+                    [&](const TSyntax::TTransformation& x) {
+                        for (auto&& m : x.Mods) {
                             auto func = m.Name;
                             if (values.FuncArity(func) != m.Values.size() + 1)
                                 throw yexception()
@@ -366,7 +366,7 @@ namespace {
                                         }
                                     }, v[0]);
                                 } else {
-                                    NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, values.Func2Id(EMacroFunctions::Cat));
+                                    NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, values.Func2Id(EMacroFunction::Cat));
                                     for (auto&& t : v) {
                                         std::visit(TOverloaded{
                                             [&](NPolexpr::TConstId id) {
@@ -382,8 +382,8 @@ namespace {
                             }
                         }
                         auto justOneThing
-                            = s.Body.size() == 1 && s.Body.front().size() == 1
-                            ? &s.Body.front().front()
+                            = x.Body.size() == 1 && x.Body.front().size() == 1
+                            ? &x.Body.front().front()
                             : nullptr;
                         // these special cases are here mostly to reinforce the notion
                         // that `${VAR}` should be equivalent to `$VAR`;
@@ -392,12 +392,12 @@ namespace {
                         // (the "const" version may appear as a result of preevaluation);
                         // conceptually, with proper typing support,
                         // this should not be required
-                        if (auto* id = std::get_if<NPolexpr::TConstId>(justOneThing); id) {
+                        if (auto* id = std::get_if<NPolexpr::TConstId>(justOneThing)) {
                             termsBuilder.Append(*id);
-                        } else if (auto* id = std::get_if<NPolexpr::EVarId>(justOneThing); id) {
+                        } else if (auto* id = std::get_if<NPolexpr::EVarId>(justOneThing)) {
                             termsBuilder.Append(*id);
                         } else {
-                            CompileArgs(values, s.Body, termsBuilder);
+                            CompileArgs(values, x.Body, termsBuilder);
                         }
                     },
                     [&](const TSyntax::TCall&) {
@@ -419,9 +419,9 @@ namespace {
 
 NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s) {
     NPolexpr::TExpression result;
-    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, values.Func2Id(EMacroFunctions::Cmds));
-    for (size_t cmd = 0; cmd != s.Commands.size(); ++cmd)
-        CompileArgs(values, s.Commands[cmd], cmdsBuilder);
+    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, values.Func2Id(EMacroFunction::Cmds));
+    for (size_t cmd = 0; cmd != s.Script.size(); ++cmd)
+        CompileArgs(values, s.Script[cmd], cmdsBuilder);
     cmdsBuilder.Build();
     return result;
 }

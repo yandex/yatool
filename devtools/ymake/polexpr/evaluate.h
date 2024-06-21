@@ -82,7 +82,7 @@ namespace NPolexpr {
                     argStack.push_back(storesStack[storesStack.size() - node.GetIdx()]);
                     break;
             }
-            if (node.IsRefereced() && node.GetType() != TExpression::TNode::EType::Function) {
+            if (node.IsReferenced() && node.GetType() != TExpression::TNode::EType::Function) {
                 storesStack.push_back(argStack.back());
             }
 
@@ -90,7 +90,7 @@ namespace NPolexpr {
                    funcStack.back().LastArg == argStack.size()) {
                 const auto& func = TFuncId::FromRepr(funcStack.back().FuncNode.GetIdx());
                 const size_t firstArgPos = funcStack.back().FirstArg;
-                const bool isReferenced = funcStack.back().FuncNode.IsRefereced();
+                const bool isReferenced = funcStack.back().FuncNode.IsReferenced();
                 auto args = std::span{argStack}.subspan(firstArgPos);
                 funcStack.pop_back();
                 TValue res = eval(func, args);
@@ -159,7 +159,7 @@ namespace NPolexpr {
             if (prettify)
                 hlMaybeBegin();
 
-            if (node.IsRefereced()) {
+            if (node.IsReferenced()) {
                 oss << "[$" << nextRefIdx++ << " = ";
             }
             switch (node.GetType()) {
@@ -189,7 +189,7 @@ namespace NPolexpr {
                     ++argsStack;
                     break;
             }
-            if (node.IsRefereced()) {
+            if (node.IsReferenced()) {
                 if (node.GetType() == TExpression::TNode::EType::Function) {
                     refsStack.push_back(nextRefIdx - 1);
                 } else {
@@ -207,7 +207,7 @@ namespace NPolexpr {
                     }
                 }
                 argsStack = funcStack.back().FirstArg + 1;
-                const bool isReferenced = funcStack.back().FuncNode.IsRefereced();
+                const bool isReferenced = funcStack.back().FuncNode.IsReferenced();
                 funcStack.pop_back();
                 oss << ')';
                 if (isReferenced) {

@@ -76,7 +76,7 @@ namespace NCommands {
 
         void AppendTerm(TTermValue&& term, TArgAccumulator* writer);
 
-        auto GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, EMacroFunctions expected);
+        auto GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, EMacroFunction expected);
 
     };
 

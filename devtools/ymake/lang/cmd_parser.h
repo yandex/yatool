@@ -11,7 +11,7 @@ namespace NCommands {
 
         // in variants, EVarId goes first to enable default ctors
 
-        struct TSubstitution;
+        struct TTransformation;
         struct TCall;
 
         // `TIdOrString` can only appear as a temporarily unclassified entry in a macro argument list;
@@ -36,7 +36,7 @@ namespace NCommands {
             // proper data
             NPolexpr::EVarId,
             NPolexpr::TConstId,
-            TSubstitution,
+            TTransformation,
             TCall,
             // temporary entries that should not appear in user-facing data
             TIdOrString,
@@ -44,14 +44,14 @@ namespace NCommands {
         >;
         using TArgument = std::vector<TTerm>;
         using TCommand = std::vector<TArgument>;
-        using TCommands = std::vector<TCommand>;
+        using TScript = std::vector<TCommand>;
 
-        struct TSubstitution {
+        struct TTransformation {
             struct TModifier {
                 using TValueTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId>;
                 using TValue = TVector<TValueTerm>;
                 using TValues = TVector<TValue>;
-                EMacroFunctions Name;
+                EMacroFunction Name;
                 TValues Values;
             };
             TVector<TModifier> Mods;
@@ -63,7 +63,7 @@ namespace NCommands {
             TVector<TSyntax> Arguments;
         };
 
-        TCommands Commands;
+        TScript Script;
 
     };
 

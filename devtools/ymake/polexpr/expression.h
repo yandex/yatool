@@ -42,7 +42,7 @@ namespace NPolexpr {
                                                     : 0;
             }
 
-            constexpr bool IsRefereced() const noexcept {return Attrs.Referenced;}
+            constexpr bool IsReferenced() const noexcept {return Attrs.Referenced;}
             constexpr void SetReferenced() noexcept {Attrs.Referenced = true;}
 
             // TODO? other node types, too

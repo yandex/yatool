@@ -225,10 +225,10 @@ private:
         TVarDefinition GetVariableDefinition(NPolexpr::EVarId id);
         const NCommands::TSyntax* GetMacroDefinition(NPolexpr::EVarId id);
         void FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst);
-        void InlineModValueTerm(const NCommands::TSyntax::TSubstitution::TModifier::TValueTerm& term, NCommands::TSyntax::TSubstitution::TModifier::TValue& writer);
+        void InlineModValueTerm(const NCommands::TSyntax::TTransformation::TModifier::TValueTerm& term, NCommands::TSyntax::TTransformation::TModifier::TValue& writer);
         void InlineScalarTerms(const NCommands::TSyntax::TArgument& arg, TCmdWriter& writer);
         void InlineArguments(const NCommands::TSyntax::TCommand& cmd, TCmdWriter& writer);
-        void InlineCommands(const NCommands::TSyntax::TCommands& cmds, TCmdWriter& writer);
+        void InlineCommands(const NCommands::TSyntax::TScript& scr, TCmdWriter& writer);
     private: // context
         const TBuildConfiguration* Conf;
         TCommands& Commands;

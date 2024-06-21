@@ -10,38 +10,38 @@ namespace {
     constexpr static ui32 COORD_MASK = (1 << COORD_BITS) - 1;
     constexpr static ui32 COORD_ARRAY_FLAG = 1 << COORD_BITS;
 
-    constexpr ui16 FunctionArity(EMacroFunctions func) noexcept {
+    constexpr ui16 FunctionArity(EMacroFunction func) noexcept {
         ui16 res = 0;
         switch (func) {
             // Variadic fucntions
-            case EMacroFunctions::Cmds:
-            case EMacroFunctions::Args:
-            case EMacroFunctions::Terms:
-            case EMacroFunctions::Cat:
+            case EMacroFunction::Cmds:
+            case EMacroFunction::Args:
+            case EMacroFunction::Terms:
+            case EMacroFunction::Cat:
                 break;
 
             // Unary functions
-            case EMacroFunctions::Input:
-            case EMacroFunctions::Output:
-            case EMacroFunctions::Tool:
-            case EMacroFunctions::Hide:
-            case EMacroFunctions::Clear:
-            case EMacroFunctions::Quo:
-            case EMacroFunctions::SetEnv:
-            case EMacroFunctions::CutExt:
-            case EMacroFunctions::LastExt:
-            case EMacroFunctions::KeyValue:
-            case EMacroFunctions::TODO1:
-            case EMacroFunctions::NoAutoSrc:
-            case EMacroFunctions::Glob:
+            case EMacroFunction::Input:
+            case EMacroFunction::Output:
+            case EMacroFunction::Tool:
+            case EMacroFunction::Hide:
+            case EMacroFunction::Clear:
+            case EMacroFunction::Quo:
+            case EMacroFunction::SetEnv:
+            case EMacroFunction::CutExt:
+            case EMacroFunction::LastExt:
+            case EMacroFunction::KeyValue:
+            case EMacroFunction::TODO1:
+            case EMacroFunction::NoAutoSrc:
+            case EMacroFunction::Glob:
                 res = 1;
                 break;
 
             // Binary functions
-            case EMacroFunctions::Pre:
-            case EMacroFunctions::Suf:
-            case EMacroFunctions::ExtFilter:
-            case EMacroFunctions::TODO2:
+            case EMacroFunction::Pre:
+            case EMacroFunction::Suf:
+            case EMacroFunction::ExtFilter:
+            case EMacroFunction::TODO2:
                 res = 2;
                 break;
         }
@@ -54,16 +54,16 @@ std::string_view TMacroValues::GetVarName(NPolexpr::EVarId id) const {
     return Vars.GetName<TCmdView>(static_cast<ui32>(id)).GetStr();
 }
 
-ui16 TMacroValues::FuncArity(EMacroFunctions func) const noexcept {
+ui16 TMacroValues::FuncArity(EMacroFunction func) const noexcept {
     return FunctionArity(func);
 }
 
-NPolexpr::TFuncId TMacroValues::Func2Id(EMacroFunctions func) const noexcept {
+NPolexpr::TFuncId TMacroValues::Func2Id(EMacroFunction func) const noexcept {
     return NPolexpr::TFuncId{FunctionArity(func), static_cast<ui32>(func)};
 }
 
-EMacroFunctions TMacroValues::Id2Func(NPolexpr::TFuncId id) const noexcept {
-    return static_cast<EMacroFunctions>(id.GetIdx());
+EMacroFunction TMacroValues::Id2Func(NPolexpr::TFuncId id) const noexcept {
+    return static_cast<EMacroFunction>(id.GetIdx());
 }
 
 NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
