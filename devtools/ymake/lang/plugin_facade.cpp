@@ -103,6 +103,10 @@ public:
         return true;
     }
 
+    bool HasIncludeChanges(TFileContentHolder&) override {
+        return true;
+    }
+
     const TIndDepsRule* DepsTransferRules() const override {
         return &Rule;
     }

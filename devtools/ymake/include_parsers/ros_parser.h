@@ -15,6 +15,10 @@ struct TRosDep {
         , MessageName(std::move(messageName))
     {
     }
+
+    bool operator==(const TRosDep& other) const {
+        return other.PackageName == PackageName && other.MessageName == MessageName;
+    }
 };
 
 class TRosIncludeParser {

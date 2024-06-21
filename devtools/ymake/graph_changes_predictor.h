@@ -1,13 +1,15 @@
 #pragma once
 
 #include <devtools/ymake/conf.h>
+#include <devtools/ymake/parser_manager.h>
 
 #include <devtools/ymake/symbols/file_store.h>
 
 class TGraphChangesPredictor {
 public:
-    TGraphChangesPredictor(TFileConf& fileConf, IChanges& changes)
-    : FileConf(fileConf)
+    TGraphChangesPredictor(const TIncParserManager& parserManager, TFileConf& fileConf, IChanges& changes)
+    : IncParserManager_(parserManager)
+    , FileConf_(fileConf)
     , Changes_(changes)
     , HasChanges_(false)
     {}
@@ -19,7 +21,8 @@ public:
     void AnalyzeChanges();
 
 private:
-    TFileConf& FileConf;
+    const TIncParserManager& IncParserManager_;
+    TFileConf& FileConf_;
     IChanges& Changes_;
 
     bool HasChanges_;

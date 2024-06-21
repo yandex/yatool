@@ -17,6 +17,10 @@ struct TParsedFile {
     {
     }
 
+    bool operator==(const TParsedFile& other) const {
+        return other.ParsedFile == ParsedFile && other.Kind == Kind;
+    }
+
     TString ParsedFile;
     EKind Kind;
 };

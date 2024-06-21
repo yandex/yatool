@@ -673,7 +673,7 @@ bool TYMake::LoadPatch() {
             YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
         }
         if (!HasGraphStructuralChanges_ && Conf.ShouldUseGraphChangesPredictor()) {
-            TGraphChangesPredictor predictor(Names.FileConf, *changes);
+            TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, *changes);
             predictor.AnalyzeChanges();
             HasGraphStructuralChanges_ = predictor.HasChanges();
         }

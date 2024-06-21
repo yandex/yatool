@@ -338,6 +338,20 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
     }
 }
 
+bool TIncParserManager::HasIncludeChanges(TFileContentHolder& incFile) const {
+    TStringBuf ext = incFile.GetName().Extension();
+
+    if (ext == "in") {
+        ext = NPath::Extension(incFile.GetName().NoExtension()); // e.g. x.cpp.in -> x.cpp, ext=cpp
+    }
+
+    TParserBase* parser = ParserByExt(ext);
+    if (parser) {
+        return parser->HasIncludeChanges(incFile);
+    }
+    return false;
+}
+
 bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
                                               const TVector<TString>& includes,
                                               TModuleWrapper& module,

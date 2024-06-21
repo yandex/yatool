@@ -113,6 +113,7 @@ public:
                                        TFileView incFileName,
                                        const TVector<TString>& includes) const = 0;
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
+    virtual bool HasIncludeChanges(TFileContentHolder& incFile) = 0;
     virtual const TIndDepsRule* DepsTransferRules() const = 0;
     virtual void SetLanguageId(ui32 parserCode, TLangId) {
         SetParserCode(parserCode);
@@ -175,6 +176,30 @@ public:
         }
         IncludeProcessor.ProcessIncludes(node, module, incFile.GetName(), includes);
         return !useCachedResult;
+    }
+
+    bool HasIncludeChanges(TFileContentHolder& incFile) override {
+        TVector<TInclude> cachedIncludes;
+        auto cacheResultId = NParsersCache::GetResultId(GetParserId().GetId(), incFile.GetTargetId());
+        if (!ParsersCache) {
+            return true;
+        }
+
+        bool hasCachedResult = ParsersCache->Get(cacheResultId, cachedIncludes);
+        if (!hasCachedResult) {
+            return true;
+        }
+
+        TVector<TInclude> currentIncludes;
+        Parser.Parse(incFile, currentIncludes);
+
+        // считаем, что порядок инклюдов важен, так как влияет на структуру графа,
+        // поэтому здесь достаточно просто поэлементного сравнения
+        if (currentIncludes != cachedIncludes) {
+            return true;
+        }
+
+        return false;
     }
 
     const TIndDepsRule* DepsTransferRules() const override {

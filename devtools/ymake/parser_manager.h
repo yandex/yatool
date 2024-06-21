@@ -70,6 +70,7 @@ public:
     void InitManager(const TParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
 
     void ProcessFile(TFileContentHolder& incFile, TFileProcessContext context) const;
+    bool HasIncludeChanges(TFileContentHolder& incFile) const;
     void ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const;
     bool ProcessOutputIncludes(TFileView outputFileName,
                                const TVector<TString>& includes,

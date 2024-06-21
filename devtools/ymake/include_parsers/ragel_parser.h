@@ -15,6 +15,10 @@ struct TRagelInclude {
     {
     }
 
+    bool operator==(const TRagelInclude& other) const {
+        return other.Include == Include && other.Kind == Kind;
+    }
+
     TString Include;
     EKind Kind;
 };
