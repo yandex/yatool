@@ -76,7 +76,7 @@ class EvlogReader:
                 try:
                     yield yjson.loads(line)
                 except Exception:
-                    logging.warning("Skip broken entry at %s line", nline + 1)
+                    logging.warning("Skip broken entry at %s line. File: %s", nline + 1, self.filepath)
                     continue
 
 
