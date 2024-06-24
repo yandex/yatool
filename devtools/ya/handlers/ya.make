@@ -1,4 +1,4 @@
-PY23_LIBRARY(ya-lib)
+PY3_LIBRARY(ya-lib)
 
 SRCDIR(devtools/ya)
 

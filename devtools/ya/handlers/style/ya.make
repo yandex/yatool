@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 PEERDIR(
     build/config/tests/cpp_style
