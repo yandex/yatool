@@ -378,18 +378,16 @@ namespace NYexport {
                 Y_ASSERT(semsDump);
                 semsDump->SemsDump += Indent(semsDump->SemsDumpDepth) + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
             };
-            auto isRootAttr = isType(ESNT_RootAttr);
+            auto isRootAttr = isType(ESNT_RootAttr) || isType(ESNT_PlatformAttr);
             auto isDirAttr = isType(ESNT_DirectoryAttr);
             auto isTarget = isType(ESNT_Target);
-            if (isRootAttr || !currentTarget) { // all root semantics or without target add to Project
+            if (isRootAttr || (!currentSubdir && (isTarget || !currentTarget))) { // all root semantics or if no place for other semantics - add to Project
                 renderSemsDump(currentProject);
                 projectEmpty = false;
-            }
-            if (isDirAttr || isTarget || !currentTarget) { // all directory semantics or without target add to Subdir
+            } else if (currentSubdir && (isDirAttr || isTarget && !currentTarget)) { // all directory semantics or without target - add to Subdir
                 renderSemsDump(currentSubdir);
                 subdirEmpty = false;
-            }
-            if (!isRootAttr && !isDirAttr && !isTarget && currentTarget) {
+            } else if (currentTarget) { // all other add to target, if exists
                 renderSemsDump(currentTarget);
                 targetEmpty = false;
             }

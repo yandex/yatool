@@ -415,7 +415,16 @@ void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::Va
         NYexport::MergeTree(map, addAttrs);
     }
     if (doDebug && DebugOpts_.DebugAttrs) {
-        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpAttrs, ::NYexport::Dump(attrs->GetMap()));
+        std::string dump;
+        const auto& attrsMap = attrs->GetMap();
+        if (DebugOpts_.DebugSems && attrsMap.contains(NInternalAttrs::DumpSems)) {
+            auto tempMap = attrsMap;
+            tempMap.erase(NInternalAttrs::DumpSems); // cut off dump_sems attribute from attributes dump
+            dump = ::NYexport::Dump(tempMap);
+        } else {
+            dump = ::NYexport::Dump(attrsMap);
+        }
+        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::DumpAttrs, dump);
     }
 }
 

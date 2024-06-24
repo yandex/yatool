@@ -534,11 +534,15 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
                 subdirs.emplace_back(subdir->Path.filename());
             }
         }
+        TStringBuilder semsDump;
+        if (DebugOpts_.DebugSems) {
+            semsDump << dir->SemsDump;
+        }
         for (auto& target: dir->Targets) {
             Y_ASSERT(target->Attrs);
             CommonFinalizeAttrs(target->Attrs, YexportSpec.AddAttrsTarget, false);
             if (DebugOpts_.DebugSems) {
-                NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::DumpSems, target->SemsDump);
+                semsDump << "\n\n--- TARGET " << target->Name << "\n" << target->SemsDump;
             }
             const auto& targetMacro = target->Macro;
             Y_ASSERT(GeneratorSpec.Targets.contains(targetMacro));
@@ -573,7 +577,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
         }
         CommonFinalizeAttrs(dir->Attrs, YexportSpec.AddAttrsDir);
         if (DebugOpts_.DebugSems) {
-            NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, dir->SemsDump);
+            NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, std::string{semsDump});
         }
         if (dir->MainTargetMacro.empty() && !dir->Targets.empty()) {
             spdlog::error("Only {} extra targets without main target in directory {}", dir->Targets.size(), dir->Path.string() + platformSuf());
