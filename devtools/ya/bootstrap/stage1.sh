@@ -19,7 +19,7 @@ fi
 cd ${BR}
 
 mv $(find . | grep devtools/ymake/bin/ymake) ${RR}
-mv $(find . | grep devtools/ya/bin3/ya-bin) ${RR}
+mv $(find . | grep devtools/ya/bin/ya-bin) ${RR}
 
 # Libiconv stored in devtools/ymake/bin is always a symlink.
 ICONV_PATH=$(find . | grep devtools/ymake/bin/libiconv.so)

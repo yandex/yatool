@@ -59,7 +59,7 @@ Python 3.9 or newer is required for this script.
 ### Stage two
 
 This stage is optional and uses tooling built in the stage one to build all targets, namely:
-- `devtools/ya/bin3`
+- `devtools/ya/bin`
 - `devtools/local_cache/toolscache/server`
 - `devtools/ya/test/programs/test_tool/bin3`
 - `devtools/ymake/bin`

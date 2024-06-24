@@ -21,7 +21,7 @@ ya make \
     --no-yt-store \
     -G -j 0 \
     devtools/ymake/bin \
-    devtools/ya/bin3 \
+    devtools/ya/bin \
     | sed \
     -e 's|"/.*python|"python|' \
     -e 's|"/.*clang|"clang|' \
