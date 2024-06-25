@@ -20,6 +20,7 @@ namespace NPropagateChangeFlags {
     struct TStateItem : public TGraphIteratorStateItemBase<false> {
         using TGraphIteratorStateItemBase::TGraphIteratorStateItemBase;
         bool WasEntered = false;
+        TNodeId ModuleNode = 0;
     };
 
     class TVisitor: public TDirectPeerdirsVisitor<TVisitorData, TStateItem> {
@@ -54,6 +55,13 @@ namespace NPropagateChangeFlags {
             TStateItem& stateItem = state.Top();
             stateItem.WasEntered = fresh;
             EnsureLoopId(stateItem);
+            SetModuleNode(stateItem, state);
+
+            if (fresh && state.TopNode()->NodeType == EMNT_NonParsedFile) {
+                auto moduleNode = Graph_[stateItem.ModuleNode];
+                state.TopNode()->State.PropagatePartialChangesFrom(moduleNode->State);
+            }
+
             return fresh;
         }
 
@@ -69,6 +77,16 @@ namespace NPropagateChangeFlags {
                 Y_ASSERT(CurEnt->LoopId != 0);
             } else {
                 CurEnt->LoopId = 0;
+            }
+        }
+
+        void SetModuleNode(TStateItem& stateItem, TState& state) {
+            if (IsModuleType(stateItem.Node()->NodeType)) {
+                stateItem.ModuleNode = stateItem.Node().Id();
+            } else {
+                if (state.Size() > 1) {
+                    stateItem.ModuleNode = state.Parent()->ModuleNode;
+                }
             }
         }
 
