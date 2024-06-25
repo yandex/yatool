@@ -113,12 +113,12 @@ class ClangTidySuite(common_types.AbstractTestSuite):
             cmd += ["--tests-filters", f]
         return cmd
 
-    @classmethod
-    def get_type_name(cls):
-        return CLANG_TIDY_TEST_TYPE
-
     def get_type(self):
         return CLANG_TIDY_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     def global_tidy_library(self):
         library_path = self.meta.global_library_path.replace("$B", "$(BUILD_ROOT)")

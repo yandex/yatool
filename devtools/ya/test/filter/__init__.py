@@ -79,6 +79,17 @@ def filter_test_size(test_size_filters):
         return lambda x: True
 
 
+def filter_suite_class_type(test_class_filters):
+    if test_class_filters:
+
+        def filter_function(test_suite):
+            return test_suite.class_type in test_class_filters
+
+        return filter_function
+    else:
+        return lambda x: True
+
+
 def filter_suite_type(type_filters):
     if "pytest" in type_filters:
         type_filters.append("py3test")
@@ -270,6 +281,9 @@ def filter_suites(suites, opts, tc):
     )
     suites = apply_filter(suites, lambda s: False if s.get_skipped_reason() else True, lambda s: s.get_skipped_reason())
     suites = apply_filter(suites, filter_test_size(test_size_filters), 'size')
+    suites = apply_filter(
+        suites, filter_suite_class_type(tc.get("test_class_filters") or opts.test_class_filters), 'class type'
+    )
     suites = apply_filter(
         suites, filter_suite_type(tc.get("test_type_filters") or opts.test_type_filters), 'suite type'
     )

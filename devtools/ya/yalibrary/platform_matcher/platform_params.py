@@ -1,4 +1,3 @@
-import copy
 import json
 import logging
 
@@ -18,14 +17,11 @@ def stringize_toolchain(tc):
     if 'test_size_filters' in tc:
         for size in sorted(tc['test_size_filters']):
             platform.append('test-size={}'.format(size))
-    if 'test_type_filters' in tc:
-        test_type_filters = copy.copy(tc['test_type_filters'])
-        regular_test_types = set(test.const.REGULAR_TEST_TYPES)
-        if regular_test_types & set(test_type_filters) == regular_test_types:
+    if 'test_class_filters' in tc:
+        if {test.const.SuiteClassType.REGULAR} == set(tc['test_class_filters']):
             platform.append('regular-tests')
-            for test_type in regular_test_types:
-                test_type_filters.remove(test_type)
-        for test_type in sorted(test_type_filters):
+    if 'test_type_filters' in tc:
+        for test_type in sorted(tc['test_type_filters']):
             platform.append('test-type={}'.format(test_type))
     flags = tc.get('flags', {})
     for k in sorted(flags):

@@ -679,6 +679,7 @@ class CrossCompilationOptions(Options):
             'targets',
             'test_type_filters',
             'test_size_filters',
+            'test_class_filters',
             'ignore_recurses',
         }
 
@@ -730,7 +731,7 @@ class CrossCompilationOptions(Options):
                     )
                 )
 
-        for list_of_str_items in ('targets', 'test_type_filters', 'test_size_filters'):
+        for list_of_str_items in ('targets', 'test_type_filters', 'test_size_filters', 'test_class_filters'):
             if data.get(list_of_str_items) is None:
                 continue
 
@@ -848,11 +849,9 @@ class CrossCompilationOptions(Options):
             ),
             ArgConsumer(
                 ['--target-platform-regular-tests'],
-                help='Run only "{}" test types for the last target platform'.format(
-                    ' '.join(test.const.REGULAR_TEST_TYPES)
-                ),
+                help='Run only regular test types for the last target platform',
                 hook=CrossCompilationOptions.PlatformsSetConstExtraExtendParamHook(
-                    'target_platform_test_type', 'test_type_filters', test.const.REGULAR_TEST_TYPES
+                    'target_platform_regular_tests', 'test_class_filters', [test.const.SuiteClassType.REGULAR]
                 ),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.EXPERT,

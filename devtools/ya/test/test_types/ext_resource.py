@@ -10,10 +10,6 @@ class ExtResourceAbstractSuite(py_test.PyLintTestSuite):
     def get_ci_type_name(cls):
         return "test"
 
-    @classmethod
-    def get_type_name(cls):
-        return VALIDATE_RESOURCE_TEST_TYPE
-
     def get_type(self):
         return VALIDATE_RESOURCE_TEST_TYPE
 
@@ -58,10 +54,6 @@ class CheckResourceTestSuite(ExtResourceAbstractSuite):
 
 
 class CheckDataSbrTestSuite(CheckResourceTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return VALIDATE_DATA_SBR_TEST_TYPE
-
     def get_type(self):
         return VALIDATE_DATA_SBR_TEST_TYPE
 

@@ -91,12 +91,12 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
 
 class JestTestSuite(BaseTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return JEST_TEST_TYPE
-
     def get_type(self):
         return JEST_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
 
     def support_splitting(self, opts=None):
         # TODO: Implement (https://st.yandex-team.ru/FEI-25459)
@@ -132,12 +132,12 @@ class JestTestSuite(BaseTestSuite):
 
 
 class HermioneTestSuite(BaseTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return HERMIONE_TEST_TYPE
-
     def get_type(self):
         return HERMIONE_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
 
     def support_splitting(self, opts=None):
         return True
@@ -190,12 +190,12 @@ class HermioneTestSuite(BaseTestSuite):
 
 
 class PlaywrightTestSuite(BaseTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return PLAYWRIGHT_TEST_TYPE
-
     def get_type(self):
         return PLAYWRIGHT_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
 
     def support_splitting(self, opts=None):
         return False
@@ -362,12 +362,12 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
         self._files = sorted(self.meta.test_files)
         self._file_processing_time = float(self.meta.lint_file_processing_time or "0.0")
 
-    @classmethod
-    def get_type_name(cls):
-        return "eslint"
-
     def get_type(self):
         return "eslint"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.STYLE
 
     def _get_config_files(self):
         return [self._eslint_config_path]
@@ -451,12 +451,12 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
         self._ts_config_path = self.meta.ts_config_path
         self._files = [f.replace("$S/", jbuild.gen.consts.SOURCE_ROOT + "/") for f in sorted(self.meta.test_files)]
 
-    @classmethod
-    def get_type_name(cls):
-        return "typecheck"
-
     def get_type(self):
         return "tsc_typecheck"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.STYLE
 
     def _get_config_files(self):
         return [self._ts_config_path]

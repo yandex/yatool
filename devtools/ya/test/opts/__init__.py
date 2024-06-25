@@ -3,8 +3,8 @@ import os
 import re
 import shlex
 
-from core import error
 import core.yarg
+from core import error
 from core.yarg import help_level
 from exts import path2
 from test import const
@@ -215,6 +215,7 @@ class FilteringOptions(core.yarg.Options):
         self.test_tag_string = None
         self.test_tags_filter = []
         self.test_type_filters = []
+        self.test_class_filters = []
         self.tests_filters = []
         self.tests_chunk_filters = []
         self.style = False
@@ -253,16 +254,14 @@ class FilteringOptions(core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--style'],
-                help='Run only style tests and implies --strip-skipped-test-deps ({}). Opposite of the --regular-tests'.format(
-                    ' '.join(const.STYLE_TEST_TYPES)
-                ),
+                help='Run only style tests and implies --strip-skipped-test-deps. Opposite of the --regular-tests',
                 hook=core.yarg.SetConstValueHook('style', True),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
             ),
             TestArgConsumer(
                 ['--regular-tests'],
-                help='Run only regular tests ({}). Opposite of the --style'.format(' '.join(const.REGULAR_TEST_TYPES)),
+                help='Run only regular tests. Opposite of the --style',
                 hook=core.yarg.SetConstValueHook('regular_tests', True),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
@@ -317,7 +316,7 @@ class FilteringOptions(core.yarg.Options):
             )
 
         if self.regular_tests:
-            self.test_type_filters.extend(const.REGULAR_TEST_TYPES)
+            self.test_class_filters = [const.SuiteClassType.REGULAR]
 
         if self.tests_filters:
             if self.last_failed_tests:
@@ -344,7 +343,7 @@ class FilteringOptions(core.yarg.Options):
 
         if params.style:
             params.strip_skipped_test_deps = True
-            params.test_type_filters = list(const.STYLE_TEST_TYPES)
+            params.test_class_filters = [const.SuiteClassType.STYLE]
 
 
 class ConsoleReportOptions(core.yarg.Options):

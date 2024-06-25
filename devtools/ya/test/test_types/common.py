@@ -52,13 +52,6 @@ class AbstractTestSuite(facility.Suite):
     The top class in the test hierarchy, all test types should inherit from it
     """
 
-    @classmethod
-    def get_type_name(cls):
-        """
-        used to determine suite internal type name
-        """
-        raise NotImplementedError()
-
     def get_type(self):
         """
         returns human readable suite type name
@@ -67,6 +60,10 @@ class AbstractTestSuite(facility.Suite):
 
     def _get_meta_info_parser(self):
         return facility.DartInfo
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.UNCLASSIFIED
 
     @classmethod
     def get_ci_type_name(cls):
@@ -1029,10 +1026,6 @@ class DiffTestSuite(AbstractTestSuite):
         self._revision = revision
         self.add_python_before_cmd = False
 
-    @classmethod
-    def get_type_name(cls):
-        return DIFF_TEST_TYPE
-
     def get_type(self):
         return DIFF_TEST_TYPE
 
@@ -1079,7 +1072,7 @@ class DiffTestSuite(AbstractTestSuite):
             opts, 'run_diff_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             "--suite-name",
-            self.get_type_name(),
+            type(self).__name__,
             "--project-path",
             self.project_path,
             "--output-dir",

@@ -163,12 +163,12 @@ class JavaTestSuite(test_types.AbstractTestSuite):
     def supports_test_parameters(self):
         return True
 
-    @classmethod
-    def get_type_name(cls):
-        return "junit"
-
     def get_type(self):
         return JAVA_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
 
     def get_test_dependencies(self):
         assert self.initialized

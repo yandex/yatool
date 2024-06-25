@@ -1116,7 +1116,7 @@ def _clang_tidy_strip_deps(plan, suites):
 
     seen_uids = {}
     for suite in suites:
-        if suite.get_type_name() != "clang_tidy":
+        if type(suite).__name__ != "ClangTidySuite":
             continue
 
         for out in suite.clang_tidy_inputs:

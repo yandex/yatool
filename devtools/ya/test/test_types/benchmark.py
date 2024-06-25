@@ -62,12 +62,12 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
 
 
 class GBenchmarkSuite(AbstractBenchmarkSuite):
-    @classmethod
-    def get_type_name(cls):
-        return GBENCHMARK_TEST_TYPE
-
     def get_type(self):
         return GBENCHMARK_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -118,12 +118,12 @@ class GBenchmarkSuite(AbstractBenchmarkSuite):
 
 
 class YBenchmarkSuite(AbstractBenchmarkSuite):
-    @classmethod
-    def get_type_name(cls):
-        return YBENCHMARK_TEST_TYPE
-
     def get_type(self):
         return YBENCHMARK_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(

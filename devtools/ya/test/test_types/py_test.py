@@ -83,12 +83,12 @@ class PyTestSuite(common.PythonTestSuite):
                     if not os.path.splitext(o)[1] in test.const.FAKE_OUTPUT_EXTS:
                         self.pytest_output_dir_deps.add(os.path.dirname(o))
 
-    @classmethod
-    def get_type_name(cls):
-        return PYTEST_TYPE
-
     def get_type(self):
         return PYTEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     @staticmethod
     def _get_ini_file_path():
@@ -333,10 +333,6 @@ class PyTestBinSuite(PyTestSuite):
     def supports_coverage(self):
         return True
 
-    @classmethod
-    def get_type_name(cls):
-        return "pytest.bin"
-
     def get_type(self):
         return PYTEST_TYPE
 
@@ -375,21 +371,21 @@ class PyTestBinSuite(PyTestSuite):
 
 
 class Py3TestBinSuite(PyTestBinSuite):
-    @classmethod
-    def get_type_name(cls):
-        return "py3test.bin"
-
     def get_type(self):
         return "py3test"
 
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
+
 
 class ExecTest(PyTestBinSuite):
-    @classmethod
-    def get_type_name(cls):
-        return EXEC_TEST_TYPE
-
     def get_type(self):
         return EXEC_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     @property
     def name(self):
@@ -459,7 +455,7 @@ class LintTestSuite(common.StyleTestSuite):
         list_cmd_result = process.execute(cmd, cwd=cwd)
         if list_cmd_result.exit_code == 0:
             for line in [_f for _f in [line.strip() for line in list_cmd_result.std_out.split(os.linesep)] if _f]:
-                result.append(test_common.SubtestInfo(line, cls.get_type_name()))
+                result.append(test_common.SubtestInfo(line, cls.__name__))
             return result
         raise Exception(list_cmd_result.std_err)
 
@@ -515,7 +511,7 @@ class PyLintTestSuite(LintTestSuite):
                 "--checker",
                 self.get_checker(opts, for_dist_build, out_path),
                 "--check-name",
-                self.get_type_name(),
+                self.get_type(),
                 "--trace-path",
                 os.path.join(work_dir, test.const.TRACE_FILE_NAME),
                 "--out-path",
@@ -578,10 +574,6 @@ class CheckImportsTestSuite(PyLintTestSuite):
     def _add_checker_stdout(self):
         return False
 
-    @classmethod
-    def get_type_name(cls):
-        return IMPORT_TEST_TYPE
-
     def get_type(self):
         return IMPORT_TEST_TYPE
 
@@ -608,12 +600,12 @@ class CheckImportsTestSuite(PyLintTestSuite):
 
 
 class GoFmtTestSuite(PyLintTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return GOFMT_TEST_TYPE
-
     def get_type(self):
         return GOFMT_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     def get_test_dependencies(self):
         return []
@@ -664,12 +656,12 @@ class GoFmtTestSuite(PyLintTestSuite):
 
 
 class GoVetTestSuite(PyLintTestSuite):
-    @classmethod
-    def get_type_name(cls):
-        return GOVET_TEST_TYPE
-
     def get_type(self):
         return GOVET_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     def get_test_dependencies(self):
         return [self.project_path]
@@ -709,9 +701,9 @@ class ClasspathClashTestSuite(PyLintTestSuite):
         self.classpath = ["{}/{}".format(consts.BUILD_ROOT, p) for p in paths]
         self.deps = sorted(set(paths))
 
-    @classmethod
-    def get_type_name(cls):
-        return CLASSPATH_CLASH_TYPE
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     def get_type(self):
         return CLASSPATH_CLASH_TYPE

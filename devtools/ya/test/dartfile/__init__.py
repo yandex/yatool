@@ -37,7 +37,7 @@ def get_dart_id(dart_info):
 
 def get_suite_id(suite):
     # type: (AbstractTestSuite) -> tuple
-    return (suite.name, suite.get_type_name(), suite.project_path, suite.salt)
+    return (suite.name, type(suite).__name__, suite.project_path, suite.salt)
 
 
 def merge_darts(darts):

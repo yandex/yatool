@@ -59,12 +59,12 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
     def support_splitting(self, opts=None):
         return False
 
-    @classmethod
-    def get_type_name(cls):
-        return "jstyle"
-
     def get_type(self):
         return "java.style"
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     @property
     def cache_test_results(self):
@@ -137,7 +137,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         list_cmd_result = test.system.process.execute(cmd, cwd=cwd)
         if list_cmd_result.exit_code == 0:
             for line in [_f for _f in [line.strip() for line in list_cmd_result.std_out.split(os.linesep)] if _f]:
-                result.append(test.common.SubtestInfo(line, cls.get_type_name()))
+                result.append(test.common.SubtestInfo(line, cls.__name__))
             return result
         raise Exception(list_cmd_result.std_err)
 
@@ -257,12 +257,12 @@ class KtlintTestSuite(LintTestSuite):
 
         return cmd
 
-    @classmethod
-    def get_type_name(cls):
-        return KTLINT_TEST_TYPE
-
     def get_type(self):
         return KTLINT_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']

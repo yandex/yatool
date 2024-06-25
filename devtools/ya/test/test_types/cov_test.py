@@ -57,10 +57,6 @@ class CoverageExtractorTestSuite(common_types.AbstractTestSuite):
     def supports_canonization(self):
         return False
 
-    @classmethod
-    def get_type_name(cls):
-        return COVERAGE_EXTRACTOR_TEST_TYPE
-
     def get_type(self):
         return COVERAGE_EXTRACTOR_TEST_TYPE
 

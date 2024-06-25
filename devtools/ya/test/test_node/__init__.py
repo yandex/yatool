@@ -2428,7 +2428,7 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         opts, "list_tests", suite.global_resources, run_on_target_platform=False
     ) + [
         "--test-suite-class",
-        suite.get_type_name(),
+        type(suite).__name__,
         "--log-path",
         log_path,
         "--test-type",

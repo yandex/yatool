@@ -36,12 +36,12 @@ class CustomLintTestSuite(LintTestSuite):
         # suite is considered to be steady
         return True
 
-    @classmethod
-    def get_type_name(cls):
-        return "custom_lint"
-
     def get_type(self):
         return self._lint_name
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.STYLE
 
     @property
     def salt(self):

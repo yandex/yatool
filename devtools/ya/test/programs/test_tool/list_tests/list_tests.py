@@ -46,7 +46,7 @@ def get_options():
     parser.add_option("--split-by-tests", dest="split_by_tests", default=True)
     parser.add_option("--test-suite-name", dest="test_suite_name", help="name of the running test suite", default=None)
     parser.add_option(
-        "--test-suite-class", dest="test_suite_class", help="type of the running test suite", default=None
+        "--test-suite-class", dest="test_suite_class", help="class name of the running test suite", default=None
     )
     parser.add_option("--test-info-path", dest="test_info_path", help="path to test info", default=None)
     parser.add_option("--test-list-path", dest="test_list_path", help="path to test list", default=None)
@@ -127,7 +127,7 @@ def main():
 
     suite_class = None
     for klass in suite_classes:
-        if options.test_suite_class == klass.get_type_name():
+        if options.test_suite_class == klass.__name__:
             suite_class = klass
             break
 

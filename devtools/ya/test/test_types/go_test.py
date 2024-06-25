@@ -108,12 +108,12 @@ class GoTestSuite(common_types.AbstractTestSuite):
 
         return cmd
 
-    @classmethod
-    def get_type_name(cls):
-        return GO_TEST_TYPE
-
     def get_type(self):
         return GO_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']
@@ -159,9 +159,9 @@ class GoBenchSuite(GoTestSuite):
             cmd += ["--benchmark-timeout", go_bench_timeout]
         return cmd
 
-    @classmethod
-    def get_type_name(cls):
-        return GO_BENCH_TEST_TYPE
-
     def get_type(self):
         return GO_BENCH_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR

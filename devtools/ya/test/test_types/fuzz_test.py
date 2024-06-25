@@ -99,12 +99,12 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
 
         return cmd
 
-    @classmethod
-    def get_type_name(cls):
-        return FUZZ_TEST_TYPE
-
     def get_type(self):
         return FUZZ_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test.const.SuiteClassType.REGULAR
 
     @property
     def name(self):
