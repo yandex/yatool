@@ -37,6 +37,10 @@ size_t TModuleDef::StatementPriority(const TStringBuf& s) {
         return 4;
     }
 
+    if (s == TStringBuf("_ADD_PY_LINTER_CHECK")) {
+        return 5;
+    }
+
     if (s == TStringBuf("PEERDIR") || s == TStringBuf("_GHOST_PEERDIR") || s == TStringBuf("SRCDIR") || s == NMacro::_LATE_GLOB) { //todo: move in config
         return 1;
     }
