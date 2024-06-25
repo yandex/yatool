@@ -32,6 +32,8 @@ enum class EMacroFunction: ui32 {
     TODO2,
     // markers
     NoAutoSrc, // output-only, preevaluated
+    NoRel, // output-only, preevaluated
+    ResolveToBinDir, // output-only, preevaluated
 };
 
 class TMacroValues {

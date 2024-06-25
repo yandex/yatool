@@ -33,6 +33,8 @@ namespace {
             case EMacroFunction::KeyValue:
             case EMacroFunction::TODO1:
             case EMacroFunction::NoAutoSrc:
+            case EMacroFunction::NoRel:
+            case EMacroFunction::ResolveToBinDir:
             case EMacroFunction::Glob:
                 res = 1;
                 break;

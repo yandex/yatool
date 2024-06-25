@@ -68,6 +68,8 @@ public:
         struct TOutput {
             TStringBuf Name;
             bool NoAutoSrc = false;
+            bool NoRel = false;
+            bool ResolveToBinDir = false;
             TOutput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };

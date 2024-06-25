@@ -153,7 +153,9 @@ namespace {
             return RootFnIdx == EMacroFunction::Tool
                 || RootFnIdx == EMacroFunction::Input
                 || RootFnIdx == EMacroFunction::Output
-                || RootFnIdx == EMacroFunction::NoAutoSrc;
+                || RootFnIdx == EMacroFunction::NoAutoSrc
+                || RootFnIdx == EMacroFunction::NoRel
+                || RootFnIdx == EMacroFunction::ResolveToBinDir;
         };
 
         TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
@@ -202,6 +204,8 @@ namespace {
                 fnIdx == EMacroFunction::Suf ||
                 fnIdx == EMacroFunction::Cat ||
                 fnIdx == EMacroFunction::NoAutoSrc ||
+                fnIdx == EMacroFunction::NoRel ||
+                fnIdx == EMacroFunction::ResolveToBinDir ||
                 fnIdx == EMacroFunction::Glob
             ) {
 
@@ -209,6 +213,23 @@ namespace {
                 unwrappedArgs.reserve(args.size());
                 for(auto&& arg : args)
                     unwrappedArgs.push_back(Values.GetValue(arg));
+                auto checkArgCount = [&](size_t expected) {
+                    if (expected != 0) {
+                        if (unwrappedArgs.size() != expected)
+                            throw std::runtime_error{fmt::format("Invalid number of arguments in {}, {} expected", ToString(fnIdx), expected)};
+                    } else {
+                        if (unwrappedArgs.size() == 0)
+                            throw std::runtime_error{fmt::format("Missing arguments in {}", ToString(fnIdx))};
+                    }
+                };
+                auto updateOutput = [&](auto fn) {
+                    checkArgCount(1);
+                    auto arg0 = std::get_if<TMacroValues::TOutput>(&unwrappedArgs[0]);
+                    if (!arg0)
+                        throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid output";
+                    UpdateCoord(Sink.Outputs, arg0->Coord, std::move(fn));
+                    return *arg0;
+                };
 
                 // TODO: get rid of escaping in Args followed by unescaping in Input/Output
 
@@ -233,8 +254,7 @@ namespace {
                         return Values.GetValue(Values.InsertStr(result));
                     }
                     case EMacroFunction::Tool: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto names = SplitArgs(TString(arg0));
                         if (names.size() == 1) {
@@ -246,8 +266,7 @@ namespace {
                         throw std::runtime_error{"Tool arrays are not supported"};
                     }
                     case EMacroFunction::Input: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        checkArgCount(1);
                         auto glob = std::get_if<TMacroValues::TGlobPattern>(&unwrappedArgs[0]);
                         if (glob) {
                             return processInput(glob->Data, true);
@@ -256,8 +275,7 @@ namespace {
                         return processInput(arg0, false);
                     }
                     case EMacroFunction::Output: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto names = SplitArgs(TString(arg0));
                         if (names.size() == 1) {
@@ -269,36 +287,28 @@ namespace {
                         throw std::runtime_error{"Output arrays are not supported"};
                     }
                     case EMacroFunction::Suf: {
-                        if (unwrappedArgs.size() != 2)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        checkArgCount(2);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
                         auto id = Values.InsertStr(fmt::format("{}{}", arg1, arg0));
                         return Values.GetValue(id);
                     }
                     case EMacroFunction::Cat: {
-                        if (unwrappedArgs.size() < 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        //checkArgCount(0);
                         auto cat = TString();
                         for (auto&& a : unwrappedArgs)
                             cat += std::get<std::string_view>(a);
                         auto id = Values.InsertStr(cat);
                         return Values.GetValue(id);
                     }
-                    case EMacroFunction::NoAutoSrc: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
-                        auto arg0 = std::get_if<TMacroValues::TOutput>(&unwrappedArgs[0]);
-                        if (!arg0)
-                            throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid output";
-                        UpdateCoord(Sink.Outputs, arg0->Coord, [](auto& var) {
-                            var.NoAutoSrc = true;
-                        });
-                        return *arg0;
-                    }
+                    case EMacroFunction::NoAutoSrc:
+                        return updateOutput([](auto& x) {x.NoAutoSrc = true;});
+                    case EMacroFunction::NoRel:
+                        return updateOutput([](auto& x) {x.NoRel = true;});
+                    case EMacroFunction::ResolveToBinDir:
+                        return updateOutput([](auto& x) {x.ResolveToBinDir = true;});
                     case EMacroFunction::Glob: {
-                        if (unwrappedArgs.size() != 1)
-                            throw std::runtime_error{"Invalid number of arguments"};
+                        checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         return TMacroValues::TGlobPattern{ .Data = arg0 };
                     }

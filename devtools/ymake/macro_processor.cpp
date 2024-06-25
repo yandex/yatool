@@ -459,6 +459,8 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         auto ix = GetOutputInternal().Push(output.Name).first;
         GetOutputInternal().Update(ix, [output](auto& var) {
             var.NoAutoSrc |= output.NoAutoSrc;
+            var.NoRel |= output.NoRel;
+            var.ResolveToBinDir |= output.ResolveToBinDir;
         });
     }
 

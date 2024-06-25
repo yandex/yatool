@@ -29,6 +29,8 @@ namespace {
             {"env",     EMacroFunction::SetEnv},
             {"kv",      EMacroFunction::KeyValue},
             {"noauto",  EMacroFunction::NoAutoSrc},
+            {"norel",   EMacroFunction::NoRel},
+            {"tobindir",EMacroFunction::ResolveToBinDir},
             {"glob",    EMacroFunction::Glob},
         };
         auto it = names.find(key);
