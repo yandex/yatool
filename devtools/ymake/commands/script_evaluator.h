@@ -70,7 +70,7 @@ namespace NCommands {
 
         TTermValue EvalFn(
             NPolexpr::TFuncId id, std::span<const TTermValue> args,
-            const TEvalCtx& ctx, const NPolexpr::TExpression* expr,
+            const TEvalCtx& ctx,
             ICommandSequenceWriter* writer
         );
 

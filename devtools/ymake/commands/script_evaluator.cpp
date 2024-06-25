@@ -147,7 +147,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
             return error ? TTermError(fmt::format("while substituting as {} into", varName), false) : TTermValue(subWriter.Args);
         },
         [&](NPolexpr::TFuncId id, std::span<const TTermValue> args) -> TTermValue {
-            return EvalFn(id, args, ctx, expr, writer);
+            return EvalFn(id, args, ctx, writer);
         },
     });
 
@@ -239,7 +239,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
         }
         else if constexpr (std::is_same_v<decltype(id), NPolexpr::TFuncId>) {
             static_assert(sizeof...(args) == 1);
-            return EvalFn(id, std::forward<decltype(args)...>(args...), ctx, expr, writer);
+            return EvalFn(id, std::forward<decltype(args)...>(args...), ctx, writer);
         }
     });
 
@@ -272,7 +272,7 @@ const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TYVar* var)
 
 TTermValue TScriptEvaluator::EvalFn(
     NPolexpr::TFuncId id, std::span<const TTermValue> args,
-    const TEvalCtx& ctx, const NPolexpr::TExpression* expr,
+    const TEvalCtx& ctx,
     ICommandSequenceWriter* writer
 ) {
     try {
@@ -296,8 +296,7 @@ TTermValue TScriptEvaluator::EvalFn(
         }
         throw yexception()
             << "Don't know how to render configure time modifier "
-            << Commands->Values.Id2Func(id)
-            << " in expression: " + Commands->PrintCmd(*expr);
+            << Commands->Values.Id2Func(id);
     } catch (yexception& e) {
         ++ErrorShower->Count;
         return TTermError(e.what(), true);
