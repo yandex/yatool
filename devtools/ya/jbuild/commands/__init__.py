@@ -319,7 +319,8 @@ def run_test(
         classpath_file = '@' + classpath_file
 
     if allure:
-        properties.append('-Dallure.results.directory=' + (test_outputs_root or os.curdir))
+        allure_dir = os.path.join(suite_work_dir or os.curdir, "allure")
+        properties.append('-Dallure.results.directory=' + allure_dir)
 
     if tests_tmp_dir:
         properties.append('-Djava.io.tmpdir=' + tests_tmp_dir)
