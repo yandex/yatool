@@ -13,6 +13,34 @@ from .resource import PrepareResource
 logger = logging.getLogger(__name__)
 
 
+class NodeResolveStatus:
+    LOCAL = 0
+    DIST = 1
+    EXEC = 2
+    ERROR = 3
+
+
+def _get_node_resolve_status(node, local_cache, dist_cache, opts):
+    cacheable = not opts.clear_build and node.cacheable
+    if not cacheable:
+        return NodeResolveStatus.EXEC
+
+    if local_cache.has(node.uid):
+        return NodeResolveStatus.LOCAL
+
+    should_try_dist_cache = dist_cache and dist_cache.fits(node)
+    if not should_try_dist_cache:
+        return NodeResolveStatus.EXEC
+
+    if dist_cache.has(node.uid):
+        return NodeResolveStatus.DIST
+
+    if opts.yt_store_exclusive:
+        return NodeResolveStatus.ERROR
+
+    return NodeResolveStatus.EXEC
+
+
 class UniqueTask(object):
     def __str__(self):
         raise ImportError('Missing __str__ implementation')
@@ -60,23 +88,19 @@ class PrepareAllNodesTask(UniqueTask):
             for x in node.dep_nodes():
                 x.max_dist = max(x.max_dist, node.max_dist + 1)
 
-            cacheable = not self._ctx.opts.clear_build and node.cacheable
-            local_cache_task = cacheable and self._cache.has(node.uid)
-            dist_cache_task = False
-            if cacheable and not local_cache_task and self._dist_cache and self._dist_cache.fits(node):
-                if self._dist_cache.has(node.uid):
-                    dist_cache_task = True
-                elif self._ctx.opts.yt_store_exclusive:
-                    logger.error("Failed to find {!s} in the distributed cache".format(node))
-                    self._exit_code = core.error.ExitCodes.YT_STORE_FETCH_ERROR
-                    self._ctx.fast_fail(fatal=True)
-                    return
+            resolve_status = _get_node_resolve_status(node, self._cache, self._dist_cache, self._ctx.opts)
 
-            if local_cache_task:
+            if resolve_status == NodeResolveStatus.ERROR:
+                logger.error("Failed to find {0} in the distributed cache".format(node))
+                self._exit_code = core.error.ExitCodes.YT_STORE_FETCH_ERROR
+                self._ctx.fast_fail(fatal=True)
+                return
+
+            elif resolve_status == NodeResolveStatus.LOCAL:
                 self._ctx.task_cache(node, self._ctx.restore_from_cache)
                 tp.schedule_node(node, when_ready=tp.notify_dependants)
 
-            elif dist_cache_task:
+            elif resolve_status == NodeResolveStatus.DIST:
                 self._ctx.task_cache(node, self._ctx.restore_from_dist_cache)
                 tp.schedule_node(node, when_ready=tp.notify_dependants)
 
@@ -174,20 +198,12 @@ class PrepareNodeTask(object):
         self._dist_cache = dist_cache
 
     def __call__(self, *args, **kwargs):
-        cacheable = not self._ctx.opts.clear_build and self._node.cacheable
-        local_cache_task = cacheable and self._cache.has(self._node.uid)
-        dist_cache_task = (
-            cacheable
-            and not local_cache_task
-            and self._dist_cache
-            and self._dist_cache.fits(self._node)
-            and self._dist_cache.has(self._node.uid)
-        )
+        resolve_status = _get_node_resolve_status(self._node, self._cache, self._dist_cache, self._ctx.opts)
 
-        if local_cache_task:
+        if resolve_status == NodeResolveStatus.LOCAL:
             self._ctx.runq.add(self._ctx.restore_from_cache(self._node), joint=self)
 
-        elif dist_cache_task:
+        elif resolve_status == NodeResolveStatus.DIST:
             self._ctx.runq.add(self._ctx.restore_from_dist_cache(self._node), joint=self)
 
         else:
