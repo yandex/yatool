@@ -27,7 +27,7 @@ for platform in $(cat ${SR}/devtools/ya/bootstrap/platform_list); do
     mkdir -p ${RR}/stage2/${platform}
     mkdir -p ${RR}/stage2/additional/${platform}
     ${RR}/stage1/ya-bin m \
-        ${SR}/devtools/ya/bin3 \
+        ${SR}/devtools/ya/bin \
         ${SR}/devtools/ymake/bin \
         ${SR}/devtools/local_cache/toolscache/server \
         ${SR}/devtools/ya/test/programs/test_tool/bin3 \
