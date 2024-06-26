@@ -52,12 +52,35 @@ class _Populate(object):
         self.env = dict(os.environ)
         self.env['YA_ARCADIA_ROOT'] = find_root(fail_on_error=False)
 
-        for config_file, config in load_config_by_file(self.config_files):  # type: str, dict
+        config_files = list(self.config_files)
+        loaded_files = set()
+
+        while len(config_files) > 0:
+            config_file = config_files.pop(0)
+            config = load_config_by_file(config_file)
+            loaded_files.add(config_file)
+
+            if config is None:
+                continue
+
             # _original_config = config.copy()
             resolve_env_vars(config, self.env)
             logger.debug("Use config file `%s` with `%d` keys", config_file, len(config))
 
             self._inject_aliases(tuple(self._extract_aliases(config_file, config)))
+
+            for include_path in self._extract_includes(config):
+                if config_file not in self.config_files:
+                    logger.warning("Skipping nested include `%s` from `%s`", include_path, config_file)
+                    continue
+
+                if (include_path in config_files) or (include_path in loaded_files):
+                    logger.warning("Multiple inclusions of `%s`", include_path)
+                    continue
+
+                logger.debug("Including config file `%s` from `%s`", include_path, config_file)
+
+                config_files.append(include_path)
 
             apply_config(self.opt, self.consumer, config, self._get_prefix_config(config))
 
@@ -120,6 +143,20 @@ class _Populate(object):
         )
 
         self._aliases.extend(aliases)
+
+    def _extract_includes(self, config):
+        # type: (dict) -> tp.Iterable[str]
+        includes = config.get("include", tuple())  # type: tp.Sequence[dict]
+
+        for include in includes:
+            resolve_env_vars(include, self.env)
+
+            path = include.get("path")
+
+            if not path:
+                continue
+
+            yield path
 
     def _populate_env(self):
         if self.env is not None:

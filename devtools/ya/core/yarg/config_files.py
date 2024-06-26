@@ -26,26 +26,27 @@ def encode_config(config_data):
         yield param, value
 
 
-def load_config_by_file(files):
-    # type: (tp.Sequence[str]) -> tp.Iterable[tuple[str, dict]]
+def load_config_by_file(config_file):
+    # type: (str) -> tp.Optional[dict]
 
-    for config_file in files:
-        if not os.path.isfile(config_file):
-            continue
+    if not os.path.isfile(config_file):
+        return None
 
-        try:
-            logger.debug("Load data from config %s", config_file)
+    try:
+        logger.debug("Load data from config %s", config_file)
 
-            with open(config_file) as file:
-                data = toml.load(file)
+        with open(config_file) as file:
+            data = toml.load(file)
 
-            logger.debug("Found %d keys", len(data))
+        logger.debug("Found %d keys", len(data))
 
-            data = dict(encode_config(data))
+        data = dict(encode_config(data))
 
-            yield config_file, data
-        except Exception as e:
-            logger.warning("Failed to load {}: {}".format(config_file, str(e)))
+        return data
+    except Exception as e:
+        logger.warning("Failed to load %s: %s", config_file, str(e))
+
+    return None
 
 
 def load_config(files):
@@ -53,8 +54,11 @@ def load_config(files):
 
     config = {}
 
-    for _, data in load_config_by_file(files):
-        config.update(data)
+    for file in files:
+        data = load_config_by_file(file)
+
+        if data is not None:
+            config.update(data)
 
     return config
 
