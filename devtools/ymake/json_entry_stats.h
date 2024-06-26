@@ -211,6 +211,48 @@ struct TJSONEntryStatsNewUID : public TEntryStats, public TNodeDebugOnly {
 protected:
 };
 
+struct TJsonDepsDebug : public TNodeDebug {
+    const char* DebugName;
+
+    TJsonDepsDebug(const TNodeDebug& nodeDebug, const char* debugName)
+        : TNodeDebug(nodeDebug)
+        , DebugName(debugName)
+    {
+    }
+};
+
+using TJsonDepsDebugOnly = TDebugOnly<TJsonDepsDebug>;
+
+struct TJsonDeps :
+    public THolder<TUniqVector<TNodeId>>,
+    public TJsonDepsDebugOnly
+{
+    using TJsonDepsDebugOnly::TJsonDepsDebugOnly;
+
+    void Add(TNodeId id) {
+        AddTo(id, *this);
+
+        if constexpr (DebugEnabled) {
+            TraceAdd(id);
+        }
+    }
+
+    void Add(const TJsonDeps& ids) {
+        AddTo<TUniqVector<TNodeId>>(ids, *this);
+
+        if constexpr (DebugEnabled) {
+            if (ids) {
+                for (TNodeId id : *ids) {
+                    TraceAdd(id);
+                }
+            }
+        }
+    }
+
+private:
+    void TraceAdd(TNodeId id);
+};
+
 struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
     union {
         ui8 AllFlags;
@@ -235,9 +277,9 @@ struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
     TNodeId LoopId = 0;
     TNodeId OutTogetherDependency = 0;
 
-    THolder<TUniqVector<TNodeId>> IncludedDeps;
-    THolder<TUniqVector<TNodeId>> NodeDeps;
-    THolder<TUniqVector<TNodeId>> NodeToolDeps;
+    TJsonDeps IncludedDeps;
+    TJsonDeps NodeDeps;
+    TJsonDeps NodeToolDeps;
     THolder<TUniqVector<TNodeId>> ExtraOuts;
     THolder<TJsonStatsBase> Uids;
 

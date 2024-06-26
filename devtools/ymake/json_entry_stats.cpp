@@ -128,10 +128,17 @@ void TJsonStatsNew::SetSelfUid(const TMd5Value& oldMd5) {
     YDIAG(Dev) << "Set SelfUID, value is " << SelfUID.ToBase64() << Endl;
 }
 
+void TJsonDeps::TraceAdd(TNodeId id) {
+    Y_UNUSED(id);
+}
+
 TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool isFile)
     : TEntryStats(nodeDebug, inStack, isFile)
     , TNodeDebugOnly{nodeDebug}
     , AllFlags(0)
+    , IncludedDeps(nodeDebug, "IncludedDeps")
+    , NodeDeps(nodeDebug, "NodeDeps")
+    , NodeToolDeps(nodeDebug, "NodeToolDeps")
     , IsGlobalVarsCollectorStarted(false)
 {
 }

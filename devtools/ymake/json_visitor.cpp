@@ -460,9 +460,9 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             } else if (!currData.Fake) {
                 YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
                 if (!prntDone)
-                    AddTo(currNode.Id(), prntDestSet);
+                    prntDestSet.Add(currNode.Id());
                 if (!currDone)
-                    AddTo(currNode.Id(), currData.IncludedDeps);
+                    currData.IncludedDeps.Add(currNode.Id());
             }
 
             const TNodeId outTogetherDependencyId = currData.OutTogetherDependency;
@@ -484,9 +484,9 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                         moduleState->Hash->Old()->SelfContextMd5Update(name.data(), name.size());
                     }
                     if (outTogetherDependencyId) {
-                        AddTo(outTogetherDependencyId, moduleData->NodeDeps);
+                        moduleData->NodeDeps.Add(outTogetherDependencyId);
                     } else if (addToOuts) {
-                        AddTo(currNode.Id(), moduleData->NodeDeps);
+                        moduleData->NodeDeps.Add(currNode.Id());
                     }
                 }
 
@@ -531,30 +531,30 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
             if (!prntDone && outTogetherDependencyId && !currData.Fake) {
                 YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; as AlsoBuilt add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
-                AddTo(outTogetherDependencyId, prntDestSet);
+                prntDestSet.Add(outTogetherDependencyId);
             }
         }
 
         if (tool) {
             if (!prntDone) {
                 if (!bundle) {
-                    AddTo(tool, prntData->NodeToolDeps);
+                    prntData->NodeToolDeps.Add(tool);
                 }
-                AddTo(tool, prntDestSet);  // Note: this ensures tools in regular deps
+                prntDestSet.Add(tool);  // Note: this ensures tools in regular deps
             }
         } else {
             if (!prntDone) {
                 if (NewUids) {
                     if (state.Parent()->CurDep().Value() != EDT_OutTogether) {
-                        AddTo(currData.IncludedDeps, prntDestSet);
+                        prntDestSet.Add(currData.IncludedDeps);
                     } else {
-                        AddTo(currNode.Id(), prntDestSet);
+                        prntDestSet.Add(currNode.Id());
                     }
                 } else {
-                    AddTo(currData.IncludedDeps, prntDestSet);
+                    prntDestSet.Add(currData.IncludedDeps);
                 }
                 if (IsDirectPeerdirDep(incDep) && prntState->Module->PassPeers()) {
-                    AddTo(currData.IncludedDeps, prntData->IncludedDeps);
+                    prntData->IncludedDeps.Add(currData.IncludedDeps);
                 }
             }
         }
@@ -629,7 +629,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
 
         if (!prntDone && IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep)) {
-            AddTo(currData.NodeToolDeps, prntData->NodeToolDeps);
+            prntData->NodeToolDeps.Add(currData.NodeToolDeps);
         }
 
         if (!tool && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
@@ -700,7 +700,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     CalcLoopSig(currData.LoopId, LoopCnt[currData.LoopId], loop, graph);
                     for (auto l : loop) {
                         if (l != currNode.Id()) { // TODO: THINK: just assign currentStateData.IncludedDeps to all
-                            AddTo(currData.IncludedDeps, Nodes.at(l).IncludedDeps);
+                            Nodes.at(l).IncludedDeps.Add(currData.IncludedDeps);
                         }
                     }
 
@@ -928,7 +928,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                 AddTo(chldNode.Id(), currData.ExtraOuts);
                 const auto outTogetherDependency = GetOutTogetherDependency(chldNode);
                 if (outTogetherDependency.IsValid()) {
-                    AddTo(outTogetherDependency.Id(), currData.NodeDeps);
+                    currData.NodeDeps.Add(outTogetherDependency.Id());
                 }
             }
             if (RestoreContext.Conf.DumpInputsInJSON && chldNode->NodeType == EMNT_File) {
