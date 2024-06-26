@@ -29,7 +29,7 @@ def check_if_package_exists(repo, pkg_name, arch_all, debian_distribution, debia
         return True
     else:
         logger.info("Information about %s was not found in %s" % (pkg_name, repo_web_url))
-        raise PackageNotFoundError("package {} was not found in {}".format(pkg_name, repo))
+        raise PackageNotFoundError("package {} was not found in {} ({})".format(pkg_name, repo, repo_web_url))
 
 
 def upload_package(package_file_dir, full_package_name, opts):
