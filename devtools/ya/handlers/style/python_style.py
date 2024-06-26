@@ -3,7 +3,7 @@ import subprocess
 
 import six
 
-import build.plugins.lib.tests.ruff as ruff_configs
+import build.plugins.lib.tests.utils as config_utils
 import core
 import exts
 import yalibrary
@@ -19,11 +19,6 @@ def python_config():
     return core.resource.try_get_resource('config.toml')
 
 
-def default_ruff_config():
-    # type() -> bytes
-    return core.resource.try_get_resource('ruff.toml')
-
-
 @exts.func.lazy
 def get_config_paths():
     # type(str) -> dict
@@ -37,11 +32,8 @@ def get_ruff_config(path):
         raise RuntimeError('Can\'t find arcadia root, so can\'t find config for ruff')
     config_paths = get_config_paths()
 
-    full_config_path = ruff_configs.get_ruff_config(path, config_paths, arc_root)
-    if full_config_path:
-        return load_ruff_config(full_config_path, None)
-
-    return load_ruff_config(None, default_ruff_config())
+    full_config_path = config_utils.select_project_config(path, config_paths, arc_root)
+    return load_ruff_config(full_config_path)
 
 
 def fix_python_with_black(data, path, fast, args):
@@ -57,7 +49,11 @@ def fix_python_with_black(data, path, fast, args):
 
     p = subprocess.Popen(
         black_args,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, **popen_python_kwargs
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        **popen_python_kwargs
     )
     out, err = p.communicate(input=data)
 
@@ -77,8 +73,7 @@ def _launch_ruff(data, path, config_path, cmd_args):
     ruff_args = [yalibrary.tools.tool('ruff')] + cmd_args + ['--config', config_path, '-']
 
     p = subprocess.Popen(
-        ruff_args,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True
+        ruff_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True
     )
     out, err = p.communicate(input=data)
 

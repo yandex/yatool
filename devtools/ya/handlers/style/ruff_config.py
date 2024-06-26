@@ -8,9 +8,9 @@ DEFAULT_CONFIG_FILENAME = 'ruff.toml'
 
 
 @exts.func.memoize()
-def load_ruff_config(filename=None, content=None):
-    # type(typing.Optional[str], typing.Optional[bytes]) -> RuffConfig
-    return RuffConfig(filename=filename, content=content)
+def load_ruff_config(filename):
+    # type(str) -> RuffConfig
+    return RuffConfig(filename=filename)
 
 
 class RuffConfig:
