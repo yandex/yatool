@@ -335,10 +335,6 @@ class BazelStore(DistStore):
             return False
         return True
 
-    def load_meta(self, uids, heater_mode=False, refresh_on_read=False):
-        # Meta preloading is no required for bazel store
-        return
-
     @exts.func.memoize(thread_safe=False)
     def _do_has(self, uid):
         if self._disabled:

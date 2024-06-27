@@ -73,8 +73,8 @@ class DistStore(object):
     def fits(self, node):
         raise NotImplementedError()
 
-    def load_meta(self, uids, heater_mode=False, refresh_on_read=False):
-        raise NotImplementedError()
+    def prepare(self, *args, **kwargs):
+        return
 
     def _do_has(self, uid):
         raise NotImplementedError()

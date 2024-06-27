@@ -470,7 +470,11 @@ def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
         cache = dist_cache_future()
         if cache:
             logger.debug("Loading meta from dist cache")
-            cache.load_meta(uids, heater_mode=heater_mode, refresh_on_read=opts.yt_store_refresh_on_read)
+
+            # needed for catching an error in this rare scenario
+            _async = not (opts.yt_store_exclusive or heater_mode)
+
+            cache.prepare(uids, heater_mode=heater_mode, refresh_on_read=opts.yt_store_refresh_on_read, _async=_async)
 
         logger.debug("Dist cache prepared")
         return cache
