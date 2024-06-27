@@ -31,6 +31,8 @@ class YaBaseOptions(BaseOptions):
         self.cache_dir = self._pop('cache_dir')
         self.cache_dir_tools = self._pop('cache_dir_tools')
         self.logs_dir = self._pop('logs_dir')
+        self.evlog_path = self._pop('evlog_path')
+        self.log_path = self._pop('log_path')
         if self.logs_dir and not self.error_file:
             self.error_file = os.path.join(self.logs_dir, 'error.txt')
 
@@ -112,9 +114,12 @@ class YaBaseOptions(BaseOptions):
             env['YA_CACHE_DIR'] = self.cache_dir
         if self.cache_dir_tools:
             env['YA_CACHE_DIR_TOOLS'] = self.cache_dir_tools
+
         if self.logs_dir:
-            env['YA_EVLOG_FILE'] = os.path.join(self.logs_dir, 'event_log_file.json')
-            env['YA_LOG_FILE'] = os.path.join(self.logs_dir, 'log_file.txt')
+            env['YA_EVLOG_FILE'] = (
+                self.evlog_path if self.evlog_path else os.path.join(self.logs_dir, 'event_log_file.json')
+            )
+            env['YA_LOG_FILE'] = self.log_path if self.log_path else os.path.join(self.logs_dir, 'log_file.txt')
 
         if self.token:
             env['YA_TOKEN'] = self.token
