@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 import collections
 import copy
 import glob
@@ -8,19 +9,29 @@ import subprocess
 import sys
 import tempfile
 import time
-import six.moves.cPickle as cPickle
-
-import six
-
 import typing as tp  # noqa
-
-import app_config
 from test import const
 
-import test.util.tools as test_tools
+import six
+import six.moves.cPickle as cPickle
 
-from exts import func
-from exts.decompress import udopen
+import app_config
+import build.build_plan as bp
+import build.build_result as br
+import build.gen_plan as gp
+import build.graph as lg
+import build.makefile as mk
+import build.owners as ow
+import build.reports.autocheck_report as ar
+import build.reports.results_listener as pr
+import build.stat.graph_metrics as st
+import build.stat.statistics as bs
+import core.config as core_config
+import core.error
+import core.event_handling as event_handling
+import core.profiler as cp
+import core.report
+import core.yarg
 import exts.asyncthread as core_async
 import exts.filelock
 import exts.fs
@@ -32,13 +43,25 @@ import exts.timer
 import exts.tmp
 import exts.windows
 import exts.yjson as json
-
-from yalibrary.runner import patterns as ptrn
-from yalibrary.runner import uid_store
-from yalibrary.last_failed import last_failed
-from yalibrary.runner import ring_store
-from yalibrary.runner import result_store
+import test.common as test_common
+import test.util.tools as test_tools
+from build import build_facade, frepkage, test_results_console_printer
+from build.evlog.progress import (
+    get_print_status_func,
+    YmakeTimeStatistic,
+)
+from build.reports import build_reports as build_report
+from build.reports import configure_error as ce
+from build.reports import results_report
+from core import stage_tracer
+from exts import func
+from exts.decompress import udopen
 from yalibrary import tools
+from yalibrary.last_failed import last_failed
+from yalibrary.runner import patterns as ptrn
+from yalibrary.runner import result_store
+from yalibrary.runner import ring_store
+from yalibrary.runner import uid_store
 from yalibrary.toolscache import (
     toolscache_version,
     get_task_stats,
@@ -46,38 +69,8 @@ from yalibrary.toolscache import (
     post_local_cache_report,
     tc_force_gc,
 )
-from yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.ya_helper.ya_utils import CacheKind
-
-from build.reports import configure_error as ce
-from build.reports import results_report
-import build.reports.autocheck_report as ar
-import build.reports.results_listener as pr
-
-import core.config as core_config
-import core.event_handling as event_handling
-import core.yarg
-import core.error
-import core.profiler as cp
-import core.report
-from core import stage_tracer
-
-import test.common as test_common
-
-import build.build_plan as bp
-import build.build_result as br
-import build.gen_plan as gp
-import build.graph as lg
-import build.makefile as mk
-import build.owners as ow
-import build.stat.graph_metrics as st
-import build.stat.statistics as bs
-from build import build_facade, frepkage, test_results_console_printer
-from build.reports import build_reports as build_report
-from build.evlog.progress import (
-    get_print_status_func,
-    YmakeTimeStatistic,
-)
+from yalibrary.yandex.distbuild import distbs_consts
 
 try:
     from yalibrary import build_graph_cache
@@ -342,123 +335,160 @@ def make_lock(opts, garbage_dir, write_lock=False, non_blocking=False):
 
 
 def _setup_content_uids(opts, enable):
-    if not getattr(opts, 'force_content_uids', False):
-        if getattr(opts, 'request_content_uids', False):
-            if enable:
-                logger.debug('content UIDs enabled by request')
-                opts.force_content_uids = True
-            else:
-                logger.debug('content UIDs disabled: incompatible with cache version')
-        else:
-            logger.debug('content UIDs disabled by request')
-    else:
+    if getattr(opts, 'force_content_uids', False):
         logger.debug('content UIDs forced')
+        return
+
+    if not getattr(opts, 'request_content_uids', False):
+        logger.debug('content UIDs disabled by request')
+        return
+
+    if not enable:
+        logger.debug('content UIDs disabled: incompatible with cache version')
+        return
+
+    logger.debug('content UIDs enabled by request')
+    opts.force_content_uids = True
 
 
-def make_cache(opts, garbage_dir):
-    if exts.windows.on_win():
-        _setup_content_uids(opts, False)
-        return uid_store.UidStore(os.path.join(garbage_dir, 'cache', CACHE_GENERATION))
+class CacheFactory(object):
+    def __init__(self, opts):
+        self._opts = opts
 
-    if getattr(opts, 'build_cache', False):
-        from yalibrary.toolscache import ACCache, buildcache_enabled
+    def get_dist_cache_instance(self):
+        cache_instance = self._try_init_bazel_remote_cache()
+        if cache_instance is None:
+            cache_instance = self._try_init_yt_dist_cache()
+        return cache_instance
 
-        # garbage_dir is configured in yalibrary.toolscache
-        if buildcache_enabled(opts):
-            _setup_content_uids(opts, True)
-            return ACCache(os.path.join(garbage_dir, 'cache', '7'))
+    def get_local_cache_instance(self, garbage_dir):
+        if exts.windows.on_win():
+            _setup_content_uids(self._opts, False)
+            return uid_store.UidStore(os.path.join(garbage_dir, 'cache', CACHE_GENERATION))
 
-    _setup_content_uids(opts, False)
-    if getattr(opts, 'new_store', False) and getattr(opts, 'new_runner', False):
-        from yalibrary.store import new_store
+        if getattr(self._opts, 'build_cache', False):
+            from yalibrary.toolscache import ACCache, buildcache_enabled
 
-        # FIXME: This suspected to have some race condition in current content_uids implementation (see YMAKE-701)
-        store = new_store.NewStore(os.path.join(garbage_dir, 'cache', '6'))
-        return store
-    else:
+            # garbage_dir is configured in yalibrary.toolscache
+            if buildcache_enabled(self._opts):
+                _setup_content_uids(self._opts, True)
+                return ACCache(os.path.join(garbage_dir, 'cache', '7'))
+
+        _setup_content_uids(self._opts, False)
+        if getattr(self._opts, 'new_store', False) and getattr(self._opts, 'new_runner', False):
+            from yalibrary.store import new_store
+
+            # FIXME: This suspected to have some race condition in current content_uids implementation (see YMAKE-701)
+            store = new_store.NewStore(os.path.join(garbage_dir, 'cache', '6'))
+            return store
+
         return ring_store.RingStore(os.path.join(garbage_dir, 'cache', CACHE_GENERATION))
 
+    def _try_init_bazel_remote_cache(self):
+        if not self._can_use_bazel_remote_cache():
+            return None
+        return self._init_bazel_remote_cache()
 
-def init_bazel_remote_cache(opts):
-    use_bazel_dist_cache = all(
-        (
-            getattr(opts, 'bazel_remote_store', False),
-            not (getattr(opts, 'use_distbuild', False) and getattr(opts, 'bazel_readonly', False)),
-        )
-    )
-    if use_bazel_dist_cache:
+    def _try_init_yt_dist_cache(self):
+        if not self._can_use_yt_dist_cache():
+            return None
+
+        try:
+            return self._init_yt_dist_cache()
+        except ImportError as e:
+            logger.warning("YT store is not available: %s", e)
+            return None
+
+    def _init_bazel_remote_cache(self):
         from yalibrary.store.bazel_store import bazel_store
 
-        base_uri = getattr(opts, 'bazel_remote_baseuri', None)
-        if base_uri:
-            password = getattr(opts, 'bazel_remote_password', None)
-            password_file = getattr(opts, 'bazel_remote_password_file', None)
-            if not password and password_file:
-                logger.debug("Using '%s' file to obtain bazel remote password", password_file)
+        password = self._get_bazel_password()
+        fits_filter = self._get_fits_filter()
+
+        return bazel_store.BazelStore(
+            base_uri=getattr(self._opts, 'bazel_remote_baseuri'),
+            username=getattr(self._opts, 'bazel_remote_username', None),
+            password=password,
+            readonly=getattr(self._opts, 'bazel_remote_readonly', True),
+            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
+            max_connections=getattr(self._opts, 'dist_store_threads', 24),
+            fits_filter=fits_filter,
+        )
+
+    def _init_yt_dist_cache(self):
+        from yalibrary.store.yt_store import yt_store
+
+        token = self._get_yt_token()
+        yt_store_class = yt_store.YndexerYtStore if self._opts.yt_replace_result_yt_upload_only else yt_store.YtStore
+
+        return yt_store_class(
+            self._opts.yt_proxy,
+            self._opts.yt_dir,
+            self._opts.yt_cache_filter,
+            token=token,
+            readonly=self._opts.yt_readonly,
+            create_tables=self._opts.yt_create_tables,
+            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
+            max_cache_size=self._opts.yt_max_cache_size,
+            ttl=self._opts.yt_store_ttl,
+        )
+
+    def _can_use_bazel_remote_cache(self):
+        return all(
+            (
+                getattr(self._opts, 'bazel_remote_store', False),
+                getattr(self._opts, 'bazel_remote_baseuri', None),
+                not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'bazel_readonly', False)),
+            )
+        )
+
+    def _can_use_yt_dist_cache(self):
+        try:
+            import app_config
+
+            yt_store_enabled = app_config.in_house
+        except ImportError:
+            yt_store_enabled = False
+
+        return all(
+            (
+                yt_store_enabled,
+                getattr(self._opts, 'yt_store', False),
+                not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'yt_readonly', False)),
+            )
+        )
+
+    def _get_bazel_password(self):
+        password = getattr(self._opts, 'bazel_remote_password', None)
+        password_file = getattr(self._opts, 'bazel_remote_password_file', None)
+
+        if not password and password_file:
+            logger.debug("Using '%s' file to obtain bazel remote password", password_file)
+            try:
                 with open(password_file) as afile:
                     password = afile.read()
+            except Exception as e:
+                logger.warning("Failed to read bazel remote password file: %s", e)
+        return password
 
-            def fits_filter(node):
-                # XXX Noda -> <dict>
-                if not isinstance(node, dict):
-                    node = node.args
-                return is_dist_cache_suitable(node, None, opts)
+    def _get_yt_token(self):
+        token = self._opts.yt_token or self._opts.oauth_token
+        if not token:
+            try:
+                from yalibrary import oauth
 
-            return bazel_store.BazelStore(
-                base_uri=base_uri,
-                username=getattr(opts, 'bazel_remote_username', None),
-                password=password,
-                readonly=getattr(opts, 'bazel_remote_readonly', True),
-                max_file_size=getattr(opts, 'dist_cache_max_file_size', 0),
-                max_connections=getattr(opts, 'dist_store_threads', 24),
-                fits_filter=fits_filter,
-            )
+                token = oauth.get_token(core_config.get_user())
+            except Exception as e:
+                logger.warning("Failed to get YT token: %s", e)
+        return token
 
+    def _get_fits_filter(self):
+        def fits_filter(node):
+            if not isinstance(node, dict):
+                node = node.args
+            return is_dist_cache_suitable(node, None, self._opts)
 
-def init_yt_dist_cache(opts):
-    try:
-        import app_config
-
-        yt_store_enabled = app_config.in_house
-    except ImportError:
-        yt_store_enabled = False
-
-    use_dist_cache = all(
-        (
-            yt_store_enabled,
-            getattr(opts, 'yt_store', False),
-            not (getattr(opts, 'use_distbuild', False) and getattr(opts, 'yt_readonly', False)),
-        )
-    )
-    if not use_dist_cache:
-        return None
-    token = opts.yt_token or opts.oauth_token
-    if not token:
-        try:
-            from yalibrary import oauth
-
-            token = oauth.get_token(core_config.get_user())
-        except Exception as e:
-            logger.warning("Failed to get YT token: %s", str(e))
-
-    try:
-        from yalibrary.store.yt_store import yt_store
-    except ImportError as e:
-        logger.warning("YT store is not available: %s", e)
-        return None
-
-    yt_store_class = yt_store.YndexerYtStore if opts.yt_replace_result_yt_upload_only else yt_store.YtStore
-    return yt_store_class(
-        opts.yt_proxy,
-        opts.yt_dir,
-        opts.yt_cache_filter,
-        token=token,
-        readonly=opts.yt_readonly,
-        create_tables=opts.yt_create_tables,
-        max_file_size=getattr(opts, 'dist_cache_max_file_size', 0),
-        max_cache_size=opts.yt_max_cache_size,
-        ttl=opts.yt_store_ttl,
-    )
+        return fits_filter
 
 
 def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
@@ -507,21 +537,21 @@ def load_configure_errors(errors):
 
     if not errors:
         return loaded_errors
-    else:
-        for path, errorList in six.iteritems(errors):
-            if errorList == 'OK':
-                loaded_errors[path].append(ce.ConfigureError('OK', 0, 0))
-                continue
 
-            for error in errorList:
-                if isinstance(error, list) and len(error) == 3:
-                    loaded = ce.ConfigureError(error[0], error[1], error[2])
-                else:
-                    logger.debug('Suspicious configure error type: %s (error: %s)', str(type(error)), str(error))
-                    loaded = ce.ConfigureError(str(error), 0, 0)
-                loaded_errors[path].append(loaded)
+    for path, error_list in six.iteritems(errors):
+        if error_list == 'OK':
+            loaded_errors[path].append(ce.ConfigureError('OK', 0, 0))
+            continue
 
-        return loaded_errors
+        for error in error_list:
+            if isinstance(error, list) and len(error) == 3:
+                loaded = ce.ConfigureError(*error)
+            else:
+                logger.debug('Suspicious configure error type: %s (error: %s)', type(error), error)
+                loaded = ce.ConfigureError(str(error), 0, 0)
+            loaded_errors[path].append(loaded)
+
+    return loaded_errors
 
 
 def prepare_local_change_list(app_ctx, opts):
@@ -783,10 +813,12 @@ class Context(object):
         make_files=None,
         lite_graph=None,
     ):
-        timer = exts.timer.Timer('context_creation')
+        self._timer = timer = exts.timer.Timer('context_creation')
         context_creation_stage = stager.start('context_creation')
 
         self.stage_times = {}
+
+        self._cache_factory = CacheFactory(opts)
 
         self.opts = opts
         self.cache_test_statuses = need_cache_test_statuses(opts)
@@ -831,10 +863,7 @@ class Context(object):
 
         self.output_replacements = [(opts.oauth_token, "<YA-TOKEN>")] if opts.oauth_token else []
 
-        if getattr(opts, 'bazel_remote_store', False):
-            dist_cache_future = core_async.future(lambda: init_bazel_remote_cache(opts))
-        else:
-            dist_cache_future = core_async.future(lambda: init_yt_dist_cache(opts))
+        dist_cache_future = core_async.future(lambda: self._cache_factory.get_dist_cache_instance())
 
         display = getattr(app_ctx, 'display', None)
         print_status = get_print_status_func(opts, display, logger)
@@ -870,18 +899,7 @@ class Context(object):
             if self.configure_errors and not opts.continue_on_fail:
                 raise ConfigurationError()
 
-        if self.graph is not None:
-            self.graph['conf']['keepon'] = opts.continue_on_fail
-            self.graph['conf'].update(gp.gen_description())
-            if self.opts.default_node_requirements:
-                self.graph['conf']['default_node_requirements'] = self.opts.default_node_requirements
-            if self.opts.use_distbuild:
-                if self.opts.distbuild_cluster:
-                    self.graph['cluster'] = self.opts.distbuild_cluster
-                if self.opts.coordinators_filter:
-                    self.graph['conf']['coordinator'] = self.opts.coordinators_filter
-                if self.opts.distbuild_pool:
-                    self.graph['conf']['pool'] = self.opts.distbuild_pool
+        self._populate_graph_fields()
 
         nodes_map = {}
         for node in self.graph['graph'] if self.graph is not None else lite_graph['graph']:
@@ -894,7 +912,7 @@ class Context(object):
                 dist_cache_future, self.opts, nodes_map.keys(), heater_mode=not self.opts.yt_store_wt
             )
         with stager.scope('configure-local-cache'):
-            self.cache = make_cache(self.opts, self.garbage_dir)
+            self.cache = self._cache_factory.get_local_cache_instance(self.garbage_dir)
 
         print_status("Configuration done. Preparing for execution")
 
@@ -1003,7 +1021,7 @@ class Context(object):
             test_map = {x.uid: x for x in self.tests}
             for uid in sandbox_run_test_uids:
                 node = nodes_map[uid]
-                newnode = test_node.create_sandbox_run_test_node(
+                new_node = test_node.create_sandbox_run_test_node(
                     node,
                     test_map[uid],
                     nodes_map,
@@ -1012,7 +1030,7 @@ class Context(object):
                     opts=self.opts,
                 )
                 node.clear()
-                node.update(newnode)
+                node.update(new_node)
 
             # Strip dangling test nodes (such can be appeared if FORK_*TEST or --tests-retries were specified)
             self.graph = lg.strip_graph(self.graph)
@@ -1051,21 +1069,7 @@ class Context(object):
                 makefile_generator.gen_makefile(self.graph)
                 timer.show_step("generate_makefile finished")
 
-        if opts.dump_graph:
-            if opts.use_lite_graph:
-                graph_to_dump = self.lite_graph
-                logger.warning("Full graph is not downloaded with option -use-lite-graph, dumping lite graph.")
-            else:
-                graph_to_dump = self.graph
-
-            if opts.dump_graph_file:
-                with open(opts.dump_graph_file, 'w') as gf:
-                    json.dump(graph_to_dump, gf, sort_keys=True, indent=4, default=str)
-            else:
-                stdout = opts.stdout or sys.stdout
-                json.dump(graph_to_dump, stdout, sort_keys=True, indent=4, default=str)
-                stdout.flush()
-            timer.show_step("dump_graph finished")
+        self._dump_graph_if_needed()
 
         self.runner = make_runner()
 
@@ -1124,7 +1128,7 @@ class Context(object):
 
             try:
                 with make_lock(opts, self.garbage_dir, write_lock=True, non_blocking=True):
-                    self.cache = make_cache(self.opts, self.garbage_dir)
+                    self.cache = self._cache_factory.get_local_cache_instance(self.garbage_dir)
                     if hasattr(self.cache, 'clear_tray'):
                         self.cache.clear_tray()
             except LockException:
@@ -1176,6 +1180,41 @@ class Context(object):
     @property
     def lock_file(self):
         return os.path.join(self.garbage_dir, self.lock_name)
+
+    def _populate_graph_fields(self):
+        if self.graph is None:
+            return
+
+        self.graph['conf']['keepon'] = self.opts.continue_on_fail
+        self.graph['conf'].update(gp.gen_description())
+        if self.opts.default_node_requirements:
+            self.graph['conf']['default_node_requirements'] = self.opts.default_node_requirements
+        if self.opts.use_distbuild:
+            if self.opts.distbuild_cluster:
+                self.graph['cluster'] = self.opts.distbuild_cluster
+            if self.opts.coordinators_filter:
+                self.graph['conf']['coordinator'] = self.opts.coordinators_filter
+            if self.opts.distbuild_pool:
+                self.graph['conf']['pool'] = self.opts.distbuild_pool
+
+    def _dump_graph_if_needed(self):
+        if not self.opts.dump_graph:
+            return
+
+        graph_to_dump = self.graph
+        if self.opts.use_lite_graph:
+            graph_to_dump = self.lite_graph
+            logger.warning("Full graph is not downloaded with option -use-lite-graph, dumping lite graph.")
+
+        if self.opts.dump_graph_file:
+            with open(self.opts.dump_graph_file, 'w') as gf:
+                json.dump(graph_to_dump, gf, sort_keys=True, indent=4, default=str)
+        else:
+            stdout = self.opts.stdout or sys.stdout
+            json.dump(graph_to_dump, stdout, sort_keys=True, indent=4, default=str)
+            stdout.flush()
+
+        self._timer.show_step("dump_graph finished")
 
 
 def extension(f):
@@ -1712,14 +1751,8 @@ class YaMake(object):
 
             self.exit_code = self._calc_exit_code()
 
-            if self.exit_code == core.error.ExitCodes.NO_TESTS_COLLECTED:
-                self.app_ctx.display.emit_message("[[bad]]Failed - No tests collected[[rst]]")
-            elif self.exit_code:
-                self.app_ctx.display.emit_message('[[bad]]Failed[[rst]]')
-            elif self.opts.show_final_ok:
-                self.app_ctx.display.emit_message('[[good]]Ok[[rst]]')
-            else:
-                self.app_ctx.display.emit_message('')  # clear stderr
+            msg = self._calc_msg(self.exit_code)
+            self.app_ctx.display.emit_message(msg)
 
             if self.ctx.create_symlinks:
                 self._setup_repo_state()
@@ -1746,6 +1779,15 @@ class YaMake(object):
             release_all_data()
             post_local_cache_report()
             self.ctx.unlock()
+
+    def _calc_msg(self, exit_code):
+        if exit_code == core.error.ExitCodes.NO_TESTS_COLLECTED:
+            return "[[bad]]Failed - No tests collected[[rst]]"
+        elif exit_code:
+            return '[[bad]]Failed[[rst]]'
+        elif self.opts.show_final_ok:
+            return '[[good]]Ok[[rst]]'
+        return ''  # clear stderr
 
     def _validate_opts(self):
         if self.opts.build_results_report_file and not self.opts.output_root:
