@@ -130,12 +130,12 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
         ctx = yalibrary.app_ctx.get_app_ctx()
         modules = [
             ('params', params.configure(parameters, with_respawn, handler_python_major_version)),
-            ('vcs_type', configure_vcs_type(ctx)),
             ('hide_token', token_suppressions.configure(ctx)),
             ('state', configure_active_state(ctx)),
             ('display', configure_display(ctx)),
             ('custom_file_log', configure_custom_file_log(ctx)),
             ('display_log', configure_display_log(ctx)),
+            ('vcs_type', configure_vcs_type(ctx)),
             ('self_info', configure_self_info()),
             ('fetcher_params', configure_fetcher_params(ctx)),
             ('hide_token2', token_suppressions.configure(ctx)),
