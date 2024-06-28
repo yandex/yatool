@@ -2,6 +2,8 @@ option optimize_for = SPEED;
 
 import "library/cpp/eventlog/proto/events_extension.proto";
 
+option go_package = "a.yandex-team.ru/devtools/yexport/diag/msg";
+
 package NEvent;
 
 message TFileExported {

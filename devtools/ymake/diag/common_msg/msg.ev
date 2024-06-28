@@ -2,6 +2,8 @@ option optimize_for = SPEED;
 
 import "library/cpp/eventlog/proto/events_extension.proto";
 
+option go_package = "a.yandex-team.ru/devtools/ymake/diag/common_msg/";
+
 package NEvent;
 
 message TStageStarted {
