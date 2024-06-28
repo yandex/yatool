@@ -47,7 +47,7 @@ private:
     bool AreEdgesChanged(TDepGraph::TConstNodeRef nodeRef) const;
 
     static bool ShouldCheckEdgesChanged(EMakeNodeType nodeType) {
-        return (nodeType == EMNT_File);
+        return (nodeType == EMNT_File || nodeType == EMNT_MissingFile);
     }
 
     static bool ShouldCheckContentChanged(EMakeNodeType nodeType) {
