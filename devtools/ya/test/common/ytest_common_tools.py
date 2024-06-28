@@ -233,7 +233,7 @@ def get_python_cmd(opts=None, suite=None):
     return ["$(PYTHON)/python"]
 
 
-def normalize_filename(filename):
+def normalize_filename(filename, rstrip=False):
     """
     Replace invalid for file names characters with string equivalents
     :param some_string: string to be converted to a valid file name
@@ -241,6 +241,8 @@ def normalize_filename(filename):
     """
     not_allowed_pattern = r"[\[\]\/:*?\"\'<>|+\0\\\t\n\r\x0b\x0c ]"
     filename = re.sub(not_allowed_pattern, ".", filename)
+    if rstrip:
+        filename = filename.rstrip(".")
     return re.sub(r"\.{2,}", ".", filename)
 
 

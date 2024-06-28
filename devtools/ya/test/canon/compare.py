@@ -6,6 +6,7 @@ import difflib
 import typing  # noqa: F401
 
 from test import const
+from test.common import ytest_common_tools
 from yatest_lib import external
 import diff_match_patch
 import exts.func
@@ -94,13 +95,17 @@ class ResultsComparer(object):
         self._max_file_diff_length_deviation = max_file_diff_length_deviation
         self._mds_storage = mds_storage
 
+    @property
+    def test_name(self):
+        return ytest_common_tools.normalize_filename(self._test_name, rstrip=True)
+
     def diff(self, given, expected):
         extracted = None
         diffs = self._get_diffs(given, expected, TestResultCrumbs())
         d = os.linesep.join(diffs)
         whole_diff_max_len = self._max_file_diff_length * 5  # XXX extract to parameter on demand
         if whole_diff_max_len and len(d) > whole_diff_max_len:
-            extracted = self._save_diff(self._test_name + ".diff", yalibrary.display.strip_markup(d))
+            extracted = self._save_diff(self.test_name + ".diff", yalibrary.display.strip_markup(d))
             d = yalibrary.formatter.truncate_middle(
                 d,
                 whole_diff_max_len,
@@ -284,7 +289,7 @@ class ResultsComparer(object):
         return message
 
     def _save_diff(self, filename, diff):
-        output_dir = os.path.join(self._output_dir, self._test_name)
+        output_dir = os.path.join(self._output_dir, self.test_name)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         filename = test.common.get_unique_file_path(output_dir, filename)
