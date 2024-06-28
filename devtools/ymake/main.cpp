@@ -190,10 +190,9 @@ void TYMake::BuildDepGraph() {
 
     TModule& rootModule = Modules.GetRootModule();
     TUniqVector<TNodeId> startDirs;
-    for (size_t i = 0; i < Conf.StartDirs.size(); ++i) {
-        TString curDir = NPath::ConstructPath(NPath::FromLocal(Conf.StartDirs[i]), NPath::Source);
-        YDebug() << "Parsing dir " << curDir << Endl;
-        const TNodeId nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, curDir, &rootModule);
+    for (ui32 id : CurStartDirs_) {
+        YDebug() << "Parsing dir " << Names.FileNameById(id) << Endl;
+        const TNodeId nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, id, &rootModule);
         if (nodeId) {
             startDirs.Push(nodeId);
         }
@@ -214,7 +213,7 @@ void TYMake::BuildDepGraph() {
             }
             for (const auto& [to, dep] : *deps) {
                 if (IsTestRecurseDep(node.NodeType, dep, to.NodeType)) {
-                    UpdIter->RecursiveAddStartTarget(to.NodeType, Graph.GetFileName(to.ElemId).GetTargetStr(), &rootModule);
+                    UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
                 }
             }
         }
@@ -233,7 +232,7 @@ void TYMake::BuildDepGraph() {
         }
         for (const auto& [to, dep] : *deps) {
             if (IsDependsDep(node.NodeType, dep, to.NodeType)) {
-                UpdIter->RecursiveAddStartTarget(to.NodeType, Graph.GetFileName(to.ElemId).GetTargetStr(), &rootModule);
+                UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
             }
         }
     }

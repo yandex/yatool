@@ -23,7 +23,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 36;
+    const ui64 ImageVersion = 37;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -637,6 +637,12 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
     }
 
+    if (cacheReader.HasNextBlob()) {
+        TBlob blob = cacheReader.GetNextBlob();
+        TMemoryInput inputStartDirs(blob.Data(), blob.Length());
+        TSerializer<decltype(PrevStartDirs_)>::Load(&inputStartDirs, PrevStartDirs_);
+    }
+
     if (loadFsCache && loadFsCacheFromBlobs()) {
         YDebug() << "FS cache has been loaded..." << Endl;
         FSCacheLoaded_ = true;
@@ -659,6 +665,22 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     return true;
 }
 
+void TYMake::AnalyzeGraphChanges(IChanges& changes) {
+    if (!DepsCacheLoaded_) {
+        HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
+    }
+    if (PrevStartDirs_ != CurStartDirs_) {
+        HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because start dirs are different" << Endl;
+    }
+    if (!HasGraphStructuralChanges_ && Conf.ShouldUseGraphChangesPredictor()) {
+        TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
+        predictor.AnalyzeChanges();
+        HasGraphStructuralChanges_ = predictor.HasChanges();
+    }
+}
+
 bool TYMake::LoadPatch() {
     if (!Conf.PatchPath) {
         return true;
@@ -668,16 +690,7 @@ bool TYMake::LoadPatch() {
     }
     auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
     if (changes) {
-        if (!DepsCacheLoaded_) {
-            HasGraphStructuralChanges_ = true;
-            YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
-        }
-        if (!HasGraphStructuralChanges_ && Conf.ShouldUseGraphChangesPredictor()) {
-            TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, *changes);
-            predictor.AnalyzeChanges();
-            HasGraphStructuralChanges_ = predictor.HasChanges();
-        }
-
+        AnalyzeGraphChanges(*changes);
         Names.FileConf.UseExternalChanges(std::move(changes));
     }
     return true;
@@ -735,6 +748,13 @@ void TYMake::FixStartTargets(const TVector<ui32>& elemIds) {
     }
 }
 
+void TYMake::SaveStartDirs(TCacheFileWriter& writer) {
+    TBuffer buffer;
+    TBufferOutput output(buffer);
+    TSerializer<decltype(CurStartDirs_)>::Save(&output, CurStartDirs_);
+    writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
+}
+
 void TYMake::Save(const TFsPath& file, bool delayed) {
     // Graph.Save() requires no references into graph
     Modules.ResetTransitiveInfo();
@@ -744,6 +764,8 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
 
     CurrDepsFingerprint = TGUID::Create().AsGuidString();
     cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
+
+    SaveStartDirs(cacheWriter);
 
     TInternalCacheSaver saver(*this, cacheWriter);
     DepCacheTempFile = saver.Save(delayed);

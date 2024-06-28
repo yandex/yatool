@@ -2121,8 +2121,7 @@ void TUpdIter::Rescan(TDGIterAddable& from, TIntents missingProps) {
     }
 }
 
-TNodeId TUpdIter::RecursiveAddStartTarget(EMakeNodeType type, const TStringBuf& name, TModule* module) {
-    const ui64 elemId = Graph.Names().AddName(type, name);
+TNodeId TUpdIter::RecursiveAddStartTarget(EMakeNodeType type, ui32 elemId, TModule* module) {
     RecurseQueue.MarkReachable(TDepTreeNode(type, elemId));
     while (!RecurseQueue.Empty()) {
         const TDepTreeNode node = RecurseQueue.GetFront();

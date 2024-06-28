@@ -744,7 +744,7 @@ public:
 
     void SaveModule(ui64 elemId, const TAutoPtr<TModuleDef>& mod);
 
-    TNodeId RecursiveAddStartTarget(EMakeNodeType type, const TStringBuf& name, TModule* module);
+    TNodeId RecursiveAddStartTarget(EMakeNodeType type, ui32 elemId, TModule* module);
     TNodeId RecursiveAddNode(EMakeNodeType type, const TStringBuf& name, TModule* module);
     TNodeId RecursiveAddNode(EMakeNodeType type, ui64 id, TModule* module);
 

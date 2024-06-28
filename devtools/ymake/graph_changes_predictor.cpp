@@ -10,11 +10,13 @@ void TGraphChangesPredictor::AnalyzeChanges() {
 
         if (type == EChangeType::Remove) {
             HasChanges_ = true;
+            YDebug() << "Graph has structural changes because " << change.Name << " file was removed" << Endl;
             return;
         }
 
         if (type == EChangeType::Create) {
             HasChanges_ = true;
+            YDebug() << "Graph has structural changes because " << change.Name << " file was created" << Endl;
             return;
         }
 
@@ -23,6 +25,7 @@ void TGraphChangesPredictor::AnalyzeChanges() {
         auto fileData = FileConf_.GetFileData(fileView);
         if (fileData.IsMakeFile) {
             HasChanges_ = true;
+            YDebug() << "Graph has structural changes because " << change.Name << " file has changes" << Endl;
             return;
         }
 
@@ -32,6 +35,7 @@ void TGraphChangesPredictor::AnalyzeChanges() {
         auto fileContent = FileConf_.GetFileByName(fileView);
         if (IncParserManager_.HasIncludeChanges(*fileContent)) {
             HasChanges_ = true;
+            YDebug() << "Graph has structural changes because " << change.Name << " file has includes changes" << Endl;
             return;
         }
     };

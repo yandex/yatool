@@ -74,12 +74,17 @@ private:
     bool JSONCacheLoaded_{false};
     bool UidsCacheLoaded_{false};
 
+    TVector<ui32> PrevStartDirs_;
+    TVector<ui32> CurStartDirs_;
     bool HasGraphStructuralChanges_{false};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
     bool TryLoadUids(TUidsCachable* uidsCachable);
+    void TransferStartDirs();
+    void SaveStartDirs(TCacheFileWriter& writer);
 
+    void AnalyzeGraphChanges(IChanges& changes);
 public:
     explicit TYMake(TBuildConfiguration& conf);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table

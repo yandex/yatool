@@ -72,7 +72,15 @@ void TYMake::SortAllEdges() {
     FORCE_TRACE(U, NEvent::TStageFinished("Sort edges"));
 }
 
+void TYMake::TransferStartDirs() {
+    for (const auto& dir : Conf.StartDirs) {
+        TString curDir = NPath::ConstructPath(NPath::FromLocal(dir), NPath::Source);
+        CurStartDirs_.push_back(Names.AddName(EMNT_Directory, curDir));
+    }
+}
+
 void TYMake::PostInit() {
+    TransferStartDirs();
     IncParserManager.InitManager(Conf.ParserPlugins);
     LoadPatch();
     Names.FileConf.InitAfterCacheLoading();
