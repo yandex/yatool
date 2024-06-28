@@ -121,8 +121,8 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
             while (((dpos = str.find(delimeter, bpos)) != std::string::npos) && (!count || count > 1)) {
                 list.emplace_back(str.substr(bpos, dpos - bpos));
                 bpos = dpos + delimeter.size();
-                if (count > 0) {
-                    --count;
+                if (count > 1) {
+                    if (--count == 1) break;
                 }
             }
             list.emplace_back(str.substr(bpos));
@@ -136,10 +136,10 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
             size_t bpos = str.size() - 1;
             size_t dpos;
             while (((dpos = str.rfind(delimeter, bpos)) != std::string::npos) && (!count || count > 1)) {
-                list.insert(list.begin(), str.substr(dpos + 1, bpos - dpos));
+                list.insert(list.begin(), str.substr(dpos + delimeter.size(), bpos - dpos));
                 bpos = dpos - delimeter.size();
-                if (count > 0) {
-                    --count;
+                if (count > 1) {
+                    if (--count == 1) break;
                 }
             }
             list.insert(list.begin(), str.substr(0, bpos + 1));
