@@ -5,7 +5,7 @@ SRCS(
 )
 
 PEERDIR(
-    library/cpp/openssl/crypto
+    contrib/libs/xxhash
 )
 
 END()

@@ -1,6 +1,6 @@
 from libcpp.utility cimport move as std_move
 
-from devtools.libs.acdigest.acdigest cimport TFileDigest, GetFileDigest, DIGEST_GIT_LIKE_VERSION, DIGEST_CURRENT_VERSION
+from devtools.libs.acdigest.acdigest cimport TFileDigest, GetFileDigest, DIGEST_GIT_LIKE_VERSION, DIGEST_XXHASH_VERSION, DIGEST_CURRENT_VERSION
 from util.folder.path cimport TFsPath
 from util.generic.string cimport TString
 
@@ -33,4 +33,5 @@ def get_file_digest(file_name: str, content_digest: str = "") -> FileDigest:
 
 
 digest_git_like_version = DIGEST_GIT_LIKE_VERSION
+digest_xxhash_version = DIGEST_XXHASH_VERSION
 digest_current_version = DIGEST_CURRENT_VERSION

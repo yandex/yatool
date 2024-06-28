@@ -6,9 +6,34 @@
 #include <util/system/error.h>
 #include <util/system/fs.h>
 
+namespace {
+    class TXXHasher{
+    public:
+        TXXHasher() {
+            State_ = XXH3_createState();
+            Y_ENSURE(State_, "Out of memory");
+            XXH3_128bits_reset(State_);
+        }
+
+        ~TXXHasher() {
+            XXH3_freeState(State_);
+        }
+
+        void Update(const char* data, size_t size) {
+            XXH3_128bits_update(State_, data, size);
+        }
+
+        XXH128_hash_t Final() {
+            return XXH3_128bits_digest(State_);
+        }
+    private:
+        XXH3_state_t* State_{};
+    };
+}
+
 namespace NACDigest {
     TStreamDigest GetStreamDigest(IInputStream& in, size_t limit) {
-        NOpenSsl::NSha1::TCalcer calc{};
+        TXXHasher calc{};
         size_t totalSize = 0;
         TTempBuf buf;
         while (size_t size = in.Read(buf.Data(), buf.Size())) {
@@ -22,14 +47,6 @@ namespace NACDigest {
                 break;
             }
         }
-
-        if (limit == 0) {
-            // Add size to hash
-            calc.Update("", 1);
-            TString fileSize{ToString(totalSize)};
-            calc.Update(fileSize.Data(), fileSize.Size());
-        }
-
         return TStreamDigest{calc.Final(), totalSize};
     }
 
