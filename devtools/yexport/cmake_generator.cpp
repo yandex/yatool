@@ -91,6 +91,9 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
             topLevelSubdirs.emplace_back(subdir->Path.c_str());
         }
         auto subdirValuesMap = GetSubdirValuesMap(platform, subdir, this);
+        if (!YexportSpec.AddAttrsDir.empty()) {
+            MergeTree(subdirValuesMap->GetWritableMap(), YexportSpec.AddAttrsDir);
+        }
         SetCurrentDirectory(ArcadiaRoot / subdir->Path);
         RenderJinjaTemplates(subdirValuesMap, dirJinjaTemplates, subdir->Path, platform->Name);
     }
@@ -101,6 +104,12 @@ void TCMakeGenerator::RenderPlatform(TPlatformPtr platform) {
     auto& rootdirMap = rootdirAttrs->GetWritableMap();
     NInternalAttrs::EmplaceAttr(rootdirMap, NInternalAttrs::Subdirs, topLevelSubdirs);
     SetCurrentDirectory(ArcadiaRoot);
+    if (!YexportSpec.AddAttrsDir.empty()) {
+        MergeTree(rootdirMap, YexportSpec.AddAttrsDir);
+    }
+    if (!YexportSpec.AddAttrsRoot.empty()) {
+        MergeTree(rootdirMap, YexportSpec.AddAttrsRoot);
+    }
     RenderJinjaTemplates(rootdirAttrs, dirJinjaTemplates, "", platform->Name);
 }
 
@@ -145,6 +154,9 @@ void TCMakeGenerator::RenderRoot() {
     PrepareRootCMakeList(rootAttrs);
     PrepareConanRequirements(rootAttrs);
     ApplyRules(rootAttrs);
+    if (!YexportSpec.AddAttrsRoot.empty()) {
+        MergeTree(rootAttrs->GetWritableMap(), YexportSpec.AddAttrsRoot);
+    }
     SetCurrentDirectory(ArcadiaRoot);
     RenderJinjaTemplates(rootAttrs, rootJinjaTemplates);
 }
