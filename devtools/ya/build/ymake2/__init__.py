@@ -155,6 +155,8 @@ def _gen_graph_params():
         core.yarg.Param('enabled_events', default_value='A'),
         core.yarg.Param('yndex_file', default_value=None),
         core.yarg.Param('patch_path', default_value=None),
+        core.yarg.Param('cache_info_file', default_value=None),
+        core.yarg.Param('cache_info_name', default_value=None),
         core.yarg.Param('modules_info_file', default_value=None),
         core.yarg.Param('modules_info_filter', default_value=None),
         core.yarg.Param('lic_link_type', default_value=None),
@@ -249,6 +251,14 @@ def _cons_ymake_args(**kwargs):
     patch_path = kwargs.pop('patch_path', None)
     if patch_path:
         ret += ['--patch-path', patch_path]
+
+    cache_info_file = kwargs.pop('cache_info_file', None)
+    if cache_info_file:
+        ret += ['--cache-info-file', cache_info_file]
+
+    cache_info_name = kwargs.pop('cache_info_name', None)
+    if cache_info_name:
+        ret += ['--cache-info-name', cache_info_name]
 
     no_ymake_resource = kwargs.pop('no_ymake_resource', False)
     if no_ymake_resource:

@@ -68,6 +68,9 @@ except ImportError:
         def archive_cache_dir(*args, **kwargs):
             return None
 
+        def BuildGraphCacheCLFromArc(*args, **kwargs):
+            return None
+
     bg_cache = Mock()
 
 
@@ -980,6 +983,18 @@ def _update_graph_execution_cost(stat, cost_info):
         cost_info["evaluation_errors"] = cost_info.get("evaluation_errors", 0) + 1
 
 
+def _prepare_local_change_list(app_ctx, opts):
+    if not app_ctx:
+        return None
+
+    if app_ctx.vcs_type != 'arc':
+        return None
+
+    if bg_cache:
+        evlog = getattr(app_ctx, "evlog", None)
+        return bg_cache.BuildGraphCacheCLFromArc(evlog, opts)
+
+
 class _AsyncContext(object):
     __slots__ = ('_future', '_done')
 
@@ -1201,6 +1216,13 @@ class _GraphMaker(object):
         self._exit_stack = exit_stack
         self._print_status = print_status
         self._heater = self._opts.build_graph_cache_heater
+
+        if getattr(self._opts, "build_graph_cache_force_local_cl", False):
+            import app_ctx
+
+            self._local_cl_generator = _prepare_local_change_list(app_ctx, self._opts)
+        else:
+            self._local_cl_generator = None
 
     def make_graphs(
         self,
@@ -1651,7 +1673,6 @@ class _GraphMaker(object):
             dump_inputs_map=self._is_inputs_map_required(),
             ev_listener=self._get_event_listener_debug_id_wrapper(ev_listener, debug_id, tc),
             enabled_events=enabled_events,
-            patch_path=change_list,
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
             disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
@@ -1665,6 +1686,16 @@ class _GraphMaker(object):
 
         if make_files_dart:
             o['dump_make_files'] = make_files_dart
+
+        if self._local_cl_generator and change_list is None:
+            with stager.scope("force_changelist_creation"):
+                o['patch_path'] = self._local_cl_generator.get_changelist(ya_cache_dir)
+            o['cache_info_file'] = self._local_cl_generator.path_to_current_hash
+            o['cache_info_name'] = self._local_cl_generator.DEFAULT_HASH_FILE_NAME
+            if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
+                o['debug_options'].append('completely-trust-fs-cache')
+        else:
+            o['patch_path'] = change_list
 
         if self._opts.dump_file_path:
             assert debug_id
