@@ -635,7 +635,7 @@ namespace NInternal {
                     printer->Print("{\n");
 
                     printer->Indent();
-                    printer->Print("SharedCtor();\n");
+                    printer->Print("SharedCtor(nullptr, false);\n");
                     GenerateFieldInitializers(printer, /* prefix = */ "");
                     printer->Outdent();
 
