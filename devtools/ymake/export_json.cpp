@@ -180,13 +180,13 @@ namespace {
             }
         }
 
-        void RefreshFullyRestoredNode(TMakeNode& node) {
+        void RefreshEmptyMakeNode(TMakeNode& node, const TMakeNodeSavedState& nodeSavedState, NCache::TConversionContext& context) {
             node.Uid = DumpInfo.UID;
             node.SelfUid = DumpInfo.SelfUID;
 
-            ReplaceNodeDeps(node);
+            FillNodeDeps(node);
             ReplaceNodeInputs();
-            RestoreLateOutsFromNode(node);
+            RestoreLateOutsFromNode(nodeSavedState, context);
         }
 
         void RefreshPartiallyRestoredNode(TMakeNode& node) {
@@ -197,15 +197,14 @@ namespace {
             Subst2Json.FakeFinish(MakeCommand.CmdInfo);
         }
 
-        void RestoreLateOutsFromNode(TMakeNode& node) {
+        void RestoreLateOutsFromNode(const TMakeNodeSavedState& nodeSavedState, NCache::TConversionContext& context) {
             if (NodeId != ModuleId) {
                 return;
             }
 
             ui32 moduleElemId = Graph[ModuleId]->ElemId;
             auto& moduleLateOuts = Modules.GetModuleLateOuts(moduleElemId);
-            moduleLateOuts.clear();
-            moduleLateOuts.swap(node.LateOuts);
+            moduleLateOuts = nodeSavedState.RestoreLateOuts(context);
         }
 
     private:
@@ -231,27 +230,26 @@ namespace {
 
         }
 
-        void ReplaceNodeDeps(TMakeNode& node) const {
-            auto depsIt = node.Deps.begin();
-            for (const auto& [_, depId] : NodeDeps) {
-                const auto dependency = CmdBuilder.Nodes.find(depId);
-                Y_ASSERT(dependency != CmdBuilder.Nodes.end());
-                if (dependency->second.HasBuildCmd) {
-                    Y_ASSERT(depsIt != node.Deps.end());
-                    *depsIt = dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids());
-                    depsIt++;
+        void FillNodeDeps(TMakeNode& node) const {
+            if (!NodeDeps.empty()) {
+                node.Deps.reserve(NodeDeps.size());
+                for (const auto& [_, depId] : NodeDeps) {
+                    const auto dependency = CmdBuilder.Nodes.find(depId);
+                    Y_ASSERT(dependency != CmdBuilder.Nodes.end());
+                    if (dependency->second.HasBuildCmd) {
+                        node.Deps.emplace_back(dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids()));
+                    }
                 }
             }
-            depsIt = node.ToolDeps.begin();
-            for (const auto& [name, depId] : ToolDeps) {
-                const auto dependency = CmdBuilder.Nodes.find(depId);
-                Y_ASSERT(dependency != CmdBuilder.Nodes.end());
-                Y_ASSERT(dependency->second.HasBuildCmd);
-                Y_ASSERT(depsIt != node.ToolDeps.end());
-                *depsIt = dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids());
-                depsIt++;
+            if (!ToolDeps.empty()) {
+                node.ToolDeps.reserve(ToolDeps.size());
+                for (const auto& [name, depId] : ToolDeps) {
+                    const auto dependency = CmdBuilder.Nodes.find(depId);
+                    Y_ASSERT(dependency != CmdBuilder.Nodes.end());
+                    Y_ASSERT(dependency->second.HasBuildCmd);
+                    node.ToolDeps.emplace_back(dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids()));
+                }
             }
-            Y_ASSERT(depsIt == node.ToolDeps.end());
         }
 
         void ReplaceNodeInputs() {
@@ -342,7 +340,7 @@ namespace {
             };
 
             for (const auto& [_, depId] : NodeDeps) {
-                auto depNodeRef = Graph[depId];
+                const auto depNodeRef = Graph[depId];
 
                 if (IsModuleType(depNodeRef->NodeType) && !Conf.DumpInputsInJSON && !Conf.ShouldAddPeersToInputs()) {
                     continue;
@@ -420,55 +418,60 @@ namespace {
         return RenderMakeNode(makeNode);
     }
 
-    void RenderOrRestoreJSONNodeImpl(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* node) {
-        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, node);
+    void RenderOrRestoreJSONNodeImpl(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
+        TMakeNode node;
+        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node);
 
         if (!yMake.Conf.ReadJsonCache && !yMake.Conf.WriteJsonCache) {
             renderer.RenderNodeDelayed();
             renderer.CompleteRendering();
+            jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
             return;
         }
 
         const auto cacheUid = renderer.CalculateCacheUid();
-        bool restored = cache.RestoreByCacheUid(cacheUid, node);
-        BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(restored));
-        if (restored) {
-            renderer.RefreshFullyRestoredNode(*node);
+        const auto* cachedNode = cache.GetCachedNodeByCacheUid(cacheUid);
+        BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(cachedNode));
+        if (cachedNode) {
             cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
+            auto& context = cache.GetConversionContext(&node);
+            renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
+            jsonWriter.WriteArrayValue(plan.NodesArr,*cachedNode, &context);
             return;
         }
 
         // If we didn't find exactly the same node, try to find the same, but with different UID.
         // To make it possible, use partial rendering and calculation of RenderId.
 
-        renderer.RenderNodeDelayed();
-        const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
+        do {
+            renderer.RenderNodeDelayed();
+            const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
 
-        TString renderId{};
+            TString renderId{};
 
-        if (!cmdbuilder.ShouldUseNewUids()) {
-            TString renderId = renderer.CalculateRenderId();
-            restored = cache.RestoreByRenderId(renderId, node);
-            BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
-            if (restored) {
-                renderer.RefreshPartiallyRestoredNode(*node);
-                // Update node in cache to avoid partial rendering next time
-                cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
-                cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
-                return;
+            if (!cmdbuilder.ShouldUseNewUids()) {
+                TString renderId = renderer.CalculateRenderId();
+                auto restored = cache.RestoreByRenderId(renderId, &node);
+                BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
+                if (restored) {
+                    renderer.RefreshPartiallyRestoredNode(node);
+                    // Update node in cache to avoid partial rendering next time
+                    cache.AddRenderedNode(node, nodeName, cacheUid, renderId);
+                    cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
+                    break;
+                }
             }
-        }
 
-        renderer.CompleteRendering();
-        cache.AddRenderedNode(*node, nodeName, cacheUid, renderId);
-        cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
+            renderer.CompleteRendering();
+            cache.AddRenderedNode(node, nodeName, cacheUid, renderId);
+            cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
+        } while (0);
+        jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
     }
 
-    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo) {
-        constexpr size_t maxNodesInMem = 1000u;
+    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
         try {
-            plan.Nodes.emplace_back();
-            RenderOrRestoreJSONNodeImpl(yMake, cmdbuilder, cache, nodeId, nodeInfo, &plan.Nodes.back());
+            RenderOrRestoreJSONNodeImpl(yMake, cmdbuilder, plan, cache, nodeId, nodeInfo, jsonWriter);
 #if defined(NEW_UID_COMPARE)
             TString currentRender = RenderMakeNode(plan.Nodes.back());
             TString fullRender = RenderJsonNodeFullString(yMake, cmdbuilder, nodeId, nodeInfo);
@@ -502,10 +505,6 @@ namespace {
 
             throw;
 #endif
-        }
-
-        if (plan.Nodes.size() >= maxNodesInMem) {
-            plan.Flush();
         }
     }
 
@@ -639,13 +638,14 @@ namespace {
 
             TMakePlanCache cache(yMake.Conf);
             yMake.JSONCacheLoaded(cache.LoadFromFile());
+            plan.WriteConf();
 
             for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
                 if (cmdbuilder.ShouldUseNewUids())
                     UpdateUids(cmdbuilder, nodeId);
 
                 const auto& node = cmdbuilder.Nodes.at(nodeId);
-                RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node);
+                RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);
                 if (IsModuleType(graph[nodeId]->NodeType)) {
                     TProgressManager::Instance()->IncRenderModulesDone();
                 }
@@ -654,7 +654,6 @@ namespace {
             TProgressManager::Instance()->ForceRenderModulesDone();
             tmpFile = cache.SaveToFile();
             cacheFile = cache.GetCachePath();
-            plan.Flush();
             YDebug() << cache.GetStatistics() << Endl;
         }
         // Release cache before rename: on Windows open cache file prevents renaming

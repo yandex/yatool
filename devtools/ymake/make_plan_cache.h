@@ -33,6 +33,9 @@ namespace NCache {
     struct TConversionContext;
 }
 
+using TMakeCmdCached = TMakeCmdDescription<NCache::TCached, NCache::TJoinedCachedCommand>;
+using TMakeNodeCached = TMakeNodeDescription<NCache::TCached, NCache::TJoinedCached, NCache::TJoinedCachedCommand>;
+
 class TMakeNodeSavedState {
 public:
     struct TCacheId {
@@ -43,7 +46,7 @@ public:
     };
 
 private:
-    TMakeNodeDescription<NCache::TCached, NCache::TJoinedCached, NCache::TJoinedCachedCommand> CachedNode;
+    TMakeNodeCached CachedNode;
     NCache::TCached InvalidationId;
     NCache::TCached PartialMatchId;
     bool StrictInputs;
@@ -52,6 +55,8 @@ public:
     TMakeNodeSavedState() = default;
     TMakeNodeSavedState(const TMakeNode& node, const TStringBuf& nodeName, const TStringBuf& nodeCacheUid, const TStringBuf& nodeRenderId, const TBuildConfiguration& conf, NCache::TConversionContext& context);
     void Restore(NCache::TConversionContext& context, TMakeNode* result) const;
+    TVector<NCache::TOriginal> RestoreLateOuts(NCache::TConversionContext& context) const;
+    void WriteAsJson(NYMake::TJsonWriter& writer, const NCache::TConversionContext* conversionContext) const;
 
     Y_SAVELOAD_DEFINE(CachedNode, InvalidationId, PartialMatchId, StrictInputs);
 
@@ -87,10 +92,14 @@ private:
     // TODO: Remove after switching to new UIDs implementation.
     TRestoredNodesMap PartialMatchMap;
 
+    THolder<NCache::TConversionContext> ConversionContext_;
 public:
     explicit TMakePlanCache(const TBuildConfiguration& conf);
+    ~TMakePlanCache();
 
     bool RestoreByCacheUid(const TStringBuf& uid, TMakeNode* result);
+    const TMakeNodeSavedState* GetCachedNodeByCacheUid(const TStringBuf& uid);
+    NCache::TConversionContext& GetConversionContext(const TMakeNode* refreshedMakeNode = nullptr);
 
     // Correspondence "RenderId <-> Text(Rendered Command)" is biunique
     bool RestoreByRenderId(const TStringBuf& renderId, TMakeNode* result);
@@ -112,6 +121,7 @@ public:
     NStats::TJsonCacheStats Stats{"JSON cache stats"};
 
 private:
+    const TMakeNodeSavedState* GetCachedNode(const TStringBuf& id, bool partialMatch);
     bool RestoreNode(const TStringBuf& id, bool partialMatch, TMakeNode* result);
 
     void Load(TBlob& namesBlob, TBlob& nodesBlob);

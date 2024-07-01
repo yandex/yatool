@@ -6,41 +6,46 @@
 #include <library/cpp/json/json_reader.h>
 #include <util/generic/overloaded.h>
 
-using namespace NJson;
-
 template <>
 bool TMakeCmd::Empty() const {
     return std::visit(TOverloaded{
         [](const TString& args)          { return args.empty() || args == "[]"; },
         [](const TVector<TString>& args) { return args.empty(); }
-    }, this->CmdArgs);
+    }, CmdArgs);
 }
 
 template <>
-void TMakeCmd::WriteAsJson(NYMake::TJsonWriter& writer) const {
-    if (Empty()) {
-        return;
-    }
-    auto map = writer.OpenMap();
+void TMakeCmd::WriteCmdArgsArr(TJsonWriterFuncArgs&& funcArgs) const {
     std::visit(TOverloaded{
         [&](const TString& args) {
-            Y_DEBUG_ABORT_UNLESS(ValidateJson(args), "%s", args.c_str());
-            writer.WriteMapKeyJsonValue(map, "cmd_args", args);
+            Y_DEBUG_ABORT_UNLESS(NJson::ValidateJson(args), "%s", args.c_str());
+            funcArgs.Writer.WriteMapKeyJsonValue(funcArgs.Map, funcArgs.Key, args);
         },
         [&](const TVector<TString>& args) {
-            writer.WriteMapKeyValue(map, "cmd_args", args);
+            funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, args);
         }
-    }, this->CmdArgs);
-    if (this->Cwd) {
-        writer.WriteMapKeyValue(map, "cwd", *this->Cwd);
+    }, CmdArgs);
+}
+
+template <>
+void TMakeCmd::WriteCwdStr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (Cwd) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, *Cwd);
     }
-    if (this->StdOut) {
-        writer.WriteMapKeyValue(map, "stdout", *this->StdOut);
+}
+
+template <>
+void TMakeCmd::WriteStdoutStr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (StdOut) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, *StdOut);
     }
-    if (this->Env) {
-        writer.WriteMapKeyValue(map, "env", this->Env);
+}
+
+template <>
+void TMakeCmd::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!Env.empty()) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, Env);
     }
-    writer.CloseMap(map);
 }
 
 template <>
@@ -51,94 +56,6 @@ bool TMakeCmd::operator==(const TMakeCmd& rhs) const {
 template <>
 bool TMakeCmd::operator!=(const TMakeCmd& rhs) const {
     return !(rhs == *this);
-}
-
-template <>
-void TMakeNode::WriteAsJson(NYMake::TJsonWriter& writer) const {
-    auto map = writer.OpenMap();
-
-    writer.WriteMapKeyValue(map, "uid", this->Uid);
-
-    Y_ASSERT(!this->SelfUid.empty());
-    writer.WriteMapKeyValue(map, "self_uid", this->SelfUid);
-
-    {
-        writer.WriteMapKey(map, "cmds");
-        auto cmdArr = writer.OpenArray();
-        for (const auto& cmd: this->Cmds) {
-            if (cmd.Empty()) {
-                continue;
-            }
-            writer.WriteArrayValue(cmdArr, cmd);
-        }
-        writer.CloseArray(cmdArr);
-    }
-
-    writer.WriteMapKeyValue(map, "inputs", this->Inputs);
-
-    Y_DEBUG_ABORT_UNLESS(ValidateJson(this->Outputs), "%s", this->Outputs.c_str());
-    writer.WriteMapKeyJsonValue(map, "outputs", this->Outputs);
-
-    writer.WriteMapKeyValue(map, "deps", this->Deps);
-
-    if (!this->ToolDeps.empty()) {
-        writer.WriteMapKey(map, "foreign_deps");
-        auto depsMap = writer.OpenMap();
-        writer.WriteMapKeyValue(depsMap, "tool", this->ToolDeps);
-        writer.CloseMap(depsMap);
-    }
-
-#if !defined (NEW_UID_COMPARE)
-    auto prepareMap = [](const THashMap<TString, TString>& map) -> const THashMap<TString, TString>& {
-        return map;
-    };
-#else
-    auto prepareMap = [](const THashMap<TString, TString>& map) -> TVector<std::pair<TString, TString>> {
-        TVector<std::pair<TString, TString>> sorted{map.begin(), map.end()};
-        Sort(sorted);
-        return sorted;
-    };
-#endif
-
-    writer.WriteMapKeyValue(map, "kv", prepareMap(this->KV));
-
-    {
-        writer.WriteMapKey(map, "requirements");
-        auto reqMap = writer.OpenMap();
-        const auto& mapRequirements = prepareMap(this->Requirements);
-        size_t value;
-        for (const auto& kv : mapRequirements) {
-            if (TryFromString<size_t>(kv.second, value)) {
-                writer.WriteMapKeyValue(reqMap, kv.first, value);
-            } else {
-                writer.WriteMapKeyValue(reqMap, kv.first, kv.second);
-            }
-        }
-        writer.CloseMap(reqMap);
-    }
-
-    if (this->OldEnv) {
-        writer.WriteMapKeyValue(map, "env", prepareMap(this->OldEnv));
-    }
-
-    writer.WriteMapKeyValue(map, "target_properties", prepareMap(this->TargetProps));
-
-    if (!this->ResourceUris.empty()) {
-        writer.WriteMapKey(map, "resources");
-        auto resArr = writer.OpenArray();
-        for (const auto& uri : this->ResourceUris) {
-            auto uriMap = writer.OpenMap(resArr);
-            writer.WriteMapKeyValue(uriMap, "uri", uri);
-            writer.CloseMap(uriMap);
-        }
-        writer.CloseArray(resArr);
-    }
-
-    if (!this->TaredOuts.empty()) {
-        writer.WriteMapKeyValue(map, "tared_outputs", this->TaredOuts);
-    }
-
-    writer.CloseMap(map);
 }
 
 template <>
@@ -163,12 +80,129 @@ bool TMakeNode::operator!=(const TMakeNode& rhs) const {
     return !(rhs == *this);
 }
 
+template <>
+auto TMakeNode::PrepareMap(const TKeyValueMap<NCache::TOriginal>& map) {
+#if !defined(NEW_UID_COMPARE)
+    return map;
+#else
+    TVector<std::pair<TString, TString>> sorted{map.begin(), map.end()};
+    Sort(sorted);
+    return sorted;
+#endif
+}
+
+template <>
+void TMakeNode::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, Uid);
+}
+
+template <>
+void TMakeNode::WriteSelfUidStr(TJsonWriterFuncArgs&& funcArgs) const {
+    Y_ASSERT(!SelfUid.empty());
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, SelfUid);
+}
+
+template <>
+void TMakeNode::WriteCmdsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    auto& writer = funcArgs.Writer;
+    writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+    auto cmdArr = writer.OpenArray();
+    for (const auto& cmd: Cmds) {
+        if (cmd.Empty()) {
+            continue;
+        }
+        writer.WriteArrayValue(cmdArr, cmd, nullptr);
+    }
+    writer.CloseArray(cmdArr);
+}
+
+template <>
+void TMakeNode::WriteInputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, Inputs);
+}
+
+template <>
+void TMakeNode::WriteOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    Y_DEBUG_ABORT_UNLESS(NJson::ValidateJson(Outputs), "%s", Outputs.c_str());
+    funcArgs.Writer.WriteMapKeyJsonValue(funcArgs.Map, funcArgs.Key, Outputs);
+}
+
+template <>
+void TMakeNode::WriteDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, Deps);
+}
+
+template <>
+void TMakeNode::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!ToolDeps.empty()) {
+        auto& writer = funcArgs.Writer;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto depsMap = writer.OpenMap();
+        writer.WriteMapKeyValue(depsMap, "tool", ToolDeps);
+        writer.CloseMap(depsMap);
+    }
+}
+
+template <>
+void TMakeNode::WriteKVMap(TJsonWriterFuncArgs&& funcArgs) const {
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(KV));
+}
+
+template <>
+void TMakeNode::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const {
+    auto& writer = funcArgs.Writer;
+    writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+    auto reqMap = writer.OpenMap();
+    size_t value;
+    for (const auto& kv : PrepareMap(Requirements)) {
+        if (TryFromString<size_t>(kv.second, value)) {
+            writer.WriteMapKeyValue(reqMap, kv.first, value);
+        } else {
+            writer.WriteMapKeyValue(reqMap, kv.first, kv.second);
+        }
+    }
+    writer.CloseMap(reqMap);
+}
+
+template <>
+void TMakeNode::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!OldEnv.empty()) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(OldEnv));
+    }
+}
+
+template <>
+void TMakeNode::WriteTargetPropertiesMap(TJsonWriterFuncArgs&& funcArgs) const {
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(TargetProps));
+}
+
+template <>
+void TMakeNode::WriteResourcesMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!ResourceUris.empty()) {
+        auto& writer = funcArgs.Writer;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto resArr = writer.OpenArray();
+        for (const auto& uri : ResourceUris) {
+            auto uriMap = writer.OpenMap(resArr);
+            writer.WriteMapKeyValue(uriMap, "uri", uri);
+            writer.CloseMap(uriMap);
+        }
+        writer.CloseArray(resArr);
+    }
+}
+
+template <>
+void TMakeNode::WriteTaredOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!TaredOuts.empty()) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, TaredOuts);
+    }
+}
+
 TMakePlan::TMakePlan(NYMake::TJsonWriter& writer)
     : Writer(writer) {
 }
 
 TMakePlan::~TMakePlan() {
-    Flush();
     Writer.CloseArray(NodesArr);
 
     Writer.WriteMapKeyValue(Map, "result", this->Results);
@@ -188,20 +222,6 @@ TMakePlan::~TMakePlan() {
 
     Writer.CloseMap(Map);
     Writer.Flush();
-}
-
-void TMakePlan::Flush() {
-    if (!ConfWritten) {
-        WriteConf();
-        ConfWritten = true;
-    } else {
-    }
-
-    for (const auto& node : this->Nodes) {
-        Writer.WriteArrayValue(NodesArr, node);
-    }
-
-    Nodes.clear();
 }
 
 void TMakePlan::WriteConf() {

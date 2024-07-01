@@ -12,6 +12,10 @@
 
 #include <concepts>
 
+namespace NCache {
+    struct TConversionContext;
+}
+
 namespace NYMake {
     class TJsonWriter;
 
@@ -34,8 +38,8 @@ namespace NYMake {
 
     // Value is struct/class with WriteAsJson function
     template<typename V>
-    concept CWriteAsJson = requires(V v, TJsonWriter& jsonWriter) {
-        v.WriteAsJson(jsonWriter);
+    concept CWriteAsJson = requires(V v, TJsonWriter& jsonWriter, const NCache::TConversionContext* context) {
+        v.WriteAsJson(jsonWriter, context);
     };
 
     class TJsonWriter {
@@ -100,7 +104,13 @@ namespace NYMake {
         /// Write struct/class with WriteAsJson function value
         template<CWriteAsJson V>
         inline void WriteValue(const V& value) {
-            value.WriteAsJson(*this);
+            value.WriteAsJson(*this, nullptr);
+        }
+
+        /// Write struct/class with WriteAsJson function value with conversion context
+        template<CWriteAsJson V>
+        inline void WriteValue(const V& value, const NCache::TConversionContext* context) {
+            value.WriteAsJson(*this, context);
         }
 
         /// Write array item value
@@ -108,6 +118,13 @@ namespace NYMake {
         inline void WriteArrayValue(TOpenedArray& openedArray, const V& value) {
             WriteValueSeparatorIfNeeded(openedArray.ValueIndex++);
             WriteValue(value);
+        }
+
+        /// Write array item value with conversion context
+        template<CWriteAsJson V>
+        inline void WriteArrayValue(TOpenedArray& openedArray, const V& value, const NCache::TConversionContext* context) {
+            WriteValueSeparatorIfNeeded(openedArray.ValueIndex++);
+            WriteValue(value, context);
         }
 
         /// Write array item JSON value (direct write string/string_view without escaping)

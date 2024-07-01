@@ -38,6 +38,7 @@ namespace NCache {
     struct TConversionContext {
         TNameStore& Names;
         bool StoreInputs;
+        const TMakeNode* RefreshedMakeNode;///< MakeNode with refreshed UIDs
 
         explicit TConversionContext(TNameStore& names, bool storeInputs)
                 : Names(names)
@@ -46,9 +47,13 @@ namespace NCache {
         }
 
         template <typename TStrType>
-        void Convert(const TCached& src, TStrType& dst) {
+        void Convert(const TCached& src, TStrType& dst) const {
             TStringBuf buffer = Names.GetName<TCmdView>(src).GetStr();
             dst = buffer;
+        }
+
+        TStringBuf GetBuf(const TCached& src) const {
+            return Names.GetName<TCmdView>(src).GetStr();
         }
 
         template <typename TStrType>
@@ -206,6 +211,48 @@ namespace NCache {
     };
 }
 
+namespace {
+    inline void WriteCachedJoinedArrToMap(TJsonWriterFuncArgs&& funcArgs, const NCache::TJoinedCached& cachedArr) {
+        auto& writer = funcArgs.Writer;
+        const auto* context = funcArgs.Context;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        writer.WriteJsonValue(JOINED_START);
+        if (!cachedArr.empty()) {
+            writer.WriteJsonValue(JOINED_PART_START);
+            for (const auto& cachedItem : cachedArr) {
+                writer.WriteJsonValue(context->GetBuf(cachedItem));
+                if (&cachedItem != &cachedArr.back()) {
+                    writer.WriteJsonValue(JOINED_PART_SEPARATOR);
+                }
+            }
+            writer.WriteJsonValue(JOINED_PART_END);
+        }
+        writer.WriteJsonValue(JOINED_END);
+    }
+
+    inline void WriteCachedArrToMap(TJsonWriterFuncArgs&& funcArgs, const NCache::TJoinedCached& cachedArr) {
+        auto& writer = funcArgs.Writer;
+        const auto* context = funcArgs.Context;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto arr = writer.OpenArray();
+        for (const auto cachedItem : cachedArr) {
+            writer.WriteArrayValue(arr, context->GetBuf(cachedItem));
+        }
+        writer.CloseArray(arr);
+    }
+
+    inline void WriteCachedMapToMap(TJsonWriterFuncArgs&& funcArgs, const TKeyValueMap<NCache::TCached>& cachedMap) {
+        auto& writer = funcArgs.Writer;
+        const auto* context = funcArgs.Context;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto subMap = writer.OpenMap();
+        for (const auto [cachedKey, cachedValue] : cachedMap) {
+            writer.WriteMapKeyValue(subMap, context->GetBuf(cachedKey), context->GetBuf(cachedValue));
+        }
+        writer.CloseMap(subMap);
+    }
+}
+
 TMd5Sig JsonConfHash(const TBuildConfiguration& conf) {
     auto fakeIdValue = conf.CommandConf.Get1("JSON_CACHE_FAKE_ID");
     if (fakeIdValue.empty()) {
@@ -231,6 +278,199 @@ void TMakeNodeSavedState::Restore(NCache::TConversionContext& context, TMakeNode
     context.Convert(CachedNode, *result);
 }
 
+TVector<NCache::TOriginal> TMakeNodeSavedState::RestoreLateOuts(NCache::TConversionContext& context) const {
+    TVector<NCache::TOriginal> lateOuts;
+    context.Convert(CachedNode.LateOuts, lateOuts);
+    return lateOuts;
+}
+
+void TMakeNodeSavedState::WriteAsJson(NYMake::TJsonWriter& writer, const NCache::TConversionContext* context) const {
+    CachedNode.WriteAsJson(writer, context);
+}
+
+template <>
+bool TMakeCmdCached::Empty() const {
+    return CmdArgs.Data.empty();
+}
+
+template <>
+void TMakeCmdCached::WriteCmdArgsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    switch (CmdArgs.Tag) {
+        case 0:
+            WriteCachedJoinedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), CmdArgs.Data);
+            return;
+        case 1:
+            WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), CmdArgs.Data);
+            return;
+        default:
+            throw yexception() << "Invalid CmdArgs.Tag = " << ToString<>(CmdArgs.Tag);
+    }
+}
+
+template <>
+void TMakeCmdCached::WriteCwdStr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (Cwd) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, funcArgs.Context->GetBuf(*Cwd));
+    }
+}
+
+template <>
+void TMakeCmdCached::WriteStdoutStr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (StdOut) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, funcArgs.Context->GetBuf(*StdOut));
+    }
+}
+
+template <>
+void TMakeCmdCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!Env.empty()) {
+        WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Env);
+    }
+}
+
+template <>
+auto TMakeNodeCached::PrepareMap(const TKeyValueMap<NCache::TCached>& map) {
+#if !defined(NEW_UID_COMPARE)
+    return map;
+#else
+#   error "Sorting map not implemented yet"
+#endif
+}
+
+template<>
+void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
+    const auto* context = funcArgs.Context;
+    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Uid);
+    } else {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, context->GetBuf(Uid));
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteSelfUidStr(TJsonWriterFuncArgs&& funcArgs) const {
+    const auto* context = funcArgs.Context;
+    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->SelfUid);
+    } else {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, context->GetBuf(SelfUid));
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteCmdsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    auto& writer = funcArgs.Writer;
+    const auto* context = funcArgs.Context;
+    writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+    auto cmdArr = writer.OpenArray();
+    for (const auto& cmd: Cmds) {
+        if (cmd.Empty()) {
+            continue;
+        }
+        writer.WriteArrayValue(cmdArr, cmd, context);
+    }
+    writer.CloseArray(cmdArr);
+}
+
+template<>
+void TMakeNodeCached::WriteInputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    const auto* context = funcArgs.Context;
+    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode && !context->StoreInputs) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Inputs);
+    } else {
+        WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Inputs);
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Outputs);
+}
+
+template<>
+void TMakeNodeCached::WriteDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (const auto* refreshedMakeNode = funcArgs.Context->RefreshedMakeNode; refreshedMakeNode) {
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Deps);
+    } else {
+        WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Deps);
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!ToolDeps.empty()) {
+        auto& writer = funcArgs.Writer;
+        const auto* context = funcArgs.Context;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto depsMap = writer.OpenMap();
+        if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+            writer.WriteMapKeyValue(depsMap, "tool", refreshedMakeNode->ToolDeps);
+        } else {
+            WriteCachedArrToMap({writer, depsMap, "tool", context}, ToolDeps);
+        }
+        writer.CloseMap(depsMap);
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteKVMap(TJsonWriterFuncArgs&& funcArgs) const {
+    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(KV));
+}
+
+template<>
+void TMakeNodeCached::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const {
+    auto& writer = funcArgs.Writer;
+    const auto* context = funcArgs.Context;
+    writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+    auto reqMap = writer.OpenMap();
+    size_t intValue;
+    for (const auto [cachedKey, cachedValue] : PrepareMap(Requirements)) {
+        const auto bufKey = context->GetBuf(cachedKey);
+        const auto bufValue = context->GetBuf(cachedValue);
+        if (TryFromString<size_t>(bufValue, intValue)) {
+            writer.WriteMapKeyValue(reqMap, bufKey, intValue);
+        } else {
+            writer.WriteMapKeyValue(reqMap, bufKey, bufValue);
+        }
+    }
+    writer.CloseMap(reqMap);
+}
+
+template<>
+void TMakeNodeCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!OldEnv.empty()) {
+        WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(OldEnv));
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteTargetPropertiesMap(TJsonWriterFuncArgs&& funcArgs) const {
+    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(TargetProps));
+}
+
+template<>
+void TMakeNodeCached::WriteResourcesMap(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!ResourceUris.empty()) {
+        auto& writer = funcArgs.Writer;
+        const auto* context = funcArgs.Context;
+        writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
+        auto resArr = writer.OpenArray();
+        for (const auto& uri : ResourceUris) {
+            auto uriMap = writer.OpenMap(resArr);
+            writer.WriteMapKeyValue(uriMap, "uri", context->GetBuf(uri));
+            writer.CloseMap(uriMap);
+        }
+        writer.CloseArray(resArr);
+    }
+}
+
+template<>
+void TMakeNodeCached::WriteTaredOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
+    if (!TaredOuts.empty()) {
+        WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), TaredOuts);
+    }
+}
+
 bool TMakeNodeSavedState::TCacheId::operator==(const TMakeNodeSavedState::TCacheId& rhs) const {
     return std::tie(Id, StrictInputs) == std::tie(rhs.Id, rhs.StrictInputs);
 }
@@ -240,8 +480,11 @@ TMakePlanCache::TMakePlanCache(const TBuildConfiguration& conf)
         , LoadFromCache(Conf.ReadJsonCache)
         , SaveToCache(Conf.WriteJsonCache)
         , CachePath(Conf.YmakeJsonCache)
-{
-}
+        , ConversionContext_(MakeHolder<NCache::TConversionContext>(Names, Conf.StoreInputsInJsonCache))
+{}
+
+TMakePlanCache::~TMakePlanCache()
+{}
 
 bool TMakePlanCache::LoadFromFile() {
     if (!LoadFromCache) {
@@ -282,32 +525,39 @@ bool TMakePlanCache::RestoreByCacheUid(const TStringBuf& uid, TMakeNode* result)
     return RestoreNode(uid, false, result);
 }
 
+const TMakeNodeSavedState* TMakePlanCache::GetCachedNodeByCacheUid(const TStringBuf& uid) {
+    return GetCachedNode(uid, false);
+}
+
+NCache::TConversionContext& TMakePlanCache::GetConversionContext(const TMakeNode* refreshedMakeNode) {
+    ConversionContext_->RefreshedMakeNode = refreshedMakeNode;
+    return *ConversionContext_;
+}
+
 bool TMakePlanCache::RestoreByRenderId(const TStringBuf& renderId, TMakeNode* result) {
     return RestoreNode(renderId, true, result);
 }
 
-bool TMakePlanCache::RestoreNode(const TStringBuf& id, bool partialMatch, TMakeNode* result) {
-    Stats.Inc(partialMatch
-        ? NStats::EJsonCacheStats::PartialMatchRequests
-        : NStats::EJsonCacheStats::FullMatchRequests);
-    NCache::TConversionContext context(Names, Conf.StoreInputsInJsonCache);
-
+const TMakeNodeSavedState* TMakePlanCache::GetCachedNode(const TStringBuf& id, bool partialMatch) {
+    Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchRequests : NStats::EJsonCacheStats::FullMatchRequests);
     TMakeNodeSavedState::TCacheId cacheId;
-    context.Convert(id, cacheId.Id);
+    ConversionContext_->Convert(id, cacheId.Id);
     cacheId.StrictInputs = Conf.DumpInputsInJSON;
-
-    const auto& matchMap = partialMatch? PartialMatchMap : FullMatchMap;
-
+    const auto& matchMap = partialMatch ? PartialMatchMap : FullMatchMap;
     auto restoredIt = matchMap.find(cacheId);
     if (restoredIt == matchMap.end()) {
+        return nullptr;
+    }
+    Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchSuccess : NStats::EJsonCacheStats::FullMatchSuccess);
+    return &restoredIt->second.get();
+}
+
+bool TMakePlanCache::RestoreNode(const TStringBuf& id, bool partialMatch, TMakeNode* result) {
+    const auto* cachedNode = GetCachedNode(id, partialMatch);
+    if (!cachedNode) {
         return false;
     }
-
-    Stats.Inc(partialMatch
-        ? NStats::EJsonCacheStats::PartialMatchSuccess
-        : NStats::EJsonCacheStats::FullMatchSuccess);
-    TMakeNodeSavedState& node = restoredIt->second.get();
-    node.Restore(context, result);
+    cachedNode->Restore(*ConversionContext_, result);
     return true;
 }
 
