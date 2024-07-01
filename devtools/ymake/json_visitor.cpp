@@ -68,8 +68,13 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     : TBase{restoreContext, commands, cmdConf, startDirs, newUids}
     , Commands{commands}
     , GlobalVarsCollector(restoreContext)
+    , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
     , ErrorShower(ParseErrorMode(restoreContext.Conf.ExpressionErrorDetails))
 {
+    if (JsonDepsFromMainOutputEnabled_) {
+        YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;
+    }
+
     LoopCnt.resize(Loops.size());
 
     for (TTarget target : startDirs) {
@@ -544,7 +549,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
         } else {
             if (!prntDone) {
-                if (NewUids) {
+                if (NewUids && !JsonDepsFromMainOutputEnabled_) {
                     if (state.Parent()->CurDep().Value() != EDT_OutTogether) {
                         prntDestSet.Add(currData.IncludedDeps);
                     } else {

@@ -288,6 +288,7 @@ void TBuildConfiguration::FillMiscValues() {
     ForceListDirInResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_FORCE_LISTDIR"));
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
     UseNewUids = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_USE_NEW_UIDS"));
+    JsonDepsFromMainOutputEnabled_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_JSON_DEPS_FROM_MAIN_OUTPUT"));
     MainOutputAsExtra_ = NYMake::IsTrue(CommandConf.EvalValue("MAIN_OUTPUT_AS_EXTRA"));
     UseGraphChangesPredictor = NYMake::IsTrue(CommandConf.EvalValue("USE_GRAPH_CHANGES_PREDICTOR"));
 

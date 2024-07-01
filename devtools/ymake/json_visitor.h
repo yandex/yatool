@@ -61,6 +61,8 @@ private:
 
     NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 
+    const bool JsonDepsFromMainOutputEnabled_ = false;
+
 public:
     TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids);
 

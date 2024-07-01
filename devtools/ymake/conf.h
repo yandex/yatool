@@ -125,6 +125,10 @@ public:
         return UseNewUids;
     }
 
+    bool JsonDepsFromMainOutputEnabled() const noexcept {
+        return JsonDepsFromMainOutputEnabled_;
+    }
+
     bool ShouldUseGraphChangesPredictor() const noexcept {
         return UseGraphChangesPredictor;
     }
@@ -172,6 +176,7 @@ private:
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
     bool UseNewUids = UseNewUidsDefault;
+    bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = false;
     bool UseGraphChangesPredictor = false;
 
