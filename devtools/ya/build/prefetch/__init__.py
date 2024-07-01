@@ -138,9 +138,14 @@ class ArcStreamingPrefetcher:
         # Ignoring not found items for handlers like `ya py`, that create temp dirs in junk
         cmd = [self._arc_tool, 'prefetch-files', '--read-paths-from', '-', '--ignore-not-found', '--disable-priorities']
         self._arc_process = exts.process.popen(
-            cmd, stdout=None, stderr=subprocess.PIPE, stdin=subprocess.PIPE, **({'text': True} if six.PY3 else {})
+            cmd,
+            stdout=None,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            cwd=self._arc_root,
+            **({'text': True} if six.PY3 else {})
         )
-        logger.debug('arc prefetch-files started with pid %d, cmd: %s', self._arc_process.pid, cmd)
+        logger.debug('arc prefetch-files started with pid %d, cmd: %s, cwd: %s', self._arc_process.pid, cmd, self._arc_root)
 
         logger.debug('Starting writer and reader threads')
         self._writer_thread = exts.asyncthread.asyncthread(self._run_write_loop)
@@ -178,6 +183,10 @@ class ArcStreamingPrefetcher:
 
             try:
                 for target in self._dedup_targets(targets):
+                    # ymake uses '/' as path separator on all systems
+                    if "/" not in target:
+                        logger.debug("Skip target '%s' as it is a top-level dir", target)
+                        continue
                     self._arc_process.stdin.write(os.path.join(self._arc_root, target) + '\n')
                 self._arc_process.stdin.flush()
             except Exception:
