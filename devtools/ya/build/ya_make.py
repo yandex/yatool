@@ -378,7 +378,7 @@ class CacheFactory(object):
         if getattr(self._opts, 'new_store', False) and getattr(self._opts, 'new_runner', False):
             from yalibrary.store import new_store
 
-            # FIXME: This suspected to have some race condition in current content_uids implementation (see YMAKE-701)
+            # FIXME: This suspected to have some race condition in current content_uids implementation (see YA-701)
             store = new_store.NewStore(os.path.join(garbage_dir, 'cache', '6'))
             return store
 
