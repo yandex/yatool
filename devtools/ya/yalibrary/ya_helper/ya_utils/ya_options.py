@@ -23,6 +23,7 @@ class YaBaseOptions(BaseOptions):
         self.ya_bin = self._pop('ya_bin')
 
         self.be_verbose = self._pop('be_verbose')
+        self.detailed_args = self._pop('detailed_args')
         self.with_profile = self._pop('with_profile')
         self.error_file = self._pop('error_file')
         self.no_report = self._pop('no_report')

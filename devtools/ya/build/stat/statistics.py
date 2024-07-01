@@ -780,8 +780,8 @@ def get_detailed_timings(tasks):
     for task in tasks:
         if hasattr(task, 'detailed_timings') and task.detailed_timings is not None:
             for st_name, timings in six.iteritems(task.detailed_timings):
-                for duration in timings:
-                    stages[st_name].append((duration[1] - duration[0]) * 1000)
+                for ev in timings:
+                    stages[st_name].append((ev.stop - ev.start) * 1000)
 
     for stage in stages:
         stages[stage].sort()

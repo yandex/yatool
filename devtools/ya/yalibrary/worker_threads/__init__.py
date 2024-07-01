@@ -141,8 +141,13 @@ class WorkerThreads(object):
         if hasattr(action, "advanced_timings"):
             timings = action.advanced_timings()
             for key in timings:
-                for timing in timings[key]:
-                    self._evlog_writer('node-detailed', name=key, time=tuple(timing), tag=key)
+                for ev in timings[key]:
+                    self._evlog_writer(
+                        'node-detailed',
+                        name="{} - {}".format(key, ev.data.get('cmd')) if ev.data.get('cmd') else key,
+                        time=(ev.start, ev.stop),
+                        tag=key,
+                    )
 
     def add(self, action, inplace_execution=False):
         res = action.res()

@@ -30,6 +30,7 @@ from devtools.ya.test import opts as test_opts
 from core.common_opts import (
     PrintStatisticsOptions,
     BeVerboseOptions,
+    DetailedArgsOptions,
     OutputStyleOptions,
     ShowHelpOptions,
     ProfileOptions,
@@ -3062,6 +3063,7 @@ def ya_make_options(  # compat
             ContinueOnFailOptions(),
             PrintStatisticsOptions(),
             BeVerboseOptions(),
+            DetailedArgsOptions(),
             OutputStyleOptions(),
             ProfileOptions(),
             CustomSourceRootOptions(),

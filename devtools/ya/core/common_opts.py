@@ -125,6 +125,21 @@ class BeVerboseOptions(Options):
         )
 
 
+class DetailedArgsOptions(Options):
+    def __init__(self, detailed_args=False):
+        self.detailed_args = detailed_args
+
+    @staticmethod
+    def consumer():
+        return ArgConsumer(
+            ['--detailed-args'],
+            help='Detailed args in envlog',
+            hook=SetConstValueHook('detailed_args', True),
+            group=PRINT_CONTROL_GROUP,
+            visible=HelpLevel.BASIC,
+        )
+
+
 class OutputStyleOptions(Options):
     def __init__(self):
         self.do_not_output_stderrs = False

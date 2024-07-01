@@ -386,7 +386,10 @@ class RunNodeTask(object):
                     requirements = {"network": self._node.requirements.get("network")}
 
                 tmp_dir = prepare_tmp_dir()
-                self._detailed_timings.start_stage(DetailedStages.EXECUTE_COMMAND, time.time())
+                full_cmd = None
+                if self._ctx.opts.detailed_args:
+                    full_cmd = ' '.join(map(six.ensure_str, args))
+                self._detailed_timings.start_stage(DetailedStages.EXECUTE_COMMAND, time.time(), cmd=full_cmd)
                 stderr, exit_code = self._executor.run(
                     args=args,
                     stdout=stdout,
