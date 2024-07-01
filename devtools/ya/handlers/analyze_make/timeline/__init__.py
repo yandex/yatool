@@ -6,7 +6,7 @@ import devtools.ya.tools.analyze_make.common as common
 
 def convert_to_chromium_trace(nodes):
     threads = {}
-    for node in nodes:
+    for node in sorted(nodes, key=lambda n: (n.start, -n.end)):
         if node.thread_name not in threads:
             threads[node.thread_name] = len(threads)
         tid = threads[node.thread_name]
