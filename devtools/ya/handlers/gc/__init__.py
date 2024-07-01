@@ -214,10 +214,11 @@ def _clean_tools():
 
 def do_cache(opts):
     build_root = opts.custom_build_directory or cc.build_root()
+    cache_factory = ym.CacheFactory(opts)
 
     cache = None
     try:
-        cache = ym.make_cache(opts, build_root)
+        cache = cache_factory.get_local_cache_instance(build_root)
     except Exception:
         logger.exception("While initializing cache")
 
