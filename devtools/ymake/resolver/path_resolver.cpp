@@ -373,7 +373,7 @@ static TFileId MakeFileId(TFileConf& fileConf, TStringBuf name, ELinkType linkTy
     } else {
         if (linkType != ELT_Default) {
             fileView = fileConf.GetStoredName(TFileConf::ConstructPathWithLink(linkType, name, NPath::Unset));
-        } else if (NPath::IsTypedPath(name) && (NPath::ERoot::Unset == NPath::GetType(name))) {
+        } else if (NPath::IsTypedPathEx(name) && (NPath::ERoot::Unset == NPath::GetType(name))) {
             fileView = fileConf.GetStoredName(name);
         } else {
             fileView = fileConf.GetStoredName(NPath::ConstructPath(name, NPath::Unset));
