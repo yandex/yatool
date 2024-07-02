@@ -128,12 +128,18 @@ def merge_granular_coverage_segments(record, segments):
             return l_seg[end_shift] < r_seg[end_shift]
 
     # invariant: l_seg start <= r_seg start
-    def can_be_merged(l_seg, r_seg):
-        """compare left end with right start. if (left end >= right start) => segments can be merged"""
-        if l_seg[end_line] + 1 >= r_seg[start_line]:
-            return True
+    def can_be_merged(l_seg, r_seg, covered):
+        """
+        compare left end with right start.
+        if (covered and (left end + 1 >= right start)) or (not covered and sequential) => segments can be merged
+        """
+        if covered:
+            return l_seg[end_line] + 1 >= r_seg[start_line]
+
+        elif l_seg[end_line] == r_seg[start_line]:
+            return l_seg[end_shift] + 1 >= r_seg[start_shift]
         else:
-            return False
+            return l_seg[end_line] > r_seg[start_line]
 
     def segments_iterator(left_seg, right_seg):
         left_len = len(left_seg)
@@ -208,7 +214,7 @@ def merge_granular_coverage_segments(record, segments):
         result = []
         prev_seg = merged_segments[0]
         for seg in merged_segments[1:]:
-            if can_be_merged(prev_seg, seg) and prev_seg[is_covered] == seg[is_covered]:
+            if prev_seg[is_covered] == seg[is_covered] and can_be_merged(prev_seg, seg, prev_seg[is_covered]):
                 prev_seg[end_line] = seg[end_line]
                 prev_seg[end_shift] = seg[end_shift]
             else:
@@ -363,7 +369,7 @@ def merge_segments(record1, record2):
             elif (
                 curr[end_pos] >= segment[start_pos]
                 and bool(curr[counter]) == bool(segment[counter])
-                and curr[missing_branch] == curr[missing_branch]
+                and curr[missing_branch] == segment[missing_branch]
             ):
                 curr[end_pos] = segment[end_pos]
             else:
