@@ -10,7 +10,7 @@ DISTBUILD_FAST_CHECK_PRIORITY_DELTA = DISTBUILD_HIGH_CACHE_HIT_PRIORITY_DELTA + 
 
 
 class DistbuildClusterType(object):
-    PRODUCTION, TESTING = range(2)
+    PRODUCTION, TESTING, RC = range(3)
 
 
 class DistbuildRepoType(object):
