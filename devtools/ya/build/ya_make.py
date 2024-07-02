@@ -1188,6 +1188,13 @@ class Context(object):
                 self.graph['conf']['coordinator'] = self.opts.coordinators_filter
             if self.opts.distbuild_pool:
                 self.graph['conf']['pool'] = self.opts.distbuild_pool
+            if self.opts.distbuild_tracing_context:
+                project, trace_id, span_id = self.opts.distbuild_tracing_context.split(':')
+                self.graph['conf']['trace_context'] = {
+                    'project': project,
+                    'trace_id': trace_id,
+                    'span_id': span_id,
+                }
 
     def _dump_graph_if_needed(self):
         if not self.opts.dump_graph:

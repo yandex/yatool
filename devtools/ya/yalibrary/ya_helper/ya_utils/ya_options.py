@@ -351,6 +351,7 @@ class YaMakeOptions(YaBaseOptions):
         self.graph_distbuild_pool = self._pop('graph_distbuild_pool')
         self.graph_coordinators_filter = self._pop('graph_coordinators_filter')
         self.arc_url_as_working_copy_in_distbuild = self._pop('arc_url_as_working_copy_in_distbuild')
+        self.distbuild_tracing_context = self._pop('distbuild_tracing_context')
 
         self.distbuild_statistic_resource_id = self._pop('distbuild_statistic_resource_id')
 
@@ -709,6 +710,8 @@ class YaMakeOptions(YaBaseOptions):
             env['YA_GRAPH_COORDINATORS_FILTER'] = self.graph_coordinators_filter
         if self.arc_url_as_working_copy_in_distbuild is not None:
             env['YA_ARC_URL_AS_WORKING_COPY_IN_DISTBUILD'] = self.arc_url_as_working_copy_in_distbuild
+        if self.distbuild_tracing_context is not None:
+            env['YA_DISTBUILD_TRACING_CONTEXT'] = self.distbuild_tracing_context
 
         if self.strip_idle_build_results is not None:
             env['YA_STRIP_IDLE_BUILD_RESULTS'] = self._bool_to_env(self.strip_idle_build_results)
