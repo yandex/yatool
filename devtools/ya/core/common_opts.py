@@ -446,6 +446,7 @@ class EventLogFileOptions(Options):
         self.dump_platform_to_evlog = False
         self.dump_failed_node_info_to_evlog = False
         self.evlog_dump_node_stat = False
+        self.compress_evlog = True
 
     @staticmethod
     def consumer():
@@ -501,6 +502,15 @@ class EventLogFileOptions(Options):
                 name='YA_EVLOG_NODE_STAT',
                 hook=SetConstValueHook('evlog_dump_node_stat', return_true_if_enabled),
             ),
+            ArgConsumer(
+                ['--no-compress-evlog'],
+                help='Disable evlog compression',
+                hook=SetConstValueHook('compress_evlog', False),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(name='YA_NO_COMPRESS_EVLOG', hook=SetConstValueHook('compress_evlog', False)),
+            ConfigConsumer('compress_evlog'),
         ]
 
     def postprocess2(self, params):

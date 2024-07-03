@@ -203,13 +203,13 @@ class EvlogFileFinder(object):
 
 
 class EvlogFacade(object):
-    def __init__(self, evlog_dir, filename=None, replacements=None):
+    def __init__(self, evlog_dir, filename=None, replacements=None, compress_evlog=True):
         fs.create_dirs(evlog_dir)
 
         self._evlog_dir = evlog_dir
         self._now_time = datetime.datetime.now()
 
-        filepath = filename or self._gen_default_filepath()
+        filepath = filename or self._gen_default_filepath(compress_evlog)
         logging.debug('Event log file is %s', filepath)
 
         self.writer = EvlogWriter(filepath, replacements)
@@ -239,9 +239,10 @@ class EvlogFacade(object):
     def get_latest(self):
         return self.file_finder.get_latest()
 
-    def _gen_default_filepath(self):
+    def _gen_default_filepath(self, compress_evlog):
         run_uid = core.gsid.uid()
-        default_filename = self._now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + EvlogSuffix.ZST
+        sfx = EvlogSuffix.ZST if compress_evlog else EvlogSuffix.JSON
+        default_filename = self._now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + sfx
         chunk_name = self._now_time.strftime(_LOG_DIR_NAME_FMT)
         fs.create_dirs(os.path.join(self._evlog_dir, chunk_name))
         return os.path.join(self._evlog_dir, chunk_name, default_filename)
@@ -263,7 +264,8 @@ class EvlogFacade(object):
 
 def with_evlog(params, evlog_dir, hide_token):
     filename = getattr(params, 'evlog_file', None)
-    evlog = EvlogFacade(evlog_dir, filename, hide_token)
+    compress_evlog = getattr(params, 'compress_evlog', True)
+    evlog = EvlogFacade(evlog_dir, filename, hide_token, compress_evlog)
     evlog.cleanup_old_dirs()
     evlog.write('init', 'init', args=sys.argv, env=os.environ.copy())
 
