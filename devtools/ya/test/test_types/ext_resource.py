@@ -60,8 +60,3 @@ class CheckDataSbrTestSuite(CheckResourceTestSuite):
     @property
     def name(self):
         return VALIDATE_DATA_SBR_TEST_TYPE
-
-
-class CheckMDSTestSuite(ExtResourceAbstractSuite):
-    def get_checker(self, opts, dist_build, out_path):
-        return "check_mds"

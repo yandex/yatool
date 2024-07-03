@@ -12,7 +12,6 @@ IF (PYTHON3)
         PEERDIR(
             devtools/ya/test/programs/test_tool/build_sancov_coverage_report
             devtools/ya/test/programs/test_tool/check_external
-            devtools/ya/test/programs/test_tool/check_mds
             devtools/ya/test/programs/test_tool/check_resource
             devtools/ya/test/programs/test_tool/checkout
             devtools/ya/test/programs/test_tool/cov_merge_vfs
