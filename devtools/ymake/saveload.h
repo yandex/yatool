@@ -38,6 +38,7 @@ public:
         ChangedConfig,
         ChangedExtraConfig
     };
+    using enum EReadResult;
 
     TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash = DefaultConfHash, TConfHash extraConf = ExtraConfHash);
 

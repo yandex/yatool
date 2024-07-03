@@ -593,28 +593,28 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     bool loadDepsCache = Conf.ReadDepsCache;
     const char* info = nullptr;
     switch (readResult) {
-        case TCacheFileReader::EReadResult::Success:
+        case TCacheFileReader::Success:
             if (useYmakeCache) {
                 info = "Graph is readonly loaded from cache.";
             }
             break;
-        case TCacheFileReader::EReadResult::ChangedExtraConfig:
+        case TCacheFileReader::ChangedExtraConfig:
             if (useYmakeCache) {
                 info = "Graph is readonly loaded from cache.";
             }
             HasGraphStructuralChanges_ = true;
             YDebug() << "Graph maybe has structural changes because extra conf is changed" << Endl;
             break;
-        case TCacheFileReader::EReadResult::IncompatibleFormat:
+        case TCacheFileReader::IncompatibleFormat:
             info = "Incompatible ymake.cache format, graph will be rebuilt...";
             loadFsCache = false;
             loadDepsCache = false;
             break;
-        case TCacheFileReader::EReadResult::ChangedConfig:
+        case TCacheFileReader::ChangedConfig:
             info = "Config has changed, graph will be rebuilt...";
             loadDepsCache = false;
             break;
-        case TCacheFileReader::EReadResult::UpdatedBinary:
+        case TCacheFileReader::UpdatedBinary:
             if (forceLoad) {
                 info = "Current ymake binary and cache may be not compatible.";
             } else {
