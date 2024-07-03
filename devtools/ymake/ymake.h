@@ -82,7 +82,6 @@ private:
     void FixStartTargets(const TVector<ui32>& elemIds);
     bool TryLoadUids(TUidsCachable* uidsCachable);
     void TransferStartDirs();
-    void SaveStartDirs(TCacheFileWriter& writer);
 
     void AnalyzeGraphChanges(IChanges& changes);
 public:
@@ -137,6 +136,7 @@ public:
     bool LoadPatch();
     void LoadUids(TUidsCachable* uidsCachable);
     void Save(const TFsPath& file, bool delayed);
+    void SaveStartDirs(TCacheFileWriter& writer);
     void SaveUids(TUidsCachable* uidsCachable);
     void CommitCaches();
     void JSONCacheLoaded(bool jsonCacheLoaded);

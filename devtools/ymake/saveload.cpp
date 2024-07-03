@@ -280,6 +280,7 @@ namespace {
                 SaveCommands();
                 SaveInternalGraph();
                 SaveDiagnostics();
+                YMake.SaveStartDirs(Writer);
             }
 
             Stats.Set(NStats::EInternalCacheSaverStats::TotalCacheSize, Writer.GetBuilder().GetLength());
@@ -583,6 +584,12 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         if (cacheReader.HasNextBlob()) {
             TDebugTimer timer("conf msg manager");
             ConfMsgManager()->Load(cacheReader.GetNextBlob());
+        }
+        if (cacheReader.HasNextBlob()) {
+            TDebugTimer timer("start dirs");
+            TBlob blob = cacheReader.GetNextBlob();
+            TMemoryInput inputStartDirs(blob.Data(), blob.Length());
+            TSerializer<decltype(PrevStartDirs_)>::Load(&inputStartDirs, PrevStartDirs_);
         } else {
             return false;
         }
@@ -635,12 +642,6 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     if (cacheReader.HasNextBlob()) {
         TBlob blob = cacheReader.GetNextBlob();
         prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
-    }
-
-    if (cacheReader.HasNextBlob()) {
-        TBlob blob = cacheReader.GetNextBlob();
-        TMemoryInput inputStartDirs(blob.Data(), blob.Length());
-        TSerializer<decltype(PrevStartDirs_)>::Load(&inputStartDirs, PrevStartDirs_);
     }
 
     if (loadFsCache && loadFsCacheFromBlobs()) {
@@ -764,8 +765,6 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
 
     CurrDepsFingerprint = TGUID::Create().AsGuidString();
     cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
-
-    SaveStartDirs(cacheWriter);
 
     TInternalCacheSaver saver(*this, cacheWriter);
     DepCacheTempFile = saver.Save(delayed);
