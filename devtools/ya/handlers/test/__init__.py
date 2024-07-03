@@ -9,6 +9,11 @@ import core.yarg
 class YaTestYaHandler(core.yarg.OptsHandler):
     description = 'Build and run all tests\n[[imp]]ya test[[rst]] is alias for [[imp]]ya make -A[[rst]]'
 
+    extra_help = (
+        "By default, [[imp]]ya test[[rst]] [[alt1]]doesn't build targets that tests do not need[[rst]].\n"
+        "To build all targets use [[imp]]-b[[rst]] / [[imp]]--build-all[[rst]] option."
+    )
+
     def __init__(self):
         core.yarg.OptsHandler.__init__(
             self,
@@ -42,4 +47,5 @@ class YaTestYaHandler(core.yarg.OptsHandler):
                 strip_idle_build_results=True,
             ),
             visible=True,
+            extra_help=self.extra_help,
         )
