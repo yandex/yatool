@@ -2493,6 +2493,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.dist_cache_evict_cached = False
         self.dist_cache_max_file_size = 0
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
+        self.dist_cache_late_fetch = False
         self.yt_store = True
         self.yt_create_tables = False
         self.yt_cache_filter = None
@@ -2547,6 +2548,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.EXPERT,
                 ),
                 ConfigConsumer('dist_cache_max_file_size'),
+                ArgConsumer(
+                    ['--dist-cache-late-fetch'],
+                    help="Mode with delayed probing of a remote store, to increase the dist hit cache",
+                    hook=SetConstValueHook('dist_cache_late_fetch', True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.INTERNAL,
+                ),
+                ConfigConsumer('dist_cache_late_fetch'),
                 ArgConsumer(
                     ['--bazel-remote-store'],
                     help='Use Bazel-remote storage',

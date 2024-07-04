@@ -32,7 +32,8 @@ def _get_node_resolve_status(node, local_cache, dist_cache, opts):
     if not should_try_dist_cache:
         return NodeResolveStatus.EXEC
 
-    if dist_cache.has(node.uid):
+    resolve_dist = opts.dist_cache_late_fetch or dist_cache.has(node.uid)
+    if resolve_dist:
         return NodeResolveStatus.DIST
 
     if opts.yt_store_exclusive:

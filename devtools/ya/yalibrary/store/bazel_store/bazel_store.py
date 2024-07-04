@@ -335,7 +335,6 @@ class BazelStore(DistStore):
             return False
         return True
 
-    @exts.func.memoize(thread_safe=False)
     def _do_has(self, uid):
         if self._disabled:
             return False

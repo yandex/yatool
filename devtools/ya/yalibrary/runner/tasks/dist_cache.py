@@ -120,7 +120,14 @@ class RestoreFromDistCacheTask(object):
         start_time = time.time()
         self._build_root.create()
 
-        if self._dist_cache.try_restore(self._node.uid, self._build_root.path, self._filter):
+        if self._ctx.opts.dist_cache_late_fetch:
+            is_ok = self._dist_cache.has(self._node.uid) and self._dist_cache.try_restore(
+                self._node.uid, self._build_root.path, self._filter
+            )
+        else:
+            is_ok = self._dist_cache.try_restore(self._node.uid, self._build_root.path, self._filter)
+
+        if is_ok:
             if self._ctx.content_uids:
                 # If hashes file is not cached remotely it will be recomputed and cached locally
                 # otherwise it assumed to be among outputs and will be processed as such
