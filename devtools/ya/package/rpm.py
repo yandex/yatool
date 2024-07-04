@@ -199,7 +199,7 @@ def create_spec_file(
 
 def create_gz_file(package_context, temp_work_dir, package_data_path, threads=None):
     package_name = package_context.package_name
-    package_version = package_context.version
+    package_version = package_context.version.split('-', 1)[0]
 
     dir_to_arch = os.path.join(temp_work_dir, "dir_to_arch")
     content_dir = os.path.join(dir_to_arch, package_name) + '-{}'.format(package_version)

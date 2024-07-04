@@ -791,7 +791,12 @@ def create_package(package_context, output_root, builds):
                 )
 
             elif package_format == const.PackageFormat.RPM:
+                rpm_build_version = package_version
+                if package_context.params.custom_version and '-' in package_version:
+                    rpm_build_version, rpm_build_release = package_version.split('-', 1)
+                    package_meta.update({"rpm_release": rpm_build_release})
                 verify_rpm_package_meta(package_meta)
+                rpm_build_release = package_meta["rpm_release"]
                 data_files = []
                 for elem in package_data:
                     try:
@@ -807,8 +812,8 @@ def create_package(package_context, output_root, builds):
                 spec_file = package.rpm.create_spec_file(
                     temp_work_dir,
                     package_name,
-                    package_version,
-                    package_meta["rpm_release"],
+                    rpm_build_version,
+                    rpm_build_release,
                     package_meta.get("rpm_buildarch"),
                     'package {} was built by ya package'.format(package_name),
                     package_meta['homepage'],
@@ -834,7 +839,7 @@ def create_package(package_context, output_root, builds):
                     params.publish_to,
                     params.key,
                 )
-                package_version = "{0}-{1}".format(package_version, package_meta["rpm_release"])
+                package_version = "{0}-{1}".format(rpm_build_version, rpm_build_release)
 
             elif package_format == const.PackageFormat.DOCKER:
                 package_path, info = package.docker.create_package(
