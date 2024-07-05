@@ -41,7 +41,6 @@ ATTRS_TO_STATE_HASH = [
     'test_size',
     'name',
 ]
-WINDOWS_CRIT_LEN = 8192
 DIFF_TEST_TYPE = "canon_diff"
 
 yatest_logger = logging.getLogger(__name__)
@@ -54,15 +53,21 @@ class AbstractTestSuite(facility.Suite):
 
     def get_type(self):
         """
-        returns human readable suite type name
+        Returns human readable suite type name
         """
         raise NotImplementedError()
 
     def _get_meta_info_parser(self):
+        """
+        Return parser for meta information from which test suites are generated
+        """
         return facility.DartInfo
 
     @property
     def class_type(self):
+        """
+        Type of the suite (style, regular, etc)
+        """
         return test.const.SuiteClassType.UNCLASSIFIED
 
     @classmethod
@@ -70,9 +75,15 @@ class AbstractTestSuite(facility.Suite):
         return "test"
 
     def get_sandbox_uid_extension(self):
+        """
+        This works as a salt to change uid for resource validation tests
+        """
         return ""
 
     def get_resource_tools(self):
+        """
+        Returns list of names of custom tools required to run suite
+        """
         return []
 
     def __init__(
@@ -85,11 +96,10 @@ class AbstractTestSuite(facility.Suite):
         multi_target_platform_run=False,
     ):
         """
-        :param meta: meta info like `test.dart` file
+        :param meta: meta info like parsed `test.dart` file
         """
         super(AbstractTestSuite, self).__init__()
         self.meta = self._get_meta_info_parser()(meta_dict)
-        self.run_result = None
         self._result_uids = []
         self._output_uids = []
         self.dep_uids = []
@@ -212,27 +222,17 @@ class AbstractTestSuite(facility.Suite):
         return "{}-{}-{}".format(self.project_path, self.get_type(), self.get_ci_type_name())
 
     def insert_additional_filters(self, filters):
+        """
+        Insert filters in addition to ones provided in opts explicitly
+        E.g. filter only those that failed in the last attempt
+        """
         self._additional_filters.extend(filters)
 
     def get_additional_filters(self):
+        """
+        Get additional filters
+        """
         return self._additional_filters
-
-    def verify_filters(self):
-        total_filter_len = 0
-        for flt in self._additional_filters:
-            total_filter_len += len(flt)
-        if exts.windows.on_win() and total_filter_len > WINDOWS_CRIT_LEN:
-            yatest_logger.warn(
-                "run test cmd for suite %s may be too long, current length of all 'last failed' filters: %s",
-                repr(self.name),
-                total_filter_len,
-            )
-
-    def clear_additional_filters(self):
-        self._additional_filters = []
-
-    def set_result(self, result):
-        self.run_result = result
 
     @property
     def result_uids(self):
@@ -252,6 +252,9 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def name(self):
+        """
+        Test name
+        """
         val = self.meta.test_name
         if val == ".":
             val = os.path.basename(self._source_folder_path(''))
@@ -259,10 +262,16 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def target_platform_descriptor(self):
+        """
+        Definitive description of the target platform with tags
+        """
         return self._target_platform_descriptor or "unknown-target-platform"  # To fix ujson dump in PY3
 
     @property
     def multi_target_platform_run(self):
+        """
+        Whether we need to build for multiple target platforms
+        """
         return self._multi_target_platform_run
 
     def binary_path(self, root):
@@ -279,11 +288,11 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def _use_arcadia_python(self):
+        """
+        Use python from contrib/
+        'no' means use python installed on your system
+        """
         return (self.meta.use_arcadia_python or 'yes') == 'yes'
-
-    @property
-    def _script_rel_path(self):
-        return self.meta.script_rel_path
 
     def _source_folder_path(self, root):
         return os.path.join(root, self.meta.source_folder_path)
@@ -310,6 +319,10 @@ class AbstractTestSuite(facility.Suite):
         return self.declared_timeout
 
     def set_timeout(self, value):
+        """
+        Set refined timeout calculated based on various properties:
+        Passed parameters, suite type etc
+        """
         self._specified_timeout = value
 
     def _tested_file_rel_path(self):
@@ -317,12 +330,17 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def test_project_filename(self):
+        """
+        Name of the produced binary
+        """
         return self.meta.tested_project_filename or self.meta.tested_project_name
 
     @property
     def project_path(self):
-        project_path = self.meta.source_folder_path
-        return project_path
+        """
+        Path from arcadia root to the test module
+        """
+        return self.meta.source_folder_path
 
     @property
     def test_size(self):
@@ -331,6 +349,9 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def _custom_dependencies(self):
+        """
+        List of custom dependencies passed from plugins
+        """
         return list(
             set(
                 [x for x in self.meta.custom_dependencies.split(' ') if x and not x == "$TEST_DEPENDS_VALUE"]
@@ -340,6 +361,9 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def recipes(self):
+        """
+        Base64 encoded content of all related USE_RECIPE separated by new line
+        """
         if self.support_recipes():
             return self.meta.test_recipes
         else:
@@ -347,6 +371,9 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def env(self):
+        """
+        List of env variables set with ENV macros
+        """
         return self.meta.test_env
 
     @property
@@ -354,11 +381,10 @@ class AbstractTestSuite(facility.Suite):
         return False
 
     @property
-    def preserve_env(self):
-        return self.meta.test_preserve_env
-
-    @property
     def yt_spec_files(self):
+        """
+        List of json files with specification of tests that will be executed in YT
+        """
         return self.meta.yt_spec
 
     @property
@@ -366,6 +392,9 @@ class AbstractTestSuite(facility.Suite):
         return True
 
     def _get_all_test_data(self, data_type):
+        """
+        Content of DATA and DATA_FILES
+        """
         if not self.requires_test_data:
             return []
 
@@ -427,6 +456,9 @@ class AbstractTestSuite(facility.Suite):
         return self._get_all_test_data(data_type='atd')
 
     def get_state_hash(self):
+        """
+        This is used to pinpoint exactly the same tests between different runs
+        """
         res = ''
         for attr in ATTRS_TO_STATE_HASH:
             res += str(getattr(self, attr, ''))
@@ -445,6 +477,9 @@ class AbstractTestSuite(facility.Suite):
         return os.path.join(self.output_dir(), "list_stderr")
 
     def get_test_dependencies(self):
+        """
+        Get all test dependencies
+        """
         deps = set()
         deps.add(os.path.dirname(self._tested_file_rel_path()).strip('/'))
         deps.add(os.path.dirname(self.binary_path('')).strip('/'))
@@ -484,16 +519,11 @@ class AbstractTestSuite(facility.Suite):
     def set_work_dir(self, work_dir):
         self._work_dir = work_dir
 
-    def clear_work_dir(self):
-        if os.path.exists(self.work_dir()):
-            exts.fs.remove_tree(self.work_dir())
-        exts.fs.create_dirs(self.output_dir())
-
     def output_dir(self, *path):
+        """
+        Path to test outputs (logs etc)
+        """
         return os.path.join(self.work_dir(), test.const.TESTING_OUT_DIR_NAME, *path)
-
-    def trace_file_path(self):
-        return os.path.join(self.work_dir(), test.const.TRACE_FILE_NAME)
 
     def get_list_cmd(self, arc_root, build_root, opts):
         """
@@ -510,9 +540,6 @@ class AbstractTestSuite(facility.Suite):
         :return: get_list_cmd inputs list
         """
         return []
-
-    def get_list_cwd(self, arc_root, build_root, opts):
-        return None
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         """

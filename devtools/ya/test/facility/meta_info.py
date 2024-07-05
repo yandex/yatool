@@ -164,10 +164,6 @@ class MetaInfo(object):
         return self._nyc_resource
 
     @property
-    def old_pytest(self):
-        return self._old_pytest
-
-    @property
     def python_paths(self):
         return self._python_paths or ()
 
@@ -266,10 +262,6 @@ class MetaInfo(object):
         return self._test_partition
 
     @property
-    def test_preserve_env(self):
-        return self._test_preserve_env
-
-    @property
     def test_recipes(self):
         return self._test_recipes
 
@@ -358,9 +350,7 @@ class DartInfo(MetaInfo):
         self._no_check = dart_info.get('NO-CHECK')
         self._nodejs_resource = dart_info.get(dart_info.get("NODEJS-ROOT-VAR-NAME"))
         self._nodejs_root_var_name = dart_info.get("NODEJS-ROOT-VAR-NAME")
-        # Deprecated? is not set anywhere
         self._nyc_resource = dart_info.get(dart_info.get("NYC-ROOT-VAR-NAME"))
-        self._old_pytest = dart_info.get('OLD_PYTEST')
         self._python_paths = dart_info.get('PYTHON-PATHS')
         self._requirements = dart_info.get('REQUIREMENTS')
         self._sbr_uid_ext = dart_info.get('SBR-UID-EXT')
@@ -383,7 +373,6 @@ class DartInfo(MetaInfo):
         self._test_jar = dart_info.get('TEST_JAR')
         self._test_name = dart_info.get("TEST-NAME")
         self._test_partition = dart_info.get('TEST_PARTITION')
-        self._test_preserve_env = dart_info.get('TEST-PRESERVE-ENV')
         self._test_recipes = dart_info.get('TEST-RECIPES')
         self._test_runner_bin = dart_info.get('TEST-RUNNER-BIN')
         self._test_timeout = dart_info.get('TEST-TIMEOUT')

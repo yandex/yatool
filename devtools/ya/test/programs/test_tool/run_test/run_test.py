@@ -446,7 +446,6 @@ def parse_args(args=None):
     )
     parser.add_argument("--tag", dest="test_tags", action="append", help="Suite tags", default=[])
     parser.add_argument("--env", dest="test_env", action="append", help="Test env", default=[])
-    parser.add_argument("--preserve-env", action='store_true', default=False)
     parser.add_argument("--no-clean-environment", dest="create_clean_environment", action='store_false', default=True)
     parser.add_argument("--supports-canonization", dest="supports_canonization", action='store_true', default=False)
     parser.add_argument("--supports-test-parameters", action='store_true')
@@ -1226,10 +1225,7 @@ def main():
     except Exception as e:
         logger.debug('Available memory unknown: %s', e)
 
-    if options.preserve_env:
-        env = system_env.Environ(only_mandatory_env=True)
-    else:
-        env = system_env.Environ()
+    env = system_env.Environ()
     # We can't redefine tmp env.vars because some tests would fail to create unix sockets
     # hitting filename length limit.
     env.adopt_update_mandatory(["TEMP", "TMP", "TMPDIR"])

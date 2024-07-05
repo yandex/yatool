@@ -264,10 +264,6 @@ class PyTestSuite(common.PythonTestSuite):
             )
 
     @property
-    def _old_pytest(self):
-        return (self.meta.old_pytest or 'no') == 'yes'
-
-    @property
     def setup_pythonpath_env(self):
         # XXX remove when YA-1008 is done
         return 'ya:no_pythonpath_env' not in self.tags

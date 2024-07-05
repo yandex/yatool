@@ -548,9 +548,6 @@ def create_test_node(
     if opts.setup_pythonpath_env and suite.setup_pythonpath_env:
         runner_cmd += ["--setup-pythonpath-env"]
 
-    if suite.preserve_env:
-        runner_cmd += ["--preserve-env"]
-
     if suite.supports_canonization:
         runner_cmd.append("--supports-canonization")
 
