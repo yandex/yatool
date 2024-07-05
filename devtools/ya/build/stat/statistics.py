@@ -199,7 +199,7 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
     max_elapsed_len = 0
     for task in tasks:
         if task.get_time_elapsed() > 0:
-            max_elapsed_len = max(max_elapsed_len, len(str(task.get_time_elapsed())))
+            max_elapsed_len = max(max_elapsed_len, get_int_length(task.get_time_elapsed()))
 
     if ymake_stats:
         for configure_task in ymake_stats.threads_time:
@@ -272,7 +272,7 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
     max_elapsed_len = 0
     for node in critical_path:
         if not node.is_fake():
-            max_elapsed_len = max(max_elapsed_len, len(str(node.get_time_elapsed())))
+            max_elapsed_len = max(max_elapsed_len, get_int_length(node.get_time_elapsed()))
             total_elapsed += node.get_time_elapsed()
 
     elapsed_format = '[%%%dd ms] ' % max_elapsed_len
@@ -619,6 +619,11 @@ def print_disk_usage(task_stats, filename, display):
     return js_data
 
 
+def get_int_length(x):
+    assert isinstance(x, int)
+    return int(math.ceil(math.log10(x)))
+
+
 def print_summary_times(graph, tasks, display):
     COPY_STAGES = [
         'dep_start',
@@ -678,14 +683,22 @@ def print_summary_times(graph, tasks, display):
 
     if len(time_by_type) > 0:
         display.emit_message('Total time by type:')
-        for task_type in sorted(time_by_type, key=lambda x: time_by_type[x], reverse=True):
+
+        max_elapsed_len = 0
+        for task_type in time_by_type:
+            max_elapsed_len = max(max_elapsed_len, get_int_length(time_by_type[task_type]))
+
+        task_type_format = ('[%%%dd ms] ' % max_elapsed_len) + '[[[c:%s]]%s[[rst]]] [count: %d, ave time %.02f msec]'
+
+        for task_type in sorted(time_by_type, key=time_by_type.get, reverse=True):
             display.emit_message(
-                '[[[c:%s]]%s[[rst]]] - %d ms. (count: %d)\n'
+                task_type_format
                 % (
+                    time_by_type[task_type],
                     task_by_type[task_type].get_type_color(),
                     task_type,
-                    time_by_type[task_type],
                     count_by_type[task_type],
+                    time_by_type[task_type] / count_by_type[task_type],
                 )
             )
 
