@@ -414,6 +414,7 @@ class YndexerOptions(Options):
         self.kythe_to_proto_tool = None
         self.py3_yndexing = False
         self.py_yndexing = True
+        self.ts_yndexing = False
 
     @staticmethod
     def consumer():
@@ -461,6 +462,13 @@ class YndexerOptions(Options):
                 visible=HelpLevel.INTERNAL,
             ),
             ArgConsumer(
+                ['--ts-yndexing'],
+                help='Run TypeScript yndexing',
+                hook=SetConstValueHook('ts_yndexing', True),
+                group=CODENAV_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
                 ['--kythe2proto-tool'],
                 help='kythe entries to protos converter',
                 hook=SetValueHook('kythe_to_proto_tool'),
@@ -477,6 +485,8 @@ class YndexerOptions(Options):
     def postprocess2(self, params):
         if self.java_yndexing:
             params.flags['JAVA_YNDEXING'] = 'yes'
+        if self.ts_yndexing:
+            params.flags['TS_YNDEXING'] = 'yes'
 
 
 class RebuildOptions(Options):
