@@ -1045,7 +1045,7 @@ def load_package(arcadia_root, package_file, included=None):
         raise YaPackageException("The old package format is no longer supported.")
 
     for include_package in parsed_package.get("include", []):
-        if type(include_package) == dict:
+        if type(include_package) is dict:
             include_package_path = include_package["package"]
             include_package_root = include_package.get("targets_root")
         else:
@@ -1745,7 +1745,7 @@ def _get_all_includes(arcadia_root, package_file, included=None):
     included.append(package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file)
 
     for include_package in parsed_package.get("include", []):
-        if type(include_package) == dict:
+        if type(include_package) is dict:
             include_package_path = include_package["package"]
         else:
             include_package_path = include_package

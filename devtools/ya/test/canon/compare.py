@@ -170,7 +170,7 @@ class ResultsComparer(object):
         if external.is_external(expected):
             expected = external.ExternalDataInfo(expected)
 
-        if type(given) != type(expected):
+        if type(given) is not type(expected):
             if isinstance(given, six.string_types) and isinstance(expected, external.ExternalDataInfo):
                 given_checksum = exts.hashing.md5_value(test.common.to_utf8(given))
                 expected_file_path, expected_checksum = self._get_expected_external_path_and_checksum(expected)
@@ -251,7 +251,7 @@ class ResultsComparer(object):
                 else:
                     diffs.extend(self._get_diffs(given, expected, crumbs + i))
 
-            if type(expected) == dict:
+            if type(expected) is dict:
                 for key, expected_dict_value in six.iteritems(expected):
                     if key in given:
                         given_dict_value = given[key]
@@ -327,7 +327,7 @@ class ResultsComparer(object):
     def _get_file_diff(self, given, expected, custom_diff_tool=None, diff_file_name=None, diff_diff_tool_timeout=None):
         try:
             if custom_diff_tool:
-                if type(custom_diff_tool) != list:
+                if type(custom_diff_tool) is not list:
                     custom_diff_tool = [custom_diff_tool]
                 binary_path = custom_diff_tool[0]
                 if os.path.isdir(binary_path):

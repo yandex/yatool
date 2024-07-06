@@ -656,7 +656,7 @@ class CanonicalData(object):
         def process_diff(value, value_path):
             if any(
                 [
-                    not value_path and (type(value) != dict or external.is_external(value)),
+                    not value_path and (type(value) is not dict or external.is_external(value)),
                     value_path and not external.is_external(value),
                     len(value_path) > 1,
                     type(test_case.result) != dict,
