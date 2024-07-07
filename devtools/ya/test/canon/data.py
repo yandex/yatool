@@ -659,7 +659,7 @@ class CanonicalData(object):
                     not value_path and (type(value) is not dict or external.is_external(value)),
                     value_path and not external.is_external(value),
                     len(value_path) > 1,
-                    type(test_case.result) != dict,
+                    type(test_case.result) is not dict,
                 ]
             ):
                 raise DiffTestResultSanityCheckException(
