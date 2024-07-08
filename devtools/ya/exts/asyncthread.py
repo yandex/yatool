@@ -74,7 +74,12 @@ def asyncthread(f, daemon=True):
 def future(f, daemon=True):
     e = asyncthread(f, daemon)
 
-    return lambda: unwrap(e())
+    def result(wrapped=False):
+        if wrapped:
+            return e()
+        return unwrap(e())
+
+    return result
 
 
 def apply_parallel(funcs):
