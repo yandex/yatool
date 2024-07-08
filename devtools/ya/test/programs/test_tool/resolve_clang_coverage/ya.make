@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 STYLE_PYTHON()
 
@@ -19,5 +19,6 @@ PEERDIR(
 
 END()
 
-RECURSE_FOR_TESTS(tests)
-
+RECURSE_FOR_TESTS(
+    tests
+)
