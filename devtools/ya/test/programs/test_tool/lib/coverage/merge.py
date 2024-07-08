@@ -133,10 +133,7 @@ def merge_granular_coverage_segments(record, segments):
         compare left end with right start.
         if (covered and (left end + 1 >= right start)) or (not covered and sequential) => segments can be merged
         """
-        if covered:
-            return l_seg[end_line] + 1 >= r_seg[start_line]
-
-        elif l_seg[end_line] == r_seg[start_line]:
+        if l_seg[end_line] == r_seg[start_line]:
             return l_seg[end_shift] + 1 >= r_seg[start_shift]
         else:
             return l_seg[end_line] > r_seg[start_line]
@@ -166,7 +163,7 @@ def merge_granular_coverage_segments(record, segments):
         if left[end_line] != right[start_line]:
             return left[end_line] > right[start_line]
         else:
-            return left[end_shift] >= right[start_shift]
+            return left[end_shift] > right[start_shift]
 
     def merge():
         uni_res = []
@@ -180,9 +177,17 @@ def merge_granular_coverage_segments(record, segments):
                 if not is_equal_starts(cur_seg, seg):
                     # |-----------|
                     #     |-------|
-                    uni_res.append(
-                        [cur_seg[start_line], cur_seg[start_shift], seg[start_line], seg[start_shift], cur_seg[4]]
-                    )
+                    if cur_seg[is_covered]:
+                        uni_res.append(
+                            [
+                                cur_seg[start_line],
+                                cur_seg[start_shift],
+                                seg[start_line],
+                                seg[start_shift],
+                                cur_seg[is_covered],
+                            ]
+                        )
+
                     cur_seg[start_line] = seg[start_line]
                     cur_seg[start_shift] = seg[start_shift]
                 if compare_ends(cur_seg, seg):
@@ -202,9 +207,11 @@ def merge_granular_coverage_segments(record, segments):
                 else:
                     cur_seg = None
             else:
-                uni_res.append(cur_seg)
+                if cur_seg[is_covered]:
+                    uni_res.append(cur_seg)
+
                 cur_seg = seg
-        if cur_seg is not None:
+        if cur_seg is not None and cur_seg[is_covered]:
             uni_res.append(cur_seg)
         return uni_res
 
