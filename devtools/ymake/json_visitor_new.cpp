@@ -390,9 +390,19 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
         return;
     }
 
+    TAutoPtr<THashSet<TString>> seenVars;
+
     auto addVarsFromModule = [&](ui32 moduleElemId) {
         for (const auto& [varName, varValue] : RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars()) {
             if (CurrData->UsedReservedVars->contains(varName)) {
+                if (seenVars) {
+                    if (seenVars->contains(varName)) {
+                        continue;
+                    } else {
+                        seenVars->insert(varName);
+                    }
+                }
+
                 for (const auto& varItem : varValue) {
                     if (varItem.StructCmd) {
                         Y_DEBUG_ABORT_UNLESS(CurrData->StructCmdDetected);
@@ -439,6 +449,11 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
 
     TModule* module = RestoreContext.Modules.Get(moduleElemId);
     if (module->GetAttrs().RequireDepManagement) {
+        seenVars.Reset(new THashSet<TString>{});
+        for (const auto& [varName, _] : RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars()) {
+            seenVars->insert(varName);
+        }
+
         const auto managedPeersListId = RestoreContext.Modules.GetModuleNodeIds(moduleElemId).UniqPeers;
         for (TNodeId peerNodeId : RestoreContext.Modules.GetNodeListStore().GetList(managedPeersListId)) {
             ui32 peerModuleElemId = RestoreContext.Graph[peerNodeId]->ElemId;
