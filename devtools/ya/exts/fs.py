@@ -42,3 +42,11 @@ def remove_tree_with_perm_update(dir):
         logger.debug('Error while changing permissions: %s', e)
 
     remove(safe=True)
+
+
+def fast_relpath(path, start):
+    start = start.rstrip("/") + "/"
+    if path.startswith(start):
+        return path[len(start) :]
+    else:
+        return os.path.relpath(path, start)

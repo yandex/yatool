@@ -333,7 +333,7 @@ class BuildRoot(object):
                     continue
                 try:
                     runner_fs.make_hardlink(
-                        x, os.path.join(into, os.path.relpath(x, self.path)), retries=1, prepare=True
+                        x, os.path.join(into, fs.fast_relpath(x, self.path)), retries=1, prepare=True
                     )
                 except (
                     OSError
