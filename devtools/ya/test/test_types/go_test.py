@@ -106,6 +106,9 @@ class GoTestSuite(common_types.AbstractTestSuite):
         if opts.canonize_tests:
             cmd.append('--report-deselected')
 
+        if getattr(opts, 'allure_report', False):
+            cmd.append('--allure')
+
         return cmd
 
     def get_type(self):

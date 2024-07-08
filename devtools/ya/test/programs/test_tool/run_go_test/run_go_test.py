@@ -38,6 +38,10 @@ TOTAL_TEST_NAME = '[total]'
 
 DIR_WITH_CANONDATA = 'canon'
 
+ALLURE_OUTPUT_PATH_ENV = 'ALLURE_OUTPUT_PATH'
+ALLURE_OUTPUT_FOLDER_ENV = 'ALLURE_OUTPUT_FOLDER'
+ALLURE_DIR = 'allure'
+
 
 def on_timeout(signum, frame):
     raise process.SignalInterruptionError()
@@ -81,6 +85,7 @@ def parse_args():
     parser.add_argument(
         "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
     )
+    parser.add_argument("--allure", action="store_true")
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -519,6 +524,10 @@ def run_tests(opts):
         cmd.extend([x for x in opts.test_param])
     else:
         cmd.extend([x for x in opts.test_binary_args])
+
+    if opts.allure:
+        os.environ[ALLURE_OUTPUT_PATH_ENV] = opts.test_work_dir
+        os.environ[ALLURE_OUTPUT_FOLDER_ENV] = ALLURE_DIR
 
     std_out, std_err = '', ''
     test_elapsed_time = 0
