@@ -81,6 +81,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 test_opts.RuntimeEnvironOptions(),
                 test_opts.TestToolOptions(),
                 test_opts.UidCalculationOptions(cache_tests=False),
+                test_opts.LintersOptions(),
                 core.common_opts.YaBin3Options(),
                 core.common_opts.OutputStyleOptions(),
             ]
