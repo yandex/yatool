@@ -1,6 +1,7 @@
 """
 Fetches resources from sandbox
 """
+
 import collections
 import logging
 import optparse

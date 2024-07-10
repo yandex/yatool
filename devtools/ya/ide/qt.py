@@ -645,9 +645,9 @@ endif()
             settings['env'].append(u'CMAKE_YA_IDE_QT_CONF={}'.format(self._cmake_build_type(conf)))
 
         if self.version >= (2, 8) and self.version < (3, 0):
-            settings['extra_conf'][
-                'CMakeProjectManager.CMakeBuildConfiguration.BuildDirectory'
-            ] = exts.strings.to_unicode(self.build_conf_path(conf))
+            settings['extra_conf']['CMakeProjectManager.CMakeBuildConfiguration.BuildDirectory'] = (
+                exts.strings.to_unicode(self.build_conf_path(conf))
+            )
 
         return settings
 

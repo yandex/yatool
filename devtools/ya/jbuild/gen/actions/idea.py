@@ -1789,18 +1789,20 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
     if not ctx.opts.separate_tests_modules:
         collapse_ut(
             by_path,
-            is_jtest=lambda path: mp2.is_jtest(ctx.by_path[path].plain)
-            if ctx.by_path[path].is_idea_target()
-            else False,
-            is_jtest_for=lambda path: mp2.is_jtest_for(ctx.by_path[path].plain)
-            if ctx.by_path[path].is_idea_target()
-            else False,
-            jtest_for_wat=lambda path: sum(ctx.by_path[path].plain.get(consts.JAVA_TEST_FOR, []), [])
-            if ctx.by_path[path].is_idea_target()
-            else False,
-            is_junit5=lambda path: mp2.is_junit5(ctx.by_path[path].plain)
-            if ctx.by_path[path].is_idea_target()
-            else False,
+            is_jtest=lambda path: (
+                mp2.is_jtest(ctx.by_path[path].plain) if ctx.by_path[path].is_idea_target() else False
+            ),
+            is_jtest_for=lambda path: (
+                mp2.is_jtest_for(ctx.by_path[path].plain) if ctx.by_path[path].is_idea_target() else False
+            ),
+            jtest_for_wat=lambda path: (
+                sum(ctx.by_path[path].plain.get(consts.JAVA_TEST_FOR, []), [])
+                if ctx.by_path[path].is_idea_target()
+                else False
+            ),
+            is_junit5=lambda path: (
+                mp2.is_junit5(ctx.by_path[path].plain) if ctx.by_path[path].is_idea_target() else False
+            ),
         )
 
     warns = warn_uniq_names(by_path)

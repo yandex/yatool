@@ -230,10 +230,8 @@ def resolve_env_vars(config, env=None):
     env_macro = re.compile(r'\$\{(?P<id>\w+)\}')
 
     def normalize_config(data):
-        subst_env = (
-            lambda v: env_macro.sub(lambda m: env.get(m.group('id'), m.group(0)), v)
-            if isinstance(v, (six.string_types))
-            else v
+        subst_env = lambda v: (  # noqa: E731
+            env_macro.sub(lambda m: env.get(m.group('id'), m.group(0)), v) if isinstance(v, (six.string_types)) else v
         )
         return dict((k, subst_env(v)) for k, v in six.iteritems(data))
 
