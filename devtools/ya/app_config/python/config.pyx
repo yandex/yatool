@@ -2,6 +2,8 @@ from libcpp cimport bool
 from util.generic.string cimport TString
 
 cdef extern from "devtools/ya/app_config/lib/config.h" namespace "NYa::NConfig" nogil:
+    cdef TString DocumentationUrl
+    cdef TString SupportUrl
     cdef TString Description
     cdef bool HasMapping
     cdef bool InHouse
@@ -11,6 +13,8 @@ cdef extern from "devtools/ya/app_config/lib/config.h" namespace "NYa::NConfig" 
     cdef TString ExtraConfRoot
 
 
+documentation_url = DocumentationUrl.decode()
+support_url = SupportUrl.decode()
 description = Description.decode()
 has_mapping = HasMapping
 in_house = InHouse

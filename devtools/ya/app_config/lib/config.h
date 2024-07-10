@@ -2,6 +2,8 @@
 #include <library/cpp/resource/resource.h>
 
 namespace NYa::NConfig {
+    extern const TString DocumentationUrl;
+    extern const TString SupportUrl;
     extern const TString Description;
     extern const bool HasMapping;
     extern const bool InHouse;

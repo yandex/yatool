@@ -6,6 +6,7 @@ import six
 import sys
 import time
 
+import app_config
 import core.config
 import core.gsid
 import core.sig_handler
@@ -167,8 +168,6 @@ def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=
 
 
 def configure_self_info():
-    import app_config
-
     logger.debug("origin: %s", "arcadia" if app_config.in_house else "github")
     logger.debug("python: %s", sys.version_info)
     yield True
@@ -456,8 +455,6 @@ def configure_fetcher_params(app_ctx):
         and getattr(app_ctx.params, 'oauth_exchange_ssh_keys', False)
         and not core.config.has_mapping()
     ):
-        import app_config
-
         if not app_config.have_oauth_support:
             yield custom_fetcher, fetcher_params, None
             return
@@ -488,7 +485,6 @@ def configure_fetcher(app_ctx):
 
 
 def configure_fetchers_storage(app_ctx):
-    import app_config
     import yalibrary.fetcher.fetchers_storage as fetchers_storage
 
     have_sandbox = app_config.in_house or app_config.have_sandbox_fetcher
@@ -772,6 +768,7 @@ def configure_exit_interceptor(error_file):
 
         if mute_error:
             print_message(e)
+            error_code = core.error.ExitCodes.GENERIC_ERROR
         else:
             import traceback
 
@@ -780,6 +777,15 @@ def configure_exit_interceptor(error_file):
                 encoding=exts.strings.get_stream_encoding(sys.stderr),
             )
             sys.stderr.write(exc_str)
+
+            if app_config.in_house:
+                sys.stderr.write(
+                    "If you have problems with ya, you can submit a request to our support: {}\n".format(
+                        app_config.support_url
+                    )
+                )
+
+            error_code = core.error.ExitCodes.UNHANDLED_EXCEPTION
 
         no_space_left = False
         if isinstance(e, OSError):
@@ -793,9 +799,10 @@ def configure_exit_interceptor(error_file):
                 "Seems like you have no space left on device. \n"
                 "You can try: \n"
                 "* run `ya --no-logs gc cache`\n"
-                "* remove some `~/.ya` subdirectories\n"
-                "* ask https://st.yandex-team.ru/createTicket?queue=DEVTOOLSSUPPORT&_form=65090\n"
+                "* remove some `~/.ya/` subdirectories\n"
             )
+            if app_config.in_house:
+                sys.stderr.write("* ask  for help: {}\n".format(app_config.support_url))
 
         if error_file:
             if not no_space_left:
@@ -806,17 +813,6 @@ def configure_exit_interceptor(error_file):
             else:
                 sys.stderr.write("Can't write error into file")
 
-        import app_config
-
-        if app_config.in_house:
-            sys.stderr.write(
-                "If you have some troubles with ya-bin, you can send request "
-                "to our support: "
-                "https://st.yandex-team.ru/createTicket?queue=DEVTOOLSSUPPORT&_form=65090"
-                "\n"
-            )
-
-        error_code = 1
         if not retriable_error:
             error_code = core.error.ExitCodes.NOT_RETRIABLE_ERROR
         elif temp_error:
