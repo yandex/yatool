@@ -10,6 +10,7 @@ NO_LINT()
 
 NO_CHECK_IMPORTS(
     pip.__pip-runner__
+    pip._internal.locations._distutils
     pip._vendor.*
 )
 
