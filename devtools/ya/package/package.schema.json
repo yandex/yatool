@@ -724,6 +724,10 @@
                     "description": "Do not sign debian package",
                     "type": "boolean"
                 },
+                "sign_debsigs": {
+                    "description": "When debian package signing is enabled, also sign using debsigs",
+                    "type": "boolean"
+                },
                 "sloppy_deb": {
                     "description": "Fewer checks and no compression when building debian package",
                     "type": "boolean"

@@ -354,6 +354,7 @@ class PackageCustomizableOptions(core.yarg.Options):
         self.resource_attrs = {}
         self.resource_type = "YA_PACKAGE"
         self.sign = True
+        self.sign_debsigs = False
         self.sloppy_deb = False
         self.store_debian = True
         self.strip = False
@@ -559,6 +560,13 @@ class PackageCustomizableOptions(core.yarg.Options):
                 names=['--not-sign-debian'],
                 help='Do not sign debian package',
                 hook=core.yarg.SetConstValueHook('sign', False),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DEB_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--sign-debsigs'],
+                help='When debian package signing is enabled, also sign using debsigs',
+                hook=core.yarg.SetConstValueHook('sign_debsigs', True),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DEB_SUBGROUP,
             ),

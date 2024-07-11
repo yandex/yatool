@@ -81,12 +81,16 @@ Description: Debug symbols for {package}
 
 DCH_COMMAND = "dch"
 
+# NOTE: must be a single line & must not include '='
+DEBSIGS_HOOK = "debsigs -v --sign origin {key} ../*.deb"
+
 
 def create_debian_package(
     result_dir,
     package_context,
     arch_all,
     sign,
+    sign_debsigs,
     key,
     sloppy_deb,
     publish_to_list,
@@ -131,6 +135,13 @@ def create_debian_package(
 
                 if not sign:
                     args.extend(['-i', '-us', '-uc'])
+
+                # This hook is passed through to dpkg-buildpackage,
+                # so it must be placed after all the regular debuild arguments
+                if sign and sign_debsigs:
+                    debsigs_hook_key = '--default-key {}'.format(key) if key else ''
+                    debsigs_hook = DEBSIGS_HOOK.format(key=debsigs_hook_key)
+                    args.append('--hook-buildinfo={}'.format(debsigs_hook))
 
                 package.process.run_process(
                     DEBUILD_COMMAND,

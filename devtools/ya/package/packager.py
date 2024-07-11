@@ -777,6 +777,7 @@ def create_package(package_context, output_root, builds):
                     package_context,
                     params.arch_all,
                     params.sign,
+                    params.sign_debsigs,
                     params.key,
                     params.sloppy_deb,
                     params.publish_to,
