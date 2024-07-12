@@ -1,7 +1,6 @@
 import errno
 import logging
 import os.path
-import stat
 import filecmp
 
 import exts.fs
@@ -28,13 +27,11 @@ def prepare_parent_dir(link):
     link_dir = os.path.dirname(link)
 
     if link_dir:
-        try:
-            s = os.lstat(link_dir)
-            if not stat.S_ISDIR(s.st_mode):
-                logger.warning('Can\'t create parent parent directory %s: not a directory', link_dir)
-                return False
-        except OSError:
+        if not os.path.exists(link_dir) and not os.path.islink(link_dir):
             exts.fs.create_dirs(link_dir)
+        elif not os.path.isdir(link_dir):
+            logger.warning('Can\'t create parent parent directory %s: not a directory', link_dir)
+            return False
 
     return True
 
