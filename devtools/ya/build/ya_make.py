@@ -228,6 +228,12 @@ def _checkout(opts, display=None):
     if not getattr(opts, "checkout", False):
         return
 
+    from yalibrary import vcs
+
+    if vcs.detect_vcs_type(opts.arc_root) != "svn":
+        logging.warn("--checkout supported only for SVN, option skipped")
+        return
+
     from yalibrary import checkout
 
     fetcher = checkout.VcsFetcher(opts.arc_root)
