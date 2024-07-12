@@ -294,3 +294,7 @@ message TGraphChangesPrediction {
     option (message_id) = 47;
     required bool PredictsStructuralChanges = 1;
 };
+
+message TReadyForUpdateCacheInfo {
+    option (message_id) = 48;
+};

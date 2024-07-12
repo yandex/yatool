@@ -3,6 +3,7 @@
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/common/probe.h>
 #include <devtools/ymake/diag/dbg.h>
+#include <devtools/ymake/diag/trace.h>
 
 #include <util/system/execpath.h>
 #include <util/string/split.h>
@@ -146,4 +147,5 @@ void TStartUpOptions::OnDepsCacheSaved() const {
         // Use CopyTo instead RenameTo, because few ymake run may use one CacheInfoFile
         CacheInfoFile.CopyTo(CacheInfoOutputFile, true);
     }
+    FORCE_TRACE(T, NEvent::TReadyForUpdateCacheInfo{});
 }
