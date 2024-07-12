@@ -680,6 +680,7 @@ class SandboxAuthOptions(AuthOptions):
             ),
             ConfigConsumer('sandbox_token', hook=SetValueHook('oauth_token')),
             EnvConsumer('SANDBOX_TOKEN', help='oAuth token', hook=SetValueHook('oauth_token')),
+            EnvConsumer('SB_TOKEN', help='oAuth token path', hook=SetValueHook('oauth_token_path')),
             ArgConsumer(
                 [self.ssh_user_option_name],
                 help='Custom user name for authorization',
