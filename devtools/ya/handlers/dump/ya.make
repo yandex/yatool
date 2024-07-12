@@ -48,5 +48,6 @@ END()
 
 RECURSE_FOR_TESTS(
     bin
+    conf/bin
     tests
 )
