@@ -139,6 +139,10 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
 void TStartUpOptions::OnDepsCacheEnabled() const {
     if (CacheInfoOutputFile.IsDefined()) {
         CacheInfoOutputFile.DeleteIfExists();
+    } else {
+        // Magic ortopedia - remove commit hash by known basename
+        auto const KnownCacheInfoOutputFile = BuildRoot / "hash";
+        KnownCacheInfoOutputFile.DeleteIfExists();
     }
 }
 
