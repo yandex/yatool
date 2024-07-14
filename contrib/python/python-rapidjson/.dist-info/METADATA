@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: python-rapidjson
-Version: 1.17
+Version: 1.18
 Summary: Python wrapper around rapidjson
 Home-page: https://github.com/python-rapidjson/python-rapidjson
 Author: Ken Robbins
@@ -154,6 +154,14 @@ __ https://python-rapidjson.readthedocs.io/en/latest/quickstart.html#incompatibi
 
 Changes
 -------
+
+1.18 (2024-06-29)
+~~~~~~~~~~~~~~~~~
+
+* Expose PEP-484 typing stubs, thanks to Rodion Kosianenko and GoodWasHere (`PR #204`__)
+
+  __ https://github.com/python-rapidjson/python-rapidjson/pull/204
+
 
 1.17 (2024-05-18)
 ~~~~~~~~~~~~~~~~~
