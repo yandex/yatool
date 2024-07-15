@@ -565,7 +565,8 @@ class PackageCustomizableOptions(core.yarg.Options):
             ),
             core.yarg.ArgConsumer(
                 names=['--sign-debsigs'],
-                help='When debian package signing is enabled, also sign using debsigs',
+                help='When debian package signing is enabled, also sign using debsigs'
+                ' (package \'debsigs\' must be installed to use this feature)',
                 hook=core.yarg.SetConstValueHook('sign_debsigs', True),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DEB_SUBGROUP,

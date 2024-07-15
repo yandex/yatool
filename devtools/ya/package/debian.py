@@ -81,8 +81,12 @@ Description: Debug symbols for {package}
 
 DCH_COMMAND = "dch"
 
-# NOTE: must be a single line & must not include '='
-DEBSIGS_HOOK = "debsigs -v --sign origin {key} ../*.deb"
+# This hook runs in the unpacked source directory (as per `man dpkg-buildpackage`),
+# which in this case is new_result_dir. Build outputs are produced in the parent
+# directory (see https://www.debian.org/doc/manuals/maint-guide/), i.e. temp_dir,
+# hence the use of the wildcard '../*.deb'.
+# NOTE: hook must be a single line & must not include '='
+DEBSIGS_HOOK_FMT = "debsigs -v --sign origin {key} ../*.deb"
 
 
 def create_debian_package(
@@ -140,7 +144,7 @@ def create_debian_package(
                 # so it must be placed after all the regular debuild arguments
                 if sign and sign_debsigs:
                     debsigs_hook_key = '--default-key {}'.format(key) if key else ''
-                    debsigs_hook = DEBSIGS_HOOK.format(key=debsigs_hook_key)
+                    debsigs_hook = DEBSIGS_HOOK_FMT.format(key=debsigs_hook_key)
                     args.append('--hook-buildinfo={}'.format(debsigs_hook))
 
                 package.process.run_process(

@@ -725,7 +725,7 @@
                     "type": "boolean"
                 },
                 "sign_debsigs": {
-                    "description": "When debian package signing is enabled, also sign using debsigs",
+                    "description": "When debian package signing is enabled, also sign using debsigs (package 'debsigs' must be installed to use this feature)",
                     "type": "boolean"
                 },
                 "sloppy_deb": {
