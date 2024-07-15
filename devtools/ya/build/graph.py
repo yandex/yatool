@@ -1693,7 +1693,7 @@ class _GraphMaker(object):
             o['cache_info_file'] = self._local_cl_generator.path_to_current_hash
             o['cache_info_name'] = self._local_cl_generator.DEFAULT_HASH_FILE_NAME
             if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
-                o['debug_options'].append('completely-trust-fs-cache')
+                o['debug_options'] += ['completely-trust-fs-cache']
         else:
             o['patch_path'] = change_list
 
