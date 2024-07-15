@@ -70,7 +70,7 @@ def fix_python_with_black(data, path, fast, args):
 def _launch_ruff(data, path, config_path, cmd_args):
     # type(str, str, str, list[str]) -> str
 
-    ruff_args = [yalibrary.tools.tool('ruff')] + cmd_args + ['--config', config_path, '-']
+    ruff_args = [yalibrary.tools.tool('ruff')] + cmd_args + ['--config', config_path, '-s', '-']
 
     p = subprocess.Popen(
         ruff_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True
