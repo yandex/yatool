@@ -247,7 +247,7 @@ namespace {
         }
 
         TSyntax::TTransformation& GetCurrentXfm() {
-            return std::get<TSyntax::TTransformation>(Syntax.Script.back().back().back());
+            return std::get<TSyntax::TTransformation>(GetCurrentCommand().back().back());
         }
 
         std::string_view Unvariable(std::string_view s) {

@@ -518,25 +518,71 @@ const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const 
 }
 
 struct TCommands::TCmdWriter {
+
     // TODO .reserve hints
     TCmdWriter(NCommands::TSyntax& s, bool argMode): S(s), ArgMode(argMode) {}
+
     void BeginCommand()  { S.Script.emplace_back(); }
     void BeginArgument() { S.Script.back().emplace_back(); }
     template<typename T>
     void WriteTerm(T t)  {
-        if constexpr (std::is_same_v<T, NPolexpr::EVarId>) {
-            if (ArgMode) {
-                S.Script.back().back().emplace_back(NCommands::TSyntax::TUnexpanded(t));
-                return;
-            }
-        }
-        S.Script.back().back().emplace_back(std::move(t));
+        S.Script.back().back().push_back(
+            ArgMode
+            ? LockVariables(std::move(t))
+            : UnlockVariables(std::move(t))
+        );
     }
     void EndArgument()   { if (S.Script.back().back().empty()) S.Script.back().pop_back(); }
     void EndCommand()    { if (S.Script.back().empty()) S.Script.pop_back(); }
+
+private:
+    template<typename T>
+    NCommands::TSyntax::TTerm LockVariables(T&& x) {
+        return std::forward<T>(x);
+    }
+    template<>
+    NCommands::TSyntax::TTerm LockVariables(NCommands::TSyntax::TTerm&& x) {
+        return std::visit([&](auto&& y) {return LockVariables(std::move(y));}, std::move(x));
+    }
+    template<>
+    NCommands::TSyntax::TTerm LockVariables(NPolexpr::EVarId&& x) {
+        return NCommands::TSyntax::TUnexpanded(x);
+    }
+    template<>
+    NCommands::TSyntax::TTerm LockVariables(NCommands::TSyntax::TTransformation&& x) {
+        for (auto& arg : x.Body)
+            for (auto& term : arg)
+                term = LockVariables(std::move(term));
+        // TBD: TModifier::TValueTerm does not support TUnexpanded; do we need it there, as well?
+        return std::move(x);
+    }
+
+private:
+    template<typename T>
+    NCommands::TSyntax::TTerm UnlockVariables(T&& x) {
+        return std::forward<T>(x);
+    }
+    template<>
+    NCommands::TSyntax::TTerm UnlockVariables(NCommands::TSyntax::TTerm&& x) {
+        return std::visit([&](auto&& y) {return UnlockVariables(std::move(y));}, std::move(x));
+    }
+    template<>
+    NCommands::TSyntax::TTerm UnlockVariables(NCommands::TSyntax::TUnexpanded&& x) {
+        return x.Variable;
+    }
+    template<>
+    NCommands::TSyntax::TTerm UnlockVariables(NCommands::TSyntax::TTransformation&& x) {
+        for (auto& arg : x.Body)
+            for (auto& term : arg)
+                term = UnlockVariables(std::move(term));
+        // TBD: TModifier::TValueTerm does not support TUnexpanded; do we need it there, as well?
+        return std::move(x);
+    }
+
 private:
     NCommands::TSyntax& S;
-    bool ArgMode;
+    const bool ArgMode;
+
 };
 
 void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst) {
@@ -555,6 +601,12 @@ void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TS
             argName.Chop(strlen(NStaticConf::ARRAY_SUFFIX));
         auto writer = TCmdWriter(dst.VarDefinitions[argName], true);
         InlineCommands(src.Arguments[i].Script, writer);
+#if 0
+        YDebug()
+            << "macro args eval for " << Commands.Values.GetVarName(src.Function) << "[" << i << "]: "
+            << Commands.PrintExpr(src.Arguments[i]) << " -> "
+            << Commands.PrintExpr(dst.VarDefinitions[argName]) << Endl;
+#endif
     }
 }
 
@@ -735,7 +787,7 @@ void TCommands::TInliner::InlineScalarTerms(
                 Y_ABORT();
             },
             [&](const NCommands::TSyntax::TUnexpanded& x) {
-                writer.WriteTerm(x.Variable);
+                writer.WriteTerm(x);
             },
         }, term);
     }
