@@ -53,16 +53,9 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
         devtools/ya/handlers/yav
-        devtools/ya/handlers/py23migration/_ya0bin2
-        devtools/ya/handlers/py23migration/_ya0bin3
-        devtools/ya/handlers/py23migration/_ya2bin0
-        devtools/ya/handlers/py23migration/_ya2bin2
-        devtools/ya/handlers/py23migration/_ya3bin0
-        devtools/ya/handlers/py23migration/_ya3bin3
     )
     IF (PYTHON3)
         PEERDIR(
-            devtools/ya/handlers/py23migration/py23_utils
             devtools/ya/handlers/vim
             devtools/ya/handlers/curl
             devtools/ya/handlers/neovim
@@ -137,15 +130,3 @@ RECURSE(
     ydb
     yql
 )
-
-IF (NOT OPENSOURCE)
-    RECURSE(
-        py23migration/_ya0bin2
-        py23migration/_ya0bin3
-        py23migration/_ya2bin0
-        py23migration/_ya3bin0
-        py23migration/_ya3bin3
-        py23migration/_ya2bin2
-        py23migration/py23_utils
-    )
-ENDIF()
