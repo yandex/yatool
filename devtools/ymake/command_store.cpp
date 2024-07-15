@@ -467,7 +467,7 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
     TStringBuf subName, subValue;
     ParseLegacyCommandOrSubst(var->front().Name, subId, subName, subValue);
     Y_ASSERT(name == subName);
-    Y_ASSERT(GetMacroType(subValue) == EMT_MacroDef);
+    //Y_ASSERT(GetMacroType(subValue) == EMT_MacroDef); // this breaks on empty .CMD, returns EMT_MacroCall
 
     // check the parser cache
 

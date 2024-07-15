@@ -88,13 +88,13 @@ namespace {
 
         // single-quoted terms
 
-        std::any visitTermSQR(CmdParser::TermSQRContext *ctx) override { return doVisitTermR(ctx); }
+        std::any visitTermSQR(CmdParser::TermSQRContext *ctx) override { return doVisitTermQR(ctx); }
         std::any visitTermSQV(CmdParser::TermSQVContext *ctx) override { return doVisitTermV(ctx); }
         std::any visitTermSQX(CmdParser::TermSQXContext *ctx) override { return doVisitTermX(ctx); }
 
         // double-quoted terms
 
-        std::any visitTermDQR(CmdParser::TermDQRContext *ctx) override { return doVisitTermR(ctx); }
+        std::any visitTermDQR(CmdParser::TermDQRContext *ctx) override { return doVisitTermQR(ctx); }
         std::any visitTermDQV(CmdParser::TermDQVContext *ctx) override { return doVisitTermV(ctx); }
         std::any visitTermDQX(CmdParser::TermDQXContext *ctx) override { return doVisitTermX(ctx); }
 
@@ -150,6 +150,12 @@ namespace {
             return visitChildren(ctx);
         }
 
+        std::any doVisitTermQR(antlr4::RuleContext *ctx) {
+            auto& arg = GetCurrentArgument();
+            arg.emplace_back(Values.InsertStr(Unescape(ctx->getText())));
+            return visitChildren(ctx);
+        }
+
         std::any doVisitTermC(CmdParser::TermCContext *ctx) {
             auto rawArgs = TSyntax::TCommand();
             auto result = std::any();
@@ -182,6 +188,8 @@ namespace {
     private:
 
         TVector<TSyntax> CollectArgs(TStringBuf macroName, TSyntax::TCommand rawArgs) {
+            // see the "functions/arg-passing" test for the sorts of patterns this logic is supposed to handle
+
             //
             // block data representations:
             // `macro FOOBAR(A, B[], C...) {...}`  -->  ArgNames == {"B...", "A", "C..."}, Keywords = {"B"}
@@ -196,44 +204,105 @@ namespace {
             auto blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
             Y_ASSERT(blockData); // TODO handle unknown macros
 
-            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size(), {{TSyntax::TCommand()}});
-            TSyntax* namedArg = nullptr;
+            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size());
+            const TKeyword* kwDesc = nullptr;
 
             auto kwArgCnt = blockData->CmdProps->Keywords.size();
             auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->Keywords.size();
-            auto hasVarArg = blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
-            for (auto rawArg = rawArgs.begin(); rawArg != rawArgs.end(); ++rawArg) {
+            auto hasVarArg = !blockData->CmdProps->ArgNames.empty() && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+
+            for (size_t i = 0; i != posArgCnt; ++i)
+                args[kwArgCnt + i].Script.emplace_back();
+            if (hasVarArg)
+                --posArgCnt;
+
+            auto maybeStartNamedArg = [&]() {
+                Y_ASSERT(kwDesc);
+                auto namedArg = &args[kwDesc->Pos];
+                if (kwDesc->To == 0)
+                    return;
+                if (namedArg->Script.empty())
+                    namedArg->Script.emplace_back();
+            };
+
+            auto maybeFinishNamedArg = [&]() {
+                if (!kwDesc)
+                    return;
+                auto namedArg = &args[kwDesc->Pos];
+                if (kwDesc->To == 0) {
+                    if (namedArg->Script.empty()) // it will not be empty if we repeat the respective arg; TBD do we even want to allow this?
+                        AssignPreset(namedArg->Script, kwDesc->OnKwPresent);
+                    kwDesc = nullptr;
+                    return;
+                }
+                if (namedArg->Script.back().size() == kwDesc->To)
+                    kwDesc = nullptr;
+            };
+
+            size_t posArg = 0;
+            for (auto rawArg = rawArgs.begin(); rawArg != rawArgs.end(); ++rawArg, maybeFinishNamedArg()) {
 
                 if (rawArg->size() == 1)
-                    if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front()))
-                        if (blockData->CmdProps->HasKeyword(kw->Value)) {
-                            namedArg = &args[blockData->CmdProps->Key2ArrayIndex(kw->Value)];
+                    if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front())) {
+                        auto kwDescIt = blockData->CmdProps->Keywords.find(kw->Value);
+                        if (kwDescIt != blockData->CmdProps->Keywords.end()) {
+                            kwDesc = &kwDescIt->second;
+                            maybeStartNamedArg();
                             continue;
                         }
+                    }
 
                 for (auto& term : *rawArg)
                     if (auto str = std::get_if<TSyntax::TIdOrString>(&term))
                         term = Values.InsertStr(str->Value);
 
-                if (namedArg) {
+                if (kwDesc) {
+                    auto namedArg = &args[kwDesc->Pos];
                     namedArg->Script.back().push_back(std::move(*rawArg));
-                    continue;
+                } else {
+                    if (posArg < posArgCnt)
+                        args[kwArgCnt + posArg].Script.back().push_back(std::move(*rawArg));
+                    else if (hasVarArg)
+                        args[kwArgCnt + posArgCnt].Script.back().push_back(std::move(*rawArg));
+                    else
+                        throw TError()
+                            << "Macro " << macroName
+                            << " called with too many positional arguments"
+                            << " (" << posArgCnt << " expected)";
+                    ++posArg;
                 }
-
-                size_t rawPos = rawArg - rawArgs.begin();
-                if (rawPos < posArgCnt)
-                    args[kwArgCnt + rawPos].Script.back().push_back(std::move(*rawArg));
-                else if (hasVarArg)
-                    args[kwArgCnt + posArgCnt - 1].Script.back().push_back(std::move(*rawArg));
-                else
-                    throw TError()
-                        << "Macro " << macroName
-                        << " called with too many positional arguments"
-                        << " (" << posArgCnt << " expected)";
 
             }
 
+            if (posArg < posArgCnt)
+                throw TError()
+                    << "Macro " << macroName
+                    << " called with too few positional arguments"
+                    << " (" << posArgCnt << (hasVarArg ? " or more" : "") << " expected)";
+
+            for (auto& kw : blockData->CmdProps->Keywords) {
+                auto namedArg = &args[kw.second.Pos];
+                if (!namedArg->Script.empty()) {
+                    Y_ASSERT(namedArg->Script.size() == 1);
+                    if (namedArg->Script.back().size() < kw.second.From)
+                        throw TError()
+                            << "Macro " << macroName
+                            << " did not get enough data for the named argument " << kw.first;
+                }
+                if (namedArg->Script.empty())
+                    AssignPreset(namedArg->Script, kw.second.OnKwMissing);
+            }
+
             return args;
+        }
+
+        void AssignPreset(TSyntax::TScript& dst, const TVector<TString>& src) {
+            Y_ASSERT(dst.empty());
+            TSyntax::TArgument arg;
+            arg.reserve(src.size());
+            for (auto& s : src)
+                arg.emplace_back(Values.InsertStr(s));
+            dst.push_back({std::move(arg)});
         }
 
     private:
