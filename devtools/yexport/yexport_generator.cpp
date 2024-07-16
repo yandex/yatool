@@ -2,10 +2,8 @@
 
 #include "cmake_generator.h"
 #include "jinja_generator.h"
-#include "generator_spec.h"
 #include "generators.h"
 #include "py_requirements_generator.h"
-#include "spec_based_generator.h"
 
 #include <util/generic/scope.h>
 
@@ -17,20 +15,14 @@ THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& ar
     const std::optional<TDumpOpts> dumpOpts, const std::optional<TDebugOpts> debugOpts
 ) {
     if (generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
-#ifdef CMAKE_AS_HARDCODED_CMAKE
-        spdlog::warn("Use generator 'cmake' as 'hardcoded-cmake'");
-        return TJinjaGenerator::Load(arcadiaRoot, "cmake", configDir, dumpOpts, debugOpts);
-#else
         return TCMakeGenerator::Load(arcadiaRoot, generator, configDir);
-#endif
-    }
-    if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
+    } else if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py3);
-    }
-    if (generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
+    } else if (generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py2);
+    } else {
+        return TJinjaGenerator::Load(arcadiaRoot, generator, configDir, dumpOpts, debugOpts);
     }
-    return TJinjaGenerator::Load(arcadiaRoot, generator, configDir, dumpOpts, debugOpts);
 }
 
 void TYexportGenerator::RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored) {

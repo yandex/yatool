@@ -22,7 +22,7 @@ struct TOpts {
     std::string ProjectName;
     TVector<fs::path> SemGraphs;
     TVector<std::string> Platforms;
-    std::string Generator;
+    std::optional<std::string> Generator;
 
     bool CleanIgnored = false;
     bool ReportIgnored = false;

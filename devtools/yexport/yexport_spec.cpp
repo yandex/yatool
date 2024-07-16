@@ -7,6 +7,8 @@
 
 #include <util/string/builder.h>
 
+#include <spdlog/spdlog.h>
+
 #include <fstream>
 
 namespace NYexport {
@@ -22,6 +24,8 @@ namespace NKeys {
     constexpr const char* Addition = "addition"; ///< String for addition to sem data
     constexpr const char* Name = "name"; ///< Name of sem
     constexpr const char* Args = "args"; ///< Args of sem
+
+    constexpr const char* DefaultGenerator = "default_generator"; ///< Name of default generator
 }
 
 namespace {
@@ -256,6 +260,26 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
     } catch (const std::out_of_range& err) {
         throw TBadYexportSpec{err.what()};
     }
+}
+
+std::optional<std::string> GetDefaultGenerator(const fs::path& path) {
+    auto spath = path.string();
+    if (fs::exists(path)) {
+        try {
+            std::ifstream input{path};
+            if (!input) {
+                throw std::system_error{errno, std::system_category(), "failed to open " + spath};
+            }
+            const auto doc = toml::parse(input, spath);
+            if (!doc.contains(NKeys::DefaultGenerator)) {
+                return {};
+            }
+            return toml::get<std::string>(find<toml::value>(doc, NKeys::DefaultGenerator));
+        } catch (const std::exception& err) {
+            spdlog::error("Can't detect " + std::string{NKeys::DefaultGenerator} + " from " + spath + ": " + err.what());
+        }
+    }
+    return {};
 }
 
 void TYexportSpec::Dump(IOutputStream& out) const {

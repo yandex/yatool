@@ -49,8 +49,9 @@ inline bool operator== (const TYexportSpec& a, const TYexportSpec& b) noexcept {
     return a.Dump() == b.Dump();
 };
 
-TYexportSpec ReadYexportSpec(const std::filesystem::path& path);
-TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& path);
+TYexportSpec ReadYexportSpec(const fs::path& path);
+TYexportSpec ReadYexportSpec(std::istream& input, const fs::path& path);
+std::optional<std::string> GetDefaultGenerator(const fs::path& path);
 
 struct TBadYexportSpec: public std::runtime_error {
     TBadYexportSpec(const std::string& msg)

@@ -26,9 +26,7 @@ TOpts TOpts::Parse(int argc, char** argv) {
     opts.AddLongOption('C', "clean-ignored", "Remove subdirs with project ignored by the export").StoreTrue(&ret.CleanIgnored);
     opts.AddLongOption('I', "report-ignored", "Report subdirs with project ignored by the export as evlog events (noop of events rerting is turned off)").StoreTrue(&ret.ReportIgnored);
     opts.AddLongOption('l', "list", "Show a list of available generators").StoreTrue(&ret.List);
-    opts.AddLongOption('G', "generator", "Generator to use")
-        .StoreResult(&ret.Generator)
-        .DefaultValue(NGenerators::HARDCODED_CMAKE_GENERATOR);
+    opts.AddLongOption('G', "generator", "Generator to use").StoreResult(&ret.Generator);
     opts.AddLongOption('P', "py-deps-dump", "Path to the result of `ya dump dep-graph --flat-json-files --no-legacy-deps` result (for python-requirements generator only)")
         .StoreResult(&ret.PyDepsDump);
     opts.AddLongOption("py2", "Use python2 contrib version [deprecated]").NoArgument().StoreValue(&ret.PyVer, "py2");

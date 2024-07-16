@@ -2,9 +2,8 @@
 #include "logging.h"
 
 #include "../generators.h"
-#include "../generator_spec.h"
-#include "../read_sem_graph.h"
 #include "../yexport_generator.h"
+#include "../spec_based_generator.h"
 
 #include <library/cpp/getopt/small/last_getopt.h>
 
@@ -34,19 +33,30 @@ int main(int argc, char** argv) try {
         return 0;
     }
 
-    auto generator = Load(opts.Generator, opts.ArcadiaRoot, opts.ConfigDir, opts.DumpOpts, opts.DebugOpts);
+    if (!opts.Generator.has_value()) {
+        if (!opts.ConfigDir.empty()) {
+            auto yexportToml = opts.ConfigDir / TSpecBasedGenerator::YEXPORT_FILE;
+            opts.Generator = GetDefaultGenerator(yexportToml);
+        }
+        if (!opts.Generator.has_value()) {
+            opts.Generator = NGenerators::HARDCODED_CMAKE_GENERATOR;
+        }
+    }
+
+    const auto& generatorName = opts.Generator.value();
+    auto generator = Load(generatorName, opts.ArcadiaRoot, opts.ConfigDir, opts.DumpOpts, opts.DebugOpts);
     generator->SetProjectName(opts.ProjectName);
 
-    if (opts.Generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || opts.Generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
+    if (generatorName == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || generatorName == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
         if (opts.PyDepsDump.empty()) {
-            spdlog::error("path to py dependency dump is required for the {} generator", opts.Generator);
+            spdlog::error("path to py dependency dump is required for the {} generator", generatorName);
             return 1;
         }
         generator->LoadSemGraph("", opts.PyDepsDump);
     }
     if (opts.Platforms.empty() || generator->IgnorePlatforms()) { // no platforms, load strong one semgraph with empty platform name
         if (opts.SemGraphs.size() != 1) {
-            spdlog::error("Requires exactly one semantic graph while using generator {}", opts.Generator);
+            spdlog::error("Requires exactly one semantic graph while using generator {}", generatorName);
             return 1;
         }
         generator->LoadSemGraph("", opts.SemGraphs.front());
