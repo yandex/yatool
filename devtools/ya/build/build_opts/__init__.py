@@ -752,6 +752,7 @@ class MavenImportOptions(SandboxUploadOptions):
         self.contrib_owner = None
         self.dry_run = False
         self.unified_mode = True
+        self.replace_version = {}
         self.write_licenses = True
         self.canonize_licenses = True
         self.minimal_pom_validation = True
@@ -806,6 +807,12 @@ class MavenImportOptions(SandboxUploadOptions):
                 group=MAVEN_OPT_GROUP,
             ),
             FreeArgConsumer(help=mi.Artifact.FORMAT + ' ...', hook=SetValueHook('libs')),
+            ArgConsumer(
+                ['--replace-version'],
+                help='Replace dependency lib version (or specify if missing)',
+                hook=DictPutHook('replace_version'),
+                group=MAVEN_OPT_GROUP,
+            ),
             ArgConsumer(
                 ['--no-write-licenses'],
                 help='Write contribs licenses into ya.make\'s',

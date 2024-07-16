@@ -67,6 +67,10 @@ class ArtifactUploadError(Exception):
     mute = True
 
 
+class NoArtefactVersionError(Exception):
+    mute = True
+
+
 class Artifact(object):
     FORMAT = '<groupId>:<artifactId>[:<extension>[:<classifier>]]:<version>'
 
@@ -94,11 +98,11 @@ class Artifact(object):
         )
 
     @staticmethod
-    def from_unified_dict(dct):
+    def from_unified_dict(dct, set_version=True):
         return Artifact(
             dct['group_id'],
             dct['artifact_id'],
-            dct['version'],
+            dct.get('version') if set_version else None,
             dct.get('extension'),
             dct.get('classifier'),
         )
@@ -1262,8 +1266,10 @@ def import_unified(
                     logger.info("License aliases file {} are updated".format(license_aliases_file))
             except Exception as e:
                 logger.warning("Can't update license aliases: {}".format(e))
+
+        replace_version = opts.replace_version
         for data in meta:
-            key = Artifact.from_unified_dict(data['artifact'])
+            key = extract_artefact(data['artifact'], replace_version)
             my_licenses = [
                 licenses_map.get(license_aliases.get(i, i), license_aliases.get(i, i)) for i in data.get('licenses', [])
             ]
@@ -1281,9 +1287,9 @@ def import_unified(
                 'pom_file': data.get('pom_file'),
                 'jar_file': data.get('jar_file'),
                 'source_file': data.get('source_file'),
-                'includes': [Artifact.from_unified_dict(i['artifact']) for i in data.get('managed_imports', [])],
-                'peerdirs': [Artifact.from_unified_dict(i['artifact']) for i in data.get('dependencies', [])],
-                'dm': [Artifact.from_unified_dict(i['artifact']) for i in data.get('managed_dependencies', [])],
+                'includes': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_imports', [])],
+                'peerdirs': [extract_artefact(i['artifact'], replace_version) for i in data.get('dependencies', [])],
+                'dm': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_dependencies', [])],
                 'licenses': my_licenses,
                 'repository': data.get('repository'),
             }
@@ -1329,6 +1335,19 @@ def import_unified(
             )
         if bombs:
             populate_bombs_unified(arcadia, bombs, opts.dry_run, forced_deps)
+
+
+def extract_artefact(raw_artefact, replace_versions: dict):
+    artefact = Artifact.from_unified_dict(raw_artefact, set_version=False)
+
+    package_name = str(artefact)
+    new_version = replace_versions.get(package_name, raw_artefact.get('version'))
+    if new_version:
+        artefact.version = new_version
+    else:
+        raise NoArtefactVersionError("No version specified for artifact '{}'".format(package_name))
+
+    return artefact
 
 
 def collect_licenses_spdx_map(licenses):
