@@ -221,7 +221,7 @@ def do_tool(params):
         # Remove environment variables set by 'ya' wrapper.
         # They are actually one-time ya-bin parameters rather than inheritable environment
         # for all descendant processes.
-        for key in ('YA_SOURCE_ROOT', 'YA_PYVER_REQUIRE', 'YA_PYVER_SET_FORCED'):
+        for key in ('YA_SOURCE_ROOT',):
             env.pop(key, None)
 
         env.update(_useful_env_vars())

@@ -548,10 +548,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             unknown_args_as_free=True,
         )
         self['gradle'] = core.yarg.OptsHandler(
-            action=app.execute(
-                ide.gradle.do_gradle if six.PY3 else (lambda *a, **k: None),
-                handler_python_major_version=3,
-            ),
+            action=app.execute(ide.gradle.do_gradle),
             description='Generate gradle for project with yexport',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -569,10 +566,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=False,
         )
         self['yegradle'] = core.yarg.OptsHandler(
-            action=app.execute(
-                ide.yegradle.do_yegradle if six.PY3 else (lambda *a, **k: None),
-                handler_python_major_version=3,
-            ),
+            action=app.execute(ide.yegradle.do_yegradle),
             description='Generate gradle for project by yexport',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [

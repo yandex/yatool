@@ -117,20 +117,18 @@ def execute_early(action):
     return helper
 
 
-def execute(action, respawn=RespawnType.MANDATORY, handler_python_major_version=None):
+def execute(action, respawn=RespawnType.MANDATORY):
     # noinspection PyStatementEffect
     def helper(parameters):
         stager.finish("handler-selection")
         modules_initialization_full_stage = stager.start("modules-initialization-full")
-        if handler_python_major_version:
-            logger.info("Handler require python major version: %d", handler_python_major_version)
 
         if respawn == RespawnType.OPTIONAL:
-            check_and_respawn_if_possible(handler_python_major_version)
+            check_and_respawn_if_possible()
         with_respawn = respawn == RespawnType.MANDATORY
         ctx = yalibrary.app_ctx.get_app_ctx()
         modules = [
-            ('params', params.configure(parameters, with_respawn, handler_python_major_version)),
+            ('params', params.configure(parameters, with_respawn)),
             ('hide_token', token_suppressions.configure(ctx)),
             ('state', configure_active_state(ctx)),
             ('display', configure_display(ctx)),
@@ -603,13 +601,13 @@ def configure_event_queue():
     yield queue
 
 
-def check_and_respawn_if_possible(handler_python_major_version=None):
+def check_and_respawn_if_possible():
     arcadia_root = yalibrary.find_root.detect_root(os.getcwd())
     logger.debug("Cwd arcadia root: {}".format(arcadia_root))
     if arcadia_root is not None:
         import core.respawn
 
-        core.respawn.check_for_respawn(arcadia_root, handler_python_major_version)
+        core.respawn.check_for_respawn(arcadia_root)
 
 
 def _ya_downloads_report():

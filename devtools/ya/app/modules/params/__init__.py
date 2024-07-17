@@ -8,7 +8,7 @@ from exts.windows import win_path_fix
 logger = logging.getLogger(__name__)
 
 
-def resolve_and_respawn(params, handler_python_major_version):
+def resolve_and_respawn(params):
     kwargs = params.as_dict()
     source_root = kwargs.pop('custom_source_root', None)
     old_targets = kwargs.pop('build_targets', [])
@@ -16,17 +16,8 @@ def resolve_and_respawn(params, handler_python_major_version):
     custom_build_directory = kwargs.pop('custom_build_directory', None)
     build_root = kwargs.pop('custom_build_root', None)
 
-    ya_bin3_required = kwargs.get('ya_bin3_required', None)
-
-    if ya_bin3_required:
-        logger.debug("ya-bin3 require set throught ya.conf, set handler_python_major_version = 3")
-        handler_python_major_version = 3
-    elif ya_bin3_required is False:
-        logger.debug("ya-bin2 require set throught ya.conf, set handler_python_major_version = 2")
-        handler_python_major_version = 2
-
     info = build.targets.resolve(source_root, old_targets)
-    core.respawn.check_for_respawn(info.root, handler_python_major_version)
+    core.respawn.check_for_respawn(info.root)
 
     kwargs['abs_targets'] = list(map(win_path_fix, info.targets))
     kwargs['rel_targets'] = [win_path_fix(os.path.relpath(x, info.root)) for x in info.targets]
@@ -47,8 +38,8 @@ def resolve_and_respawn(params, handler_python_major_version):
     return core.yarg.Params(**kwargs)
 
 
-def configure(params, with_respawn, handler_python_major_version):
+def configure(params, with_respawn):
     if with_respawn:
-        yield resolve_and_respawn(params, handler_python_major_version)
+        yield resolve_and_respawn(params)
     else:
         yield params

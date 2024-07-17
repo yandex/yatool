@@ -42,8 +42,6 @@ class YaBaseOptions(BaseOptions):
 
         self.custom_fetcher = self._pop('custom_fetcher')
 
-        self.ya_py_version = self._pop("ya_py_version")
-
     def generate(self, include_new_opts=False):  # type: (bool) -> tp.Tuple[tp.List[str], tp.Dict[str, str]]
         self._check_parameters()
         ya_bin_cmd = self.ya_bin
@@ -83,9 +81,6 @@ class YaBaseOptions(BaseOptions):
 
     def _generate_pre_handler(self, include_new_opts=False):
         result = []
-        if self.ya_py_version:
-            assert str(self.ya_py_version) in ('2', '3')
-            result += ['-{}'.format(self.ya_py_version)]
 
         if self.be_verbose:
             # TODO: Rename current be_verbose to do_not_rewrite_output_information
