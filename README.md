@@ -50,3 +50,8 @@ For more details see [bootstrap guide](devtools/ya/bootstrap/README.md).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions to contribute.
+
+## Documentation
+
+[Documentation in Russian](build/docs/ru/README.md)
+Documentation in English is on the way
