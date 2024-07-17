@@ -73,7 +73,7 @@ class PrepareAllNodesTask(UniqueTask):
         touch_mode = not self._ctx.opts.clear_build and self._ctx.opts.strip_cache and hasattr(self._cache, 'compact')
         results = []
         for node in self._nodes:
-            if node.is_result_node():
+            if node.is_result_node:
                 q.put(node)
                 tp.add_node(node)
                 results.append(node)

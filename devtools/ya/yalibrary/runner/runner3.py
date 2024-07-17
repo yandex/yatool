@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import time
-import weakref
 
 import typing as tp  # noqa
 
@@ -38,23 +37,6 @@ from yalibrary.status_view.helpers import format_paths
 
 
 logger = logging.getLogger(__name__)
-
-
-def calc_once(func):
-    def f(self):
-        try:
-            self.__cache
-        except AttributeError:
-            self.__cache = weakref.WeakKeyDictionary()
-
-        try:
-            return self.__cache[func]
-        except KeyError:
-            self.__cache[func] = func(self)
-
-        return self.__cache[func]
-
-    return f
 
 
 class EarlyStoppingException(Cancelled):
@@ -239,8 +221,9 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     ninja = opts.output_style == 'ninja'
 
     class Noda(object):
-        def __init__(self, kwargs):
+        def __init__(self, kwargs, is_result_node=False):
             self.args = kwargs
+            self.is_result_node = is_result_node
             self.uid = kwargs.get('uid')
             self.self_uid = kwargs.get('self_uid', None)
             # FIXME: we need separate property in the node for this
@@ -263,6 +246,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.ignore_broken_dependencies = kwargs.get('ignore_broken_dependencies', False)
             self.refcount = 0
             self.stable_dir_outputs = kwargs.get('stable_dir_outputs', False)
+            self.__dep_nodes = None
 
         @property
         def has_self_uid_support(self):
@@ -316,19 +300,16 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         def unresolved_patterns(self):
             return set(patterns.unresolved(self._unresolved_sources())) - {'BUILD_ROOT'}
 
-        @calc_once
-        def is_result_node(self):
-            return self.uid in results
-
-        @calc_once
         def dep_nodes(self):
-            return [who_provides[d] for d in self.consume()]
-
-    nodes = [Noda(x) for x in graph['graph']]
-
-    timer.show_step('build nodes')
+            if self.__dep_nodes is None:
+                self.__dep_nodes = [who_provides[d] for d in self.consume()]
+            return self.__dep_nodes
 
     results = frozenset(graph['result'])
+
+    nodes = [Noda(x, x.get('uid') in results) for x in graph['graph']]
+
+    timer.show_step('build nodes')
 
     who_provides = dict()
     refs = dict()
@@ -452,11 +433,11 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             import yalibrary.runner.tasks.prepare
 
             if self.opts.use_distbuild:
-                res_nodes = [x for x in nodes if x.is_result_node()]
+                res_nodes = [x for x in nodes if x.is_result_node]
                 if self.opts.output_only_tests:  # XXX
                     # We need to download test's output (testing_output_stuff.tar, etc) from distbuild - use output_uids instead of result_uids
                     res_set = set(sum([t.output_uids for t in ctx.tests], []))
-                    res_nodes = [x for x in nodes if x.is_result_node() and x.uid in res_set]
+                    res_nodes = [x for x in res_nodes if x.uid in res_set]
                 download_test_results = bool(self.opts.run_tests)
                 if not opts.download_artifacts and download_test_results:
                     if opts.remove_result_node:
