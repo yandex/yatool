@@ -625,12 +625,13 @@ const TStringBuf TFrameDecoder::GetRawEvent() const {
     return RawEventData_;
 }
 
-TEventStreamer::TEventStreamer(TFrameStream& fs, ui64 s, ui64 e, bool strongOrdering, TIntrusivePtr<TEventFilter> filter, bool losslessStrongOrdering)
+TEventStreamer::TEventStreamer(TFrameStream& fs, ui64 s, ui64 e, bool strongOrdering, TIntrusivePtr<TEventFilter> filter, bool losslessStrongOrdering, bool isTailMode)
     : Frames_(fs)
     , Start_(s)
     , End_(e)
     , MaxEndTimestamp_(0)
     , Frontier_(0)
+    , IsTailMode_(isTailMode)
     , StrongOrdering_(strongOrdering)
     , LosslessStrongOrdering_(losslessStrongOrdering)
     , EventFilter_(filter)
@@ -687,15 +688,15 @@ bool TEventStreamer::LoadMoreEvents() {
     const TFrame& fr1 = *Frames_;
     const ui64 maxRequestDuration = (StrongOrdering_ ? MAX_REQUEST_DURATION : 0);
 
-    if (fr1.EndTime() <= Frontier_ + maxRequestDuration) {
+    if (!NeedPrintEventsAndReturn_ && fr1.EndTime() <= Frontier_ + maxRequestDuration) {
         ythrow yexception() << "Wrong frame stream state";
     }
 
-    if (Frontier_ >= End_) {
+    if (!NeedPrintEventsAndReturn_ && Frontier_ >= End_) {
         return false;
     }
 
-    const ui64 old_frontier = Frontier_;
+    const ui64 old_frontier = NeedPrintEventsAndReturn_ ? OldFrontier_ : Frontier_;
     Frontier_ = fr1.EndTime();
 
     {
@@ -704,6 +705,10 @@ bool TEventStreamer::LoadMoreEvents() {
         };
 
         for (; Frames_.Avail(); Frames_.Next()) {
+            if (NeedPrintEventsAndReturn_) {
+                NeedPrintEventsAndReturn_ = false;
+                Frames_.Next();
+            }
             const TFrame& fr2 = *Frames_;
 
             // Frames need to start later than the Frontier.
@@ -723,6 +728,12 @@ bool TEventStreamer::LoadMoreEvents() {
             // Checking for the frame to be within the main time borders.
             if (fr2.EndTime() >= Start_ && fr2.StartTime() <= End_) {
                 TransferEvents(fr2);
+
+                if (IsTailMode_) {
+                    NeedPrintEventsAndReturn_ = true;
+                    OldFrontier_ = old_frontier;
+                    return true;
+                }
             }
         }
     }

@@ -50,7 +50,7 @@ namespace {
             }
 
             EvFilter = ConstructEventFilter(o.EnableEvents, o.EvList, fac);
-            EventStream.Reset(new TEventStreamer(*FrameStream, o.StartTime, o.EndTime, o.ForceStrongOrdering, EvFilter, o.ForceLosslessStrongOrdering));
+            EventStream.Reset(new TEventStreamer(*FrameStream, o.StartTime, o.EndTime, o.ForceStrongOrdering, EvFilter, o.ForceLosslessStrongOrdering, o.TailFMode));
         }
 
         TConstEventPtr Next() override {

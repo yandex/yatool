@@ -298,7 +298,7 @@ private:
 
 class TEventStreamer: public TEventStream {
 public:
-    TEventStreamer(TFrameStream&, ui64 start, ui64 end, bool strongOrdering, TIntrusivePtr<TEventFilter> filter, bool losslessStrongOrdering = false);
+    TEventStreamer(TFrameStream&, ui64 start, ui64 end, bool strongOrdering, TIntrusivePtr<TEventFilter> filter, bool losslessStrongOrdering = false, bool isTailMode = false);
     ~TEventStreamer() override;
 
     bool Avail() const override;
@@ -337,6 +337,9 @@ private:
     ui64 Start_, End_;
     ui64 MaxEndTimestamp_;
     ui64 Frontier_;
+    ui64 OldFrontier_;
+    bool NeedPrintEventsAndReturn_ = false;
+    bool IsTailMode_ = false;
     bool StrongOrdering_;
     bool LosslessStrongOrdering_;
     TIntrusivePtr<TEventFilter> EventFilter_;
