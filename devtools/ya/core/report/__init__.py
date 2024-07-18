@@ -7,15 +7,18 @@ import uuid
 import time
 import json
 
+import six
+
 from exts import func
 from exts import flatten
 from exts import strings
 from core import config
 from core import gsid
+from devtools.ya.core import sec
 
 
 logger = logging.getLogger(__name__)
-SUPPRESSIONS = None
+SUPPRESSIONS = None  # type: list[str]
 
 
 class ReportTypes(object):
@@ -109,17 +112,9 @@ class CompositeTelemetry:
     def report(self, key, value, namespace=default_namespace(), urgent=False):
         if self.no_backends:
             return
-
-        def __filter(s):
-            if SUPPRESSIONS:
-                for sup in SUPPRESSIONS:
-                    s = s.replace(sup, '[SECRET]')
-                return s
-            return s
-
         try:
             value = strings.unicodize_deep(value)
-            svalue = json.loads(__filter(json.dumps(value, cls=ReportEncoder)))
+            svalue = json.loads(sec.cleanup(json.dumps(value, cls=ReportEncoder), SUPPRESSIONS))
         except Exception as e:
             # Don't expose exception: it may contain secret
             svalue = 'Unable to filter report value: {}'.format(e)
@@ -185,6 +180,21 @@ class CompositeTelemetry:
         return "{}"
 
 
+def mine_env_vars():
+    def match(var):
+        if var.startswith('YA_'):
+            return True
+        if var in ['TOOLCHAIN', 'CC', 'CXX', 'USER']:
+            return True
+        return False
+
+    return dict((k, v) for k, v in six.iteritems(os.environ) if match(k))
+
+
+def mine_cmd_args():
+    return [strings.to_unicode(arg, strings.guess_default_encoding()) for arg in sys.argv]
+
+
 def gen_reporter():
     import app_config
 
@@ -195,6 +205,7 @@ def gen_reporter():
         def load_snowden():
             from yalibrary import snowden
 
+            # TODO: Make this class, not module, for typing
             return snowden
 
         backends['snowden'] = load_snowden

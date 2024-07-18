@@ -6,9 +6,11 @@ from time import time
 
 import logging
 
+import devtools.ya.core.sec as sec
 import os
 import typing as tp  # noqa: F401
 import six
+
 
 if six.PY2:
     import subprocess32 as subprocess
@@ -26,23 +28,6 @@ class _SubprocessRunnerWrapper(object):
     def __init__(self):
         self.runner = subprocess.run
         self.logger = logging.getLogger(__name__)
-
-    @staticmethod
-    def env_without_secret(env):
-        # TODO: Use _may_be_token from app/__init__.py
-
-        clean_env = {}
-        for k, v in six.iteritems(env):
-            if k.lower().endswith(('token', 'secret')):
-                clean_env[k] = "[SECRET]"
-                continue
-            elif 'AQAD-' in v:
-                clean_env[k] = "[SECRET]"
-                continue
-            else:
-                clean_env[k] = v
-
-        return clean_env
 
     def run_subprocess(self, cmd, env=None, original_env=False, **kwargs):
         # type: (tp.Iterable[str], tp.Optional[tp.Dict[str, str]], bool, tp.Any) -> subprocess.CompletedProcess
@@ -67,7 +52,7 @@ class _SubprocessRunnerWrapper(object):
         cmd = tuple(map(str, cmd))
         logger.info("RUN %s", os.path.basename(cmd[0]))
         logger.debug("cmd: %s", cmd)
-        logger.debug("env: %s", self.env_without_secret(env_))
+        logger.debug("env: %s", sec.environ(env_))
         cwd = kwargs.get('cwd', os.getcwd())
         logger.debug("cwd: %s", cwd)
 

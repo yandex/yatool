@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_app_ctx():
+    # type: () -> AppCtx
     if 'app_ctx' in sys.modules:
         import app_ctx as ctx
     else:

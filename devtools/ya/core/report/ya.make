@@ -2,6 +2,7 @@ PY23_LIBRARY()
 
 PEERDIR(
     contrib/python/distro
+    devtools/ya/core/sec
     devtools/ya/core/config
     devtools/ya/core/gsid
     devtools/ya/exts

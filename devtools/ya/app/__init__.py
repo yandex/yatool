@@ -633,18 +633,20 @@ def _resources_report():
 
 def configure_report_interceptor(ctx, report_events):
     # we can only do that after respawn with valid python
-    from core.report import telemetry, ReportTypes
+    from core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args
+
+    params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
 
     telemetry.init_reporter(
-        suppressions=sec.mine_suppression_filter(),
+        suppressions=sec.mine_suppression_filter(params_dict),
         report_events=ya_options.YaBaseOptions.parse_events_filter(report_events),
     )
 
     telemetry.report(
         ReportTypes.EXECUTION,
         {
-            'cmd_args': sec.mine_cmd_args(),
-            'env_vars': sec.mine_env_vars(),
+            'cmd_args': mine_cmd_args(),
+            'env_vars': mine_env_vars(),
             'cwd': os.getcwd(),
             '__file__': __file__,
             'version': ctx.revision,
@@ -670,8 +672,8 @@ def configure_report_interceptor(ctx, report_events):
         telemetry.report(
             ReportTypes.FAILURE,
             {
-                'cmd_args': sec.mine_cmd_args(),
-                'env_vars': sec.mine_env_vars(),
+                'cmd_args': mine_cmd_args(),
+                'env_vars': mine_env_vars(),
                 'cwd': os.getcwd(),
                 '__file__': __file__,
                 'traceback': traceback.format_exc(),
@@ -694,7 +696,7 @@ def configure_report_interceptor(ctx, report_events):
             dict(
                 cwd=os.getcwd(),
                 duration=duration,
-                cmd_args=sec.mine_cmd_args(),
+                cmd_args=mine_cmd_args(),
                 success=success,
                 exit_code=exit_code,
                 prefix=core.yarg.OptsHandler.latest_handled_prefix(),

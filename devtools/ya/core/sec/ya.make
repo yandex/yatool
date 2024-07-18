@@ -6,9 +6,13 @@ PY_SRCS(
 
 PEERDIR(
     contrib/python/six
-    library/python/strings
+    devtools/ya/exts
 )
 
 STYLE_PYTHON()
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

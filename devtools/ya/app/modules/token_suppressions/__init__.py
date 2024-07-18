@@ -1,6 +1,3 @@
-import six
-import os
-
 import devtools.ya.core.sec as sec
 
 from yalibrary import loggers
@@ -8,23 +5,7 @@ from core.report import set_suppression_filter
 
 
 def configure(app_ctx):
-    replacements = set()
-
-    for k, v in six.iteritems(app_ctx.params.__dict__):
-        if isinstance(v, (tuple, list, set)):
-            for sub_v in v:
-                if sec.may_be_token(k, sub_v):
-                    replacements.add(sub_v)
-        elif isinstance(v, dict):
-            for sub_k, sub_v in six.iteritems(v):
-                if sec.may_be_token(k, sub_v) or sec.may_be_token(sub_k, sub_v):
-                    replacements.add(sub_v)
-        elif sec.may_be_token(k, v):
-            replacements.add(v)
-
-    for k, v in six.iteritems(os.environ):
-        if sec.may_be_token(k, v):
-            replacements.add(v)
+    replacements = set(sec.mine_suppression_filter(app_ctx.params.__dict__))
 
     additional_replacements = set()
     for replacement in replacements:

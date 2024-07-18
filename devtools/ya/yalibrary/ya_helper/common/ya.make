@@ -12,6 +12,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/core/sec
     contrib/python/six
 )
 
