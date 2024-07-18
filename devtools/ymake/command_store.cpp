@@ -153,6 +153,7 @@ namespace {
             return RootFnIdx == EMacroFunction::Tool
                 || RootFnIdx == EMacroFunction::Input
                 || RootFnIdx == EMacroFunction::Output
+                || RootFnIdx == EMacroFunction::Context
                 || RootFnIdx == EMacroFunction::NoAutoSrc
                 || RootFnIdx == EMacroFunction::NoRel
                 || RootFnIdx == EMacroFunction::ResolveToBinDir;
@@ -201,8 +202,10 @@ namespace {
                 fnIdx == EMacroFunction::Tool ||
                 fnIdx == EMacroFunction::Input ||
                 fnIdx == EMacroFunction::Output ||
+                fnIdx == EMacroFunction::Pre ||
                 fnIdx == EMacroFunction::Suf ||
                 fnIdx == EMacroFunction::Cat ||
+                fnIdx == EMacroFunction::Context ||
                 fnIdx == EMacroFunction::NoAutoSrc ||
                 fnIdx == EMacroFunction::NoRel ||
                 fnIdx == EMacroFunction::ResolveToBinDir ||
@@ -286,11 +289,18 @@ namespace {
                         }
                         throw std::runtime_error{"Output arrays are not supported"};
                     }
+                    case EMacroFunction::Pre: {
+                        checkArgCount(2);
+                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
+                        auto id = Values.InsertStr(TString::Join(arg0, arg1));
+                        return Values.GetValue(id);
+                    }
                     case EMacroFunction::Suf: {
                         checkArgCount(2);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
-                        auto id = Values.InsertStr(fmt::format("{}{}", arg1, arg0));
+                        auto id = Values.InsertStr(TString::Join(arg1, arg0));
                         return Values.GetValue(id);
                     }
                     case EMacroFunction::Cat: {
@@ -300,6 +310,19 @@ namespace {
                             cat += std::get<std::string_view>(a);
                         auto id = Values.InsertStr(cat);
                         return Values.GetValue(id);
+                    }
+                    case EMacroFunction::Context: {
+                        checkArgCount(2);
+                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        auto context = TFileConf::GetContextType(arg0);
+                        auto arg1 = std::get_if<TMacroValues::TInputs>(&unwrappedArgs[1]);
+                        if (!arg1)
+                            throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid input sequence";
+                        for (auto& coord : arg1->Coords)
+                            UpdateCoord(Sink.Inputs, coord, [=](auto& var) {
+                                var.Context = context;
+                            });
+                        return *arg1;
                     }
                     case EMacroFunction::NoAutoSrc:
                         return updateOutput([](auto& x) {x.NoAutoSrc = true;});

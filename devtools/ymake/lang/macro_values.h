@@ -21,8 +21,11 @@ enum class EMacroFunction: ui32 {
     Clear,
     Pre,
     Suf,
+    Join,
     Quo,
+    Cwd,
     SetEnv,
+    RootRel,
     CutExt,
     LastExt,
     ExtFilter,
@@ -31,6 +34,7 @@ enum class EMacroFunction: ui32 {
     TODO1,
     TODO2,
     // markers
+    Context, // input-only, preevaluated
     NoAutoSrc, // output-only, preevaluated
     NoRel, // output-only, preevaluated
     ResolveToBinDir, // output-only, preevaluated

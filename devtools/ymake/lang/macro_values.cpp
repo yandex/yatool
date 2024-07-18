@@ -27,7 +27,9 @@ namespace {
             case EMacroFunction::Hide:
             case EMacroFunction::Clear:
             case EMacroFunction::Quo:
+            case EMacroFunction::Cwd:
             case EMacroFunction::SetEnv:
+            case EMacroFunction::RootRel:
             case EMacroFunction::CutExt:
             case EMacroFunction::LastExt:
             case EMacroFunction::KeyValue:
@@ -42,7 +44,9 @@ namespace {
             // Binary functions
             case EMacroFunction::Pre:
             case EMacroFunction::Suf:
+            case EMacroFunction::Join:
             case EMacroFunction::ExtFilter:
+            case EMacroFunction::Context:
             case EMacroFunction::TODO2:
                 res = 2;
                 break;

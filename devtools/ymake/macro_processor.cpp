@@ -451,6 +451,8 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 
     for (const auto& input : cmdInputs) {
         TVarStrEx in(input.Name);
+        if (input.Context)
+            in.Name = TFileConf::ConstructLink(input.Context, NPath::ConstructPath(in.Name)); // lifted from TCommandInfo::ApplyMods
         in.IsGlob = input.IsGlob;
         GetInputInternal().Push(in);
     }

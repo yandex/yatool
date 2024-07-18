@@ -17,6 +17,7 @@ struct ICommandSequenceWriter {
     virtual void BeginScript() = 0;
     virtual void BeginCommand() = 0;
     virtual void WriteArgument(TStringBuf arg) = 0;
+    virtual void WriteCwd(TStringBuf cwd) = 0;
     virtual void WriteEnv(TStringBuf env) = 0;
     virtual void EndCommand() = 0;
     virtual void EndScript(TCommandInfo& cmdInfo, const TVars& vars) = 0;
@@ -26,6 +27,7 @@ protected:
 };
 
 struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
+    virtual void WriteCwd(TStringBuf)          override { throw TNotImplemented() << "CWD is not supported here"; }
     virtual void WriteEnv(TStringBuf)          override { throw TNotImplemented() << "environment settings are not supported here"; }
     virtual void PostScript(TVars&)            override {  }
 protected:

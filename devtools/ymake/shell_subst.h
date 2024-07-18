@@ -30,6 +30,7 @@ private:
     void BeginScript() override;
     void BeginCommand() override;
     void WriteArgument(TStringBuf arg) override;
+    void WriteCwd(TStringBuf cwd) override;
     void WriteEnv(TStringBuf env) override;
     void EndCommand() override;
     void EndScript(TCommandInfo& cmdInfo, const TVars& vars) override;

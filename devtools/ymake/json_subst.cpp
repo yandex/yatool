@@ -158,6 +158,10 @@ void TJsonCmdAcceptor::WriteArgument(TStringBuf arg) {
     std::get<TVector<TString>>(Commands.back().CmdStr).push_back(TString(arg));
 }
 
+void TJsonCmdAcceptor::WriteCwd(TStringBuf cwd) {
+    Commands.back().Cwd = cwd;
+}
+
 void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     auto envStr = TString(env);
 

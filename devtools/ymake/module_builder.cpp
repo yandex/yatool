@@ -406,7 +406,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         }
     }
 
-    if (GetModuleConf().StructCmd && cmdKind == EModuleCmdKind::Default) {
+    if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
         auto compiled = Commands.Compile(command, &Conf, Vars, Vars, true, EOutputAccountingMode::Module);
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
@@ -442,7 +442,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         TStringBuf cmd = Vars.Get1(cmdName);
         if (cmd.empty()) {
             if (cmdKind == EModuleCmdKind::Global) {
-                YConfErr(NoCmd) << "No valid command to link global srcs" << name << ", check your config for " << cmd << Endl;
+                YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << cmd << Endl;
             }
             else {
                 YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << cmd << Endl;

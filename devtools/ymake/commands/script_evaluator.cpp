@@ -286,8 +286,11 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::Clear: return RenderClear(args);
             case EMacroFunction::Pre: return RenderPre(args);
             case EMacroFunction::Suf: return RenderSuf(args);
+            case EMacroFunction::Join: return RenderJoin(args);
             case EMacroFunction::Quo: return RenderQuo(args);
+            case EMacroFunction::Cwd: RenderCwd(writer, ctx, args); return TTermNothing();
             case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
+            case EMacroFunction::RootRel: return RenderRootRel(args);
             case EMacroFunction::CutExt: return RenderCutExt(args);
             case EMacroFunction::LastExt: return RenderLastExt(args);
             case EMacroFunction::ExtFilter: return RenderExtFilter(args);

@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/config/config.h>
 #include <devtools/ymake/diag/dbg.h>
+#include <devtools/ymake/conf.h>
 #include <devtools/ymake/exec.h>
 #include <fmt/format.h>
 #include <util/generic/overloaded.h>
@@ -174,6 +175,27 @@ TTermValue NCommands::RenderSuf(std::span<const TTermValue> args) {
     }, args[1]);
 }
 
+TTermValue NCommands::RenderJoin(std::span<const TTermValue> args) {
+    if (args.size() != 2) {
+        throw yexception() << "Join requires 2 arguments";
+    }
+    auto glue = std::get<TString>(args[0]);
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            return TTermNothing();
+        },
+        [&](const TString& body) -> TTermValue {
+            return body;
+        },
+        [&](const TVector<TString>& bodies) -> TTermValue {
+            return JoinSeq(glue, bodies);
+        }
+    }, args[1]);
+}
+
 TTermValue NCommands::RenderQuo(std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "Quo requires 1 argument";
@@ -182,6 +204,31 @@ TTermValue NCommands::RenderQuo(std::span<const TTermValue> args) {
     // the quotes in question should disappear after argument extraction,
     // so for the arg-centric model this modifier is effectively a no-op
     return args[0];
+}
+
+void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "Cwd requires 1 argument";
+    }
+    std::visit(TOverloaded{
+        [](TTermError) {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
+            throw TNotImplemented();
+        },
+        [&](const TString& s) {
+            writer->WriteCwd(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
+        },
+        [&](const TVector<TString>& v) {
+            if (v.empty())
+                return;
+            else if (v.size() == 1)
+                writer->WriteCwd(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
+            else
+                throw yexception() << "Cwd does not support arrays";
+        }
+    }, args[0]);
 }
 
 void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
@@ -240,6 +287,32 @@ void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> 
                 GetOrInit(ctx.CmdInfo.KV)[v[0]] = "yes";
             else
                 throw TNotImplemented();
+        }
+    }, args[0]);
+}
+
+TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "RootRel requires 1 argument";
+    }
+    auto apply = [](TString s) {
+        // lifted from EMF_PrnRootRel processing:
+        return TString(NPath::CutType(GlobalConf()->CanonPath(s)));
+    };
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            throw TNotImplemented();
+        },
+        [&](TString s) -> TTermValue {
+            return apply(std::move(s));
+        },
+        [&](TVector<TString> v) -> TTermValue {
+            for (auto& s : v)
+                s = apply(std::move(s));
+            return std::move(v);
         }
     }, args[0]);
 }
