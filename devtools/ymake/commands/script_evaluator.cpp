@@ -275,6 +275,9 @@ TTermValue TScriptEvaluator::EvalFn(
     const TEvalCtx& ctx,
     ICommandSequenceWriter* writer
 ) {
+    for (auto& arg : args)
+        if (std::holds_alternative<TTermError>(arg))
+            return arg;
     try {
         switch (Commands->Values.Id2Func(id)) {
             case EMacroFunction::Args: return RenderArgs(args);

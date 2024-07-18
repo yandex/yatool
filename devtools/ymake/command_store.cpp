@@ -640,27 +640,38 @@ void TCommands::TInliner::InlineModValueTerm(
                 writer.push_back(id);
                 return;
             }
+            auto recurse = [&](auto subId) {
+                if (def.Legacy) {
+                    Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
+                    ++LegacyVars.RecursionDepth[id];
+                    Y_DEFER {--LegacyVars.RecursionDepth[id];};
+                    InlineModValueTerm(subId, writer);
+                } else
+                    InlineModValueTerm(subId, writer);
+            };
             for (auto&& thatTerm : def.Definition->Script[0][0]) {
                 std::visit(TOverloaded{
                     [&](NPolexpr::TConstId subId) {
-                        if (def.Legacy) {
-                            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
-                            ++LegacyVars.RecursionDepth[id];
-                            Y_DEFER {--LegacyVars.RecursionDepth[id];};
-                            InlineModValueTerm(subId, writer);
-                        } else
-                            InlineModValueTerm(subId, writer);
+                        recurse(subId);
                     },
                     [&](NPolexpr::EVarId subId) {
-                        if (def.Legacy) {
-                            Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
-                            ++LegacyVars.RecursionDepth[id];
-                            Y_DEFER {--LegacyVars.RecursionDepth[id];};
-                            InlineModValueTerm(subId, writer);
-                        } else
-                            InlineModValueTerm(subId, writer);
+                        recurse(subId);
                     },
-                    [&](const NCommands::TSyntax::TTransformation&) {
+                    [&](const NCommands::TSyntax::TTransformation& xfm) {
+                        if (xfm.Mods.empty() && xfm.Body.size() == 1 && xfm.Body.front().size() == 1 && std::visit(TOverloaded{
+                            [&](NPolexpr::EVarId subId) {
+                                recurse(subId);
+                                return true;
+                            },
+                            [&](const NCommands::TSyntax::TUnexpanded& x) {
+                                writer.push_back(x.Variable);
+                                return true;
+                            },
+                            [](auto&) {
+                                return false;
+                            }
+                        }, xfm.Body.front().front()))
+                            return;
                         ythrow TError() << "cannot sub-substitute";
                     },
                     [&](const NCommands::TSyntax::TCall&) {
@@ -669,8 +680,8 @@ void TCommands::TInliner::InlineModValueTerm(
                     [&](const NCommands::TSyntax::TIdOrString&) {
                         Y_ABORT();
                     },
-                    [&](const NCommands::TSyntax::TUnexpanded&) {
-                        Y_ABORT();
+                    [&](const NCommands::TSyntax::TUnexpanded& x) {
+                        writer.push_back(x.Variable);
                     },
                 }, thatTerm);
             }
