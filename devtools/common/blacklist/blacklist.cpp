@@ -16,7 +16,7 @@ namespace NBlacklist {
         Y_ASSERT(!path.empty());
         size_t index = path[0];
         if (path.size() > 1) {
-            index &= (static_cast<size_t>(path[1]) << 8);
+            index |= (static_cast<size_t>(path[1]) << 8);
         }
         return index;
     }
