@@ -409,7 +409,7 @@ namespace {
             }
             // Ugly hack here. In Jinja generator world PROGRAM and DLL target should use their own templates
             // and handle allocators in a different way then other target types
-            return CurTarget_->Macro == "add_executable"sv || (CurTarget_->Macro == "add_library" && !CurTarget_->MacroArgs.empty() && CurTarget_->MacroArgs[0] == "SHARED"sv);
+            return CurTarget_->Macro == "add_executable"sv || CurTarget_->Macro == "add_shared_library"sv || (CurTarget_->Macro == "add_library" && !CurTarget_->MacroArgs.empty() && CurTarget_->MacroArgs[0] == "SHARED"sv);
         }
 
         void AddGlobalVar(const std::string& name, std::span<const std::string> args) {
