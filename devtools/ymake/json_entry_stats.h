@@ -129,6 +129,11 @@ public:
         return StructureUID;
     }
 
+    const TMd5SigValue& GetPreStructureUid() const {
+        Y_ASSERT(Finished);
+        return PreStructureUID;
+    }
+
     const TMd5SigValue& GetIncludeStructureUid() const {
         Y_ASSERT(Finished);
         return IncludeStructureUID;
@@ -173,6 +178,7 @@ public:
     bool Stored = false;
 
     TMd5SigValue StructureUID;
+    TMd5SigValue PreStructureUID;
     TMd5SigValue IncludeStructureUID;
     TMd5SigValue ContentUID;
     TMd5SigValue IncludeContentUID;
@@ -320,7 +326,11 @@ public:
     using TItemDebug = TNodeDebugOnly;
 
     void Save(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept;
+    void LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids, bool asPre = false) noexcept;
     bool Load(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids) noexcept;
+
+private:
+    void SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept;
 };
 
 template <>

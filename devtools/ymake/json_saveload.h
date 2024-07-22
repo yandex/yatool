@@ -119,28 +119,36 @@ private:
     const ui8* Iterator = nullptr;
     const ui8* End = nullptr;
 
+    void LoadRawBufferFromStream(IInputStream* input, size_t size) {
+        RawBuffer->yresize(size);
+        LoadBufferFromStream(input, RawBuffer->data(), size);
+        Iterator = RawBuffer->data();
+        End = Iterator + size;
+    }
+
 public:
     TLoadBuffer(TVector<ui8>* rawBuffer) : RawBuffer(rawBuffer) {}
 
-    bool LoadUnchangedNodeDataFromStream(IInputStream* input, TNodeId* resultNode, const TDepGraph& graph) {
+    bool LoadUnchangedNodeDataFromStream(IInputStream* input, TNodeId& nodeId, const TDepGraph& graph, size_t onSkipHeaderSize = 0) {
         ui8 useFileId = LoadFromStream<ui8>(input);
         ui32 elemId = LoadFromStream<ui32>(input);
         ui32 size = LoadFromStream<ui32>(input);
 
         auto nodeRef = graph.GetNodeById(useFileId ? EMNT_File : EMNT_BuildCommand, elemId);
+        nodeId = nodeRef.Id();
 
         // TODO: Make separate usage of content and structure changes flag.
         if (!nodeRef.IsValid() || !nodeRef.Value().State.HasNoChanges()) {
-            input->Skip(size);
+            if (onSkipHeaderSize) {
+                Y_ASSERT(size >= onSkipHeaderSize);
+                LoadRawBufferFromStream(input, onSkipHeaderSize);
+                input->Skip(size - onSkipHeaderSize);
+            } else {
+                input->Skip(size);
+            }
             return false;
         }
-
-        RawBuffer->yresize(size);
-        LoadBufferFromStream(input, RawBuffer->data(), size);
-
-        *resultNode = nodeRef.Id();
-        Iterator = RawBuffer->data();
-        End = Iterator + size;
+        LoadRawBufferFromStream(input, size);
         return true;
     }
 

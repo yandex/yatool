@@ -128,8 +128,8 @@ public:
         return *this;
     }
 
-    void SetRawData(ui8 rawData[16], TStringBuf reason) {
-        memcpy(Md5Sig_.RawData, rawData, 16);
+    void SetRawData(const ui8 rawData[16], TStringBuf reason) {
+        memcpy(Md5Sig_.RawData, rawData, sizeof(Md5Sig_.RawData));
         LogMd5Change(*this, nullptr, reason);
     }
 
@@ -158,6 +158,10 @@ public:
 
     const ui8* GetRawData() const {
         return Md5Sig_.RawData;
+    }
+
+    const TMd5Sig& GetRawSig() const {
+        return Md5Sig_;
     }
 
     Y_SAVELOAD_DEFINE(Md5Sig_);

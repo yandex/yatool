@@ -131,6 +131,7 @@ namespace NStats {
         DiscardedLoops /* "Discarded loops" */,
         SavedNodes /* "Saved nodes" */,
         SavedLoops /* "Saved loops" */,
+        ReallyAllNoRendered /* "Really all nodes no rendered" */,
     };
 
     enum class EYMakeStats {

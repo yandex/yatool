@@ -59,8 +59,6 @@ private:
     THashSet<TNodeId> StartModules;
     TGlobalVarsCollector GlobalVarsCollector;
 
-    NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
-
     const bool JsonDepsFromMainOutputEnabled_ = false;
 
 public:
@@ -85,8 +83,6 @@ public:
     TNodeId GetModuleByNode(TNodeId nodeId);
     const TVector<TNodeId>& GetOrderedNodes() const { return SortedNodesForRendering; }
     ui64 GetModuleNodesNum() const { return NumModuleNodesForRendering; }
-
-    void ReportCacheStats() { CacheStats.Report(); }
 
 public:
     TErrorShowerState ErrorShower;

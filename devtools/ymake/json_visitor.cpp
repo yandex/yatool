@@ -124,16 +124,36 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
 
-    ui32 nodesCount = Nodes.size();
+    ui32 nodesCount;
+    if (NewUids) {
+        nodesCount = 0;
+        for (const auto& [nodeId, nodeData] : Nodes) {
+            if (nodeData.Completed) {
+                ++nodesCount;
+            }
+        }
+    } else {
+        nodesCount = Nodes.size();
+    }
     output->Write(&nodesCount, sizeof(nodesCount));
 
-    for (const auto& [nodeId, nodeData] : Nodes) {
-        TSaveBuffer buffer{&rawBuffer};
-        nodeData.Save(&buffer, graph, NewUids);
-        buffer.SaveNodeDataToStream(output, nodeId, graph);
+    if (NewUids) {
+        for (const auto& [nodeId, nodeData] : Nodes) {
+            if (!nodeData.Completed) {
+                continue;
+            }
+            TSaveBuffer buffer{&rawBuffer};
+            nodeData.Save(&buffer, graph, NewUids);
+            buffer.SaveNodeDataToStream(output, nodeId, graph);
+        }
+    } else {
+        for (const auto& [nodeId, nodeData] : Nodes) {
+            TSaveBuffer buffer{&rawBuffer};
+            nodeData.Save(&buffer, graph, NewUids);
+            buffer.SaveNodeDataToStream(output, nodeId, graph);
+        }
     }
-
-    CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, Nodes.size());
+    CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, nodesCount);
 
     ui32 loopsCount = Loops.empty() ? 0 : Loops.size() - 1;
     output->Write(&loopsCount, sizeof(loopsCount));
@@ -160,18 +180,20 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
     for (size_t i = 0; i < nodesCount; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId nodeId;
-        if (!buffer.LoadUnchangedNodeDataFromStream(input, &nodeId, graph)) {
-            CacheStats.Inc(NStats::EUidsCacheStats::SkippedNodes);
-            continue;
-        }
+        auto nodeLoaded = buffer.LoadUnchangedNodeDataFromStream(input, nodeId, graph, sizeof(TMd5Sig));
 
         auto nodeRef = graph.Get(nodeId);
-
         auto [it, added] = Nodes.try_emplace(nodeRef.Id(), TJSONEntryStats::TItemDebug{graph, nodeRef.Id()});
         auto& [_, nodeData] = *it;
         nodeData.InStack = false;
         nodeData.InitUids(NewUids);
         Y_ASSERT(added);
+
+        if (!nodeLoaded) {
+            nodeData.LoadStructureUid(&buffer, graph, NewUids, true);
+            CacheStats.Inc(NStats::EUidsCacheStats::SkippedNodes);
+            continue;
+        }
 
         if (!nodeData.Load(&buffer, graph, NewUids)) {
             CacheStats.Inc(NStats::EUidsCacheStats::DiscardedNodes);
@@ -186,7 +208,7 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
     for (size_t i = 0; i < loopsCount; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId loopNodeId;
-        if (!buffer.LoadUnchangedNodeDataFromStream(input, &loopNodeId, graph)) {
+        if (!buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph)) {
             CacheStats.Inc(NStats::EUidsCacheStats::SkippedLoops);
             continue;
         }

@@ -11,6 +11,7 @@ TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommand
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
 {
+    CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
     YDebug() << "Using " << (newUids ? "new" : "old") << " UIDs implementation" << Endl;
     Loops.FindLoops(RestoreContext.Graph, startDirs, false);
 }
@@ -247,6 +248,9 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
 
     CurrData->NewUids()->SetStructureUid(CurrState->Hash->New()->GetStructureMd5());
     CurrData->NewUids()->SetIncludeStructureUid(CurrState->Hash->New()->GetIncludeStructureMd5());
+    CurrData->NewUids()->Finished = true;
+    CurrData->Completed = true;
+    CheckStructureUidChanged();
 }
 
 void TJSONVisitorNew::PassToParent(TState& state) {
@@ -520,6 +524,9 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
 
             nodeData.NewUids()->SetStructureUid(structureUid);
         }
+        nodeData.NewUids()->Finished = true;
+        nodeData.Completed = true;
+        CheckStructureUidChanged();
     }
 }
 
@@ -543,4 +550,19 @@ void TJSONVisitorNew::UpdateReferences(TState& state) {
 
     const auto node = CurrState->Node();
     Graph = &TDepGraph::Graph(node);
+}
+
+void TJSONVisitorNew::CheckStructureUidChanged() {
+    if (CurrData->NewUids()->GetStructureUid().GetRawData() != CurrData->NewUids()->GetPreStructureUid().GetRawData()) {
+        CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 0); // at least one node rendered
+    } else {
+        // TODO Research and try load it from cache
+    }
+}
+
+void TJSONVisitorNew::ReportCacheStats() {
+    if (NewUids) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EUidsCacheStats::ReallyAllNoRendered), CacheStats.Get(NStats::EUidsCacheStats::ReallyAllNoRendered) ? true : false);
+    }
+    CacheStats.Report();
 }

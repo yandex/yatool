@@ -7,6 +7,8 @@
 
 #include <devtools/ymake/compact_graph/loops.h>
 
+#include <string_view>
+
 struct TRestoreContext;
 
 class TJSONVisitorNew: public TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem> {
@@ -39,9 +41,13 @@ public:
         return NewUids;
     }
 
+    void ReportCacheStats();
+
 protected:
     TGraphLoops Loops;
     const bool NewUids;
+
+    NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 
 private:
 
@@ -66,4 +72,5 @@ private:
     autoarray<TLoopCnt> LoopsHash;
 
     void UpdateReferences(TState& state);
+    void CheckStructureUidChanged();
 };

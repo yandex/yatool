@@ -62,6 +62,7 @@ void TJsonStatsOld::SetSelfContextSign(const TMd5SigValue& md5, TUidDebugNodeId 
 
 TJsonStatsNew::TJsonStatsNew(TNodeDebugOnly nodeDebug)
     : StructureUID(nodeDebug, "TJSONEntryStats::StructureUID"sv)
+    , PreStructureUID(nodeDebug, "TJSONEntryStats::PreStructureUID"sv)
     , IncludeStructureUID(nodeDebug, "TJSONEntryStats::IncludeStructureUID"sv)
     , ContentUID(nodeDebug, "TJSONEntryStats::ContentUID"sv)
     , IncludeContentUID(nodeDebug, "TJSONEntryStats::IncludeContentUID"sv)
@@ -157,7 +158,14 @@ TString TJSONEntryStats::GetNodeSelfUid(bool newUids) const {
         return OldUids()->GetNodeSelfUid();
 }
 
+void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept {
+    if (newUids) {
+        buffer->Save(NewUids()->StructureUID.GetRawSig());
+    }
+}
+
 void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept {
+    SaveStructureUid(buffer, graph, newUids);
     buffer->Save<ui8>(static_cast<const TEntryStatsData*>(this)->AllFlags);
     buffer->Save<ui8>(AllFlags);
     buffer->SaveElemId(OutTogetherDependency, graph);
@@ -168,22 +176,33 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph, bool new
     buffer->SaveReservedVars(UsedReservedVars.Get(), graph);
 
     if (newUids) {
-        buffer->Save(NewUids()->StructureUID.GetRawData(), 16);
-        buffer->Save(NewUids()->IncludeStructureUID.GetRawData(), 16);
-        buffer->Save(NewUids()->ContentUID.GetRawData(), 16);
-        buffer->Save(NewUids()->IncludeContentUID.GetRawData(), 16);
-        buffer->Save(NewUids()->FullUID.GetRawData(), 16);
-        buffer->Save(NewUids()->SelfUID.GetRawData(), 16);
+        buffer->Save(NewUids()->IncludeStructureUID.GetRawSig());
+        buffer->Save(NewUids()->ContentUID.GetRawSig());
+        buffer->Save(NewUids()->IncludeContentUID.GetRawSig());
+        buffer->Save(NewUids()->FullUID.GetRawSig());
+        buffer->Save(NewUids()->SelfUID.GetRawSig());
     } else {
-        buffer->Save(OldUids()->IncludedContextSign.GetRawData(), 16);
-        buffer->Save(OldUids()->ContextSign.GetRawData(), 16);
-        buffer->Save(OldUids()->SelfContextSign.GetRawData(), 16);
-        buffer->Save(OldUids()->IncludedSelfContextSign.GetRawData(), 16);
-        buffer->Save(OldUids()->RenderId.GetRawData(), 16);
+        buffer->Save(OldUids()->IncludedContextSign.GetRawSig());
+        buffer->Save(OldUids()->ContextSign.GetRawSig());
+        buffer->Save(OldUids()->SelfContextSign.GetRawSig());
+        buffer->Save(OldUids()->IncludedSelfContextSign.GetRawSig());
+        buffer->Save(OldUids()->RenderId.GetRawSig());
+    }
+}
+
+void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids, bool asPre) noexcept {
+    if (newUids) {
+        if (asPre) {
+            buffer->LoadMd5(&NewUids()->PreStructureUID);
+        } else {
+            buffer->LoadMd5(&NewUids()->StructureUID);
+            NewUids()->PreStructureUID.SetRawData(NewUids()->StructureUID.GetRawData(), "Copy StructureUid"sv);
+        }
     }
 }
 
 bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids) noexcept {
+    LoadStructureUid(buffer, graph, newUids);
     static_cast<TEntryStatsData*>(this)->AllFlags = buffer->Load<ui8>();
     AllFlags = buffer->Load<ui8>();
     if (!buffer->LoadElemId(&OutTogetherDependency, graph))
@@ -200,7 +219,6 @@ bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph, bool new
         return false;
 
     if (newUids) {
-        buffer->LoadMd5(&NewUids()->StructureUID);
         buffer->LoadMd5(&NewUids()->IncludeStructureUID);
         buffer->LoadMd5(&NewUids()->ContentUID);
         buffer->LoadMd5(&NewUids()->IncludeContentUID);
