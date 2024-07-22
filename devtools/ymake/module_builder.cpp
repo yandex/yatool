@@ -68,7 +68,7 @@ namespace {
     bool ValidateNotRelative(TStringBuf dir, TStringBuf macroName) {
         auto rel = NPath::CutType(dir);
         if (rel == "." || rel.StartsWith("./") || rel.StartsWith("..")) {
-             YConfErr(BlckLst) << "Relative path [[imp]]" << NPath::CutType(dir) << "[[rst]] is not allowed in [[alt1]]" << macroName << "[[rst]]" << Endl;
+             YConfErr(BadDir) << "Relative path [[imp]]" << NPath::CutType(dir) << "[[rst]] is not allowed in [[alt1]]" << macroName << "[[rst]]" << Endl;
              return false;
 
         }
