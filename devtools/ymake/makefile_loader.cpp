@@ -788,16 +788,19 @@ void TDirParser::AddSubdir(const TStringBuf& dir, const TStringBuf& name) {
                 << "[[rst]] is from prohibited directory [[alt1]]" << *ptr << "[[rst]]" << Endl;
         }
     }
-    if (!Names.FileConf.CheckDirectory(dir)) {
+
+    auto storedDir = Names.FileConf.GetStoredName(dir);
+    if (!Names.FileConf.CheckDirectory(storedDir)) {
         TRACE(P, NEvent::TInvalidRecurse(TString{dir}));
         YConfErrPrecise(BadDir, GetStatementRow(name), GetStatementColumn(name)) << "[[imp]]" << name << "[[rst]] to non-directory [[imp]]" << dir << "[[rst]]" << Endl;
         return;
     }
 
+    auto dirElemId = storedDir.GetElemId();
     if (name == "RECURSE_FOR_TESTS") {
-        TestRecurses.Push(MakeDepFileCacheId(Names.FileConf.Add(dir)));
+        TestRecurses.Push(MakeDepFileCacheId(dirElemId));
     } else {
-        Recurses.Push(MakeDepFileCacheId(Names.FileConf.Add(dir)));
+        Recurses.Push(MakeDepFileCacheId(dirElemId));
     }
 }
 
