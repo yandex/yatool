@@ -210,6 +210,7 @@ class Macro(Node):
             self.remove_child(node)
 
     def get_values(self):
+        # type: () -> list[Value]
         if not self.is_empty():
             nodes = []
             for value_node in self.children:
