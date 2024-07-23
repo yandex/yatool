@@ -400,8 +400,8 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
         for (const auto& [varName, varValue] : RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars()) {
             if (CurrData->UsedReservedVars->contains(varName)) {
                 if (seenVars) {
-                    auto [_, seen] = seenVars->insert(varName);
-                    if (seen)
+                    auto [_, added] = seenVars->insert(varName);
+                    if (!added)
                         continue;
                 }
 
