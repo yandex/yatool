@@ -46,6 +46,7 @@ class VSCodePyOptions(core.yarg.Options):
         self.black_enabled = False
         self.venv_excluded_peerdirs = []
         self.allow_project_inside_arc = False
+        self.python_index_enabled = True
 
     @classmethod
     def consumer(cls):
@@ -106,6 +107,12 @@ class VSCodePyOptions(core.yarg.Options):
                 ['--allow-project-inside-arc'],
                 help="Allow creating project inside Arc repository",
                 hook=core.yarg.SetConstValueHook('allow_project_inside_arc', True),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--no-python-index"],
+                help="Do not let pylance to index whole project",
+                hook=core.yarg.SetConstValueHook("python_index_enabled", False),
                 group=cls.GROUP,
             ),
         ]
@@ -647,7 +654,7 @@ class PyProject(object):
                             ("python.analysis.autoSearchPaths", False),
                             ("python.analysis.diagnosticMode", "openFilesOnly"),
                             ("python.analysis.enablePytestSupport", False),
-                            ("python.analysis.indexing", True),
+                            ("python.analysis.indexing", self.params.python_index_enabled),
                             ("python.analysis.persistAllIndices", True),
                         )
                     ),

@@ -12,7 +12,8 @@ class VSCodeAllOptions(core.yarg.Options):
         self.debug_enabled = True
         self.tests_enabled = True
         self.black_formatter_enabled = True
-        self.write_pyright_config = False
+        self.write_pyright_config = True
+        self.python_index_enabled = True
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
         self.clangd_extra_args = []
@@ -172,7 +173,20 @@ class VSCodeAllOptions(core.yarg.Options):
                 help="Write pyrightconfig.json on disk",
                 hook=core.yarg.SetConstValueHook("write_pyright_config", True),
                 group=cls.GROUP,
+                visible=core.yarg.HelpLevel.NONE,
+            ),
+            core.yarg.ArgConsumer(
+                ["--no-pyright-config"],
+                help="Do not write pyrightconfig.json on disk",
+                hook=core.yarg.SetConstValueHook("write_pyright_config", False),
+                group=cls.GROUP,
                 visible=core.yarg.HelpLevel.ADVANCED,
+            ),
+            core.yarg.ArgConsumer(
+                ["--no-python-index"],
+                help="Do not let pylance to index whole project",
+                hook=core.yarg.SetConstValueHook("python_index_enabled", False),
+                group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(
                 ["--allow-project-inside-arc"],

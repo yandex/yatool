@@ -236,7 +236,7 @@ class VSCodeProject(object):
                 settings["clangd.arguments"].append("--background-index=0")
 
         if self.is_py3:
-            settings["python.analysis.indexing"] = True
+            settings["python.analysis.indexing"] = self.params.python_index_enabled
             settings["python.analysis.persistAllIndices"] = True
 
         if self.is_go:
