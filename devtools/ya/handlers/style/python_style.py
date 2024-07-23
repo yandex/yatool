@@ -1,4 +1,6 @@
 from __future__ import absolute_import
+
+import os
 import subprocess
 
 import six
@@ -73,7 +75,13 @@ def _launch_ruff(data, path, config_path, cmd_args):
     ruff_args = [yalibrary.tools.tool('ruff')] + cmd_args + ['--config', config_path, '-s', '-']
 
     p = subprocess.Popen(
-        ruff_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True
+        ruff_args,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        text=True,
+        env=dict(os.environ.copy(), RUFF_OUTPUT_FORMAT="concise"),
     )
     out, err = p.communicate(input=data)
 
