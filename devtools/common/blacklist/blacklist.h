@@ -10,9 +10,8 @@ namespace NBlacklist {
 
     enum class EParserErrorKind {
         Ok = 0,
-        AbsoultePath,
+        AbsolutePath,
         InvalidPath,
-        NonTopLevel
     };
 
     class TBucket;

@@ -69,7 +69,7 @@ namespace NBlacklist {
             if (!token.empty()){
                 TPathSplitUnix pathSplit(token);
                 if (pathSplit.IsAbsolute) {
-                    OnParserError(EParserErrorKind::AbsoultePath, token, file);
+                    OnParserError(EParserErrorKind::AbsolutePath, token, file);
                 } else if (pathSplit.empty() || pathSplit[0] == TStringBuf(".") || pathSplit[0] == TStringBuf("..")) {
                     OnParserError(EParserErrorKind::InvalidPath, token, file);
                 } else {

@@ -34,7 +34,7 @@ void TBlackList::Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& list
 
 void TBlackList::OnParserError(EParserErrorKind kind, TStringBuf path, TStringBuf file) {
     switch (kind) {
-        case EParserErrorKind::AbsoultePath:
+        case EParserErrorKind::AbsolutePath:
             YConfWarn(Syntax) << "Absolute path in black list file [[imp]]"
                 << ArcPath(file) << "[[rst]]. This path [[alt1]]" << path
                 << "[[rst]] << will be skipped." << Endl;
@@ -42,11 +42,6 @@ void TBlackList::OnParserError(EParserErrorKind kind, TStringBuf path, TStringBu
         case EParserErrorKind::InvalidPath:
             YConfWarn(Syntax) << "Invalid path in black list file [[imp]]"
                 << ArcPath(file) << "[[rst]]. This path [[alt1]]" << path
-                << "[[rst]] will be skipped." << Endl;
-            break;
-        case EParserErrorKind::NonTopLevel:
-            YConfWarn(Syntax) << "Path listed in black list file [[imp]]"
-                << ArcPath(file) << "[[rst]] is not top level project. This path [[alt1]]" << path
                 << "[[rst]] will be skipped." << Endl;
             break;
         default:
