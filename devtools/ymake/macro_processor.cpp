@@ -5,6 +5,7 @@
 #include "add_dep_adaptor.h"
 #include "add_dep_adaptor_inline.h"
 #include "args_converter.h"
+#include "builtin_macro_consts.h"
 #include "conf.h"
 #include "module_state.h"
 #include "module_builder.h"
@@ -642,8 +643,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
             SBDIAG << "  " << peer;
         }
         SBDIAG << Endl;
-        TString name = "PEERDIR";
-        modBuilder.DirStatement(name, *AddPeers);
+        modBuilder.DirStatement(NMacro::PEERDIR, *AddPeers);
         AddPeers.Reset();
     }
     if (AddIncls) {
@@ -652,8 +652,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
             SBDIAG << "  " << incl;
         }
         SBDIAG << Endl;
-        TString name = "ADDINCL";
-        modBuilder.DirStatement(name, *AddIncls);
+        modBuilder.DirStatement(NMacro::ADDINCL, *AddIncls);
         AddIncls.Reset();
     }
     return true;

@@ -1,7 +1,7 @@
 #include "makefile_loader.h"
 
+#include "builtin_macro_consts.h"
 #include "module_loader.h"
-#include "out.h"
 #include "prop_names.h"
 #include "ymake.h"
 
@@ -300,7 +300,7 @@ bool TDirParser::ShouldSkip(TStringBuf command) const {
          if (ReadModuleContentOnly && (!Module || ReadModuleContentOnlyDone)) {
             // For GO_TEST_FOR and alikes we (unfortunately) should allow basically everything
             // Otherwise IFs may not properly
-            return command.StartsWith("RECURSE"sv) || command.StartsWith("PARTITIONED_RECURSE"sv);
+            return command.StartsWith(NMacro::RECURSE) || command.StartsWith(NMacro::PARTITIONED_RECURSE);
         }
     }
     return false;
@@ -533,7 +533,7 @@ TVector<TString> TDirParser::GetDirsFromArgs(const TStringBuf& statementName,
 TVector<TString> TDirParser::GetRecurseDirs(const TStringBuf& statementName,
                                             const TVector<TStringBuf>& args) {
     TVector<TString> dirs;
-    if (statementName == "RECURSE" || statementName == "RECURSE_FOR_TESTS") {
+    if (statementName == NMacro::RECURSE || statementName == NMacro::RECURSE_FOR_TESTS) {
         dirs = GetDirsFromArgs(
             statementName, args,
             [this](TStringBuf arg) { return NPath::GenPath(Dir, arg); });
@@ -559,7 +559,7 @@ void TDirParser::ReportFailOnRecurse(const TVector<TString>& takenRecurseDirs,
 
 bool TDirParser::DirStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     TVector<TString> takenRecurseDirs, ignoredRecurseDirs;
-    if (name.StartsWith("RECURSE"sv)) {
+    if (name.StartsWith(NMacro::RECURSE)) {
         takenRecurseDirs = GetRecurseDirs(name, args);
         if (Conf.ShouldFailOnRecurse()) {
             ReportFailOnRecurse(takenRecurseDirs, ignoredRecurseDirs);
@@ -630,7 +630,7 @@ bool TDirParser::MiscStatement(const TStringBuf& name, const TVector<TStringBuf>
 
         if (name == "PY_PROTOS_FOR") {
             CheckNumArgs(name, args, 1, ": dir_for <args for module in dir_for>");
-            AddSubdir(ArcPath("contrib/libs/protobuf/python"), "RECURSE"); //XXX: remove it ASAP, use PEERDIR from PACKAGE to PACKAGE instead
+            AddSubdir(ArcPath("contrib/libs/protobuf/python"), NMacro::RECURSE); //XXX: remove it ASAP, use PEERDIR from PACKAGE to PACKAGE instead
         } else {
             CheckMinArgs(name, args, 1, ": dir_for <args for module in dir_for>");
         }
@@ -669,13 +669,13 @@ bool TDirParser::MiscStatement(const TStringBuf& name, const TVector<TStringBuf>
             ReadModuleContentOnly = true;
             Vars().SetStoreOriginals(TStringBuf("GO_TEST_IMPORT_PATH"), ToString(args[0]), OrigVars());
             Vars().SetStoreOriginals(TStringBuf("_GO_IMPORT_PATH"), ToString(args[0]), OrigVars());
-            Vars().SetAppendStoreOriginals(TStringBuf("SRCDIR"), ToString(args[0]), OrigVars());
+            Vars().SetAppendStoreOriginals(NMacro::SRCDIR, ToString(args[0]), OrigVars());
         }
 
         if (name == "TS_TEST_FOR") {
             ReadModuleContentOnly = true;
             Vars().SetStoreOriginals(TStringBuf("TS_TEST_FOR_PATH"), ToString(args[0]), OrigVars());
-            Vars().SetAppendStoreOriginals(TStringBuf("SRCDIR"), ToString(args[0]), OrigVars());
+            Vars().SetAppendStoreOriginals(NMacro::SRCDIR, ToString(args[0]), OrigVars());
         }
 
         TString makelib = NPath::GenSourcePath(dir_for, "ya.make");
@@ -765,7 +765,7 @@ void TDirParser::DataStatement(const TStringBuf& name, const TVector<TStringBuf>
     }
     reportMissingAutoUpConfig("<none>");
     Y_ASSERT(Module);
-    Module->AddStatement("_DATA_FILES", dataFilesPathes);
+    Module->AddStatement(NMacro::_DATA_FILES, dataFilesPathes);
 }
 
 void TDirParser::DependsStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {

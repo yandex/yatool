@@ -12,8 +12,8 @@ namespace NYndex {
 
     static const ::TSourceLocation BuiltinDocLink = __LOCATION__;
     static const TNameDocPair BuiltinDefinitions[] = {
-        { "PEERDIR",
-            "@usage: PEERDIR(dirs...)  # builtin\n\n"
+        { NMacro::PEERDIR,
+            "@usage: " + TString{NMacro::PEERDIR} + "(dirs...)  # builtin\n\n"
                 "Specify project dependencies\n"
                 "Indicates that the project depends on all of the projects from the list of dirs.\n"
                 "Libraries from these directories will be collected and linked to the current target if the target is executable or sharedlib/dll.\n"
@@ -35,25 +35,25 @@ namespace NYndex {
                 "or more than one final target available in multimodule DEPENDS to it will"
                 "produce configuration error."
         },
-        { "RECURSE",
-            "@usage: RECURSE(dirs...)  # builtin\n\n"
+        { NMacro::RECURSE,
+            "@usage: " + TString{NMacro::RECURSE} + "(dirs...)  # builtin\n\n"
                 "Add directories to the build\n"
                 "All projects must be reachable from the root chain RECURSE() for monorepo continuous integration functionality" },
-        { "PARTITIONED_RECURSE",
-            "@usage: PARTITIONED_RECURSE([BALANCING_CONFIG config] dirs...)  # builtin\n\n"
+        { NMacro::PARTITIONED_RECURSE,
+            "@usage: " + TString{NMacro::PARTITIONED_RECURSE} + "([BALANCING_CONFIG config] dirs...)  # builtin\n\n"
                 "Add directories to the build\n"
                 "All projects must be reachable from the root chain RECURSE() for monorepo continuous integration functionality.\n"
                 "Arguments are processed in chunks"},
-        { "RECURSE_FOR_TESTS",
-            "@usage: RECURSE_FOR_TESTS(dirs...)  # builtin\n\n"
+        { NMacro::RECURSE_FOR_TESTS,
+            "@usage: " + TString{NMacro::RECURSE_FOR_TESTS} + "(dirs...)  # builtin\n\n"
                 "Add directories to the build if tests are demanded.\n"
                 "Use --force-build-depends flag if you want to build testing modules without tests running"},
-        { "PARTITIONED_RECURSE_FOR_TESTS",
-            "@usage: PARTITIONED_RECURSE_FOR_TESTS([BALANCING_CONFIG config] dirs...)  # builtin\n\n"
+        { NMacro::PARTITIONED_RECURSE_FOR_TESTS,
+            "@usage: " + TString{NMacro::PARTITIONED_RECURSE_FOR_TESTS} + "([BALANCING_CONFIG config] dirs...)  # builtin\n\n"
                 "Add directories to the build if tests are demanded.\n"
                 "Arguments are processed in chunks"},
-        { "ADDINCL",
-            "@usage: ADDINCL([FOR <lang>][GLOBAL dir]* dirlist)  # builtin\n\n"
+        { NMacro::ADDINCL,
+            "@usage: " + TString{NMacro::ADDINCL} + "([FOR <lang>][GLOBAL dir]* dirlist)  # builtin\n\n"
                 "The macro adds the directories to include/import search path to compilation flags of the current project.\n"
                 "By default settings apply to C/C++ compilation namely sets -I<library path> flag, use FOR argument to change target command.\n"
             "@params:\n"
@@ -85,8 +85,8 @@ namespace NYndex {
             "@usage: PARTITIONED_RECURSE_ROOT_RELATIVE([BALANCING_CONFIG config] dirlist)  # builtin\n\n"
                 "In comparison with RECURSE(), in dirlist there must be a directory relative to the root (${ARCADIA_ROOT}).\n"
                 "Arguments are processed in chunks"},
-        { "SRCDIR",
-            "@usage: SRCDIR(dirlist)  # builtin\n\n"
+        { NMacro::SRCDIR,
+            "@usage: " + TString{NMacro::SRCDIR} + "(dirlist)  # builtin\n\n"
                 "Add the specified directories to the list of those in which the source files will be searched\n"
                 "Available only for arcadia/contrib"},
         { "ONLY_TAGS",

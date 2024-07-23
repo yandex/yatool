@@ -1,10 +1,8 @@
 #include "module_state.h"
 
-#include "args_converter.h"
-#include "makefile_loader.h"
+#include "builtin_macro_consts.h"
 #include "macro_string.h"
 #include "macro_processor.h"
-#include "out.h"
 #include "peers.h"
 #include "command_store.h"
 
@@ -407,8 +405,8 @@ TVars TModule::ModuleDirsToVars() const {
     TVector<TStringBuf> srcDirs, peers;
     SrcDirs.IntoStrings(srcDirs);
     Peers.IntoStrings(peers);
-    vars.SetAppend("SRCDIR", srcDirs);
-    vars.SetAppend("PEERDIR", peers);
+    vars.SetAppend(NMacro::SRCDIR, srcDirs);
+    vars.SetAppend(NMacro::PEERDIR, peers);
     return vars;
 }
 

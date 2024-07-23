@@ -41,7 +41,7 @@ size_t TModuleDef::StatementPriority(const TStringBuf& s) {
         return 5;
     }
 
-    if (s == TStringBuf("PEERDIR") || s == TStringBuf("_GHOST_PEERDIR") || s == TStringBuf("SRCDIR") || s == NMacro::_LATE_GLOB) { //todo: move in config
+    if (s == NMacro::PEERDIR || s == NMacro::_GHOST_PEERDIR || s == NMacro::SRCDIR || s == NMacro::_LATE_GLOB) { //todo: move in config
         return 1;
     }
 
@@ -129,9 +129,9 @@ bool TModuleDef::ProcessBaseMacro(const TStringBuf& macroName, const TVector<TSt
 
 // Called on user-specified statements only(statements from makelist)
 void TModuleDef::ProcessMakelistStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (name == TStringBuf("PEERDIR")) {
+    if (name == NMacro::PEERDIR) {
         for (const TStringBuf& arg: args) {
-            if (arg == TStringBuf("ADDINCL") || arg == TStringBuf("GLOBAL")) {
+            if (arg == NMacro::ADDINCL || arg == TStringBuf("GLOBAL")) {
                 continue;
             }
 

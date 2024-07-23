@@ -541,9 +541,9 @@ void TModuleBuilder::ProcessStatement(const TStringBuf& name, const TVector<TStr
     PluginStatement(name, args) ||
     SkipStatement(name, args);
     // Make directories immediately available after command processing
-    ApplyVarAsMacro("PEERDIR");
-    ApplyVarAsMacro("SRCDIR");
-    ApplyVarAsMacro("ADDINCL");
+    ApplyVarAsMacro(NMacro::PEERDIR);
+    ApplyVarAsMacro(NMacro::SRCDIR);
+    ApplyVarAsMacro(NMacro::ADDINCL);
 }
 
 void TModuleBuilder::ApplyVarAsMacro(const TStringBuf& name, bool force) {
@@ -581,9 +581,9 @@ bool TModuleBuilder::ProcessMakeFile() {
         AddIncdir(dir_for, EIncDirScope::Local, false);
     }
 
-    ApplyVarAsMacro("PEERDIR");
-    ApplyVarAsMacro("SRCDIR");
-    ApplyVarAsMacro("ADDINCL");
+    ApplyVarAsMacro(NMacro::PEERDIR);
+    ApplyVarAsMacro(NMacro::SRCDIR);
+    ApplyVarAsMacro(NMacro::ADDINCL);
 
     for (const auto& statement : ModuleDef->GetMakeFileMap()) {
         const TStringBuf& name = statement.first.second;
@@ -594,9 +594,9 @@ bool TModuleBuilder::ProcessMakeFile() {
     // These functions perform some macro substitution inside and it is not guaranteed that
     // values are known at the time of arrtival. Here we know all the VARs, so reapply forcefully just in case.
     // Internal de-duplication code ensures that directies are not added twice.
-    ApplyVarAsMacro("PEERDIR", true);
-    ApplyVarAsMacro("SRCDIR", true);
-    ApplyVarAsMacro("ADDINCL", true);
+    ApplyVarAsMacro(NMacro::PEERDIR, true);
+    ApplyVarAsMacro(NMacro::SRCDIR, true);
+    ApplyVarAsMacro(NMacro::ADDINCL, true);
 
 //  FIXME(spreis) Some Dirs are added with inputs, so call to AddDirsToProps() here
 //                loses some dirs in props. On the other hand late call leaves GlIncDirs
@@ -616,12 +616,12 @@ bool TModuleBuilder::ProcessMakeFile() {
 bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     using namespace NPath;
 
-    if (name == TStringBuf("PEERDIR") || name == TStringBuf("_GHOST_PEERDIR")) {
+    if (name == NMacro::PEERDIR || name == NMacro::_GHOST_PEERDIR) {
         ValidateForBlackList(args, Conf, name);
 
         enum { normal, include } next = normal;
         for (const auto& arg : args) {
-            if (arg == TStringBuf("ADDINCL")) {
+            if (arg == NMacro::ADDINCL) {
                 next = include;
             } else {
                 TString dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, {}, ConstrYDirDiag);
@@ -633,7 +633,7 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
                 }
 
                 const TFlags<EPeerOption> addPeerOpts{next == include ? EPeerOption::AddIncl : EPeerOption::NoOption};
-                if (name == TStringBuf("_GHOST_PEERDIR")) {
+                if (name == NMacro::_GHOST_PEERDIR) {
                     if (Graph.Names().FileConf.DirHasYaMakeFile(dir)) {
                         AddPeerdir(dir, addPeerOpts | EPeerOption::MaterialGhost);
                     } else {
@@ -645,7 +645,7 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
                 next = normal;
             }
         }
-    } else if (name == TStringBuf("SRCDIR")) {
+    } else if (name == NMacro::SRCDIR) {
         ValidateForBlackList(args, Conf, name);
 
         for (const auto& arg : args) {
@@ -655,7 +655,7 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
             }
             AddSrcdir(dir);
         }
-    } else if (name == TStringBuf("ADDINCL")) {
+    } else if (name == NMacro::ADDINCL) {
         ValidateForBlackList(args, Conf, name);
 
         TLangId nextLangId = TModuleIncDirs::BAD_LANG;
@@ -726,7 +726,7 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
         Transform(args.begin(), args.end(), std::back_inserter(Module.Provides), [](TStringBuf in) {return TString{in};});
     } else if (name == TStringBuf("CHECK_PROVIDES")) {
         Module.SetCheckProvides(true);
-    } else if (name == TStringBuf("_DATA_FILES")) {
+    } else if (name == NMacro::_DATA_FILES) {
         ValidateForBlackList(args, Conf, name);
 
         for (auto arg : args) {
@@ -1065,7 +1065,7 @@ bool TModuleBuilder::SkipStatement(const TStringBuf& name, const TVector<TString
 
     if (IsKnownGarbageStatement(name)) {
         YConfInfo(Garbage) << "ymake doesn't make use of " << name << " statement\n";
-    } else if (name == "RECURSE" || name == "RECURSE_FOR_TESTS") {
+    } else if (name == NMacro::RECURSE || name == NMacro::RECURSE_FOR_TESTS) {
         TString what = TString::Join("[[alt1]]", name, "[[rst]] inside module ", Module.GetName().GetTargetStr(), "; ymake skip this.");
         TRACE(S, NEvent::TMakeSyntaxError(what, TString(Module.GetMakefile().GetTargetStr())));
         YConfErr(Syntax) << what << Endl;

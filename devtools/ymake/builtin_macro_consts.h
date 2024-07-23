@@ -17,6 +17,16 @@ constexpr TStringBuf DISABLE = "DISABLE";
 constexpr TStringBuf _GLOB = "_GLOB";
 constexpr TStringBuf _LATE_GLOB = "_LATE_GLOB";
 constexpr TStringBuf _NEVERCACHE = "_NEVERCACHE";
+constexpr TStringBuf PEERDIR = "PEERDIR";
+constexpr TStringBuf SRCDIR = "SRCDIR";
+constexpr TStringBuf ADDINCL = "ADDINCL";
+constexpr TStringBuf _GHOST_PEERDIR = "_GHOST_PEERDIR";
+constexpr TStringBuf _DATA_FILES = "_DATA_FILES";
+constexpr TStringBuf _FOR_TESTS = "_FOR_TESTS";
+constexpr TStringBuf RECURSE = "RECURSE";
+constexpr TStringBuf RECURSE_FOR_TESTS = "RECURSE_FOR_TESTS";
+constexpr TStringBuf PARTITIONED_RECURSE = "PARTITIONED_RECURSE";
+constexpr TStringBuf PARTITIONED_RECURSE_FOR_TESTS = "PARTITIONED_RECURSE_FOR_TESTS";
 
 }
 

@@ -1,4 +1,5 @@
 #include "build_result.h"
+#include "builtin_macro_consts.h"
 #include "conf.h"
 #include "dependency_management.h"
 #include "export_json.h"
@@ -325,7 +326,7 @@ namespace {
 
             auto makefileName = NPath::SmartJoin(graph.GetFileName(node).GetTargetStr(), "ya.make");
             TScopedContext context(graph.Names().FileConf.Add(makefileName), makefileName, false);
-            TStringBuf macro = depType == EDT_Include ? TStringBuf("RECURSE") : TStringBuf("DEPENDS");
+            TStringBuf macro = depType == EDT_Include ? NMacro::RECURSE : NProps::DEPENDS;
             YConfErr(BadDir) << "[[alt1]]" << macro << "[[rst]] to " << (actualDepDirType == EMNT_NonProjDir ? "directory without ya.make: " : "missing directory: ") << depDirName << Endl;
             TRACE(P, NEvent::TInvalidRecurse(TString(depDirName.GetTargetStr())));
             return false;
