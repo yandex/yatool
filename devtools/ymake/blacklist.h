@@ -13,5 +13,5 @@ public:
 
     const TString* IsValidPath(TStringBuf path) const;
     void OnParserError(EParserErrorKind kind, TStringBuf path, TStringBuf file) override;
-    void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confData);
+    void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash, MD5& anotherConfHash);
 };

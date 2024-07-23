@@ -149,6 +149,14 @@ public:
         return DefaultRequirements;
     }
 
+    void SetBlacklistHashChanged(bool value) {
+        BlacklistHashChanged_ = value;
+    }
+
+    bool IsBlacklistHashChanged() const noexcept {
+        return BlacklistHashChanged_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
 
@@ -158,7 +166,7 @@ private:
     void LoadSystemHeaders(MD5& confData);
     void LoadLicenses(MD5& confData);
     void LoadPeersRules(MD5& confData);
-    void LoadBlackLists(MD5& confData);
+    void LoadBlackLists(MD5& confHash, MD5& anotherConfHash);
     void LoadIsolatedProjects(MD5& confData);
     void FillMiscValues();
     void InitExcludedPeerdirs();
@@ -179,6 +187,7 @@ private:
     bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = false;
     bool UseGraphChangesPredictor = false;
+    bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;

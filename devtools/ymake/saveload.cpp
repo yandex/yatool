@@ -23,7 +23,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 38;
+    const ui64 ImageVersion = 39;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -279,6 +279,7 @@ namespace {
                 SaveModules(modulesData);
                 SaveCommands();
                 SaveInternalGraph();
+                SaveBlacklistHash();
                 SaveDiagnostics();
                 YMake.SaveStartDirs(Writer);
             }
@@ -311,6 +312,10 @@ namespace {
             YMake.Graph.Save(*namesBuilder);
             Writer.AddBlob(namesBuilder.Release());
             Stats.Set(NStats::EInternalCacheSaverStats::GraphCacheSize, GetLastSavedSize());
+        }
+
+        void SaveBlacklistHash() {
+            Writer.AddBlob(new TBlobSaverMemory(YMake.Conf.YmakeBlacklistHash.RawData, sizeof(TMd5Sig::RawData)));
         }
 
         void SaveCommands() {
@@ -580,6 +585,13 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         if (cacheReader.HasNextBlob()) {
             TDebugTimer timer("graph");
             Graph.Load(cacheReader.GetNextBlob());
+        }
+        if (cacheReader.HasNextBlob()) {
+            auto& blob = cacheReader.GetNextBlob();
+            TMd5Sig YmakePreBlacklistHash;
+            Y_ASSERT(blob.Length() == sizeof(TMd5Sig::RawData));
+            memcpy(YmakePreBlacklistHash.RawData, blob.Data(), sizeof(TMd5Sig::RawData));
+            Conf.SetBlacklistHashChanged(YmakePreBlacklistHash != Conf.YmakeBlacklistHash);
         }
         if (cacheReader.HasNextBlob()) {
             TDebugTimer timer("conf msg manager");

@@ -133,7 +133,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         GenerateCustomData(CustomData);
     }
 
-    MD5 confData, confWoRulesData, rulesData, extraData;
+    MD5 confData, confWoRulesData, rulesData, blacklistHash, extraData;
 
     SetGlobalConf(this);
 
@@ -171,7 +171,9 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     LoadSystemHeaders(extraData);
     LoadPeersRules(rulesData);
     if (Diag()->BlckLst) {
-        LoadBlackLists(rulesData);
+        // Add blacklist hash to rules (current behavior - deprecated) and only blacklist hash (new behavior)
+        LoadBlackLists(rulesData, blacklistHash);
+        blacklistHash.Final(YmakeBlacklistHash.RawData);
     }
     if (Diag()->IslPrjs) {
         LoadIsolatedProjects(rulesData);
@@ -253,10 +255,10 @@ void TBuildConfiguration::LoadPeersRules(MD5& confData) {
     PeersRules.Finalize();
 }
 
-void TBuildConfiguration::LoadBlackLists(MD5& confData) {
+void TBuildConfiguration::LoadBlackLists(MD5& confHash, MD5& anotherConfHash) {
     const TString blacklistsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_BLACKLISTS, CommandConf);
     TVector<TStringBuf> blacklistFiles = StringSplitter(blacklistsVar).Split(' ').SkipEmpty();
-    BlackList.Load(SourceRoot, blacklistFiles, confData);
+    BlackList.Load(SourceRoot, blacklistFiles, confHash, anotherConfHash);
 }
 
 void TBuildConfiguration::LoadIsolatedProjects(MD5& confData) {
