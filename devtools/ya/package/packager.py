@@ -304,6 +304,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_codec = params.yt_store_codec
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
+    build_options.disable_flake8_migrations = params.disable_flake8_migrations
 
     build_options.oauth_token = params.oauth_token
     if app_config.in_house:
