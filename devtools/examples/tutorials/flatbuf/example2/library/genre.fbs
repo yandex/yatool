@@ -1,0 +1,12 @@
+namespace library;
+
+enum Genre:ubyte {
+    adventure,
+    comedy,
+    detective,
+    fantasy,
+    histoty,
+    horror,
+    mystery,
+    romance
+}

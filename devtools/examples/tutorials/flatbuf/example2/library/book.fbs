@@ -1,0 +1,12 @@
+include "devtools/examples/tutorials/flatbuf/example2/page/page.fbs";
+include "devtools/examples/tutorials/flatbuf/example2/library/genre.fbs";
+
+namespace library;
+
+table Book {
+    title:string;
+    genre:Genre;
+    pages:[page.Page];
+}
+
+root_type Book;

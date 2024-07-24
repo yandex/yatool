@@ -1,0 +1,7 @@
+JAVA_LIBRARY(hello-sublib)
+
+JDK_VERSION(11)
+
+DEFAULT_JAVA_SRCS_LAYOUT()
+
+END()

@@ -1,0 +1,8 @@
+namespace library.page;
+
+table Page {
+    content:string;
+    number:ulong;
+}
+
+root_type Page;

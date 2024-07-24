@@ -1,0 +1,25 @@
+namespace library;
+
+enum Genre:ubyte {
+    adventure,
+    comedy,
+    detective,
+    fantasy,
+    histoty,
+    horror,
+    mystery,
+    romance
+}
+
+table Page {
+    content:string;
+    number:ulong;
+}
+
+table Book {
+    title:string;
+    genre:Genre;
+    pages:[Page];
+}
+
+root_type Book;

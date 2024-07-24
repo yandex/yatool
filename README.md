@@ -53,5 +53,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions to contribute.
 
 ## Documentation
 
-[Documentation in Russian](build/docs/ru/README.md)
-Documentation in English is on the way
+Documentation in [Russian](build/docs/ru/README.md).
+
+Documentation in English is on the way.
+
+[Project examples](devtools/examples/tutorials/README.md).

@@ -1,0 +1,4 @@
+RECURSE(
+    library
+    page
+)

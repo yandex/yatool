@@ -1,0 +1,5 @@
+RECURSE(
+    lib
+    sublib
+    prog
+)

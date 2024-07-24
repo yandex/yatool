@@ -1,0 +1,4 @@
+RECURSE(
+    hello
+    internal/greeting
+)

@@ -1,0 +1,9 @@
+RECURSE(
+    cpp_program
+    go_program
+    java_program
+    library
+    page
+    py2_program
+    py3_program
+)
