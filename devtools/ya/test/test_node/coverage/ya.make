@@ -15,7 +15,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/app
     devtools/ya/build/gen_plan
     devtools/ya/exts
     devtools/ya/test/const
