@@ -282,6 +282,10 @@ class MetaInfo(object):
         return self._ts_config_path
 
     @property
+    def ts_stylelint_config(self):
+        return self._ts_stylelint_config
+
+    @property
     def ts_test_data_dirs(self):
         return self._ts_test_data_dirs
 
@@ -378,6 +382,7 @@ class DartInfo(MetaInfo):
         self._test_timeout = dart_info.get('TEST-TIMEOUT')
         self._t_jvm_args = dart_info.get(jbuild.gen.consts.T_JVM_ARGS)
         self._ts_config_path = dart_info.get("TS_CONFIG_PATH")
+        self._ts_stylelint_config = dart_info.get("TS_STYLELINT_CONFIG")
         self._ts_test_data_dirs = dart_info.get("TS-TEST-DATA-DIRS")
         self._ts_test_data_dirs_rename = dart_info.get("TS-TEST-DATA-DIRS-RENAME")
         self._ts_test_for_path = dart_info.get("TS-TEST-FOR-PATH")
