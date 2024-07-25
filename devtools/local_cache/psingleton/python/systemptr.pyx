@@ -1,6 +1,5 @@
 import cython
 import exts.func
-import six
 from util.generic.maybe cimport TMaybe
 from util.generic.string cimport TString
 from util.system.types cimport i32, i64
@@ -36,13 +35,13 @@ cdef extern from "devtools/local_cache/psingleton/systemptr.h" nogil:
 
 
 def get_server_info(lock_file, log_file=None, non_blocking=False, fresh=False):
-    cdef TString lock = six.ensure_binary(lock_file)
+    cdef TString lock = lock_file.encode()
 
     cdef bint nb = non_blocking
 
     cdef bint c_fresh = fresh
 
-    cdef TString log = six.ensure_binary(log_file) if log_file else ''
+    cdef TString log = log_file.encode() if log_file else ''
 
     cdef TPFileSingleton* info = GetClientPSingleton(lock, log, c_fresh)
 
@@ -57,7 +56,7 @@ def get_server_info(lock_file, log_file=None, non_blocking=False, fresh=False):
 
     cdef TSystemWideName name = res.GetRef()
 
-    return (name.GetPid(), name.GetStartTime(), name.ToGrpcAddress())
+    return (name.GetPid(), name.GetStartTime(), name.ToGrpcAddress().decode())
 
 
 @exts.func.memoize()

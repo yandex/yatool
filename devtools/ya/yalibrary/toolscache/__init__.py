@@ -68,10 +68,7 @@ def _log_name():
 
 
 def _retry_grpc(e):
-    if isinstance(e, _RestartTCException):
-        return True
-
-    if isinstance(e, subprocess.CalledProcessError):
+    if isinstance(e, (_RestartTCException, subprocess.CalledProcessError)):
         return True
 
     if not isinstance(e, grpc.RpcError) or not hasattr(e, 'code'):
@@ -125,7 +122,6 @@ class _Server(object):
     _in_progress_thread = None
     _full_path = None
     _sb_path = None
-    _sb_path_id = None
     _sb_id = None
     _ini_file = None
     _done = False
@@ -157,6 +153,10 @@ class _Server(object):
 
     @classmethod
     def _do_read_config(cls, opts):
+        if six.PY2:
+            logger.debug("TC/AC caches don't support python2")
+            return
+
         if cls._read_config:
             return
 
@@ -252,14 +252,10 @@ class _Server(object):
             cls._tc_cache_size = getattr(params, "tools_cache_size", None)
 
             if cls._ac_cache_size is not None:
-                cls._ac_cache_size = min(
-                    8223372036854775808, long(cls._ac_cache_size) if six.PY2 else int(cls._ac_cache_size)  # noqa
-                )
+                cls._ac_cache_size = min(8223372036854775808, int(cls._ac_cache_size))
 
             if cls._tc_cache_size is not None:
-                cls._tc_cache_size = min(
-                    8223372036854775808, long(cls._tc_cache_size) if six.PY2 else int(cls._tc_cache_size)  # noqa
-                )
+                cls._tc_cache_size = min(8223372036854775808, int(cls._tc_cache_size))
 
             if params.tools_cache_bin:
                 cls._full_path = params.tools_cache_bin
@@ -268,10 +264,6 @@ class _Server(object):
             # For testing only
             if 'sb_path' in cls._tc_config_options:
                 cls._sb_path = cls._tc_config_options['sb_path']
-
-            # For testing only
-            if 'sb_path_id' in cls._tc_config_options:
-                cls._sb_path_id = cls._tc_config_options['sb_path_id']
 
             # For testing only
             if 'sb_id' in cls._tc_config_options:
@@ -305,7 +297,7 @@ class _Server(object):
 
     @classmethod
     def _run_tc_binary(cls, thr_ident):
-        if cls._sb_id or cls._sb_path_id:
+        if cls._sb_id:
             with _with_no_tc_notification(cls, thr_ident):
                 cls._fetch_ya_tc()
 
@@ -317,20 +309,18 @@ class _Server(object):
             + (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else [])
             + ["--tools_cache-master_mode", "true" if cls._tc_master else "false"]
             + (["--tools_cache-disk_limit={}".format(cls._tc_cache_size)] if cls._tc_cache_size is not None else [])
-            + ["--tools_cache-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._tc_config_options)]
-            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)]
+            + ["--tools_cache-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._tc_config_options.items()]
+            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._gl_config_options.items()]
             + [("ALL-" if cls._single_instance else "TC-") + core.gsid.flat_session_id()]
         )
 
-        new_args = (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else []) + (
-            ["--grpc-service=all"] if cls._single_instance else ["--grpc-service=tools_cache"]
-        )
+        new_args = ["--grpc-service=all"] if cls._single_instance else ["--grpc-service=tools_cache"]
 
         if cls._single_instance:
             new_args += (
                 (["--ac-master_mode", "true" if cls._ac_master else "false"])
                 + (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else [])
-                + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)]
+                + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._ac_config_options.items()]
             )
 
         logger.debug("run {0} with args {1}".format(cls._full_path, args + new_args))
@@ -365,13 +355,12 @@ class _Server(object):
             + ([] if _logs_are_enabled() else ["--no-logs"])
             + (["--tools_cache-sb_id", cls._sb_id] if cls._sb_id else [])
             + (["--tools_cache-sb_path", cls._sb_path] if cls._sb_path else [])
-            + (["--tools_cache-sb_alt_id", cls._sb_path_id] if cls._sb_path_id else [])
             + (["--ac-master_mode", "true" if cls._ac_master else "false"])
             + (["--ac-cache_dir", cls._bld_dir] if cls._bld_dir else [])
             + (["--ac-disk_limit={}".format(cls._ac_cache_size)] if cls._ac_cache_size is not None else [])
             + ["--grpc-service=build_cache"]
-            + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._ac_config_options)]
-            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in six.iteritems(cls._gl_config_options)]
+            + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._ac_config_options.items()]
+            + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._gl_config_options.items()]
             + ["AC-" + core.gsid.flat_session_id()]
         )
 
@@ -405,18 +394,14 @@ class _Server(object):
             import yalibrary.tools as tools
 
             with _with_no_tc_notification(cls, thr_ident):
-                # Start from p.1.
-                # Relying on yalibrary.fetcher
-                cls._sb_path, cls._sb_path_id = os.path.split(
+                cls._sb_path, cls._sb_id = os.path.split(
                     tools.toolchain_root("ya-tc", toolchain_extra=None, for_platform=None)
                 )
-                cls._sb_id = tools.resource_id("ya-tc", toolchain_extra=None, for_platform=None).replace('sbr:', '')
                 cls._full_path = cls._fetch_ya_tc()
 
             logger.debug(
-                "Tools cache server resource download/parameters done: id=%s, path_id=%s, full_path=%s",
+                "Tools cache server resource download/parameters done: id=%s, full_path=%s",
                 cls._sb_id,
-                cls._sb_path_id,
                 cls._full_path,
             )
 
@@ -518,74 +503,70 @@ class _Server(object):
         return cls._ac_enable
 
     @classmethod
-    def unary_method_no_retry(cls, method, diag, tc, verbose=True, ignore_error_for_tc=False, **kwargs):
-        thr_ident = threading.current_thread().ident if tc else None
-        if tc and thr_ident == cls._in_progress_thread:
+    def _report_grpc_error(cls, grpc_exc, service, pid):
+        if hasattr(grpc_exc, 'details') and hasattr(grpc_exc, 'code'):
+            details = "{} {}".format(grpc_exc.code(), grpc_exc.details())
+        else:
+            details = str(grpc_exc)
+        logger.debug("grpc error accessing %s cache %s, remote: pid=%d", service, details, pid)
+        cls._Report._grpc_exceptions += 1
+
+    @classmethod
+    def _ac_unary_method_no_retry(cls, method, method_kwargs, diag, verbose=True):
+        full_address = cls._ac_cache_address(diag, verbose=verbose)
+        pid, ctime, address = full_address
+        if address is not None:
+            try:
+                return method(full_address, timeout=cls._dead_line, **method_kwargs)
+            except grpc.RpcError as e:
+                cls._report_grpc_error(e, "AC", pid)
+                cls._ac_full_address = None
+                raise
+        else:
+            raise AssertionError("AC cache service not found in {} for {}".format(cls._ac_lock_file, diag))
+
+    @classmethod
+    def _tc_unary_method_no_retry(cls, method, method_kwargs, diag, verbose=True, ignore_error_for_tc=False):
+        thr_ident = threading.current_thread().ident
+        if thr_ident == cls._in_progress_thread:
             return
 
-        # If ya-tc in maintenance mode, then notification requests should be disabled.
         def ignore_ya_tc_notification(pid, grpc_exc):
             if not ignore_error_for_tc:
                 return False
             if grpc_exc.code() != grpc.StatusCode.FAILED_PRECONDITION:
                 return False
-
-            resource_id = kwargs.get("sbid")
-            resource_dir = kwargs.get("sbpath")
-            if resource_dir != cls._sb_path:
+            if method_kwargs["sbpath"] != cls._sb_path or method_kwargs["sbid"] != cls._sb_id:
                 return False
-
-            if resource_id not in (cls._sb_id, cls._sb_path_id):
-                return False
-
-            logger.debug(
-                "Ignore grpc error {} for ya-tc notification about itself, remote: pid={}".format(grpc_exc, pid)
-            )
+            logger.debug("Ignore grpc error %s for ya-tc notification about itself, remote: pid=%d", str(grpc_exc), pid)
             return True
 
-        full_address = (
-            cls._tc_cache_address(thr_ident, diag, verbose=verbose)
-            if tc
-            else cls._ac_cache_address(diag, verbose=verbose)
-        )
+        full_address = cls._tc_cache_address(thr_ident, diag, verbose=verbose)
         pid, ctime, address = full_address
         if address is not None:
             try:
-                return method(full_address, timeout=cls._dead_line, **kwargs)
+                return method(full_address, timeout=cls._dead_line, **method_kwargs)
             except grpc.RpcError as e:
-                if tc and ignore_ya_tc_notification(pid, e):
+                if ignore_ya_tc_notification(pid, e):
                     return
-                if hasattr(e, 'details') and hasattr(e, 'code'):
-                    logger.debug(
-                        "grpc error accessing {} cache {} {}, remote: pid={}".format(
-                            "TC" if tc else "AC", e.code(), e.details(), pid
-                        )
-                    )
-                else:
-                    logger.debug(
-                        "grpc error accessing {} cache {}, remote: pid={}".format("TC" if tc else "AC", e, pid)
-                    )
-                if tc:
-                    cls._tc_full_address = None
-                else:
-                    cls._ac_full_address = None
-                cls._Report._grpc_exceptions += 1
+                cls._report_grpc_error(e, "TC", pid)
+                cls._tc_full_address = None
                 raise
         else:
-            msg = "Cache service not found in {} for {}".format(cls._tc_lock_file if tc else cls._ac_lock_file, diag)
-            logger.debug(msg)
-            raise AssertionError(msg)
+            raise AssertionError("TC cache service not found in {} for {}".format(cls._tc_lock_file, diag))
+
+    @staticmethod
+    def _get_wrapper(func, retries):
+        return retry.retrying(
+            max_times=retries, raise_exception=lambda e: not _retry_grpc(e), retry_sleep=lambda i, t: i
+        )(func)
 
     @classmethod
-    def unary_method(
-        cls, method, diag, tc, verbose=True, ignore_error_for_tc=False, ignore_exception=False, retries=4, **kwargs
-    ):
-        @retry.retrying(max_times=retries, raise_exception=lambda e: not _retry_grpc(e), retry_sleep=lambda i, t: i)
-        def wrapper(*args, **kwargs):
-            return cls.unary_method_no_retry(*args, **kwargs)
-
+    def unary_method(cls, method, method_kwargs, diag, tc, ignore_exception=False, retries=4, **kwargs):
+        func = cls._tc_unary_method_no_retry if tc else cls._ac_unary_method_no_retry
+        wrapper = cls._get_wrapper(func, retries)
         try:
-            return wrapper(method, diag=diag, verbose=verbose, ignore_error_for_tc=ignore_error_for_tc, tc=tc, **kwargs)
+            return wrapper(method, method_kwargs, diag=diag, **kwargs)
         except (grpc.RpcError, subprocess.CalledProcessError, _RestartTCException):
             if not ignore_exception:
                 raise
@@ -600,10 +581,10 @@ class _Server(object):
 
         return cls.unary_method(
             notify_resource_used,
+            kwargs,
             diag='(request for resource {})'.format(resource_id),
             tc=True,
             ignore_error_for_tc=True,
-            **kwargs
         )
 
     @classmethod
@@ -612,9 +593,7 @@ class _Server(object):
 
         kwargs = {'disk_limit': max_cache_size}
 
-        return cls.unary_method(
-            force_gc, diag='(force gc tools cache {})'.format(max_cache_size), tc=True, verbose=True, **kwargs
-        )
+        return cls.unary_method(force_gc, kwargs, diag='(force gc tools cache {})'.format(max_cache_size), tc=True)
 
     @classmethod
     def lock_resource(cls, where):
@@ -624,33 +603,33 @@ class _Server(object):
 
         kwargs = {'sbpath': resource_dir, 'sbid': resource_id}
 
-        return cls.unary_method(lock_resource, diag='(lock resource {})'.format(resource_id), tc=True, **kwargs)
+        return cls.unary_method(lock_resource, kwargs, diag='(lock resource {})'.format(resource_id), tc=True)
 
     @classmethod
     def get_task_tc_stats(cls):
         from devtools.local_cache.toolscache.python.toolscache import get_task_stats
 
-        return cls.unary_method(get_task_stats, diag='(request for tc stats)', tc=True, ignore_exception=True)
+        return cls.unary_method(get_task_stats, {}, diag='(request for tc stats)', tc=True, ignore_exception=True)
 
     @classmethod
     def check_status(cls):
         from devtools.local_cache.toolscache.python.toolscache import check_status
 
-        return cls.unary_method(check_status, diag='(check status)', tc=True)
+        return cls.unary_method(check_status, {}, diag='(check status)', tc=True)
 
     @classmethod
     def unlock_all(cls):
         from devtools.local_cache.toolscache.python.toolscache import unlock_all
 
-        return cls.unary_method(unlock_all, diag='(unlock all)', tc=True)
+        return cls.unary_method(unlock_all, {}, diag='(unlock all)', tc=True)
 
     @classmethod
     def has_uid(cls, uid, is_result):
         from devtools.local_cache.ac.python.ac import has_uid
 
-        kwargs = {'uid': six.ensure_binary(uid), 'is_result': is_result}
+        kwargs = {'uid': uid, 'is_result': is_result}
 
-        return cls.unary_method(has_uid, diag='(has uid {})'.format(uid), tc=False, verbose=False, **kwargs)
+        return cls.unary_method(has_uid, kwargs, diag='(has uid {})'.format(uid), tc=False, verbose=False)
 
     @classmethod
     def get_uid(cls, uid, dest_path, hardlink, is_result, release):
@@ -658,7 +637,7 @@ class _Server(object):
 
         kwargs = {'uid': uid, 'dest_path': dest_path, 'hardlink': hardlink, 'is_result': is_result, 'release': release}
 
-        return cls.unary_method(get_uid, diag='(get uid {})'.format(uid), tc=False, verbose=True, **kwargs)
+        return cls.unary_method(get_uid, kwargs, diag='(get uid {})'.format(uid), tc=False)
 
     @classmethod
     def put_uid(cls, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names):
@@ -675,7 +654,7 @@ class _Server(object):
             'file_names': file_names,
         }
 
-        return cls.unary_method(put_uid, diag='(put uid {})'.format(uid), tc=False, verbose=True, **kwargs)
+        return cls.unary_method(put_uid, kwargs, diag='(put uid {})'.format(uid), tc=False)
 
     @classmethod
     def remove_uid(cls, uid, forced_removal):
@@ -683,13 +662,13 @@ class _Server(object):
 
         kwargs = {'uid': uid, 'forced_removal': forced_removal}
 
-        return cls.unary_method(remove_uid, diag='(remove uid {})'.format(uid), tc=False, **kwargs)
+        return cls.unary_method(remove_uid, kwargs, diag='(remove uid {})'.format(uid), tc=False)
 
     @classmethod
     def get_task_ac_stats(cls):
         from devtools.local_cache.ac.python.ac import get_task_stats
 
-        return cls.unary_method(get_task_stats, diag='(request for ac stats)', tc=False, ignore_exception=True)
+        return cls.unary_method(get_task_stats, {}, diag='(request for ac stats)', tc=False, ignore_exception=True)
 
     @classmethod
     def put_dependencies(cls, uid, deps):
@@ -697,7 +676,7 @@ class _Server(object):
 
         kwargs = {'uid': uid, 'deps': deps}
 
-        return cls.unary_method(put_dependencies, diag='(graph info {})'.format(uid), tc=False, verbose=False, **kwargs)
+        return cls.unary_method(put_dependencies, kwargs, diag='(graph info {})'.format(uid), tc=False, verbose=False)
 
     @classmethod
     def ac_force_gc(cls, max_cache_size):
@@ -705,19 +684,19 @@ class _Server(object):
 
         kwargs = {'disk_limit': max_cache_size}
 
-        return cls.unary_method(force_gc, diag='(force gc {})'.format(max_cache_size), tc=False, verbose=True, **kwargs)
+        return cls.unary_method(force_gc, kwargs, diag='(force gc {})'.format(max_cache_size), tc=False)
 
     @classmethod
     def release_all(cls):
         from devtools.local_cache.ac.python.ac import release_all
 
-        return cls.unary_method(release_all, diag='(release all data)', tc=False, verbose=True, ignore_exception=True)
+        return cls.unary_method(release_all, {}, diag='(release all data)', tc=False, ignore_exception=True)
 
     @classmethod
     def analyze_ac(cls):
         from devtools.local_cache.ac.python.ac import analyze_du
 
-        return cls.unary_method(analyze_du, diag='(analyze disk usage)', tc=False, verbose=True, ignore_exception=True)
+        return cls.unary_method(analyze_du, {}, diag='(analyze disk usage)', tc=False, ignore_exception=True)
 
     @classmethod
     def synchronous_gc(cls, total_size=None, min_last_access=None, max_object_size=None):
@@ -725,9 +704,7 @@ class _Server(object):
 
         kwargs = {'total_size': total_size, 'min_last_access': min_last_access, 'max_object_size': max_object_size}
 
-        return cls.unary_method(
-            synchronous_gc, diag='(synchronous gc {})'.format(kwargs), tc=False, verbose=True, **kwargs
-        )
+        return cls.unary_method(synchronous_gc, kwargs, diag='(synchronous gc {})'.format(kwargs), tc=False)
 
 
 _SERVER = _Server()
@@ -914,7 +891,7 @@ class ACCache(object):
     def compact(self, interval, max_cache_size, state):
         if self._max_age is not None:
             r = _SERVER.synchronous_gc(min_last_access=self._max_age * 1000)
-            max_cache_size = min(8223372036854775808, long(max_cache_size) if six.PY2 else int(max_cache_size))  # noqa
+            max_cache_size = min(8223372036854775808, int(max_cache_size))
         else:
             r = _SERVER.ac_force_gc(max_cache_size)
         if r:
@@ -929,7 +906,7 @@ class ACCache(object):
             def convert(uid, info):
                 blobs = []
                 file_names = []
-                for rel_path, info in six.iteritems(info):
+                for rel_path, info in info.items():
                     store_path, _, fhash = info
                     if not os.path.exists(store_path):
                         return

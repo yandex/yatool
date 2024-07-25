@@ -3,7 +3,6 @@ import contextlib
 import exts.func
 import grpc
 import logging
-import six
 import threading
 
 from devtools.local_cache.ac.proto import ac_pb2, ac_pb2_grpc
@@ -87,26 +86,22 @@ def _analyze_metadata(call):
     _RECREATE_CHECK_REPORTED = True
 
 
-def _check_common_args(paddress, timeout, wait_for_ready, task_id=b""):
+def _check_common_args(paddress, timeout, wait_for_ready):
     pid, ctime, address = paddress
     assert isinstance(pid, int), type(pid)
-    assert isinstance(ctime, six.integer_types), type(ctime)
-    assert isinstance(address, six.binary_type), type(address)
+    assert isinstance(ctime, int), type(ctime)
+    assert isinstance(address, str), type(address)
 
     assert timeout is None or isinstance(timeout, (int, float)), type(timeout)
     assert isinstance(wait_for_ready, bool), type(wait_for_ready)
-    assert isinstance(task_id, six.binary_type), type(task_id)
 
 
-def put_uid(paddress, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def put_uid(paddress, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    uid = six.ensure_binary(uid)
-    root_path = six.ensure_binary(root_path)
-
-    assert isinstance(uid, six.binary_type), type(uid)
-    assert isinstance(root_path, six.binary_type), type(root_path)
+    assert isinstance(uid, str), type(uid)
+    assert isinstance(root_path, str), type(root_path)
     assert isinstance(blobs, list), type(blobs)
     assert isinstance(hardlink, bool), type(hardlink)
     assert isinstance(weight, int), type(weight)
@@ -116,21 +111,16 @@ def put_uid(paddress, uid, root_path, blobs, weight, hardlink, replace, is_resul
     assert file_names is None or len(file_names) == len(blobs), type(blobs)
 
     peer = known_service_pb2.TPeer(
-        TaskGSID=task_id,
         Proc=_memoize_my_name()
     )
 
     blob_info = []
     for fpath, fuid in blobs:
-        fpath = six.ensure_binary(fpath)
-
-        assert isinstance(fpath, six.binary_type), type(fpath)
+        assert isinstance(fpath, str), type(fpath)
         if fuid is None:
             blob_info.append(ac_pb2.TBlobInfo(Path=fpath, Optimization=ac_pb2.Hardlink if hardlink else ac_pb2.Copy))
         else:
-            fuid = six.ensure_binary(fuid)
-
-            assert isinstance(fuid, six.binary_type), type(fuid)
+            assert isinstance(fuid, str), type(fuid)
             blob_info.append(ac_pb2.TBlobInfo(Path=fpath, Optimization=ac_pb2.Hardlink if hardlink else ac_pb2.Copy, CASHash=ac_pb2.THash(Uid=fuid)))
 
     query = ac_pb2.TPutUid(
@@ -154,21 +144,17 @@ def put_uid(paddress, uid, root_path, blobs, weight, hardlink, replace, is_resul
         return resp, call.trailing_metadata()
 
 
-def get_uid(paddress, uid, dest_path, hardlink, is_result, release=False, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def get_uid(paddress, uid, dest_path, hardlink, is_result, release=False, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    uid = six.ensure_binary(uid)
-    dest_path = six.ensure_binary(dest_path)
-
-    assert isinstance(uid, six.binary_type), type(uid)
-    assert isinstance(dest_path, six.binary_type), type(dest_path)
+    assert isinstance(uid, str), type(uid)
+    assert isinstance(dest_path, str), type(dest_path)
     assert isinstance(hardlink, bool), type(hardlink)
     assert isinstance(is_result, bool), type(is_result)
     assert isinstance(release, bool), type(release)
 
     peer = known_service_pb2.TPeer(
-        TaskGSID=task_id,
         Proc=_memoize_my_name()
     )
 
@@ -190,17 +176,14 @@ def get_uid(paddress, uid, dest_path, hardlink, is_result, release=False, task_i
         return resp, call.trailing_metadata()
 
 
-def has_uid(paddress, uid, is_result, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def has_uid(paddress, uid, is_result, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    uid = six.ensure_binary(uid)
-
-    assert isinstance(uid, six.binary_type), type(uid)
+    assert isinstance(uid, str), type(uid)
     assert isinstance(is_result, bool), type(is_result)
 
     peer = known_service_pb2.TPeer(
-        TaskGSID=task_id,
         Proc=_memoize_my_name()
     )
 
@@ -223,9 +206,7 @@ def remove_uid(paddress, uid, forced_removal=False, timeout=None, wait_for_ready
     _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    uid = six.ensure_binary(uid)
-
-    assert isinstance(uid, six.binary_type), type(uid)
+    assert isinstance(uid, str), type(uid)
     assert isinstance(forced_removal, bool), type(forced_removal)
 
     query = ac_pb2.TRemoveUid(
@@ -242,12 +223,11 @@ def remove_uid(paddress, uid, forced_removal=False, timeout=None, wait_for_ready
         return resp
 
 
-def get_task_stats(paddress, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def get_task_stats(paddress, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
 
     pid, ctime, address = paddress
     query = known_service_pb2.TPeer(
-        TaskGSID=task_id,
         Proc=_memoize_my_name()
     )
     if not timeout:
@@ -263,9 +243,7 @@ def put_dependencies(paddress, uid, deps, timeout=None, wait_for_ready=False):
     _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    uid = six.ensure_binary(uid)
-
-    assert isinstance(uid, six.binary_type), type(uid)
+    assert isinstance(uid, str), type(uid)
     assert isinstance(deps, list), type(deps)
 
     dep_info = [ac_pb2.THash(Uid=duid) for duid in deps]
@@ -284,14 +262,13 @@ def put_dependencies(paddress, uid, deps, timeout=None, wait_for_ready=False):
         return resp
 
 
-def force_gc(paddress, disk_limit, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def force_gc(paddress, disk_limit, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
-    assert isinstance(disk_limit, six.integer_types)
+    assert isinstance(disk_limit, int)
 
     query = ac_pb2.TForceGC(
         Peer=known_service_pb2.TPeer(
-            TaskGSID=task_id,
             Proc=_memoize_my_name()
         ),
         TargetSize=disk_limit
@@ -306,12 +283,11 @@ def force_gc(paddress, disk_limit, task_id=b"", timeout=None, wait_for_ready=Fal
         return resp
 
 
-def release_all(paddress, task_id=b"", timeout=None, wait_for_ready=False):
-    _check_common_args(paddress, timeout, wait_for_ready, task_id=task_id)
+def release_all(paddress, timeout=None, wait_for_ready=False):
+    _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
     query = known_service_pb2.TPeer(
-        TaskGSID=task_id,
         Proc=_memoize_my_name()
     )
 
@@ -356,21 +332,21 @@ def synchronous_gc(paddress, total_size=None, min_last_access=None, max_object_s
     _check_common_args(paddress, timeout, wait_for_ready)
     pid, ctime, address = paddress
 
-    assert total_size is None or isinstance(total_size, six.integer_types + (float, ))
-    assert max_object_size is None or isinstance(max_object_size, six.integer_types + (float, ))
-    assert min_last_access is None or isinstance(min_last_access, six.integer_types + (float, ))
+    assert total_size is None or isinstance(total_size, (float, int))
+    assert max_object_size is None or isinstance(max_object_size, (float, int))
+    assert min_last_access is None or isinstance(min_last_access, (float, int))
 
     if total_size is not None:
         query = ac_pb2.TSyncronousGC(
-            TotalSize=long(total_size) if six.PY2 else int(total_size),
+            TotalSize=int(total_size),
         )
     elif max_object_size is not None:
         query = ac_pb2.TSyncronousGC(
-            BLobSize=long(max_object_size) if six.PY2 else int(max_object_size),
+            BLobSize=int(max_object_size),
         )
     elif min_last_access is not None:
         query = ac_pb2.TSyncronousGC(
-            Timestamp=long(min_last_access) if six.PY2 else int(min_last_access),
+            Timestamp=int(min_last_access),
         )
     else:
         query = ac_pb2.TSyncronousGC()
