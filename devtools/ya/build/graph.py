@@ -983,7 +983,7 @@ def _update_graph_execution_cost(stat, cost_info):
         cost_info["evaluation_errors"] = cost_info.get("evaluation_errors", 0) + 1
 
 
-def _prepare_local_change_list(app_ctx, opts):
+def _prepare_local_change_list_generator(app_ctx, opts):
     if not app_ctx:
         return None
 
@@ -1216,13 +1216,6 @@ class _GraphMaker(object):
         self._exit_stack = exit_stack
         self._print_status = print_status
         self._heater = self._opts.build_graph_cache_heater
-
-        if getattr(self._opts, "build_graph_cache_force_local_cl", False):
-            import app_ctx
-
-            self._local_cl_generator = _prepare_local_change_list(app_ctx, self._opts)
-        else:
-            self._local_cl_generator = None
 
     def make_graphs(
         self,
@@ -1687,13 +1680,19 @@ class _GraphMaker(object):
         if make_files_dart:
             o['dump_make_files'] = make_files_dart
 
-        if self._local_cl_generator and change_list is None:
-            with stager.scope("force_changelist_creation"):
-                o['patch_path'] = self._local_cl_generator.get_changelist(ya_cache_dir)
-            o['cache_info_file'] = self._local_cl_generator.path_to_current_hash
-            o['cache_info_name'] = self._local_cl_generator.DEFAULT_HASH_FILE_NAME
-            if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
-                o['debug_options'] += ['completely-trust-fs-cache']
+        if change_list is None:
+            if getattr(self._opts, "build_graph_cache_force_local_cl", False):
+                import app_ctx
+
+                cl_generator = _prepare_local_change_list_generator(app_ctx, self._opts)
+                if cl_generator is not None:
+                    with stager.scope("force_changelist_creation"):
+                        o['patch_path'] = cl_generator.get_changelist(ya_cache_dir)
+                    if os.path.exists(cl_generator.path_to_current_hash):
+                        o['cache_info_file'] = cl_generator.path_to_current_hash
+                        o['cache_info_name'] = cl_generator.DEFAULT_HASH_FILE_NAME
+                    if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
+                        o['debug_options'] += ['completely-trust-fs-cache']
         else:
             o['patch_path'] = change_list
 
