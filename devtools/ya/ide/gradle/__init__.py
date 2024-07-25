@@ -141,7 +141,7 @@ def recursive_symlinks(arcadia_root, gradle_project_root, target):
                 recursive_symlinks(arcadia_root, gradle_project_root, os.path.join(target, path))
 
 
-def apply_graph(params, sem_graph, gradle_project_root):
+def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targets):
     with open(sem_graph) as f:
         graph = json.load(f)
         f.close()
@@ -156,6 +156,7 @@ def apply_graph(params, sem_graph, gradle_project_root):
     arcadia_root = params.arc_root
     project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
     build_rel_targets = []  # Relative paths to targets for build
+    build_rel_targets.extend(additional_run_java_targets)
     for node in graph['data']:
         validated, additional_targets, outside_targets = NodeValidator(rel_targets_with_slash, arcadia_root).validate(
             node
@@ -235,6 +236,71 @@ def apply_graph(params, sem_graph, gradle_project_root):
                     os.symlink(src, dst)
 
 
+def find_run_java_program(sem_graph, gradle_project_root, arcadia_root):
+    with open(sem_graph) as f:
+        graph = json.load(f)
+        f.close()
+
+    additional_targets = list()
+    for node in graph['data']:
+        if node.get('NodeType', None) != 'NonParsedFile' or 'semantics' not in node:
+            continue
+        semantics = node['semantics']
+        if (
+            'sem' in semantics[0]
+            and len(semantics[0]['sem']) == 1
+            and semantics[0]['sem'][0] == 'runs-ITEM'
+            and semantics[2]['sem'][1] != '@.cplst'
+        ):
+            additional_target = semantics[2]['sem'][1]
+            additional_target = additional_target.replace('@', '')
+            additional_target = os.path.dirname(additional_target)
+            additional_target = os.path.relpath(additional_target, gradle_project_root)
+            additional_target = os.path.join(arcadia_root, additional_target)
+            additional_targets.append(additional_target)
+
+    return additional_targets
+
+
+def make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener):
+    conf = build_facade.gen_conf(
+        build_root=handler_root,
+        build_type='nobuild',
+        build_targets=params.abs_targets,
+        flags=params.flags,
+        ymake_bin=getattr(params, 'ymake_bin', None),
+        host_platform=params.host_platform,
+        target_platforms=params.target_platforms,
+        arc_root=arcadia_root,
+    )
+
+    ymake_args = [
+        '-k',
+        '--build-root',
+        gradle_project_root,
+        '--config',
+        conf,
+        '--plugins-root',
+        os.path.join(arcadia_root, 'build/plugins'),
+        '--xs',
+        '--sem-graph',
+    ] + params.abs_targets
+
+    logger.info("Generate sem-graph command:\n" + ' '.join([ymake] + ymake_args) + "\n")
+
+    _, stdout, _ = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
+
+    shutil.copy(
+        conf, os.path.join(handler_root, 'ymake.conf')
+    )  # TODO Remove For debugonly, required for retry to make sem.json
+    sem_graph = os.path.join(handler_root, 'sem.json')
+    with open(sem_graph, 'w') as f:
+        f.write(stdout)
+        f.close()
+
+    return sem_graph
+
+
 def do_gradle(params):
     do_gradle_stage = stager.start('do_gradle')
 
@@ -296,46 +362,22 @@ def do_gradle(params):
     # to avoid problems with proto
     params.ya_make_extra.append('-DBUILD_LANGUAGES=JAVA')
 
-    conf = build_facade.gen_conf(
-        build_root=handler_root,
-        build_type='nobuild',
-        build_targets=params.abs_targets,
-        flags=params.flags,
-        ymake_bin=getattr(params, 'ymake_bin', None),
-        host_platform=params.host_platform,
-        target_platforms=params.target_platforms,
-        arc_root=arcadia_root,
-    )
-
     yexport = yalibrary.tools.tool('yexport') if params.yexport_bin is None else params.yexport_bin
     ymake = yalibrary.tools.tool('ymake') if params.ymake_bin is None else params.ymake_bin
-
-    ymake_args = [
-        '-k',
-        '--build-root',
-        gradle_project_root,
-        '--config',
-        conf,
-        '--plugins-root',
-        os.path.join(arcadia_root, 'build/plugins'),
-        '--xs',
-        '--sem-graph',
-    ] + params.abs_targets
 
     def listener(event):
         logger.info(event)
 
-    logger.info("Generate sem-graph command:\n" + ' '.join([ymake] + ymake_args) + "\n")
-
-    _, stdout, _ = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
-
-    shutil.copy(
-        conf, os.path.join(handler_root, 'ymake.conf')
-    )  # TODO Remove For debugonly, required for retry to make sem.json
-    sem_graph = os.path.join(handler_root, 'sem.json')
-    with open(sem_graph, 'w') as f:
-        f.write(stdout)
-        f.close()
+    sem_graph = make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener)
+    additional_run_java_program_targets = find_run_java_program(sem_graph, gradle_project_root, arcadia_root)
+    additional_run_java_program_rel_targets = list()
+    if len(additional_run_java_program_targets) > 0:
+        for additional_run_java_program_target in additional_run_java_program_targets:
+            params.abs_targets.append(additional_run_java_program_target)
+            rel_target = os.path.relpath(additional_run_java_program_target, arcadia_root)
+            params.rel_targets.append(rel_target)
+            additional_run_java_program_rel_targets.append(rel_target)
+        sem_graph = make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener)
 
     if params.gradle_name:
         project_name = params.gradle_name
@@ -375,6 +417,8 @@ def do_gradle(params):
         handler_root,
         '--semantic-graph',
         sem_graph,
+        '--debug-mode',
+        'attrs',
         '--generator',
         'ide-gradle',
         '--target',
@@ -385,7 +429,7 @@ def do_gradle(params):
 
     subprocess.call(yexport_args)
 
-    apply_graph(params, sem_graph, gradle_project_root)
+    apply_graph(params, sem_graph, gradle_project_root, additional_run_java_program_rel_targets)
 
     # TODO remove ymake.conf, sem.json, yexport.toml
 
