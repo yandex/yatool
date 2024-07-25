@@ -437,6 +437,7 @@ class CacheFactory(object):
             max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             max_cache_size=self._opts.yt_max_cache_size,
             ttl=self._opts.yt_store_ttl,
+            heater_mode=not self._opts.yt_store_wt,
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -510,7 +511,7 @@ def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
             # needed for catching an error in this rare scenario
             _async = not (opts.yt_store_exclusive or heater_mode)
 
-            cache.prepare(uids, heater_mode=heater_mode, refresh_on_read=opts.yt_store_refresh_on_read, _async=_async)
+            cache.prepare(uids, refresh_on_read=opts.yt_store_refresh_on_read, _async=_async)
 
         logger.debug("Dist cache prepared")
         return cache
