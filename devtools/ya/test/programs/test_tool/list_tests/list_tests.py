@@ -43,6 +43,7 @@ def get_options():
     parser.add_option("--partition-mode", dest="partition_mode", default="SEQUENTIAL")
     parser.add_option("--tests-filters", dest="tests_filters", default=[], action='append')
     parser.add_option("--test-param", dest="test_param", default=[], action='append')
+    parser.add_option("--env", dest="test_env", action="append", help="Test env", default=[])
     parser.add_option("--split-by-tests", dest="split_by_tests", default=True)
     parser.add_option("--test-suite-name", dest="test_suite_name", help="name of the running test suite", default=None)
     parser.add_option(
@@ -198,8 +199,9 @@ def main():
 
     list_cmd = test.util.shared.change_cmd_root(list_cmd, source_root, new_source_root, build_root)
 
-    # change roots in the env's PYTHONPATH
     env = os.environ.copy()
+    env.update(entry.split("=", 1) for entry in options.test_env)
+    # change roots in the env's PYTHONPATH
     python_paths = test.util.shared.change_cmd_root(
         options.test_related_paths, source_root, new_source_root, build_root
     )

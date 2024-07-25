@@ -141,6 +141,23 @@ def get_test_build_deps_or_throw(suite):
     return suite.get_build_dep_uids()
 
 
+def _get_env_arg(opts, suite):
+    test_env = []
+    if suite.env:
+        test_env.extend(suite.env)
+
+    if opts and getattr(opts, 'test_env'):
+        test_env.extend(opts.test_env)
+
+    arg = []
+    for s in test_env:
+        if "=" in s:
+            arg.extend(("--env", s))
+        elif s in os.environ:
+            arg.extend(("--env", s + '=' + os.environ[s]))
+    return arg
+
+
 # XXX WIP
 class TestFramer(object):
     def __init__(self, arc_root, graph, platform, add_conf_error, opts):
@@ -531,19 +548,7 @@ def create_test_node(
     if suite.requires_ram_disk:
         runner_cmd += ["--requires-ram-disk"]
 
-    test_env = []
-    if suite.env:
-        test_env.extend(suite.env)
-
-    if opts and getattr(opts, 'test_env'):
-        test_env.extend(opts.test_env)
-
-    for s in test_env:
-        if "=" not in s:
-            if s in os.environ:
-                s += "=" + os.environ[s]
-        if "=" in s:
-            runner_cmd += ["--env", s]
+    runner_cmd.extend(_get_env_arg(opts, suite))
 
     if opts.setup_pythonpath_env and suite.setup_pythonpath_env:
         runner_cmd += ["--setup-pythonpath-env"]
@@ -2458,6 +2463,8 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
     if suite.tags:
         for tag in suite.tags:
             list_cmd += ["--test-tags", tag]
+
+    list_cmd.extend(_get_env_arg(opts, suite))
 
     tests_cases = suite.get_computed_test_names(opts)
     if tests_cases:
