@@ -68,6 +68,7 @@ public:
         };
         struct TOutput {
             TStringBuf Name;
+            bool IsTmp = false;
             bool NoAutoSrc = false;
             bool NoRel = false;
             bool ResolveToBinDir = false;

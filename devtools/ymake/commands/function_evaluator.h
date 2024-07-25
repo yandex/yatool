@@ -14,6 +14,7 @@ namespace NCommands {
     TTermValue RenderJoin(std::span<const TTermValue> args);
     TTermValue RenderQuo(std::span<const TTermValue> args);
     void RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
+    void RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> args);
     TTermValue RenderRootRel(std::span<const TTermValue> args);

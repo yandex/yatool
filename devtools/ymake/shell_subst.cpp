@@ -98,6 +98,10 @@ void TSubst2Shell::WriteCwd(TStringBuf cwd) {
     Commands.back().Cwd = cwd;
 }
 
+void TSubst2Shell::WriteStdout(TStringBuf path) {
+    Commands.back().StdOut = path;
+}
+
 void TSubst2Shell::WriteEnv(TStringBuf env) {
     auto envStr = TString(env);
     Commands.back().EnvSetDefs.push_back(envStr);

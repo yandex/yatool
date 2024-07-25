@@ -461,6 +461,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
     for (const auto& output : cmdOutputs) {
         auto ix = GetOutputInternal().Push(output.Name).first;
         GetOutputInternal().Update(ix, [output](auto& var) {
+            var.IsTmp |= output.IsTmp;
             var.NoAutoSrc |= output.NoAutoSrc;
             var.NoRel |= output.NoRel;
             var.ResolveToBinDir |= output.ResolveToBinDir;

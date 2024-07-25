@@ -162,6 +162,10 @@ void TJsonCmdAcceptor::WriteCwd(TStringBuf cwd) {
     Commands.back().Cwd = cwd;
 }
 
+void TJsonCmdAcceptor::WriteStdout(TStringBuf path) {
+    Commands.back().StdOut = path;
+}
+
 void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     auto envStr = TString(env);
 

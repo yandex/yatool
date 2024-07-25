@@ -231,6 +231,31 @@ void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, s
     }, args[0]);
 }
 
+void NCommands::RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "StdOut requires 1 argument";
+    }
+    std::visit(TOverloaded{
+        [](TTermError) {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
+            throw TNotImplemented();
+        },
+        [&](const TString& s) {
+            writer->WriteStdout(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
+        },
+        [&](const TVector<TString>& v) {
+            if (v.empty())
+                return;
+            else if (v.size() == 1)
+                writer->WriteStdout(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
+            else
+                throw yexception() << "StdOut does not support arrays";
+        }
+    }, args[0]);
+}
+
 void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "Env requires 1 argument";

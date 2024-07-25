@@ -153,6 +153,7 @@ namespace {
             return RootFnIdx == EMacroFunction::Tool
                 || RootFnIdx == EMacroFunction::Input
                 || RootFnIdx == EMacroFunction::Output
+                || RootFnIdx == EMacroFunction::Tmp
                 || RootFnIdx == EMacroFunction::Context
                 || RootFnIdx == EMacroFunction::NoAutoSrc
                 || RootFnIdx == EMacroFunction::NoRel
@@ -202,8 +203,12 @@ namespace {
                 fnIdx == EMacroFunction::Tool ||
                 fnIdx == EMacroFunction::Input ||
                 fnIdx == EMacroFunction::Output ||
+                fnIdx == EMacroFunction::Tmp ||
                 fnIdx == EMacroFunction::Pre ||
                 fnIdx == EMacroFunction::Suf ||
+                fnIdx == EMacroFunction::HasDefaultExt ||
+                fnIdx == EMacroFunction::CutPath ||
+                fnIdx == EMacroFunction::CutExt ||
                 fnIdx == EMacroFunction::Cat ||
                 fnIdx == EMacroFunction::Context ||
                 fnIdx == EMacroFunction::NoAutoSrc ||
@@ -277,7 +282,9 @@ namespace {
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         return processInput(arg0, false);
                     }
-                    case EMacroFunction::Output: {
+                    case EMacroFunction::Output:
+                    case EMacroFunction::Tmp:
+                    {
                         checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto names = SplitArgs(TString(arg0));
@@ -285,7 +292,10 @@ namespace {
                             // one does not simply reuse the original argument,
                             // for it might have been transformed (e.g., dequoted)
                             auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                            return TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Sink.Outputs)};
+                            auto result = TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Sink.Outputs)};
+                            if (fnIdx == EMacroFunction::Tmp)
+                                UpdateCoord(Sink.Outputs, result.Coord, [](auto& x) {x.IsTmp = true;});
+                            return result;
                         }
                         throw std::runtime_error{"Output arrays are not supported"};
                     }
@@ -296,11 +306,44 @@ namespace {
                         auto id = Values.InsertStr(TString::Join(arg0, arg1));
                         return Values.GetValue(id);
                     }
-                    case EMacroFunction::Suf: {
+                    case EMacroFunction::Suf:
+                    case EMacroFunction::HasDefaultExt:
+                    {
                         checkArgCount(2);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
+                        if (fnIdx == EMacroFunction::HasDefaultExt) {
+                            // cf. EMF_HasDefaultExt handling
+                            size_t dot = arg1.rfind('.');
+                            size_t slash = arg1.rfind(NPath::PATH_SEP);
+                            bool hasSpecExt = slash != TString::npos ? (dot > slash) : true;
+                            if (dot != TString::npos && hasSpecExt)
+                                return Values.GetValue(Values.InsertStr(arg1));
+                        }
                         auto id = Values.InsertStr(TString::Join(arg1, arg0));
+                        return Values.GetValue(id);
+                    }
+                    case EMacroFunction::CutPath: {
+                        checkArgCount(1);
+                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        // cf. EMF_CutPath processing
+                        size_t slash = arg0.rfind(NPath::PATH_SEP);
+                        if (slash != TString::npos)
+                            arg0 = arg0.substr(slash + 1);
+                        auto id = Values.InsertStr(arg0);
+                        return Values.GetValue(id);
+                    }
+                    case EMacroFunction::CutExt: {
+                        checkArgCount(1);
+                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        // cf. RenderCutExt()
+                        size_t slash = arg0.rfind(NPath::PATH_SEP); //todo: windows slash!
+                        if (slash == TString::npos)
+                            slash = 0;
+                        size_t dot = arg0.rfind('.');
+                        if (dot != TString::npos && dot >= slash)
+                            arg0 = arg0.substr(0, dot);
+                        auto id = Values.InsertStr(arg0);
                         return Values.GetValue(id);
                     }
                     case EMacroFunction::Cat: {

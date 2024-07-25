@@ -289,6 +289,7 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::Join: return RenderJoin(args);
             case EMacroFunction::Quo: return RenderQuo(args);
             case EMacroFunction::Cwd: RenderCwd(writer, ctx, args); return TTermNothing();
+            case EMacroFunction::AsStdout: RenderStdout(writer, ctx, args); return TTermNothing();
             case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
             case EMacroFunction::RootRel: return RenderRootRel(args);
             case EMacroFunction::CutExt: return RenderCutExt(args);

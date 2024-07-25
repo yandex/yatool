@@ -23,13 +23,16 @@ namespace {
             // Unary functions
             case EMacroFunction::Input:
             case EMacroFunction::Output:
+            case EMacroFunction::Tmp:
             case EMacroFunction::Tool:
             case EMacroFunction::Hide:
             case EMacroFunction::Clear:
             case EMacroFunction::Quo:
             case EMacroFunction::Cwd:
+            case EMacroFunction::AsStdout:
             case EMacroFunction::SetEnv:
             case EMacroFunction::RootRel:
+            case EMacroFunction::CutPath:
             case EMacroFunction::CutExt:
             case EMacroFunction::LastExt:
             case EMacroFunction::KeyValue:
@@ -44,6 +47,7 @@ namespace {
             // Binary functions
             case EMacroFunction::Pre:
             case EMacroFunction::Suf:
+            case EMacroFunction::HasDefaultExt:
             case EMacroFunction::Join:
             case EMacroFunction::ExtFilter:
             case EMacroFunction::Context:
