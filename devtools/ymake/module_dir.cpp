@@ -55,9 +55,11 @@ void TModuleDirBuilder::AddDepends(const TVector<TStringBuf>& args) {
             YConfErr(BadDir) << "DEPENDS to non-directory " << dirName << Endl;
             continue;
         }
-        dirProps.push_back(MakeDepFileCacheId(Graph.Names().FileConf.Add(dirName)));
-        Module.Vars.SetAppend("TEST_DEPENDS_VALUE", NPath::CutType(dirName));
-        FORCE_UNIQ_CONFIGURE_TRACE(Graph.Names().FileConf.GetStoredName(dirName), H, NEvent::TNeedDirHint(TString{NPath::CutType(dirName)}));
+        auto dirView = AddDependsDir(dirName);
+        dirProps.push_back(MakeDepFileCacheId(dirView.GetElemId()));
+        auto dirNameWoType = NPath::CutType(dirName);
+        Module.Vars.SetAppend("TEST_DEPENDS_VALUE", dirNameWoType);
+        FORCE_UNIQ_CONFIGURE_TRACE(dirView, H, NEvent::TNeedDirHint(TString{dirNameWoType}));
     }
     TPropertySourceDebugOnly sourceDebug{EPropertyAdditionType::Created};
     TPropertyType dependsPropertyType{Graph.Names(), EVI_GetModules, NProps::DEPENDS};
@@ -95,6 +97,15 @@ void TModuleDirBuilder::AddDataPath(TStringBuf path) {
     }
     Module.DataPaths->Push(pathEnt);
     YDIAG(DG) << "DATA dep for module: " << path << Endl;
+}
+
+TFileView TModuleDirBuilder::AddDependsDir(TStringBuf dir) {
+    TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);
+    if (!Module.Depends) {
+        Module.Depends = MakeHolder<TDirs>();
+    }
+    Module.Depends->Push(dirEnt);
+    return dirEnt;
 }
 
 void TModuleDirBuilder::AddIncdir(const TStringBuf& dir, EIncDirScope scope, bool checkDir, TLangId langId) {
