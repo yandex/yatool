@@ -54,6 +54,7 @@ struct TCommandInfo {
 
     explicit TCommandInfo(const TBuildConfiguration* conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
     void SetCommandSink(TCommands* commands);
+    void SetCommandSource(const TCommands* commands);
     bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod);
 
 public:
@@ -96,7 +97,8 @@ private:
 
     const TBuildConfiguration* Conf;
     TDepGraph* Graph;
-    TCommands* CommandSink = nullptr;
+    TCommands* CommandSink = nullptr; // intended for the new command engine, stores compilation results
+    const TCommands* CommandSource = nullptr; // intended for the old command engine, provides contents of global vars coming in from new-style modules
     TUpdIter* UpdIter;
 
     std::variant<TSpecFileLists, TSpecFileArrs> SpecFiles;

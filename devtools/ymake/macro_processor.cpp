@@ -209,6 +209,10 @@ void TCommandInfo::SetCommandSink(TCommands* commands) {
     CommandSink = commands;
 }
 
+void TCommandInfo::SetCommandSource(const TCommands* commands) {
+    CommandSource = commands;
+}
+
 TAutoPtr<IMemoryPool> TCommandInfo::StrPool = IMemoryPool::Construct();
 
 // macroDef is "(X Y Z)zzz"
@@ -1774,6 +1778,23 @@ void TCommandInfo::SubstData(
         result += "\"";
     for (size_t cnt = 0; cnt < num; cnt++) {
         TVarStr nextsubst(macro.RawString ? TVarStr(macro.Name) : (pvar ? (*pvar)[cnt] : macro.OrigFragment));
+        if (nextsubst.StructCmd) {
+            Y_DEBUG_ABORT_UNLESS(CommandSource);
+            if (Y_LIKELY(CommandSource)) {
+                auto& cmdSrc = *CommandSource;
+                auto& conf = Graph->Names().CommandConf;
+                auto& expr = *cmdSrc.Get(nextsubst.Name, &conf);
+                auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
+                auto argses = TCommands::SimpleCommandSequenceWriter()
+                    .Write(cmdSrc, expr, vars, {}, dummyCmdInfo, &conf)
+                    .Extract();
+                TVector<TString> cmds;
+                cmds.reserve(argses.size());
+                for (auto& args : argses)
+                    cmds.push_back(JoinSeq(' ', args));
+                nextsubst.Name = JoinSeq(" && ", cmds);
+            }
+        }
         nextsubst.HasPeerDirTags = pvar && (*pvar)[cnt].HasPeerDirTags;
         SBDIAG << "SD+++ " << nextsubst.Name << " [" << cnt << "] coord=" << (macro.NeedCoord() ? macro.CoordWhere() : "no") << "\n";
         if (!macro.RawString && pvar == nullptr) {

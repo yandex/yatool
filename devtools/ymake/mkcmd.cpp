@@ -348,6 +348,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorSh
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
+        CmdInfo.SetCommandSource(Commands);
         CmdString = CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, ECF_ExpandSimpleVars, true);
         CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
         const auto& cmdInfo = CmdInfo;
