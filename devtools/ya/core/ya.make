@@ -16,7 +16,6 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/test/const
     devtools/ya/yalibrary/app_ctx
-    devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/find_root
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/platform_matcher
