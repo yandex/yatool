@@ -1640,9 +1640,11 @@ inline void TUpdIter::Left(TState& state) {
             currProps.SetIntentNotReady(EVI_ModuleProps, YMake.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
         }
     } else if (!needEdit && IsTooldirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType)) {
-        const auto dirNode = Graph.GetNodeById(LastType, LastElem);
-        const auto toolDir = Graph.GetFileName(dirNode);
-        FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleTool(toolDir));
+        if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
+            const auto dirNode = Graph.GetNodeById(LastType, LastElem);
+            const auto toolDir = Graph.GetFileName(dirNode);
+            FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleTool(toolDir));
+        }
     }
 
     if (needEdit && !st.IsEdited()) {
