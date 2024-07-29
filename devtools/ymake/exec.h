@@ -29,7 +29,7 @@ protected:
 
 struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
     virtual void WriteCwd(TStringBuf)          override { throw TNotImplemented() << "CWD is not supported here"; }
-    virtual void WriteStdout(TStringBuf path)  override { throw TNotImplemented() << "stdout settings are not supported here"; }
+    virtual void WriteStdout(TStringBuf)       override { throw TNotImplemented() << "stdout settings are not supported here"; }
     virtual void WriteEnv(TStringBuf)          override { throw TNotImplemented() << "environment settings are not supported here"; }
     virtual void PostScript(TVars&)            override {  }
 protected:

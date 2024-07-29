@@ -152,7 +152,7 @@ TString TJSONEntryStats::GetNodeSelfUid() const {
     return NewUids()->GetNodeSelfUid();
 }
 
-void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {
+void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& /* graph */) const noexcept {
     buffer->Save(NewUids()->StructureUID.GetRawSig());
 }
 
@@ -173,7 +173,7 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const no
     buffer->Save(NewUids()->SelfUID.GetRawSig());
 }
 
-void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool asPre) noexcept {
+void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& /* graph */, bool asPre) noexcept {
     if (asPre) {
         buffer->LoadMd5(&NewUids()->PreStructureUID);
     } else {
