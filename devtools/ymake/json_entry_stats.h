@@ -259,7 +259,7 @@ private:
     void TraceAdd(TNodeId id);
 };
 
-struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
+struct TJSONEntryStats : public TEntryStats, public TJsonStatsNew, public TNodeDebugOnly  {
     union {
         ui8 AllFlags;
         struct {  // 7 bits used
@@ -295,29 +295,12 @@ struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
 public:
     TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack = false, bool isFile = false);
 
-    void InitUids() {
-        if (Uids)
-            return;
-        Uids.Reset(new TJsonStatsNew{*this});
-    }
-
-    TString GetNodeUid() const;
-    TString GetNodeSelfUid() const;
-
-    TJsonStatsOld* OldUids() noexcept {
-        return Uids.Get()->Old();
-    }
-
-    const TJsonStatsOld* OldUids() const noexcept {
-        return Uids.Get()->Old();
-    }
-
     TJsonStatsNew* NewUids() noexcept {
-        return Uids.Get()->New();
+        return this;
     }
 
     const TJsonStatsNew* NewUids() const noexcept {
-        return Uids.Get()->New();
+        return this;
     }
 
     using TItemDebug = TNodeDebugOnly;

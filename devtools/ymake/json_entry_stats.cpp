@@ -135,6 +135,7 @@ void TJsonDeps::TraceAdd(TNodeId id) {
 
 TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool isFile)
     : TEntryStats(nodeDebug, inStack, isFile)
+    , TJsonStatsNew(nodeDebug)
     , TNodeDebugOnly{nodeDebug}
     , AllFlags(0)
     , IncludedDeps(nodeDebug, "IncludedDeps")
@@ -144,16 +145,8 @@ TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool is
 {
 }
 
-TString TJSONEntryStats::GetNodeUid() const {
-    return NewUids()->GetNodeUid();
-}
-
-TString TJSONEntryStats::GetNodeSelfUid() const {
-    return NewUids()->GetNodeSelfUid();
-}
-
-void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& /* graph */) const noexcept {
-    buffer->Save(NewUids()->StructureUID.GetRawSig());
+void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph&) const noexcept {
+    buffer->Save(StructureUID.GetRawSig());
 }
 
 void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {
@@ -166,19 +159,19 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const no
     buffer->SaveElemIds(NodeToolDeps, graph);
     buffer->SaveElemIds(ExtraOuts, graph);
     buffer->SaveReservedVars(UsedReservedVars.Get(), graph);
-    buffer->Save(NewUids()->IncludeStructureUID.GetRawSig());
-    buffer->Save(NewUids()->ContentUID.GetRawSig());
-    buffer->Save(NewUids()->IncludeContentUID.GetRawSig());
-    buffer->Save(NewUids()->FullUID.GetRawSig());
-    buffer->Save(NewUids()->SelfUID.GetRawSig());
+    buffer->Save(IncludeStructureUID.GetRawSig());
+    buffer->Save(ContentUID.GetRawSig());
+    buffer->Save(IncludeContentUID.GetRawSig());
+    buffer->Save(FullUID.GetRawSig());
+    buffer->Save(SelfUID.GetRawSig());
 }
 
 void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& /* graph */, bool asPre) noexcept {
     if (asPre) {
-        buffer->LoadMd5(&NewUids()->PreStructureUID);
+        buffer->LoadMd5(&PreStructureUID);
     } else {
-        buffer->LoadMd5(&NewUids()->StructureUID);
-        NewUids()->PreStructureUID.SetRawData(NewUids()->StructureUID.GetRawData(), "Copy StructureUid"sv);
+        buffer->LoadMd5(&StructureUID);
+        PreStructureUID.SetRawData(StructureUID.GetRawData(), "Copy StructureUid"sv);
     }
 }
 
@@ -199,16 +192,16 @@ bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept
     if (!buffer->LoadReservedVars(&UsedReservedVars, graph))
         return false;
 
-    buffer->LoadMd5(&NewUids()->IncludeStructureUID);
-    buffer->LoadMd5(&NewUids()->ContentUID);
-    buffer->LoadMd5(&NewUids()->IncludeContentUID);
-    buffer->LoadMd5(&NewUids()->FullUID);
-    buffer->LoadMd5(&NewUids()->SelfUID);
+    buffer->LoadMd5(&IncludeStructureUID);
+    buffer->LoadMd5(&ContentUID);
+    buffer->LoadMd5(&IncludeContentUID);
+    buffer->LoadMd5(&FullUID);
+    buffer->LoadMd5(&SelfUID);
 
-    NewUids()->IsSelfUIDCompleted = true;
-    NewUids()->IsFullUIDCompleted = true;
+    IsSelfUIDCompleted = true;
+    IsFullUIDCompleted = true;
 
-    NewUids()->Finished = true;
+    Finished = true;
 
     HasUsualEntry = false;
     WasVisited = false;

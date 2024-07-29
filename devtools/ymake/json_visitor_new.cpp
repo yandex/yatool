@@ -21,15 +21,13 @@ bool TJSONVisitorNew::AcceptDep(TState& state) {
 
 bool TJSONVisitorNew::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
-    if (fresh)
-        CurEnt->InitUids();
 
     UpdateReferences(state);
 
-    ++CurrData->NewUids()->EnterDepth;
+    ++CurrData->EnterDepth;
 
     if (fresh && !CurrData->Completed) {
-        Y_ASSERT(!CurrData->NewUids()->Finished);
+        Y_ASSERT(!CurrData->Finished);
         PrepareCurrent(state);
     }
 
@@ -42,16 +40,16 @@ void TJSONVisitorNew::Leave(TState& state) {
     TNodeId chldLoop = CurrData->LoopId;
     bool inSameLoop = chldLoop && PrntData && chldLoop == PrntData->LoopId;
 
-    --CurrData->NewUids()->EnterDepth;
-    if (CurrData->NewUids()->EnterDepth == 0 && !CurrData->NewUids()->Finished) {
+    --CurrData->EnterDepth;
+    if (CurrData->EnterDepth == 0 && !CurrData->Finished) {
         FinishCurrent(state);
-        CurrData->NewUids()->Finished = true;
+        CurrData->Finished = true;
         if (chldLoop && !inSameLoop) {
             ComputeLoopHash(chldLoop);
         }
     }
 
-    if (PrntState != nullptr && !PrntData->NewUids()->Finished && CurrData->NewUids()->Finished && !inSameLoop) {
+    if (PrntState != nullptr && !PrntData->Finished && CurrData->Finished && !inSameLoop) {
         PassToParent(state);
     }
 
@@ -190,7 +188,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
                 Y_ASSERT(chldState);
                 if (chldState) {
                     CurrState->Hash->New()->IncludeStructureMd5Update(
-                        chldState->NewUids()->GetIncludeStructureUid(),
+                        chldState->GetIncludeStructureUid(),
                         "Pass IncludeStructure for managed peer"
                     );
                 }
@@ -236,13 +234,13 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
     }
 
     if (UseFileId(CurrNode->NodeType) || CurrNode->NodeType == EMNT_BuildCommand) {
-        CurrData->NewUids()->SetContentUid(CurrState->Hash->New()->GetContentMd5());
-        CurrData->NewUids()->SetIncludeContentUid(CurrState->Hash->New()->GetIncludeContentMd5());
+        CurrData->SetContentUid(CurrState->Hash->New()->GetContentMd5());
+        CurrData->SetIncludeContentUid(CurrState->Hash->New()->GetIncludeContentMd5());
     }
 
-    CurrData->NewUids()->SetStructureUid(CurrState->Hash->New()->GetStructureMd5());
-    CurrData->NewUids()->SetIncludeStructureUid(CurrState->Hash->New()->GetIncludeStructureMd5());
-    CurrData->NewUids()->Finished = true;
+    CurrData->SetStructureUid(CurrState->Hash->New()->GetStructureMd5());
+    CurrData->SetIncludeStructureUid(CurrState->Hash->New()->GetIncludeStructureMd5());
+    CurrData->Finished = true;
     CurrData->Completed = true;
     CheckStructureUidChanged();
 }
@@ -257,7 +255,7 @@ void TJSONVisitorNew::PassToParent(TState& state) {
 
     // include build command
     if (IsBuildCommandDep(Edge) || IsInnerCommandDep(Edge)) {
-        UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include build cmd name to parent structure hash");
+        UpdateParent(state, CurrData->GetStructureUid(), "Include build cmd name to parent structure hash");
     }
 
     // tool dep
@@ -268,26 +266,26 @@ void TJSONVisitorNew::PassToParent(TState& state) {
 
     // local variables
     if (*Edge == EDT_BuildCommand && CurrNode->NodeType == EMNT_BuildVariable) {
-        UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include local variables");
+        UpdateParent(state, CurrData->GetStructureUid(), "Include local variables");
     }
 
     // global variables in non-modules
     if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
         if (Edge.From()->NodeType == EMNT_NonParsedFile && *Edge == EDT_Include && CurrNode->NodeType == EMNT_BuildCommand) {
-            UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include global variables (non-module version)");
+            UpdateParent(state, CurrData->GetStructureUid(), "Include global variables (non-module version)");
         }
     }
 
     // late globs
     if (*Edge == EDT_BuildFrom && CurrNode->NodeType == EMNT_BuildCommand) {
-        UpdateParent(state, CurrData->NewUids()->GetStructureUid(), "Include late glob hash to parent structure hash");
-        PrntState->Hash->New()->ContentMd5Update(CurrData->NewUids()->GetIncludeContentUid(), "Add late glob include content hash"_sb);
+        UpdateParent(state, CurrData->GetStructureUid(), "Include late glob hash to parent structure hash");
+        PrntState->Hash->New()->ContentMd5Update(CurrData->GetIncludeContentUid(), "Add late glob include content hash"_sb);
     }
 
     if (*Edge == EDT_Property && IsFileType(CurrNode->NodeType)) {
         TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         UpdateParent(state, nodeName, "Include file names to late glob structure hash");
-        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->NewUids()->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
+        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
     }
 
     if (IsFileType(CurrNode->NodeType) && IsFileType(PrntState->Node()->NodeType)) {
@@ -302,12 +300,12 @@ void TJSONVisitorNew::PassToParent(TState& state) {
                 isDMModules = CurrState->Module->GetAttrs().RequireDepManagement && PrntState->Module->GetAttrs().RequireDepManagement;
             }
             if (!isDMModules) {
-                PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass IncludeStructure by EDT_Include");
+                PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructure by EDT_Include");
             }
         }
 
         if (*Edge == EDT_BuildFrom) {
-            PrntState->Hash->New()->StructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Pass IncludeStructre by EDT_BuildFrom");
+            PrntState->Hash->New()->StructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructre by EDT_BuildFrom");
         }
     }
 
@@ -315,18 +313,18 @@ void TJSONVisitorNew::PassToParent(TState& state) {
         TStringBuf globalSrcName = Graph->ToTargetStringBuf(CurrNode);
         PrntState->Hash->New()->IncludeStructureMd5Update(globalSrcName, "Add GlobalSrc name"sv);
 
-        PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->NewUids()->GetIncludeStructureUid(), "Add IncludeStructure from GlobalSrc"sv);
+        PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Add IncludeStructure from GlobalSrc"sv);
     }
 
     if (IsIncludeFileDep(Edge)) {
-        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->NewUids()->GetIncludeContentUid(), "Pass IncludeContent by EDT_Include"sv);
+        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->GetIncludeContentUid(), "Pass IncludeContent by EDT_Include"sv);
     }
 
     if (*Edge == EDT_BuildFrom && IsSrcFileType(CurrNode->NodeType)) {
         if (CurrNode->NodeType != EMNT_NonParsedFile) {
-            PrntState->Hash->New()->ContentMd5Update(CurrData->NewUids()->GetContentUid(), "Update parent content UID with content"sv);
+            PrntState->Hash->New()->ContentMd5Update(CurrData->GetContentUid(), "Update parent content UID with content"sv);
         }
-        PrntState->Hash->New()->ContentMd5Update(CurrData->NewUids()->GetIncludeContentUid(), "Update parent content UID with include content"sv);
+        PrntState->Hash->New()->ContentMd5Update(CurrData->GetIncludeContentUid(), "Update parent content UID with include content"sv);
     }
 }
 
@@ -475,10 +473,10 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
 
         const TJSONEntryStats& nodeData = nodeDataIt->second;
         TStringBuf nodeName = Graph->ToTargetStringBuf(Graph->Get(nodeId));
-        structureLoopHash.AddSign(nodeData.NewUids()->GetStructureUid(), nodeName, true);
-        includeStructureLoopHash.AddSign(nodeData.NewUids()->GetIncludeStructureUid(), nodeName, true);
-        contentLoopHash.AddSign(nodeData.NewUids()->GetContentUid(), nodeName, true);
-        includeContentLoopHash.AddSign(nodeData.NewUids()->GetIncludeContentUid(), nodeName, true);
+        structureLoopHash.AddSign(nodeData.GetStructureUid(), nodeName, true);
+        includeStructureLoopHash.AddSign(nodeData.GetIncludeStructureUid(), nodeName, true);
+        contentLoopHash.AddSign(nodeData.GetContentUid(), nodeName, true);
+        includeContentLoopHash.AddSign(nodeData.GetIncludeContentUid(), nodeName, true);
     }
 
     TMd5SigValue structureLoopUid{"TJSONVisitorNew::StructureLoopUID"sv};
@@ -497,12 +495,12 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
         }
 
         TJSONEntryStats& nodeData = nodeDataIt->second;
-        nodeData.NewUids()->SetIncludeStructureUid(includeStructureLoopUid);
-        nodeData.NewUids()->SetContentUid(contentLoopUid);
-        nodeData.NewUids()->SetIncludeContentUid(includeContentLoopUid);
+        nodeData.SetIncludeStructureUid(includeStructureLoopUid);
+        nodeData.SetContentUid(contentLoopUid);
+        nodeData.SetIncludeContentUid(includeContentLoopUid);
 
         if (!nodeData.HasBuildCmd) {
-            nodeData.NewUids()->SetStructureUid(structureLoopUid);
+            nodeData.SetStructureUid(structureLoopUid);
 
         } else {
             TMd5Value structureHash{"Loop structure hash with name"sv};
@@ -513,9 +511,9 @@ void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
             TMd5SigValue structureUid{"Loop structure uid with name"sv};
             structureUid.MoveFrom(std::move(structureHash));
 
-            nodeData.NewUids()->SetStructureUid(structureUid);
+            nodeData.SetStructureUid(structureUid);
         }
-        nodeData.NewUids()->Finished = true;
+        nodeData.Finished = true;
         nodeData.Completed = true;
         CheckStructureUidChanged();
     }
@@ -544,7 +542,7 @@ void TJSONVisitorNew::UpdateReferences(TState& state) {
 }
 
 void TJSONVisitorNew::CheckStructureUidChanged() {
-    if (CurrData->NewUids()->GetStructureUid().GetRawData() != CurrData->NewUids()->GetPreStructureUid().GetRawData()) {
+    if (CurrData->GetStructureUid().GetRawData() != CurrData->GetPreStructureUid().GetRawData()) {
         CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 0); // at least one node rendered
     } else {
         // TODO Research and try load it from cache

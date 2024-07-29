@@ -159,7 +159,6 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
         auto [it, added] = Nodes.try_emplace(nodeRef.Id(), TJSONEntryStats::TItemDebug{graph, nodeRef.Id()});
         auto& [_, nodeData] = *it;
         nodeData.InStack = false;
-        nodeData.InitUids();
         Y_ASSERT(added);
 
         if (!nodeLoaded) {
@@ -555,8 +554,8 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 }
 
 void TJSONVisitor::Leave(TState& state) {
-    if (CurEnt->NewUids()->EnterDepth == 1 && !CurEnt->NewUids()->Stored) {
-        CurEnt->NewUids()->Stored = true;
+    if (CurEnt->EnterDepth == 1 && !CurEnt->Stored) {
+        CurEnt->Stored = true;
         CurEnt->WasFresh = true;
     } else {
         CurEnt->WasFresh = false;

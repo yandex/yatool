@@ -46,7 +46,7 @@ namespace {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         // structure uid ноды
         TMd5Value md5{"ComputeUIDForPeersLateOutsNode::<md5>"sv};
-        md5.Update(nodeInfo.NewUids()->GetStructureUid(), "ComputeUIDForPeersLateOutsNode::<StructureUid>"sv);
+        md5.Update(nodeInfo.GetStructureUid(), "ComputeUIDForPeersLateOutsNode::<StructureUid>"sv);
 
         // full uids of dependencies
         if (nodeInfo.NodeDeps) {
@@ -54,7 +54,7 @@ namespace {
                 const auto depIt = cmdBuilder.Nodes.find(dep);
                 Y_ASSERT(depIt != cmdBuilder.Nodes.end());
 
-                const TMd5SigValue& depFullUid = depIt->second.NewUids()->GetFullUid();
+                const TMd5SigValue& depFullUid = depIt->second.GetFullUid();
                 md5.Update(depFullUid, "ComputeUIDForPeersLateOutsNode::<depFullUid>"sv);
             }
         }
@@ -159,7 +159,7 @@ namespace {
                 auto uid = ComputeUIDForPeersLateOutsNode(CmdBuilder, NodeId).ToBase64();
                 return uid;
             }
-            return NodeInfo.NewUids()->GetStructureUid().ToBase64();
+            return NodeInfo.GetStructureUid().ToBase64();
         }
 
         void RefreshEmptyMakeNode(TMakeNode& node, const TMakeNodeSavedState& nodeSavedState, NCache::TConversionContext& context) {
@@ -475,7 +475,7 @@ namespace {
 
     void ComputeFullUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
-        if (nodeInfo.NewUids()->IsFullUidCompleted()) {
+        if (nodeInfo.IsFullUidCompleted()) {
             return;
         }
 
@@ -483,7 +483,7 @@ namespace {
         if (nodeInfo.NodeDeps) {
             // self uid ноды
             TMd5Value md5{"ComputeFullUID::<md5>"sv};
-            md5.Update(nodeInfo.NewUids()->GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
+            md5.Update(nodeInfo.GetSelfUid(), "ComputeFullUID::<SelfUid>"sv);
 
             for (const auto& dep : *nodeInfo.NodeDeps.Get()) {
                 const auto depIt = cmdBuilder.Nodes.find(dep);
@@ -491,32 +491,32 @@ namespace {
 
                 const TJSONEntryStats& depData = depIt->second;
 
-                if (!depData.NewUids()->IsFullUidCompleted()) {
+                if (!depData.IsFullUidCompleted()) {
                     ComputeFullUID(cmdBuilder, dep);
                 }
-                const TMd5SigValue& depFullUid = depData.NewUids()->GetFullUid();
+                const TMd5SigValue& depFullUid = depData.GetFullUid();
                 md5.Update(depFullUid, "ComputeFullUID::<depFullUid>"sv);
             }
 
-            nodeInfo.NewUids()->SetFullUid(md5);
+            nodeInfo.SetFullUid(md5);
 
         } else {
-            nodeInfo.NewUids()->SetFullUid(nodeInfo.NewUids()->GetSelfUid());
+            nodeInfo.SetFullUid(nodeInfo.GetSelfUid());
         }
 
     }
 
     void ComputeSelfUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
-        if (nodeInfo.NewUids()->IsSelfUidCompleted()) {
+        if (nodeInfo.IsSelfUidCompleted()) {
             return;
         }
         // структурный uid главного output'a
         TMd5Value md5{"ComputeSelfUID::<md5>"sv};
-        md5.Update(nodeInfo.NewUids()->GetStructureUid(), "ComputeSelfUID::<StructureUid>"sv);
-        md5.Update(nodeInfo.NewUids()->GetContentUid(), "ComputeSelfUID::<ContentUid>"sv);
+        md5.Update(nodeInfo.GetStructureUid(), "ComputeSelfUID::<StructureUid>"sv);
+        md5.Update(nodeInfo.GetContentUid(), "ComputeSelfUID::<ContentUid>"sv);
 
-        nodeInfo.NewUids()->SetSelfUid(md5);
+        nodeInfo.SetSelfUid(md5);
     }
 
     void UpdateUids(TJSONVisitor& cmdbuilder, TNodeId nodeId) {
