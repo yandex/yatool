@@ -5,7 +5,6 @@ import argparse
 import test.common
 import test.test_types.common
 import test.const
-import test.util.shared
 
 
 def setup_logging(verbose):

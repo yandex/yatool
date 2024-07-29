@@ -4,9 +4,7 @@
 
 import os
 import io
-import re
 import shutil
-import hashlib
 import logging
 
 import exts.fs
@@ -17,49 +15,6 @@ from yalibrary.loggers.file_log import TokenFilterFormatter
 
 
 logger = logging.getLogger(__name__)
-
-# Used to remove mutable substrings from an stderr.
-cleanup_regex = re.compile(
-    r"""(
-        (\d+.\d+(s|\ssec))|  # time
-        (\d+\sms)|  # time
-        (\d\d\:\d\d\:\d\d)|  # time
-        (\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})|  # date from rtmr_logpusher
-        (\d{2}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}.\d{3})|  # timestamp from syn_synpool_test
-        ([0-9a-f]+-[0-9a-f]+-[0-9a-f]+-[0-9a-f]+)|  # guid
-        (RSS=\d+M)|  # from querydata_indexer
-        (\swork\:\s\d+)|  # from rus_fio
-        (\d+m\s\d+s)|  # from mr_trie_test
-        (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3}\s[\+\-]\d{4})|  # from syn_synpool_test
-        (sandbox(-middle)?\d+(\.yandex\.ru)?)|  # sandbox host from syn_synpool_test
-        (\d+\.\d+\.\d+\.\d+(\:\d+)?)|  # endpoint from syn_synpool_test
-        (pid\s+\=\s+\d+)|  # pid from syn_synpool_test
-        (serialized\s+\=\s+[0-9A-Z]+)|  # serialized from syn_synpool_test
-        (/place/sandbox\-data/srcdir/arcadia_cache[^/]*/)|  # arcadia cache path
-        (\[\d+\.\d+\]\s+seconds)|  # time from mtd
-        (MRRPL_START[\r\n]+[A-Z0-9]+[\r\n]+MRRPL_END)|  # from objects_and_diversity_cleancache
-        (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})|  # from objects_and_diversity_cleancache
-        (0x[0-9a-f]{8,})|  # from test_makepool
-        (\[([0-9a-f]{1,4}\:){7}[0-9a-f]{1,4}\]\:\d+)|  # simplified IPv6 endpoint from syn_synpool_test
-        ([\w\-\.]+\.yandex\.(ru|net))  # from ip2backend_ut
-    )""",
-    re.VERBOSE,
-)
-
-
-def hash_path(path, cleanup=False, debug_path=None):
-    """
-    Hash file content
-    """
-
-    content = open(path, "rb").read()
-    if cleanup:
-        content = cleanup_regex.sub("", content)
-    if debug_path:
-        # Used to debug "output changed" false positives.
-        # projects.sandboxsdk.paths.make_folder(os.path.dirname(debug_path))
-        open(debug_path, "wb").write(content)
-    return hashlib.sha1(content).hexdigest()
 
 
 def append_python_paths(env, paths, overwrite=False):

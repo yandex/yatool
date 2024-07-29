@@ -1,10 +1,11 @@
-import yaml
 import marisa_trie
 import six
 from collections import defaultdict
 
 
 def load_yaml_config(path):
+    import yaml
+
     try:
         with open(path) as migrations_file:
             return yaml.safe_load(migrations_file)

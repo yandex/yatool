@@ -10,7 +10,6 @@ PEERDIR(
     devtools/ya/test/common
     devtools/ya/test/const
     devtools/ya/test/test_types
-    devtools/ya/test/util
 )
 
 END()

@@ -21,7 +21,6 @@ import sys
 import time
 import traceback
 
-from . import core_file
 from . import test_context
 from .stages import Stages
 
@@ -51,7 +50,6 @@ from devtools.ya.test.dependency import sandbox_storage
 import exts.archive
 import exts.fs
 import exts.uniq_id
-import test.canon.data as canon_data
 import test.common
 import test.reports
 import test.result
@@ -1940,6 +1938,8 @@ def main():
 
         core_search_file = context.get('internal', 'core_search_file')
         if core_search_file and os.path.exists(core_search_file):
+            from . import core_file
+
             stages.stage("process_user_cores")
 
             core_file.process_user_cores(
@@ -1962,6 +1962,8 @@ def main():
 
         if suite.chunk.tests:
             if options.supports_canonization and any(t.result is not None for t in suite.chunk.tests):
+                import test.canon.data as canon_data
+
                 stages.stage("canonical_data_verification")
                 canonical_data = canon_data.CanonicalData(
                     arc_path=options.custom_canondata_path or options.source_root,

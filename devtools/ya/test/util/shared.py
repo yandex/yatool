@@ -21,7 +21,6 @@ from test import const
 from test.util import tools
 from test.system import process
 from library.python import cores
-from library.python import coredump_filter
 
 from yalibrary import formatter
 from yalibrary import term
@@ -709,6 +708,8 @@ def postprocess_coredump(binary, cwd, pid, logs, gdb_path, collect_cores, filena
             logs['binary'] = binary
 
         if os.path.exists(gdb_path):
+            from library.python import coredump_filter
+
             logger.debug("Obtaining backtrace")
             backtrace = cores.get_gdb_full_backtrace(binary, core_path, gdb_path)
 
