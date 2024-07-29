@@ -143,13 +143,13 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
                 continue;
             }
             TSaveBuffer buffer{&rawBuffer};
-            nodeData.Save(&buffer, graph, NewUids);
+            nodeData.Save(&buffer, graph);
             buffer.SaveNodeDataToStream(output, nodeId, graph);
         }
     } else {
         for (const auto& [nodeId, nodeData] : Nodes) {
             TSaveBuffer buffer{&rawBuffer};
-            nodeData.Save(&buffer, graph, NewUids);
+            nodeData.Save(&buffer, graph);
             buffer.SaveNodeDataToStream(output, nodeId, graph);
         }
     }
@@ -190,12 +190,12 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
         Y_ASSERT(added);
 
         if (!nodeLoaded) {
-            nodeData.LoadStructureUid(&buffer, graph, NewUids, true);
+            nodeData.LoadStructureUid(&buffer, graph, true);
             CacheStats.Inc(NStats::EUidsCacheStats::SkippedNodes);
             continue;
         }
 
-        if (!nodeData.Load(&buffer, graph, NewUids)) {
+        if (!nodeData.Load(&buffer, graph)) {
             CacheStats.Inc(NStats::EUidsCacheStats::DiscardedNodes);
             Nodes.erase(nodeRef.Id());
         }

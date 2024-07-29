@@ -158,14 +158,12 @@ TString TJSONEntryStats::GetNodeSelfUid(bool newUids) const {
         return OldUids()->GetNodeSelfUid();
 }
 
-void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept {
-    if (newUids) {
-        buffer->Save(NewUids()->StructureUID.GetRawSig());
-    }
+void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {
+    buffer->Save(NewUids()->StructureUID.GetRawSig());
 }
 
-void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept {
-    SaveStructureUid(buffer, graph, newUids);
+void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {
+    SaveStructureUid(buffer, graph);
     buffer->Save<ui8>(static_cast<const TEntryStatsData*>(this)->AllFlags);
     buffer->Save<ui8>(AllFlags);
     buffer->SaveElemId(OutTogetherDependency, graph);
@@ -174,35 +172,24 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph, bool new
     buffer->SaveElemIds(NodeToolDeps, graph);
     buffer->SaveElemIds(ExtraOuts, graph);
     buffer->SaveReservedVars(UsedReservedVars.Get(), graph);
+    buffer->Save(NewUids()->IncludeStructureUID.GetRawSig());
+    buffer->Save(NewUids()->ContentUID.GetRawSig());
+    buffer->Save(NewUids()->IncludeContentUID.GetRawSig());
+    buffer->Save(NewUids()->FullUID.GetRawSig());
+    buffer->Save(NewUids()->SelfUID.GetRawSig());
+}
 
-    if (newUids) {
-        buffer->Save(NewUids()->IncludeStructureUID.GetRawSig());
-        buffer->Save(NewUids()->ContentUID.GetRawSig());
-        buffer->Save(NewUids()->IncludeContentUID.GetRawSig());
-        buffer->Save(NewUids()->FullUID.GetRawSig());
-        buffer->Save(NewUids()->SelfUID.GetRawSig());
+void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool asPre) noexcept {
+    if (asPre) {
+        buffer->LoadMd5(&NewUids()->PreStructureUID);
     } else {
-        buffer->Save(OldUids()->IncludedContextSign.GetRawSig());
-        buffer->Save(OldUids()->ContextSign.GetRawSig());
-        buffer->Save(OldUids()->SelfContextSign.GetRawSig());
-        buffer->Save(OldUids()->IncludedSelfContextSign.GetRawSig());
-        buffer->Save(OldUids()->RenderId.GetRawSig());
+        buffer->LoadMd5(&NewUids()->StructureUID);
+        NewUids()->PreStructureUID.SetRawData(NewUids()->StructureUID.GetRawData(), "Copy StructureUid"sv);
     }
 }
 
-void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids, bool asPre) noexcept {
-    if (newUids) {
-        if (asPre) {
-            buffer->LoadMd5(&NewUids()->PreStructureUID);
-        } else {
-            buffer->LoadMd5(&NewUids()->StructureUID);
-            NewUids()->PreStructureUID.SetRawData(NewUids()->StructureUID.GetRawData(), "Copy StructureUid"sv);
-        }
-    }
-}
-
-bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids) noexcept {
-    LoadStructureUid(buffer, graph, newUids);
+bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept {
+    LoadStructureUid(buffer, graph);
     static_cast<TEntryStatsData*>(this)->AllFlags = buffer->Load<ui8>();
     AllFlags = buffer->Load<ui8>();
     if (!buffer->LoadElemId(&OutTogetherDependency, graph))
@@ -218,24 +205,16 @@ bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph, bool new
     if (!buffer->LoadReservedVars(&UsedReservedVars, graph))
         return false;
 
-    if (newUids) {
-        buffer->LoadMd5(&NewUids()->IncludeStructureUID);
-        buffer->LoadMd5(&NewUids()->ContentUID);
-        buffer->LoadMd5(&NewUids()->IncludeContentUID);
-        buffer->LoadMd5(&NewUids()->FullUID);
-        buffer->LoadMd5(&NewUids()->SelfUID);
+    buffer->LoadMd5(&NewUids()->IncludeStructureUID);
+    buffer->LoadMd5(&NewUids()->ContentUID);
+    buffer->LoadMd5(&NewUids()->IncludeContentUID);
+    buffer->LoadMd5(&NewUids()->FullUID);
+    buffer->LoadMd5(&NewUids()->SelfUID);
 
-        NewUids()->IsSelfUIDCompleted = true;
-        NewUids()->IsFullUIDCompleted = true;
+    NewUids()->IsSelfUIDCompleted = true;
+    NewUids()->IsFullUIDCompleted = true;
 
-        NewUids()->Finished = true;
-    } else {
-        buffer->LoadMd5(&OldUids()->IncludedContextSign);
-        buffer->LoadMd5(&OldUids()->ContextSign);
-        buffer->LoadMd5(&OldUids()->SelfContextSign);
-        buffer->LoadMd5(&OldUids()->IncludedSelfContextSign);
-        buffer->LoadMd5(&OldUids()->RenderId);
-    }
+    NewUids()->Finished = true;
 
     HasUsualEntry = false;
     WasVisited = false;

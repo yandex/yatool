@@ -325,12 +325,12 @@ public:
 
     using TItemDebug = TNodeDebugOnly;
 
-    void Save(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept;
-    void LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids, bool asPre = false) noexcept;
-    bool Load(TLoadBuffer* buffer, const TDepGraph& graph, bool newUids) noexcept;
+    void Save(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept;
+    void LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool asPre = false) noexcept;
+    bool Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept;
 
 private:
-    void SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph, bool newUids) const noexcept;
+    void SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept;
 };
 
 template <>
