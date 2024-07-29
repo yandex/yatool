@@ -121,10 +121,6 @@ public:
         return ReportMissingAddincls;
     }
 
-    bool ShouldUseNewUids() const noexcept {
-        return UseNewUids;
-    }
-
     bool JsonDepsFromMainOutputEnabled() const noexcept {
         return JsonDepsFromMainOutputEnabled_;
     }
@@ -183,7 +179,6 @@ private:
     bool ForceListDirInResolving = false;
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
-    bool UseNewUids = UseNewUidsDefault;
     bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = false;
     bool UseGraphChangesPredictor = false;
@@ -192,8 +187,6 @@ private:
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
     THashMap<TString, TString> DefaultRequirements;
-
-    static bool UseNewUidsDefault;
 };
 
 TBuildConfiguration* GlobalConf();

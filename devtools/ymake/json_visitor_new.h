@@ -23,7 +23,7 @@ protected:
 
 public:
 
-    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids);
+    TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
 
     bool AcceptDep(TState& state);
     bool Enter(TState& state);
@@ -41,7 +41,6 @@ public:
 
 protected:
     TGraphLoops Loops;
-    const bool NewUids;
 
     NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 

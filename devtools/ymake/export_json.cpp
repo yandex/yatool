@@ -534,7 +534,7 @@ namespace {
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
         THolder<TJSONVisitor> cmdbuilderHolder;
         auto cmdBuilderReset = [&]() {
-            cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets, conf.ShouldUseNewUids()));
+            cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets));
         };
 
         cmdBuilderReset();

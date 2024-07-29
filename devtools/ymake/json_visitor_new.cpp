@@ -3,16 +3,14 @@
 #include "module_restorer.h"
 #include "parser_manager.h"
 
-TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf &cmdConf, const TVector<TTarget>& startDirs, bool newUids)
+TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf &cmdConf, const TVector<TTarget>& startDirs)
     : TBase{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Commands(commands)
     , CmdConf(cmdConf)
-    , NewUids(newUids)
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
 {
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
-    YDebug() << "Using " << (newUids ? "new" : "old") << " UIDs implementation" << Endl;
     Loops.FindLoops(RestoreContext.Graph, startDirs, false);
 }
 
@@ -24,41 +22,37 @@ bool TJSONVisitorNew::AcceptDep(TState& state) {
 bool TJSONVisitorNew::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     if (fresh)
-        CurEnt->InitUids(NewUids);
+        CurEnt->InitUids();
 
-    if (NewUids) {
-        UpdateReferences(state);
+    UpdateReferences(state);
 
-        ++CurrData->NewUids()->EnterDepth;
+    ++CurrData->NewUids()->EnterDepth;
 
-        if (fresh && !CurrData->Completed) {
-            Y_ASSERT(!CurrData->NewUids()->Finished);
-            PrepareCurrent(state);
-        }
+    if (fresh && !CurrData->Completed) {
+        Y_ASSERT(!CurrData->NewUids()->Finished);
+        PrepareCurrent(state);
     }
 
     return fresh;
 }
 
 void TJSONVisitorNew::Leave(TState& state) {
-    if (NewUids) {
-        UpdateReferences(state);
+    UpdateReferences(state);
 
-        TNodeId chldLoop = CurrData->LoopId;
-        bool inSameLoop = chldLoop && PrntData && chldLoop == PrntData->LoopId;
+    TNodeId chldLoop = CurrData->LoopId;
+    bool inSameLoop = chldLoop && PrntData && chldLoop == PrntData->LoopId;
 
-        --CurrData->NewUids()->EnterDepth;
-        if (CurrData->NewUids()->EnterDepth == 0 && !CurrData->NewUids()->Finished) {
-            FinishCurrent(state);
-            CurrData->NewUids()->Finished = true;
-            if (chldLoop && !inSameLoop) {
-                ComputeLoopHash(chldLoop);
-            }
+    --CurrData->NewUids()->EnterDepth;
+    if (CurrData->NewUids()->EnterDepth == 0 && !CurrData->NewUids()->Finished) {
+        FinishCurrent(state);
+        CurrData->NewUids()->Finished = true;
+        if (chldLoop && !inSameLoop) {
+            ComputeLoopHash(chldLoop);
         }
+    }
 
-        if (PrntState != nullptr && !PrntData->NewUids()->Finished && CurrData->NewUids()->Finished && !inSameLoop) {
-            PassToParent(state);
-        }
+    if (PrntState != nullptr && !PrntData->NewUids()->Finished && CurrData->NewUids()->Finished && !inSameLoop) {
+        PassToParent(state);
     }
 
     TBase::Leave(state);
@@ -558,8 +552,6 @@ void TJSONVisitorNew::CheckStructureUidChanged() {
 }
 
 void TJSONVisitorNew::ReportCacheStats() {
-    if (NewUids) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EUidsCacheStats::ReallyAllNoRendered), CacheStats.Get(NStats::EUidsCacheStats::ReallyAllNoRendered) ? true : false);
-    }
+    NStats::TStatsBase::MonEvent(MON_NAME(EUidsCacheStats::ReallyAllNoRendered), CacheStats.Get(NStats::EUidsCacheStats::ReallyAllNoRendered) ? true : false);
     CacheStats.Report();
 }

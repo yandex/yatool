@@ -295,13 +295,10 @@ struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
 public:
     TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack = false, bool isFile = false);
 
-    void InitUids(bool newUids) {
+    void InitUids() {
         if (Uids)
             return;
-        if (newUids)
-            Uids.Reset(new TJsonStatsNew{*this});
-        else
-            Uids.Reset(new TJsonStatsOld{*this});
+        Uids.Reset(new TJsonStatsNew{*this});
     }
 
     TString GetNodeUid() const;

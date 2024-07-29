@@ -51,8 +51,8 @@ inline bool NeedToPassInputs(const TConstDepRef& dep) {
     return true;
 }
 
-TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids)
-    : TBase{restoreContext, commands, cmdConf, startDirs, newUids}
+TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
+    : TBase{restoreContext, commands, cmdConf, startDirs}
     , GlobalVarsCollector(restoreContext)
     , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
     , ErrorShower(ParseErrorMode(restoreContext.Conf.ExpressionErrorDetails))
@@ -159,7 +159,7 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
         auto [it, added] = Nodes.try_emplace(nodeRef.Id(), TJSONEntryStats::TItemDebug{graph, nodeRef.Id()});
         auto& [_, nodeData] = *it;
         nodeData.InStack = false;
-        nodeData.InitUids(NewUids);
+        nodeData.InitUids();
         Y_ASSERT(added);
 
         if (!nodeLoaded) {

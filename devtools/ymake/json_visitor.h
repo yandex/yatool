@@ -61,7 +61,7 @@ private:
     const bool JsonDepsFromMainOutputEnabled_ = false;
 
 public:
-    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs, bool newUids);
+    TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
 
     using TBase::Nodes;
 
