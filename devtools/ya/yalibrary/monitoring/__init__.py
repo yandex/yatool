@@ -1,4 +1,6 @@
+import contextlib
 import logging
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -14,13 +16,14 @@ class YaMonEvent(object):
             if YaMonEvent._evlog_writer is not None:
                 return  # Already tried get evlog, absent, do nothing
 
-            import yalibrary.app_ctx as app_ctx
+            try:
+                import app_ctx
 
-            if getattr(app_ctx, 'evlog', None):
                 YaMonEvent._evlog_writer = app_ctx.evlog.get_writer('ya')
-            else:
+            except (ImportError, AttributeError):
+                logger.debug('app_ctx.evlog not found')
                 YaMonEvent._evlog_writer = False
-                return  # no evlog, do nothing
+                return
 
         # Event format see TMonitoringStat at devtools/ymake/diag/trace.ev
         # Name format is string representation of enum items in devtools/ymake/diag/stats_enum.h, here use same strings for generality
@@ -48,3 +51,13 @@ class YaMonEvent(object):
     @staticmethod
     def _send_evlog(**kwargs):
         YaMonEvent._evlog_writer('NEvent.TMonitoringStat', **kwargs)
+
+
+@contextlib.contextmanager
+def monitoring_scope(name):
+    # type: (str) -> types.GeneratorType
+    start = time.time()
+    try:
+        yield None
+    finally:
+        YaMonEvent.send(name, time.time() - start)
