@@ -49,7 +49,6 @@ private:
 
     autoarray<TLoopCnt> LoopCnt;
 
-    TCommands& Commands;
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> LoopsInputs;
@@ -94,6 +93,5 @@ private:
     void SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph);
     bool LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph);
 
-    void CalcLoopSig(TNodeId loopId, TLoopCnt& loopHash, TGraphLoop& loop, const TDepGraph& graph);
     bool NeedAddToOuts(const TState& state, const TDepTreeNode& node) const;
 };
