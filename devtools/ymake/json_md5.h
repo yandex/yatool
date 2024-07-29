@@ -35,87 +35,7 @@ namespace NUidDebug {
     TString LoopNodeName(TNodeId loopId);
 };
 
-class TJsonMd5Old;
-class TJsonMd5New;
-
-class TJsonMd5Base {
-public:
-    virtual ~TJsonMd5Base() noexcept;
-
-    inline TJsonMd5Old* Old() noexcept;
-    inline TJsonMd5New* New() noexcept;
-};
-
-class TJsonMd5Old : public TJsonMd5Base {
-private:
-    TString NodeName;
-    TUidDebugNodeId NodeId;
-
-    const TSymbols& SymbolsTable;
-
-    // To calculate UID
-    TMd5Value ContextMd5;
-    TMd5Value IncludesMd5;
-    // To calculate self UID (without Deps uid)
-    TMd5Value SelfContextMd5;
-    TMd5Value IncludesSelfContextMd5;
-    // To be used as part of RenderId in JSON-caching
-    TMd5Value RenderMd5;
-
-public:
-    TJsonMd5Old(TNodeDebugOnly nodeDebug, const TString& name, const TSymbols& symbols);
-
-    TStringBuf GetName() const {
-        return NodeName;
-    }
-
-    TUidDebugNodeId GetId() const {
-        return NodeId;
-    }
-
-    void ContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
-    void ContextMd5Update(const char* data, size_t len);
-
-    void IncludesMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName, TStringBuf description);
-    void IncludesMd5Update(const char* data, size_t len);
-
-    void SelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
-    void SelfContextMd5Update(const char* data, size_t len);
-
-    void IncludesSelfContextMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
-    void IncludesSelfContextMd5Update(const char* data, size_t len);
-
-    void RenderMd5Update(const TMd5SigValue& md5Sig, TStringBuf reasonOfUpdateName);
-    void RenderMd5Update(const char* data, size_t len);
-
-    const TMd5Value& GetContextMd5() const {
-        return ContextMd5;
-    }
-
-    const TMd5Value& GetIncludesMd5() const {
-        return IncludesMd5;
-    }
-
-    const TMd5Value& GetSelfContextMd5() const {
-        return SelfContextMd5;
-    }
-
-    const TMd5Value& GetIncludesSelfContextMd5() const {
-        return IncludesSelfContextMd5;
-    }
-
-    const TMd5Value& GetRenderMd5() const {
-        return RenderMd5;
-    }
-
-    void LogContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const;
-    void LogIncludedChange(const TMd5Value&  IncludesMd5, TUidDebugNodeId depNodeId) const;
-
-    void LogSelfContextChange(const TMd5Value& ContextMd5, TUidDebugNodeId depNodeId) const;
-    void LogSelfIncludedChange(const TMd5Value&  IncludesMd5, TUidDebugNodeId depNodeId) const;
-};
-
-class TJsonMd5New : public TJsonMd5Base {
+class TJsonMd5 {
 private:
     TMd5Value StructureMd5;
     TMd5Value IncludeStructureMd5;
@@ -123,7 +43,7 @@ private:
     TMd5Value IncludeContentMd5;
 
 public:
-    TJsonMd5New(TNodeDebugOnly nodeDebug);
+    TJsonMd5(TNodeDebugOnly nodeDebug);
 
     void StructureMd5Update(const TMd5UpdateValue& value, TStringBuf reason) {
         StructureMd5.Update(value, reason);
@@ -157,16 +77,6 @@ public:
         return IncludeContentMd5;
     }
 };
-
-inline TJsonMd5Old* TJsonMd5Base::Old() noexcept {
-    Y_ASSERT(dynamic_cast<TJsonMd5Old*>(this) != nullptr);
-    return static_cast<TJsonMd5Old*>(this);
-}
-
-inline TJsonMd5New* TJsonMd5Base::New() noexcept {
-    Y_ASSERT(dynamic_cast<TJsonMd5New*>(this) != nullptr);
-    return static_cast<TJsonMd5New*>(this);
-}
 
 class TJsonMultiMd5 {
 private:

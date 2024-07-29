@@ -65,7 +65,7 @@ void TJSONVisitorNew::PrepareCurrent(TState& state) {
 
     TNodeDebugOnly nodeDebug{*Graph, CurrNode.Id()};
     Y_ASSERT(!CurrState->Hash);
-    CurrState->Hash = new TJsonMd5New(nodeDebug);
+    CurrState->Hash = new TJsonMd5(nodeDebug);
 
     if (IsModuleType(CurrNode->NodeType) && !CurrState->Module) {
         CurrState->Module = RestoreContext.Modules.Get(CurrNode->ElemId);
@@ -122,10 +122,10 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
             }
             if (expr)
                 Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
-                    CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
+                    CurrState->Hash->StructureMd5Update({data, size}, "new_cmd");
                 });
         }
-        CurrState->Hash->New()->StructureMd5Update(RestoreContext.Conf.GetUidsSalt(), "FAKEID");
+        CurrState->Hash->StructureMd5Update(RestoreContext.Conf.GetUidsSalt(), "FAKEID");
     }
 
     // include content hash to content uid
@@ -134,16 +134,16 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         const TFileData& fileData = Graph->Names().FileConf.GetFileDataById(elemId);
         Y_ASSERT(fileData.HashSum != TMd5Sig());
         TString value = Md5SignatureAsBase64(fileData.HashSum);
-        CurrState->Hash->New()->ContentMd5Update(value, "Update content hash by current file hash sum");
-        CurrState->Hash->New()->IncludeContentMd5Update(value, "Update include content hash by current file hash sum");
+        CurrState->Hash->ContentMd5Update(value, "Update content hash by current file hash sum");
+        CurrState->Hash->IncludeContentMd5Update(value, "Update include content hash by current file hash sum");
     }
 
     if (CurrNode->NodeType == EMNT_NonParsedFile) {
         TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         TMd5Value md5{TNodeDebugOnly{*Graph, CurrNode.Id()}, "TJSONVisitorNew::Enter::<md5#2>"sv};
         md5.Update(nodeName, "TJSONVisitorNew::Enter::<nodeName>"sv);
-        CurrState->Hash->New()->ContentMd5Update(nodeName, "Update content hash by current file name");
-        CurrState->Hash->New()->IncludeContentMd5Update(nodeName, "Update include content hash by current file name");
+        CurrState->Hash->ContentMd5Update(nodeName, "Update content hash by current file name");
+        CurrState->Hash->IncludeContentMd5Update(nodeName, "Update include content hash by current file name");
     }
 
     // include extra output names to parent entry
@@ -174,7 +174,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         // as the graph structure remains mostly the same (the difference is there are
         // no GROUP_NAME=ModuleInputs entries in module and that's almost all).
         if (CurrState->Module->IsFakeModule()) {
-            CurrState->Hash->New()->IncludeStructureMd5Update("FakeModuleTag"_sb, "Add fake module tag"sv);
+            CurrState->Hash->IncludeStructureMd5Update("FakeModuleTag"_sb, "Add fake module tag"sv);
         }
 
         // include managed peers closure to structure hash
@@ -187,7 +187,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
                 const TNodeData* chldState = Nodes.FindPtr(nodeId);
                 Y_ASSERT(chldState);
                 if (chldState) {
-                    CurrState->Hash->New()->IncludeStructureMd5Update(
+                    CurrState->Hash->IncludeStructureMd5Update(
                         chldState->GetIncludeStructureUid(),
                         "Pass IncludeStructure for managed peer"
                     );
@@ -212,12 +212,12 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         // TODO: This is a workaround, and should be removed when "inputs" sections
         // no more contain spurious dependency main outputs.
         TStringBuf mainOutputName = Graph->ToTargetStringBuf(Graph->Get(CurrData->OutTogetherDependency));
-        CurrState->Hash->New()->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
+        CurrState->Hash->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
     }
 
     // Node name will be in $AUTO_INPUT for the consumer of this node.
     if (IsFileType(CurrNode->NodeType)) {
-        CurrState->Hash->New()->IncludeStructureMd5Update(Graph->ToTargetStringBuf(CurrNode), "Node name for $AUTO_INPUT");
+        CurrState->Hash->IncludeStructureMd5Update(Graph->ToTargetStringBuf(CurrNode), "Node name for $AUTO_INPUT");
     }
 
     // There is no JSON node for current DepGraph node
@@ -234,12 +234,12 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
     }
 
     if (UseFileId(CurrNode->NodeType) || CurrNode->NodeType == EMNT_BuildCommand) {
-        CurrData->SetContentUid(CurrState->Hash->New()->GetContentMd5());
-        CurrData->SetIncludeContentUid(CurrState->Hash->New()->GetIncludeContentMd5());
+        CurrData->SetContentUid(CurrState->Hash->GetContentMd5());
+        CurrData->SetIncludeContentUid(CurrState->Hash->GetIncludeContentMd5());
     }
 
-    CurrData->SetStructureUid(CurrState->Hash->New()->GetStructureMd5());
-    CurrData->SetIncludeStructureUid(CurrState->Hash->New()->GetIncludeStructureMd5());
+    CurrData->SetStructureUid(CurrState->Hash->GetStructureMd5());
+    CurrData->SetIncludeStructureUid(CurrState->Hash->GetIncludeStructureMd5());
     CurrData->Finished = true;
     CurrData->Completed = true;
     CheckStructureUidChanged();
@@ -279,13 +279,13 @@ void TJSONVisitorNew::PassToParent(TState& state) {
     // late globs
     if (*Edge == EDT_BuildFrom && CurrNode->NodeType == EMNT_BuildCommand) {
         UpdateParent(state, CurrData->GetStructureUid(), "Include late glob hash to parent structure hash");
-        PrntState->Hash->New()->ContentMd5Update(CurrData->GetIncludeContentUid(), "Add late glob include content hash"_sb);
+        PrntState->Hash->ContentMd5Update(CurrData->GetIncludeContentUid(), "Add late glob include content hash"_sb);
     }
 
     if (*Edge == EDT_Property && IsFileType(CurrNode->NodeType)) {
         TStringBuf nodeName = Graph->ToTargetStringBuf(CurrNode);
         UpdateParent(state, nodeName, "Include file names to late glob structure hash");
-        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
+        PrntState->Hash->IncludeContentMd5Update(CurrData->GetContentUid(), "Add file content hash to late glob content include hash"_sb);
     }
 
     if (IsFileType(CurrNode->NodeType) && IsFileType(PrntState->Node()->NodeType)) {
@@ -300,31 +300,31 @@ void TJSONVisitorNew::PassToParent(TState& state) {
                 isDMModules = CurrState->Module->GetAttrs().RequireDepManagement && PrntState->Module->GetAttrs().RequireDepManagement;
             }
             if (!isDMModules) {
-                PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructure by EDT_Include");
+                PrntState->Hash->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructure by EDT_Include");
             }
         }
 
         if (*Edge == EDT_BuildFrom) {
-            PrntState->Hash->New()->StructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructre by EDT_BuildFrom");
+            PrntState->Hash->StructureMd5Update(CurrData->GetIncludeStructureUid(), "Pass IncludeStructre by EDT_BuildFrom");
         }
     }
 
     if (IsGlobalSrcDep(Edge)) {
         TStringBuf globalSrcName = Graph->ToTargetStringBuf(CurrNode);
-        PrntState->Hash->New()->IncludeStructureMd5Update(globalSrcName, "Add GlobalSrc name"sv);
+        PrntState->Hash->IncludeStructureMd5Update(globalSrcName, "Add GlobalSrc name"sv);
 
-        PrntState->Hash->New()->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Add IncludeStructure from GlobalSrc"sv);
+        PrntState->Hash->IncludeStructureMd5Update(CurrData->GetIncludeStructureUid(), "Add IncludeStructure from GlobalSrc"sv);
     }
 
     if (IsIncludeFileDep(Edge)) {
-        PrntState->Hash->New()->IncludeContentMd5Update(CurrData->GetIncludeContentUid(), "Pass IncludeContent by EDT_Include"sv);
+        PrntState->Hash->IncludeContentMd5Update(CurrData->GetIncludeContentUid(), "Pass IncludeContent by EDT_Include"sv);
     }
 
     if (*Edge == EDT_BuildFrom && IsSrcFileType(CurrNode->NodeType)) {
         if (CurrNode->NodeType != EMNT_NonParsedFile) {
-            PrntState->Hash->New()->ContentMd5Update(CurrData->GetContentUid(), "Update parent content UID with content"sv);
+            PrntState->Hash->ContentMd5Update(CurrData->GetContentUid(), "Update parent content UID with content"sv);
         }
-        PrntState->Hash->New()->ContentMd5Update(CurrData->GetIncludeContentUid(), "Update parent content UID with include content"sv);
+        PrntState->Hash->ContentMd5Update(CurrData->GetIncludeContentUid(), "Update parent content UID with include content"sv);
     }
 }
 
@@ -333,7 +333,7 @@ void TJSONVisitorNew::UpdateParent(TState& state, TStringBuf value, TStringBuf d
     const auto& graph = TDepGraph::Graph(state.TopNode());
 
     YDIAG(Dev) << description << ": " << value << " " << graph.ToString(parentState.Node()) << Endl;
-    parentState.Hash->New()->StructureMd5Update(value, value);
+    parentState.Hash->StructureMd5Update(value, value);
 }
 
 void TJSONVisitorNew::UpdateParent(TState& state, const TMd5SigValue& value, TStringBuf description) {
@@ -343,14 +343,14 @@ void TJSONVisitorNew::UpdateParent(TState& state, const TMd5SigValue& value, TSt
     TStringBuf nodeName = graph.ToTargetStringBuf(state.TopNode());
 
     YDIAG(Dev) << description << ": " << nodeName << " " << graph.ToString(parentState.Node()) << Endl;
-    parentState.Hash->New()->StructureMd5Update(value, nodeName);
+    parentState.Hash->StructureMd5Update(value, nodeName);
 }
 
 void TJSONVisitorNew::UpdateCurrent(TState& state, TStringBuf value, TStringBuf description) {
     const auto& graph = TDepGraph::Graph(state.TopNode());
 
     YDIAG(Dev) << description << ": " << value << " " << graph.ToString(state.TopNode()) << Endl;
-    state.Top().Hash->New()->StructureMd5Update(value, value);
+    state.Top().Hash->StructureMd5Update(value, value);
 }
 
 void TJSONVisitorNew::AddAddincls(TState& state) {
@@ -404,7 +404,7 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
                         Y_ASSERT(expr);
                         UpdateCurrent(state, varName, "new_cmd_name");
                         Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
-                            CurrState->Hash->New()->StructureMd5Update({data, size}, "new_cmd");
+                            CurrState->Hash->StructureMd5Update({data, size}, "new_cmd");
                         });
                     } else {
                         TString value = FormatProperty(varName, varItem.Name);

@@ -12,7 +12,7 @@ class TSaveBuffer;
 class TLoadBuffer;
 
 struct TJsonStackData {
-    TAutoPtr<TJsonMd5Base> Hash; // Md5 constructors are heavy
+    TAutoPtr<TJsonMd5> Hash; // Md5 constructors are heavy
     const TModule* Module = nullptr;
 };
 

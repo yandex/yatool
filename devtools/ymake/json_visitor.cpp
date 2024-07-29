@@ -251,9 +251,6 @@ bool TJSONVisitor::Enter(TState& state) {
 
     if (fresh) {
         TNodeDebugOnly nodeDebug{graph, node.Id()};
-        if (!currState.Hash) {
-            currState.Hash = new TJsonMd5Old(nodeDebug, TString(graph.ToTargetStringBuf(node)), graph.Names());
-        }
 
         if (nodeType == EMNT_File || nodeType == EMNT_MakeFile) {
             auto elemId = currState.Node()->ElemId;
@@ -312,10 +309,6 @@ bool TJSONVisitor::Enter(TState& state) {
     }
 
     if (fresh) {
-        if (!currState.Hash) {
-            currState.Hash = new TJsonMd5Old(TNodeDebugOnly{graph, node.Id()}, TString(graph.ToTargetStringBuf(node)), graph.Names());
-        }
-
         if (IsModuleType(nodeType)) {
             currState.Module = RestoreContext.Modules.Get(node->ElemId);
             Y_ENSURE(currState.Module != nullptr);
@@ -616,7 +609,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     if (*dep == EDT_OutTogetherBack) {
         if (!currDone) {
             TStringBuf additionalOutputName = graph.ToTargetStringBuf(dep.To());
-            currState.Hash->New()->StructureMd5Update(additionalOutputName, additionalOutputName);
+            currState.Hash->StructureMd5Update(additionalOutputName, additionalOutputName);
         }
         return false;
     }
