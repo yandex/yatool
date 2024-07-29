@@ -42,16 +42,6 @@
 using EDebugUidType = NDebugEvents::NExportJson::EUidType;
 
 namespace {
-    TMd5SigValue CombineMd5Signs(TNodeDebugOnly nodeDebug, TStringBuf valueName, const std::initializer_list<TMd5SigValue>& signs) {
-        TMd5Value md5{nodeDebug, "CombineMd5Signs::<md5>"};
-        for (const auto& sign : signs) {
-            md5.Update(sign, "CombineMd5Signs"sv);
-        }
-        TMd5SigValue finalSign{nodeDebug, valueName};
-        finalSign.MoveFrom(std::move(md5));
-        return finalSign;
-    }
-
     TMd5Value ComputeUIDForPeersLateOutsNode(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         // structure uid ноды
@@ -106,7 +96,7 @@ namespace {
                 , NodeDebug(Graph, nodeId)
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
-                , DumpInfo(nodeInfo.GetNodeUid(cmdBuilder.ShouldUseNewUids()), nodeInfo.GetNodeSelfUid(cmdBuilder.ShouldUseNewUids()))
+                , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
                 , Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(ymake)
         {
             PrepareDeps();
@@ -164,20 +154,12 @@ namespace {
         };
 
         TString CalculateCacheUid() {
-            if (!CmdBuilder.ShouldUseNewUids()) {
-                const auto baseRenderId = NodeInfo.OldUids()->GetRenderId();
-                TMd5Value md5 = CalculateDepsId();
-                md5.Update(baseRenderId, "TJSONRenderer::CalculateCacheUid::<baseRenderId>"sv);
-                RenderId.MoveFrom(std::move(md5));
-                return CombineMd5Signs(NodeDebug, "TJSONRenderer::CalculateCacheUid::<return>", {NodeInfo.OldUids()->GetContextSign(), RenderId}).ToBase64();
-            } else {
-                const TModule* mod = GetModule();
-                if (mod && ModuleId == NodeId && mod->GetAttrs().UsePeersLateOuts) {
-                    auto uid = ComputeUIDForPeersLateOutsNode(CmdBuilder, NodeId).ToBase64();
-                    return uid;
-                }
-                return NodeInfo.NewUids()->GetStructureUid().ToBase64();
+            const TModule* mod = GetModule();
+            if (mod && ModuleId == NodeId && mod->GetAttrs().UsePeersLateOuts) {
+                auto uid = ComputeUIDForPeersLateOutsNode(CmdBuilder, NodeId).ToBase64();
+                return uid;
             }
+            return NodeInfo.NewUids()->GetStructureUid().ToBase64();
         }
 
         void RefreshEmptyMakeNode(TMakeNode& node, const TMakeNodeSavedState& nodeSavedState, NCache::TConversionContext& context) {
@@ -237,7 +219,7 @@ namespace {
                     const auto dependency = CmdBuilder.Nodes.find(depId);
                     Y_ASSERT(dependency != CmdBuilder.Nodes.end());
                     if (dependency->second.HasBuildCmd) {
-                        node.Deps.emplace_back(dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids()));
+                        node.Deps.emplace_back(dependency->second.GetNodeUid());
                     }
                 }
             }
@@ -247,7 +229,7 @@ namespace {
                     const auto dependency = CmdBuilder.Nodes.find(depId);
                     Y_ASSERT(dependency != CmdBuilder.Nodes.end());
                     Y_ASSERT(dependency->second.HasBuildCmd);
-                    node.ToolDeps.emplace_back(dependency->second.GetNodeUid(CmdBuilder.ShouldUseNewUids()));
+                    node.ToolDeps.emplace_back(dependency->second.GetNodeUid());
                 }
             }
         }
@@ -443,29 +425,12 @@ namespace {
         // If we didn't find exactly the same node, try to find the same, but with different UID.
         // To make it possible, use partial rendering and calculation of RenderId.
 
-        do {
-            renderer.RenderNodeDelayed();
-            const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
+        renderer.RenderNodeDelayed();
+        renderer.CompleteRendering();
 
-            TString renderId{};
-
-            if (!cmdbuilder.ShouldUseNewUids()) {
-                TString renderId = renderer.CalculateRenderId();
-                auto restored = cache.RestoreByRenderId(renderId, &node);
-                BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Render, renderId, static_cast<bool>(restored));
-                if (restored) {
-                    renderer.RefreshPartiallyRestoredNode(node);
-                    // Update node in cache to avoid partial rendering next time
-                    cache.AddRenderedNode(node, nodeName, cacheUid, renderId);
-                    cache.Stats.Inc(NStats::EJsonCacheStats::PartiallyRendered);
-                    break;
-                }
-            }
-
-            renderer.CompleteRendering();
-            cache.AddRenderedNode(node, nodeName, cacheUid, renderId);
-            cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
-        } while (0);
+        const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
+        cache.AddRenderedNode(node, nodeName, cacheUid, TString{});
+        cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
         jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
     }
 
@@ -509,8 +474,6 @@ namespace {
     }
 
     void ComputeFullUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
-        Y_ASSERT(cmdBuilder.ShouldUseNewUids());
-
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         if (nodeInfo.NewUids()->IsFullUidCompleted()) {
             return;
@@ -544,8 +507,6 @@ namespace {
     }
 
     void ComputeSelfUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
-        Y_ASSERT(cmdBuilder.ShouldUseNewUids());
-
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         if (nodeInfo.NewUids()->IsSelfUidCompleted()) {
             return;
@@ -641,8 +602,7 @@ namespace {
             plan.WriteConf();
 
             for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
-                if (cmdbuilder.ShouldUseNewUids())
-                    UpdateUids(cmdbuilder, nodeId);
+                UpdateUids(cmdbuilder, nodeId);
 
                 const auto& node = cmdbuilder.Nodes.at(nodeId);
                 RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);
@@ -667,7 +627,7 @@ namespace {
             if (resultIt->second.OutTogetherDependency != 0 && !resultIt->second.HasBuildCmd) {
                 resultIt = cmdbuilder.Nodes.find(resultIt->second.OutTogetherDependency);
             }
-            plan.Results.push_back(resultIt->second.GetNodeUid(cmdbuilder.ShouldUseNewUids()));
+            plan.Results.push_back(resultIt->second.GetNodeUid());
         }
         std::sort(plan.Results.begin(), plan.Results.end());
 

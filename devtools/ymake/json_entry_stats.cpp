@@ -144,18 +144,12 @@ TJSONEntryStats::TJSONEntryStats(TNodeDebugOnly nodeDebug, bool inStack, bool is
 {
 }
 
-TString TJSONEntryStats::GetNodeUid(bool newUids) const {
-    if (newUids)
-        return NewUids()->GetNodeUid();
-    else
-        return OldUids()->GetNodeUid();
+TString TJSONEntryStats::GetNodeUid() const {
+    return NewUids()->GetNodeUid();
 }
 
-TString TJSONEntryStats::GetNodeSelfUid(bool newUids) const {
-    if (newUids)
-        return NewUids()->GetNodeSelfUid();
-    else
-        return OldUids()->GetNodeSelfUid();
+TString TJSONEntryStats::GetNodeSelfUid() const {
+    return NewUids()->GetNodeSelfUid();
 }
 
 void TJSONEntryStats::SaveStructureUid(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept {

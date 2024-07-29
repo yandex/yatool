@@ -304,8 +304,8 @@ public:
             Uids.Reset(new TJsonStatsOld{*this});
     }
 
-    TString GetNodeUid(bool newUids) const;
-    TString GetNodeSelfUid(bool newUids) const;
+    TString GetNodeUid() const;
+    TString GetNodeSelfUid() const;
 
     TJsonStatsOld* OldUids() noexcept {
         return Uids.Get()->Old();

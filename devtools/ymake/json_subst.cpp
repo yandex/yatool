@@ -285,13 +285,13 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
 
     for (const auto& dep : DumpInfo.Deps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
-        auto nodeUid = nodeIt->second.GetNodeUid(JSONVisitor.ShouldUseNewUids());
+        auto nodeUid = nodeIt->second.GetNodeUid();
         makeNode.Deps.push_back(nodeUid);
     }
 
     for (const auto& dep : DumpInfo.ToolDeps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
-        auto nodeUid = nodeIt->second.GetNodeUid(JSONVisitor.ShouldUseNewUids());
+        auto nodeUid = nodeIt->second.GetNodeUid();
         makeNode.ToolDeps.push_back(nodeUid);
     }
 

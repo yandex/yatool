@@ -37,10 +37,6 @@ public:
     // Returning from a child node. The child node should be finished, while the parent is not.
     void PassToParent(TState& state);
 
-    bool ShouldUseNewUids() const noexcept {
-        return NewUids;
-    }
-
     void ReportCacheStats();
 
 protected:
