@@ -206,8 +206,9 @@ jinja2::Value TAttrs::GetSimpleAttrValue(const EAttrTypes attrType, const jinja2
                 if (!tool.empty()) {
                     auto [toolsIt, _] = NInternalAttrs::EmplaceAttr(Attrs_, NInternalAttrs::Tools, jinja2::ValuesList{});
                     auto& tools = toolsIt->second.asList();
-                    if (std::find(tools.begin(),tools.end(), tool) == tools.end()) {
-                        tools.emplace_back(tool);
+                    auto jtool = jinja2::Value{std::string{tool}};
+                    if (std::find(tools.begin(),tools.end(), jtool) == tools.end()) {
+                        tools.emplace_back(jtool);
                     }
                     auto slash_pos = tool.rfind('/');
                     Y_ASSERT(slash_pos != std::string::npos);

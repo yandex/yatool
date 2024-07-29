@@ -660,7 +660,7 @@ const std::string& TJinjaGenerator::ToolGetter(const std::string& s) const {
         if (!GeneratorSpec.BinaryRootReplacer.empty()) {
             maybeTool = std::regex_replace(maybeTool, std::regex(std::string{"^"} + std::regex_replace(GeneratorSpec.BinaryRootReplacer, ESCAPING_RE, ESCAPING_REPLACE) + "/"), "");
         }
-        if (std::find(subdirTools.begin(), subdirTools.end(), maybeTool) == subdirTools.end()) {
+        if (std::find(subdirTools.begin(), subdirTools.end(), jinja2::Value{std::string{maybeTool}}) == subdirTools.end()) {
             break;// not tool
         }
         ToolGetterBuffer_ = maybeTool;

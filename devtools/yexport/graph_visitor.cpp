@@ -224,8 +224,9 @@ namespace NYexport {
                 }
                 auto toolRelPath = NPath::CutType(tool.To()->Path);
                 toolRelPath.ChopSuffix(".exe"sv);
-                if (std::find(tools->begin(), tools->end(), toolRelPath) == tools->end()) {
-                    tools->emplace_back(std::string{toolRelPath});
+                auto jtool = jinja2::Value{std::string{toolRelPath}};
+                if (std::find(tools->begin(), tools->end(), jtool) == tools->end()) {
+                    tools->emplace_back(jtool);
                 }
             }
         }
