@@ -1216,6 +1216,10 @@ class _GraphMaker(object):
         self._exit_stack = exit_stack
         self._print_status = print_status
         self._heater = self._opts.build_graph_cache_heater
+        self._allow_changelist = True
+
+    def disable_changelist(self):
+        self._allow_changelist = False
 
     def make_graphs(
         self,
@@ -1681,7 +1685,7 @@ class _GraphMaker(object):
             o['dump_make_files'] = make_files_dart
 
         if change_list is None:
-            if getattr(self._opts, "build_graph_cache_force_local_cl", False):
+            if getattr(self._opts, "build_graph_cache_force_local_cl", False) and self._allow_changelist:
                 import app_ctx
 
                 cl_generator = _prepare_local_change_list_generator(app_ctx, self._opts)
@@ -2032,6 +2036,8 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
 
     with stager.scope("get-tools"):
         graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc)
+
+    graph_maker.disable_changelist()
 
     any_tests = any([_should_run_tests(opts, tc) for tc in target_tcs])
 
