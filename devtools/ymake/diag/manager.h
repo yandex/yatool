@@ -97,6 +97,7 @@ public:
     bool IsDelayed() const;
 
     void Erase(ui32 owner);
+    bool EraseMessagesByKind(const TStringBuf var, ui32 owner = 0); // If owner == 0 erase for all owners
 
     void Load(const TBlob& blob);
     void Save(TMultiBlobBuilder& builder);
@@ -137,6 +138,9 @@ TConfMsgManager* ConfMsgManager();
 
 #define YConfWarn(var) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var)
 #define YConfWarnPrecise(var, row, column) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var, row, column)
+
+#define YConfErase(var) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var)
+#define YConfEraseByOwner(var, owner) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var, owner)
 
 // This macro must not be used before ConfMsgManager()->DisableDelay and only for unstable diagnostincs which can be diferent
 // depending on dep cacahe state or start target order

@@ -124,6 +124,30 @@ void TConfMsgManager::Erase(ui32 owner) {
     Events.erase(owner);
 }
 
+bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, ui32 owner) {
+    auto eraseOwnerMessages = [](const TStringBuf& var, TVector<TConfigureMessage>& messages) {
+        auto size = messages.size();
+        EraseIf(messages, [&var](const TConfigureMessage& message) {
+            return message.Kind == var;
+        });
+        return size > messages.size();
+    };
+
+    if (!owner) {
+        bool someErased = false;
+        for (auto& [_, messages] : Messages) {
+            someErased |= eraseOwnerMessages(var, messages);
+        }
+        return someErased;
+    } else {
+        auto it = Messages.find(owner);
+        if (it != Messages.end()) {
+            return eraseOwnerMessages(var, it->second);
+        }
+        return false;
+    }
+}
+
 void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
     TString confMsgsData;
     {
