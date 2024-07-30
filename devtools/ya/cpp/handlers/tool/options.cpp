@@ -20,6 +20,7 @@ namespace NYa::NTool {
     const TStringBuf UNSUPPORTED_OPTIONS[] = {
         "--custom-fetcher",
         "--fetcher-params",
+        "--universal-fetcher",
         "--force-refetch",
         "--force-update",
         "--get-param",

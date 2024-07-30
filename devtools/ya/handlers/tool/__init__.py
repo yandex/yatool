@@ -23,7 +23,7 @@ from core.yarg import (
 
 import app
 
-from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions
+from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
 from core.yarg.groups import PRINT_CONTROL_GROUP
 from core.yarg.help_level import HelpLevel
 from yalibrary.tools import environ, param, resource_id, tool, tools, toolchain_root, toolchain_sys_libs
@@ -42,7 +42,7 @@ class ToolYaHandler(CompositeHandler):
 
     @staticmethod
     def common_download_options():
-        return [SandboxAuthOptions(), CustomFetcherOptions(), ToolsOptions()]
+        return [SandboxAuthOptions(), CustomFetcherOptions(), UniversalFetcherOptions(), ToolsOptions()]
 
     def __init__(self):
         CompositeHandler.__init__(

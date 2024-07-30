@@ -1650,6 +1650,28 @@ class SonarOptions(Options):
         ]
 
 
+class UniversalFetcherOptions(Options):
+    def __init__(self):
+        self.universal_fetcher = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--universal-fetcher'],
+                help='Universal fetcher impl',
+                hook=SetConstValueHook('universal_fetcher', True),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_UNIVERSAL_FETCHER',
+                hook=SetConstValueHook('universal_fetcher', True),
+            ),
+            ConfigConsumer('universal_fetcher', hook=SetConstValueHook('universal_fetcher', True)),
+        ]
+
+
 class CustomFetcherOptions(Options):
     DEFAULT_PARAMS = [{'name': 'custom'}, {'name': 'proxy'}, {'name': 'skynet'}, {'name': 'mds'}, {'name': 'sandbox'}]
 
@@ -3081,6 +3103,7 @@ def ya_make_options(  # compat
             BuildTypeOptions(build_type=build_type),
             FlagsOptions(),
             CustomFetcherOptions(),
+            UniversalFetcherOptions(),
             RebuildOptions(),
             YndexerOptions(),
             StrictInputsOptions(),
