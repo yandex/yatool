@@ -1515,12 +1515,17 @@ def do_package(params):
                     package.fs_util.copy_tree(output_root, build_temp)
                     package.display.emit_message('Build temp directory: [[imp]]{}'.format(build_temp))
 
-        if params.output_root:
-            package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
-            is_package_skipped = build_package(package_params, os.path.join(params.output_root, package_path))
-        else:
-            with exts.tmp.temp_dir() as output_root:
-                is_package_skipped = build_package(package_params, output_root)
+        with exts.tmp.temp_dir() as output_root:
+            is_package_skipped = build_package(package_params, output_root)
+
+            if params.output_root:
+                package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
+                exts.fs.hardlink_tree(
+                    output_root,
+                    os.path.join(params.output_root, package_path),
+                    hardlink_function=package.fs_util.hardlink_or_copy,
+                    mkdir_function=exts.fs.ensure_dir,
+                )
 
         if is_package_skipped:
             continue

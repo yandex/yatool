@@ -5,15 +5,18 @@ import random
 import stat
 import errno
 import shutil
+import typing as tp  # noqa
 
 import exts.fs
 
 
 def _temp_path(path):
+    # type: (str) -> str
     return path + '.tmp.' + str(random.random())
 
 
 def cleanup(path, force=False):
+    # type: (str, bool) -> None
     if force:
         os.chmod(path, stat.S_IRWXU)
         for root, dirs, _ in os.walk(path):
@@ -24,7 +27,11 @@ def cleanup(path, force=False):
 
 
 def copy_tree(source, destination):
+    # type: (str, str) -> None
+
     def copy_function_with_follback_on_dirs(src, dst):
+        # type: (str, str) -> None
+
         try:
             return shutil.copy2(src, dst)
         except IOError as e:
@@ -33,6 +40,22 @@ def copy_tree(source, destination):
             raise
 
     exts.fs.copytree3(source, destination, copy_function=copy_function_with_follback_on_dirs)
+
+
+def hardlink_or_copy(src, lnk, copy_function=exts.fs.copy2_safe):
+    # type: (str, str, tp.Callable) -> None
+
+    try:
+        return exts.fs.hardlink_or_copy(src, lnk, copy_function)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            same_hardlink = os.stat(src).st_ino == os.stat(lnk).st_ino
+            if not same_hardlink:
+                # it's faster to remove and make new hardlink then copying
+                exts.fs.remove_file(lnk)
+                return exts.fs.hardlink_or_copy(src, lnk, copy_function)
+        else:
+            raise
 
 
 class AtomicPath(object):
