@@ -144,7 +144,10 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     merged_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
     merged_opts.export_to_maven = build_info.get("maven-export", False)
     merged_opts.dump_sources = build_info.get("sources", False)
+    merged_opts.disable_flake8_migrations = params.disable_flake8_migrations
+
     build_options = merged_opts.initialize([])
+
     build_options.build_targets = [os.path.join(arcadia_root, t) for t in targets]
 
     build_options.build_type = build_info.get("build_type", params.build_type)
@@ -304,7 +307,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_codec = params.yt_store_codec
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
-    build_options.disable_flake8_migrations = params.disable_flake8_migrations
 
     build_options.oauth_token = params.oauth_token
     if app_config.in_house:
