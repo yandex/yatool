@@ -11,10 +11,37 @@
 class TModule;
 class TModules;
 
+struct TForeignPlatformEventsReporterEntryStats: public TEntryStats {
+    bool ToolReported = false;
+
+    explicit TForeignPlatformEventsReporterEntryStats(TItemDebug itemDebug = {}, bool inStack = false, bool isFile = false)
+        : TEntryStats(itemDebug, inStack, isFile)
+    {
+    }
+};
+
+class TForeignPlatformEventsReporter: public TNoReentryStatsConstVisitor<TForeignPlatformEventsReporterEntryStats> {
+public:
+    using TBase = TNoReentryStatsConstVisitor<TForeignPlatformEventsReporterEntryStats>;
+    using TState = typename TBase::TState;
+
+    const TSymbols& Names;
+    const TModules& Modules;
+    const bool RenderSemantics;
+
+public:
+    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics)
+        : Names(names)
+        , Modules(modules)
+        , RenderSemantics(renderSemantics)
+    {}
+
+    bool Enter(TState& state);
+    bool AcceptDep(TState& state);
+};
+
 struct TConfigureEventsReporterEntryStats: public TEntryStats {
     bool WasFresh = false;
-    const TModule* PrevModule = nullptr;
-    bool ToolReported = false;
 
     explicit TConfigureEventsReporterEntryStats(TItemDebug itemDebug = {}, bool inStack = false, bool isFile = false)
         : TEntryStats(itemDebug, inStack, isFile)
@@ -29,7 +56,6 @@ public:
 
     const TSymbols& Names;
     const TModules& Modules;
-    const TModule* CurModule = nullptr;
     const bool RenderSemantics;
 
 public:

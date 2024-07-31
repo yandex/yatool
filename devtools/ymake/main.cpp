@@ -864,6 +864,7 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->SortAllEdges();
 
+    yMake->ReportForeignPlatformEvents();
     yMake->ReportConfigureEvents();
 
     FORCE_TRACE(U, NEvent::TStageStarted("Save and compact"));

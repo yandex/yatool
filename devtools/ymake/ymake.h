@@ -106,6 +106,7 @@ public:
     void DumpJavaDart(IOutputStream& cmsg);
     void DumpMakeFilesDart(IOutputStream& cmsg);
     void ReportConfigureEvents();
+    void ReportForeignPlatformEvents();
     void ReportGraphBuildStats();
     void ReportModulesStats();
     void ReportMakeCommandStats();
