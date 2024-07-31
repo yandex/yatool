@@ -741,9 +741,7 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
             if (!Conf.IsolatedProjects.Empty()) {
                 Conf.IsolatedProjects.CheckStatementPath(name, Module.GetMakefile().GetTargetStr(), arg);
             }
-            if (Conf.ShouldAddDataPaths()) {
-                AddDataPath(arg);
-            }
+            AddDataPath(arg);
         }
     } else {
         return false;

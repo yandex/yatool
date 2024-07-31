@@ -286,7 +286,6 @@ void TBuildConfiguration::FillMiscValues() {
     TraverseDepends = NYMake::IsTrue(CommandConf.EvalValue("TRAVERSE_DEPENDS"));
     AddPeerdirsGenTests = NYMake::IsTrue(CommandConf.EvalValue("ADD_PEERDIRS_GEN_TESTS"));
     AddPeersToInputs = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_PEERS_TO_INPUTS"));
-    AddDataPaths = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_ADD_DATA"));
     ForceListDirInResolving = NYMake::IsTrue(CommandConf.EvalValue("RESOLVE_FORCE_LISTDIR"));
     CheckDependsInDart = NYMake::IsTrue(CommandConf.EvalValue("CHECK_DEPENDS_IN_DART"));
     JsonDepsFromMainOutputEnabled_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_JSON_DEPS_FROM_MAIN_OUTPUT"));

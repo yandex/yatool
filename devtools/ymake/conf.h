@@ -105,10 +105,6 @@ public:
         return AddPeersToInputs;
     }
 
-    bool ShouldAddDataPaths() const {
-        return AddDataPaths;
-    }
-
     bool ShouldForceListDirInResolving() const {
         return ForceListDirInResolving;
     }
@@ -175,7 +171,6 @@ private:
     bool AddGlobalSrcToResults = false;
     bool AddPeerdirsGenTests = false;
     bool AddPeersToInputs = false;
-    bool AddDataPaths = false;
     bool ForceListDirInResolving = false;
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
