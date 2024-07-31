@@ -2,6 +2,10 @@ PROGRAM(flatc)
 
 LICENSE(Apache-2.0)
 
+VERSION(2.0.0)
+
+ORIGINAL_SOURCE(https://github.com/google/flatbuffers/archive/refs/tags/v2.0.0.tar.gz)
+
 ADDINCL(
     contrib/deprecated/flatc/flatbuffers/grpc
     contrib/deprecated/flatc/flatbuffers/include
