@@ -3,6 +3,7 @@ import logging
 import queue
 import threading
 import six
+import signal
 import subprocess
 
 import app_config
@@ -207,19 +208,19 @@ class ArcStreamingPrefetcher:
                     break
 
         self._arc_process.terminate()
-        self._arc_process.wait()
+        rc = self._arc_process.wait()
 
-        if self._arc_process.returncode != 0:
+        if rc not in {0, -signal.SIGTERM}:
             logger.warning(
                 'arc prefetch-files [pid: %d] died with rc %s. Configuration may be slower. See logs for more info',
                 self._arc_process.pid,
-                self._arc_process.returncode,
+                rc,
             )
 
         logger.debug(
             'arc prefetch-files [pid: %d] finished with rc %s. stderr: %s',
             self._arc_process.pid,
-            self._arc_process.returncode,
+            rc,
             '\n'.join(stderr),
         )
 
