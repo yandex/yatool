@@ -206,6 +206,7 @@ class ArcStreamingPrefetcher:
                 if err.closed:
                     break
 
+        self._arc_process.terminate()
         self._arc_process.wait()
 
         if self._arc_process.returncode != 0:
