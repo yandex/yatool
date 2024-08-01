@@ -1,6 +1,5 @@
 JAVA_CONTRIB_PROXY()
 
-
 PEERDIR(
     contrib/java/org/yaml/snakeyaml/2.2
 )
@@ -31,4 +30,5 @@ RECURSE(
     1.32
     2.2
     2.1
+    1.8
 )
