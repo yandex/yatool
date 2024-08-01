@@ -10,17 +10,18 @@
 #include <grpcpp/server_context.h>
 #include <grpcpp/security/server_credentials.h>
 
+#include <library/cpp/deprecated/atomic/atomic.h>
 #include <library/cpp/sighandler/async_signals_handler.h>
 
 #include <util/generic/list.h>
 #include <util/stream/file.h>
 #include <util/string/builder.h>
 #include <util/system/atexit.h>
-#include <library/cpp/deprecated/atomic/atomic.h>
 #include <util/system/condvar.h>
 #include <util/system/error.h>
 #include <util/system/shellcommand.h>
 #include <util/thread/factory.h>
+
 
 namespace {
     TAtomic ShutdownRequested(0);
@@ -200,6 +201,7 @@ public:
         for (const auto& env : command->GetEnv()) {
             options.Environment[env.GetName()] = env.GetValue();
         }
+        options.Environment["_BINARY_EXEC_TIMESTAMP"] = ToString(TInstant::Now().MicroSeconds());
 #if defined(_win_)
         // Problem is still rarely reproducing
         // https://wpdev.uservoice.com/forums/110705-universal-windows-platform/suggestions/18355615-ucrtbase-bug-wspawnve-is-broken

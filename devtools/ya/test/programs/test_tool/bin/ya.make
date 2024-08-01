@@ -8,6 +8,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/test/programs/test_tool/main_entry_point
+    library/cpp/testing/startup_timestamp
 )
 
 WINDOWS_LONG_PATH_MANIFEST()

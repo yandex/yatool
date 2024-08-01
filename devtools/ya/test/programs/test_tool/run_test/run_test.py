@@ -615,7 +615,7 @@ class TraceFileWatcher(object):
             return
 
         # there are no compete line
-        if not any(['\n' in d for d in self._buffer]):
+        if not any('\n' in d for d in self._buffer):
             return
 
         data = ''.join(self._buffer)
@@ -1085,13 +1085,29 @@ def set_user_env_vars(env, env_data, global_resources):
         env[key] = value[1:]
 
 
-def update_chunk_metrics(suite, stages):
+def update_chunk_metrics(suite, stages, main_start_timestamp):
     test_cases_duration = sum(t.elapsed for t in suite.chunk.tests)
+    first_test_case_ts = min((t.started for t in suite.chunk.tests if t.started), default=None)
+
+    mil = 1e6
+    bin_start_ts = os.getenv('_BINARY_START_TIMESTAMP')
+    bin_start_ts = int(bin_start_ts) / mil if bin_start_ts else None
+
+    bin_exec_ts = os.getenv('_BINARY_EXEC_TIMESTAMP') or os.getenv('DISTBUILD_RUNNER_BINARY_START_TIMESTAMP')
+    bin_exec_ts = int(bin_exec_ts) / mil if bin_exec_ts else None
+
     if test_cases_duration:
         stages.set('in_test_secs', test_cases_duration)
         duration = stages.get_duration('wrapper_execution')
         if duration:
             stages.set('off_test_secs', duration - test_cases_duration)
+
+    if bin_start_ts:
+        stages.set('binary_startup_secs', main_start_timestamp - bin_start_ts)
+    if bin_start_ts and bin_exec_ts:
+        stages.set('binary_exec_delay_secs', bin_start_ts - bin_exec_ts)
+    if first_test_case_ts and bin_start_ts:
+        stages.set('delay_until_first_test_secs', first_test_case_ts - bin_start_ts)
 
 
 def dump_slowest_tests(suite, limit=15):
@@ -1570,7 +1586,7 @@ def main():
         if options.prepare_only:
             test_context_file_path = os.path.join(work_dir, const.SUITE_CONTEXT_FILE_NAME)
             context.save(test_context_file_path)
-            logger.debug("Saved text context to %s", test_context_file_path)
+            logger.debug("Saved test context to %s", test_context_file_path)
 
         else:
             while need_to_rerun_test(stderr, exit_code, test_command_retry_num, options.test_tags, failed_recipes):
@@ -1881,7 +1897,7 @@ def main():
             options.propagate_timeout_info,
         )
         update_chunk_logs(suite, options)
-        update_chunk_metrics(suite, stages)
+        update_chunk_metrics(suite, stages, main_start_timestamp)
         dump_slowest_tests(suite)
 
         if suite_error_status and exit_code < 0:
