@@ -823,18 +823,10 @@ class ACCache(object):
         self.timers[tag] += x
         self.counters[tag] += 1
 
-    def _acccount_failure(self, tag, r, metadata=None, count_failure=True):
-        if r and r.Success:
-            return True
-
-        if r and metadata:
-            for key, value in metadata:
-                if key == 'io-exception':
-                    logger.warning("IO error in local cache: %s", value)
-
-        if count_failure:
+    def _acccount_failure(self, tag, r):
+        if not r.Success:
             self.failures[tag] += 1
-        return False
+        return r.Success
 
     def put(self, uid, root_path, files, codec=None, weight=0, hardlink=True, replace=True, is_result=False):
         # Compute blob hashes on cache side.
@@ -848,41 +840,32 @@ class ACCache(object):
                     fuid = digest.uid
                 blobs.add((file, fuid))
             blobs = list(blobs)
-            r, metadata = [None] * 2
-            out = _SERVER.put_uid(uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None)
-            if out:
-                r, metadata = out
-                self._set_stats(r.Stats)
-        return self._acccount_failure('put', r, metadata=metadata)
+            r = _SERVER.put_uid(uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None)
+            self._set_stats(r.Stats)
+        return self._acccount_failure('put', r)
 
     def has(self, uid, is_result=False):
         with AccumulateTime(lambda x: self._inc_time(x, 'has')):
             r = _SERVER.has_uid(uid, is_result)
-            if r:
-                self._set_stats(r.Stats)
-        return self._acccount_failure('has', r, count_failure=False)
+            self._set_stats(r.Stats)
+            return r.Success
 
     def try_restore(self, uid, dest_path, hardlink=True, is_result=False, release=True):
         with AccumulateTime(lambda x: self._inc_time(x, 'get')):
-            r, metadata = [None] * 2
-            out = _SERVER.get_uid(uid, dest_path, hardlink, is_result, release)
-            if out:
-                r, metadata = out
-                self._set_stats(r.Stats)
-        return self._acccount_failure('get', r, metadata=metadata)
+            r = _SERVER.get_uid(uid, dest_path, hardlink, is_result, release)
+            self._set_stats(r.Stats)
+        return self._acccount_failure('get', r)
 
     def clear_uid(self, uid, forced_removal=False):
         with AccumulateTime(lambda x: self._inc_time(x, 'remove')):
             r = _SERVER.remove_uid(uid, forced_removal)
-            if r:
-                self._set_stats(r.Stats)
+            self._set_stats(r.Stats)
         return self._acccount_failure('remove', r)
 
     def put_dependencies(self, uid, deps):
         with AccumulateTime(lambda x: self._inc_time(x, 'deps')):
             r = _SERVER.put_dependencies(uid, deps)
-            if r:
-                self._set_stats(r.Stats)
+            self._set_stats(r.Stats)
         return self._acccount_failure('deps', r)
 
     def size(self):
@@ -891,12 +874,10 @@ class ACCache(object):
     def compact(self, interval, max_cache_size, state):
         if self._max_age is not None:
             r = _SERVER.synchronous_gc(min_last_access=self._max_age * 1000)
-            max_cache_size = min(8223372036854775808, int(max_cache_size))
         else:
+            max_cache_size = min(8223372036854775808, int(max_cache_size))
             r = _SERVER.ac_force_gc(max_cache_size)
-        if r:
-            self._set_stats(r)
-
+        self._set_stats(r)
         new_store_path = os.path.join(os.path.dirname(self._store_path), '6')
         if not os.path.exists(new_store_path):
             return
@@ -915,8 +896,7 @@ class ACCache(object):
                     blobs.append((store_path, fuid))
                     file_names.append(rel_path)
 
-                r, metadata = [None] * 2
-                out = _SERVER.put_uid(
+                r = _SERVER.put_uid(
                     uid,
                     root_path='',
                     blobs=blobs,
@@ -926,11 +906,8 @@ class ACCache(object):
                     is_result=False,
                     file_names=file_names,
                 )
-                if out:
-                    r, metadata = out
-                    self._set_stats(r.Stats)
-
-                self._acccount_failure('put', r, metadata=metadata)
+                self._set_stats(r.Stats)
+                self._acccount_failure('put', r)
 
             from yalibrary.store import new_store
 
