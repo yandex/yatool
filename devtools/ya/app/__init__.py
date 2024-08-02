@@ -655,6 +655,10 @@ def configure_report_interceptor(ctx, report_events):
     )
 
     start = time.time()
+    for stat in stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION).values():
+        for intvl in stat.intervals:
+            start = min(intvl[0], start)
+
     success = False
     exit_code = -1
     try:
