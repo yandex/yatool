@@ -210,6 +210,39 @@ TTermValue NCommands::RenderQuo(std::span<const TTermValue> args) {
     return args[0];
 }
 
+TTermValue NCommands::RenderQuoteEach(std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "QuoteEach requires 1 argument";
+    }
+    return args[0]; // NOP for the same reason as "quo"
+}
+
+TTermValue NCommands::RenderToUpper(std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "ToUpper requires 1 argument";
+    }
+    auto apply = [](TString s) {
+        s.to_upper();
+        return s;
+    };
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            throw TNotImplemented();
+        },
+        [&](TString s) -> TTermValue {
+            return apply(std::move(s));
+        },
+        [&](TVector<TString> v) -> TTermValue {
+            for (auto& s : v)
+                s = apply(std::move(s));
+            return std::move(v);
+        }
+    }, args[0]);
+}
+
 void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "Cwd requires 1 argument";

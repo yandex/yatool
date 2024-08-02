@@ -28,6 +28,8 @@ namespace {
             case EMacroFunction::Hide:
             case EMacroFunction::Clear:
             case EMacroFunction::Quo:
+            case EMacroFunction::QuoteEach:
+            case EMacroFunction::ToUpper:
             case EMacroFunction::Cwd:
             case EMacroFunction::AsStdout:
             case EMacroFunction::SetEnv:

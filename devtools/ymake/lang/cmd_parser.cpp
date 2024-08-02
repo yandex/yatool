@@ -26,6 +26,8 @@ namespace {
             {"defext",  EMacroFunction::HasDefaultExt},
             {"join",    EMacroFunction::Join},
             {"quo",     EMacroFunction::Quo},
+            {"qe",      EMacroFunction::QuoteEach},
+            {"toupper", EMacroFunction::ToUpper},
             {"rootrel", EMacroFunction::RootRel},
             {"nopath",  EMacroFunction::CutPath},
             {"noext",   EMacroFunction::CutExt},

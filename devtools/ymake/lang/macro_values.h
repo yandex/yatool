@@ -25,6 +25,8 @@ enum class EMacroFunction: ui32 {
     HasDefaultExt,
     Join,
     Quo,
+    QuoteEach,
+    ToUpper,
     Cwd,
     AsStdout,
     SetEnv,
