@@ -35,6 +35,7 @@ namespace {
             {"stdout",  EMacroFunction::AsStdout},
             {"env",     EMacroFunction::SetEnv},
             {"kv",      EMacroFunction::KeyValue},
+            {"late_out",EMacroFunction::LateOut},
             {"context", EMacroFunction::Context},
             {"noauto",  EMacroFunction::NoAutoSrc},
             {"norel",   EMacroFunction::NoRel},

@@ -316,16 +316,34 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
         lateOuts.push_back(subst.Name);
     };
 
+    auto isNewFormat = Graph.GetCmdName(Graph[CmdNode]).IsNewFormat();
+
     for (const TNodeId lateOutNodeId : lateOutsProps) {
         TString dummy;
         const auto pattern = GetPropertyValue(Graph.GetCmdName(Graph.Get(lateOutNodeId)).GetStr());
-        TVector<TMacroData> macros;
-        GetMacrosFromPattern(pattern, macros, false);
-        for (TMacroData& macroData: macros) {
-            macroData.Flags.Reset(EMF_LateOut);
-            macroData.Flags.Reset(EMF_Hide);
-            dummy.clear();
-            CmdInfo.SubstData(nullptr, macroData, Vars, ECF_ExpandVars, ESM_DoSubst, dummy, ECF_Unset, lateOutsObserver);
+        if (isNewFormat) {
+            Y_DEBUG_ABORT_UNLESS(Commands);
+            if (Y_LIKELY(Commands)) {
+                auto& cmdSrc = *Commands;
+                auto& conf = Graph.Names().CommandConf;
+                auto& expr = *cmdSrc.Get(pattern, &conf);
+                auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
+                auto scr = TCommands::SimpleCommandSequenceWriter()
+                    .Write(cmdSrc, expr, Vars, {}, dummyCmdInfo, &conf)
+                    .Extract();
+                for (auto& cmd : scr)
+                    for (auto& arg : cmd)
+                        lateOutsObserver(arg);
+            }
+        } else {
+            TVector<TMacroData> macros;
+            GetMacrosFromPattern(pattern, macros, false);
+            for (TMacroData& macroData: macros) {
+                macroData.Flags.Reset(EMF_LateOut);
+                macroData.Flags.Reset(EMF_Hide);
+                dummy.clear();
+                CmdInfo.SubstData(nullptr, macroData, Vars, ECF_ExpandVars, ESM_DoSubst, dummy, ECF_Unset, lateOutsObserver);
+            }
         }
     }
 

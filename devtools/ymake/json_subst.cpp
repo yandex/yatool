@@ -305,9 +305,18 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
     makeNode.Requirements = cmdInfo.TakeRequirements();
     makeNode.LateOuts = std::move(DumpInfo.LateOuts);
     TYVar lateOutsVars;
-    lateOutsVars.reserve(makeNode.LateOuts.size());
+    auto cmdLateOuts = cmdInfo.LateOuts.Get();
+    lateOutsVars.reserve(
+        makeNode.LateOuts.size() +
+        (Y_UNLIKELY(cmdLateOuts) ? cmdLateOuts->size() : 0)
+    );
     for (const auto& lateOut : makeNode.LateOuts) {
         lateOutsVars.emplace_back(lateOut, false, true);
+    }
+    if (Y_UNLIKELY(cmdLateOuts)) {
+        for (const auto& lateOut : *cmdLateOuts) {
+            lateOutsVars.emplace_back(lateOut, false, true);
+        }
     }
 
     XXXJsonEmptyList(makeNode.Outputs);

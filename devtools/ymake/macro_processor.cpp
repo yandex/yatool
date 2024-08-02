@@ -386,6 +386,19 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
     //     or a "0:VARNAME=S:123" context variable node
     //
 
+    auto mkCmd = [&](TStringBuf exprVarName) {
+        ui64 id;
+        TStringBuf cmdName;
+        TStringBuf cmdValue;
+        ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
+        auto compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
+        // TODO: there's no point in allocating cmdElemId for expressions
+        // that do _not_ have directly corresponding nodes
+        // (and are linked as "0:VARNAME=S:123" instead)
+        auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
+        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), id);
+    };
+
     auto exprVars = commands.GetCommandVars(srcExpr);
     for (auto&& exprVarName : exprVars) {
 
@@ -393,6 +406,11 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
 
         if (isGlobalReservedVar) {
             GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, exprVarName));
+        }
+
+        if (exprVarName.ends_with("__LATEOUT__")) {
+            auto [_ignore_cmdName, value, _ignore_id] = mkCmd(exprVarName);
+            GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::LATE_OUT, value));
         }
 
         auto var = varDefinitionSources.Lookup(exprVarName);
@@ -408,16 +426,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
             if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
                 auto [it, added] = GetOrInit(GlobalVars).emplace(exprVarName, TYVar{});
                 if (added) {
-                    ui64 id;
-                    TStringBuf cmdName;
-                    TStringBuf cmdValue;
-                    ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
-                    auto compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
-                    // TODO: there's no point in allocating cmdElemId for expressions
-                    // that do _not_ have directly corresponding nodes
-                    // (and are linked as "0:VARNAME=S:123" instead)
-                    auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
-                    auto value = Graph->Names().CmdNameById(cmdElemId).GetStr();
+                    auto [cmdName, value, id] = mkCmd(exprVarName);
                     it->second.SetSingleVal(cmdName, value, id);
                 }
             }
@@ -1102,6 +1111,9 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             names.push_back(var.first);
         Sort(names);
         for (auto name : names) {
+            auto storedInProperties = name.ends_with("__LATEOUT__");
+            if (storedInProperties)
+                continue;
             auto& var = LocalVars->at(name);
             auto varElemId = InitCmdNode(var);
             actionNode.AddUniqueDep(EDT_BuildCommand, EMNT_BuildVariable, varElemId);

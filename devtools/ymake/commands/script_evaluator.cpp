@@ -282,6 +282,7 @@ TTermValue TScriptEvaluator::EvalFn(
         switch (Commands->Values.Id2Func(id)) {
             case EMacroFunction::Args: return RenderArgs(args);
             case EMacroFunction::Terms: return RenderTerms(args);
+            case EMacroFunction::Cat: return RenderCat(args);
             case EMacroFunction::Hide: return TTermNothing();
             case EMacroFunction::Clear: return RenderClear(args);
             case EMacroFunction::Pre: return RenderPre(args);
@@ -292,10 +293,12 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::AsStdout: RenderStdout(writer, ctx, args); return TTermNothing();
             case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
             case EMacroFunction::RootRel: return RenderRootRel(args);
+            case EMacroFunction::CutPath: return RenderCutPath(args);
             case EMacroFunction::CutExt: return RenderCutExt(args);
             case EMacroFunction::LastExt: return RenderLastExt(args);
             case EMacroFunction::ExtFilter: return RenderExtFilter(args);
             case EMacroFunction::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
+            case EMacroFunction::LateOut: RenderLateOut(ctx, args); return TTermNothing();
             case EMacroFunction::TODO1: return RenderTODO1(args);
             case EMacroFunction::TODO2: return RenderTODO2(args);
             default:

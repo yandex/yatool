@@ -64,6 +64,7 @@ public:
     THolder<THashMap<TString, TString>> KV;
     THolder<THashMap<TString, TString>> ToolPaths;
     THolder<THashMap<TString, TString>> ResultPaths;
+    THolder<TVector<TString>> LateOuts;
     struct TMultiCmdDescr* MkCmdAcceptor = nullptr; // for command builder only
     bool KeepTargetPlatform = false;
 

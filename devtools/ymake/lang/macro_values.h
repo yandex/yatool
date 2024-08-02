@@ -34,6 +34,7 @@ enum class EMacroFunction: ui32 {
     LastExt,
     ExtFilter,
     KeyValue,
+    LateOut,
     Glob,
     TODO1,
     TODO2,

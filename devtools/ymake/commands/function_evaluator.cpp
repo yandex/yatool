@@ -55,6 +55,10 @@ TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
     return result;
 }
 
+TTermValue NCommands::RenderCat(std::span<const TTermValue> args) {
+    return RenderTerms(args);
+}
+
 TTermValue NCommands::RenderClear(std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "Clear requires 1 argument";
@@ -316,6 +320,27 @@ void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> 
     }, args[0]);
 }
 
+void NCommands::RenderLateOut(const TEvalCtx& ctx, std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "LateOut requires 1 argument";
+    }
+    std::visit(TOverloaded{
+        [](TTermError) {
+            Y_ABORT();
+        },
+        [](TTermNothing) {
+            throw TNotImplemented();
+        },
+        [&](const TString& s) {
+            GetOrInit(ctx.CmdInfo.LateOuts).push_back(s);
+        },
+        [&](const TVector<TString>& v) {
+            for (auto& s : v)
+                GetOrInit(ctx.CmdInfo.LateOuts).push_back(s);
+        }
+    }, args[0]);
+}
+
 TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
     if (args.size() != 1) {
         throw yexception() << "RootRel requires 1 argument";
@@ -323,6 +348,35 @@ TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
     auto apply = [](TString s) {
         // lifted from EMF_PrnRootRel processing:
         return TString(NPath::CutType(GlobalConf()->CanonPath(s)));
+    };
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing) -> TTermValue {
+            throw TNotImplemented();
+        },
+        [&](TString s) -> TTermValue {
+            return apply(std::move(s));
+        },
+        [&](TVector<TString> v) -> TTermValue {
+            for (auto& s : v)
+                s = apply(std::move(s));
+            return std::move(v);
+        }
+    }, args[0]);
+}
+
+TTermValue NCommands::RenderCutPath(std::span<const TTermValue> args) {
+    if (args.size() != 1) {
+        throw yexception() << "Nopath requires 1 argument";
+    }
+    auto apply = [](TString s) {
+        // lifted from EMF_CutPath processing:
+        size_t slash = s.rfind(NPath::PATH_SEP);
+        if (slash != TString::npos)
+            s = s.substr(slash + 1);
+        return s;
     };
     return std::visit(TOverloaded{
         [](TTermError) -> TTermValue {

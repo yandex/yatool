@@ -36,6 +36,7 @@ namespace {
             case EMacroFunction::CutExt:
             case EMacroFunction::LastExt:
             case EMacroFunction::KeyValue:
+            case EMacroFunction::LateOut:
             case EMacroFunction::TODO1:
             case EMacroFunction::NoAutoSrc:
             case EMacroFunction::NoRel:

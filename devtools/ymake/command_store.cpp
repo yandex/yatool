@@ -459,7 +459,11 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
 
     // legacy lookup
 
-    if (name.ends_with("__NOINLINE__") || name.ends_with("__NO_UID__"))
+    if (
+        Y_UNLIKELY(name.ends_with("__NO_UID__")) ||
+        Y_UNLIKELY(name.ends_with("__NOINLINE__")) ||
+        Y_UNLIKELY(name.ends_with("__LATEOUT__"))
+    )
         return {};
 
     auto buildConf = GlobalConf();
