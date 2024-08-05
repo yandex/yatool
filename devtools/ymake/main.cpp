@@ -681,17 +681,6 @@ void TYMake::AddPackageOutputs() {
     FORCE_TRACE(U, NEvent::TStageFinished("Fill package outputs"));
 }
 
-void TYMake::RenderIDEProj(const TStringBuf& type, const TStringBuf& name, const TStringBuf& dir) {
-    if (type.StartsWith("msvs")) {
-        size_t version = FromString<size_t>(type.Tail(4));
-        RenderMsvsSolution(version, name, dir);
-    } else {
-        YErr() << "Unsupported IDE project type " << type << Endl;
-        YInfo() << "Available types: msvs<year>" << Endl;
-        Diag()->HasConfigurationErrors = true;
-    }
-}
-
 void TYMake::DumpMetaData() {
     if (! Conf.WriteMetaData.size())
         return;
@@ -973,10 +962,6 @@ int main_real(TBuildConfiguration& conf) {
 
     if (!conf.FindPathTo.empty()) {
         yMake->FindPathBetween(conf.FindPathFrom, conf.FindPathTo);
-    }
-
-    if (conf.WriteIDEProj) {
-        yMake->RenderIDEProj(conf.WriteIDEProj, conf.IDEProjName, conf.IDEProjDir);
     }
 
     if (conf.WriteOwners) {

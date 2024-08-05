@@ -71,7 +71,7 @@ private:
     void MinePeers();
 
     /// Mines values of variables created with _GLOB and _LATE_GLOB macro. Uses RealPath internally and must
-    /// be called only when TBuildConfiguration::RealPath is prepared to generate executor or IDE file paths.
+    /// be called only when TBuildConfiguration::RealPath is prepared to generate executor file paths.
     void MineGlobVars();
 
     /// This mines module global vars (ends with "_RESOURCE_GLOBAL" and reserved names)

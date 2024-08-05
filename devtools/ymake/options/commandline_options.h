@@ -34,9 +34,6 @@ struct TCommandLineOptions {
     TString ModulesInfoFile;
     TString ModulesInfoFilter;
 
-    TString WriteIDEProj;
-    TString IDEProjName;
-    TString IDEProjDir;
     TString JsonCompressionCodec;
 
     void AddOptions(NLastGetopt::TOpts& opts);

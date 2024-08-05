@@ -11,10 +11,9 @@ struct TVars;
 
 class TSubst2Shell: public TMultiCmdDescr, private ICommandSequenceWriter {
     TStringBuf OrigCmd;
-    bool ForMSVS;
 
 public:
-    TSubst2Shell();
+    TSubst2Shell() noexcept = default;
     IOutputStream& PrintAsLine(IOutputStream& out) const;
     // this might be somewhat inefficient
     TString PrintAsLine() const;

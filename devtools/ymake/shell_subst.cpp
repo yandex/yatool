@@ -14,10 +14,6 @@
 #include <util/system/yassert.h>
 
 
-TSubst2Shell::TSubst2Shell() {
-     ForMSVS = GlobalConf()->WriteIDEProj.StartsWith("msvs");
-}
-
 // TODO: optimize/fix
 static TStringBuf SkipSpaces(TStringBuf s) {
     while (s.at(0) == ' ' || s.at(0) == '\t')
@@ -47,11 +43,7 @@ void TSubst2Shell::FinishCommand(TString& res) {
     }
 
     for (const auto& env : cmd.EnvSetDefs) {
-        if (ForMSVS) {
-            prepend += TString::Join("set ", env, " && ");
-        } else {
-            prepend += env + " ";
-        }
+        prepend += env + " ";
     }
     cmd.EnvSetDefs.clear();
 

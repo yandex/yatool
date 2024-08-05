@@ -123,9 +123,6 @@ public:
     void FindMissingPeerdirs();
     void AssignSrcsToModules(THashMap<TNodeId, TVector<TNodeId>>& mod2Srcs);
 
-    void RenderMsvsSolution(size_t version, const TStringBuf& name, const TStringBuf& dir);
-    void RenderIDEProj(const TStringBuf& type, const TStringBuf& name, const TStringBuf& dir);
-
     void DumpMetaData();
 
     void DumpOwners();

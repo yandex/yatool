@@ -26,9 +26,6 @@ void TCommandLineOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('o', "makefiles-dart", "makefiles.dart export file").StoreResult(&WriteMakeFilesDart);
     opts.AddLongOption('Y', "yndex", "write json yndex to file and exit").StoreResult(&WriteYdx);
 
-    opts.AddLongOption('P', "ide-project-path", "write an IDE project").StoreResult(&WriteIDEProj);
-    opts.AddLongOption('U', "ide-project-name", "IDE project custom name").StoreResult(&IDEProjName);
-    opts.AddLongOption('V', "ide-project-dir", "IDE project output path").StoreResult(&IDEProjDir);
     opts.AddLongOption("modules-info-file", "dump information for modules into file specified").StoreResult(&ModulesInfoFile);
     opts.AddLongOption("modules-info-filter", "dump only information for modules matching regexp (for h)").StoreResult(&ModulesInfoFilter);
     opts.AddLongOption("json-compression-codec", "compress json using specified codec (uber compressor format)").StoreResult(&JsonCompressionCodec);

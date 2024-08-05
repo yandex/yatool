@@ -168,27 +168,8 @@ SRCS(
     ymake.cpp
 )
 
-IF (OPENSOURCE)
-    SRCS(
-        dummy_msvs.cpp
-    )
-ELSE()
-    SRCS(
-        msvs.cpp
-        msvs/command.cpp
-        msvs/configuration.cpp
-        msvs/file.cpp
-        msvs/guid.cpp
-        msvs/module.cpp
-        msvs/obj.cpp
-        msvs/project.cpp
-        msvs/project_tree.cpp
-        msvs/query.cpp
-        msvs/vcxproj.cpp
-        msvs/version.cpp
-    )
+IF (NOT OPENSOURCE)
     PEERDIR(
-        devtools/msvs
         library/cpp/xml/document
     )
 ENDIF()
@@ -209,11 +190,6 @@ GENERATE_ENUM_SERIALIZATION(induced_props.h)
 GENERATE_ENUM_SERIALIZATION(module_resolver.h)
 GENERATE_ENUM_SERIALIZATION(module_state.h)
 GENERATE_ENUM_SERIALIZATION(peers_rules.h)
-
-RESOURCE(
-    msvs/proj.xml proj.xml
-    msvs/all_proj.xml all_proj.xml
-)
 
 PY_REGISTER(ymake)
 
@@ -249,12 +225,6 @@ RECURSE_FOR_TESTS(
     ut
     ut/hexencoder
 )
-
-IF (NOT OPENSOURCE)
-    RECURSE(
-        msvs/ut
-    )
-ENDIF()
 
 IF (OS_WINDOWS OR YA_OPENSOURCE OR OPENSOURCE)
     # This excludes integrational tests, but leaves unit tests
