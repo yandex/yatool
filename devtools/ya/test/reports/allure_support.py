@@ -4,7 +4,6 @@ import subprocess
 
 import exts.process
 import exts.fs
-import yalibrary.tools
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +14,8 @@ class AllureReportNotFoundError(Exception):
 
 class AllureReportGenerator(object):
     def __init__(self):
+        import yalibrary.tools
+
         self._allure_path = yalibrary.tools.tool('allure')
         self._java_path = yalibrary.tools.tool('java')
 

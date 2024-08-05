@@ -58,7 +58,7 @@ if app_config.in_house or app_config.have_sandbox_fetcher:
     import package.sandbox_postprocessor
 if app_config.in_house:
     from yalibrary.upload import uploader, mds_uploader
-    from yalibrary.yandex.sandbox import fix_logging
+    from devtools.ya.yalibrary.yandex.sandbox.misc.fix_logging import fix_logging
 
 logger = logging.getLogger(__name__)
 

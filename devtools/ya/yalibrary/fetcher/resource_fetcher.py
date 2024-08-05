@@ -113,8 +113,8 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
         import app_ctx
 
         normal_fetched_schemas = app_ctx.fetchers_storage.accepted_schemas()
-    except ImportError:  # internal tests have no app_ctx
-        normal_fetched_schemas = {'sbr'}
+    except (ImportError, AttributeError):  # internal tests can have no app_ctx or configured fetchers_storage
+        normal_fetched_schemas = {'sbr', 'http', 'https'}
 
     default_resource_info = {
         'file_name': parsed_uri.resource_id[:20],

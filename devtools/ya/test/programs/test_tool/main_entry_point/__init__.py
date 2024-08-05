@@ -10,20 +10,6 @@ def configure_display():
     yield display.Display(sys.stderr, formatter.DryFormatter())
 
 
-def configure_fetchers_storage():
-    import yalibrary.fetcher.fetchers_storage as fetchers_storage
-
-    storage = fetchers_storage.FetchersStorage()
-    try:
-        from yalibrary.yandex.sandbox import fetcher
-
-        storage.register(['sbr', 'http', 'https'], fetcher.SandboxFetcher())
-    except (ImportError, AttributeError):
-        pass
-
-    yield storage
-
-
 def get_executor():
     from devtools.ya.test.programs.test_tool.lib import run
 
@@ -34,7 +20,6 @@ def get_executor():
         with ctx.configure(
             [
                 ('display', configure_display()),
-                ('fetchers_storage', configure_fetchers_storage()),
             ]
         ):
             return run()

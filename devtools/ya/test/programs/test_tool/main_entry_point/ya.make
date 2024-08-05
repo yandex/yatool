@@ -9,7 +9,6 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/yalibrary/app_ctx
     devtools/ya/yalibrary/display
-    devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/formatter
     devtools/ya/test/programs/test_tool/lib
 )
