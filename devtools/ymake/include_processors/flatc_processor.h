@@ -4,7 +4,7 @@
 
 class TFlatcIncludeProcessorBase: public TStringIncludeProcessor {
 public:
-    ui32 Version() const override { return 2; }
+    ui32 Version() const override { return 2 + CommonVersion; }
     TFlatcIncludeProcessorBase(TStringBuf inducedFrom,
                                TStringBuf inducedTo);
     void ProcessIncludes(TAddDepAdaptor& node,

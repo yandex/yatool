@@ -7,7 +7,7 @@
 
 class TRagelIncludeProcessor: public TIncludeProcessorBase {
 public:
-    ui32 Version() const override { return 1; }
+    ui32 Version() const override { return 1 + CommonVersion; }
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& module,
                          TFileView incFileName,

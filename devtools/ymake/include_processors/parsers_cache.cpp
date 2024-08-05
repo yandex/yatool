@@ -109,13 +109,14 @@ namespace NParsersCache {
     }
 }
 
-ui32 TParsersCache::GetParserId(ui32 fileId, size_t parsersCount) const {
+EIncludesParserType TParsersCache::GetParserType(ui32 fileId) const {
+    ui32 parsersCount = static_cast<ui32>(EIncludesParserType::PARSERS_COUNT);
     for (ui32 parserId = 0; parserId < parsersCount; parserId++) {
         if (ResultsMap.contains(NParsersCache::GetResultId(parserId, fileId))) {
-            return parserId;
+            return static_cast<EIncludesParserType>(parserId);
         }
     }
-    return BAD_PARSER_ID;
+    return EIncludesParserType::BAD_PARSER;
 }
 
 void TParsersCache::Save(TMultiBlobBuilder& builder) {

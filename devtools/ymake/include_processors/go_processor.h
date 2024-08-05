@@ -13,7 +13,7 @@
 class TGoImportProcessor: public TIncludeProcessorBase {
 public:
     explicit TGoImportProcessor(const TEvaluatorBase& vars, TSymbols& symbols);
-    ui32 Version() const override { return 1; }
+    ui32 Version() const override { return 1 + CommonVersion; }
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& module,
                          TFileView incFileName,

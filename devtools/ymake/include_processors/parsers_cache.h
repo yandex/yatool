@@ -1,5 +1,6 @@
 #pragma once
 
+#include <devtools/ymake/include_parsers/base.h>
 #include <devtools/ymake/include_parsers/cython_parser.h>
 #include <devtools/ymake/include_parsers/ros_parser.h>
 #include <devtools/ymake/symbols/name_store.h>
@@ -117,7 +118,7 @@ public:
         return true;
     }
 
-    ui32 GetParserId(ui32 fileId, size_t parsersCount) const;
+    EIncludesParserType GetParserType(ui32 fileId) const;
 
     void Save(TMultiBlobBuilder& builder);
 

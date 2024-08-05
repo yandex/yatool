@@ -29,7 +29,7 @@ namespace NLanguages {
 
     TLangId GetLanguageIdByExt(const TStringBuf& ext);
 
-    TLangId GetLanguageIdByParserId(ui32 parserId);
+    TLangId GetLanguageIdByParserType(EIncludesParserType type);
 
     TStringBuf GetLanguageName(TLangId languageId);
 
@@ -39,10 +39,7 @@ namespace NLanguages {
 
     TString DumpLanguagesList();
 
-    size_t ParsersCount();
-
     size_t LanguagesCount();
-
 }
 
 struct TFileProcessContext {
@@ -59,7 +56,6 @@ private:
     const TBuildConfiguration& Conf;
     TSymbols& Names;
     TString ExtForDefaultParser;
-    ui32 ParsersCount = 0;
 
 public:
     TParsersCache Cache;
@@ -78,7 +74,7 @@ public:
                                TAddDepAdaptor& node,
                                const TSymbols& names,
                                const TAddIterStack& stack) const;
-    void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, TLangId languageId = NLanguages::BAD_LANGUAGE);
+    void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
     bool HasParserFor(TStringBuf fileName) const;
     bool HasParserFor(TFileView fileName) const;
     void SetDefaultParserSameAsFor(TFileView fileName);

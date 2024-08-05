@@ -4,6 +4,31 @@
 
 #include <util/generic/string.h>
 
+enum class EIncludesParserType : ui32 {
+    EmptyParser = 0,
+    CppOnlyParser,
+    AsmParser,
+    ProtoParser,
+    LexParser,
+    RagelParser,
+    MapkitIdlParser,
+    FortranParser,
+    XsParser,
+    XsynParser,
+    SwigParser,
+    CythonParser,
+    FlatcParser,
+    GoParser,
+    ScParser,
+    YDLParser,
+    NlgParser,
+    CfgprotoParser,
+    TsParser,
+    RosParser,
+    PARSERS_COUNT,
+    BAD_PARSER = PARSERS_COUNT
+};
+
 class TIncludesParserBase {
 protected:
     TString IncPrefix;

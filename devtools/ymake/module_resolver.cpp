@@ -267,9 +267,9 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
     if (!isKnownRoot && langId == BY_SRC) {
         langId = NLanguages::GetLanguageIdByExt(src.Extension());
         if (langId == TModuleIncDirs::BAD_LANG) {
-            auto parserId = Ctx.ParsersCache.GetParserId(src.GetElemId(), NLanguages::ParsersCount());
-            if (parserId != TParsersCache::BAD_PARSER_ID) {
-                langId = NLanguages::GetLanguageIdByParserId(parserId);
+            auto parserType = Ctx.ParsersCache.GetParserType(src.GetElemId());
+            if (parserType != EIncludesParserType::BAD_PARSER) {
+                langId = NLanguages::GetLanguageIdByParserType(parserType);
             } else {
                 langId = NLanguages::GetLanguageId("c");
             }

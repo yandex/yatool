@@ -19,7 +19,7 @@ class TModuleResolver;
 class TIncludeProcessorBase {
 protected:
     TIndDepsRule Rule;
-
+    const ui64 CommonVersion = 1;
 public:
     TLangId LanguageId = TModuleIncDirs::C_LANG;
 
@@ -33,7 +33,7 @@ public:
                                        TModuleWrapper& module,
                                        TFileView incFileName,
                                        const TVector<TString>& includes) const = 0;
-    virtual ui32 Version() const { return 0; }
+    virtual ui32 Version() const { return CommonVersion; }
 
     template<class TIncl>
     static void ResolveAsUnset(const TVector<TIncl>& includes, TVector<TString>& resolved) {
@@ -70,7 +70,7 @@ public:
 class TEmptyIncludeProcessor: public TStringIncludeProcessor {
 public:
     explicit TEmptyIncludeProcessor(bool passNoInducedDeps);
-    ui32 Version() const override { return 1; }
+    ui32 Version() const override { return 1 + CommonVersion; }
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& module,
                          TFileView incFileName,
@@ -95,8 +95,11 @@ public:
     }
 
     TIdType GetId() const { return Id; }
-    void SetCode(ui32 code) { SetBits<0, CodeBitsSize, TIdType>(Id, code); }
-    ui32 GetCode() const { return SelectBits<0, CodeBitsSize, TIdType>(Id); }
+    void SetType(EIncludesParserType type) { SetBits<0, CodeBitsSize, TIdType>(Id, static_cast<ui32>(type)); }
+    EIncludesParserType GetType() const {
+        ui32 id = SelectBits<0, CodeBitsSize, TIdType>(Id);
+        return static_cast<EIncludesParserType>(id);
+    }
     void SetVersion(ui32 version) { SetBits<CodeBitsSize, VersionBitsSize, TIdType>(Id, version); }
     ui32 GetVersion() const { return SelectBits<CodeBitsSize, VersionBitsSize, TIdType>(Id); }
 private:
@@ -115,16 +118,15 @@ public:
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
     virtual bool HasIncludeChanges(TFileContentHolder& incFile) = 0;
     virtual const TIndDepsRule* DepsTransferRules() const = 0;
-    virtual void SetLanguageId(ui32 parserCode, TLangId) {
-        SetParserCode(parserCode);
-    };
+    virtual void SetLanguageId(TLangId) {};
+    virtual void SetParserType(EIncludesParserType) {};
     virtual void RegisterIndDepsRule(TSymbols&){};
     virtual ~TParserBase() = default;
 
     TParserId GetParserId() const { return ParserId; }
 
 protected:
-    void SetParserCode(ui32 code) { ParserId.SetCode(code); }
+    void SetType(EIncludesParserType type) { ParserId.SetType(type); }
     void SetParserVersion(ui32 version) { ParserId.SetVersion(version); }
 
 private:
@@ -206,11 +208,13 @@ public:
         return IncludeProcessor.DepsTransferRules();
     }
 
-    void SetLanguageId(ui32 parserCode, TLangId processorId) override {
-        SetParserCode(parserCode);
+    void SetLanguageId(TLangId processorId) override {
         IncludeProcessor.LanguageId = processorId;
     }
 
+    void SetParserType(EIncludesParserType type) override {
+        SetType(type);
+    }
 private:
     TParser Parser;
     TParsersCache* ParsersCache = nullptr;

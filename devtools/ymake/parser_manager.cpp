@@ -101,37 +101,33 @@ namespace {
         return std::function<TParserBaseRef(TParsersCache*, const TEvaluatorBase&, TSymbols&)>(constructor);
     }
 
-    const auto& GetLanguagesAndExtensions() {
-        // ATTN! Do not change order of elements in this collection and add new elements only to the end.
+    const auto& GetParsersAndExtensions() {
         static auto languages_and_extensions = {
-                std::make_tuple("other", TVector<TStringBuf>({"fml", "fml2", "fml3", "pln", "info", "a", "lua", "sh"}), ParserConstructor<MakeEmptyParser>(false)),
-                std::make_tuple("other", TVector<TStringBuf>({"bin", "py", "pyi", "pysrc"}), ParserConstructor<MakeEmptyParser>(true)),
-                std::make_tuple("c", TVector<TStringBuf>({"cpp", "cc", "cxx", "c", "C", "auxcpp"}), ParserConstructor<MakeCLikeParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"h", "hh", "hpp", "cuh", "H", "hxx", "xh", "ipp", "ixx"}), ParserConstructor<MakeCHeaderParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"cu", "S", "s", "sfdl", "m", "mm"}), ParserConstructor<MakeCppParser>()),
-                std::make_tuple("asm", TVector<TStringBuf>({"asm"}), ParserConstructor<MakeAsmParser>()),
-                std::make_tuple("proto", TVector<TStringBuf>({"gzt", "gztproto"}), ParserConstructor<MakeGztParser>()),
-                std::make_tuple("proto", TVector<TStringBuf>({"proto", "ev"}), ParserConstructor<MakeProtoParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"l", "lex", "lpp"}), ParserConstructor<MakeLexParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"y", "ypp"}), ParserConstructor<MakeLexParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"gperf"}), ParserConstructor<MakeLexParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"asp"}), ParserConstructor<MakeLexParser>()),
-                std::make_tuple("ragel", TVector<TStringBuf>({"rl", "rh", "rli", "rl6", "rl5"}), ParserConstructor<MakeRagelParser>()),
-                std::make_tuple("idl", TVector<TStringBuf>({"idl"}), ParserConstructor<MakeMapkitIdlParser>()),
-                std::make_tuple("c", TVector<TStringBuf>({"f"}), ParserConstructor<MakeFortranParser>()),
-                std::make_tuple("xs", TVector<TStringBuf>({"xs"}), ParserConstructor<MakeXsParser>()),
-                std::make_tuple("xsyn", TVector<TStringBuf>({"xsyn"}), ParserConstructor<MakeXsynParser>()),
-                std::make_tuple("swig", TVector<TStringBuf>({"swg"}), ParserConstructor<MakeSwigParser>()),
-                std::make_tuple("cython", TVector<TStringBuf>({"pyx", "pxd", "pxi"}), ParserConstructor<MakeCythonParser>()),
-                std::make_tuple("flatc", TVector<TStringBuf>({"fbs"}), ParserConstructor<MakeFlatcParser>()),
-                std::make_tuple("flatc", TVector<TStringBuf>({"fbs64"}), ParserConstructor<MakeFlatcParser64>()),
-                std::make_tuple("c", TVector<TStringBuf>({"go"}), ParserConstructor<MakeGoParser>()),
-                std::make_tuple("sc", TVector<TStringBuf>({"sc"}), ParserConstructor<MakeScParser>()),
-                std::make_tuple("ydl", TVector<TStringBuf>({"ydl"}), ParserConstructor<MakeYDLParser>()),
-                std::make_tuple("nlg", TVector<TStringBuf>({"nlg"}), ParserConstructor<MakeNlgParser>()),
-                std::make_tuple("proto", TVector<TStringBuf>({"cfgproto"}), ParserConstructor<MakeCfgprotoParser>()),
-                std::make_tuple("other", TVector<TStringBuf>({"ts", "js", "tsx", "jsx"}), ParserConstructor<MakeTsParser>()),
-                std::make_tuple("ros", TVector<TStringBuf>({"msg"}), ParserConstructor<MakeRosParser>()),
+                std::make_tuple(EIncludesParserType::EmptyParser, "other", TVector<TStringBuf>({"fml", "fml2", "fml3", "pln", "info", "a", "lua", "sh"}), ParserConstructor<MakeEmptyParser>(false)),
+                std::make_tuple(EIncludesParserType::EmptyParser, "other", TVector<TStringBuf>({"bin", "py", "pyi", "pysrc"}), ParserConstructor<MakeEmptyParser>(true)),
+                std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"cpp", "cc", "cxx", "c", "C", "auxcpp"}), ParserConstructor<MakeCLikeParser>()),
+                std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"h", "hh", "hpp", "cuh", "H", "hxx", "xh", "ipp", "ixx"}), ParserConstructor<MakeCHeaderParser>()),
+                std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"cu", "S", "s", "sfdl", "m", "mm"}), ParserConstructor<MakeCppParser>()),
+                std::make_tuple(EIncludesParserType::AsmParser, "asm", TVector<TStringBuf>({"asm"}), ParserConstructor<MakeAsmParser>()),
+                std::make_tuple(EIncludesParserType::ProtoParser, "proto", TVector<TStringBuf>({"gzt", "gztproto"}), ParserConstructor<MakeGztParser>()),
+                std::make_tuple(EIncludesParserType::ProtoParser, "proto", TVector<TStringBuf>({"proto", "ev"}), ParserConstructor<MakeProtoParser>()),
+                std::make_tuple(EIncludesParserType::LexParser, "c", TVector<TStringBuf>({"l", "lex", "lpp", "y", "ypp", "gperf", "asp"}), ParserConstructor<MakeLexParser>()),
+                std::make_tuple(EIncludesParserType::RagelParser, "ragel", TVector<TStringBuf>({"rl", "rh", "rli", "rl6", "rl5"}), ParserConstructor<MakeRagelParser>()),
+                std::make_tuple(EIncludesParserType::MapkitIdlParser, "idl", TVector<TStringBuf>({"idl"}), ParserConstructor<MakeMapkitIdlParser>()),
+                std::make_tuple(EIncludesParserType::FortranParser, "c", TVector<TStringBuf>({"f"}), ParserConstructor<MakeFortranParser>()),
+                std::make_tuple(EIncludesParserType::XsParser, "xs", TVector<TStringBuf>({"xs"}), ParserConstructor<MakeXsParser>()),
+                std::make_tuple(EIncludesParserType::XsynParser, "xsyn", TVector<TStringBuf>({"xsyn"}), ParserConstructor<MakeXsynParser>()),
+                std::make_tuple(EIncludesParserType::SwigParser, "swig", TVector<TStringBuf>({"swg"}), ParserConstructor<MakeSwigParser>()),
+                std::make_tuple(EIncludesParserType::CythonParser, "cython", TVector<TStringBuf>({"pyx", "pxd", "pxi"}), ParserConstructor<MakeCythonParser>()),
+                std::make_tuple(EIncludesParserType::FlatcParser, "flatc", TVector<TStringBuf>({"fbs"}), ParserConstructor<MakeFlatcParser>()),
+                std::make_tuple(EIncludesParserType::FlatcParser, "flatc", TVector<TStringBuf>({"fbs64"}), ParserConstructor<MakeFlatcParser64>()),
+                std::make_tuple(EIncludesParserType::GoParser, "c", TVector<TStringBuf>({"go"}), ParserConstructor<MakeGoParser>()),
+                std::make_tuple(EIncludesParserType::ScParser, "sc", TVector<TStringBuf>({"sc"}), ParserConstructor<MakeScParser>()),
+                std::make_tuple(EIncludesParserType::YDLParser, "ydl", TVector<TStringBuf>({"ydl"}), ParserConstructor<MakeYDLParser>()),
+                std::make_tuple(EIncludesParserType::NlgParser, "nlg", TVector<TStringBuf>({"nlg"}), ParserConstructor<MakeNlgParser>()),
+                std::make_tuple(EIncludesParserType::CfgprotoParser, "proto", TVector<TStringBuf>({"cfgproto"}), ParserConstructor<MakeCfgprotoParser>()),
+                std::make_tuple(EIncludesParserType::TsParser, "other", TVector<TStringBuf>({"ts", "js", "tsx", "jsx"}), ParserConstructor<MakeTsParser>()),
+                std::make_tuple(EIncludesParserType::RosParser, "ros", TVector<TStringBuf>({"msg"}), ParserConstructor<MakeRosParser>()),
         };
         return languages_and_extensions;
     }
@@ -147,9 +143,9 @@ namespace {
     }
 
     struct TLanguagesManager {
+        THashMap<EIncludesParserType, TStringBuf> LanguageNameByParserType;
         THashMap<TStringBuf, TLangId> LanguageIdByName;
         THashMap<TStringBuf, TLangId> LanguageIdByExt;
-        TVector<TLangId> LanguageIdByParserId;
         TVector<TStringBuf> LanguageNameById;
         TVector<TString> LanguageIncludeNameById;
         TSet<TLangId> LanguagesWithNonPathAddincls;
@@ -159,20 +155,17 @@ namespace {
             LanguageNameById.push_back("c");
             LanguageIncludeNameById.push_back("_C__INCLUDE");
             LanguageIdByName.insert(std::make_pair("c", static_cast<TLangId>(0)));
-            LanguageIdByParserId.push_back(static_cast<TLangId>(0));
-            for (const auto& language : GetLanguagesAndExtensions()) {
-                const auto& name = std::get<0>(language);
-                const auto& exts = std::get<1>(language);
-                const auto [it, fresh] = LanguageIdByName.insert(std::make_pair(name, static_cast<TLangId>(LanguageNameById.size())));
+            for (const auto& [parserType, languageName, exts, _] : GetParsersAndExtensions()) {
+                LanguageNameByParserType[parserType] = languageName;
+                const auto [it, fresh] = LanguageIdByName.insert(std::make_pair(languageName, static_cast<TLangId>(LanguageNameById.size())));
                 if (fresh) {
-                    LanguageNameById.push_back(name);
-                    auto&& incName = TString::Join(TModuleIncDirs::VAR_PREFIX, to_upper(TString(name)), TModuleIncDirs::VAR_SUFFIX);
+                    LanguageNameById.push_back(languageName);
+                    auto&& incName = TString::Join(TModuleIncDirs::VAR_PREFIX, to_upper(TString(languageName)), TModuleIncDirs::VAR_SUFFIX);
                     LanguageIncludeNameById.push_back(incName);
                 }
                 for (const auto& ext : exts) {
                     LanguageIdByExt[ext] = it->second;
                 }
-                LanguageIdByParserId.push_back(it->second);
             }
 
             for (const auto& name : GetLanguagesWithNonPathAddincls()) {
@@ -205,9 +198,12 @@ namespace NLanguages {
         return it == languageIdByExt.end() ? BAD_LANGUAGE : it->second;
     }
 
-    TLangId GetLanguageIdByParserId(ui32 parserId) {
-        const auto& languageByParserId = TLanguagesManager::Instance().LanguageIdByParserId;
-        return languageByParserId.at(TParserId(parserId).GetCode());
+    TLangId GetLanguageIdByParserType(EIncludesParserType parserType) {
+        const auto& languageByParserType = TLanguagesManager::Instance().LanguageNameByParserType;
+        if (!languageByParserType.contains(parserType)) {
+            return BAD_LANGUAGE;
+        }
+        return GetLanguageId(languageByParserType.at(parserType));
     }
 
     TStringBuf GetLanguageName(TLangId languageId) {
@@ -227,10 +223,8 @@ namespace NLanguages {
 
     TString DumpLanguagesList() {
         TMap<TStringBuf, TVector<TStringBuf>> ExtensionsByLanguage;
-        for (const auto& language : GetLanguagesAndExtensions()) {
-            const auto& name = std::get<0>(language);
-            const auto& exts = std::get<1>(language);
-            auto& data = ExtensionsByLanguage[name];
+        for (const auto& [parserType, languageName, exts, _] : GetParsersAndExtensions()) {
+            auto& data = ExtensionsByLanguage[languageName];
             data.insert(data.end(), exts.begin(), exts.end());
         }
         TStringBuilder str;
@@ -247,10 +241,6 @@ namespace NLanguages {
             str << ")";
         }
         return str;
-    }
-
-    size_t ParsersCount() {
-        return GetLanguagesAndExtensions().size();
     }
 
     size_t LanguagesCount() {
@@ -368,9 +358,9 @@ bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
     }
 }
 
-void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>& extensions, TLangId languageId) {
-    ParsersCount++;
-    parser->SetLanguageId(ParsersCount, languageId);
+void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type) {
+    parser->SetLanguageId(NLanguages::GetLanguageIdByParserType(type));
+    parser->SetParserType(type);
     for (const auto& ext : extensions) {
         Ext2Parser[ext] = parser;
     }
@@ -379,7 +369,7 @@ void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>&
 void TIncParserManager::AddParsers(const TParsersList& parsersList) {
     for (const auto& [parser, extensions] : parsersList) {
         parser->RegisterIndDepsRule(Names);
-        AddParser(parser, extensions, NLanguages::BAD_LANGUAGE);
+        AddParser(parser, extensions, EIncludesParserType::EmptyParser);
     }
 }
 
@@ -403,11 +393,8 @@ void TIncParserManager::InitManager(const TParsersList& parsersList) {
     TVarsEvaluator evaluator(Conf.CommandConf);
     auto* cache = &Cache;
 
-    for (const auto& language : GetLanguagesAndExtensions()) {
-        const auto& name = std::get<0>(language);
-        const auto& exts = std::get<1>(language);
-        const auto& constructor = std::get<2>(language);
-        AddParser(constructor(cache, evaluator, Names), {exts.begin(), exts.end()}, NLanguages::GetLanguageId(name));
+    for (const auto& [parserType, _, exts, constructor] : GetParsersAndExtensions()) {
+        AddParser(constructor(cache, evaluator, Names), {exts.begin(), exts.end()}, parserType);
     }
 
     AddParsers(parsersList);

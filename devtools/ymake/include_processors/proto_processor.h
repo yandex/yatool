@@ -7,7 +7,7 @@
 class TProtoIncludeProcessor: public TStringIncludeProcessor {
 public:
     explicit TProtoIncludeProcessor(TSymbols& symbols);
-    ui32 Version() const override { return 1; }
+    ui32 Version() const override { return 1 + CommonVersion; }
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& module,
                          TFileView incFileName,
