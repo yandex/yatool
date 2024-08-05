@@ -134,15 +134,6 @@ def _build_params():
     ]
 
 
-def _gen_proj_params():
-    return _configure_params(buildable=False) + [
-        core.yarg.Param('ide_name'),
-        core.yarg.Param('ide_project_title'),
-        core.yarg.Param('ide_project_dir'),
-        core.yarg.Param('no_caches_on_retry', default_value=False),
-    ]
-
-
 def _gen_graph_params():
     return _configure_params(buildable=False, continue_on_fail=True) + [
         core.yarg.Param('dump_inputs_map', default_value=False),
@@ -166,12 +157,6 @@ def _gen_graph_params():
         core.yarg.Param('cpp', default_value=False),
         core.yarg.Param('compress_ymake_output_codec', default_value=None),
     ]
-
-
-def ymake_gen_proj(**kwargs):
-    logger.debug('Generate project with {0}'.format(kwargs))
-    res, _ = core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_proj_params()))
-    return res
 
 
 def _ymake_build(**kwargs):
@@ -344,17 +329,6 @@ def _cons_ymake_args(**kwargs):
 
     for tag in kwargs.pop('lic_custom_tags', []):
         ret += ['--xlic-custom-tag', tag]
-
-    # GENPROJ PARAMS
-    ide_name = kwargs.pop('ide_name', None)
-    ide_project_title = kwargs.pop('ide_project_title', None)
-    ide_project_dir = kwargs.pop('ide_project_dir', None)
-    if ide_name:
-        ret += ['--ide-project-path', ide_name]
-        if ide_project_title:
-            ret += ['--ide-project-name', ide_project_title]
-        if ide_project_dir:
-            ret += ['--ide-project-dir', ide_project_dir]
 
     find_path_from = kwargs.pop('find_path_from', None)
     if find_path_from:

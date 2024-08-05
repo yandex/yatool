@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import collections
-import copy
 import itertools
 import exts.yjson as json
 import logging
@@ -430,30 +429,6 @@ class IdeRemoteOptions(core.yarg.Options):
                     'To prepare remote environment you must specify path to remote \'ya\' tool '
                     '(or use \'--remote-env-ready\')'
                 )
-
-
-def gen_ide_ymake_conf(params, toolchain_params, extra_flags, build_type=IDE_YMAKE_BUILD_TYPE):
-    flags = copy.deepcopy(params.flags)
-    flags.update(extra_flags)
-    flags['IDE_MSVS_CALL'] = 'yes'
-    if 'BUILD_LANGUAGES' not in flags:
-        if getattr(params, 'java_fix', True):
-            flags['BUILD_LANGUAGES'] = 'CPP PY2 PY3 JAVA'
-        else:
-            flags['BUILD_LANGUAGES'] = 'CPP PY2 PY3'
-    flags['USE_CLANG'] = 'yes' if params.use_clang else 'no'
-
-    return build.genconf.gen_conf(
-        arc_dir=params.arc_root,
-        conf_dir=os.path.join(params.bld_dir, 'confs'),
-        build_type=build_type,
-        use_local_conf=True,
-        local_conf_path=None,
-        extra_flags=flags,
-        tool_chain=toolchain_params,
-        conf_debug=params.conf_debug_options,
-        debug_id='ide',
-    )
 
 
 class IdeProjectInfo(object):
