@@ -558,15 +558,6 @@ public:
         return Graph(node).ToTargetStringBuf(*node);
     }
 
-    /// Inplace replacement NodeIds to ElemIds
-    static TVector<ui32> NodeToElemIds(const TDepGraph& graph, TVector<TNodeId>&& nodeIds) {
-        for (auto& nodeId : nodeIds) {
-            // Inplace replacement NodeId to ElemId
-            nodeId = graph.Get(nodeId)->ElemId;
-        }
-        return nodeIds;
-    }
-
     /// Converting to vector replacement NodeIds to ElemIds
     template<class TNodeIds>
     static TVector<ui32> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
