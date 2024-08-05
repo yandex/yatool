@@ -404,6 +404,10 @@ class CanonicalData(object):
         temp_test_results_folders = {}
         with tmp.temp_dir() as results_root, tmp.temp_dir() as root_dir_for_extracted_files:
             deselected = set()
+            for chunk in suite.chunks:
+                if chunk.get_status() != test_const.Status.GOOD and chunk.has_comment():
+                    yatest_logger.error("%s has error: %s", chunk.get_name(), chunk.get_comment())
+                    res = False
             for test_case in suite.tests:
                 if test_case.status in (
                     test_const.Status.DESELECTED,
