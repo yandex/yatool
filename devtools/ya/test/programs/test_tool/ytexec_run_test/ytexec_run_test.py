@@ -652,22 +652,20 @@ def process_test_results(args, ytexec_config, exit_code, start_time):
             exit_code = yt_res["exit_code"]
             run_test.dump_meta(args, exit_code, start_time, time.time())
             if exit_code:
+                op_url = extract_operation_url(args.output_dir)
                 if yt_res["is_oom"]:
                     # In case of OOM there is no metadata
                     parts = ["YT operation has reported out-of-memory error"]
-                    op_url = extract_operation_url(args.output_dir)
-                    if op_url:
-                        parts.append("For more info see operation: [[imp]]{}[[rst]]".format(op_url))
-                    suite = dump_test_info(args, yt_metrics, ". ".join(parts), const.Status.CRASHED)
+                    status = const.Status.CRASHED
                 elif yt_res["exit_signal"]:
-                    suite = dump_test_info(
-                        args,
-                        yt_metrics,
-                        "Run_test node was killed by signal {}".format(yt_res["exit_signal"]),
-                        const.Status.TIMEOUT,
-                    )
+                    parts = ["Run_test node was killed by signal {}".format(yt_res["exit_signal"])]
+                    status = const.Status.TIMEOUT
                 else:
-                    suite = dump_test_info(args, yt_metrics, "Unknown yt error", const.Status.FAIL)
+                    parts = ["Unknown yt error"]
+                    status = const.Status.FAIL
+                if op_url:
+                    parts.append("For more info see operation: [[imp]]{}[[rst]]".format(op_url))
+                suite = dump_test_info(args, yt_metrics, ". ".join(parts), status)
             else:
                 suite = dump_test_info(args, yt_metrics)
     else:
