@@ -12,18 +12,14 @@ class YaMonEvent(object):
     @staticmethod
     def send(name, value):
         # PY3 def send(name: str, value: bool | int | float) -> None:
-        if not YaMonEvent._evlog_writer:
-            if YaMonEvent._evlog_writer is not None:
-                return  # Already tried get evlog, absent, do nothing
+        try:
+            import app_ctx
 
-            try:
-                import app_ctx
-
-                YaMonEvent._evlog_writer = app_ctx.evlog.get_writer('ya')
-            except (ImportError, AttributeError):
-                logger.debug('app_ctx.evlog not found')
-                YaMonEvent._evlog_writer = False
-                return
+            YaMonEvent._evlog_writer = app_ctx.evlog.get_writer('ya')
+        except (ImportError, AttributeError):
+            logger.debug('app_ctx.evlog not found')
+            YaMonEvent._evlog_writer = False
+            return
 
         # Event format see TMonitoringStat at devtools/ymake/diag/trace.ev
         # Name format is string representation of enum items in devtools/ymake/diag/stats_enum.h, here use same strings for generality
