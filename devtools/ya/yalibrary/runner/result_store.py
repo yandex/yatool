@@ -26,10 +26,7 @@ class ResultStore(object):
 
     def __init__(self, root):
         self.root = os.path.abspath(root)
-        if not os.path.exists(self.root) and not os.path.islink(self.root):
-            exts.fs.create_dirs(self.root)
-        elif not os.path.isdir(self.root):
-            logger.warning('Can\'t create result directory %s', self.root)
+        yalibrary.runner.fs.prepare_dir(self.root)
 
     def _put_with_path_transform(
         self, target, path, action, transform_path, forced_existing_dir_removal=False, tared=False
@@ -184,46 +181,37 @@ class SymlinkResultStore(ResultStore):
         with open(os.path.dirname(symlinkable_path) + AUX_EXT, 'w') as f:
             f.write(symlink_path)
 
-    def _remove_item(self, item, now, cleanup, ttl):
-        if item.endswith(AUX_EXT):
-            return
+    @staticmethod
+    def _is_symres_link(link, item):
+        return os.path.islink(link) and os.path.dirname(os.path.realpath(os.readlink(link))) == os.path.realpath(item)
 
-        to_remove = cleanup or now - os.stat(item).st_mtime > ttl
-
+    def _remove_item(self, item):
         link_file = item + AUX_EXT
         if os.path.exists(link_file):
             with open(link_file, 'r') as f:
                 link = f.read()
 
-            if to_remove:
-                if os.path.islink(link):
-                    if os.path.dirname(os.path.realpath(os.readlink(link))) == os.path.realpath(item):
-                        logger.debug("Removing symlink %s", link)
-                        fs.remove_tree_safe(link)
-                        to_remove = True
+            if self._is_symres_link(link):
+                logger.debug("Removing symlink %s", link)
+                fs.remove_tree_safe(link)
 
-            if not os.path.exists(link) or not os.path.islink(link):
-                logger.debug("Removing .link %s", link_file)
-                fs.remove_tree_safe(link_file)
-                to_remove = True
-
-        if to_remove:
-            logger.debug("Removing link %s", item)
-            if os.path.isdir(item):
-                os.chmod(item, stat.S_IRWXU)
-                for path, dirs, _ in os.walk(item):
-                    for momo in dirs:
-                        os.chmod(os.path.join(path, momo), stat.S_IRWXU)
-            fs.remove_tree_safe(item)
+        logger.debug("Removing link %s", item)
+        if os.path.isdir(item):
+            os.chmod(item, stat.S_IRWXU)
+            for path, dirs, _ in os.walk(item):
+                for momo in dirs:
+                    os.chmod(os.path.join(path, momo), stat.S_IRWXU)
+        fs.remove_tree_safe(item)
 
     def sieve(self, state, ttl, cleanup=False):
-        now = time.time()
+        min_mtime = time.time() - ttl
 
         for base_name in os.listdir(self.root):
             item = os.path.join(self.root, base_name)
 
             try:
-                self._remove_item(item, now, cleanup, ttl)
+                if not item.endswith(AUX_EXT) and (cleanup or os.stat(item).st_mtime < min_mtime):
+                    self._remove_item(item)
             except Exception as e:
                 logger.debug("Failed to remove %s: %s", item, str(e))
 

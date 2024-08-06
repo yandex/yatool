@@ -21,17 +21,22 @@ def read_from_file(src):
         return f.read()
 
 
+def prepare_dir(path):
+    if not os.path.lexists(path):
+        exts.fs.create_dirs(path)
+    elif not os.path.isdir(path):
+        logger.warning('Can\'t create directory %s: not a directory', path)
+        return False
+
+    return True
+
+
 def prepare_parent_dir(link):
     assert link
 
     link_dir = os.path.dirname(link)
-
     if link_dir:
-        if not os.path.exists(link_dir) and not os.path.islink(link_dir):
-            exts.fs.create_dirs(link_dir)
-        elif not os.path.isdir(link_dir):
-            logger.warning('Can\'t create parent parent directory %s: not a directory', link_dir)
-            return False
+        return prepare_dir(link_dir)
 
     return True
 
