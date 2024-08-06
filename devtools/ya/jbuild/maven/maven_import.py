@@ -709,10 +709,10 @@ def populate_contrib_unified(
                 license_macro.add_value(lic)
 
         # REPOSITORY
-        # if p.get('repository'):
-        #     repository_macro = find_or_create(project, 'ORIGINAL_SOURCE')
-        #     repository_macro.children = []
-        #     repository_macro.add_value(p.get('repository'))
+        if p.get('repository'):
+            repository_macro = find_or_create(project, 'ORIGINAL_SOURCE')
+            repository_macro.children = []
+            repository_macro.add_value(p.get('repository'))
 
         # if p['generate_ya_dependency_management_inc']:
         #     macro = md.StringMacro('INCLUDE')
