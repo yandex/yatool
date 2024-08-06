@@ -272,21 +272,22 @@ def gen_run_configurations(params, modules, args, YA_PATH):
                                         "text": "set print object on",
                                         "ignoreFailures": True,
                                     },
+                                    {
+                                        "text": "set substitute-path /-S/ " + params.arc_root,
+                                        "description": "Map source files",
+                                        "ignoreFailures": True,
+                                    },
+                                    {
+                                        "text": "set substitute-path /-B/ " + params.output_root,
+                                        "description": "Map generated files",
+                                        "ignoreFailures": True,
+                                    },
                                 ],
                             ),
                             (
                                 "sourceFileMap",
                                 OrderedDict(
-                                    (
-                                        ("/-S/", {"editorPath": params.arc_root, "useForBreakpoints": True}),
-                                        (
-                                            "/-B/",
-                                            {
-                                                "editorPath": params.output_root or params.arc_root,
-                                                "useForBreakpoints": True,
-                                            },
-                                        ),
-                                    )
+                                    ((params.arc_root, {"editorPath": params.arc_root, "useForBreakpoints": True}),)
                                 ),
                             ),
                         )

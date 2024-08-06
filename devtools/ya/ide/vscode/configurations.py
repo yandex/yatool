@@ -80,16 +80,21 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                                     "text": "set print object on",
                                     "ignoreFailures": True,
                                 },
+                                {
+                                    "text": "set substitute-path /-S/ " + arc_root,
+                                    "description": "Map source files",
+                                    "ignoreFailures": True,
+                                },
+                                {
+                                    "text": "set substitute-path /-B/ " + (output_root or arc_root),
+                                    "description": "Map generated files",
+                                    "ignoreFailures": True,
+                                },
                             ],
                         ),
                         (
                             "sourceFileMap",
-                            OrderedDict(
-                                (
-                                    ("/-S/", {"editorPath": arc_root, "useForBreakpoints": True}),
-                                    ("/-B/", {"editorPath": output_root or arc_root, "useForBreakpoints": True}),
-                                )
-                            ),
+                            OrderedDict(((arc_root, {"editorPath": arc_root, "useForBreakpoints": True}),)),
                         ),
                     )
                 )

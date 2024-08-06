@@ -410,7 +410,7 @@ class VSCodeProject(object):
             workspace["launch"]["configurations"] = vscode.configurations.gen_debug_configurations(
                 run_modules,
                 self.params.arc_root,
-                self.params.output_root,
+                self.codegen_cpp_dir,
                 self.params.languages,
                 tool_fetcher,
                 self.python_wrappers_dir,
