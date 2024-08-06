@@ -465,13 +465,13 @@ namespace NAcClient {
         TCacheStatsGeneratorObject() = delete;
         ~TCacheStatsGeneratorObject() = delete;
 
-        static inline PyObject* New(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+        static inline PyObject* New(PyTypeObject *type, PyObject */* args */, PyObject */* kwds */) {
             TCacheStatsGeneratorObject *self = (TCacheStatsGeneratorObject*) type->tp_alloc(type, 0);
             self->Inited = false;
             return (PyObject*) self;
         }
 
-        static inline int Init(PyObject *self, PyObject *args, PyObject *kwds) {
+        static inline int Init(PyObject *self, PyObject */* args */, PyObject */* kwds */) {
             TCacheStatsGeneratorObject* m = (TCacheStatsGeneratorObject*) self;
             try {
                 new(&m->State) TCacheStatsGeneratorState();
