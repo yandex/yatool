@@ -74,6 +74,8 @@ public:
     void RecalcVars(const TString& variable, TVars& realVars, TOriginalVars& origVars);
     void RecalcAll(TVars& realVars);
     void AddActionForVariable(const TString& variable, const size_t& condNumber, const TConditionAction& action);
+    void AddRawCondition(const TString& condition) { RawConditions.push_back(condition); }
+    const TVector<TString>& GetRawConditions() const { return RawConditions; }
 
     TYmakeConfigConditionCalc ConditionCalc; //all compiled conditions indexed by numbers
 private:
@@ -81,4 +83,5 @@ private:
     TVar2Macros Var2Macros;
     TMacro2Conditions Macro2Conditions;
     TMap<size_t, TConditionAction> Condition2Action;
+    TVector<TString> RawConditions;
 };

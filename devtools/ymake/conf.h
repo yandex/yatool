@@ -162,6 +162,7 @@ private:
     void LoadIsolatedProjects(MD5& confData);
     void FillMiscValues();
     void InitExcludedPeerdirs();
+    void CompileAndRecalcAllConditions();
 
     bool TraverseRecurses = false;
     bool TraverseAllRecurses = false;     // Including RECURSE_FOR_TESTS

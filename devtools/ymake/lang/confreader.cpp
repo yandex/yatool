@@ -791,8 +791,8 @@ namespace {
                     }
                 }
                 YDIAG(Conf) << "Condition action: [" << varName << "] -> [" << rvalue << "]" << Endl;
-                int conditionNumber = Conditions.size();
-                Conditions.push_back((char*)Pool->Append(ConditionStack.ToString()).data());
+                int conditionNumber = Conf.Conditions.GetRawConditions().size();
+                Conf.Conditions.AddRawCondition(ConditionStack.ToString());
                 TConditionAction action(varName, GetOperator(assignOp), rvalue);
                 for (auto& var : ConditionVars) {
                     TString dollarVar = TString::Join("$", var);
@@ -1048,7 +1048,6 @@ namespace {
 
         void Postprocess() {
             PostprocessForeachStatements();
-            CompileConditions();
         }
 
         static void ValidateUtf8(const TStringBuf content, const TStringBuf fileName) {
@@ -1114,12 +1113,6 @@ namespace {
             YDIAG(Conf) << __FUNCTION__ << " finished ..." << Endl;
         }
 
-        void CompileConditions() {
-            YDIAG(Conf) << "Compile and apply all conditions from config." << Endl;
-            Conf.Conditions.ConditionCalc.Compile(Conditions.data(), Conditions.size());
-            Conf.Conditions.RecalcAll(Conf.CommandConf);
-        }
-
     private:
         TFsPath SourceRoot;
         TFsPath BuildRoot;
@@ -1133,8 +1126,6 @@ namespace {
         TConditionStack ConditionStack;
         TVector<TVector<TString>> ConditionVarsStack;
         bool AllowConditionVars;
-        TAutoPtr<IMemoryPool> Pool = IMemoryPool::Construct();
-        TVector<char*> Conditions;
         THashMap<TString, std::pair<TString, TString>> Commands;
         THashMap<TString, TArgs> Macros;
         TSet<TString> Generics;

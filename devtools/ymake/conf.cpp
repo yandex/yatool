@@ -11,6 +11,7 @@
 #include <devtools/ymake/yndex/builtin.h>
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/common/memory_pool.h>
 
 #include <util/generic/strbuf.h>
 #include <util/generic/vector.h>
@@ -83,6 +84,17 @@ void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('Q', "dump-custom-data", "<type0>:<output file0>;<type1>:<output file1>...<typen>:<output filen> - generate custom data").StoreResult(&CustomData);
 }
 
+void TBuildConfiguration::CompileAndRecalcAllConditions() {
+    TTraceStage stage("Compile and RecalcAll conditions");
+    TAutoPtr<IMemoryPool> pool = IMemoryPool::Construct();
+    TVector<char*> conditions;
+    for (const auto& s: Conditions.GetRawConditions()) {
+        conditions.push_back((char*)pool->Append(s).data());
+    }
+    Conditions.ConditionCalc.Compile(conditions.data(), conditions.size());
+    Conditions.RecalcAll(CommandConf);
+}
+
 void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DisableHumanReadableOutput) {
         Display()->SetStream(LockedStream());
@@ -143,7 +155,13 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
     LoadConfig(YmakeConf.GetPath(), SourceRoot.GetPath(), BuildRoot.GetPath(),  confData);
-    FoldGlobalCommands(this);
+
+    CompileAndRecalcAllConditions();
+
+    {
+        TTraceStage stage("Fold global commands");
+        FoldGlobalCommands(this);
+    }
 
     // this code hangs on win while trying to lock locked non-recursive mutex
     // (after an error that file is not found)
