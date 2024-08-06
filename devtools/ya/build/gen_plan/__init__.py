@@ -628,6 +628,7 @@ def real_build_type(tc, opts):
 
 
 PLATFORM_FLAGS = set(['MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'])
+FLAGS_MAPPING = {'USE_LTO': 'lto', 'USE_THINLTO': 'thinlto', 'MUSL': 'musl', 'USE_AFL': 'AFL', 'RACE': 'race'}
 
 
 def _fmt_tag(k, v):
@@ -639,20 +640,8 @@ def _fmt_tag(k, v):
     except ValueError:
         yes = 0
 
-    if k == 'USE_LTO':
-        return 'lto' if yes else None
-
-    if k == 'USE_THINLTO':
-        return 'thinlto' if yes else None
-
-    if k == 'MUSL':
-        return 'musl' if yes else None
-
-    if k == 'USE_AFL':
-        return 'AFL' if yes else None
-
-    if k == 'RACE':
-        return 'race' if yes else None
+    if k in FLAGS_MAPPING:
+        return FLAGS_MAPPING[k] if yes else None
 
     return '{k}={v}'.format(k=k, v=v)
 

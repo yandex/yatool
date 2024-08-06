@@ -2071,9 +2071,12 @@ class YaMake(object):
 
 
 def merge_pgo_profiles(profiles):
+    logger.info('Will try to merge pgo profiles. It can take some time.')
+
     all_profiles = [g for profile in profiles for g in glob.glob(profile)]
     if not all_profiles:
         raise EmptyProfilesListException('PGO profiles not found')
+
     if len(all_profiles) == 1:
         with open(all_profiles[0], 'rb') as f:
             if f.read(8) == b'\xfflprofi\x81':

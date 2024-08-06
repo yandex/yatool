@@ -1568,33 +1568,36 @@ class _GraphMaker(object):
 
         if should_run_tc_tests:
             platform = tc.get('platform', {})
-            if platform.get('target', {}).get('os') == 'IOS':
+            target_os = platform.get('target', {}).get('os')
+            target_arch = platform.get('target', {}).get('arch')
+
+            if target_os == 'IOS':
                 for test in tc_tests:
                     if (test.binary_path('') or '').endswith('.ios.tar'):
                         if not test.get_ios_device_type():
                             continue
-                        if platform.get('target', {}).get('arch') == 'x86_64':
+                        if target_arch == 'x86_64':
                             test.special_runner = 'ios.simctl.x86_64'
-                        elif platform.get('target', {}).get('arch') == 'i386':
+                        elif target_arch == 'i386':
                             test.special_runner = 'ios.simctl.i386'
-                    elif platform.get('target', {}).get('arch') == 'x86_64':
+                    elif target_arch == 'x86_64':
                         test.special_runner = 'ios'
-            elif platform.get('target', {}).get('os') == 'IOSSIM':
+            elif target_os == 'IOSSIM':
                 for test in tc_tests:
                     if (test.binary_path('') or '').endswith('.ios.tar'):
                         if not test.get_ios_device_type():
                             continue
-                        if platform.get('target', {}).get('arch') == 'arm64':
+                        if target_arch == 'arm64':
                             test.special_runner = 'ios.simctl.arm64'
-            elif platform.get('target', {}).get('os') == 'ANDROID':
+            elif target_os == 'ANDROID':
                 for test in tc_tests:
                     if not test.get_android_apk_activity():
                         continue
-                    if platform.get('target', {}).get('arch') == 'x86_64':
+                    if target_arch == 'x86_64':
                         test.special_runner = 'android.x86_64'
-                    elif platform.get('target', {}).get('arch') == 'i686':
+                    elif target_arch == 'i686':
                         test.special_runner = 'android.i686'
-                    elif platform.get('target', {}).get('arch') == 'armv8a':
+                    elif target_arch == 'armv8a':
                         test.special_runner = 'android.armv8a'
 
         return _GenGraphResult(graph=graph, tc_tests=tc_tests, java_darts=java_darts, make_files_map=make_files_map)

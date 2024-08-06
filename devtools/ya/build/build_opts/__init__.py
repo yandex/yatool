@@ -625,14 +625,15 @@ class PGOOptions(Options):
         return [
             ArgConsumer(
                 ['--pgo-add'],
-                help='Create PGO profile',
+                help='Create PGO profile. Profile is written to path specified in LLVM_PROFILE_FILE env var (default: '
+                'default.profraw). Supports %p substitution for pid',
                 hook=SetConstValueHook('pgo_add', True),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.ADVANCED,
             ),
             ArgConsumer(
                 ['--pgo-use'],
-                help='PGO profiles path',
+                help='PGO profiles path. Supports glob',
                 hook=SetAppendHook('pgo_user_path'),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.ADVANCED,
