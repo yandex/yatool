@@ -229,13 +229,9 @@ def mine_py_main(arc_root, modules):
                 return child.name
 
     def get_main_value(node):
-        main_is_next = False
         for child in node.children:
-            if isinstance(child, yalibrary.makelists.macro_definitions.SrcValue):
-                if main_is_next:
-                    return child.name
-                if child.name == "MAIN":
-                    main_is_next = True
+            if isinstance(child, yalibrary.makelists.macro_definitions.PyMainValue):
+                return child.value
 
     def find_main(node):
         if isinstance(node, yalibrary.makelists.macro_definitions.Macro) and node.name == "PY_MAIN":
