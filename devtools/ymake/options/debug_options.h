@@ -108,17 +108,35 @@ struct TDebugOptions {
 
     bool UidsCacheWasSetExplicitly = false;
 
+    bool ReadConfCache = true;
+    bool WriteConfCache = true;
+    bool ConfCacheWasSetExplicitly = false;
+
     TString PatchPath2;
     bool ReadFileContentFromZipatch2 = false;
 
     TString ExpressionErrorDetails;
 
     // The Uids cache can be controlled by the Deps cache settings,
-    // but this still could be overriden by --xCC=u and --xRC=u.
+    // but this still could be overridden by --xCC=u and --xRC=u.
     void MakeDepsCacheControlUidsCache() {
         if (!UidsCacheWasSetExplicitly) {
             ReadUidsCache = ReadDepsCache;
             WriteUidsCache = WriteDepsCache;
+        }
+    }
+
+    void DisableConfCache() {
+        ReadConfCache = false;
+        WriteConfCache = false;
+    }
+
+    // The Conf cache can be controlled by the Deps Cache Settings,
+    // but this still could be overridden by --xCC=c and --xCR=c.
+    void MakeDepsCacheControlConfCache() {
+        if (!ConfCacheWasSetExplicitly) {
+            ReadConfCache = ReadDepsCache;
+            WriteConfCache = WriteDepsCache;
         }
     }
 

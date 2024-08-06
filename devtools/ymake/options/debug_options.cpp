@@ -44,6 +44,8 @@ namespace {
     }
 
     struct TCacheFlags {
+        bool ReadConfCache = true;
+        bool WriteConfCache = true;
         bool ReadDepsCache = true;
         bool WriteDepsCache = true;
         bool ReadFsCache = true;
@@ -53,24 +55,29 @@ namespace {
         bool ReadUidsCache = true;
         bool WriteUidsCache = true;
 
+        bool ConfCacheWasSetExplicitly = false;
         bool UidsCacheWasSetExplicitly = false;
     };
 
     void ParseCacheConfig(const TVector<TString>& config, TCacheFlags* cacheFlags) {
         auto&& parser = [cacheFlags](TStringBuf item) {
             if (item.size() != 3
-                || !EqualToOneOf(item[0], 'd', 'f', 'j', 'u')
+                || !EqualToOneOf(item[0], 'c', 'd', 'f', 'j', 'u')
                 || item[1] != ':'
                 || !EqualToOneOf(item[2], 'a', 'n', 'r', 'w'))
             {
                 TStringStream message;
-                message << "Invalid value format: [(d|f|j|u):(a|n|r|w)]: [" << item << "]";
+                message << "Invalid value format: [(c|d|f|j|u):(a|n|r|w)]: [" << item << "]";
                 throw TCacheConfigParserError(message.Str());
             }
 
             bool *readFlag = nullptr;
             bool *writeFlag = nullptr;
             switch (item[0]) {
+                case 'c':
+                    readFlag = &cacheFlags->ReadConfCache;
+                    writeFlag = &cacheFlags->WriteConfCache;
+                    cacheFlags->ConfCacheWasSetExplicitly = true;
                 case 'd':
                     readFlag = &cacheFlags->ReadDepsCache;
                     writeFlag = &cacheFlags->WriteDepsCache;
@@ -129,6 +136,7 @@ namespace {
                 flags.ReadUidsCache,
                 flags.WriteUidsCache
             );
+        opts->ConfCacheWasSetExplicitly = opts->ConfCacheWasSetExplicitly || flags.ConfCacheWasSetExplicitly;
         opts->UidsCacheWasSetExplicitly = opts->UidsCacheWasSetExplicitly || flags.UidsCacheWasSetExplicitly;
     }
 
