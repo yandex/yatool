@@ -1018,7 +1018,7 @@ namespace {
                 Y_ASSERT(module);
                 DMConf.MergeRules(rules, *module, DMConfErrors);
                 if (DMConf.IsContribWithVer(*module)) {
-                    if (auto it = Proxies.find(rootItem); it != Proxies.end()) {
+                    if (auto it = Proxies.find(module->GetId()); it != Proxies.end()) {
                         directPeers.push_back({it->second, EPeerResolution::Default});
                     } else {
                         directPeers.push_back({rootItem, EPeerResolution::Direct});
