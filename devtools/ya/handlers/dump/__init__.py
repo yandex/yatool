@@ -409,8 +409,6 @@ def do_modules(params):
 
 
 def do_module_info(params, write_stdout=True):
-    if params.with_data:
-        params.flags['YMAKE_ADD_DATA'] = 'yes'
     return _do_dump(
         gen_func=gen_module_info,
         params=params,
@@ -960,7 +958,6 @@ class DumpRecipesOptions(Options):
 
 def do_dump_srcdeps(params):
     debug_options = []
-    params.flags['YMAKE_ADD_DATA'] = 'yes'
     if params.with_yamake:
         debug_options.append('mkf')
     _do_dump(gen_srcdeps, params, debug_options)
@@ -1054,7 +1051,6 @@ def do_files(params):
     options = []
     if params.with_data:
         options = ['dump-data']
-        params.flags['YMAKE_ADD_DATA'] = 'yes'
     if params.skip_make_files:
         options.append('skip-make-files')
     if params.mark_make_files:
