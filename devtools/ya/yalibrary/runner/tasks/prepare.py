@@ -1,6 +1,6 @@
+import itertools
 import sys
 import logging
-import six.moves.queue as queue
 
 import core.error
 import exts.uniq_id
@@ -53,6 +53,9 @@ class UniqueTask(object):
 class PrepareAllNodesTask(UniqueTask):
     node_type = 'PrepareAllNodes'
 
+    class _ResolveError(RuntimeError):
+        pass
+
     def __init__(self, nodes, ctx, cache, dist_cache):
         self._nodes = nodes
         self._ctx = ctx
@@ -64,28 +67,9 @@ class PrepareAllNodesTask(UniqueTask):
     def exit_code(self):
         return self._exit_code
 
-    def __call__(self, *args, **kwargs):
-        self._ctx.signal_ready()
-
-        q = queue.Queue()
-        tp = topo.Topo()
-
-        touch_mode = not self._ctx.opts.clear_build and self._ctx.opts.strip_cache and hasattr(self._cache, 'compact')
-        results = []
-        for node in self._nodes:
-            if node.is_result_node:
-                q.put(node)
-                tp.add_node(node)
-                results.append(node)
-                node.refcount += 1
-
-            if touch_mode and node.cacheable:
-                # touch node.uid for aggressive compaction
-                self._cache.has(node.uid)
-
-        while not q.empty():
-            node = q.get()
-
+    def _process_node(self, tp, nodes):
+        new_nodes = set()
+        for node in nodes:
             for x in node.dep_nodes():
                 x.max_dist = max(x.max_dist, node.max_dist + 1)
 
@@ -95,7 +79,7 @@ class PrepareAllNodesTask(UniqueTask):
                 logger.error("Failed to find {0} in the distributed cache".format(node))
                 self._exit_code = core.error.ExitCodes.YT_STORE_FETCH_ERROR
                 self._ctx.fast_fail(fatal=True)
-                return
+                raise PrepareAllNodesTask._ResolveError()
 
             elif resolve_status == NodeResolveStatus.LOCAL:
                 self._ctx.task_cache(node, self._ctx.restore_from_cache)
@@ -104,11 +88,10 @@ class PrepareAllNodesTask(UniqueTask):
             elif resolve_status == NodeResolveStatus.DIST:
                 self._ctx.task_cache(node, self._ctx.restore_from_dist_cache)
                 tp.schedule_node(node, when_ready=tp.notify_dependants)
-
             else:
                 for x in node.dep_nodes():
                     if x not in tp:
-                        q.put(x)
+                        new_nodes.add(x)
                         tp.add_node(x)
                     tp.add_deps(node, x)
 
@@ -127,6 +110,52 @@ class PrepareAllNodesTask(UniqueTask):
                     tp.notify_dependants(node)
 
                 tp.schedule_node(node, when_ready=add_run_node)
+
+        return new_nodes
+
+    def __call__(self, *args, **kwargs):
+        import concurrent.futures as cf
+
+        self._ctx.signal_ready()
+
+        tp = topo.Topo()
+
+        touch_mode = not self._ctx.opts.clear_build and self._ctx.opts.strip_cache and hasattr(self._cache, 'compact')
+        results = []
+        nodes_to_process = set()
+        for node in self._nodes:
+            if node.is_result_node:
+                nodes_to_process.add(node)
+                tp.add_node(node)
+                results.append(node)
+                node.refcount += 1
+
+                # touch node.uid for aggressive compaction
+            if touch_mode and node.cacheable:
+                self._cache.has(node.uid)
+
+        # Optimal values were got from the performance testing
+        THREAD_COUNT = 3
+        BATCH_SIZE = 32
+        seen_nodes = set()
+        futures = set()
+        with cf.ThreadPoolExecutor(THREAD_COUNT, "PrepareAllNodes") as thread_pool:
+            while nodes_to_process or futures:
+                nodes_to_process -= seen_nodes
+                seen_nodes |= nodes_to_process
+                for batch in itertools.batched(nodes_to_process, BATCH_SIZE):
+                    futures.add(thread_pool.submit(self._process_node, tp, batch))
+                nodes_to_process.clear()
+
+                done, _ = cf.wait(futures, return_when=cf.FIRST_COMPLETED)
+                futures -= done
+                for future in done:
+                    try:
+                        new_nodes = future.result()
+                        if new_nodes:
+                            nodes_to_process |= new_nodes
+                    except PrepareAllNodesTask._ResolveError:
+                        return
 
         # Sanity check
         unscheduled = tp.get_unscheduled()
