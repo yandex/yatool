@@ -227,6 +227,7 @@ struct TYmakeConfig {
     TMd5Sig YmakeExtraConfMD5;
 
     TMd5Sig YmakeBlacklistHash;
+    TMd5Sig YmakeIsolatedProjectsHash;
 
     THashSet<TString> ReservedNames;
     THashSet<TString> ResourceNames; // Strictly speaking these are not part of Ymake config hence arriving late

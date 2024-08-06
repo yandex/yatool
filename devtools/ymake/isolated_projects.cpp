@@ -267,13 +267,16 @@ TVector<TString> TFoldersTree::GetPaths() const {
     return restoredPaths;
 }
 
-void TIsolatedProjects::Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confData) {
+void TIsolatedProjects::Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confData, MD5& anotherConfData, bool addAnother) {
     TProjectPathToSources projectToSources; // ordered projects + info from where we got it
     for (const auto path : lists) {
         try {
             TFileInput file(sourceRoot / path);
             TString content = file.ReadAll();
             confData.Update(content.data(), content.size());
+            if (addAnother) {
+                anotherConfData.Update(content.data(), content.size());
+            }
             LoadFromString(projectToSources, content, path);
         } catch (const TFileError& e) {
             YConfErr(BadFile) << "Error while reading blacklist file " << path << ": " << e.what() << Endl;

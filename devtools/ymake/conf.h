@@ -149,6 +149,14 @@ public:
         return BlacklistHashChanged_;
     }
 
+    void SetIsolatedProjectsHashChanged(bool value) {
+        IsolatedProjectsHashChanged_ = value;
+    }
+
+    bool IsIsolatedProjectsHashChanged() const noexcept {
+        return IsolatedProjectsHashChanged_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
 
@@ -159,7 +167,7 @@ private:
     void LoadLicenses(MD5& confData);
     void LoadPeersRules(MD5& confData);
     void LoadBlackLists(MD5& confHash, MD5& anotherConfHash);
-    void LoadIsolatedProjects(MD5& confData);
+    void LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother);
     void FillMiscValues();
     void InitExcludedPeerdirs();
     void CompileAndRecalcAllConditions();
@@ -179,6 +187,7 @@ private:
     bool MainOutputAsExtra_ = false;
     bool UseGraphChangesPredictor = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
+    bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;

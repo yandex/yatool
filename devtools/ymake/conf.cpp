@@ -145,7 +145,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         GenerateCustomData(CustomData);
     }
 
-    MD5 confData, confWoRulesData, rulesData, blacklistHash, extraData;
+    MD5 confData, confWoRulesData, rulesData, blacklistHash, isolatedProjectsHash, extraData;
 
     SetGlobalConf(this);
 
@@ -194,7 +194,9 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         blacklistHash.Final(YmakeBlacklistHash.RawData);
     }
     if (Diag()->IslPrjs) {
-        LoadIsolatedProjects(rulesData);
+        // Add blacklist hash to only isolated projects hash (new behavior) and rules (current behavior - deprecated) by config switch
+        LoadIsolatedProjects(isolatedProjectsHash, rulesData, NYMake::IsTrue(CommandConf.EvalValue("INCLUDE_ISOLATED_PROJECTS_TO_CONF_HASH")));
+        isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
     LoadLicenses(extraData);
     TMd5Sig rules;
@@ -279,10 +281,10 @@ void TBuildConfiguration::LoadBlackLists(MD5& confHash, MD5& anotherConfHash) {
     BlackList.Load(SourceRoot, blacklistFiles, confHash, anotherConfHash);
 }
 
-void TBuildConfiguration::LoadIsolatedProjects(MD5& confData) {
+void TBuildConfiguration::LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother) {
     const TString isolatedProjectsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_ISOLATED_PROJECTS, CommandConf);
     TVector<TStringBuf> isolatedProjectsFiles = StringSplitter(isolatedProjectsVar).Split(' ').SkipEmpty();
-    IsolatedProjects.Load(SourceRoot, isolatedProjectsFiles, confData);
+    IsolatedProjects.Load(SourceRoot, isolatedProjectsFiles, confData, anotherConfData, addAnother);
 }
 
 void TBuildConfiguration::FillMiscValues() {

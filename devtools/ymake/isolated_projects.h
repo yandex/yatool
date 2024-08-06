@@ -66,7 +66,7 @@ private:
 class TIsolatedProjects {
 public:
     // load isolated projects list
-    void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confData);
+    void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confData, MD5& anotherConfData, bool addAnother);
 
     // check DATA|DEPENDS reference to path from makefile not cause usage isolated projects data from another project (use FoldersTree_)
     void CheckStatementPath(TStringBuf statement, TStringBuf makefile, TStringBuf path) const;
