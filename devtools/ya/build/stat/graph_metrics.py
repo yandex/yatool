@@ -4,6 +4,8 @@ import logging
 from collections import defaultdict
 import six
 
+from build.node_checks import is_module, is_binary
+
 
 try:
     RecursionError
@@ -12,14 +14,6 @@ except NameError:
     RecursionError = RuntimeError
 
 logger = logging.getLogger(__name__)
-
-
-def _is_module(v):
-    return 'module_type' in v.get('target_properties', {})
-
-
-def _is_binary(v):
-    return _is_module(v) and v['target_properties']['module_type'] == 'bin'
 
 
 def make_dependencies_lists(graph):
@@ -35,7 +29,7 @@ def make_dependencies_lists(graph):
         if v in modules or v in not_modules:
             return
 
-        if _is_module(nodes[v]) and v != start_node:
+        if is_module(nodes[v]) and v != start_node:
             modules.add(v)
         else:
             if v != start_node:
@@ -49,7 +43,7 @@ def make_dependencies_lists(graph):
 
     result = {}
     for uid, node in six.iteritems(nodes):
-        if _is_module(node):
+        if is_module(node):
             modules = set()
             not_modules = set()
             try:
@@ -79,7 +73,7 @@ def make_targets_metrics(graph, tasks_metrics):
         return res
 
     for node in graph:
-        if _is_module(node):
+        if is_module(node):
             uid = node['uid']
             task_metrics = tasks_metrics.get(uid, {})
             if 'size' in task_metrics:
@@ -87,7 +81,7 @@ def make_targets_metrics(graph, tasks_metrics):
 
             if uid in deps:
                 modules, not_modules = deps[uid]
-                if _is_binary(node):
+                if is_binary(node):
                     add(node, 'dependencies-count', len(modules))
 
                 elapsed = calculate_elapsed(list(not_modules) + [uid])

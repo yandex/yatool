@@ -141,10 +141,22 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_key_str = "[[alt1]][{}][[rst]] ".format(build_key) if build_key else ""
     package.display.emit_message('{}Building targets: [[imp]]{}'.format(build_key_str, ' '.join(targets)))
 
+    # TODO: This is very bad. Need to automatically copy all copiable parameters from params to merged_opts
+
     merged_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
     merged_opts.export_to_maven = build_info.get("maven-export", False)
     merged_opts.dump_sources = build_info.get("sources", False)
     merged_opts.disable_flake8_migrations = params.disable_flake8_migrations
+
+    merged_opts.add_result = params.add_result
+    merged_opts.add_host_result = params.add_host_result
+    merged_opts.replace_result = params.replace_result
+    merged_opts.all_outputs_to_result = params.all_outputs_to_result
+
+    merged_opts.add_modules_to_results = params.add_modules_to_results
+    merged_opts.gen_renamed_results = params.gen_renamed_results
+    merged_opts.strip_packages_from_results = params.strip_packages_from_results
+    merged_opts.strip_binary_from_results = params.strip_binary_from_results
 
     build_options = merged_opts.initialize([])
 

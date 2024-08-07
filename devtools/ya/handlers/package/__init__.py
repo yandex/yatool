@@ -56,6 +56,8 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 build.build_opts.ExecutorOptions(),
                 build.build_opts.ForceDependsOptions(),
                 build.build_opts.IgnoreRecursesOptions(),
+                build.build_opts.GraphFilterOutputResultOptions(),
+                build.build_opts.GraphOperateResultsOptions(),
                 core.common_opts.CustomSourceRootOptions(),
                 core.common_opts.CustomBuildRootOptions(),
                 core.common_opts.ShowHelpOptions(),

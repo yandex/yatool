@@ -14,6 +14,7 @@ import test.const as test_consts
 import threading
 import traceback
 
+import typing as tp  # noqa
 from itertools import chain
 
 import exts.fs
@@ -47,6 +48,7 @@ import yalibrary.debug_store
 from yalibrary.monitoring import YaMonEvent
 
 import build.makelist as bml
+import build.node_checks as node_checks
 import build.gen_plan as gen_plan
 import build.ymake2 as ymake2
 from build.ymake2.consts import YmakeEvents
@@ -311,14 +313,10 @@ def _optimize_graph(graph):
     }
 
 
-def _is_module(n):
-    return 'target_properties' in n and 'module_type' in n['target_properties']
-
-
 def _add_modules_to_results(graph):
     results = set(graph['result'])
     for node in graph['graph']:
-        if _is_module(node):
+        if node_checks.is_module(node):
             results.add(node['uid'])
     graph['result'] = list(results)
     return graph
@@ -338,11 +336,6 @@ def _add_json_prefix(graph, tests, prefix):
         old_to_new_uids[node['uid']] = prefix + node['uid']
 
     _substitute_uids(graph, tests, old_to_new_uids)
-
-
-def _is_package(elem_props):
-    # TODO: mark PACKAGE and UNION explicitly
-    return elem_props.get('kv', {}).get('p', '') in ('PK', 'UN')
 
 
 def _gen_rename_nodes(graph, uid_map, src_dir):
@@ -379,7 +372,7 @@ def _gen_rename_nodes(graph, uid_map, src_dir):
 
 
 def _iter_extra_resources(g):
-    if _is_empty_graph(g):
+    if node_checks.is_empty_graph(g):
         return
 
     seen = set()
@@ -393,21 +386,11 @@ def _iter_extra_resources(g):
                     yield k, ALLOWED_EXTRA_RESOURCES[k]
 
 
-def _is_empty_graph(g):
-    if not g:
-        return True
-
-    if not g['graph']:
-        return True
-
-    return False
-
-
 def _naive_merge(g1, g2):
-    if _is_empty_graph(g1):
+    if node_checks.is_empty_graph(g1):
         return g2
 
-    if _is_empty_graph(g2):
+    if node_checks.is_empty_graph(g2):
         return g1
 
     conf1 = g1.get('conf', {}).copy()
@@ -726,23 +709,19 @@ def _propagate_cache_false_from_kv(graph):
             n['cache'] = False
 
 
-def _is_host_platform(node):
-    return bool(node.get('host_platform'))
-
-
 # This function removes all common tags (tags which present in all nodes)
 # and assign the only tag "tool" to the host (tool) nodes.
 # The former is to reduce length of a runner progress report (runner adds all tags to a report line)
 # and the latter is somehow used in distbuild.
-# TODO:
-# - do the common tag removing in the runner before start (not in graph generating like this).
-# - assign tool tag in _build_tools().
+#
+# TODO: do the common tag removing in the runner before start (not in graph generating like this).
+# TODO: assign tool tag in _build_tools().
 def _strip_tags(nodes):
     by_tag = collections.defaultdict(long)
     node_count = 0
 
     for node in nodes:
-        if _is_host_platform(node):
+        if node_checks.is_host_platform(node):
             node['tags'] = ['tool']
         else:
             node_count += 1
@@ -754,7 +733,7 @@ def _strip_tags(nodes):
     bad_tags = frozenset(k for k, v in by_tag.items() if v == node_count)
     if bad_tags:
         for node in nodes:
-            if not _is_host_platform(node):
+            if not node_checks.is_host_platform(node):
                 tags = node.get('tags')
                 if tags:
                     node['tags'] = [tag for tag in tags if tag not in bad_tags]
@@ -1243,7 +1222,7 @@ class _GraphMaker(object):
 
         cache_dir = bg_cache.configure_build_graph_cache_dir(self._opts)
         if cache_dir:
-            if _is_tools_tc(target_tc):
+            if node_checks.is_tools_tc(target_tc):
                 cache_dir = self._build_graph_cache_dirname(target_tc, cache_dir, 'TOOLS')
             elif is_global_tools:
                 cache_dir = self._build_graph_cache_dirname(target_tc, cache_dir, 'GTOOLS')
@@ -1627,7 +1606,7 @@ class _GraphMaker(object):
         flags[tc['name'].upper()] = 'yes'
         flags['YA'] = 'yes'
 
-        if not _is_tools_tc(tc) and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends):
+        if not node_checks.is_tools_tc(tc) and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends):
             flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'yes'
             flags['TRAVERSE_DEPENDS'] = 'yes'
         if self._opts.ignore_recurses or tc.get('ignore_recurses'):
@@ -1665,8 +1644,10 @@ class _GraphMaker(object):
             continue_on_fail=self._opts.continue_on_fail,
             ymake_bin=self._opts.ymake_bin,
             warn_mode=self._opts.warn_mode,
-            build_depends=not _is_tools_tc(tc)
-            and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends),
+            build_depends=(
+                not node_checks.is_tools_tc(tc)
+                and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends)
+            ),
             arcadia_tests_data_path=self._opts.arcadia_tests_data_path,
             checkout_data_by_ya=getattr(self._opts, "checkout_data_by_ya", False),
             strict_inputs=self._need_strict_inputs(flags),
@@ -2087,7 +2068,11 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
 
     if opts.strip_packages_from_results:
         with stager.scope('strip_packages_from_results'):
-            graph = _strip_packages_from_results(graph)
+            graph = _strip_graph_results(graph, node_checks.is_package, "package")
+
+    if opts.strip_binary_from_results:
+        with stager.scope('strip_binaries_from_results'):
+            graph = _strip_graph_results(graph, node_checks.is_binary, "binary")
 
     with stager.scope('strip-graph'):
         graph = strip_graph(graph)
@@ -2196,12 +2181,8 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
     return graph, tests, stripped_tests, ctx, make_files
 
 
-def _is_tools_tc(target_tc):
-    return target_tc.get('flags') and target_tc.get('flags').get('TOOL_BUILD_MODE') == 'yes'
-
-
 def _should_run_tests(opts, target_tc):
-    return not _is_tools_tc(target_tc) and (
+    return not node_checks.is_tools_tc(target_tc) and (
         opts.run_tests or target_tc.get('run_tests') or opts.list_tests or opts.canonize_tests
     )
 
@@ -2383,24 +2364,13 @@ def _clean_maven_deploy_from_run_java_program(graph):
         if uid in reachable_exported:
             continue
         node['kv']['mvn_export'] = 'no'
-        node['cmds'] = [cmd for cmd in node['cmds'] if not _is_maven_deploy(cmd)]
+        node['cmds'] = [cmd for cmd in node['cmds'] if not node_checks.is_maven_deploy(cmd)]
         logging.debug(
             'Disable maven export of TOOL only java module "{}" uid: {}'.format(
                 node.get('target_properties', {}).get('module_dir', 'NOT A MODULE'), uid
             )
         )
     return graph
-
-
-def _is_maven_deploy(cmd):
-    maven_bin = False
-    deploy_file = False
-    for arg in cmd['cmd_args']:
-        if arg.endswith('bin/mvn'):
-            maven_bin = True
-        elif arg == 'deploy:deploy-file':
-            deploy_file = True
-    return maven_bin and deploy_file
 
 
 def _make_yndexing_graph(graph, opts, ymake_bin, host_tool_resolver):
@@ -3140,10 +3110,11 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
     return graph, ctx
 
 
-def _strip_packages_from_results(graph):
+def _strip_graph_results(graph, node_checker, node_type_name):
+    # type: (dict, tp.Callable[[dict], bool], str) -> dict
     results = set(graph['result'])
-    stripped = set([node['uid'] for node in graph['graph'] if _is_package(node) and node['uid'] in results])
-    logger.debug("Going to remove %d nodes from results as package node results", len(stripped))
+    stripped = set([node['uid'] for node in graph['graph'] if node['uid'] in results and node_checker(node)])
+    logger.debug("Going to remove %d nodes from results as %s node results", len(stripped), node_type_name)
     graph['result'] = list(results - stripped)
     return graph
 

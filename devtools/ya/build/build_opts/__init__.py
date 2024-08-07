@@ -13,6 +13,7 @@ from core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
     CHECKOUT_ONLY_GROUP,
     OUTPUT_CONTROL_GROUP,
+    RESULT_CONTROL_GROUP,
     PRINT_CONTROL_GROUP,
     PLATFORM_CONFIGURATION_GROUP,
     CACHE_CONTROL_GROUP,
@@ -1008,39 +1009,19 @@ class ExecutorOptions(Options):
             yrfs.enable_clonefile()
 
 
-class YaMakeOptions(Options):
+class GraphFilterOutputResultOptions(Options):
     def __init__(self):
-        self.do_clear = False
-        self.show_command = []
         self.add_result = []
         self.add_host_result = []
-        self.show_timings = False
-        self.ext_progress = False
         self.replace_result = False
-        self.add_modules_to_results = False
-        self.strip_packages_from_results = False
-        self.gen_renamed_results = True
         self.all_outputs_to_result = False
 
     @staticmethod
     def consumer():
         protobuf_exts = ['.pb.h', '.pb.cc', '.pb.go', '_pb2.py', '_pb2_grpc.py', '_pb2.pyi']
         flatbuf_exts = ['.fbs.h', '.fbs.gosrc', '.fbs.jsrc', '.fbs.pysrc']
+
         return [
-            ArgConsumer(
-                ['--clear'],
-                help='Clear temporary data',
-                hook=SetConstValueHook('do_clear', True),
-                group=OPERATIONAL_CONTROL_GROUP,
-                visible=HelpLevel.BASIC,
-            ),
-            ArgConsumer(
-                ['--show-command'],
-                help='Print command for selected build output',
-                hook=SetAppendHook('show_command'),
-                group=PRINT_CONTROL_GROUP,
-                visible=HelpLevel.ADVANCED,
-            ),
             ArgConsumer(
                 ['--add-result'],
                 help='Process selected build output as a result',
@@ -1080,6 +1061,84 @@ class YaMakeOptions(Options):
             ConfigConsumer('add_result_extend', hook=ExtendHook('add_result')),
             ConfigConsumer('add_host_result'),
             ConfigConsumer('all_outputs_to_result'),
+            ArgConsumer(
+                ['--replace-result'],
+                help='Build only --add-result targets',
+                hook=SetConstValueHook('replace_result', True),
+                group=OUTPUT_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+        ]
+
+
+class GraphOperateResultsOptions(Options):
+    def __init__(self):
+        self.add_modules_to_results = False
+        self.gen_renamed_results = True
+        self.strip_packages_from_results = False
+        self.strip_binary_from_results = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--add-modules-to-results'],
+                help='Process all modules as results',
+                hook=SetConstValueHook('add_modules_to_results', True),
+                group=RESULT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            EnvConsumer(
+                'YA_NO_GEN_RENAMED_RESULTS',
+                help='Generate renamed results in cross-builds',
+                hook=SetConstValueHook('gen_renamed_results', False),
+            ),
+            ArgConsumer(
+                ['--strip-packages-from-results'],
+                help='Strip all packages from results',
+                hook=SetConstValueHook('strip_packages_from_results', True),
+                group=RESULT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            EnvConsumer(
+                'YA_STRIP_PACKAGES_FROM_RESULTS',
+                help='Strip all packages from results',
+                hook=SetConstValueHook('strip_packages_from_results', True),
+            ),
+            ArgConsumer(
+                ['--strip-binary-from-result'],
+                help="Strip all binaries from results",
+                hook=SetConstValueHook('strip_binary_from_results', True),
+                group=RESULT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+        ]
+
+
+class YaMakeOptions(Options):
+    def __init__(self):
+        self.do_clear = False
+        self.show_command = []
+        self.show_timings = False
+        self.ext_progress = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--clear'],
+                help='Clear temporary data',
+                hook=SetConstValueHook('do_clear', True),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--show-command'],
+                help='Print command for selected build output',
+                hook=SetAppendHook('show_command'),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
             ConfigConsumer('show_timings'),
             ConfigConsumer('show_extra_progress', hook=SetValueHook('ext_progress')),
             ArgConsumer(
@@ -1095,37 +1154,6 @@ class YaMakeOptions(Options):
                 hook=SetConstValueHook('ext_progress', True),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,
-            ),
-            ArgConsumer(
-                ['--replace-result'],
-                help='Build only --add-result targets',
-                hook=SetConstValueHook('replace_result', True),
-                group=OUTPUT_CONTROL_GROUP,
-                visible=HelpLevel.BASIC,
-            ),
-            ArgConsumer(
-                ['--add-modules-to-results'],
-                help='Process all modules as results',
-                hook=SetConstValueHook('add_modules_to_results', True),
-                group=OUTPUT_CONTROL_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            EnvConsumer(
-                'YA_NO_GEN_RENAMED_RESULTS',
-                help='Generate renamed results in cross-builds',
-                hook=SetConstValueHook('gen_renamed_results', False),
-            ),
-            ArgConsumer(
-                ['--strip-packages-from-results'],
-                help='Strip all packages from results',
-                hook=SetConstValueHook('strip_packages_from_results', True),
-                group=OUTPUT_CONTROL_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            EnvConsumer(
-                'YA_STRIP_PACKAGES_FROM_RESULTS',
-                help='Strip all packages from results',
-                hook=SetConstValueHook('strip_packages_from_results', True),
             ),
         ]
 
@@ -3132,6 +3160,8 @@ def ya_make_options(  # compat
             YMakeDumpGraphOptions(),
             YMakeGenerateMakefileOptions(),
             CrossCompilationOptions(),
+            GraphFilterOutputResultOptions(),
+            GraphOperateResultsOptions(),
             YaMakeOptions(),
             ExecutorOptions(),
             ForceDependsOptions(),

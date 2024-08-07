@@ -32,6 +32,7 @@ PEERDIR(
     devtools/ya/build/gen_plan
     devtools/ya/build/genconf
     devtools/ya/build/makelist
+    devtools/ya/build/node_checks
     devtools/ya/build/owners
     devtools/ya/build/prefetch
     devtools/ya/build/reports
