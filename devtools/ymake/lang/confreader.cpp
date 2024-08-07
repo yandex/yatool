@@ -57,6 +57,29 @@ namespace {
             << fileName << "(" << line << ", " << column << "): " << message << Endl;
     }
 
+    void UpdateConfMd5(TStringBuf content, MD5* confMd5, TString* ignoredContent) {
+        if (confMd5 == nullptr) {
+            // Nothing to do
+            return;
+        }
+
+        bool ignoreNextLine = false;
+        for (const auto& it: StringSplitter(content).Split('\n').SkipEmpty()) {
+            const auto line = it.Token();
+            if (line.StartsWith(TStringBuf("# IGNORE YMAKE CONF CONTEXT"))) {
+                ignoreNextLine = true;
+                continue;
+            } else if (ignoreNextLine) {
+                if (ignoredContent) {
+                    ignoredContent->append(line).append('\n');
+                }
+                ignoreNextLine = false;
+                continue;
+            }
+            confMd5->Update(line.data(), line.size());
+        }
+    }
+
     std::string NormalizeRval(std::string_view rval, bool leftTrim)
     {
         // Eliminate 'new line' and 'carriage return' symbols from the string
@@ -384,23 +407,7 @@ namespace {
         }
 
         void UpdateConfMd5(TStringBuf content) {
-            if (ConfMd5 == nullptr) {
-                // Nothing to do
-                return;
-            }
-
-            bool ignoreNextLine = false;
-            for (const auto& it: StringSplitter(content).Split('\n').SkipEmpty()) {
-                const auto line = it.Token();
-                if (line.StartsWith(TStringBuf("# IGNORE YMAKE CONF CONTEXT"))) {
-                    ignoreNextLine = true;
-                    continue;
-                } else if (ignoreNextLine) {
-                    ignoreNextLine = false;
-                    continue;
-                }
-                ConfMd5->Update(line.data(), line.size());
-            }
+            ::UpdateConfMd5(content, ConfMd5, nullptr);
         }
 
         void ProcessImport(TStringBuf fileName) {
@@ -1650,4 +1657,18 @@ void TYmakeConfig::LoadConfig(TStringBuf path, TStringBuf sourceRoot, TStringBuf
 void TYmakeConfig::LoadConfigFromContext(TStringBuf context) {
     TConfBuilder::ValidateUtf8(context, "<context>"sv);
     ::LoadConfig(""sv, context, ""sv, ""sv, *this, nullptr);
+}
+
+namespace NConfReader {
+    void UpdateConfMd5(TStringBuf content, MD5& confData) {
+        ::UpdateConfMd5(content, &confData, nullptr);
+    }
+
+    TString CalculateConfMd5(TStringBuf content, TString* ignoredHashContenet) {
+        MD5 md5;
+        char buffer[33];
+        ::UpdateConfMd5(content, &md5, ignoredHashContenet);
+        md5.End(buffer);
+        return buffer;
+    }
 }

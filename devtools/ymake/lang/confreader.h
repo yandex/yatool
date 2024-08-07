@@ -6,5 +6,10 @@
 
 #include <util/generic/string.h>
 
-class TConfigError: public TMakeError {
-};
+namespace NConfReader {
+    class TConfigError: public TMakeError {
+    };
+
+    void UpdateConfMd5(TStringBuf content, MD5& confData);
+    TString CalculateConfMd5(TStringBuf content, TString* ignoredHashContent = nullptr);
+}
