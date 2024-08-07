@@ -166,7 +166,7 @@ private:
     void LoadSystemHeaders(MD5& confData);
     void LoadLicenses(MD5& confData);
     void LoadPeersRules(MD5& confData);
-    void LoadBlackLists(MD5& confHash, MD5& anotherConfHash);
+    void LoadBlackLists(MD5& confHash, MD5& anotherConfHash, bool addToAnother);
     void LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother);
     void FillMiscValues();
     void InitExcludedPeerdirs();

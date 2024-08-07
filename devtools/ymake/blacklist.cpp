@@ -18,14 +18,16 @@ const TString* TBlackList::IsValidPath(TStringBuf path) const {
     return NBlacklist::TSvnBlacklist::IsValidPath(path);
 }
 
-void TBlackList::Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash, MD5& anotherConfHash) {
+void TBlackList::Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash, MD5& anotherConfHash, bool addToAnother) {
     Clear();
     for (const auto path : lists) {
         try {
             TFileInput file(sourceRoot / path);
             TString content = file.ReadAll();
             confHash.Update(content.data(), content.size());
-            anotherConfHash.Update(content.data(), content.size());
+            if (addToAnother) {
+                anotherConfHash.Update(content.data(), content.size());
+            }
             LoadFromString(content, path);
         } catch (const TFileError& e) {
             YConfErr(BadFile) << "Error while reading blacklist file " << path << ": " << e.what() << Endl;
