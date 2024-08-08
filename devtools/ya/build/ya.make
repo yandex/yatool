@@ -78,7 +78,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/yalibrary/yandex/distbuild
         devtools/ya/yalibrary/svn
         devtools/ya/yalibrary/upload
-        # devtools/ya/yalibrary/store/yt_store # YA-938
+        devtools/ya/yalibrary/store/yt_store # YA-938
     )
 ENDIF()
 
