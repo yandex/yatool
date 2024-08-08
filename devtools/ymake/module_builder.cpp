@@ -40,21 +40,6 @@ namespace {
         return var.IsMacro ? EMNT_UnknownCommand : NodeTypeForVar(var);
     }
 
-    bool ValidateForBlackList(const TVector<TStringBuf>& dirs, const TBuildConfiguration& conf, const TStringBuf& macroName) {
-        bool result = true;
-        if (!conf.BlackList.Empty()) {
-            for (auto dir : dirs) {
-                dir.SkipPrefix(TStringBuf("${ARCADIA_ROOT}/"));
-                if (const auto ptr = conf.BlackList.IsValidPath(dir)) {
-                    result = false;
-                    YConfErr(BlckLst) << "Path [[imp]]" << ArcPath(dir) << "[[rst]] inside [[alt1]]" << macroName
-                                      << "[[rst]] is from prohibited directory [[alt1]]" << *ptr << "[[rst]]" << Endl;
-                }
-            }
-        }
-        return result;
-    };
-
     bool ValidateForOwnDir(const TStringBuf& dir, const TModule& module, const TStringBuf& macroName) {
         if (dir == module.GetDir()) {
             TString what = TString::Join(module.GetName().GetTargetStr(), " has ", macroName, " to its own dir");
@@ -617,8 +602,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
     using namespace NPath;
 
     if (name == NMacro::PEERDIR || name == NMacro::_GHOST_PEERDIR) {
-        ValidateForBlackList(args, Conf, name);
-
         enum { normal, include } next = normal;
         for (const auto& arg : args) {
             if (arg == NMacro::ADDINCL) {
@@ -646,8 +629,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
             }
         }
     } else if (name == NMacro::SRCDIR) {
-        ValidateForBlackList(args, Conf, name);
-
         for (const auto& arg : args) {
             TString dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, {}, ConstrYDirDiag);
             if (dir.empty() || dir == Module.GetDir().GetTargetStr() || !ValidateNotRelative(dir, name)) {
@@ -656,8 +637,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
             AddSrcdir(dir);
         }
     } else if (name == NMacro::ADDINCL) {
-        ValidateForBlackList(args, Conf, name);
-
         TLangId nextLangId = TModuleIncDirs::BAD_LANG;
         EIncDirScope nextScope = EIncDirScope::Local;
         enum { normal, lang } next = normal;
@@ -718,8 +697,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
             YConfErr(UserErr) << "Tail arguments in [[alt1]]" << name << "[[rst]] without a dir to apply will be ignored" << Endl;
         }
     } else if (name == TStringBuf(NProps::DEPENDS)) {
-        ValidateForBlackList(args, Conf, name);
-
         AddDepends(args);
     } else if (name == TStringBuf("PROVIDES")) {
         Module.Provides.reserve(args.size());
@@ -727,8 +704,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
     } else if (name == TStringBuf("CHECK_PROVIDES")) {
         Module.SetCheckProvides(true);
     } else if (name == NMacro::_DATA_FILES) {
-        ValidateForBlackList(args, Conf, name);
-
         for (auto arg : args) {
             arg.SkipPrefix("${ARCADIA_ROOT}/"sv);
             if (arg.StartsWith("${ARCADIA_BUILD_ROOT}"sv)) {

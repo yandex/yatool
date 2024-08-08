@@ -60,6 +60,7 @@ SRCS(
     addincls.cpp
     args_converter.cpp
     blacklist.cpp
+    blacklist_checker.cpp
     cmd_properties.cpp
     command_helpers.cpp
     command_store.cpp

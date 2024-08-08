@@ -1,6 +1,7 @@
 #include "ymake.h"
 
 #include "mkcmd.h"
+#include "blacklist_checker.h"
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/query.h>
@@ -70,6 +71,14 @@ void TYMake::SortAllEdges() {
         }
     }
     FORCE_TRACE(U, NEvent::TStageFinished("Sort edges"));
+}
+
+void TYMake::CheckBlacklist() {
+    FORCE_TRACE(U, NEvent::TStageStarted("Check blacklist"));
+    TRestoreContext restoreContext(Conf, Graph, Modules);
+    TBlacklistChecker blacklistChecker(restoreContext, StartTargets);
+    blacklistChecker.CheckAll();
+    FORCE_TRACE(U, NEvent::TStageFinished("Check blacklist"));
 }
 
 void TYMake::TransferStartDirs() {

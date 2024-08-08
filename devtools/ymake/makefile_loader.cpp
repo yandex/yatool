@@ -537,7 +537,7 @@ TVector<TString> TDirParser::GetRecurseDirs(const TStringBuf& statementName,
         dirs = GetDirsFromArgs(
             statementName, args,
             [this](TStringBuf arg) { return NPath::GenPath(Dir, arg); });
-    } else if (statementName == "RECURSE_ROOT_RELATIVE") {
+    } else if (statementName == NMacro::RECURSE_ROOT_RELATIVE) {
         dirs = GetDirsFromArgs(
             statementName, args,
             [](TStringBuf arg) { return NPath::ConstructYDir(arg, TStringBuf(), ConstrYDirDiag); });
@@ -781,13 +781,6 @@ void TDirParser::DependsStatement(const TStringBuf& name, const TVector<TStringB
 
 void TDirParser::AddSubdir(const TStringBuf& dir, const TStringBuf& name) {
     YDIAG(DG) << "Sub-directory dep: " << dir << "( " << name << ")" << Endl;
-    if (!Conf.BlackList.Empty()) {
-        if (const auto ptr = Conf.BlackList.IsValidPath(dir)) {
-            YConfErrPrecise(BlckLst, GetStatementRow(name), GetStatementColumn(name))
-                << "Path [[imp]]" << dir << "[[rst]] inside [[alt1]]" << name
-                << "[[rst]] is from prohibited directory [[alt1]]" << *ptr << "[[rst]]" << Endl;
-        }
-    }
 
     auto storedDir = Names.FileConf.GetStoredName(dir);
     if (!Names.FileConf.CheckDirectory(storedDir)) {

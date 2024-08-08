@@ -261,24 +261,6 @@ bool TJSONVisitor::Enter(TState& state) {
             Inputs.push_back(std::make_pair(elemId, fileData.HashSum));
         }
 
-        if (!RestoreContext.Conf.BlackList.Empty() && IsFileType(nodeType) && !IsOutputType(nodeType)) {
-            auto& fileConf = RestoreContext.Graph.Names().FileConf;
-            TFileView fileView = graph.GetFileName(currState.Node());
-            const auto path = fileConf.ResolveLink(fileView);
-            if (path.GetType() != NPath::Source) {
-                // Do nothing
-            } else if (const auto ptr = RestoreContext.Conf.BlackList.IsValidPath(path.GetTargetStr())) {
-                const auto moduleIt = FindModule(state);
-                THolder<TScopedContext> pcontext{nullptr};
-                if (moduleIt != state.end()) {
-                    pcontext.Reset(new TScopedContext(graph.GetFileName(moduleIt->Node())));
-                }
-                YConfErr(BlckLst) << "Trying to use [[imp]]" << path
-                    << "[[rst]] from the prohibited directory [[alt1]]"
-                    << *ptr << "[[rst]]" << Endl;
-            }
-        }
-
         if (state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildFrom && !IsModuleType(nodeType)) {
             if (prntData->Fake) {
                 // Module with Fake attribute may be a program and thus not fake itself, but its own BFs are still fake

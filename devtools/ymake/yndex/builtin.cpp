@@ -78,8 +78,8 @@ namespace NYndex {
                 "Note: current behavior of SUBSCRIBER is almost the same as OWNER. The are only 2 differences: "
                 "SUBSCRIBER is not mandatory and it may be separately processed by external tools\n\n"
                 "Ask devtools@yandex-team.ru if you need more information" },
-        { "RECURSE_ROOT_RELATIVE",
-            "@usage: RECURSE_ROOT_RELATIVE(dirlist)  # builtin\n\n"
+        { NMacro::RECURSE_ROOT_RELATIVE,
+            "@usage: "+ TString{NMacro::RECURSE_ROOT_RELATIVE} + "(dirlist)  # builtin\n\n"
                 "In comparison with RECURSE(), in dirlist there must be a directory relative to the root (${ARCADIA_ROOT})" },
         { "PARTITIONED_RECURSE_ROOT_RELATIVE",
             "@usage: PARTITIONED_RECURSE_ROOT_RELATIVE([BALANCING_CONFIG config] dirlist)  # builtin\n\n"

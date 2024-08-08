@@ -148,6 +148,17 @@ bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, ui32 owner) {
     }
 }
 
+bool TConfMsgManager::HasMessagesByKind(const TStringBuf var, ui32 owner) const {
+    const auto it = Messages.find(owner);
+    if (it == Messages.end()) {
+        return false;
+    }
+    const auto& messages = it->second;
+    return FindIf(messages, [&var](const TConfigureMessage& message) {
+        return message.Kind == var;
+    }) != messages.end();
+}
+
 void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
     TString confMsgsData;
     {

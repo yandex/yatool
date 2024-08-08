@@ -98,6 +98,7 @@ public:
     void AddModulesToStartTargets();
     void AddPackageOutputs();
     void SortAllEdges();
+    void CheckBlacklist();
     void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false);
     void DumpSrcDeps(IOutputStream& cmsg);
     void PrintTargetDeps(IOutputStream& cmsg);

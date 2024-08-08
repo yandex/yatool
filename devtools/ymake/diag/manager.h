@@ -98,6 +98,7 @@ public:
 
     void Erase(ui32 owner);
     bool EraseMessagesByKind(const TStringBuf var, ui32 owner = 0); // If owner == 0 erase for all owners
+    bool HasMessagesByKind(const TStringBuf var, ui32 owner) const;
 
     void Load(const TBlob& blob);
     void Save(TMultiBlobBuilder& builder);
@@ -141,6 +142,7 @@ TConfMsgManager* ConfMsgManager();
 
 #define YConfErase(var) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var)
 #define YConfEraseByOwner(var, owner) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var, owner)
+#define YConfHasMessagesByOwner(var, owner) Diag()->var && ConfMsgManager()->HasMessagesByKind("-W" #var, owner)
 
 // This macro must not be used before ConfMsgManager()->DisableDelay and only for unstable diagnostincs which can be diferent
 // depending on dep cacahe state or start target order
