@@ -8,6 +8,7 @@ PY_SRCS(
     dist_cache.py
     pattern.py
     prepare.py
+    resource_display.py
     resource.py
     result.py
     run.py
