@@ -298,3 +298,13 @@ message TGraphChangesPrediction {
 message TReadyForUpdateCacheInfo {
     option (message_id) = 48;
 };
+
+message TNodeChanges {
+    option (message_id) = 49;
+    required bool HasRenderedNodeChanges = 1;
+};
+
+message TArcChanges {
+    option (message_id) = 50;
+    required bool HasChangelist = 1;
+};

@@ -95,7 +95,6 @@ void TYMake::PostInit() {
     Names.FileConf.InitAfterCacheLoading();
     FSCacheMonEvent();
     DepsCacheMonEvent();
-    GraphChangesPredictionEvent();
 }
 
 static void SafeRemove(const TFsPath& path) {

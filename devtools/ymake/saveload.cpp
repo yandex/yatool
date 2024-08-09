@@ -375,6 +375,11 @@ namespace {
         }
     };
 
+    void ArcChangesEvent(bool value) {
+        NEvent::TArcChanges ev;
+        ev.SetHasChangelist(value);
+        FORCE_TRACE(U, ev);
+    }
 }
 
 TFsPath MakeTempFilename(const TString& basePath) {
@@ -707,9 +712,11 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
 }
 
 bool TYMake::LoadPatch() {
+    ArcChangesEvent(!Conf.PatchPath.Empty());
     if (!Conf.PatchPath) {
         return true;
     }
+
     if (TimeStamps.IsNeedNewSession()) { // if cache not loaded by Load() must init session
         TimeStamps.InitSession(Graph.GetFileNodeData());
     }
@@ -717,6 +724,7 @@ bool TYMake::LoadPatch() {
     if (changes) {
         AnalyzeGraphChanges(*changes);
         Names.FileConf.UseExternalChanges(std::move(changes));
+        GraphChangesPredictionEvent();
     }
     return true;
 }

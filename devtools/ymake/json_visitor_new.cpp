@@ -550,6 +550,8 @@ void TJSONVisitorNew::CheckStructureUidChanged() {
 }
 
 void TJSONVisitorNew::ReportCacheStats() {
-    NStats::TStatsBase::MonEvent(MON_NAME(EUidsCacheStats::ReallyAllNoRendered), CacheStats.Get(NStats::EUidsCacheStats::ReallyAllNoRendered) ? true : false);
+    NEvent::TNodeChanges ev;
+    ev.SetHasRenderedNodeChanges(CacheStats.Get(NStats::EUidsCacheStats::ReallyAllNoRendered) ? false : true);
+    FORCE_TRACE(U, ev);
     CacheStats.Report();
 }
