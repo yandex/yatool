@@ -484,6 +484,10 @@ def _run_ymake(**kwargs):
                 _run_info["has_structural_changes"] = j.get("HasStructuralChanges", None)
             elif _type == "NEvent.TGraphChangesPrediction":
                 _run_info["predicts_structural_changes"] = j.get("PredictsStructuralChanges", None)
+            elif _type == "NEvent.TArcChanges":
+                _run_info["has_changelist"] = j.get("HasChangelist", None)
+            elif _type == "NEvent.TNodeChanges":
+                _run_info["has_rendered_node_changes"] = j.get("HasRenderedNodeChanges", None)
 
         except Exception:
             logger.exception("While processing event: `%s`", j)
