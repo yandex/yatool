@@ -1,12 +1,10 @@
 Metadata-Version: 2.1
 Name: path
-Version: 16.14.0
+Version: 17.0.0
 Summary: A module wrapper for os.path
-Home-page: https://github.com/jaraco/path
-Author: Jason Orendorff
-Author-email: jason.orendorff@gmail.com
-Maintainer: Jason R. Coombs
-Maintainer-email: jaraco@jaraco.com
+Author-email: Jason Orendorff <jason.orendorff@gmail.com>
+Maintainer-email: "Jason R. Coombs" <jaraco@jaraco.com>
+Project-URL: Source, https://github.com/jaraco/path
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
@@ -15,26 +13,27 @@ Classifier: Programming Language :: Python :: 3 :: Only
 Classifier: Operating System :: OS Independent
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Requires-Python: >=3.8
+Description-Content-Type: text/x-rst
 License-File: LICENSE
-Provides-Extra: docs
-Requires-Dist: sphinx >=3.5 ; extra == 'docs'
-Requires-Dist: jaraco.packaging >=9.3 ; extra == 'docs'
-Requires-Dist: rst.linker >=1.9 ; extra == 'docs'
-Requires-Dist: furo ; extra == 'docs'
-Requires-Dist: sphinx-lint ; extra == 'docs'
-Requires-Dist: jaraco.tidelift >=1.4 ; extra == 'docs'
-Provides-Extra: testing
-Requires-Dist: pytest !=8.1.1,>=6 ; extra == 'testing'
-Requires-Dist: pytest-checkdocs >=2.4 ; extra == 'testing'
-Requires-Dist: pytest-cov ; extra == 'testing'
-Requires-Dist: pytest-mypy ; extra == 'testing'
-Requires-Dist: pytest-enabler >=2.2 ; extra == 'testing'
-Requires-Dist: pytest-ruff >=0.2.1 ; extra == 'testing'
-Requires-Dist: appdirs ; extra == 'testing'
-Requires-Dist: packaging ; extra == 'testing'
-Requires-Dist: more-itertools ; extra == 'testing'
-Requires-Dist: pygments ; extra == 'testing'
-Requires-Dist: pywin32 ; (platform_system == "Windows" and python_version < "3.12") and extra == 'testing'
+Provides-Extra: doc
+Requires-Dist: sphinx >=3.5 ; extra == 'doc'
+Requires-Dist: jaraco.packaging >=9.3 ; extra == 'doc'
+Requires-Dist: rst.linker >=1.9 ; extra == 'doc'
+Requires-Dist: furo ; extra == 'doc'
+Requires-Dist: sphinx-lint ; extra == 'doc'
+Requires-Dist: jaraco.tidelift >=1.4 ; extra == 'doc'
+Provides-Extra: test
+Requires-Dist: pytest !=8.1.*,>=6 ; extra == 'test'
+Requires-Dist: pytest-checkdocs >=2.4 ; extra == 'test'
+Requires-Dist: pytest-cov ; extra == 'test'
+Requires-Dist: pytest-mypy ; extra == 'test'
+Requires-Dist: pytest-enabler >=2.2 ; extra == 'test'
+Requires-Dist: appdirs ; extra == 'test'
+Requires-Dist: packaging ; extra == 'test'
+Requires-Dist: more-itertools ; extra == 'test'
+Requires-Dist: pygments ; extra == 'test'
+Requires-Dist: pywin32 ; (platform_system == "Windows" and python_version < "3.12") and extra == 'test'
+Requires-Dist: pytest-ruff >=0.2.1 ; (sys_platform != "cygwin") and extra == 'test'
 
 .. image:: https://img.shields.io/pypi/v/path.svg
    :target: https://pypi.org/project/path

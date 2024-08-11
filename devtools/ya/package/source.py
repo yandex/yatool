@@ -48,9 +48,9 @@ def filter_files(path, patterns):
 
 
 def _walk_path(path):
-    for child in path.listdir():
+    for child in path.iterdir():
         yield child
-        if child.isdir() and not child.islink():
+        if child.is_dir() and not child.islink():
             for item in _walk_path(child):
                 yield item
 

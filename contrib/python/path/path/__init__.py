@@ -35,6 +35,7 @@ import hashlib
 import importlib
 import itertools
 import os
+import pathlib
 import re
 import shutil
 import sys
@@ -51,18 +52,8 @@ with contextlib.suppress(ImportError):
 with contextlib.suppress(ImportError):
     import grp
 
-from io import (
-    BufferedRandom,
-    BufferedReader,
-    BufferedWriter,
-    FileIO,
-    TextIOWrapper,
-)
 from typing import (
-    IO,
     TYPE_CHECKING,
-    Any,
-    BinaryIO,
     Callable,
     Iterator,
     overload,
@@ -71,12 +62,8 @@ from typing import (
 if TYPE_CHECKING:
     from _typeshed import (
         OpenBinaryMode,
-        OpenBinaryModeReading,
-        OpenBinaryModeUpdating,
-        OpenBinaryModeWriting,
         OpenTextMode,
     )
-    from typing_extensions import Literal
 
 from . import classes, masks, matchers
 from .compat.py38 import removeprefix, removesuffix
@@ -207,8 +194,8 @@ class Path(str):
         return self._next_class(other.__add__(self))
 
     # The / operator joins Paths.
-    def __div__(self, rel):
-        """fp.__div__(rel) == fp / rel == fp.joinpath(rel)
+    def __truediv__(self, rel):
+        """fp.__truediv__(rel) == fp / rel == fp.joinpath(rel)
 
         Join two path components, adding a separator character if
         needed.
@@ -217,12 +204,9 @@ class Path(str):
         """
         return self._next_class(self.module.join(self, rel))
 
-    # Make the / operator work even when true division is enabled.
-    __truediv__ = __div__
-
     # The / operator joins Paths the other way around
-    def __rdiv__(self, rel):
-        """fp.__rdiv__(rel) == rel / fp
+    def __rtruediv__(self, rel):
+        """fp.__rtruediv__(rel) == rel / fp
 
         Join two path components, adding a separator character if
         needed.
@@ -230,9 +214,6 @@ class Path(str):
         .. seealso:: :func:`os.path.join`
         """
         return self._next_class(self.module.join(rel, self))
-
-    # Make the / operator work even when true division is enabled.
-    __rtruediv__ = __rdiv__
 
     def __enter__(self):
         self._old_dir = self.cwd()
@@ -251,13 +232,8 @@ class Path(str):
         return cls(os.getcwd())
 
     @classmethod
-    def getcwd(cls):
-        warnings.warn(
-            ".getcwd is deprecated; use cwd",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return cls.cwd()
+    def home(cls) -> Path:
+        return cls(os.path.expanduser('~'))
 
     #
     # --- Operations on Path strings.
@@ -265,14 +241,6 @@ class Path(str):
     def absolute(self):
         """.. seealso:: :func:`os.path.abspath`"""
         return self._next_class(self.module.abspath(self))
-
-    def abspath(self):
-        warnings.warn(
-            ".abspath is deprecated; use absolute",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.absolute()
 
     def normcase(self):
         """.. seealso:: :func:`os.path.normcase`"""
@@ -334,15 +302,6 @@ class Path(str):
         """The file extension, for example ``'.py'``."""
         f, suffix = self.module.splitext(self)
         return suffix
-
-    @property
-    def ext(self):  # pragma: no cover
-        warnings.warn(
-            ".ext is deprecated; use suffix",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.suffix
 
     def with_suffix(self, suffix):
         """Return a new path with the file suffix changed (or added, if none)
@@ -560,14 +519,6 @@ class Path(str):
         match = matchers.load(match)
         return filter(match, (self / child for child in os.listdir(self)))
 
-    def listdir(self, match=None):
-        warnings.warn(
-            ".listdir is deprecated; use iterdir",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return list(self.iterdir(match=match))
-
     def dirs(self, *args, **kwargs):
         """List of this directory's subdirectories.
 
@@ -695,90 +646,7 @@ class Path(str):
     #
     # --- Reading or writing an entire file at once.
 
-    @overload
-    def open(
-        self,
-        mode: OpenTextMode = ...,
-        buffering: int = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] | None = ...,
-    ) -> TextIOWrapper: ...
-
-    @overload
-    def open(
-        self,
-        mode: OpenBinaryMode,
-        buffering: Literal[0],
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> FileIO: ...
-
-    @overload
-    def open(
-        self,
-        mode: OpenBinaryModeUpdating,
-        buffering: Literal[-1, 1] = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> BufferedRandom: ...
-
-    @overload
-    def open(
-        self,
-        mode: OpenBinaryModeReading,
-        buffering: Literal[-1, 1] = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> BufferedReader: ...
-
-    @overload
-    def open(
-        self,
-        mode: OpenBinaryModeWriting,
-        buffering: Literal[-1, 1] = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> BufferedWriter: ...
-
-    @overload
-    def open(
-        self,
-        mode: OpenBinaryMode,
-        buffering: int,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> BinaryIO: ...
-
-    @overload
-    def open(
-        self,
-        mode: str,
-        buffering: int = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-        closefd: bool = ...,
-        opener: Callable[[str, int], int] = ...,
-    ) -> IO[Any]: ...
-
+    @functools.wraps(open, assigned=())
     def open(self, *args, **kwargs):
         """Open this file and return a corresponding file object.
 
@@ -872,41 +740,14 @@ class Path(str):
         with self.open(mode='rb') as f:
             return f.read()
 
-    def text(self, encoding=None, errors='strict'):
-        r"""Legacy function to read text.
-
-        Converts all newline sequences to ``\n``.
-        """
-        warnings.warn(
-            ".text is deprecated; use read_text",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return U_NEWLINE.sub('\n', self.read_text(encoding, errors))
-
-    @overload
     def write_text(
         self,
         text: str,
-        encoding: str | None = ...,
-        errors: str = ...,
-        linesep: str | None = ...,
-        append: bool = ...,
-    ) -> None: ...
-
-    @overload
-    def write_text(
-        self,
-        text: builtins.bytes,
-        encoding: None = ...,
-        errors: str = ...,
-        linesep: str | None = ...,
-        append: bool = ...,
-    ) -> None: ...
-
-    def write_text(
-        self, text, encoding=None, errors='strict', linesep=os.linesep, append=False
-    ):
+        encoding: str | None = None,
+        errors: str = 'strict',
+        linesep: str | None = os.linesep,
+        append: bool = False,
+    ) -> None:
         r"""Write the given text to this file.
 
         The default behavior is to overwrite any existing file;
@@ -918,7 +759,7 @@ class Path(str):
 
         Parameters:
 
-          `text` - str/bytes - The text to be written.
+          `text` - str - The text to be written.
 
           `encoding` - str - The text encoding used.
 
@@ -953,29 +794,14 @@ class Path(str):
 
         --- Unicode
 
-        If `text` isn't Unicode, then apart from newline handling, the
-        bytes are written verbatim to the file.  The `encoding` and
-        `errors` arguments are not used and must be omitted.
-
-        If `text` is Unicode, it is first converted to :func:`bytes` using the
+        `text` is written using the
         specified `encoding` (or the default encoding if `encoding`
         isn't specified).  The `errors` argument applies only to this
         conversion.
         """
-        if isinstance(text, str):
-            if linesep is not None:
-                text = U_NEWLINE.sub(linesep, text)
-            bytes = text.encode(encoding or sys.getdefaultencoding(), errors)
-        else:
-            warnings.warn(
-                "Writing bytes in write_text is deprecated",
-                DeprecationWarning,
-                stacklevel=1,
-            )
-            assert encoding is None
-            if linesep is not None:
-                text = B_NEWLINE.sub(linesep.encode(), text)
-            bytes = text
+        if linesep is not None:
+            text = U_NEWLINE.sub(linesep, text)
+        bytes = text.encode(encoding or sys.getdefaultencoding(), errors)
         self.write_bytes(bytes, append=append)
 
     def lines(self, encoding=None, errors=None, retain=True):
@@ -992,8 +818,6 @@ class Path(str):
                 but translate all newline
                 characters to ``\n``.  If ``False``, newline characters are
                 omitted.
-
-        .. seealso:: :meth:`text`
         """
         text = U_NEWLINE.sub('\n', self.read_text(encoding, errors))
         return text.splitlines(retain)
@@ -1003,15 +827,14 @@ class Path(str):
         lines,
         encoding=None,
         errors='strict',
-        linesep=_default_linesep,
+        *,
         append=False,
     ):
         r"""Write the given lines of text to this file.
 
         By default this overwrites any existing file at this path.
 
-        This puts a platform-specific newline sequence on every line.
-        See `linesep` below.
+        Puts a platform-specific newline sequence on every line.
 
             `lines` - A list of strings.
 
@@ -1021,33 +844,16 @@ class Path(str):
             `errors` - How to handle errors in Unicode encoding.  This
                 also applies only to Unicode strings.
 
-            linesep - (deprecated) The desired line-ending.  This line-ending is
-                applied to every line.  If a line already has any
-                standard line ending (``'\r'``, ``'\n'``, ``'\r\n'``,
-                ``u'\x85'``, ``u'\r\x85'``, ``u'\u2028'``), that will
-                be stripped off and this will be used instead.  The
-                default is os.linesep, which is platform-dependent
-                (``'\r\n'`` on Windows, ``'\n'`` on Unix, etc.).
-                Specify ``None`` to write the lines as-is, like
-                ``.writelines`` on a file object.
-
         Use the keyword argument ``append=True`` to append lines to the
         file.  The default is to overwrite the file.
         """
         mode = 'a' if append else 'w'
         with self.open(mode, encoding=encoding, errors=errors, newline='') as f:
-            f.writelines(self._replace_linesep(lines, linesep))
+            f.writelines(self._replace_linesep(lines))
 
     @staticmethod
-    def _replace_linesep(lines, linesep):
-        if linesep != _default_linesep:
-            warnings.warn("linesep is deprecated", DeprecationWarning, stacklevel=3)
-        else:
-            linesep = os.linesep
-        if linesep is None:
-            return lines
-
-        return (line + linesep for line in _strip_newlines(lines))
+    def _replace_linesep(lines):
+        return (line + os.linesep for line in _strip_newlines(lines))
 
     def read_md5(self):
         """Calculate the md5 hash for this file.
@@ -1107,25 +913,9 @@ class Path(str):
         """.. seealso:: :func:`os.path.exists`"""
         return self.module.exists(self)
 
-    def isdir(self):  # pragma: no cover
-        warnings.warn(
-            "isdir is deprecated; use is_dir",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.is_dir()
-
     def is_dir(self):
         """.. seealso:: :func:`os.path.isdir`"""
         return self.module.isdir(self)
-
-    def isfile(self):  # pragma: no cover
-        warnings.warn(
-            "isfile is deprecated; use is_file",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.is_file()
 
     def is_file(self):
         """.. seealso:: :func:`os.path.isfile`"""
@@ -1408,6 +1198,40 @@ class Path(str):
         """.. seealso:: :func:`os.renames`"""
         os.renames(self, new)
         return self._next_class(new)
+
+    def replace(self, target_or_old: Path | str, *args) -> Path:
+        """
+        Replace a path or substitute substrings.
+
+        Implements both pathlib.Path.replace and str.replace.
+
+        If only a target is supplied, rename this path to the target path,
+        overwriting if that path exists.
+
+        >>> dest = Path(getfixture('tmp_path'))
+        >>> orig = dest.joinpath('foo').touch()
+        >>> new = orig.replace(dest.joinpath('fee'))
+        >>> orig.exists()
+        False
+        >>> new.exists()
+        True
+
+        ..seealso:: :meth:`pathlib.Path.replace`
+
+        If a second parameter is supplied, perform a textual replacement.
+
+        >>> Path('foo').replace('o', 'e')
+        Path('fee')
+        >>> Path('foo').replace('o', 'l', 1)
+        Path('flo')
+
+        ..seealso:: :meth:`str.replace`
+        """
+        return self._next_class(
+            super().replace(target_or_old, *args)
+            if args
+            else pathlib.Path(self).replace(target_or_old)
+        )
 
     #
     # --- Create/delete operations on directories
