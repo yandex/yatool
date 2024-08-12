@@ -61,14 +61,6 @@ namespace {
         return parent.GhostPeers.contains(peer.GetDirId());
     }
 
-    // TODO(svidyuk) remove me after jbuild death
-    TVector<TNodeId> SubstractPeers(TArrayRef<const TNodeId> from, TArrayRef<const TNodeId> neg) {
-        const THashSet<TNodeId> negSet{neg.begin(), neg.end()};
-        TVector<TNodeId> res;
-        CopyIf(from.begin(), from.end(), std::back_inserter(res), [&](TNodeId id) { return !negSet.contains(id); });
-        return res;
-    }
-
     template<typename TFunc>
     bool IterateJsonStrArray(TStringBuf array, TFunc&& handler) {
         struct TJsonCallbacks: NJson::TJsonCallbacks {
@@ -708,10 +700,9 @@ namespace {
     public:
         using TStateItem = TGraphIteratorStateItem<CollectedModuleInfo, true>;
 
-        TDependencyManagementCollector(const TRestoreContext& restoreContext, THashMap<ui32, TVector<TNodeId>>& extraTestDeps)
+        TDependencyManagementCollector(const TRestoreContext& restoreContext)
             : RestoreContext{restoreContext}
-            , DMConf{restoreContext.Conf.CommandConf}
-            , ExtraTestDeps{extraTestDeps} {
+            , DMConf{restoreContext.Conf.CommandConf} {
         }
 
         void LogStats() const {
@@ -793,7 +784,7 @@ namespace {
                     }
                 }
             }
-            const auto compileClasspath = ManagePeersClosure(rules, record, *parent, parentItem);
+            ManagePeersClosure(rules, record, *parent, parentItem);
             if (!parent->Get(RUN_JAVA_PROGRAM_VALUE).empty()) {
                 parent->Set(RUN_JAVA_PROGRAM_MANAGED, ManageRunJavaProgram(*parent, parentItem));
             }
@@ -824,11 +815,8 @@ namespace {
                 }
             }
 
-            const auto testClasspath = ManageTestClasspath(*parent, parentItem);
-            // TODO(svidyuk) remove me after jbuild death
-            if (!testClasspath.empty()) {
-                ExtraTestDeps[parent->GetDirId()] = SubstractPeers(testClasspath, compileClasspath);
-            }
+            ManageTestClasspath(*parent, parentItem);
+
             // DEPRECATED, used only for fill DART_CLASSPATH_DEPS
             // Real add unmanageable peers to peers closure moved to AddUnmanageablePeersToClosure
             record.UnmanageablePeersClosure = HandleUnmanageables(parentItem, *parent);
@@ -981,7 +969,7 @@ namespace {
             return pos->second;
         }
 
-        TVector<TNodeId> ManagePeersClosure(
+        void ManagePeersClosure(
             const TDependencyManagementRules& rules,
             const TManagedPeers& peersRecord,
             TModule& parent,
@@ -1006,8 +994,6 @@ namespace {
             }
             parent.Set(MANAGED_PEERS_CLOSURE, ToPeerListVar(managedPeers, EPathType::Moddir));
             parent.Set(DART_CLASSPATH, ToPeerListVar(managedPeers, EPathType::Artefact));
-            // TODO(svidyuk): remove me after jbuild death (required for ExtraTestDeps calc only)
-            return managedPeers;
         }
 
         TVector<TNodeId> ManageMultipleRoots(const TVector<TNodeId>& roots) {
@@ -1073,12 +1059,12 @@ namespace {
             cmd.SortEdges(TNodeEdgesComparator{cmd});
         }
 
-        TVector<TNodeId> ManageTestClasspath(
+        void ManageTestClasspath(
             TModule& parent,
             const TStateItem& parentItem) {
             const auto testCP = parent.Get(TEST_CLASSPATH_VALUE);
             if (testCP.empty()) {
-                return {};
+                return;
             }
 
             TVector<TNodeId> roots;
@@ -1097,7 +1083,7 @@ namespace {
                 roots.push_back(it->second);
             }
             if (roots.empty()) {
-                return {};
+                return;
             }
 
             const auto peersClosure = ManageMultipleRoots(roots);
@@ -1105,8 +1091,6 @@ namespace {
                 ManageCmdTools(parentItem.Node().Id(), cmdIt->second, peersClosure);
             }
             parent.Set(TEST_CLASSPATH_MANAGED, ToPeerListVar(peersClosure, EPathType::Moddir));
-            // TODO(svidyuk): remove me after jbuild death (required for ExtraTestDeps calc only)
-            return peersClosure;
         }
 
         TString ManageRunJavaProgram(TModule& parent, const TStateItem& parentItem) {
@@ -1394,7 +1378,6 @@ namespace {
     private:
         TRestoreContext RestoreContext;
         TDependencyManagementConf DMConf;
-        THashMap<ui32, TVector<TNodeId>>& ExtraTestDeps;
 
         THashMap<ui32, TNodeId> Proxies;
         THashMap<TNodeId, TManagedPeers> ManagedPeers;
@@ -1784,9 +1767,9 @@ namespace NDetail {
     }
 }
 
-void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets, THashMap<ui32, TVector<TNodeId>>& extraTestDeps) {
+void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets) {
     FORCE_TRACE(U, NEvent::TStageStarted("Apply Dependency Management"));
-    TDependencyManagementCollector collector{restoreContext, extraTestDeps};
+    TDependencyManagementCollector collector{restoreContext};
     TDependencyManagementCollectingVisitor collectorVisitor{collector};
     TDependencyManagementCollectingVisitor::TState collectorState;
     IterateAll(restoreContext.Graph, startTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });

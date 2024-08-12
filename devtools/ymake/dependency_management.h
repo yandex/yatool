@@ -18,8 +18,7 @@ struct TDependencyManagementModuleInfo {
     TVector<TNodeId> AppliedExcludes;
 };
 
-// TODO(svidyuk) extraTestDeps is nonlockal hack to keep test classpath alive until added as deps for test nodes.
-void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets, THashMap<ui32, TVector<TNodeId>>& extraTestDeps);
+void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets);
 
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots);
 void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EManagedPeersDepth depth = EManagedPeersDepth::Transitive);

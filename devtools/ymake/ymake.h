@@ -57,7 +57,6 @@ public:
     bool HasNonDirTargets = false;
 
     TDependsToModulesClosure DependsToModulesClosure;
-    THashMap<ui32, TVector<TNodeId>> ExtraTestDeps; // "dirId -> test classpath" TODO(svidyuk) remove me after jbuild death
 
     NYndex::TYndex Yndex;
 

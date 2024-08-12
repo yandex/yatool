@@ -871,7 +871,7 @@ int main_real(TBuildConfiguration& conf) {
 
     bool hasBadLoops = yMake->DumpLoops();
 
-    ApplyDependencyManagement(yMake->GetRestoreContext(), yMake->StartTargets, yMake->ExtraTestDeps);
+    ApplyDependencyManagement(yMake->GetRestoreContext(), yMake->StartTargets);
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         return BR_CONFIGURE_FAILED;

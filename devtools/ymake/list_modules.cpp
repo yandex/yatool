@@ -43,10 +43,6 @@ void TYMake::ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& mod
     const TModule* mod = Modules.Get(node->ElemId);
     Y_ASSERT(mod != nullptr);
     ui32 dirId = mod->GetDirId();
-    if (const auto it = ExtraTestDeps.find(dirId); it != ExtraTestDeps.end()) {
-        modules.insert(modules.end(), it->second.begin(), it->second.end());
-    }
-
     if (startTarget.IsDependsTarget) {
         const auto dirName = Graph.GetFileName(dirId).CutType();
         auto iter = DependsToModulesClosure.find(dirName);
