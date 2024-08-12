@@ -191,9 +191,12 @@ class SymlinkResultStore(ResultStore):
             with open(link_file, 'r') as f:
                 link = f.read()
 
-            if self._is_symres_link(link):
+            if self._is_symres_link(link, item):
                 logger.debug("Removing symlink %s", link)
                 fs.remove_tree_safe(link)
+
+            logger.debug("Removing .link %s", link_file)
+            fs.remove_tree_safe(link_file)
 
         logger.debug("Removing link %s", item)
         if os.path.isdir(item):
