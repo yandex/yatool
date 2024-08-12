@@ -425,7 +425,7 @@ class Source(object):
 
         def get_path(p, recursive):
             p = pathlib.Path(p)
-            if recursive and p.isdir():
+            if recursive and p.is_dir():
                 return p.walk()
             return [p]
 
