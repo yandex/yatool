@@ -135,28 +135,34 @@ def _build_params():
 
 
 def _gen_graph_params():
-    return _configure_params(buildable=False, continue_on_fail=True) + [
-        core.yarg.Param('dump_inputs_map', default_value=False),
-        core.yarg.Param('strict_inputs', default_value=False),
-        core.yarg.Param('dump_graph', default_value=None),
-        core.yarg.Param('find_path_from', default_value=None),
-        core.yarg.Param('find_path_to', default_value=None),
-        core.yarg.Param('managed_dep_tree', default_value=None),
-        core.yarg.Param('classpaths', default_value=None),
-        core.yarg.Param('enabled_events', default_value='A'),
-        core.yarg.Param('yndex_file', default_value=None),
-        core.yarg.Param('patch_path', default_value=None),
-        core.yarg.Param('cache_info_file', default_value=None),
-        core.yarg.Param('cache_info_name', default_value=None),
-        core.yarg.Param('modules_info_file', default_value=None),
-        core.yarg.Param('modules_info_filter', default_value=None),
-        core.yarg.Param('lic_link_type', default_value=None),
-        core.yarg.Param('lic_custom_tags', default_value=[]),
-        core.yarg.Param('no_caches_on_retry', default_value=False),
-        core.yarg.Param('no_ymake_retry', default_value=False),
-        core.yarg.Param('cpp', default_value=False),
-        core.yarg.Param('compress_ymake_output_codec', default_value=None),
-    ]
+    return (
+        _configure_params(buildable=False, continue_on_fail=True)
+        + [
+            core.yarg.Param('dump_inputs_map', default_value=False),
+            core.yarg.Param('strict_inputs', default_value=False),
+            core.yarg.Param('dump_graph', default_value=None),
+            core.yarg.Param('find_path_from', default_value=None),
+            core.yarg.Param('find_path_to', default_value=None),
+            core.yarg.Param('managed_dep_tree', default_value=None),
+            core.yarg.Param('classpaths', default_value=None),
+            core.yarg.Param('enabled_events', default_value='A'),
+            core.yarg.Param('yndex_file', default_value=None),
+            core.yarg.Param('patch_path', default_value=None),
+            core.yarg.Param('cache_info_file', default_value=None),
+            core.yarg.Param('cache_info_name', default_value=None),
+            core.yarg.Param('modules_info_file', default_value=None),
+            core.yarg.Param('modules_info_filter', default_value=None),
+            core.yarg.Param('lic_link_type', default_value=None),
+            core.yarg.Param('lic_custom_tags', default_value=[]),
+            core.yarg.Param('no_caches_on_retry', default_value=False),
+            core.yarg.Param('no_ymake_retry', default_value=False),
+            core.yarg.Param('cpp', default_value=False),
+            core.yarg.Param('compress_ymake_output_codec', default_value=None),
+        ]
+        + [
+            core.yarg.Param(name='changelist_generator', default_value=None),
+        ]
+    )
 
 
 def _ymake_build(**kwargs):
@@ -539,6 +545,20 @@ def _run_ymake(**kwargs):
 
         progress_subscriber = PrintProgressSubscriber(app_ctx.params, getattr(app_ctx, 'display', None), logger)
         progress_subscriber.subscribe_to(app_ctx.event_queue)
+
+        cache_info_subscriber = None
+        generator = kwargs.pop('changelist_generator', None)
+        if generator is not None:
+            try:
+                import yalibrary.build_graph_cache as bg_cache
+            except ImportError:
+                pass
+            else:
+                cache_info_subscriber = bg_cache.CacheInfoSubscriber(
+                    generator, _ymake_unique_run_id, kwargs['custom_build_directory']
+                )
+                app_ctx.event_queue.subscribe(cache_info_subscriber)
+
     try:
         with tmp.temp_file() as temp_meta:
             binary = kwargs.pop('ymake_bin', None) or _mine_ymake_binary()
@@ -627,6 +647,9 @@ def _run_ymake(**kwargs):
             prefetcher.unsubscribe_from(app_ctx.event_queue)
         if app_ctx and progress_subscriber is not None:
             progress_subscriber.unsubscribe_from(app_ctx.event_queue)
+        if app_ctx and cache_info_subscriber is not None:
+            app_ctx.event_queue.unsubscribe(cache_info_subscriber)
+
         if _stat_info_postprocessing.get('start'):
             _stat_info_postprocessing['finish'] = time.time()
             _stat_info_postprocessing['duration'] = (

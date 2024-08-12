@@ -30,6 +30,7 @@ PEERDIR(
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/diagnostics
+        devtools/ya/yalibrary/build_graph_cache
     )
 ENDIF()
 

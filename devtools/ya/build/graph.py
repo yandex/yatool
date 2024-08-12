@@ -962,8 +962,16 @@ def _update_graph_execution_cost(stat, cost_info):
         cost_info["evaluation_errors"] = cost_info.get("evaluation_errors", 0) + 1
 
 
-def _prepare_local_change_list_generator(app_ctx, opts):
-    if not app_ctx:
+def _prepare_local_change_list_generator(opts):
+    if six.PY2:
+        return None
+
+    if not getattr(opts, "build_graph_cache_force_local_cl", False):
+        return None
+
+    try:
+        import app_ctx
+    except ImportError:
         return None
 
     if app_ctx.vcs_type != 'arc':
@@ -1181,6 +1189,7 @@ class _GraphMaker(object):
         check,
         exit_stack,
         print_status,
+        cl_generator,
     ):
         self._opts = opts
         self._ya_sem = ya_sem
@@ -1196,6 +1205,7 @@ class _GraphMaker(object):
         self._print_status = print_status
         self._heater = self._opts.build_graph_cache_heater
         self._allow_changelist = True
+        self._cl_generator = cl_generator
 
     def disable_changelist(self):
         self._allow_changelist = False
@@ -1670,15 +1680,12 @@ class _GraphMaker(object):
 
         if change_list is None:
             if getattr(self._opts, "build_graph_cache_force_local_cl", False) and self._allow_changelist:
-                import app_ctx
-
-                cl_generator = _prepare_local_change_list_generator(app_ctx, self._opts)
-                if cl_generator is not None:
+                if self._cl_generator is not None:
+                    o['changelist_generator'] = (
+                        self._cl_generator
+                    )  # TODO: think of a proper way to pass it closer to ymake launch
                     with stager.scope("force_changelist_creation"):
-                        o['patch_path'] = cl_generator.get_changelist(ya_cache_dir)
-                    if os.path.exists(cl_generator.path_to_current_hash):
-                        o['cache_info_file'] = cl_generator.path_to_current_hash
-                        o['cache_info_name'] = cl_generator.DEFAULT_HASH_FILE_NAME
+                        o['patch_path'] = self._cl_generator.get_changelist(ya_cache_dir)
                     if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
                         o['debug_options'] = o['debug_options'] + ['completely-trust-fs-cache']
         else:
@@ -1820,6 +1827,8 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
     import core.config
 
     build_graph_and_tests_stage = stager.start('build_graph_and_tests')
+
+    cl_generator = _prepare_local_change_list_generator(opts)
 
     print_status = get_print_status_func(opts, display, logger)
 
@@ -1995,6 +2004,7 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
         check,
         exit_stack,
         print_status,
+        cl_generator,
     )
 
     graph_handles = []
