@@ -735,7 +735,7 @@ def create_test_node(
         # XXX Increase cpu requirement by default depending of ram requirement.
         # For more info see DISTBUILD-1313
         # Remove when DISTBUILD-329 is done.
-        if suite_ram_requirements:
+        if suite_ram_requirements and opts.cpu_detect_via_ram:
             if suite_ram_requirements >= 12:
                 requirements["cpu"] = max(4, default_cpu_requirements)
             elif suite_ram_requirements >= 8:

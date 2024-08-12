@@ -105,6 +105,7 @@ class RunTestOptions(core.yarg.Options):
         self.testing_split_factor = 0
         self.test_prepare = False
         self._is_ya_test = is_ya_test
+        self.cpu_detect_via_ram = True
 
     def consumer(self):
         peerdirs_test_types = ['none', 'gen', 'all']
@@ -163,6 +164,14 @@ class RunTestOptions(core.yarg.Options):
                 subgroup=RUN_TEST_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
             ),
+            TestArgConsumer(
+                ['--remove-cpu-detect-via-ram'],
+                help='Dont change test cpu requirements depending on ram',
+                hook=core.yarg.SetConstValueHook('cpu_detect_via_ram', False),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            core.yarg.ConfigConsumer('cpu_detect_via_ram'),
         ]
 
     def postprocess(self):
