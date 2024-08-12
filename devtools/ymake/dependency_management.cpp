@@ -173,10 +173,6 @@ namespace {
         {}
         TDependencyManagementRules() = delete;
 
-        bool IsExcluded(TNodeId moduleId, const TRestoreContext& restoreContext) const noexcept {
-            return IsExcluded(restoreContext.Graph.GetFileName(moduleId));
-        }
-
         bool IsExcluded(TFileView path) const noexcept {
             return IsExcluded(path.GetTargetStr());
         }
@@ -548,11 +544,11 @@ namespace {
                     // differ from the first one in bredth traversal.
                     AccumulatedPeers.emplace(cur.Id, TResolutionInfo{depth, resolution->second.Choice});
                 }
-                return 0;
+                return TNodeId::Invalid;
             }
 
             const auto [resolve, dmVer] = FindExplicitResolution(peerDir, depth == 1);
-            if (resolve == 0) {
+            if (resolve == TNodeId::Invalid) {
                 resolution->second.Choice.Resolution = (cur.Resolution == EPeerResolution::Managed ? EPeerResolution::Transitive : cur.Resolution);
                 return AcceptResolution(cur.Id, resolution->second.Choice, depth);
             }
@@ -633,7 +629,7 @@ namespace {
         std::pair<TNodeId, TStringBuf> FindExplicitResolution(TFileView peerDir, bool isDirect) const {
             const auto rule = Rules.GetRuleForPeer(peerDir, isDirect);
             if (rule.empty()) {
-                return {0, TStringBuf{}};
+                return {TNodeId::Invalid, TStringBuf{}};
             }
             const auto libIt = LibIds.find(rule);
             if (libIt.IsEnd()) {
@@ -656,7 +652,7 @@ namespace {
                         << "[[rst]]"
                         << Endl;
                 }
-                return {0, TStringBuf{}};
+                return {TNodeId::Invalid, TStringBuf{}};
             }
             return {libIt->second, NPath::Basename(rule)};
         }
@@ -732,9 +728,9 @@ namespace {
                     } else if (Find(RUN_JAVA_PROGRAMM_OTHER_KEYS, item) != std::end(RUN_JAVA_PROGRAMM_OTHER_KEYS)) {
                         readingClaspath = false;
                     } else if (readingClaspath) {
-                        parentItem.DepsDict.emplace(item, 0);
+                        parentItem.DepsDict.emplace(item, TNodeId::Invalid);
                     } else if (std::exchange(readingFakeOut, false)) {
-                        parentItem.ManageableCommands.emplace(item, 0);
+                        parentItem.ManageableCommands.emplace(item, TNodeId::Invalid);
                     }
                 });
                 if (!success) {
@@ -743,11 +739,11 @@ namespace {
             }
             const auto testClasspath = parent->Get(TEST_CLASSPATH_VALUE);
             if (!testClasspath.empty()) {
-                parentItem.ManageableCommands.emplace(FAKE_OUT_FOR_TEST, 0);
+                parentItem.ManageableCommands.emplace(FAKE_OUT_FOR_TEST, TNodeId::Invalid);
             }
 
             for (TStringBuf elem: StringSplitter(testClasspath).Split(' ').SkipEmpty()) {
-                const auto [pos, inserted] = parentItem.DepsDict.emplace(elem, 0);
+                const auto [pos, inserted] = parentItem.DepsDict.emplace(elem, TNodeId::Invalid);
                 if (pos->first == parent->GetDir().CutType()) {
                     pos->second = parentItem.Node().Id();
                 }
@@ -1070,7 +1066,7 @@ namespace {
             TVector<TNodeId> roots;
             for (TStringBuf item: StringSplitter(testCP).Split(' ').SkipEmpty()) {
                 const auto it = parentItem.DepsDict.find(item);
-                if (it == parentItem.DepsDict.end() || !it->second) {
+                if (it == parentItem.DepsDict.end() || it->second == TNodeId::Invalid) {
                     YConfErr(KnownBug)
                         << fmt::format(
                             "[[alt1]]TEST_CLASSPATH_VALUE[[rst]] element '{}' is neither PEERDIR nor GHOST PEERDIR of '{}'",
@@ -1087,7 +1083,7 @@ namespace {
             }
 
             const auto peersClosure = ManageMultipleRoots(roots);
-            if (const auto cmdIt = parentItem.ManageableCommands.find(FAKE_OUT_FOR_TEST); cmdIt != parentItem.ManageableCommands.end() && cmdIt->second != 0) {
+            if (const auto cmdIt = parentItem.ManageableCommands.find(FAKE_OUT_FOR_TEST); cmdIt != parentItem.ManageableCommands.end() && cmdIt->second != TNodeId::Invalid) {
                 ManageCmdTools(parentItem.Node().Id(), cmdIt->second, peersClosure);
             }
             parent.Set(TEST_CLASSPATH_MANAGED, ToPeerListVar(peersClosure, EPathType::Moddir));
@@ -1117,7 +1113,7 @@ namespace {
 
                     if (readingClaspath) {
                         const auto it = parentItem.DepsDict.find(item);
-                        if (it == parentItem.DepsDict.end() || !it->second) {
+                        if (it == parentItem.DepsDict.end() || it->second == TNodeId::Invalid) {
                             YConfErr(KnownBug)
                                 << fmt::format(
                                     "[[alt1]]RUN_JAVA_PROGRAM[[rst]] CLASSPATH element '{}' is not reacable via direct tool dependency from '{}'",
@@ -1306,11 +1302,11 @@ namespace {
             unsigned depth = 0;
             size_t currDepthEnd = 0;
             size_t nodesVisited = 0;
-            TResolvedPeer cur = {0, EPeerResolution::Direct};
+            TResolvedPeer cur = {TNodeId::Invalid, EPeerResolution::Direct};
             for (
                 enqueDeps(managedPeers);
                 !searchQueue.empty();
-                enqueDeps(cur.Id != 0 ? ManagedPeers.at(cur.Id).Direct : TVector<TResolvedPeer>{}), searchQueue.pop(), ++nodesVisited
+                enqueDeps(cur.Id != TNodeId::Invalid ? ManagedPeers.at(cur.Id).Direct : TVector<TResolvedPeer>{}), searchQueue.pop(), ++nodesVisited
             ) {
                 cur = searchQueue.front();
                 if (nodesVisited == currDepthEnd) {
@@ -1324,7 +1320,7 @@ namespace {
                 }
 
                 cur.Id = resolved; // replace current node in traversal by resolve result
-                if (resolved == 0) {
+                if (resolved == TNodeId::Invalid) {
                     continue;
                 }
                 visited.insert(resolved); // mark replacement as visited
@@ -1409,7 +1405,7 @@ namespace {
         struct TDependencyResolutionInfo {
             const TModule* Peer = nullptr;
             const TModule* Orig = nullptr;
-            TNodeId PeerId = 0;
+            TNodeId PeerId = TNodeId::Invalid;
             EResolution Resolution = Excluded;
         };
 

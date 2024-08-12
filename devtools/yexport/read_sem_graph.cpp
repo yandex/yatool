@@ -285,9 +285,7 @@ namespace {
                 if (excludesIt != depAttrs.end()) {
                     Y_ASSERT(excludesIt->second.isList());
                     for (const auto& excludeNodeVal: excludesIt->second.asList()) {
-                        const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
-                        const auto it = Id2Node.find(excludeNodeId);
-                        if (it == Id2Node.end()) {
+                        if (!Id2Node.contains(excludeNodeVal.get<int64_t>())) {
                             return false; // Node for exclude not found, try create link later
                         }
                     }
@@ -298,9 +296,8 @@ namespace {
             if (depHasData && hasExcludes) {
                 auto& data = *dep.Data.Get();
                 for (auto& excludeNodeVal: excludesIt->second.asList()) {
-                    const auto excludeNodeId = static_cast<TNodeId>(excludeNodeVal.get<int64_t>());
-                    const auto it = Id2Node.find(excludeNodeId);
-                    excludeNodeVal = jinja2::Value{it->second};
+                    const auto it = Id2Node.find(excludeNodeVal.get<int64_t>());
+                    excludeNodeVal = jinja2::Value{ToUnderlying(it->second)};
                 }
                 Graph.SetDepData(edge, std::move(data));
             }

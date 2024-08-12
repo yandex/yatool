@@ -177,7 +177,7 @@ struct TBuildTargetDepsEntStats : TEntryStats {
 
     TBuildTargetDepsEntStats(TItemDebug itemDebug, bool inStack = false, bool isFile = false)
         : TEntryStats(itemDebug, inStack, isFile)
-        , LoopId(0)
+        , LoopId(TNodeId::Invalid)
     {
     }
 };

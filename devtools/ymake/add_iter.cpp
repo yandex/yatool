@@ -275,8 +275,8 @@ TDGIterAddable::TDGIterAddable(TDepGraph& graph, const TAddDepIter& it)
     : TUpdIterStBase(graph, it.DepNodeId)
     , Graph(graph)
 {
-    NodeStart = it.DepNodeId ? it.DepNodeId : graph.GetNodeById(it.DepNode).Id();
-    if (NodeStart) {
+    NodeStart = it.DepNodeId != TNodeId::Invalid ? it.DepNodeId : graph.GetNodeById(it.DepNode).Id();
+    if (NodeStart != TNodeId::Invalid) {
         Node = graph.Get(NodeStart).Value();
     } else {
         Node = it.DepNode;
@@ -672,7 +672,7 @@ inline void TDGIterAddable::StartEdit(TYMake& yMake, TUpdIter& dgIter) {
 
     TFileHolder fileContent;
 
-    bool enteredExistentNode = NodeStart && !CurDep;
+    bool enteredExistentNode = NodeStart != TNodeId::Invalid && !CurDep;
     if (enteredExistentNode) {
         if (!NeedUpdate(yMake, fileContent, reassemble, stack.back(), prev, pprev)) {
             // We perform repeat resolving every ymake's run for correct invalidation
@@ -1023,7 +1023,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
 }
 
 TUpdIter::TUpdIter(TYMake& yMake)
-    : TDepthDGIter<TDGIterAddable>(yMake.Graph, 0)
+    : TDepthDGIter<TDGIterAddable>(yMake.Graph, TNodeId::Invalid)
     , YMake(yMake)
     , NeverCachePropId(GetNeverCachePropElem(yMake.Graph))
     , Nodes(yMake.Graph)
@@ -1218,7 +1218,7 @@ inline bool TUpdIter::Enter(TState& state) {
             if (!fresh) {
                 st.Add = ii->second.AddCtx;
                 YDIAG(V) << "Node was merged with existing for " << Graph.ToString(st.Node) << Endl;
-            } else if (st.Add && st.Add->UpdNode) {
+            } else if (st.Add && st.Add->UpdNode != TNodeId::Invalid) {
                 st.Add->NeedInit2 = true;
                 st.Add->Deps.Clear();
                 YDIAG(Dev) << "Run StartEdit again for " << Graph.ToString(st.Node) << Endl;
@@ -1465,7 +1465,7 @@ TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
     if (node != nullptr && node->IsModule && IsPeerdirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType)) {
         const auto dirNode = Graph.GetNodeById(LastType, LastElem);
         if (!dirNode.IsValid() || !IsDirType(dirNode->NodeType)) {
-            return {Graph.Get(0), EPeerSearchStatus::Error};
+            return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Error};
         }
 
         TStringBuf dir = Graph.GetFileName(dirNode).GetTargetStr();
@@ -1489,13 +1489,13 @@ TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
         if (!isUserSpecifiedPeerdir) {
             // FIXME: stop to silently ignore this case
             YDIAG(IPRP) << "Ignore PEERDIR from bad module to " << dir << " because it is not user-specified" << Endl;
-            return {Graph.Get(0), EPeerSearchStatus::Match};
+            return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
         }
 
-        return {Graph.Get(0), EPeerSearchStatus::Unknown};
+        return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Unknown};
     }
 
-    return {Graph.Get(0), EPeerSearchStatus::Match};
+    return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
 }
 
 void TUpdIter::PropagateIncDirs(const TDGIterAddable& st) const {
@@ -2017,7 +2017,7 @@ inline bool TUpdReiter::Enter(TState& state) {
             }
         }
 
-        if (!st.NodeStart) {
+        if (st.NodeStart == TNodeId::Invalid) {
             if (!st.Add)
                 st.Add = FindUnflushedNode(id);
             if (!st.Add || st.Add->NeedInit2) {

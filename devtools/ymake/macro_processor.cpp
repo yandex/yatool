@@ -840,24 +840,24 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
 
             const TNodeId id = Graph->GetFileNodeById(fid).Id();
-            if (!id && !finalTargetCmd && getNodeName() == output.Name) {
+            if (id == TNodeId::Invalid && !finalTargetCmd && getNodeName() == output.Name) {
                 YConfErr(BadOutput) << "The name of intermediate output " << output.Name
                                     << " matches the module name. Skip command: " << SkipId(curCmdName) << Endl;
                 return false;
             }
 
-            if (id && Graph->GetFileNodeData(fid).NodeModStamp == fileConf.TimeStamps.CurStamp()) {
+            if (id != TNodeId::Invalid && Graph->GetFileNodeData(fid).NodeModStamp == fileConf.TimeStamps.CurStamp()) {
                 TNodeId cmdId = GetDepNodeWithType(id, *Graph, EDT_BuildCommand, EMNT_BuildCommand);
-                if (!cmdId) {
+                if (cmdId == TNodeId::Invalid) {
                     // `finalTargetCmd` means either module command or global command, so we cannot just take modBuilder.GetNode().Id
                     TNodeId mainId = GetDepNodeWithType(id, *Graph, EDT_OutTogether, finalTargetCmd ? modBuilder.GetNode().NodeType : EMNT_NonParsedFile);
-                    if (finalTargetCmd && !mainId) {
+                    if (finalTargetCmd && mainId == TNodeId::Invalid) {
                         // Second try for global command
                         mainId = GetDepNodeWithType(id, *Graph, EDT_OutTogether, EMNT_NonParsedFile);
                     }
-                    Y_ASSERT(mainId);
+                    Y_ASSERT(mainId != TNodeId::Invalid);
                     cmdId = GetDepNodeWithType(mainId, *Graph, EDT_BuildCommand, EMNT_BuildCommand);
-                    Y_ASSERT(cmdId);
+                    Y_ASSERT(cmdId != TNodeId::Invalid);
                 }
                 const auto cmdView = Graph->GetCmdName(Graph->Get(cmdId));
                 if (cmdView.IsNewFormat() || curCmdId.IsNewFormat()) {

@@ -171,7 +171,7 @@ struct TIncFixer: public TDirectPeerdirsVisitor<TIFixEntryStats, TIFixStData> {
 
     bool ProcessNewNode(TState& state, TModule& module, TResolveFile newFile, EMakeNodeType newType, TModuleResolver& modRes) {
         TNodeId newNodeId = Graph.GetNodeById(newType, newFile.GetElemId()).Id();
-        bool nodeInGraph = (newNodeId != 0);
+        bool nodeInGraph = (newNodeId != TNodeId::Invalid);
         bool visitedByUpdIter = nodeInGraph && UpdIter.Nodes.contains(MakeDepsCacheId(*Graph[newNodeId]));
 
         if (!visitedByUpdIter) {

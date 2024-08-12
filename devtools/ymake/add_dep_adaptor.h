@@ -16,7 +16,7 @@ class TAddDepAdaptor : public TNonCopyable {
 public:
     EMakeNodeType NodeType = EMNT_Deleted;
     ui64 ElemId = 0;
-    TNodeId UpdNode = 0;
+    TNodeId UpdNode = TNodeId::Invalid;
 
     TAddDepAdaptor() noexcept = default;
     virtual ~TAddDepAdaptor() = default;

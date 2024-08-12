@@ -107,7 +107,7 @@ namespace {
 
         void RenderNodeDelayed() {
             PrepareNodeForRendering();
-            Y_ASSERT(NodeId != 0);
+            Y_ASSERT(NodeId != TNodeId::Invalid);
             MakeCommand.GetFromGraph(NodeId, ModuleId, ECF_Json, &DumpInfo, true, IsGlobalNode);
             RenderedWithoutSubst = true;
         }
@@ -624,7 +624,7 @@ namespace {
         // after rendering all nodes
         for (TNodeId result : results) {
             auto resultIt = cmdbuilder.Nodes.find(result);
-            if (resultIt->second.OutTogetherDependency != 0 && !resultIt->second.HasBuildCmd) {
+            if (resultIt->second.OutTogetherDependency != TNodeId::Invalid && !resultIt->second.HasBuildCmd) {
                 resultIt = cmdbuilder.Nodes.find(resultIt->second.OutTogetherDependency);
             }
             plan.Results.push_back(resultIt->second.GetNodeUid());

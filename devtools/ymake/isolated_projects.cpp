@@ -54,7 +54,7 @@ namespace {
             : Graph_(graph)
             , FileConf_(graph.Names().FileConf)
         {
-            Paths_.push_back(0); // reserve place for EmptyPath id
+            Paths_.push_back(TNodeId::Invalid); // reserve place for EmptyPath id
         }
 
         bool Enter(TState& state) {
@@ -124,7 +124,7 @@ namespace {
 
             if (toNodeType == EMNT_File || toNodeType == EMNT_Directory || toNodeType == EMNT_MakeFile || IsModuleType(toNodeType)) {
                 if (SourcesNodesStack_.size()) {
-                    ui32 fromElemId = FileConf_.GetTargetId(Graph_.Get(SourcesNodesStack_.back() & 0x7fffffff)->ElemId);
+                    ui32 fromElemId = FileConf_.GetTargetId(Graph_.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
                     ui32 toElemId = FileConf_.GetTargetId(toNodeRef->ElemId);
                     Y_ASSERT(fromElemId);
                     Y_ASSERT(toElemId);
@@ -140,7 +140,7 @@ namespace {
                     if (pathsSize != Paths_.size()) {
                         Y_ASSERT(pathsSize <= LastPathNodeBit_);
                         Deps_.back().PathId = static_cast<typename TSourceDep::TPathId>(pathsSize);
-                        Paths_.back() |= LastPathNodeBit_;
+                        Paths_.back() = TNodeId{ToUnderlying(Paths_.back()) | LastPathNodeBit_};
                         PathsLengthStat_[Paths_.size() - pathsSize] += 1; // collect debug/info statistic for paths length
                     }
                 }
@@ -167,13 +167,13 @@ namespace {
             if (dep.PathId) {
                 for (auto pathId = dep.PathId;; ++pathId) {
                     auto nodeId = Paths_[pathId];
-                    auto nodeRef = Graph_.Get(nodeId & 0x7fffffff);
+                    auto nodeRef = Graph_.Get(TNodeId{ToUnderlying(nodeId) & 0x7fffffff});
                     TStringBuf name = Graph_.ToTargetStringBuf(nodeRef);
                     if (nodeRef->NodeType == EMNT_BuildCommand) {
                         name = SkipId(name);
                     }
                     fullPath.emplace(name);
-                    if (nodeId & LastPathNodeBit_) {
+                    if (ToUnderlying(nodeId) & LastPathNodeBit_) {
                         break;
                     }
                 }
@@ -210,7 +210,7 @@ namespace {
         TVector<TNodeId> SourcesNodesStack_;
         TVector<size_t> LateGlob_;
         TVector<TSourceDep> Deps_;
-        static constexpr TNodeId LastPathNodeBit_ = 0x80000000;
+        static constexpr std::underlying_type_t<TNodeId> LastPathNodeBit_{0x80000000};
         // use queue for compact store path (not source-type nodes between TSourceDep(From..To) )
         // also for space economy use bit-marker for end of path (isolated node in path has set LastPathNodeBit)
         TDeque<TNodeId> Paths_;

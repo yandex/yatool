@@ -48,7 +48,7 @@ TModAddData& TNodeAddCtx::GetModuleData() {
 }
 
 void TNodeAddCtx::GetOldDeps(TDeps& deps, size_t numFirst, bool allOutputs) {
-    Y_ASSERT(UpdNode);
+    Y_ASSERT(UpdNode != TNodeId::Invalid);
 
     const TDepGraph::TConstNodeRef node = Graph.Get(UpdNode);
     size_t numDeps = node.Edges().Total();
@@ -122,7 +122,7 @@ void TNodeAddCtx::AddInputs() {
         TCommandInfo& cmdInfo = *modData.CmdInfo;
         Y_ASSERT(UseFileId(NodeType));
         bool cmdChanged = false;
-        if (UpdNode) {
+        if (UpdNode != TNodeId::Invalid) {
             for (const auto& edge : Graph.Get(UpdNode).Edges()) {
                 if (*edge == EDT_BuildCommand) {
                     const TDepTreeNode nodeDep = edge.To().Value();
@@ -142,7 +142,7 @@ void TNodeAddCtx::AddInputs() {
 }
 
 bool TNodeAddCtx::CheckInputsChange() const {
-    Y_ASSERT(UpdNode);
+    Y_ASSERT(UpdNode != TNodeId::Invalid);
     YDIAG(Dev) << "MacroImplInp, check " << Graph.GetFileName(NodeType, ElemId) << Endl;
     // compare inputs (BuildFrom), too
     TDeps::const_iterator i = Deps.begin(), e = Deps.end();
@@ -322,8 +322,8 @@ void TNodeAddCtx::Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule*
     ElemId = st.Node.ElemId;
     UpdNode = st.NodeStart;
 
-    Y_ASSERT(UpdNode || st.CurDep || !Graph.GetNodeById(NodeType, ElemId).Id());
-    if (Y_UNLIKELY(Diag()->FU) && UseFileId(NodeType) && !UpdNode) {
+    Y_ASSERT(UpdNode != TNodeId::Invalid || st.CurDep || Graph.GetNodeById(NodeType, ElemId).Id() == TNodeId::Invalid);
+    if (Y_UNLIKELY(Diag()->FU) && UseFileId(NodeType) && UpdNode == TNodeId::Invalid) {
         Cerr << "NEW: " << Graph.Names().FileNameById(ElemId) << Endl;
     }
     if (st.CurDep) {
@@ -351,7 +351,7 @@ void TNodeAddCtx::Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule*
 void TNodeAddCtx::WriteHeader() {
     Deps.Lock();
     FlushState->FlushPos = 0;
-    if (UpdNode) {
+    if (UpdNode != TNodeId::Invalid) {
         const TDepTreeNode node = Graph.Get(UpdNode).Value();
 
         // This is desirable property (though not required), so let's debug it
@@ -377,7 +377,7 @@ void TNodeAddCtx::WriteHeader() {
 }
 
 TFlushState::TFlushState(TDepGraph& graph, TNodeId oldNodeId, EMakeNodeType newNodeType) {
-    if (!oldNodeId) {
+    if (oldNodeId == TNodeId::Invalid) {
         IsNewNode = true;
         return;
     }
@@ -445,7 +445,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
         const TUpdEntryPtr& entry = item.EntryPtr;
         if (UseFileId(node.NodeType) == UseFileId(NodeType) && node.ElemId == ElemId && entry && entry->second.AddCtx == me.Get()) {
             Y_UNUSED(me.Release()); // Flush will be performed deeper on stack
-            return 0;
+            return TNodeId::Invalid;
         }
     }
 
@@ -471,7 +471,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
         }
         TNodeId depNodeId = Graph.GetNodeById(dep.NodeType, dep.ElemId).Id();
 
-        if (Y_UNLIKELY(!depNodeId)) {
+        if (Y_UNLIKELY(depNodeId == TNodeId::Invalid)) {
             size_t positionInStack = FindInStack(stack, dep.NodeType, dep.ElemId);
             if (!positionInStack) {
                 auto relocationIt = YMake.Parser->RelocatedNodes.find(MakeDepsCacheId(dep.NodeType, dep.ElemId));
@@ -479,7 +479,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
                     ui64 newId = relocationIt->second.ElemId;
                     EMakeNodeType newType = relocationIt->second.NodeType;
                     depNodeId = Graph.GetNodeById(newType, newId).Id();
-                    if (depNodeId) {
+                    if (depNodeId != TNodeId::Invalid) {
                         nodeRef.AddEdge(depNodeId, dep.DepType);
                         continue;
                     }
@@ -488,7 +488,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
                     Y_ASSERT(positionInStack);
                 } else if (lastTry) {
                     depNodeId = Graph.AddNode(dep.NodeType, dep.ElemId).Id();
-                    if (depNodeId) {
+                    if (depNodeId != TNodeId::Invalid) {
                         nodeRef.AddEdge(depNodeId, dep.DepType);
                         continue;
                     }
@@ -503,7 +503,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
             return FlushState->NodeId;
         }
 
-        Y_ASSERT(depNodeId);
+        Y_ASSERT(depNodeId != TNodeId::Invalid);
         nodeRef.AddEdge(depNodeId, dep.DepType);
     }
 
@@ -531,7 +531,7 @@ void TNodeAddCtx::DeleteDep(size_t idx) {
 
 void TNodeAddCtx::UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed) {
     auto& data = conf.GetById(ElemId);
-    if (!UpdNode || changed) {
+    if (UpdNode == TNodeId::Invalid || changed) {
         data.CmdModStamp = stamps.CurStamp();
     }
 }

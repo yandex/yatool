@@ -16,7 +16,7 @@ namespace {
 }
 
 TVector<ui32> TToolMiner::MineTools(TConstDepNodeRef genFileNode) {
-    TUniqVector<TNodeId> tools;
+    TUniqVector<ui32> tools;
     TStack<TStackFrame> stack;
     for (TConstDepRef dep : genFileNode.Edges()) {
         if (!IsBuildCommandDep(dep)) {

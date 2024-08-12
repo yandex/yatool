@@ -996,3 +996,6 @@ struct TTarget {
         return Id;
     }
 };
+
+template<>
+struct hash<TTarget>: hash<TNodeId> {};

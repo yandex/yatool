@@ -157,7 +157,7 @@ void TGeneralParser::RelocateFile(TNodeAddCtx& node, ui32 newElemId, EMakeNodeTy
     // Edit existing graph node if there is one
     const auto oldUpdNode = node.UpdNode;
     node.UpdNode = iterAddable.NodeStart = Graph.GetNodeById(node.NodeType, node.ElemId).Id();
-    if (node.UpdNode && node.UpdNode != oldUpdNode) {
+    if (node.UpdNode != TNodeId::Invalid && node.UpdNode != oldUpdNode) {
         node.UseOldDeps();
     }
 }
@@ -272,7 +272,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
                 if (mod->IsLoaded() && !IsPropertyValue(stack)) {
                     nodeEntry.Props.SetIntentNotReady(EVI_ModuleProps, YMake.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                 }
-                if (node.UpdNode) {
+                if (node.UpdNode != TNodeId::Invalid) {
                     YDIAG(V) << "Node was found! " << name << " -> " << src.Name << Endl;
                     break;
                 }
@@ -376,7 +376,7 @@ EMakeNodeType TGeneralParser::ProcessDirectory(TFileView dirname, TNodeAddCtx& n
     auto dirType = DirectoryType(dirname);
 
     if (dirType == EMNT_Directory) {
-        if (node.UpdNode) {
+        if (node.UpdNode != TNodeId::Invalid) {
             YDIAG(Dev) << "ProcessDirectory " << dirname << ": sz = " << node.Deps.Size() << Endl;
             node.Deps.Clear(); // we rewrite all records
         }
@@ -527,7 +527,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
     }
 
     bool depsChanged = false;
-    if (node.UpdNode) {
+    if (node.UpdNode != TNodeId::Invalid) {
         TDeps oldDeps;
         node.GetOldDeps(oldDeps, 0, false);
         if (oldDeps.Size() != node.Deps.Size()) {
@@ -553,7 +553,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
 }
 
 void TGeneralParser::ProcessProperty(TStringBuf /*name*/, TNodeAddCtx& node, TAddIterStack& /* stack& */) {
-    if (!node.UpdNode) {
+    if (node.UpdNode == TNodeId::Invalid) {
         Graph.Names().CommandConf.GetById(node.ElemId).CmdModStamp = YMake.TimeStamps.CurStamp();
     }
     //TStringBuf propName = GetPropertyName(name);
@@ -565,7 +565,7 @@ void TGeneralParser::ProcessProperty(TStringBuf /*name*/, TNodeAddCtx& node, TAd
 void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, TAddIterStack& /* stack */) {
     //Graph.Names().CommandConf.GetById(node.ElemId).CmdModStamp = YMake.TimeStamps.CurStamp();
     bool depsChanged = false;
-    if (node.UpdNode) {
+    if (node.UpdNode != TNodeId::Invalid) {
         TDeps oldDeps;
         node.GetOldDeps(oldDeps, 0, false);
         const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);

@@ -672,8 +672,8 @@ void TNodePrinter<TFormatter>::Leave(TState& state) {
     if (CurEnt->HasBuildFrom) {
         auto modIt = FindModule(state);
         TNodeId& n2m = Node2Module[st.Node().Id()];
-        if (!n2m) {
-            n2m = modIt != state.end() ? modIt->Node().Id() : 0;
+        if (n2m == TNodeId::Invalid) {
+            n2m = modIt != state.end() ? modIt->Node().Id() : TNodeId::Invalid;
         }
     }
 }
@@ -1061,7 +1061,7 @@ bool TYMake::ResolveRelationTargets(const TVector<TString>& targets, THashSet<TN
     bool success = true;
     for (TStringBuf target : targets) {
         TNodeId node = GetUserTarget(target);
-        if (node) {
+        if (node != TNodeId::Invalid) {
             result.insert(node);
             continue;
         }
@@ -1080,7 +1080,7 @@ bool TYMake::ResolveRelationTargets(const TVector<TString>& targets, THashSet<TN
             Conf.Cmsg() << "Target '" << target << "' is resolved to '" << resolvedTargetStr << "'" << Endl;
         }
         TNodeId nodeId = Graph.GetFileNodeById(resolved.GetElemId()).Id();
-        if (nodeId) {
+        if (nodeId != TNodeId::Invalid) {
             result.insert(nodeId);
         } else {
             Conf.Cmsg() << "Target '" << query << "' is not found in build graph." << Endl;
@@ -1286,7 +1286,7 @@ private:
     mutable bool HashIsValid = true;
     mutable size_t HashValue = 0;
     THashSet<TNodeId> ModDirs;
-    TNodeId PrimaryModDir = 0; // we use only primary path to print error at the case of missing peerdir
+    TNodeId PrimaryModDir = TNodeId::Invalid; // we use only primary path to print error at the case of missing peerdir
 
 public:
     THashSet<TNodeId>::iterator begin() const {
@@ -1302,7 +1302,7 @@ public:
     }
 
     void Push(TNodeId id, bool override = false) {
-        if (!PrimaryModDir || override) {
+        if (PrimaryModDir == TNodeId::Invalid || override) {
             PrimaryModDir = id;
         }
         if (ModDirs.insert(id).second) {
@@ -1318,7 +1318,7 @@ public:
         if (!HashIsValid) {
             HashValue = 0;
             for (auto id : ModDirs) {
-                HashValue += IntHash(id);
+                HashValue += IntHash(ToUnderlying(id));
             }
             HashIsValid = true;
         }
@@ -1426,26 +1426,26 @@ public:
 template <class TNodes, class TNodesData>
 TNodeId GuessModuleDir(TNodes& nodes, const TConstDepNodeRef& node, TNodesData& cur) { // was TFace::ReassignModules
     if (!cur.IsFile || !cur.ModDir.Empty()) {
-        return 0;
+        return TNodeId::Invalid;
     }
     if (node->NodeType != EMNT_File) {
-        return 0;
+        return TNodeId::Invalid;
     }
     const auto& graph = TDepGraph::Graph(node);
     TFileView fname = graph.GetFileName(node);
     if (fname.GetType() == NPath::Unset) {
-        return 0;
+        return TNodeId::Invalid;
     }
     TStringBuf dirname = NPath::Parent(fname.GetTargetStr());
     while (dirname.size()) {
         ui32 dirElemId = graph.Names().FileConf.GetIdNx(dirname);
-        TNodeId dirId = dirElemId ? graph.GetNodeById(EMNT_Directory, dirElemId).Id() : 0;
+        TNodeId dirId = dirElemId ? graph.GetNodeById(EMNT_Directory, dirElemId).Id() : TNodeId::Invalid;
         if (const auto nodesIt = nodes.find(dirId); nodesIt != nodes.end() && nodesIt->second.ModDir.has(dirId)) {
             return dirId;
         }
         dirname = NPath::Parent(dirname);
     }
-    return 0;
+    return TNodeId::Invalid;
 }
 
 class TAsnReiter: public TNoReentryStatsConstVisitor<TDirAsnEntryStats> {
@@ -1669,7 +1669,7 @@ public:
                         if (InBuildDir(dir)) {
                             dir = ArcPath(NPath::CutType(dir));
                         }
-                        if (const auto& dirNode = graph.GetFileNode(dir); dirNode.IsValid() && dirNode.Id()) {
+                        if (const auto& dirNode = graph.GetFileNode(dir); dirNode.IsValid() && dirNode.Id() != TNodeId::Invalid) {
                             // it can be 0 when there is a source directory but there is no node in it (no ya.make)
                             modDirs.Push(dirNode.Id());
                         }
@@ -1792,7 +1792,7 @@ public:
 
         if (fresh && CurEnt->ModDir.Empty()) {
             TNodeId modDir = GuessModuleDir(Nodes, state.TopNode(), *CurEnt);
-            if (auto i = modDir ? Dir2MainModule.find(modDir) : Dir2MainModule.end()) {
+            if (auto i = modDir != TNodeId::Invalid ? Dir2MainModule.find(modDir) : Dir2MainModule.end()) {
                 Mod2Srcs[i->second].push_back(state.TopNode().Id());
             }
         }
@@ -2004,11 +2004,11 @@ void TBuildTargetDepsPrinter::Leave(TState& state) {
     const auto node = state.TopNode();
     const auto& graph = TDepGraph::Graph(node);
     if (CurEnt->WasFresh) {
-        if (CurEnt->LoopId) {
+        if (CurEnt->LoopId != TNodeId::Invalid) {
             YDIAG(Dev) << graph.GetFileName(node) << " is in loop " << CurEnt->LoopId << Endl;
             bool sameLoop = state.HasIncomingDep() && ((TBuildTargetDepsEntStats*)(*state.Parent()).Cookie)->LoopId == CurEnt->LoopId;
             if (!sameLoop) {
-                TGraphLoop& loop = Loops[CurEnt->LoopId];
+                TGraphLoop& loop = Loops[AsIdx(CurEnt->LoopId)];
                 if (!loop.DepsDone) {
                     for (auto l : loop) {
                         if (l != node.Id()) { //not elegantly but working

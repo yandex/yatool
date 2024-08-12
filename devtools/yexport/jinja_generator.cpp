@@ -257,7 +257,7 @@ public:
                                     AddValueToJinjaList(listIt->second.asList(), value);
                                 }
                             } else {
-                                spdlog::error("Not found induced for excluded node id {} at {}", excludeNodeId, data.Path);
+                                spdlog::error("Not found induced for excluded node id {} at {}", ToUnderlying(excludeNodeId), data.Path);
                             }
                         }
                     }
@@ -288,7 +288,10 @@ private:
     void StoreInducedAttrValues(TNodeId nodeId, const std::string& attrName, const Values& values, const std::string& nodePath) {
         auto nodeIt = InducedAttrs_.find(nodeId);
         if (nodeIt == InducedAttrs_.end()) {
-            auto [emplaceNodeIt, _] = InducedAttrs_.emplace(nodeId, Generator_->MakeAttrs(EAttrGroup::Induced, "induced by " + std::to_string(nodeId)));
+            auto [emplaceNodeIt, _] = InducedAttrs_.emplace(
+                nodeId,
+                Generator_->MakeAttrs(EAttrGroup::Induced, "induced by " + std::to_string(ToUnderlying(nodeId)))
+            );
             nodeIt = emplaceNodeIt;
         }
         nodeIt->second->SetAttrValue(attrName, values, nodePath);

@@ -32,7 +32,7 @@ void TOwnersPrinter::Leave(TState& state) {
 
     if (leftType == EMNT_Directory) {
         TNodeId leftOwner = Nodes[leftNode].Owner;
-        if (leftOwner != 0) {
+        if (leftOwner != TNodeId::Invalid) {
             for (auto modId : Nodes[leftNode].ModIds) {
                 Module2Owner[modId] = leftOwner;
             }
@@ -57,7 +57,7 @@ void TOwnersPrinter::Left(TState& state) {
         if (IsMod) {
             CurEnt->ModIds.push_back(leftNode.Id());
         } else if (leftType == EMNT_MakeFile) {
-            if (Nodes[leftNode.Id()].Owner != 0) {
+            if (Nodes[leftNode.Id()].Owner != TNodeId::Invalid) {
                 CurEnt->Owner = Nodes[leftNode.Id()].Owner;
             }
         }

@@ -38,13 +38,13 @@ void TJSONVisitorNew::Leave(TState& state) {
     UpdateReferences(state);
 
     TNodeId chldLoop = CurrData->LoopId;
-    bool inSameLoop = chldLoop && PrntData && chldLoop == PrntData->LoopId;
+    bool inSameLoop = chldLoop != TNodeId::Invalid && PrntData && chldLoop == PrntData->LoopId;
 
     --CurrData->EnterDepth;
     if (CurrData->EnterDepth == 0 && !CurrData->Finished) {
         FinishCurrent(state);
         CurrData->Finished = true;
-        if (chldLoop && !inSameLoop) {
+        if (chldLoop != TNodeId::Invalid && !inSameLoop) {
             ComputeLoopHash(chldLoop);
         }
     }
@@ -196,7 +196,7 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         }
     }
 
-    if (CurrData->OutTogetherDependency) {
+    if (CurrData->OutTogetherDependency != TNodeId::Invalid) {
         // When a command works with a generated file that is an additional output,
         // the command should depend on the corresponding main output node, because
         // it is associated to it's build command and the JSON node, which in turn
@@ -456,7 +456,7 @@ void TJSONVisitorNew::AddGlobalVars(TState& state) {
 }
 
 void TJSONVisitorNew::ComputeLoopHash(TNodeId loopId) {
-    const TGraphLoop& loop = Loops[loopId];
+    const TGraphLoop& loop = Loops[AsIdx(loopId)];
 
     TJsonMultiMd5 structureLoopHash(loopId, Graph->Names(), loop.size());
     TJsonMultiMd5 includeStructureLoopHash(loopId, Graph->Names(), loop.size());

@@ -180,7 +180,7 @@ static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
         if (!node)
             continue;
         const TNodeId offs = yMake->Graph.GetFileNodeById(node).Id();
-        if (offs)
+        if (offs != TNodeId::Invalid)
             yMake->StartTargets.push_back(offs);
     }
     return yMake->StartTargets.size() ? TMaybe<EBuildResult>() : TMaybe<EBuildResult>(BR_CONFIGURE_FAILED);
@@ -194,7 +194,7 @@ void TYMake::BuildDepGraph() {
     for (ui32 id : CurStartDirs_) {
         YDebug() << "Parsing dir " << Names.FileNameById(id) << Endl;
         const TNodeId nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, id, &rootModule);
-        if (nodeId) {
+        if (nodeId != TNodeId::Invalid) {
             startDirs.Push(nodeId);
         }
     }
@@ -262,11 +262,11 @@ TNodeId TYMake::GetUserTarget(const TStringBuf& target) const {
     YDebug() << "Searching target '" << target << "'" << Endl;
     TString from = NPath::ConstructPath(target, NPath::Source);
     TNodeId nodeId = Graph.GetFileNode(from).Id();
-    if (!nodeId) {
+    if (nodeId == TNodeId::Invalid) {
         from = NPath::ConstructPath(target, NPath::Build);
         nodeId = Graph.GetFileNode(from).Id();
     }
-    if (!nodeId) {
+    if (nodeId == TNodeId::Invalid) {
         from = target;
         nodeId = Graph.GetFileNode(from).Id();
     }
@@ -277,7 +277,7 @@ TNodeId TYMake::GetUserTarget(const TStringBuf& target) const {
 bool TYMake::InitTargets() {
     for (const TFsPath& target: Conf.Targets) {
         TNodeId offs = GetUserTarget(NPath::FromLocal(target));
-        if (!offs) {
+        if (offs == TNodeId::Invalid) {
             YConfErr(UserErr) << "Target '" << target.c_str() << "' not found" << Endl;
             continue;
         }

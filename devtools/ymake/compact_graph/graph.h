@@ -1,12 +1,46 @@
 #pragma once
 
+#include <util/generic/cast.h>
 #include <util/generic/vector.h>
 #include <util/generic/deque.h>
 #include <util/generic/hash.h>
 #include <util/generic/algorithm.h>
 #include <util/ysaveload.h>
 
-using TNodeId = ui32;
+enum class TNodeId: ui32 {
+    Invalid = 0,
+    MinValid = 1
+};
+constexpr TNodeId& operator++ (TNodeId& id) noexcept {
+    id = TNodeId{ToUnderlying(id) + 1};
+    return id;
+}
+constexpr TNodeId operator++ (TNodeId& id, int) noexcept {
+    return std::exchange(id, TNodeId{ToUnderlying(id) + 1});
+}
+constexpr TNodeId& operator-- (TNodeId& id) noexcept {
+    id = TNodeId{ToUnderlying(id) - 1};
+    return id;
+}
+constexpr TNodeId operator-- (TNodeId& id, int) noexcept {
+    return std::exchange(id, TNodeId{ToUnderlying(id) - 1});
+}
+constexpr size_t AsIdx(TNodeId id) noexcept {
+    return static_cast<size_t>(id);
+}
+// TODO: Investigate if using default hash for enum affects performance. Switching
+// node id hash function from default for ui32 to default for enum breaks at least one
+// test which relies on iteration order over hash map:
+// https://a.yandex-team.ru/arcadia/devtools/ymake/compact_graph/iter_ut.cpp?rev=r10491100#L684
+// Most likely that it's badly written test but it is kept untouched during turning TNodeId
+// into strongly typed enum.
+template<>
+struct hash<TNodeId> {
+    size_t operator() (const TNodeId& k) const noexcept {
+        return hash<ui32>{}(ToUnderlying(k));
+    }
+};
+
 
 template <typename V>
 V Deleted();
@@ -30,23 +64,23 @@ enum EChanged : ui8 {
 template <typename VE, int IdBits>
 class TCompactEdge {
 private:
-    TNodeId ToAndValue_;
-    static constexpr TNodeId NodeMask = ~((TNodeId)-1 << IdBits);
-    static constexpr TNodeId Deleted = 0;
+    using TNodeIdRepr = std::underlying_type_t<TNodeId>;
+    TNodeIdRepr ToAndValue_;
+    static constexpr TNodeIdRepr NodeMask = ~(~TNodeIdRepr{0} << IdBits);
 
 public:
     using TValueType = VE;
 
     TCompactEdge()
-        : ToAndValue_(Deleted)
+        : ToAndValue_(ToUnderlying(TNodeId::Invalid))
     {
     }
 
     TCompactEdge(TNodeId to, VE value)
-        : ToAndValue_((value << IdBits) | to)
+        : ToAndValue_((value << IdBits) | ToUnderlying(to))
     {
-        Y_ASSERT(value < ((TNodeId)1 << (sizeof(TNodeId) * 8 - IdBits)));
-        Y_ASSERT(to < ((TNodeId)1 << IdBits));
+        Y_ASSERT(value < ((TNodeIdRepr)1 << (sizeof(TNodeId) * 8 - IdBits)));
+        Y_ASSERT(ToUnderlying(to) < ((TNodeIdRepr)1 << IdBits));
     }
 
     const VE Value() const {
@@ -54,28 +88,28 @@ public:
     }
 
     void SetValue(VE newValue) {
-        Y_ASSERT(newValue < ((TNodeId)1 << (sizeof(TNodeId) * 8 - IdBits)));
+        Y_ASSERT(newValue < (TNodeIdRepr{1} << (sizeof(TNodeId) * 8 - IdBits)));
         ToAndValue_ = Id() | (newValue << IdBits);
     }
 
     TNodeId Id() const {
-        return ToAndValue_ & NodeMask;
+        return static_cast<TNodeId>(ToAndValue_ & NodeMask);
     }
 
     void SetId(TNodeId to) {
-        ToAndValue_ = (Value() << IdBits) | to;
+        ToAndValue_ = (Value() << IdBits) | ToUnderlying(to);
     }
 
     bool IsValid() const {
-        return Id() != 0;
+        return Id() != TNodeId::Invalid;
     }
 
     void Delete() {
-        ToAndValue_ = Deleted;
+        ToAndValue_ = ToUnderlying(TNodeId::Invalid);
     }
 
     /// Compact internal representation of compact edge (to and value), can be used as id of compact edge
-    TNodeId Representation() const noexcept {
+    std::underlying_type_t<TNodeId> Representation() const noexcept {
         return ToAndValue_;
     }
 
@@ -88,13 +122,11 @@ private:
     TNodeId To_;
     VE Value_;
 
-    static constexpr TNodeId Deleted = 0;
-
 public:
     using TValueType = VE;
 
     TEdge()
-        : To_(Deleted)
+        : To_(TNodeId::Invalid)
         , Value_(VE())
     {
     }
@@ -122,11 +154,11 @@ public:
     }
 
     bool IsValid() const {
-        return Id() != Deleted;
+        return Id() != TNodeId::Invalid;
     }
 
     void Delete() {
-        To_ = Deleted;
+        To_ = TNodeId::Invalid;
     }
 
     Y_SAVELOAD_DEFINE(To_, Value_);
@@ -714,7 +746,7 @@ private:
 
 private:
     bool IsValid() const {
-        return Id_ == Graph_.Nodes_.size() || Cur().IsValid();
+        return AsIdx(Id_) == Graph_.Nodes_.size() || Cur().IsValid();
     }
 
     void Advance() {
@@ -742,7 +774,7 @@ public:
     }
 
     TNodeIterator& operator++() {
-        Y_ASSERT(Id_ < Graph_.Nodes_.size());
+        Y_ASSERT(AsIdx(Id_) < Graph_.Nodes_.size());
         Advance();
         return *this;
     }
@@ -753,10 +785,10 @@ public:
 
 private:
     TNRef Cur() {
-        return Graph_.Nodes_[Id_];
+        return Graph_.Nodes_[AsIdx(Id_)];
     }
     const TNRef Cur() const {
-        return Graph_.Nodes_[Id_];
+        return Graph_.Nodes_[AsIdx(Id_)];
     }
 };
 
@@ -805,11 +837,11 @@ private:
         }
 
         TIterator begin() const {
-            return TIterator(1, Graph_);
+            return TIterator(TNodeId::MinValid, Graph_);
         }
 
         TIterator end() const {
-            return TIterator(Graph_.Nodes_.size(), Graph_);
+            return TIterator(static_cast<TNodeId>(Graph_.Nodes_.size()), Graph_);
         }
 
         bool IsEmpty() const {
@@ -831,9 +863,9 @@ public:
     /// @brief Get modifiable reference to node
     /// Note that deleted nodes are accessible: check IsValid() after obtaining node reference
     TNodeRef Get(TNodeId id) {
-        Y_ASSERT(id < Size());
-        if (Y_LIKELY(id < Size())) {
-            return TNodeRef(Nodes_[id], id, *this);
+        Y_ASSERT(AsIdx(id) < Size());
+        if (Y_LIKELY(AsIdx(id) < Size())) {
+            return TNodeRef(Nodes_[AsIdx(id)], id, *this);
         } else {
             return GetInvalidNode();
         }
@@ -842,9 +874,9 @@ public:
     /// @brief Get read-only reference to node
     /// Note that deleted nodes are accessible: check IsValid() after obtaining node reference
     TConstNodeRef Get(TNodeId id) const {
-        Y_ASSERT(id < Size());
-        if (Y_LIKELY(id < Size())) {
-            return TConstNodeRef(Nodes_[id], id, *this);
+        Y_ASSERT(AsIdx(id) < Size());
+        if (Y_LIKELY(AsIdx(id) < Size())) {
+            return TConstNodeRef(Nodes_[AsIdx(id)], id, *this);
         } else {
             return GetInvalidNode();
         }
@@ -853,8 +885,8 @@ public:
     /// @brief Get validated mutable reference to node
     /// For invalid and out of bounds nodes exception will be thrown
     TNodeRef GetValid(TNodeId id) {
-        if (id >= Size() || !Nodes_[id].Valid()) {
-            ythrow yexception() << "Validated mutable access to graph node #" << id << " failed: " << id >= Size() ? "Out of bounds" : "Deleted node";
+        if (AsIdx(id) >= Size() || !Nodes_[AsIdx(id)].Valid()) {
+            ythrow yexception() << "Validated mutable access to graph node #" << ToUnderlying(id) << " failed: " << AsIdx(id) >= Size() ? "Out of bounds" : "Deleted node";
         }
         return Get(id);
     }
@@ -862,8 +894,8 @@ public:
     /// @brief Get validated read-only reference to node
     /// For invalid and out of bounds nodes exception will be thrown
     TConstNodeRef GetValid(TNodeId id) const {
-        if (id >= Size() || !Nodes_[id].Valid()) {
-            ythrow yexception() << "Validated const access to graph node #" << id << " failed: " << id >= Size() ? "Out of bounds" : "Deleted node";
+        if (AsIdx(id) >= Size() || !Nodes_[AsIdx(id)].Valid()) {
+            ythrow yexception() << "Validated const access to graph node #" << ToUnderlying(id) << " failed: " << AsIdx(id) >= Size() ? "Out of bounds" : "Deleted node";
         }
         return Get(id);
     }
@@ -879,7 +911,7 @@ public:
     TNodeRef AddNode(VN value) {
         Nodes_.emplace_back(value);
         NotifyChanged(EChanged::NodeAdded);
-        return TNodeRef(Nodes_.back(), Nodes_.size() - 1, *this);
+        return TNodeRef(Nodes_.back(), static_cast<TNodeId>(Nodes_.size() - 1), *this);
     }
 
     void DeleteNode(TConstNodeRef node) {
@@ -887,10 +919,10 @@ public:
     }
 
     void DeleteNode(TNodeId id) {
-        Y_ASSERT(id < Size());
-        if (Nodes_[id].IsValid()) {
+        Y_ASSERT(AsIdx(id) < Size());
+        if (Nodes_[AsIdx(id)].IsValid()) {
             // Avoid state change if node was already deleted
-            Nodes_[id].Delete();
+            Nodes_[AsIdx(id)].Delete();
             NotifyChanged(EChanged::NodeDeleted);
             NotifyChanged(EChanged::HangingEdges);
         }
@@ -920,7 +952,7 @@ public:
 
     /// @brief add edge between 2 existing nodes
     TEdgeRef AddEdge(TNodeId from, TNodeId to, VE value) {
-        Y_ASSERT(from < Size() && to < Size() && Nodes_[from].IsValid() && Nodes_[to].IsValid());
+        Y_ASSERT(AsIdx(from) < Size() && AsIdx(to) < Size() && Nodes_[AsIdx(from)].IsValid() && Nodes_[AsIdx(to)].IsValid());
         return (*this)[from].AddEdge(to, value);
     }
 
@@ -1003,8 +1035,8 @@ public:
 
     /// @brief change ends of a specific node's edges according to a map
     void ReplaceEdges(TNodeId nodeId, const THashMap<TNodeId, TNodeId>& replaces) {
-        Y_ASSERT(nodeId < Size() && Nodes_[nodeId].IsValid());
-        ReplaceEdges(Nodes_[nodeId], replaces);
+        Y_ASSERT(AsIdx(nodeId) < Size() && Nodes_[AsIdx(nodeId)].IsValid());
+        ReplaceEdges(Nodes_[AsIdx(nodeId)], replaces);
     }
 
     /// @brief change ends of all edges according to a map
@@ -1016,15 +1048,15 @@ public:
             }
         }
         for (const auto& replace : replaces) {
-            Nodes_[replace.first].Delete();
+            Nodes_[AsIdx(replace.first)].Delete();
         }
     }
 
     /// @brief change ends of a specific node's edges according to a map
     /// Can replace single edge with zero or multiple new edges.
     void ReplaceEdgesWithList(TNodeId nodeId, const THashMap<TNodeId, TVector<TNodeId>>& replaces) {
-        Y_ASSERT(nodeId < Size() && Nodes_[nodeId].IsValid());
-        TN& node = Nodes_[nodeId];
+        Y_ASSERT(AsIdx(nodeId) < Size() && Nodes_[AsIdx(nodeId)].IsValid());
+        TN& node = Nodes_[AsIdx(nodeId)];
         const size_t edgeCnt = node.Edges().size();
         for (size_t j = 0; j < edgeCnt; ++j) {
             auto& edge = node.Edges()[j];
@@ -1037,11 +1069,11 @@ public:
                     continue;
                 }
                 TNodeId newEnd = newDest[0];
-                Y_ASSERT(newEnd < Size() && Nodes_[newEnd].IsValid());
+                Y_ASSERT(AsIdx(newEnd) < Size() && Nodes_[AsIdx(newEnd)].IsValid());
                 edge.SetId(newEnd);
                 for (size_t i = 1; i < newDest.size(); i++) {
                     newEnd = newDest[i];
-                    Y_ASSERT(newEnd < Size() && Nodes_[newEnd].IsValid());
+                    Y_ASSERT(AsIdx(newEnd) < Size() && Nodes_[AsIdx(newEnd)].IsValid());
                     node.AddEdge(newEnd, edge.Value());
                 }
             }
@@ -1054,22 +1086,22 @@ public:
 protected:
     /// @brief return knowingly invalid node
     TNodeRef GetInvalidNode() {
-        return Get(0);
+        return Get(TNodeId::Invalid);
     }
 
     /// @brief return knowingly invalid node
     TConstNodeRef GetInvalidNode() const {
-        return Get(0);
+        return Get(TNodeId::Invalid);
     }
 
     /// @brief return knowingly invalid edge
     TEdgeRef GetInvalidEdge() {
-        return TEdgeRef(0, Nodes_[0].Edges(), 0, *this);
+        return TEdgeRef(0, Nodes_[0].Edges(), TNodeId::Invalid, *this);
     }
 
     /// @brief return knowingly invalid edge
     TConstEdgeRef GetInvalidEdge() const {
-        return TConstEdgeRef(0, Nodes_[0].Edges(), 0, *this);
+        return TConstEdgeRef(0, Nodes_[0].Edges(), TNodeId::Invalid, *this);
     }
 
     /// @brief compact edges in node
@@ -1107,7 +1139,7 @@ private:
             const auto replaceIt = replaces.find(edge.Id());
             if (replaceIt != replaces.end()) {
                 const TNodeId newEdgeEnd = replaceIt->second;
-                Y_ASSERT(newEdgeEnd < Size() && Nodes_[newEdgeEnd].IsValid());
+                Y_ASSERT(AsIdx(newEdgeEnd) < Size() && Nodes_[AsIdx(newEdgeEnd)].IsValid());
                 edge.SetId(newEdgeEnd);
             }
         }
@@ -1127,7 +1159,7 @@ private:
     ///        if node itself is deleted mark all its edges as deleted
     void DeleteHangingEdgesImpl(TN& node) {
         for (auto& edge : node.Edges()) {
-            if (edge.IsValid() && (!node.IsValid() || !Nodes_[edge.Id()].IsValid())) {
+            if (edge.IsValid() && (!node.IsValid() || !Nodes_[AsIdx(edge.Id())].IsValid())) {
                 edge.Delete();
             }
         }
@@ -1135,7 +1167,7 @@ private:
 
     /// @brief tries to locate hanging edge (the one not marked deleted, having one of its ends deleted)
     bool HasHangingEdgesSlow() const {
-        return FindIf([](const TN&) { return false; }, [this](const TN& node, const TE& edge) { return edge.IsValid() && (!node.IsValid() || !Nodes_[edge.Id()].IsValid()); });
+        return FindIf([](const TN&) { return false; }, [this](const TN& node, const TE& edge) { return edge.IsValid() && (!node.IsValid() || !Nodes_[AsIdx(edge.Id())].IsValid()); });
     }
 
     /// @brief tries to located deleted node or edge.
@@ -1191,14 +1223,14 @@ void TCompactGraph<VE, VN, TE, TN>::Compact() {
         return;
     }
 
-    TVector<TNodeId> moves(Nodes_.size(), 0);
-    TNodeId curOld = 0, curNew = 0;
+    TVector<TNodeId> moves(Nodes_.size(), TNodeId::Invalid);
+    TNodeId curOld = TNodeId::Invalid, curNew = TNodeId::Invalid;
 
     // Collect updated indices for nodes
     // using same logic as in remove
     for (auto& node : Nodes_) {
-        if (curOld == 0 || node.IsValid()) {
-            moves[curOld] = curNew;
+        if (curOld == TNodeId::Invalid || node.IsValid()) {
+            moves[AsIdx(curOld)] = curNew;
             ++curNew;
         }
         ++curOld;
@@ -1212,8 +1244,8 @@ void TCompactGraph<VE, VN, TE, TN>::Compact() {
     // Update all Ids in edges, remove reference to deleted nodes
     for (auto& node : Nodes_) {
         for (auto& edge : node.Edges()) {
-            TNodeId newId = moves[edge.Id()];
-            if (newId != 0) {
+            TNodeId newId = moves[AsIdx(edge.Id())];
+            if (newId != TNodeId::Invalid) {
                 edge = TE(newId, edge.Value());
             } else {
                 edge.Delete();

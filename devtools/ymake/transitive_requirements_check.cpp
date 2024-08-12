@@ -110,7 +110,7 @@ namespace {
     class TProvidesChecker {
     private:
         struct TModuleRef {
-            TNodeId Node = 0;
+            TNodeId Node = TNodeId::Invalid;
             const TModule* Module = nullptr;
         };
 
@@ -857,15 +857,15 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
     auto testNode = restoreContext.Graph.GetFileNodeById(module->GetId());
 
     auto selfPeers = restoreContext.Modules.GetModuleNodeIds(testNode->ElemId).LocalPeers;
-    TNodeId target = 0;
+    TNodeId target = TNodeId::Invalid;
 
     for (const auto& edge: testedNode.Edges()) {
         if (IsModuleType(edge.To()->NodeType) && restoreContext.Modules.Get(edge.To()->ElemId)->IsGoModule()) {
-            Y_ASSERT(!target);
+            Y_ASSERT(target == TNodeId::Invalid);
             target = edge.To().Id();
         }
     }
-    Y_ASSERT(target);
+    Y_ASSERT(target != TNodeId::Invalid);
 
     for (TNodeId selfPeer: selfPeers) {
         if(selfPeer == target) {

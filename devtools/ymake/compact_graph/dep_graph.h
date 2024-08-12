@@ -195,7 +195,7 @@ private:
 
 public:
     using TBase = TCompactGraph<EDepType, TDepTreeNode, TCompactEdge<EDepType, 28>>;
-    static constexpr const TNodeId MaxNodeId = (1 << 28) - 1;
+    static constexpr const TNodeId MaxNodeId = TNodeId{(1 << 28) - 1};
 
     explicit TDepGraph(TSymbols& names)
         : Names_(names)
@@ -611,9 +611,9 @@ private:
 
     void ResetId2NodeMaps() {
         MainId2NodeMap.clear();
-        MainId2NodeMap[0] = 0;
+        MainId2NodeMap[0] = TNodeId::Invalid;
         CmdId2NodeMap.clear();
-        CmdId2NodeMap[0] = 0;
+        CmdId2NodeMap[0] = TNodeId::Invalid;
     }
 
     void MakeId2NodeMaps() {

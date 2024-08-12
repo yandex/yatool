@@ -35,7 +35,7 @@
 
 class TMakeModuleState : public TSimpleRefCount<TMakeModuleState> {
 public:
-    TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules, ui32 moduleId) {
+    TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules, TNodeId moduleId) {
         const auto modNode = graph[moduleId];
         auto& fileConf = graph.Names().FileConf;
         TFileView modName = graph.GetFileName(modNode);
@@ -83,7 +83,7 @@ private:
     TDepGraph& Graph;
     TModules& Modules;
 
-    ui32 LastStateId_ = 0;
+    TNodeId LastStateId_ = TNodeId::Invalid;
     TMakeModuleStatePtr LastState_;
 
     friend TMakeModuleStates& GetMakeModulesStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules);
@@ -94,7 +94,7 @@ public:
     {
     }
 
-    TMakeModuleStatePtr GetState(ui32 moduleId) {
+    TMakeModuleStatePtr GetState(TNodeId moduleId) {
         GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnvCalls);
         if (LastStateId_ != moduleId) {
             LastStateId_ = moduleId;
@@ -157,7 +157,7 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
     if (isGlobalNode) {
         Vars.SetPathResolvedValue("GLOBAL_TARGET", Conf.RealPath(Graph.GetFileName(Graph.Get(nodeId))));
     }
-    if (nodeId != 0) {
+    if (nodeId != TNodeId::Invalid) {
         MineInputsAndOutputs(nodeId, modId);
         MineVarsAndExtras(addInfo, nodeId, modId);
         CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(Graph[CmdNode]->ElemId).CmdId()).KeepTargetPlatform;

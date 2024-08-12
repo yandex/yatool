@@ -171,7 +171,7 @@ namespace {
             if (IsPropertyDep(dep)) {
                 return false;
             }
-            if (!state.HasIncomingDep() && IsDirToModuleDep(dep) && !ModStartTargets.contains(dep.To().Id())) {
+            if (!state.HasIncomingDep() && IsDirToModuleDep(dep) && !ModStartTargets.contains(TTarget{dep.To().Id()})) {
                 return false;
             }
             return !IsIncludeFileDep(dep) && *dep != EDT_OutTogetherBack;

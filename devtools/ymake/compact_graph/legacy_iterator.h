@@ -33,9 +33,9 @@ public:
 
     enum class EDepVerdict { No, Yes, Delay };
 
-    TDepthDGIter(TDepGraph& graph, TNodeId startNodeOffs = 0)
+    TDepthDGIter(TDepGraph& graph, TNodeId startNodeOffs = TNodeId::Invalid)
         : Graph(graph)
-        , StartIter(Graph, 0)
+        , StartIter(Graph, TNodeId::Invalid)
         , StartNodeId(startNodeOffs)
     {
         Restart(startNodeOffs);
@@ -48,14 +48,14 @@ public:
 
     void Restart(TNodeId nodeId) {
         StartIter = typename TIterState::DepIter(Graph, nodeId);
-        StartIterPtr = nodeId ? &StartIter : nullptr;
+        StartIterPtr = nodeId != TNodeId::Invalid ? &StartIter : nullptr;
         StartNodeId = nodeId;
     }
 
     void Restart(const typename TIterState::DepIter& start) {
         StartIter = start;
         StartIterPtr = &StartIter;
-        StartNodeId = 0;
+        StartNodeId = TNodeId::Invalid;
     }
 
     // Next logic:
@@ -71,7 +71,7 @@ public:
     template <class TNodeProc>
     bool Next(TNodeProc& proc) {
         if (Y_UNLIKELY(StartIterPtr)) {
-            if (StartNodeId) {
+            if (StartNodeId != TNodeId::Invalid) {
                 State.push_back(TIterState(Graph, StartNodeId));
             } else {
                 State.push_back(TIterState(Graph, *StartIterPtr));
@@ -132,7 +132,7 @@ public:
     }
 
     template <class TNodeProc>
-    void IterateAll(TNodeProc& proc, const TVector<ui64>& nodes) {
+    void IterateAll(TNodeProc& proc, const TVector<TNodeId>& nodes) {
         Y_ASSERT(!StartIterPtr);
         for (size_t n = 0; n < nodes.size(); n++) {
             Restart(nodes[n]);

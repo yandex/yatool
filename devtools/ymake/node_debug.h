@@ -46,7 +46,7 @@ struct TNodeDebug : public TGraphDebug {
     TNodeDebug(const TGraphDebug& graph, TDepsCacheId id) : TGraphDebug(graph.DebugGraph), DebugNode(id) {}
     TNodeDebug(const TGraphDebug& graph, TDepTreeNode node) : TGraphDebug(graph.DebugGraph), DebugNode(MakeDepsCacheId(node.NodeType, node.ElemId)) {}
     TNodeDebug(const TDepGraph& graph, TNodeId id) : TGraphDebug(graph) {
-        if (id) {
+        if (id != TNodeId::Invalid) {
             TDepGraph::TConstNodeRef node = graph.Get(id);
             DebugNode = MakeDepsCacheId(node->NodeType, node->ElemId);
         }

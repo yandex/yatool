@@ -62,7 +62,7 @@ public:
     }
 
     void SkipCurrentDeps() noexcept {
-        Replacement = 0;
+        Replacement = TNodeId::Invalid;
     }
 
     void ReplaceCurrent(TNodeId id) noexcept {
@@ -94,7 +94,7 @@ private:
             case NoReplacement:
                 AddDeps(Queue.front());
                 break;
-            case 0:
+            case TNodeId::Invalid:
                 break;
             default:
                 AddDeps(Queue.front().Graph()[replacement]);
@@ -111,7 +111,7 @@ private:
     }
 
 private:
-    constexpr static TNodeId NoReplacement = std::numeric_limits<TNodeId>::max();
+    constexpr static TNodeId NoReplacement{std::numeric_limits<std::underlying_type_t<TNodeId>>::max()};
 
     std::conditional_t<std::is_function_v<TPred>, TPred*, TPred> Predicate;
     TQueue<TConstNodeRef> Queue;

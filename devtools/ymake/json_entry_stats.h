@@ -81,8 +81,8 @@ struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
         };
     };
 
-    TNodeId LoopId = 0;
-    TNodeId OutTogetherDependency = 0;
+    TNodeId LoopId = TNodeId::Invalid;
+    TNodeId OutTogetherDependency = TNodeId::Invalid;
 
     TJsonDeps IncludedDeps;
     TJsonDeps NodeDeps;

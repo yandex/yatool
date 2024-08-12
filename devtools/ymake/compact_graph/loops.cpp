@@ -14,7 +14,7 @@ struct TLoopId {
     bool IsFile;
 
     TLoopId(bool isFile = false)
-        : LoopId(0)
+        : LoopId(TNodeId::Invalid)
         , IsFile(isFile)
     {
     }
@@ -30,7 +30,7 @@ public:
     class TGluedLoops {
     private:
         struct TLoopData {
-            TNodeId ParentLoop = 0;
+            TNodeId ParentLoop = TNodeId::Invalid;
             size_t Rank = 0;
         };
 
@@ -49,13 +49,13 @@ public:
         TNodeId GetLoopId(TNodeId loopId) {
             TVector<TNodeId> pathToRoot;
 
-            while (Loops[loopId].ParentLoop > 0) {
+            while (Loops[AsIdx(loopId)].ParentLoop > TNodeId::Invalid) {
                 pathToRoot.push_back(loopId);
-                loopId = Loops[loopId].ParentLoop;
+                loopId = Loops[AsIdx(loopId)].ParentLoop;
             }
 
             for (const auto& loopNum : pathToRoot) {
-                Loops[loopNum].ParentLoop = loopId;
+                Loops[AsIdx(loopNum)].ParentLoop = loopId;
             }
 
             return loopId;
@@ -68,12 +68,12 @@ public:
                 return;
             }
 
-            if (Loops[first].Rank < Loops[second].Rank) {
+            if (Loops[AsIdx(first)].Rank < Loops[AsIdx(second)].Rank) {
                 std::swap(first, second);
-            } else if (Loops[first].Rank == Loops[second].Rank) {
-                Loops[first].Rank++;
+            } else if (Loops[AsIdx(first)].Rank == Loops[AsIdx(second)].Rank) {
+                Loops[AsIdx(first)].Rank++;
             }
-            Loops[second].ParentLoop = first;
+            Loops[AsIdx(second)].ParentLoop = first;
         }
     };
 
@@ -94,16 +94,16 @@ public:
         }
         TNodes::iterator i = Nodes.find(dep.To().Id());
         bool acc = i == Nodes.end();
-        if (i != Nodes.end() && (i->second.InStack || i->second.LoopId)) { // <=> i && (i->second.InStack || i->second.LoopId)
+        if (i != Nodes.end() && (i->second.InStack || i->second.LoopId != TNodeId::Invalid)) { // <=> i && (i->second.InStack || i->second.LoopId)
             TNodeId loopNodeStart = dep.To().Id();
 
             if (loopNodeStart == dep.From().Id()) { // link to self does not create loop
                 return acc;
             }
 
-            TNodeId knownLoopId = !i->second.InStack ? i->second.LoopId : 0;
+            TNodeId knownLoopId = !i->second.InStack ? i->second.LoopId : TNodeId::Invalid;
 
-            if (knownLoopId) {
+            if (knownLoopId != TNodeId::Invalid) {
                 auto found = state.FindRecent(
                     [knownLoopId, this](const TStateItem& item) {
                         return GluedLoops.GetLoopId(((TLoopData*)item.Cookie)->LoopId) == GluedLoops.GetLoopId(knownLoopId);
@@ -159,12 +159,12 @@ public:
                 }
             }
             // set up loop id (overlapped loops get glued into one big loop)
-            TNodeId loopId = 0;
+            TNodeId loopId = TNodeId::Invalid;
             auto found = state.FindRecent(
                 [&loopId, loopNodeStart, this](const TStateItem& item) {
                     TLoopData* ent = (TLoopData*)item.Cookie;
-                    if (ent->LoopId != 0) {
-                        if (loopId == 0) {
+                    if (ent->LoopId != TNodeId::Invalid) {
+                        if (loopId == TNodeId::Invalid) {
                             loopId = ent->LoopId;
                         } else {
                             GluedLoops.JoinLoops(loopId, ent->LoopId);
@@ -174,7 +174,7 @@ public:
                 });
             Y_ASSERT(found != state.end());
 
-            if (loopId == 0) {
+            if (loopId == TNodeId::Invalid) {
                 loopId = GluedLoops.AddLoop();
             }
             for (auto it = state.begin(), end = ++found; it != end; ++it) {
@@ -189,7 +189,7 @@ public:
         TVector<std::pair<TNodeId, TNodeId>> loopSrt;
         for (const auto& node : Nodes) {
             TNodeId loopId = node.second.LoopId;
-            if (loopId != 0) {
+            if (loopId != TNodeId::Invalid) {
                 loopId = GluedLoops.GetLoopId(loopId);
                 loopSrt.push_back(std::make_pair(loopId, node.first));
             }
@@ -211,17 +211,17 @@ public:
         }
         loop2Nodes.resize(loopSz.size() + 1);
         // loop id 0 is reserved for 'no loop' flag
-        newId = 1, curId = loopSrt[0].first;
+        newId = TNodeId::MinValid, curId = loopSrt[0].first;
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
                 newId++;
-                loop2Nodes[newId].reserve(loopSz[newId - 1]);
+                loop2Nodes[AsIdx(newId)].reserve(loopSz[AsIdx(newId) - 1]);
                 curId = loopSrt[n].first;
             }
             node2Loop[loopSrt[n].second] = newId;
-            loop2Nodes[newId].push_back(loopSrt[n].second);
+            loop2Nodes[AsIdx(newId)].push_back(loopSrt[n].second);
         }
-        Y_ASSERT(newId == loopSz.size());
+        Y_ASSERT(AsIdx(newId) == loopSz.size());
         YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
     }
 };
@@ -251,14 +251,14 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
             const auto& node = graph.Get(curNode);
 
             if (!isDirLoop && node->NodeType == EMNT_Directory) {
-                DirLoops.insert(loopNum);
+                DirLoops.insert(static_cast<TNodeId>(loopNum));
                 isDirLoop = true;
             }
 
             if (!isBuildLoop) {
                 for (const auto& edge : node.Edges()) {
                     if (*edge == EDT_BuildFrom && nodesInLoop.contains(edge.To().Id())) {
-                        BuildLoops.insert(loopNum);
+                        BuildLoops.insert(static_cast<TNodeId>(loopNum));
                         isBuildLoop = true;
                         break;
                     }
@@ -274,7 +274,7 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
 
 void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) {
     TVector<TNodeId> loops;
-    for (TNodeId loopNum = 1; loopNum < size(); ++loopNum) {
+    for (TNodeId loopNum = TNodeId::MinValid; AsIdx(loopNum) < size(); ++loopNum) {
         loops.push_back(loopNum);
     }
     if (loops.size() != 0) {
@@ -300,7 +300,7 @@ void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TC
 
     size_t loopNumber = 1;
     for (const auto& loopId : loopIds) {
-        const TGraphLoop& curLoop = (*this)[loopId];
+        const TGraphLoop& curLoop = (*this)[AsIdx(loopId)];
 
         TStringStream ss;
         ss << "Loop " << loopNumber++ << " (size: " << curLoop.size() << (isLoopBad(loopId) ? ", bad" : "") << "): ";
@@ -324,7 +324,7 @@ void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TC
         for (const auto& loopId : loopIds) {
             NEvent::TLoopDetected ev;
             ev.SetLoopId(loopNumber++);
-            TGraphLoop curLoop = (*this)[loopId];
+            TGraphLoop curLoop = (*this)[AsIdx(loopId)];
             for (const auto& curNodeId : curLoop) {
                 NEvent::TLoopItem& loopItem = *ev.AddLoopNodes();
                 const auto curNode = graph.Get(curNodeId);

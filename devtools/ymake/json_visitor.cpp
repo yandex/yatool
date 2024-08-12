@@ -71,10 +71,10 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
 }
 
 void TJSONVisitor::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph) {
-    const TGraphLoop& loop = Loops[loopId];
+    const TGraphLoop& loop = Loops[AsIdx(loopId)];
 
-    buffer->Save(LoopCnt[loopId].SelfSign.GetRawData(), 16);
-    buffer->Save(LoopCnt[loopId].Sign.GetRawData(), 16);
+    buffer->Save(LoopCnt[AsIdx(loopId)].SelfSign.GetRawData(), 16);
+    buffer->Save(LoopCnt[AsIdx(loopId)].Sign.GetRawData(), 16);
     buffer->Save<ui32>(loop.Deps.size());
     for (TNodeId depNode : loop.Deps) {
         buffer->SaveElemId(depNode, graph);
@@ -86,12 +86,12 @@ bool TJSONVisitor::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDe
     if (!loopId)
         return false;
 
-    buffer->LoadMd5(&LoopCnt[*loopId].SelfSign);
-    buffer->LoadMd5(&LoopCnt[*loopId].Sign);
+    buffer->LoadMd5(&LoopCnt[AsIdx(*loopId)].SelfSign);
+    buffer->LoadMd5(&LoopCnt[AsIdx(*loopId)].Sign);
 
     ui32 depsCount = buffer->Load<ui32>();
 
-    TGraphLoop& loop = Loops[*loopId];
+    TGraphLoop& loop = Loops[AsIdx(*loopId)];
     loop.Deps.reserve(depsCount);
     for (size_t i = 0; i < depsCount; ++i) {
         TNodeId depNode;
@@ -130,7 +130,7 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
 
     ui32 loopsCount = Loops.empty() ? 0 : Loops.size() - 1;
     output->Write(&loopsCount, sizeof(loopsCount));
-    for (size_t loopId = 1; loopId <= loopsCount; ++loopId) {
+    for (TNodeId loopId = TNodeId::MinValid; AsIdx(loopId) <= loopsCount; ++loopId) {
         TSaveBuffer buffer{&rawBuffer};
         SaveLoop(&buffer, loopId, graph);
 
@@ -138,7 +138,7 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
         // Если цикл не изменился, то подойдёт любой узел.
         // Если цикл изменился, каждый его узел изменится,
         // и мы не будем загружать его данные из кэша.
-        buffer.SaveNodeDataToStream(output, Loops[loopId][0], graph);
+        buffer.SaveNodeDataToStream(output, Loops[AsIdx(loopId)][0], graph);
     }
 
     CacheStats.Set(NStats::EUidsCacheStats::SavedLoops, loopsCount);
@@ -332,11 +332,11 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
         const bool isParentBuildEntry = prntData->IsFile && (*incDep == EDT_BuildFrom || *incDep == EDT_BuildCommand);
         auto& prntDestSet = isParentBuildEntry ? prntData->NodeDeps : prntData->IncludedDeps;
-        TNodeId tool = 0;
+        TNodeId tool = TNodeId::Invalid;
         bool bundle = false;
 
         YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; isParentBuildEntry = " << isParentBuildEntry << Endl;
-        if (currData.IsFile && (currData.HasBuildCmd || currData.OutTogetherDependency != 0)) {
+        if (currData.IsFile && (currData.HasBuildCmd || currData.OutTogetherDependency != TNodeId::Invalid)) {
             if (IsModuleType(currNode->NodeType) && IsDirectToolDep(incDep)) {
                 auto name = prntState->GetCmdName();
                 tool = currNode.Id();
@@ -350,7 +350,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
 
             const TNodeId outTogetherDependencyId = currData.OutTogetherDependency;
-            if (auto [node2ModuleIt, node2ModuleAdded] = Node2Module.try_emplace(currNode.Id(), 0); node2ModuleAdded) {
+            if (auto [node2ModuleIt, node2ModuleAdded] = Node2Module.try_emplace(currNode.Id(), TNodeId::Invalid); node2ModuleAdded) {
                 const auto moduleState = FindModule(state); // we set it on first leaving: module should be in stack
                 const bool hasModule = moduleState != state.end();
                 TJSONEntryStats* moduleData = hasModule ? VisitorEntry(*moduleState) : nullptr;
@@ -362,7 +362,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 bool addToOuts = hasModule && moduleState->Module->IsExtraOut(currNode->ElemId);
                 if (!moduleDone && NeedAddToOuts(state, *currNode) && !currData.Fake) {
                     AddTo(currNode.Id(), moduleData->ExtraOuts);
-                    if (outTogetherDependencyId) {
+                    if (outTogetherDependencyId != TNodeId::Invalid) {
                         moduleData->NodeDeps.Add(outTogetherDependencyId);
                     } else if (addToOuts) {
                         moduleData->NodeDeps.Add(currNode.Id());
@@ -370,13 +370,13 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 }
             }
 
-            if (!prntDone && outTogetherDependencyId && !currData.Fake) {
+            if (!prntDone && outTogetherDependencyId != TNodeId::Invalid && !currData.Fake) {
                 YDIAG(Dev) << "JSON: PrepareLeaving " << currState.Print() << "; as AlsoBuilt add to " << (isParentBuildEntry ? "cmd" : "include") << " deps for " << prntState->Print() << Endl;
                 prntDestSet.Add(outTogetherDependencyId);
             }
         }
 
-        if (tool) {
+        if (tool != TNodeId::Invalid) {
             if (!prntDone) {
                 if (!bundle) {
                     prntData->NodeToolDeps.Add(tool);
@@ -473,7 +473,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             prntData->NodeToolDeps.Add(currData.NodeToolDeps);
         }
 
-        if (!tool && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
+        if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
             AddTo(GetNodeInputs(currNode.Id()), GetNodeInputs(prntNode.Id()));
         }
     }
@@ -494,7 +494,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
     if (currData.WasFresh) {
         currData.WasFresh = false;
 
-        if (currData.LoopId) {
+        if (currData.LoopId != TNodeId::Invalid) {
             bool sameLoop = false;
             // When we are exiting a loop, we've met all the loop elements and registered their children -
             // this is by construction of the loop.
@@ -505,9 +505,9 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
 
             if (!sameLoop) {
-                TGraphLoop& loop = Loops[currData.LoopId];
+                TGraphLoop& loop = Loops[AsIdx(currData.LoopId)];
                 if (!loop.DepsDone) {
-                    Y_ASSERT(LoopCnt[currData.LoopId].Sign.Empty());
+                    Y_ASSERT(LoopCnt[AsIdx(currData.LoopId)].Sign.Empty());
                     SortUnique(loop.Deps);
                     for (auto l : loop) {
                         if (l != currNode.Id()) { // TODO: THINK: just assign currentStateData.IncludedDeps to all
@@ -559,10 +559,10 @@ void TJSONVisitor::Left(TState& state) {
     const TStringBuf depName = graph.ToTargetStringBuf(dep.To());
     YDIAG(Dev) << "JSON: Left from " << depName << " to " << currState.Print() << Endl;
     if (!currDone && currData.WasFresh) {
-        if (currData.LoopId) {
-            if (currData.LoopId != chldData->LoopId && !Loops[currData.LoopId].DepsDone) {
+        if (currData.LoopId != TNodeId::Invalid) {
+            if (currData.LoopId != chldData->LoopId && !Loops[AsIdx(currData.LoopId)].DepsDone) {
                 YDIAG(Dev) << "JSON: Leftnode was in loop = " << currData.LoopId << Endl;
-                Loops[currData.LoopId].Deps.push_back(chldNode);
+                Loops[AsIdx(currData.LoopId)].Deps.push_back(chldNode);
             }
         }
     }

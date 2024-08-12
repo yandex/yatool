@@ -27,7 +27,7 @@ public:
     }
 
     void SaveElemId(TNodeId nodeId, const TDepGraph& graph) noexcept {
-        if (nodeId == 0) {
+        if (nodeId == TNodeId::Invalid) {
             Save<ui8>(0);
             Save<ui32>(0);
             return;
@@ -176,7 +176,7 @@ public:
         ui32 elemId = Load<ui32>();
 
         if (useFileId == 0 && elemId == 0) {
-            *nodeId = 0;
+            *nodeId = TNodeId::Invalid;
             return true;
         }
 

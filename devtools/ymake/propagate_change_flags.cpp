@@ -20,7 +20,7 @@ namespace NPropagateChangeFlags {
     struct TStateItem : public TGraphIteratorStateItemBase<false> {
         using TGraphIteratorStateItemBase::TGraphIteratorStateItemBase;
         bool WasEntered = false;
-        TNodeId ModuleNode = 0;
+        TNodeId ModuleNode = TNodeId::Invalid;
     };
 
     class TVisitor: public TDirectPeerdirsVisitor<TVisitorData, TStateItem> {
@@ -74,9 +74,9 @@ namespace NPropagateChangeFlags {
             auto it = Loops_.Node2Loop.find(stateItem.Node().Id());
             if (it != Loops_.Node2Loop.end()) {
                 CurEnt->LoopId = it->second;
-                Y_ASSERT(CurEnt->LoopId != 0);
+                Y_ASSERT(CurEnt->LoopId != TNodeId::Invalid);
             } else {
-                CurEnt->LoopId = 0;
+                CurEnt->LoopId = TNodeId::Invalid;
             }
         }
 
@@ -112,8 +112,8 @@ namespace NPropagateChangeFlags {
                 TNodeId chldLoop = chldData->LoopId;
                 TNodeId prntLoop = prntData->LoopId;
 
-                bool inSameLoop = (chldLoop && chldLoop == prntLoop);
-                bool justFinishedLoop = (chldLoop && chldLoop != prntLoop) && justFinishedChild;
+                bool inSameLoop = (chldLoop != TNodeId::Invalid && chldLoop == prntLoop);
+                bool justFinishedLoop = (chldLoop != TNodeId::Invalid && chldLoop != prntLoop) && justFinishedChild;
 
                 if (inSameLoop) {
                     // Do nothing. All loop nodes will be processed at once when the loop is finished.
@@ -144,13 +144,13 @@ namespace NPropagateChangeFlags {
             TNodeState loopState;
             loopState.SetLocalChanges(false, false);
 
-            for (TNodeId id : Loops_[loopId]) {
+            for (TNodeId id : Loops_[AsIdx(loopId)]) {
                 loopState.PropagatePartialChangesFrom(Graph_.Get(id)->State);
             }
 
             loopState.SetChangedFlagsRecursiveScope();
 
-            for (TNodeId id : Loops_[loopId]) {
+            for (TNodeId id : Loops_[AsIdx(loopId)]) {
                 TNodeState& nodeState = Graph_.Get(id)->State;
                 nodeState.PropagateChangesFrom(loopState);
                 nodeState.SetChangedFlagsRecursiveScope();

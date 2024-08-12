@@ -6,7 +6,7 @@ struct TOwnersEntrySt: public TEntryStats {
     TNodeId Owner;
     TVector<TNodeId> ModIds;
 
-    TOwnersEntrySt(TItemDebug itemDebug = TItemDebug{}, bool inStack = false, bool isFile = false, TNodeId owner = 0)
+    TOwnersEntrySt(TItemDebug itemDebug = TItemDebug{}, bool inStack = false, bool isFile = false, TNodeId owner = TNodeId::Invalid)
         : TEntryStats(itemDebug, inStack, isFile)
         , Owner(owner)
     {

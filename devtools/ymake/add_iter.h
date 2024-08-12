@@ -38,7 +38,7 @@ struct TAddDepIter {
 
     explicit TAddDepIter(TDepGraph& graph, TNodeId nodeId)
         : DepNode()
-        , DepNodeId(0)
+        , DepNodeId(TNodeId::Invalid)
         , DepType(EDT_Include)
         , Iterator(graph.Get(nodeId).Edges().begin())
         , End(Iterator.AtEnd())
@@ -47,9 +47,9 @@ struct TAddDepIter {
 
     TAddDepIter(TDepGraph& graph, const TAddDepDescr& dep)
         : DepNode(dep.NodeType, dep.ElemId)
-        , DepNodeId(0)
+        , DepNodeId(TNodeId::Invalid)
         , DepType(dep.DepType)
-        , Iterator(graph.Get(0).Edges().begin())
+        , Iterator(graph.Get(TNodeId::Invalid).Edges().begin())
         , End(Iterator.AtEnd())
     {
     }
@@ -525,7 +525,7 @@ struct TUpdIterStBase: public TPropertiesIterState {
     bool NodeToProps(TDepGraph& graph, TDelayedSearchDirDeps& delayedDirs, const TNodeAddCtx* addCtx);
     explicit TUpdIterStBase(TDepGraph& graph, TNodeId nodeId)
         : TPropertiesIterState(TNodeDebugOnly{graph, nodeId})
-        , Node(nodeId ? graph.Get(nodeId).Value() : TDepTreeNode())
+        , Node(nodeId != TNodeId::Invalid ? graph.Get(nodeId).Value() : TDepTreeNode())
         , Dep(graph, nodeId)
         , NodeStart(nodeId)
         , CurDep(0)
@@ -651,7 +651,7 @@ struct TDGIterAddable: public TUpdIterStBase {
                 add->LeaveModule();
         } else {
             if (WasFresh) {
-                Y_ASSERT(NodeStart);
+                Y_ASSERT(NodeStart != TNodeId::Invalid);
                 Graph.Get(NodeStart)->State.SetLocalChanges(false, false);
             }
         }
@@ -730,7 +730,7 @@ public:
     typedef ::TUpdEntryStats TEntryStats;
     typedef ::TUpdEntryPtr TEntryPtr;
     TEntryPtr CurEnt = nullptr;
-    TNodeId LastNode = 0;
+    TNodeId LastNode = TNodeId::Invalid;
     ui32 LastElem = 0;
     EMakeNodeType LastType;
     TModule* ParentModule = nullptr;
@@ -836,8 +836,8 @@ struct TUpdReIterSt: public TUpdIterStBase {
         , Add(nullptr)
         , Graph(graph)
     {
-        NodeStart = it.DepNodeId ? it.DepNodeId : graph.GetNodeById(it.DepNode).Id();
-        if (NodeStart) {
+        NodeStart = it.DepNodeId != TNodeId::Invalid ? it.DepNodeId : graph.GetNodeById(it.DepNode).Id();
+        if (NodeStart != TNodeId::Invalid) {
             Node = Graph.Get(NodeStart).Value();
         } else {
             Node = it.DepNode;
@@ -892,7 +892,7 @@ struct TUpdReiter: public TDepthDGIter<TUpdReIterSt> {
     ui32 LastElem = 0;
 
     TUpdReiter(TUpdIter& parentIter)
-        : TDepthDGIter<TUpdReIterSt>(parentIter.Graph, 0)
+        : TDepthDGIter<TUpdReIterSt>(parentIter.Graph, TNodeId::Invalid)
         , ParentIter(parentIter)
         , CurEnt(nullptr)
     {

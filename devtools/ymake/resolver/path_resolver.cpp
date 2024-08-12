@@ -199,7 +199,7 @@ TResolveFile TPathResolver::CheckBuilt(TStringBuf path) {
 
     // File is not owned by module: lookup graph
     const auto nodeId = Context_.Graph.GetFileNodeById(fileId).Id();
-    if (!nodeId) {
+    if (nodeId == TNodeId::Invalid) {
         return {};
     }
 
