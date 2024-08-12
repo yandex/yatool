@@ -2443,10 +2443,7 @@ dumps_internal(
             Py_DECREF(intStrObj);
         }
     } else if (PyFloat_Check(object)) {
-        double d = PyFloat_AsDouble(object);
-        if (d == -1.0 && PyErr_Occurred())
-            return false;
-
+        double d = PyFloat_AS_DOUBLE(object);
         if (IS_NAN(d)) {
             if (numberMode & NM_NAN) {
                 writer->RawValue("NaN", 3, kNumberType);
@@ -2469,7 +2466,7 @@ dumps_internal(
             // The RJ dtoa() produces "strange" results for particular values, see #101:
             // use Python's repr() to emit a raw value instead of writer->Double(d)
 
-            PyObject* dr = PyObject_Repr(object);
+            PyObject* dr = PyFloat_Type.tp_repr(object);
 
             if (dr == NULL)
                 return false;
