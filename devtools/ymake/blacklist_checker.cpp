@@ -8,17 +8,44 @@
 #include <devtools/ymake/compact_graph/iter_direct_peerdir.h>
 
 namespace {
-    class TBlacklistVisitor: public TDirectPeerdirsVisitor<TVisitorStateItem<TEntryStatsData>, TGraphIteratorStateItemBase<true>> {
+    class TBaseBlacklistVisitor {
+    public:
+        TBaseBlacklistVisitor()
+            : HasBlacklistErrors_(false)
+        {}
+
+        bool HasBlacklistErrors() const noexcept {
+            return HasBlacklistErrors_;
+        }
+
+    protected:
+        bool HasBlacklistErrors_;
+
+        // Make blacklist error, fill scoped context, if need
+        void GenerateBlacklistError(
+            const TString* ptr,
+            const TStringBuf& path,
+            const TStringBuf& macro = ""
+        ) {
+            TString insideMacro;
+            if (macro) {
+                insideMacro = TStringBuilder() << "inside [[alt1]]" << macro << "[[rst]] ";
+            }
+            YConfErr(BlckLst) << "Path [[imp]]" << path << "[[rst]] " << insideMacro
+                << "is from prohibited directory [[alt1]]" << *ptr << "[[rst]]" << Endl;
+            HasBlacklistErrors_ = true; // found some blacklist error during check
+        }
+    };
+
+    class TBlacklistVisitor: public TDirectPeerdirsVisitor<TVisitorStateItem<TEntryStatsData>, TGraphIteratorStateItemBase<true>>, public TBaseBlacklistVisitor {
     public:
         using TBase = TDirectPeerdirsVisitor<TVisitorStateItem<TEntryStatsData>, TGraphIteratorStateItemBase<true>>;
         using TState = TBase::TState;
 
-        TBlacklistVisitor(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets)
-            : RestoreContext_(restoreContext)
-            , StartTargets_(startTargets)
+        TBlacklistVisitor(const TRestoreContext& restoreContext)
+            : TBaseBlacklistVisitor()
+            , RestoreContext_(restoreContext)
             , IsBlacklistHashChanged_(restoreContext.Conf.IsBlacklistHashChanged())
-            , HasBlacklistErrors_(false)
-            , DirectoryFound_(0)
         {}
 
         bool Enter(TState& state) {
@@ -28,16 +55,13 @@ namespace {
             const auto topNode = state.TopNode();
             auto topNodeType = topNode->NodeType;
             if (IsModuleType(topNodeType)) {
-                CheckModule(RestoreContext_.Modules.Get(topNode->ElemId), topNode);
-            } else if (IsSrcFileType(topNodeType) || IsMakeFileType(topNodeType)) {
+                CheckModule(RestoreContext_.Modules.Get(topNode->ElemId));
+            } else if (IsSrcFileType(topNodeType)) {
                 CheckPath(RestoreContext_.Graph.GetFileName(topNode->ElemId), state);
-            } else if (IsDirType(topNodeType)) {
-                if (DirectoryFound_++) { // first directory is start directory
-                    // Other directories is RECURSE or DEPENDS from start directory
-                    // If directory has module in edges, it will be checked as module directory later, skip check it here
-                    if (FindIf(topNode.Edges(), [](const auto& edge) { return IsModuleType(edge.To()->NodeType); }) == topNode.Edges().end()) {
-                        CheckPath(RestoreContext_.Graph.GetFileName(topNode->ElemId), state, SomeRecurse());
-                    }
+            } else if (IsMakeFileType(topNodeType)) {
+                auto pathView = RestoreContext_.Graph.GetFileName(topNode->ElemId);
+                if (!pathView.GetTargetStr().EndsWith("/ya.make")) { // skip ya.make files - they duplicate checks by directory
+                    CheckPath(pathView, state);
                 }
             }
             return true;
@@ -50,19 +74,13 @@ namespace {
             return !IsPropertyDep(state.NextDep()); // skip only properties
         }
 
-        bool HasBlacklistErrors() const noexcept {
-            return HasBlacklistErrors_;
-        }
 
     private:
         const TRestoreContext& RestoreContext_;
-        const TVector<TTarget>& StartTargets_;
         const bool IsBlacklistHashChanged_;
-        bool HasBlacklistErrors_;
-        int DirectoryFound_;
 
         // Check all module directories (include module directory, when need)
-        void CheckModule(const TModule* module, TState::TNodeRef moduleNode) {
+        void CheckModule(const TModule* module) {
             if (!RequireModuleRecheck(module)) {
                 return;
             }
@@ -70,25 +88,8 @@ namespace {
             const auto moduleDirView = module->GetDir();
 
             YConfEraseByOwner(BlckLst, module->GetId()); // clear all existing module blacklist errors
+
             THolder<TScopedContext> scopedContext{nullptr};
-
-            if (module->IsStartTarget()) {
-                // Check module directory only for start targets, other checked as Peers
-                const auto startTargetIt = FindIf(StartTargets_, [moduleNodeId=moduleNode.Id()](const TTarget& target){
-                    return target.Id == moduleNodeId;
-                });
-                if (startTargetIt != StartTargets_.end() && !startTargetIt->IsDependsTarget) { // skip DEPENDS start targets, it checked as module DEPENDS
-                    CheckModuleDir(module, scopedContext, moduleDirView,
-                        startTargetIt->IsDepTestTarget // detect macros by start target flags
-                            ? NMacro::RECURSE_FOR_TESTS
-                            : (startTargetIt->IsRecurseTarget
-                                ? SomeRecurse()
-                                : ""
-                            )
-                    );
-                }
-            }
-
             for (const auto dirView : module->Peers) {
                 CheckModuleDir(module, scopedContext, dirView, NMacro::PEERDIR);
             }
@@ -127,18 +128,19 @@ namespace {
                     CheckModuleDir(module, scopedContext, dirView, "DATA/DATA_FILES");
                 }
             }
-
-            if (module->Depends) {
-                for (const auto dirView : *module->Depends) {
-                    CheckModuleDir(module, scopedContext, dirView, NProps::DEPENDS);
-                }
-            }
         }
 
         void CheckModuleDir(const TModule* module, THolder<TScopedContext>& scopedContext, const TFileView dirView, const TStringBuf& macro = "") {
             auto dir = dirView.GetTargetStr();
             if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(dir)) {
-                GenerateBlacklistError(module, scopedContext, ptr, dir, macro);
+                if (!scopedContext) {
+                    scopedContext.Reset(new TScopedContext(
+                        RestoreContext_.Graph.Names().FileConf.GetStoredName(
+                            NPath::SmartJoin(module->GetDir().GetTargetStr(), "ya.make")
+                        )
+                    ));
+                }
+                GenerateBlacklistError(ptr, dir, macro);
             }
         }
 
@@ -151,31 +153,16 @@ namespace {
             if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(path)) {
                 THolder<TScopedContext> scopedContext{nullptr};
                 const auto moduleIt = FindModule(state);
-                const auto* module = moduleIt != state.end()
-                    ? RestoreContext_.Modules.Get(moduleIt->Node()->ElemId)
-                    : nullptr;
-                GenerateBlacklistError(module, scopedContext, ptr, path, macro);
+                if (moduleIt != state.end()) { // if module exists in state, fill it to context
+                    scopedContext.Reset(new TScopedContext(RestoreContext_.Modules.Get(moduleIt->Node()->ElemId)->GetName()));
+                } else {
+                    const auto& parentNode = state.ParentNode();
+                    if (parentNode.IsValid()) { // else fill parent node to context
+                        scopedContext.Reset(new TScopedContext(RestoreContext_.Graph.GetFileName(parentNode->ElemId)));
+                    }
+                }
+                GenerateBlacklistError(ptr, path, macro);
             }
-        }
-
-        // Make blacklist error, fill scoped context, if need
-        void GenerateBlacklistError(
-            const TModule* module,
-            THolder<TScopedContext>& scopedContext,
-            const TString* ptr,
-            const TStringBuf& path,
-            const TStringBuf& macro = ""
-        ) {
-            if (!scopedContext && module) {
-                scopedContext.Reset(new TScopedContext(module->GetName()));
-            }
-            TString insideMacro;
-            if (macro) {
-                insideMacro = TStringBuilder() << "inside [[alt1]]" << macro << "[[rst]] ";
-            }
-            YConfErr(BlckLst) << "Path [[imp]]" << path << "[[rst]] " << insideMacro
-                << "is from prohibited directory [[alt1]]" << *ptr << "[[rst]]" << Endl;
-            HasBlacklistErrors_ = true; // found some blacklist error during check
         }
 
         bool RequireModuleRecheck(const TModule* module) {
@@ -184,11 +171,50 @@ namespace {
             // ELSE module blacklist errors must be valid from cache
             return IsBlacklistHashChanged_ || !module->IsLoaded() || YConfHasMessagesByOwner(BlckLst, module->GetId());
         }
+    };
 
-        const TString& SomeRecurse() const {
-            static const TString SOME_RECURSE = TString{NMacro::RECURSE} + "/" + TString{NMacro::RECURSE_ROOT_RELATIVE};
-            return SOME_RECURSE;
+    class TRecurseBlacklistVisitor: public TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>>, public TBaseBlacklistVisitor {
+    public:
+        using TBase = TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>>;
+        using TState = typename TBase::TState;
+
+        TRecurseBlacklistVisitor(const TRestoreContext& restoreContext)
+            : TBaseBlacklistVisitor()
+            , RestoreContext_(restoreContext)
+        {}
+
+        bool AcceptDep(TState& state) {
+            bool result = TBase::AcceptDep(state);
+            return result && !IsModuleType(state.NextDep().To()->NodeType);
         }
+
+        bool Enter(TState& state) {
+            const auto& topNode = state.TopNode();
+            if (!TBase::Enter(state) || !IsDirType(topNode->NodeType)) {
+                return false;
+            }
+            auto& names = RestoreContext_.Graph.Names();
+            auto path = names.FileNameById(topNode->ElemId).GetTargetStr();
+            if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(path)) {
+                const auto& parentNode = state.ParentNode();
+                TStringBuf dir;
+                TStringBuf macro;
+                if (parentNode.IsValid()) {
+                    static const TString SOME_RECURSE_LIKE_MACRO = Join('/', NMacro::RECURSE, NMacro::RECURSE_ROOT_RELATIVE, NMacro::RECURSE_FOR_TESTS, NProps::DEPENDS);
+                    dir = names.FileNameById(parentNode->ElemId).GetTargetStr();
+                    macro = SOME_RECURSE_LIKE_MACRO;
+                } else {
+                    dir = names.FileNameById(topNode->ElemId).GetTargetStr(); // if no parent use my ya.make as context
+                    macro = "command arguments";
+                }
+                THolder<TScopedContext> scopedContext(new TScopedContext(names.FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make"))));
+                GenerateBlacklistError(ptr, path, macro);
+            }
+            return true;
+        }
+
+    private:
+        const TRestoreContext& RestoreContext_;
     };
 }
 
@@ -204,7 +230,9 @@ bool TBlacklistChecker::CheckAll() {
         }
         return true; // no blacklist, do nothing
     }
-    TBlacklistVisitor blacklistVisitor(RestoreContext_, StartTargets_);
+    TRecurseBlacklistVisitor recurseBlacklistVisitor(RecurseRestoreContext_);
+    IterateAll(RecurseRestoreContext_.Graph, RecurseStartTargets_, recurseBlacklistVisitor);
+    TBlacklistVisitor blacklistVisitor(RestoreContext_);
     IterateAll(RestoreContext_.Graph, StartTargets_, blacklistVisitor);
     return !blacklistVisitor.HasBlacklistErrors();
 }

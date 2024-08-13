@@ -76,7 +76,8 @@ void TYMake::SortAllEdges() {
 void TYMake::CheckBlacklist() {
     FORCE_TRACE(U, NEvent::TStageStarted("Check blacklist"));
     TRestoreContext restoreContext(Conf, Graph, Modules);
-    TBlacklistChecker blacklistChecker(restoreContext, StartTargets);
+    TRestoreContext recurseRestoreContext(Conf, RecurseGraph, Modules);
+    TBlacklistChecker blacklistChecker(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
     blacklistChecker.CheckAll();
     FORCE_TRACE(U, NEvent::TStageFinished("Check blacklist"));
 }
