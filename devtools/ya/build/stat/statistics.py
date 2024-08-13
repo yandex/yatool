@@ -620,8 +620,7 @@ def print_disk_usage(task_stats, filename, display):
 
 
 def get_int_length(x):
-    assert isinstance(x, int)
-    return int(math.ceil(math.log10(x)))
+    return len(str(x))
 
 
 def print_summary_times(graph, tasks, display):
