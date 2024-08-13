@@ -5,6 +5,7 @@
 #include <util/generic/map.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
+#include <util/ysaveload.h>
 
 struct TKeyword {
     size_t From;
@@ -33,6 +34,15 @@ struct TKeyword {
             OnKwMissing.push_back(TString{onKwMissing});
         //YDIAG(V) << "Added keyword: "  << From << "->" << To << " with deep_replace " << deep_replace_to << Endl;
     }
+
+    Y_SAVELOAD_DEFINE(
+        From,
+        To,
+        Pos,
+        DeepReplaceTo,
+        OnKwPresent,
+        OnKwMissing
+    );
 };
 
 struct TUnitProperty {
@@ -57,12 +67,20 @@ struct TUnitProperty {
             HasMacroCalls = true;
         }
     }
+
+    Y_SAVELOAD_DEFINE(
+        HasConditions,
+        ArgNames,
+        HasMacroCalls,
+        MacroCalls,
+        SpecVars
+    );
 };
 
 struct TCmdProperty: public TUnitProperty {
     TMap<TString, TKeyword> Keywords;
     TMap<size_t, TString> Position2Key;
-    size_t NumUsrArgs;
+    size_t NumUsrArgs = 0;
 
     TString ConvertCmdArgs(const TStringBuf& cmd);
     size_t Key2ArrayIndex(const TString& arg) const;
@@ -93,4 +111,19 @@ struct TCmdProperty: public TUnitProperty {
     const TKeyword& GetKeywordData(size_t arrNum) const {
         return Keywords.find(GetKeyword(arrNum))->second;
     }
+
+    TUnitProperty& GetBaseReference() {
+        return *this;
+    }
+
+    const TUnitProperty& GetBaseReference() const {
+        return *this;
+    }
+
+    Y_SAVELOAD_DEFINE(
+        GetBaseReference(),
+        Keywords,
+        Position2Key,
+        NumUsrArgs
+    );
 };

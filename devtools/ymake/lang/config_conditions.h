@@ -6,6 +6,7 @@
 
 #include <util/generic/set.h>
 #include <util/generic/string.h>
+#include <util/ysaveload.h>
 
 struct TVars;
 struct TDiagCtrl;
@@ -64,6 +65,12 @@ struct TConditionAction {
         , Aoperator(op)
     {
     }
+
+    Y_SAVELOAD_DEFINE(
+        MacroValue,
+        MacroToChange,
+        Aoperator
+    );
 };
 
 typedef TMap<TString, TSet<TString>> TVar2Macros;
@@ -76,8 +83,16 @@ public:
     void AddActionForVariable(const TString& variable, const size_t& condNumber, const TConditionAction& action);
     void AddRawCondition(const TString& condition) { RawConditions.push_back(condition); }
     const TVector<TString>& GetRawConditions() const { return RawConditions; }
+    void Clear();
 
     TYmakeConfigConditionCalc ConditionCalc; //all compiled conditions indexed by numbers
+
+    Y_SAVELOAD_DEFINE(
+        Var2Macros,
+        Macro2Conditions,
+        Condition2Action,
+        RawConditions
+    );
 private:
     void ApplyCondition(size_t condNumber, TVars& realVars);
     TVar2Macros Var2Macros;

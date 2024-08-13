@@ -14,8 +14,10 @@
 #include <library/cpp/digest/md5/md5.h>
 
 #include <util/generic/hash_set.h>
+#include <util/generic/ptr.h>
 #include <util/generic/set.h>
 #include <util/generic/string.h>
+#include <util/ysaveload.h>
 
 class TModule;
 
@@ -23,12 +25,13 @@ struct TToolOptions {
     TString AddIncl;
     TString AddPeers;
 
-    TToolOptions()
-    {
-    }
-
     bool SetOption(TStringBuf name, TStringBuf value);
     bool SetMultiValueOption(TStringBuf name, TStringBuf value);
+
+    Y_SAVELOAD_DEFINE(
+        AddIncl,
+        AddPeers
+    );
 };
 
 enum ESymlinkType {
@@ -47,35 +50,42 @@ enum EPeerdirType {
 template <typename Type>
 class TDefaultValue {
 public:
-    TDefaultValue(const Type& value = Type())
-        : Value(value)
+    using TValueType = Type;
+
+    explicit TDefaultValue(const Type& value = Type())
+        : Value_(value)
+        , IsDefault_(true)
     {
     }
 
-    TDefaultValue& operator=(const TDefaultValue& value) {
-        if (this != &value) {
-            Value = value.Value;
-            IsDefault = false;
-        }
-        return *this;
-    }
-
     operator const Type& () const {
-        return Value;
+        return Value_;
     }
 
     bool IsDefaultValue() const {
-        return IsDefault;
+        return IsDefault_;
     }
 
+    void Set(const Type& value) {
+        IsDefault_ = false;
+        Value_ = value;
+    }
+
+    Y_SAVELOAD_DEFINE(
+        Value_,
+        IsDefault_
+    );
+
 private:
-    Type Value;
-    bool IsDefault = true;
+    Type Value_;
+    bool IsDefault_;
 };
 
 struct TModuleConf {
     using TTaggedModules = TMap<TString, TModuleConf*>;
     using TOrderedModules = TVector<std::pair<TString, TModuleConf*>>;
+    using TParseModuleArgsFunction = void (*)(TModule* mod, TArrayRef<const TStringBuf> args);
+    using TModuleNameFunction = void (*)(TModule* mod);
 
     TString Cmd;
     TString CmdIgnore; // TODO this should be part of Cmd metadata
@@ -87,12 +97,12 @@ struct TModuleConf {
     THashSet<TString> GlobalInputExts;
     bool AllExtsAreInputs = false;
     bool AllGlobalExtsAreInputs = false;
-    TDefaultValue<bool> UseInjectedData = false;
-    TDefaultValue<bool> UsePeersLateOuts = false;
+    TDefaultValue<bool> UseInjectedData = TDefaultValue<bool>(false);
+    TDefaultValue<bool> UsePeersLateOuts = TDefaultValue<bool>(false);
     bool IsPackageBundle = false;
     bool IncludeTag = true;
-    TDefaultValue<bool> FinalTarget = false;
-    TDefaultValue<bool> ProxyLibrary = false;
+    TDefaultValue<bool> FinalTarget = TDefaultValue<bool>(false);
+    TDefaultValue<bool> ProxyLibrary = TDefaultValue<bool>(false);
     EMakeNodeType NodeType;
     ESymlinkType SymlinkType;
     EPeerdirType PeerdirType;
@@ -110,6 +120,9 @@ struct TModuleConf {
     TOrderedModules   OrderedSubModules;
     TVector<TString>  SelfPeers;
 
+    TParseModuleArgsFunction ParseModuleArgs;
+    TModuleNameFunction SetModuleBasename;
+
     TModuleConf()
         : NodeType(EMNT_Deleted)
         , SymlinkType(EST_Unset)
@@ -118,6 +131,8 @@ struct TModuleConf {
         , SetModuleBasename(nullptr)
     {
     }
+
+    TModuleConf(const TModuleConf&) = default;
 
     inline bool IsInput(TStringBuf fileExt) const {
         return AllExtsAreInputs || InputExts.contains(fileExt);
@@ -143,10 +158,6 @@ struct TModuleConf {
 
     bool SetOption(TStringBuf key, TStringBuf name, TStringBuf val, TVars& vars, bool renderSemantics);
 
-    void (*ParseModuleArgs)(TModule* mod, TArrayRef<const TStringBuf> args);
-
-    void (*SetModuleBasename)(TModule* mod);
-
     static bool IsOption(const TStringBuf name);
 
     void Inherit(const TModuleConf& parent);
@@ -154,6 +165,10 @@ struct TModuleConf {
     void ApplyOwnerConf(const TModuleConf& owner);
 
     void UniteRestrictions();
+
+    void Load(IInputStream* input);
+
+    void Save(IOutputStream* output) const;
 };
 
 using TSectionPatterns = THashMap<TString, TString>;
@@ -177,10 +192,10 @@ struct TBlockData {
     bool HasSemantics = false;
     bool StructCmd = false; // Marker requiring to use structured command representation DEVTOOLS-8280
     bool IsFileGroupMacro = false;
-    THolder<TToolOptions> ToolOptions;
-    THolder<TCmdProperty> CmdProps; // additional properties: keywords, spec conditions(?)
-    THolder<TModuleConf> ModuleConf;
-    THolder<TSectionPatterns> SectionPatterns; // <file ext> -> <var name> or <spec param> -> <var name> (for generic macro)
+    TSimpleSharedPtr<TToolOptions> ToolOptions;
+    TSimpleSharedPtr<TCmdProperty> CmdProps; // additional properties: keywords, spec conditions(?)
+    TSimpleSharedPtr<TModuleConf> ModuleConf;
+    TSimpleSharedPtr<TSectionPatterns> SectionPatterns; // <file ext> -> <var name> or <spec param> -> <var name> (for generic macro)
 
     void Inherit(const TString& name, const TBlockData& parent);
 
@@ -199,6 +214,62 @@ struct TBlockData {
     }
 
     void ApplyOwner(const TString& name, TBlockData& owner);
+
+    void Load(IInputStream* input) {
+        ::Load(input, ParentName);
+        ::Load(input, OwnerName);
+        ::Load(input, Completed);
+        ::Load(input, IsUserMacro);
+        ::Load(input, IsGenericMacro);
+        ::Load(input, IsMultiModule);
+        ::Load(input, HasPeerdirSelf);
+        ::Load(input, HasSemantics);
+        ::Load(input, StructCmd);
+        ::Load(input, IsFileGroupMacro);
+
+        auto loadPointer = [](IInputStream* input, auto& item) {
+            bool flag;
+            ::Load(input, flag);
+            if (flag) {
+                using PointerType = std::remove_reference_t<decltype(std::declval<decltype(*item)>())>;
+                PointerType temp;
+                ::Load(input, temp);
+                item = MakeHolder<PointerType>(temp);
+            } else {
+                item = nullptr;
+            }
+        };
+        loadPointer(input, ToolOptions);
+        loadPointer(input, CmdProps);
+        loadPointer(input, ModuleConf);
+        loadPointer(input, SectionPatterns);
+    }
+
+    void Save(IOutputStream* output) const {
+        ::Save(output, ParentName);
+        ::Save(output, OwnerName);
+        ::Save(output, Completed);
+        ::Save(output, IsUserMacro);
+        ::Save(output, IsGenericMacro);
+        ::Save(output, IsMultiModule);
+        ::Save(output, HasPeerdirSelf);
+        ::Save(output, HasSemantics);
+        ::Save(output, StructCmd);
+        ::Save(output, IsFileGroupMacro);
+
+        auto savePointer = [](IOutputStream* output, auto& item) {
+            if (item) {
+                ::Save(output, true);
+                ::Save(output, *item);
+            } else {
+                ::Save(output, false);
+            }
+        };
+        savePointer(output, ToolOptions);
+        savePointer(output, CmdProps);
+        savePointer(output, ModuleConf);
+        savePointer(output, SectionPatterns);
+    }
 };
 
 inline bool IsBlockDataModule(const TBlockData* blockData) {
@@ -248,4 +319,11 @@ struct TYmakeConfig {
 
     // FIXME DEPRECATED: Temporary hacky workaround for external resources collection into globals
     void RegisterResourceLate(const TString& variableName, const TString& value) const;
+
+    Y_SAVELOAD_DEFINE(
+        CommandConf,
+        Conditions,
+        BlockData,
+        CommandDefinitions
+    );
 };

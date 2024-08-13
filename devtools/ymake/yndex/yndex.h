@@ -4,6 +4,7 @@
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/generic/strbuf.h>
+#include <util/ysaveload.h>
 
 namespace NYndex {
     struct TSourceRange {
@@ -11,6 +12,13 @@ namespace NYndex {
         size_t Column;
         size_t EndLine;
         size_t EndColumn;
+
+        Y_SAVELOAD_DEFINE(
+            Line,
+            Column,
+            EndLine,
+            EndColumn
+        );
     };
 
     struct TSourceLocation {
@@ -29,6 +37,11 @@ namespace NYndex {
             return !File.empty();
         }
 
+        Y_SAVELOAD_DEFINE(
+            File,
+            Range
+        );
+
         TString File;
         TSourceRange Range;
     };
@@ -41,6 +54,7 @@ namespace NYndex {
     };
 
     struct TDefinition {
+        TDefinition() = default;
         TDefinition(const TString& name, const TString& docText, const TSourceLocation& link, EDefinitionType type)
             : Name(name)
             , DocText(docText)
@@ -48,6 +62,13 @@ namespace NYndex {
             , Type(type)
         {
         }
+
+        Y_SAVELOAD_DEFINE(
+            Name,
+            DocText,
+            Link,
+            Type
+        );
 
         TString Name;
         TString DocText;
@@ -71,6 +92,13 @@ namespace NYndex {
         bool AreEnabled() const {
             return Enabled;
         }
+
+        void Clear() {
+            Definitions.clear();
+            Enabled = true;
+        }
+
+        Y_SAVELOAD_DEFINE(Definitions, Enabled);
 
     private:
         THashMap<TString, TDefinition> Definitions;

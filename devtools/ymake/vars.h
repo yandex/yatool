@@ -11,13 +11,14 @@
 
 #include <util/generic/fwd.h>
 #include <util/generic/hash.h>
+#include <util/generic/hash_set.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/string/type.h>
 #include <util/string/vector.h>
 #include <util/system/types.h>
 #include <util/system/yassert.h>
-#include <util/generic/hash_set.h>
+#include <util/ysaveload.h>
 
 #include <functional>
 #include <utility>
@@ -118,6 +119,8 @@ struct TVarStr {
     };
 
 public:
+    TVarStr() = default;
+
     TVarStr(const TStringBuf& name)
         : Name(TString{name})
         , AllFlags(0)
@@ -162,6 +165,11 @@ public:
     bool operator==(const TVarStr& var) const {
         return Name == var.Name && AllFlags == var.AllFlags;
     }
+
+    Y_SAVELOAD_DEFINE(
+        Name,
+        AllFlags
+    );
 };
 
 static_assert(sizeof(TVarStr) == sizeof(TString) + sizeof(ui64), "union part of TVarStr must fit 64 bit");
@@ -284,6 +292,20 @@ struct TYVar: public TVector<TVarStr> {
                 uniqVars.insert(this->back());
             }
         }
+    }
+
+    void Load(IInputStream* input) {
+        BaseVal = nullptr;
+        ::Load(input, Flags);
+        ::Load(input, Id);
+        ::Load(input, static_cast<TVector<TVarStr>&>(*this));
+    }
+
+    void Save(IOutputStream* output) const {
+        Y_ASSERT(BaseVal == nullptr);
+        ::Save(output, Flags);
+        ::Save(output, Id);
+        ::Save(output, static_cast<const TVector<TVarStr>&>(*this));
     }
 };
 
@@ -497,5 +519,17 @@ public:
         }
         Y_ASSERT(cur); // `what' and `than' must be from our vars hierarchy
         return false;
+    }
+
+    void Load(IInputStream* input) {
+        Base = nullptr;
+        ::Load(input, Id);
+        ::Load(input, static_cast<THashMap<TString, TYVar>&>(*this));
+    }
+
+    void Save(IOutputStream* output) const {
+        Y_ASSERT(Base == nullptr);
+        ::Save(output, Id);
+        ::Save(output, static_cast<const THashMap<TString, TYVar>&>(*this));
     }
 };

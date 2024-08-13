@@ -2,6 +2,13 @@
 
 #include <devtools/ymake/diag/manager.h>
 
+void TCondition::Clear() {
+    Var2Macros.clear();
+    Macro2Conditions.clear();
+    Condition2Action.clear();
+    RawConditions.clear();
+}
+
 void TCondition::AddActionForVariable(const TString& variable, const size_t& condNumber, const TConditionAction& action) {
     //in Var2Macros insert variable -> action.MacroToChange;
     //in Macro2Conditions insert action.MacroToChange -> condNumber;

@@ -115,6 +115,93 @@ namespace {
             ReportUnexpectedValueForProperty(key, name, value);
         }
     }
+
+    template<typename Type>
+    void ApplyBoolProperty(TDefaultValue<Type>& dest, const TStringBuf key, const TStringBuf name, const TStringBuf value) {
+        if (IsTrue(value)) {
+            dest.Set(true);
+        } else if (IsFalse(value)) {
+            dest.Set(false);
+        } else {
+            ReportUnexpectedValueForProperty(key, name, value);
+        }
+    }
+
+    const TString NullFuncName = "";
+
+    const TString DirNameFuncName = "DirName";
+    const TString UseDirFuncName = "UseDirNameOrSetGoPackage";
+    const TString TwoDirFuncName = "TwoDirNames";
+    const TString ThreeDirFuncName = "ThreeDirNames";
+    const TString FullPathFuncName = "FullPath";
+
+    const TString& ModuleNameFunctionToString(TModuleConf::TModuleNameFunction func) {
+        if (func == nullptr) {
+            return NullFuncName;
+        } else if (func == SetDirNameBasename) {
+            return DirNameFuncName;
+        } else if (func == SetDirNameBasenameOrGoPackage) {
+            return UseDirFuncName;
+        } else if (func == SetTwoDirNamesBasename) {
+            return TwoDirFuncName;
+        } else if (func == SetThreeDirNamesBasename) {
+            return ThreeDirFuncName;
+        } else if (func == SetFullPathBasename) {
+            return FullPathFuncName;
+        }
+        Y_ASSERT(false);
+        return NullFuncName;
+    }
+
+    TModuleConf::TModuleNameFunction StringToModuleNameFunction(const TString& str) {
+        if (str == NullFuncName) {
+            return nullptr;
+        } else if (str == DirNameFuncName) {
+            return SetDirNameBasename;
+        } else if (str == UseDirFuncName) {
+            return SetDirNameBasenameOrGoPackage;
+        } else if (str == TwoDirFuncName) {
+            return SetTwoDirNamesBasename;
+        } else if (str == ThreeDirFuncName) {
+            return SetThreeDirNamesBasename;
+        } else if (str == FullPathFuncName) {
+            return SetFullPathBasename;
+        }
+        Y_ASSERT(false);
+        return nullptr;
+    }
+
+    const TString ParseDllFuncName = "DLL";
+    const TString ParseBaseFuncName = "Base";
+    const TString ParseRawFuncName = "Raw";
+
+    const TString& ParseModuleArgsFunctionToString(TModuleConf::TParseModuleArgsFunction func) {
+        if (func == nullptr) {
+            return NullFuncName;
+        } else if (func == ParseDllModuleArgs) {
+            return ParseDllFuncName;
+        } else if (func == ParseBaseModuleArgs) {
+            return ParseBaseFuncName;
+        } else if (func == ParseRawModuleArgs) {
+            return ParseRawFuncName;
+        }
+        Y_ASSERT(false);
+        return NullFuncName;
+    }
+
+    TModuleConf::TParseModuleArgsFunction StringToParseModuleArgsFunction(const TString& str) {
+        if (str == NullFuncName) {
+            return nullptr;
+        } else if (str == ParseDllFuncName) {
+            return ParseDllModuleArgs;
+        } else if (str == ParseBaseFuncName) {
+            return ParseBaseModuleArgs;
+        } else if (str == ParseRawFuncName) {
+            return ParseRawModuleArgs;
+        }
+        Y_ASSERT(false);
+        return nullptr;
+    }
 }
 
 template<typename TInput, typename TOutput>
@@ -471,6 +558,99 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
     return true;
 }
 
+void TModuleConf::Load(IInputStream* input) {
+    ::Load(input, Cmd);
+    ::Load(input, CmdIgnore);
+    ::Load(input, GlobalCmd);
+    ::Load(input, Name);
+    ::Load(input, Tag);
+    ::Load(input, Epilogue);
+    ::Load(input, InputExts);
+    ::Load(input, GlobalInputExts);
+    ::Load(input, AllExtsAreInputs);
+    ::Load(input, AllGlobalExtsAreInputs);
+    ::Load(input, UseInjectedData);
+    ::Load(input, UsePeersLateOuts);
+    ::Load(input, IsPackageBundle);
+    ::Load(input, IncludeTag);
+    ::Load(input, FinalTarget);
+    ::Load(input, ProxyLibrary);
+    ::Load(input, NodeType);
+    ::Load(input, SymlinkType);
+    ::Load(input, PeerdirType);
+    ::Load(input, HasSemantics);
+    ::Load(input, HasSemanticsForGlobals);
+    ::Load(input, StructCmd);
+
+    ::Load(input, Restricted);
+    ::Load(input, Ignored);
+    ::Load(input, Allowed);
+    ::Load(input, Globals);
+    ::Load(input, MacroAliases);
+    ::Load(input, SpecServiceVars);
+    // TTaggedModules    SubModules;
+    //   Submodules is filled in:
+    //     CompleteModules() -> FillInheretedData() -> ApplyOwner() -> AddSubmodule()
+    // TOrderedModules   OrderedSubModules;
+    //   OrderedSubModules is filled in:
+    //     VerifyModuleConf() -> OrderSubModules() ->  OrderSubModulesRecursively()
+    ::Load(input, SelfPeers);
+
+    {
+        TString str;
+        ::Load(input, str);
+        ParseModuleArgs = StringToParseModuleArgsFunction(str);
+    }
+
+    {
+        TString str;
+        ::Load(input, str);
+        SetModuleBasename = StringToModuleNameFunction(str);
+    }
+}
+
+void TModuleConf::Save(IOutputStream* output) const {
+    ::Save(output, Cmd);
+    ::Save(output, CmdIgnore);
+    ::Save(output, GlobalCmd);
+    ::Save(output, Name);
+    ::Save(output, Tag);
+    ::Save(output, Epilogue);
+    ::Save(output, InputExts);
+    ::Save(output, GlobalInputExts);
+    ::Save(output, AllExtsAreInputs);
+    ::Save(output, AllGlobalExtsAreInputs);
+    ::Save(output, UseInjectedData);
+    ::Save(output, UsePeersLateOuts);
+    ::Save(output, IsPackageBundle);
+    ::Save(output, IncludeTag);
+    ::Save(output, FinalTarget);
+    ::Save(output, ProxyLibrary);
+    ::Save(output, NodeType);
+    ::Save(output, SymlinkType);
+    ::Save(output, PeerdirType);
+    ::Save(output, HasSemantics);
+    ::Save(output, HasSemanticsForGlobals);
+    ::Save(output, StructCmd);
+
+    ::Save(output, Restricted);
+    ::Save(output, Ignored);
+    ::Save(output, Allowed);
+    ::Save(output, Globals);
+    ::Save(output, MacroAliases);
+    ::Save(output, SpecServiceVars);
+    // TTaggedModules    SubModules;
+    //   Submodules is filled in:
+    //     CompleteModules() -> FillInheretedData() -> ApplyOwner() -> AddSubmodule()
+    // TOrderedModules   OrderedSubModules;
+    //   OrderedSubModules is filled in:
+    //     VerifyModuleConf() -> OrderSubModules() ->  OrderSubModulesRecursively()
+    ::Save(output, SelfPeers);
+
+    ::Save(output, ParseModuleArgsFunctionToString(ParseModuleArgs));
+    ::Save(output, ModuleNameFunctionToString(SetModuleBasename));
+}
+
 void TBlockData::Inherit(const TString& name, const TBlockData& parent) {
     if (parent.ModuleConf) {
         GetOrInit(ModuleConf).Name = name;
@@ -488,13 +668,12 @@ void TBlockData::ApplyOwner(const TString& name, TBlockData& owner) {
     Y_ENSURE(!thisConf.Tag.empty());
     if (!ownerConf.AddSubmodule(thisConf.Tag, thisConf)) {
         YErr() << name << " has duplicate sub-module tag " << thisConf.Tag << ", ignored" << Endl;
-        ModuleConf.Destroy();
+        ModuleConf.Reset();
         return;
     }
 
     thisConf.ApplyOwnerConf(ownerConf);
 }
-
 
 void TYmakeConfig::FillInheritedData(TBlockData& data, const TString& name) {
 
@@ -649,7 +828,7 @@ void TYmakeConfig::VerifyModuleConfs() {
                                                              << " is not found by name for: " << data.first);
                 ownIt->second.ModuleConf.Get()->SubModules.erase(mod->Tag);
             }
-            data.second.ModuleConf.Destroy(); //TODO: check if Run mod is OK
+            data.second.ModuleConf.Reset(); //TODO: check if Run mod is OK
         }
     }
 
@@ -689,9 +868,9 @@ void TYmakeConfig::VerifyModuleConfs() {
         if (moduleNotDefined) {
             YErr() << data.first << " undefined!" << Endl;
             for (const auto& sub : mod->SubModules) {
-                BlockData[sub.second->Name].ModuleConf.Destroy();
+                BlockData[sub.second->Name].ModuleConf.Reset();
             }
-            data.second.ModuleConf.Destroy();
+            data.second.ModuleConf.Reset();
         } else {
             data.second.HasPeerdirSelf = OrderSubModules(data.first, mod->SubModules, &mod->OrderedSubModules);
         }
