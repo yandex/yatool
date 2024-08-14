@@ -602,6 +602,9 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             Y_ASSERT(blob.Length() == sizeof(TMd5Sig::RawData));
             memcpy(YmakePreBlacklistHash.RawData, blob.Data(), sizeof(TMd5Sig::RawData));
             Conf.SetBlacklistHashChanged(YmakePreBlacklistHash != Conf.YmakeBlacklistHash);
+            if (Conf.IsBlacklistHashChanged()) {
+                YDebug() << "Blacklist has changed" << Endl;
+            }
         }
         if (cacheReader.HasNextBlob()) {
             auto& blob = cacheReader.GetNextBlob();
@@ -609,6 +612,9 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             Y_ASSERT(blob.Length() == sizeof(TMd5Sig::RawData));
             memcpy(YmakePreIsolatedProjectsHash.RawData, blob.Data(), sizeof(TMd5Sig::RawData));
             Conf.SetIsolatedProjectsHashChanged(YmakePreIsolatedProjectsHash != Conf.YmakeIsolatedProjectsHash);
+            if (Conf.IsIsolatedProjectsHashChanged()) {
+                YDebug() << "Isolated projects had changed" << Endl;
+            }
         }
         if (cacheReader.HasNextBlob()) {
             TDebugTimer timer("conf msg manager");
