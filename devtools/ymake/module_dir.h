@@ -48,5 +48,4 @@ protected:
 
 private:
     void AddMissingDir(TStringBuf dir);
-    TFileView AddDependsDir(TStringBuf dir); // Add one depends directory and return it TFileView
 };

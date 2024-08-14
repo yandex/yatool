@@ -192,11 +192,6 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
         SrcDirs.Push(moduleDir);
     }
 
-    if (!saved.DependsIds.empty()) {
-        Depends = MakeHolder<TDirs>();
-        Depends->RestoreFromsIds(saved.DependsIds, Symbols);
-    }
-
     if (!saved.MissingDirsIds.empty()) {
         MissingDirs = MakeHolder<TDirs>();
         MissingDirs->RestoreFromsIds(saved.MissingDirsIds, Symbols);
@@ -262,9 +257,6 @@ void TModule::Save(TModuleSavedState& saved) const {
 
     IncDirs.Save(saved.IncDirs);
 
-    if (Depends) {
-        saved.DependsIds = Depends->SaveAsIds();
-    }
     if (MissingDirs) {
         saved.MissingDirsIds = MissingDirs->SaveAsIds();
     }
@@ -595,7 +587,6 @@ void DumpModuleInfo(IOutputStream& out, const TModule& module) {
     out << "\tPeers: " << JoinStrings(module.Peers.begin(), module.Peers.end(), " ") << Endl;
     out << "\tMissingDirs: " << (module.MissingDirs ? JoinStrings(module.MissingDirs->begin(), module.MissingDirs->end(), " ") : TString("<empty>")) << Endl;
     out << "\tDataPaths: " << (module.DataPaths ? JoinStrings(module.DataPaths->begin(), module.DataPaths->end(), " ") : TString("<empty>")) << Endl;
-    out << "\tDepends: " << (module.Depends ? JoinStrings(module.Depends->begin(), module.Depends->end(), " ") : TString("<empty>")) << Endl;
 
     module.IncDirs.Dump(out);
 

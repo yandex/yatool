@@ -55,7 +55,7 @@ void TModuleDirBuilder::AddDepends(const TVector<TStringBuf>& args) {
             YConfErr(BadDir) << "DEPENDS to non-directory " << dirName << Endl;
             continue;
         }
-        auto dirView = AddDependsDir(dirName);
+        auto dirView = Graph.Names().FileConf.GetStoredName(dirName);
         dirProps.push_back(MakeDepFileCacheId(dirView.GetElemId()));
         auto dirNameWoType = NPath::CutType(dirName);
         Module.Vars.SetAppend("TEST_DEPENDS_VALUE", dirNameWoType);
@@ -97,15 +97,6 @@ void TModuleDirBuilder::AddDataPath(TStringBuf path) {
     }
     Module.DataPaths->Push(pathEnt);
     YDIAG(DG) << "DATA dep for module: " << path << Endl;
-}
-
-TFileView TModuleDirBuilder::AddDependsDir(TStringBuf dir) {
-    TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);
-    if (!Module.Depends) {
-        Module.Depends = MakeHolder<TDirs>();
-    }
-    Module.Depends->Push(dirEnt);
-    return dirEnt;
 }
 
 void TModuleDirBuilder::AddIncdir(const TStringBuf& dir, EIncDirScope scope, bool checkDir, TLangId langId) {

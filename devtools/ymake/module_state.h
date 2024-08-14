@@ -159,7 +159,6 @@ private:
 
     TModuleIncDirs::TSavedState IncDirs;
     TVector<ui32> SrcsDirsIds;
-    TVector<ui32> DependsIds;
     TVector<ui32> MissingDirsIds;
     TVector<ui32> DataPathsIds;
     TVector<ui32> SelfPeers;
@@ -213,7 +212,6 @@ public:
     TModuleIncDirs IncDirs;
     THolder<TDirs> MissingDirs;     // Missing addincls and srcdir for proper work from cache
     THolder<TDirs> DataPaths;
-    THolder<TDirs> Depends;
     TSet<TString> ExternalResources;
     TVars Vars;
     TPeersRestrictions PeersRestrictions;
