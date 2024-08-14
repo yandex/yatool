@@ -26,509 +26,170 @@ The `ya.conf` file needs to be in [toml](https://github.com/toml-lang/toml) form
 
 - For options that are "dictionaries" (for example, `flags`), you need to open the corresponding section (table). This section contains lines in the `key = "value"` format.
 
-## Sample ya.conf
-```
-# Save config to the path_proect/{USER}/ya.conf or to the ~/.ya/ya.conf
-#
-# Add all symlink-dirs in modules to exclude dirs (--auto-exclude-symlinks)
-# auto_exclude_symlinks = false
-#
-# Copy project config for Shared Indexes if exist (--copy-shared-index-config)
-# copy_shared_index_config = false
-#
-# detect_leaks_in_pytest = true
-#
-# Create project in actual (directory based) format (--directory-based)
-# directory_based = true
-#
-# eager_execution = false
-#
-# Exclude dirs with specific names from all modules (--exclude-dirs)
-# exclude_dirs = []
-#
-# Add external content root modules (--external-content-root-module)
-# external_content_root_modules = []
-#
-# fail_maven_export_with_tests = false
-#
-# Generate tests for PEERDIR dependencies (--generate-tests-for-dependencies)
-# generate_tests_for_deps = false
-#
-# Generate run configuration for junit tests (--generate-junit-run-configurations)
-# generate_tests_run = false
-#
-# Root for .ipr and .iws files (--idea-files-root)
-# idea_files_root = "None"
-#
-# Project JDK version (--idea-jdk-version)
-# idea_jdk_version = "None"
-#
-# Store ".iml" files in project root tree (stores in source root tree by default) (--iml-in-project-root)
-# iml_in_project_root = false
-#
-# Keep relative paths in ".iml" files (works with --iml-in-project-root) (--iml-keep-relative-paths)
-# iml_keep_relative_paths = false
-#
-# Create the minimum set of project settings (--ascetic)
-# minimal = false
-#
-# oauth_exchange_ssh_keys = true
-#
-# oauth_token_path = "None"
-#
-# Do not export test_data (--omit-test-data)
-# omit_test_data = false
-#
-# List of test statuses omitted by default. Use "-P" to see all tests. Allowed statuses: crashed, deselected, diff, fail, flaky, good, internal, missing, not_launched, skipped, timeout, xfail, xfaildiff, xpass
-# omitted_test_statuses = [ "good", "xfail", "not_launched",]
-#
-# Idea project name (.ipr and .iws file) (--project-name)
-# project_name = "None"
-#
-# regenarate_with_project_update = "None"
-#
-# Default test sizes to run (1 for small, 2 for small+medium, 3 to run all tests)
-# run_tests_size = 1
-#
-# Do not merge tests modules with their own libraries (--separate-tests-modules)
-# separate_tests_modules = false
-#
-# setup_pythonpath_env = true
-#
-# strip_non_executable_target = "None"
-#
-# test_fakeid = ""
-#
-# use_atd_revisions_info = false
-#
-# use_command_file_in_testtool = false
-#
-# use_jstyle_server = false
-#
-# use_throttling = false
-#
-# Add common JVM_ARGS flags to default junit template (--with-common-jvm-args-in-junit-template)
-# with_common_jvm_args_in_junit_template = false
-#
-# Generate content root modules (--with-content-root-modules)
-# with_content_root_modules = false
-#
-# Generate long library names (--with-long-library-names)
-# with_long_library_names = false
-#
-# ya_bin3_required = "None"
-#
-# ========== Idea project options =============================================
-#
-# Add Python 3 targets to project (--add-py3-targets)
-# add_py_targets = false
-#
-# Root directory for a CLion project (-r, --project-root)
-# content_root = "None"
-#
-# Emulate create project, but do nothing (-n, --dry-run)
-# dry_run = false
-#
-# Only consider filtered content (-f, --filter)
-# filters = []
-#
-# Old Mode: Enable full targets graph generation for project. (--full-targets)
-# full_targets = false
-#
-# Group idea modules according to paths: (tree, flat) (--group-modules)
-# group_modules = "None"
-#
-# IntelliJ IDEA project root path (-r, --project-root)
-# idea_project_root = "None"
-#
-# Lite mode for solution (fast open, without build) (-m, --mini)
-# lite_mode = false
-#
-# Only recurse reachable projects are idea modules (-l, --local)
-# local = false
-#
-# Path to the directory for CMake output at the remote host (--remote-build-path)
-# remote_build_path = "None"
-#
-# Name of the remote server configuration tied to the remote toolchain (--remote-deploy-config)
-# remote_deploy_config = "None"
-#
-# Hostname associated with remote server configuration (--remote-host)
-# remote_deploy_host = "None"
-#
-# Path to the remote repository at the remote host (--remote-repo-path)
-# remote_repo_path = "None"
-#
-# Generate configurations for remote toolchain with this name (--remote-toolchain)
-# remote_toolchain = "None"
-#
-# Deploy local files via sync server instead of file watchers (--use-sync-server)
-# use_sync_server = false
-#
-# ========== Integration wuth IDE plugin ======================================
-#
-# Type of a project to use in "ya project update" upon regernation from Idea (--project-update-kind)
-# project_update_kind = "None"
-#
-# Run "ya project update" for this dirs upon regeneration from Idea (--project-update-targets)
-# project_update_targets = []
-#
-# ========== Ya operation control =============================================
-#
-# Build threads count (-j, --threads)
-# build_threads = 2
-#
-# Build as much as possible (-k, --keep-going)
-# continue_on_fail = false
-#
-# Custom build directory (autodetected by default) (-B, --build-dir)
-# custom_build_directory = "None"
-#
-# Set default node requirements, use `None` to disable (--default-node-reqs)
-# default_node_requirements_str = "None"
-#
-# Fetchers priorities and params (--fetcher-params)
-# fetcher_params_str = "None"
-#
-# Link threads count (--link-threads)
-# link_threads = 0
-#
-# Do not use ymake caches on retry (--no-ymake-caches-on-retry)
-# no_caches_on_retry = false
-#
-# Enable additional cache based on content-only dynamic UIDs [default] (--content-uids)
-# request_content_uids = false
-#
-# Set nice value for build processes (--nice)
-# set_nice_value = 10
-#
-# Use clonefile instead of hardlink on macOS (--use-clonefile)
-# use_clonefile = true
-#
-# ========== Build output =====================================================
-#
-# Process selected host build output as a result (--add-host-result)
-# add_host_result = []
-#
-# Process selected build output as a result (--add-result)
-# add_result = []
-#
-# Process all outputs of the node along with selected build output as a result (--all-outputs-to-result)
-# all_outputs_to_result = false
-#
-# Do not create any symlink in source directory (--no-src-links)
-# create_symlinks = true
-#
-# Build by DEPENDS anyway (--force-build-depends)
-# force_build_depends = false
-#
-# Do not build by RECURSES (--ignore-recurses)
-# ignore_recurses = false
-#
-# Path to accumulate resulting binaries and libraries (-I, --install)
-# install_dir = "None"
-#
-# Directory with build results (-o, --output)
-# output_root = "None"
-#
-# Do not symlink/copy output for files with given suffix, they may still be saved in cache as result (--no-output-for)
-# suppress_outputs = []
-#
-# Result store root (--result-store-root)
-# symlink_root = "None"
-#
-# ========== Printing =========================================================
-#
-# Do not symlink/copy output for files with given suffix if not overriden with --add-result (--no-output-default-for)
-# default_suppress_outputs = [ ".o", ".obj", ".mf", "..", ".cpf", ".cpsf", ".srclst", ".fake", ".vet.out", ".vet.txt", ".self.protodesc",]
-#
-# Print extra progress info (--show-extra-progress)
-# ext_progress = false
-#
-# Mask source and build root paths in stderr (--mask-roots)
-# mask_roots = "None"
-#
-# Do not rewrite output information (ninja/make) (-T)
-# output_style = "ninja"
-#
-# Show build execution statistics (--stat)
-# print_statistics = false
-#
-# Print execution time for commands (--show-timings)
-# show_timings = false
-#
-# Additional statistics output dir (--stat-dir)
-# statistics_out_dir = "None"
-#
-# ========== Platform/build configuration =====================================
-#
-# Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug)
-# build_type = "release"
-#
-# Host platform (--host-platform)
-# host_platform = "None"
-#
-# Disable ya make customization (--disable-customization)
-# preset_disable_customization = false
-#
-# Target platform (--target-platform)
-# target_platforms = []
-#
-# ========== Local cache ======================================================
-#
-# Auto-clear results cache (--auto-clean)
-# auto_clean_results_cache = true
-#
-# enable build cache (--ya-ac)
-# build_cache = false
-#
-# Override configuration options (--ya-ac-conf)
-# build_cache_conf_str = []
-#
-# enable build cache master mode (--ya-ac-master)
-# build_cache_master = false
-#
-# Cache codec (--cache-codec)
-# cache_codec = "None"
-#
-# Max cache size (--cache-size)
-# cache_size = 322122547200
-#
-# Try alternative storage (--new-store)
-# new_store = true
-#
-# Remove all symlink results except files from the current graph (--gc-symlinks)
-# strip_symlinks = false
-#
-# Results cache TTL (--symlinks-ttl)
-# symlinks_ttl = 604800
-#
-# enable tools cache (--ya-tc)
-# tools_cache = false
-#
-# Override configuration options (--ya-tc-conf)
-# tools_cache_conf_str = []
-#
-# Override configuration options (--ya-gl-conf)
-# tools_cache_gl_conf_str = []
-#
-# Override tools cache built-in ini-file (--ya-tc-ini)
-# tools_cache_ini = "None"
-#
-# enable tools cache master mode (--ya-tc-master)
-# tools_cache_master = false
-#
-# Max tool cache size (--tools-cache-size)
-# tools_cache_size = 32212254720
-#
-# ========== Graph generation =================================================
-#
-# Compress ymake output to reduce max memory usage (--compress-ymake-output)
-# compress_ymake_output = false
-#
-# Codec to compress ymake output with (--compress-ymake-output-codec)
-# compress_ymake_output_codec = "zstd08_1"
-#
-# ========== Feature flags ====================================================
-#
-# Enable new dir outputs features (--dir-outputs-test-mode)
-# dir_outputs_test_mode = false
-#
-# Enable dump debug (--dump-debug)
-# dump_debug_enabled = false
-#
-# Use local executor instead of Popen (--local-executor)
-# local_executor = true
-#
-# Try alternative runner (--new-runner)
-# new_runner = true
-#
-# Do not validate target-platforms (--disable-platform-schema-validation)
-# platform_schema_validation = false
-#
-# Disable dir_outputs support in runner (--disable-runner-dir-outputs)
-# runner_dir_outputs = true
-#
-# ========== Testing ==========================================================
-#
-# Use FS cache instead of memory cache (only read) (--cache-fs-read)
-# cache_fs_read = false
-#
-# Use FS cache instead of memory cache (only write) (--cache-fs-write)
-# cache_fs_write = false
-#
-# Use cache for tests (--cache-tests)
-# cache_tests = false
-#
-# Allows to specify backend for canonical data with pattern (--canonization-backend)
-# canonization_backend = "None"
-#
-# Allows to specify canonization backend protocol (https by default) (--canonization-scheme)
-# canonization_scheme = "https"
-#
-# Tar testing output dir in the intermediate machinery (--no-dir-outputs)
-# dir_outputs = true
-#
-# Enable dir outputs support in nodes (--dir-outputs-in-nodes)
-# dir_outputs_in_nodes = false
-#
-# Enable all flake8 checks (--disable-flake8-migrations)
-# disable_flake8_migrations = true
-#
-# Enable all java style checks (--disable-jstyle-migrations)
-# disable_jstyle_migrations = false
-#
-# Fail after the first test failure (--fail-fast)
-# fail_fast = false
-#
-# Disable truncation of the comments and print diff to the terminal (--inline-diff)
-# inline_diff = false
-#
-# JUnit extra command line options (--junit-args)
-# junit_args = "None"
-#
-# Path to junit report to be generated (--junit)
-# junit_path = "None"
-#
-# Restart tests which failed in last run for chosen target (-X, --last-failed-tests)
-# last_failed_tests = false
-#
-# Don't merge split tests testing_out_stuff dir (with macro FORK_*TESTS) (--dont-merge-split-tests)
-# merge_split_tests = true
-#
-# Remove implicit path from DATA macro (--remove-implicit-data-path)
-# remove_implicit_data_path = false
-#
-# Remove result node from graph, print test report in ya and report skipped suites after configure (--remove-result-node)
-# remove_result_node = false
-#
-# Remove top level testing_out_stuff directory (--remove-tos)
-# remove_tos = false
-#
-# Run tests marked with ya:yt tag on the YT (--run-tagged-tests-on-yt)
-# run_tagged_tests_on_yt = false
-#
-# Show passed tests (-P, --show-passed-tests)
-# show_passed_tests = false
-#
-# Show skipped tests (--show-skipped-tests)
-# show_skipped_tests = false
-#
-# Store original trace file (--store-original-tracefile)
-# store_original_tracefile = false
-#
-# Remove all result nodes (including build nodes) that are not required for running tests (--strip-idle-build-results)
-# strip_idle_build_results = false
-#
-# Don't build skipped test's dependencies (--strip-skipped-test-deps)
-# strip_skipped_test_deps = false
-#
-# Specifies output files limit (bytes) (--test-node-output-limit)
-# test_node_output_limit = "None"
-#
-# Specifies compression filter for tos.tar (none, zstd, gzip) (--test-output-compression-filter)
-# test_output_compression_filter = "zstd"
-#
-# Specifies compression level for tos.tar using specified compression filter (--test-output-compression-level)
-# test_output_compression_level = 1
-#
-# Output test stderr to console online (--test-stderr)
-# test_stderr = false
-#
-# Output test stdout to console online (--test-stdout)
-# test_stdout = false
-#
-# Test traceback style for pytests ("long", "short", "line", "native", "no") (--test-traceback)
-# test_traceback = "short"
-#
-# specify millicpu requirements for distbuild.") (--ytexec-wrapper-m-cpu)
-# ytexec_wrapper_m_cpu = 250
-#
-# ========== Packaging ========================================================
-#
-# Disable docker cache (--docker-no-cache)
-# docker_no_cache = false
-#
-# ========== Advanced =========================================================
-#
-# Hide MacOS arm64 host warning (--hide-arm64-host-warning)
-# hide_arm64_host_warning = false
-#
-# ========== For Ya developers ================================================
-#
-# Clear ymake cache (-xx)
-# clear_ymake_cache = false
-#
-# Do not remove temporary data incrementally (--incremental-build-dirs-cleanup)
-# incremental_build_dirs_cleanup = false
-#
-# Cache TTL in seconds
-# new_store_ttl = 259200
-#
-# Use cache for json-graph in ymake (-xs)
-# use_json_cache = true
-#
-# Validate build root content by cached hash in content_uids mode (--validate-build-root-content)
-# validate_build_root_content = false
-#
-# ========== Authorization ====================================================
-#
-# oAuth token (--token)
-# oauth_token = "None"
-#
-# ========== Various table options ============================================
-#
-# Uncomment table name with parameters
-#
-# [test_types_fakeid]
-#
-# Allows to remap markup colors (e.g., bad = "light-red")
-# [terminal_profile]
-#
-# Set variables (name[=val], "yes" if val is omitted) (-D)
-# [flags]
-#
-# Host platform flag (--host-platform-flag)
-# [host_platform_flags]
-#
-# Set test timeout for each size (small=60, medium=600, large=3600) (--test-size-timeout)
-# [test_size_timeouts]
-```
-The file contains various parameters that can be configured to control the build process, testing, IDE integration, caching, and other aspects of the project. Below is a brief description of the main sections and parameters of the configuration file:
 
-1. General project settings:
-- `auto_exclude_symlinks`: Exclude symlinks from module directories.
-- `directory_based`: Create a project in a directory-based format.
-- `oauth_exchange_ssh_keys`: Exchange SSH keys via OAuth.
+The file contains various parameters that can be configured to control the build process, testing, caching, and other aspects of the project.
 
-2. IDE integration settings:
-- `idea_files_root, idea_jdk_version`: Settings for the IntelliJ IDEA project files.
-- `external_content_root_modules`: Add external root content modules.
+#### General project settings
 
-3. Test settings:
-- `detect_leaks_in_pytest`: Detect leaks in pytest.
-- `run_tests_size`: Determine the size of tests to be run.
+| Option | The default value | Notes |
+|----------------|-----|----------------------------------------------------|
+| auto_exclude_symlinks | false | Add all symlink-dirs in modules to exclude dirs |
+| copy_shared_index_config | false | Copy project config for Shared Indexes if exist |
+| detect_leaks_in_pytest | true | Detect leaks in Pytest |
+| directory_based | true | Create project in actual (directory based) format |
+| eager_execution | false | Eager execution  |
+| exclude_dirs | [] | Exclude dirs with specific names from all modules |
+| external_content_root_modules | [] | Add external content root modules |
+| generate_tests_for_deps | false | Generate tests for PEERDIR dependencies |
+| generate_tests_run | false | Generate run configuration for junit tests |
+| idea_files_root | "None" | Root for .ipr and .iws files |
+| idea_jdk_version | "None" | Project JDK version |
+| iml_in_project_root | false | Store ".iml" files in project root tree (stores in source root tree by default) |
+| iml_keep_relative_paths | false | Keep relative paths in ".iml" files |
+| minimal | false | Create the minimum set of project settings |
+| omit_test_data | false | Do not export test_data |
+| project_name | "None" | Idea project name (.ipr and .iws file) |
+| run_tests_size | 1 | Default test sizes to run (1 for small, 2 for small+medium, 3 to run all tests) |
+| with_common_jvm_args_in_junit_template | false | Add common JVM_ARGS flags to default junit template |
+| with_content_root_modules | false | Generate content root modules |
+| with_long_library_names | false | Generate long library names |
 
-4. Integration with build and caching systems:
-- `build_threads`, `continue_on_fail`: Build process settings.
-- `auto_clean_results_cache`, `build_cache`: Local cache settings for the build result.
+#### IDE integration settings
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| add_py_targets | false | Добавить цели Python 3 |
+| content_root | "None" | Корневая директория для проекта CLion |
+| dry_run | false | Эмуляция создания проекта без выполнения действий |
+| filters | [] | Фильтрация содержимого |
+| full_targets | false | Полное построение графа целей проекта |
+| group_modules | "None" | Группировка модулей Idea (дерево, плоско) |
+| idea_project_root | "None" | Корневая директория проекта IntelliJ IDEA |
+| lite_mode | false | Легкий режим для решения (быстрое открытие, без сборки) |
+| local | false | Рекурсивный поиск модулей проекта Idea |
+| remote_build_path | "None" | Путь к директории для вывода CMake на удаленном хосте |
+| remote_deploy_config | "None" | Имя конфигурации удаленного сервера для удаленного инструментарием |
+| remote_deploy_host | "None" | Имя хост-сервера для удаленной конфигурации |
+| remote_repo_path | "None" | Путь к удаленному репозиторию на удаленном хосте |
+| remote_toolchain | "None" | Генерировать конфигурации для удаленного инструментарием с этим именем |
+| use_sync_server | false | Использовать сервер синхронизации вместо наблюдателей файлов |
 
-5. Output settings:
-- `mask_roots`, `output_style`: Settings controlling the output of information during build.
+#### Output settings
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| add_host_result | [] | Обрабатывать выбранные результаты сборки на хосте |
+| add_result | [] | Обрабатывать выбранные результаты сборки |
+| all_outputs_to_result | false | Обрабатывать все выходные данные узла вместе с выбранными результатами сборки |
+| create_symlinks | true | Создавать симлинки в директории с исходниками |
+| force_build_depends | false | Строить по DEPENDS в любом случае |
+| ignore_recurses | false | Не строить по RECURSES |
+| install_dir | "None" | Путь для сохранения результирующих бинарных файлов и библиотек |
+| output_root | "None" | Директория для вывода результат сборки |
+| suppress_outputs | [] | Не выводить/копировать файлы с указанными суффиксами |
+| symlink_root | "None" | Корневая директория для сохранения результатов в виде символических ссылок |
 
-6. Platform or build configuration options:
-- `build_type`, `target_platforms`: Settings determining the build type and target platforms.
+#### Printing settings
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| default_suppress_outputs | [".o", ".obj", ".mf", "…", ".cpf", ".cpsf", ".srclst", ".fake", ".vet.out", ".vet.txt", ".self.protodesc"] | Не выводить/копировать файлы с указанными суффиксами по умолчанию |
+| ext_progress | false | Печатать дополнительную информацию о прогрессе |
+| mask_roots | "None" | Закрывать исходные и корневые пути в stderr |
+| output_style | "ninja" | Стиль вывода информации (ninja/make) |
+| print_statistics | false | Печатать статистику выполнения сборки |
+| show_timings | false | Печатать время выполнения команд |
+| statistics_out_dir | "None" | Директория для вывода дополнительных статистических данных |
 
-7. Options for developers:
-- `use_json_cache`, `validate_build_root_content`: Parameters for speeding up development and validating the build.
+#### Platform/build configuration
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| build_type | "release" | Тип сборки (debug, release, profile и т.д.) |
+| host_platform | "None" | Платформа хоста |
+| preset_disable_customization | false | Отключить кастомизацию торговли ya |
+| target_platforms | [] | Целевая платформа |
+
+#### Local cache
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| auto_clean_results_cache | true | Автоматическая очистка кеша результатов сборки |
+| build_cache | false | Включить кеш сборки |
+| build_cache_conf_str | [] | Переопределить конфигурации |
+| build_cache_master | false | Включить режим мастера кеша сборки |
+| cache_codec | "None" | Кодек для кеша |
+| cache_size | 322122547200 | Максимальный размер кеша |
+| new_store | true | Использовать альтернативное хранилище |
+| strip_symlinks | false | Удалить все результаты симлинков, кроме файлов из текущего графа |
+| symlinks_ttl | 604800 | Время жизни кеша результатов |
+| tools_cache | false | Включить кеш инструментов |
+| tools_cache_conf_str | [] | Переопределить конфигурационные опции |
+| tools_cache_gl_conf_str | [] | Переопределить глобальные конфигурации кеша инструментов |
+| tools_cache_ini | "None" | Переопределить встроенный ini-файл кеша инструментов |
+| tools_cache_master | false | Включить режим мастера кеша инструментов |
+| tools_cache_size | 32212254720 | Максимальный размер кеша инструментов |
+
+#### Graph generation
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| compress_ymake_output | false | Сжимать вывод ymake для уменьшения максимального использования памяти |
+| compress_ymake_output_codec | "zstd08_1" | Кодек для сжатия вывода ymake |
+
+#### Feature flags
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| dir_outputs_test_mode | false | Включить новый режим вывода директорий |
+| dump_debug_enabled | false | Включить отладочный режим дампа |
+| local_executor | true | Использовать локальный исполнитель вместо Popen |
+| new_runner | true | Использовать альтернативный раннер |
+| platform_schema_validation | false | Не проверять целевые платформы по схеме |
+| runner_dir_outputs | true | Отключить поддержку вывода директорий в раннере |
+
+#### Test settings:
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| cache_fs_read | false | Использовать кеш файловой системы вместо памяти (только для чтения) |
+| cache_fs_write | false | Использовать кеш файловой системы вместо памяти (только для записи) |
+| cache_tests | false | Использовать кеш для тестов |
+| canonization_backend | "None" | Назначить бэкенд для канонизации с шаблоном |
+| canonization_scheme | "https" | Протокол для бэкенда канонизации (https по умолчанию) |
+| dir_outputs | true | Архивировать выходную директорию тестирования |
+| dir_outputs_in_nodes | false | Включить поддержку вывода директорий в узлах |
+| disable_flake8_migrations | true | Включить все проверки flake8 |
+| disable_jstyle_migrations | false | Включить все проверки стиля java |
+| fail_fast | false | Завершать при первом тесте с ошибкой |
+| inline_diff | false | Отключить усечение комментариев и выводить diff в терминал |
+| junit_args | "None" | Дополнительные параметры командной строки для JUnit |
+| junit_path | "None" | Путь для генерации отчета junit |
+| last_failed_tests | false | Перезапускать тесты, которые не прошли последним запуском |
+| merge_split_tests | true | Не объединять разделенные тесты в директорию ({testing_out_stuff}) c макросом FORK_*TESTS |
+| remove_implicit_data_path | false | Удалить неявный путь из макроса DATA |
+| remove_result_node | false | Удалить узел результата из графа, печатать отчет по тестам в ya |
+| remove_tos | false | Удалить верхний уровень директории {testing_out_stuff} |
+| run_tagged_tests_on_yt | false | Запускать тесты с тэгом ya:yt на YT |
+| show_passed_tests | false | Показывать пройденные тесты |
+| show_skipped_tests | false | Показывать пропущенные тесты |
+| store_original_tracefile | false | Хранить оригинальный файлы trace |
+| strip_idle_build_results | false | Удалить все узлы результата (включая узлы сборки), которые не нужны для выполнения тестов |
+| strip_skipped_test_deps | false | Не строить зависимости пропущенных тестов |
+| test_node_output_limit | "None" | Лимит размера выводных файлов тестов (в байтах) |
+| test_output_compression_filter | "zstd" | Фильтр сжатия вывода тестов (none, zstd, gzip) |
+| test_output_compression_level | 1 | Уровень сжатия вывода тестов для указанного фильтра |
+| test_stderr | false | Выводить stderr тестов в консоль в режиме реального времени |
+| test_stdout | false | Выводить stdout тестов в консоль в режиме реального времени |
+| test_traceback | "short" | Стиль backtrace для тестов ("long", "short", "line", "native", "no") |
+| ytexec_wrapper_m_cpu | 250 | Требования к millicpu для distbuild. |
+
+#### Various table options
+| Опция | Значение по умолчанию | Примечания |
+|----------------|-----|----------------------------------------------------|
+| test_types_fakeid | | Переименовывание цветов для разметки (например, bad = "light-red") |
+| terminal_profile | | Профиль терминала |
+| flags | | Установка переменных (name[=val], "yes" если значение опущено) |
+| host_platform_flags | | Флаги платформы хоста |
+| test_size_timeouts | | Установка таймаутов тестов для каждого размера (small=60, medium=600, large=3600) |
 
 Each parameter in the file begins with a key, followed by the equals sign (`=`) and the parameter value. The value ​​can be a Boolean (`true` or `false`), string (in quotes), or list (in square brackets).
 
 Comments (beginning with `#`) are used to describe parameters, suggested changes, or links to additional documentation. Some parameters have default values ​​and can be changed according to project requirements or developer preferences.
 
 The configuration file can be customized to suit the specific needs of the project. You can enable or disable certain features to optimize the development and build process.
-
-You can find a more detailed description of the parameters [here](ya_conf.md).
 
 ## Order of options implementation
 
