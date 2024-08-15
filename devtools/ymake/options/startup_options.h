@@ -21,10 +21,14 @@ struct TStartUpOptions: public TRootsOptions {
     TVector<TFsPath> StartDirs;
     TVector<TFsPath> Targets;
 
+    bool ReadStartTargetsFromEvlog = false;
+
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
     void MineTargetsAndSourceRoot(const TVector<char*>& optPos);
     void MineTargetsAndSourceRoot(const TVector<TString>& optPos);
+
+    void AddTarget(const TFsPath& target);
 
     void OnDepsCacheEnabled() const;
     void OnDepsCacheSaved() const;

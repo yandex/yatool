@@ -42,6 +42,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
     opts.AddLongOption("cache-info-file", "fullname of cache info file for current ymake run").StoreResult(&CacheInfoFile);
     opts.AddLongOption("cache-info-name", "basename for cache info output file").StoreResult(&CacheInfoName);
+    opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
@@ -103,6 +104,18 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
         }
     }
 
+    if (ReadStartTargetsFromEvlog) {
+        if (!targets.empty()) {
+            throw TConfigurationError() << "--targets-from-evlog is not compatible with commandline targets";
+        }
+
+        if (!SourceRoot) {
+            throw TConfigurationError() << "explicit --source-root is required for --targets-from-evlog";
+        }
+
+        return;
+    }
+
     if (targets.empty()) {
         targets.push_back(TFsPath::Cwd().RealPath());
     }
@@ -117,22 +130,25 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
 
     for (size_t i = 0; i < targets.size(); ++i) {
         YDebug() << "Target path: " << targets[i] << Endl;
+        AddTarget(targets[i]);
+    }
+}
 
-        // TODO: check target inside source root
-        TFsPath targetDir = targets[i].Parent();
-        if (!targets[i].IsDirectory() && !targetDir.IsDirectory()) {
-            throw TConfigurationError() << "No directory for target " << targets[i];
-        }
+void TStartUpOptions::AddTarget(const TFsPath& target) {
+    // TODO: check target inside source root
+    TFsPath targetDir = target.Parent();
+    if (!target.IsDirectory() && !targetDir.IsDirectory()) {
+        throw TConfigurationError() << "No directory for target " << target;
+    }
 
-        Targets.push_back(targets[i].RelativeTo(SourceRoot));
-        if (!Targets.back().IsDefined()) { // fix this in util
-            Targets.back() = ".";
-            StartDirs.push_back(".");
-        } else {
-            StartDirs.push_back(targets[i].IsDirectory() ? Targets.back() : targetDir.RelativeTo(SourceRoot));
-            if (!StartDirs.back().IsDefined()) // fix this in util
-                StartDirs.back() = ".";
-        }
+    Targets.push_back(target.IsAbsolute() ? target.RelativeTo(SourceRoot) : target);
+    if (!Targets.back().IsDefined()) { // fix this in util
+        Targets.back() = ".";
+        StartDirs.push_back(".");
+    } else {
+        StartDirs.push_back(target.IsDirectory() ? Targets.back() : targetDir.IsAbsolute() ? targetDir.RelativeTo(SourceRoot) : targetDir);
+        if (!StartDirs.back().IsDefined()) // fix this in util
+            StartDirs.back() = ".";
     }
 }
 

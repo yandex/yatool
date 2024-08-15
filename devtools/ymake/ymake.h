@@ -96,6 +96,8 @@ public:
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void AddPackageOutputs();
+    void AddStartTarget(const TString& dir);
+    void AddTarget(const TString& dir);
     void SortAllEdges();
     void CheckBlacklist();
     void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false);

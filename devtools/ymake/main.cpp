@@ -28,6 +28,7 @@
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/progress_manager.h>
+#include <devtools/ymake/evlog_server.h>
 
 #include <devtools/ymake/yndex/yndex.h>
 
@@ -190,12 +191,9 @@ void TYMake::BuildDepGraph() {
     UpdIter->RestorePropsToUse();
 
     TModule& rootModule = Modules.GetRootModule();
-    TUniqVector<TNodeId> startDirs;
-    for (ui32 id : CurStartDirs_) {
-        YDebug() << "Parsing dir " << Names.FileNameById(id) << Endl;
-        const TNodeId nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, id, &rootModule);
-        if (nodeId != TNodeId::Invalid) {
-            startDirs.Push(nodeId);
+    if (!Conf.ReadStartTargetsFromEvlog) {  // in server mode start targets are already added to the graph by evlog server
+        for (const auto& dir : Conf.StartDirs) {
+            AddStartTarget(dir);
         }
     }
     if (Conf.ShouldTraverseDepsTests()) {
@@ -252,10 +250,6 @@ void TYMake::BuildDepGraph() {
 
     UpdIter->DelayedSearchDirDeps.Flush(*Parser, Graph);
     Graph.RelocateNodes(Parser->RelocatedNodes);
-
-    for (const auto& s : startDirs) {
-        StartTargets.push_back(s);
-    }
 }
 
 TNodeId TYMake::GetUserTarget(const TStringBuf& target) const {
@@ -821,6 +815,13 @@ int main_real(TBuildConfiguration& conf) {
         } else {
             yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
             YDIAG(IPRP) << "Start of configure. CurStamp: " << int(yMake->TimeStamps.CurStamp()) << Endl;
+            if (conf.ReadStartTargetsFromEvlog) {
+                NEvlogServer::TServer evlogServer;
+                // For now it's a synchronous reader w/o any buffering.
+                // The client must ensure they use non-blocking writes on their side,
+                // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
+                evlogServer.ProcessStreamBlocking(Cin, yMake);
+            }
             configureBuildRes = ConfigureGraph(yMake);
         }
         if (configureBuildRes.Defined()) {

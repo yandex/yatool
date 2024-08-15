@@ -74,6 +74,7 @@ SRCS(
     dirs.cpp
     dump_owners.cpp
     exec.cpp
+    evlog_server.cpp
     export_json_debug.cpp
     export_json.cpp
     flat_json_graph.cpp

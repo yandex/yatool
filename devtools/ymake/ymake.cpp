@@ -151,3 +151,18 @@ void TYMake::ReportMakeCommandStats() {
 void TYMake::ReportDepsToIsolatedProjects() {
     Conf.IsolatedProjects.ReportDeps(Graph, StartTargets, Conf);
 }
+
+void TYMake::AddStartTarget(const TString& dir) {
+    TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
+    auto elemId = Names.AddName(EMNT_Directory, dirPath);
+    auto nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, elemId, &Modules.GetRootModule());
+    if (nodeId != TNodeId::Invalid) {
+        StartTargets.push_back(nodeId);
+    }
+}
+
+void TYMake::AddTarget(const TString& dir) {
+    TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
+    auto elemId = Names.AddName(EMNT_Directory, dirPath);
+    UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+}
