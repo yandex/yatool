@@ -234,5 +234,5 @@ bool TBlacklistChecker::CheckAll() {
     IterateAll(RecurseRestoreContext_.Graph, RecurseStartTargets_, recurseBlacklistVisitor);
     TBlacklistVisitor blacklistVisitor(RestoreContext_);
     IterateAll(RestoreContext_.Graph, StartTargets_, blacklistVisitor);
-    return !blacklistVisitor.HasBlacklistErrors();
+    return !blacklistVisitor.HasBlacklistErrors() && !recurseBlacklistVisitor.HasBlacklistErrors();
 }

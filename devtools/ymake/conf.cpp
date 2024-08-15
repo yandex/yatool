@@ -194,7 +194,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         blacklistHash.Final(YmakeBlacklistHash.RawData);
     }
     if (Diag()->IslPrjs) {
-        // Add blacklist hash to only isolated projects hash (new behavior) and rules (current behavior - deprecated) by config switch
+        // Add isolated projects hash to only isolated projects hash (new behavior) and rules (current behavior - deprecated) by config switch
         LoadIsolatedProjects(isolatedProjectsHash, rulesData, NYMake::IsTrue(CommandConf.EvalValue("INCLUDE_ISOLATED_PROJECTS_TO_CONF_HASH")));
         isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
