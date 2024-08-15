@@ -10,6 +10,8 @@ import os
 
 import exts.hashing
 import exts.fs
+import exts.archive
+import exts.yjson
 
 from build.build_opts import SandboxAuthOptions
 
@@ -27,6 +29,8 @@ from core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHe
 import core.config
 import core.logger
 import core.yarg.help_level
+
+import yalibrary.evlog as evlog_lib
 
 try:
     from pathlib import Path
@@ -150,6 +154,8 @@ def do_dump_debug(params):
 
     item.load()
 
+    _decompress_evlog_if_needed(item)
+
     # Store all tools_cache logs
 
     tools_cache_root = item.debug_bundle_data.get('tools_cache_root', None)
@@ -185,6 +191,26 @@ def do_dump_debug(params):
 
     dump_upload.upload(item, params, app_ctx)
     return 0
+
+
+def _decompress_evlog_if_needed(item):
+    path = item.path
+
+    if not path:
+        return
+
+    path_as_str = str(path)
+    if not evlog_lib.is_compressed(path_as_str):
+        return
+
+    decompressed_evlog_filepath = os.path.splitext(path_as_str)[0]
+    if os.path.exists(decompressed_evlog_filepath):
+        return
+
+    evlog_reader = evlog_lib.EvlogReader(path_as_str)
+    with open(decompressed_evlog_filepath, "a+") as fout:
+        for record in evlog_reader:
+            fout.write(exts.yjson.dumps(record) + '\n')
 
 
 def _discovery_folder(tools_cache_root, base_name, item_key):

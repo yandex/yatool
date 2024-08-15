@@ -61,6 +61,9 @@ class BaseDumpItem(object):
         raise NotImplementedError()
 
     def _filter(self, *keys):
+        num_of_found = 0
+        need_to_find = len(keys) or float('inf')
+
         for source, index, line in self._lazy_read():
             try:
                 key, value = self._filter_line(line, keys)
@@ -68,6 +71,10 @@ class BaseDumpItem(object):
                     continue
 
                 yield key, value
+
+                num_of_found += 1
+                if num_of_found >= need_to_find:
+                    return
             except Exception as e:
                 self.logger.warning("While parse %s:%s: %s", source, index, e)
                 from traceback import format_exc

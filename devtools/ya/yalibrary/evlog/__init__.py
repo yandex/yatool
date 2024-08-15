@@ -12,9 +12,7 @@ import zstandard as zstd
 
 import core.config
 import core.gsid
-from exts import fs
-from exts import os2
-from exts import yjson
+from exts import fs, os2, yjson, archive
 
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
@@ -50,7 +48,7 @@ def _fix_non_utf8(data):
 
 
 def is_compressed(filepath):
-    return filepath.endswith(('.zstd', '.zst'))
+    return archive.get_filter_type(filepath) == "zstd"
 
 
 class EvlogReader:
@@ -103,8 +101,13 @@ class EvlogWriter(object):
         self._replacements = self._get_replacements(replacements)
 
     @staticmethod
-    def _open_file(filepath):
-        if is_compressed(filepath):
+    def _need_to_be_compressed(filepath):
+        # TODO: fix me in YA-1998
+        return filepath.endswith(('.zstd', '.zst'))
+
+    @classmethod
+    def _open_file(cls, filepath):
+        if cls._need_to_be_compressed(filepath):
             if six.PY3:
                 return zstd.open(filepath, 'w', cctx=zstd.ZstdCompressor(level=1))
             # XXX Remove when YA-261 is done

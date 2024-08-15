@@ -17,6 +17,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/debug_store/processor
     devtools/ya/yalibrary/yandex/sandbox/misc
+    devtools/ya/yalibrary/evlog
 )
 
 IF (NOT YA_OPENSOURCE)
