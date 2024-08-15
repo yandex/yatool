@@ -700,12 +700,12 @@ void TCommands::TInliner::InlineModValueTerm(
             if (def.Definition->Script.size() == 0)
                 return;
             if (def.Definition->Script.size() != 1)
-                ythrow TError() << "unexpected multicommand substitution";
+                ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(id);
             if (def.Definition->Script[0].size() == 0)
                 return;
             if (def.Definition->Script[0].size() != 1) {
                 if (def.Legacy && LegacyVars.RecursionDepth[id] != 0)
-                    ythrow TError() << "unexpected multiargument substitution";
+                    ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(id);
                 // leave it for the actual evaluation to expand
                 writer.push_back(id);
                 return;
@@ -780,13 +780,13 @@ void TCommands::TInliner::InlineScalarTerms(
                 if (def.Definition->Script.size() == 0)
                     return;
                 if (def.Definition->Script.size() != 1)
-                    ythrow TError() << "unexpected multicommand substitution";
+                    ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(var);
                 if (def.Definition->Script[0].size() == 0)
                     return;
                 if (def.Definition->Script[0].size() != 1) {
                     // TODO just disallow this?
                     if (!def.Legacy || LegacyVars.RecursionDepth[var] != 0)
-                        ythrow TError() << "unexpected multiargument substitution";
+                        ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(var);
                     // TODO dev warning?
                     // leave it for the actual evaluation to expand
                     writer.WriteTerm(var);
@@ -824,7 +824,7 @@ void TCommands::TInliner::InlineScalarTerms(
                             if (def.Definition->Script.size() == 0)
                                 return true;
                             if (def.Definition->Script.size() != 1)
-                                ythrow TError() << "unexpected multicommand in a substitution";
+                                ythrow TError() << "unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
                             NCommands::TSyntax newBody;
                             TCmdWriter newWriter(newBody, false);
                             if (def.Legacy) {
@@ -835,7 +835,7 @@ void TCommands::TInliner::InlineScalarTerms(
                             } else
                                 InlineCommands(def.Definition->Script, newWriter);
                             if (newBody.Script.size() != 1)
-                                ythrow TError() << "totally unexpected multicommand in a substitution";
+                                ythrow TError() << "totally unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
                             newXfm.Body = std::move(newBody.Script[0]);
                             return true;
                         }
@@ -857,11 +857,11 @@ void TCommands::TInliner::InlineScalarTerms(
                 if (def->Script.size() == 0)
                     return;
                 if (def->Script.size() != 1)
-                    ythrow TError() << "unexpected multicommand call";
+                    ythrow TError() << "unexpected multicommand call: " << Commands.Values.GetVarName(call.Function);
                 if (def->Script[0].size() == 0)
                     return;
                 if (def->Script[0].size() != 1)
-                    ythrow TError() << "unexpected multiargument call";
+                    ythrow TError() << "unexpected multiargument call: " << Commands.Values.GetVarName(call.Function);
                 InlineScalarTerms(def->Script[0][0], writer);
             },
             [&](const NCommands::TSyntax::TIdOrString&) {
@@ -888,7 +888,7 @@ void TCommands::TInliner::InlineArguments(
         if (def.Definition->Script.size() == 0)
             return true;
         if (def.Definition->Script.size() != 1)
-            ythrow TError() << "unexpected multicommand substitution";
+            ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(id);
         if (def.Legacy) {
             Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
             ++LegacyVars.RecursionDepth[id];
@@ -909,7 +909,7 @@ void TCommands::TInliner::InlineArguments(
         if (def->Script.size() == 0)
             return true;
         if (def->Script.size() != 1)
-            ythrow TError() << "unexpected multicommand call";
+            ythrow TError() << "unexpected multicommand call: " << Commands.Values.GetVarName(call.Function);
         InlineArguments(def->Script[0], writer);
         return true;
     };
