@@ -291,6 +291,10 @@ public:
     /// Marks that Dirs are now trustworthy
     void SetDirsComplete();
 
+    void ResetIncDirs() {
+        IncDirs.ResetPropagatedDirs();
+    }
+
     bool IsPeersComplete() const {
         return PeersComplete;
     }

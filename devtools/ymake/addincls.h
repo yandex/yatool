@@ -154,8 +154,8 @@ public:
         THolder<TDirs> LocalUserGlobal, UserGlobal, Global;
 
         struct TSavedState {
-            TVector<ui32> LocalUserGlobal, UserGlobal, Global;
-            Y_SAVELOAD_DEFINE(LocalUserGlobal, UserGlobal, Global);
+            TVector<ui32> UserGlobalPropagated, GlobalPropagated, LocalUserGlobal, UserGlobal, Global;
+            Y_SAVELOAD_DEFINE(UserGlobalPropagated, GlobalPropagated, LocalUserGlobal, UserGlobal, Global);
         };
 
         void Add(TFileView dir, EIncDirScope scope);
@@ -197,6 +197,13 @@ public:
     const decltype(UsedLanguages)& GetAllUsed() const;
 
     void PropagateTo(TModuleIncDirs& other) const;
+
+    void ResetPropagatedDirs() {
+        for (auto& [_, incDirs] : IncDirsByLang) {
+            incDirs.GlobalPropagated.Reset();
+            incDirs.UserGlobalPropagated.Reset();
+        }
+    }
 
     void Load(const TSavedState& from);
 

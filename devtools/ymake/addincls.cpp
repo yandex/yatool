@@ -70,6 +70,8 @@ void TModuleIncDirs::TLanguageIncDirs::Load(const TModuleIncDirs::TLanguageIncDi
         }
     };
 
+    loadDirs(from.UserGlobalPropagated, UserGlobalPropagated);
+    loadDirs(from.GlobalPropagated, GlobalPropagated);
     loadDirs(from.LocalUserGlobal, LocalUserGlobal);
     loadDirs(from.UserGlobal, UserGlobal);
     loadDirs(from.Global, Global);
@@ -82,6 +84,8 @@ void TModuleIncDirs::TLanguageIncDirs::Save(TModuleIncDirs::TLanguageIncDirs::TS
         }
     };
 
+    saveDirs(UserGlobalPropagated, to.UserGlobalPropagated);
+    saveDirs(GlobalPropagated, to.GlobalPropagated);
     saveDirs(LocalUserGlobal, to.LocalUserGlobal);
     saveDirs(UserGlobal, to.UserGlobal);
     saveDirs(Global, to.Global);

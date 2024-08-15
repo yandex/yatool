@@ -1165,6 +1165,7 @@ inline bool TUpdIter::Enter(TState& state) {
             auto* module = YMake.Modules.Get(st.Node.ElemId);
             Y_ASSERT(module);
             if (module->IsLoaded()) {
+                module->ResetIncDirs();
                 for (const auto [dirId, ghostType]: module->GhostPeers) {
                     const bool expected = ghostType == EGhostType::Virtual;
                     const auto& path = Graph.Names().FileConf.GetName(dirId).GetTargetStr();
