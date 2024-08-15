@@ -1,0 +1,15 @@
+#include "config.h"
+
+namespace NYT::NTracing {
+
+////////////////////////////////////////////////////////////////////////////////
+
+void TTracingTransportConfig::Register(TRegistrar registrar)
+{
+    registrar.Parameter("send_baggage", &TThis::SendBaggage)
+        .Default(true);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+} // namespace NYT::NTracing

@@ -1,0 +1,18 @@
+#pragma once
+
+#include <library/cpp/yt/memory/ref_counted.h>
+
+namespace NYT::NTracing {
+
+////////////////////////////////////////////////////////////////////////////////
+
+DECLARE_REFCOUNTED_STRUCT(ITracer)
+
+class TBatchTrace;
+
+class TAsyncQueueTrace;
+class TAsyncQueueTraceGuard;
+
+////////////////////////////////////////////////////////////////////////////////
+
+} // namespace NYT::NTracing

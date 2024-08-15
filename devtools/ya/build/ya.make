@@ -57,6 +57,7 @@ PEERDIR(
     devtools/ya/yalibrary/runner
     devtools/ya/yalibrary/store
     devtools/ya/yalibrary/store/bazel_store
+    devtools/ya/yalibrary/store/yt_store
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/toolscache
     devtools/ya/yalibrary/vcs
@@ -78,7 +79,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/yalibrary/yandex/distbuild
         devtools/ya/yalibrary/svn
         devtools/ya/yalibrary/upload
-        devtools/ya/yalibrary/store/yt_store # YA-938
     )
 ENDIF()
 

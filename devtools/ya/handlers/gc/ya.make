@@ -18,16 +18,11 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/runner
     devtools/ya/yalibrary/store
+    devtools/ya/yalibrary/store/yt_store
     devtools/ya/yalibrary/toolscache
     library/python/fs
     library/python/windows
 )
-
-IF (NOT YA_OPENSOURCE)
-    PEERDIR(
-        devtools/ya/yalibrary/store/yt_store # see YA-938
-    )
-ENDIF()
 
 END()
 
