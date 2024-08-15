@@ -29,7 +29,6 @@ TStringBuf Get1(const TYVar* var);
 TStringBuf Eval1(const TYVar* var);
 TString GetAll(const TYVar* var);
 TString EvalAll(const TYVar* var);
-TVector<TString> EvalAllSplit(const TYVar* var);
 
 namespace NYMake {
     inline bool IsTrue(TStringBuf b) {
@@ -475,10 +474,6 @@ public:
         if (!var && defaultToName)
             return TString("$") + name;
         return ::EvalAll(var);
-    }
-
-    TVector<TString> EvalAllSplit(const TStringBuf& name) const {
-        return ::EvalAllSplit(Lookup(name));
     }
 
     bool Has(const TStringBuf& name) const {
