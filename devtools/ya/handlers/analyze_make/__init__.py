@@ -69,6 +69,37 @@ class AnalyzeYaMakeOpts(core.yarg.Options):
         ]
 
 
+class TimeBloatOpts(core.yarg.Options):
+    def __init__(self) -> None:
+        super(TimeBloatOpts, self).__init__()
+        self.show_leaf_nodes = False
+        self.file_filters = []
+        self.threshold = 0.1
+
+    @staticmethod
+    def consumer():
+        return [
+            core.yarg.ArgConsumer(
+                ['--show-leaf-nodes'],
+                help='Display leaf nodes (compilation/linking/etc) in dispatch_build stage. Use with caution (or filters) on large evlogs',
+                hook=core.yarg.SetConstValueHook('show_leaf_nodes', True),
+                group=core.yarg.FILTERS_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--file-filter'],
+                help="Show only build nodes that match <file-filter>. Syntax is the same as in --test-filter",
+                hook=core.yarg.SetAppendHook('file_filters'),
+                group=core.yarg.FILTERS_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--threshold-sec'],
+                help="Do not show build nodes that were shorter than threshold",
+                hook=core.yarg.SetValueHook('threshold', transform=float),
+                group=core.yarg.FILTERS_OPT_GROUP,
+            ),
+        ]
+
+
 def run_analyze_make_task_contention(params):
     exe = yalibrary.tools.tool('analyze-make')
     if params.print_path:
@@ -96,7 +127,7 @@ class AnalyzeMakeYaHandler(core.yarg.CompositeHandler):
         self['timebloat'] = core.yarg.OptsHandler(
             action=execute(timebloat.main),
             description='build events in bloat format',
-            opts=basic_options(),
+            opts=basic_options() + [TimeBloatOpts()],
         )
         if app_config.in_house:
             self['task-contention'] = core.yarg.OptsHandler(

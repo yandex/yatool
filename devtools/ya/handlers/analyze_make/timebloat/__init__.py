@@ -8,7 +8,8 @@ import collections
 import typing as tp
 
 import devtools.ya.tools.analyze_make.common as common
-
+import test.filter as test_filter
+import tqdm
 
 import library.python.resource as resource
 
@@ -37,18 +38,78 @@ HTML_LEGEND_TEMPLATE = (
 Color = collections.namedtuple('Color', ['type', 'color'])
 
 
+def unify_paths(paths: list[str]) -> str:
+    if len(paths) == 1:
+        return paths[0]
+    paths.sort()
+    result = ""
+    residues = []
+    for index, checked_symbol in enumerate(paths[0]):
+        checker = []
+        for s in paths[1:]:
+            try:
+                checker.append(s[index] == checked_symbol)
+            except IndexError:
+                checker.append(False)
+        if all(checker):
+            result += checked_symbol
+        else:
+            break
+
+    for p in paths:
+        residue = p[len(result) :]
+        residues.append(residue)
+
+    return result + "{" + ", ".join(sorted(residues)) + "}"
+
+
 class TreeNode(object):
-    def __init__(self, node: tp.Optional[common.Node] = None, name: tp.Optional[str] = None, is_root: bool = False):
+    def __init__(
+        self,
+        node: tp.Optional[common.Node] = None,
+        name: tp.Optional[str] = None,
+        is_root: bool = False,
+        path: tp.Optional[str] = None,
+        is_build_node: bool = False,
+    ):
         self.node: tp.Optional[common.Node] = node
         self.children: dict[str, TreeNode] = {}
         self.is_root: bool = is_root
+        self._path: tp.Optional[str] = path
 
         self._name: str = name or "tree node"
         self._colorizer: ColorType = ColorType
+        self._is_build_node: bool = is_build_node
 
         self._relative_size: tp.Optional[float] = None
         self._real_size: tp.Optional[float] = None
         self._size: tp.Optional[float] = None
+
+    @property
+    def path(self) -> list[str]:
+        if self._path:
+            return self._path.split("/")
+        if self.node:
+            return self.get_node_path(self.node)
+        return []
+
+    @staticmethod
+    def get_node_path(node: common.Node) -> list[str]:
+        try:
+            for check in {"Resource", "Pattern", "PutInCache", "WriteThroughCaches"}:
+                if check in node.name.split("(")[0]:
+                    return [node.name]
+            paths = []
+            for file in node.name.split(" "):
+                try:
+                    _, path = file.split("$(BUILD_ROOT)/")
+                    path = path.removesuffix(")")
+                    paths.append(path)
+                except Exception:
+                    pass
+            return unify_paths(paths).split("/")
+        except Exception:
+            return []
 
     @property
     def name(self) -> str:
@@ -56,7 +117,7 @@ class TreeNode(object):
         if self.node is not None:
             if "/" in self.node.name:
                 res.append(self.node.tag)
-                res.append(self.node.name.split("/")[-1][:-1])
+                res.append(self.get_node_path(self.node)[-1])
             else:
                 res.append(self.node.name)
 
@@ -100,51 +161,107 @@ class TreeNode(object):
 
         return self._size
 
-    def as_dict(self) -> dict:
+    def as_filtered_dict(self, path_filters, threshold, show_leaf_nodes) -> tp.Optional[dict]:
+        """
+        Filters out and returns a dictionary representation of the node and its children.
+
+        All filters are applied to build nodes.
+        Path filters are applied recursively.
+        If node itself or any descendant matches path filters, the checked node won't be filtered out.
+
+        :param path_filters: path filters to apply.
+        :param threshold: minimal allowed duration to be shown (seconds).
+        :param show_leaf_nodes: whether leaf nodes (files, PREPARE nodes, etc.) should be shown.
+        :return: a JSON-serializable representation of the node and its children (or None if the node is filtered out)
+        """
+        if self._is_build_node:
+            if self.duration < threshold:
+                return None
+
+            if self.path:
+                if not self.match_filters(path_filters):
+                    return None
+
+                if len(self.children.keys()) == 0 and not show_leaf_nodes:
+                    return None
+
+        children = []
+        for child in self.children.values():
+            dct = child.as_filtered_dict(
+                path_filters,
+                threshold,
+                show_leaf_nodes,
+            )
+            if dct is not None:
+                children.append(dct)
+
         return dict(
-            name='%s %s' % (self.name, self.text_size()),
+            name='%s %s' % (self.name, self.text_size),
             size=self._relative_size or self.get_size(),
             type=self._colorizer.css_name(self).value,
-            children=[child.as_dict() for child in self.children.values()],
+            children=children,
         )
 
-    def get_path(self, node: common.Node) -> list[str]:
-        try:
-            _, path = node.name.split("$(BUILD_ROOT)/")
-            path = path.removesuffix(")")
-            return path.split("/")
-        except Exception:
-            return []
-
-    def insert_at_path(self, node: common.Node, path: list[str]) -> tp.Self:
+    def _do_insert_at_path(self, node: common.Node, path: list[str], prefix: list[str] = None) -> tp.Self:
+        prefix = prefix or []
         if len(path) == 0:
             self.node = node
             return self
 
-        d = path[0]
-        if d not in self.children:
-            self.children[d] = TreeNode(node=None, name=d)
+        cur_dir = path[0]
+        prefix = prefix + [cur_dir]
+        if len(path) == 1:
+            node_key = cur_dir + str(node.start)
+        else:
+            node_key = cur_dir
+        if node_key not in self.children:
+            self.children[node_key] = TreeNode(
+                node=None,
+                name=cur_dir,
+                path="/".join(prefix),
+                is_build_node=True,
+            )
 
-        return self.children[d].insert_at_path(node, path[1:])
+        return self.children[node_key]._do_insert_at_path(node, path[1:], prefix)
 
-    def insert_node(self, node: common.Node) -> tp.Self:
+    def _do_insert(self, node: common.Node) -> tp.Self:
+        path = self.get_node_path(node)
+        if not path:
+            n = TreeNode(node)
+            self.children[node.name + str(node.start)] = n
+            return n
+        else:
+            return self._do_insert_at_path(node, path)
+
+    def match_filters(self, filters: list[str]) -> bool:
+        if len(filters) == 0:
+            return True
+        full_path = "/".join(self.path)
+        path_filter = test_filter.make_name_filter(filters)
+
+        if path_filter(full_path):
+            return True
+        else:
+            children = []
+            for _, child in self.children.items():
+                children.append(child.match_filters(filters))
+            return any(children)
+
+    def insert_node(self, node: common.Node) -> tp.Optional[tp.Self]:
+        if self.name == "dispatch_build" and node.thread_name != "MainThread":
+            # Fast insert is available since dispatch_build is parent and non-mainthread nodes are scheduled by it.
+            return self._do_insert(node)
+
         for child in self.children.values():
             if can_be_parent_node(child.node, node):
                 return child.insert_node(node)
         else:
-            path = self.get_path(node)
-            if not path:
-                n = TreeNode(node)
-                self.children[node.name + str(node.start)] = n
-                return n
-            else:
-                return self.insert_at_path(node, path)
+            return self._do_insert(node)
 
     def iter_nodes(self) -> tp.Iterator[tp.Self]:
         yield self
         for child in self.children.values():
-            for node in child.iter_nodes():
-                yield node
+            yield from child.iter_nodes()
 
     def max_level(self, level=0) -> int:
         levels = [-1]
@@ -152,7 +269,8 @@ class TreeNode(object):
             levels.append(child.max_level(level + 1))
         return max(level, *levels)
 
-    def text_size(self) -> str:
+    @property
+    def duration(self) -> float:
         r = 0
         if self.node is not None:
             if self.node.thread_name != "MainThread":
@@ -164,7 +282,11 @@ class TreeNode(object):
                 r = self.get_size()
             else:
                 r = self.get_real_size()
-        return Time.time_to_str(round(r, 2))
+        return r
+
+    @property
+    def text_size(self) -> str:
+        return Time.time_to_str(round(self.duration, 2))
 
 
 class Time:
@@ -226,7 +348,7 @@ def can_be_parent_node(a: common.Node, b: common.Node) -> bool:
 
 
 def insert_nodes(root: TreeNode, nodes: list[common.Node]) -> None:
-    for node in nodes:
+    for node in tqdm.tqdm(nodes, unit="node", file=sys.stderr):
         root.insert_node(node)
 
 
@@ -321,7 +443,18 @@ def main(opts):
 
     raw_html = resource.find(f'{RESOURCE_PREFIX / INDEX_HTML}').decode()
     html_with_legend = raw_html.replace(HMTL_LEGEND_PLACEHOLDER, '\n'.join(legend))
-    full_html = html_with_legend.replace(JSON_PLACEHOLDER, json.dumps({"tree": root.as_dict()}))
+    full_html = html_with_legend.replace(
+        JSON_PLACEHOLDER,
+        json.dumps(
+            {
+                "tree": root.as_filtered_dict(
+                    opts.file_filters,
+                    opts.threshold,
+                    opts.show_leaf_nodes,
+                ),
+            },
+        ),
+    )
 
     with (directory / INDEX_HTML).open('w') as f:
         f.write(full_html)
