@@ -55,84 +55,84 @@ The file contains various parameters that can be configured to control the build
 | with_long_library_names | false | Generate long library names |
 
 #### IDE integration settings
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| add_py_targets | false | Добавить цели Python 3 |
-| content_root | "None" | Корневая директория для проекта CLion |
-| dry_run | false | Эмуляция создания проекта без выполнения действий |
-| filters | [] | Фильтрация содержимого |
-| full_targets | false | Полное построение графа целей проекта |
-| group_modules | "None" | Группировка модулей Idea (дерево, плоско) |
-| idea_project_root | "None" | Корневая директория проекта IntelliJ IDEA |
-| lite_mode | false | Легкий режим для решения (быстрое открытие, без сборки) |
-| local | false | Рекурсивный поиск модулей проекта Idea |
-| remote_build_path | "None" | Путь к директории для вывода CMake на удаленном хосте |
-| remote_deploy_config | "None" | Имя конфигурации удаленного сервера для удаленного инструментарием |
-| remote_deploy_host | "None" | Имя хост-сервера для удаленной конфигурации |
-| remote_repo_path | "None" | Путь к удаленному репозиторию на удаленном хосте |
-| remote_toolchain | "None" | Генерировать конфигурации для удаленного инструментарием с этим именем |
-| use_sync_server | false | Использовать сервер синхронизации вместо наблюдателей файлов |
+| add_py_targets | false | Add Python 3 targets to project |
+| content_root | "None" | Root directory for a CLion project |
+| dry_run | false | Emulate create project, but do nothing |
+| filters | [] | Only consider filtered content |
+| full_targets | false | Old Mode: Enable full targets graph generation for project. |
+| group_modules | "None" | Group idea modules according to paths: (tree, flat) |
+| idea_project_root | "None" | IntelliJ IDEA project root path (-r, --project-root) |
+| lite_mode | false | Lite mode for solution (fast open, without build) |
+| local | false | Only recurse reachable projects are idea modules (-l, --local) |
+| remote_build_path | "None" | Path to the directory for CMake output at the remote host |
+| remote_deploy_config | "None" | Name of the remote server configuration tied to the remote toolchain |
+| remote_deploy_host | "None" | Hostname associated with remote server configuration |
+| remote_repo_path | "None" | Path to the remote repository at the remote host |
+| remote_toolchain | "None" | Generate configurations for remote toolchain with this name |
+| use_sync_server | false | Deploy local files via sync server instead of file watchers |
 
-#### Output settings
-| Опция | Значение по умолчанию | Примечания |
+#### Build output settings
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| add_host_result | [] | Обрабатывать выбранные результаты сборки на хосте |
-| add_result | [] | Обрабатывать выбранные результаты сборки |
-| all_outputs_to_result | false | Обрабатывать все выходные данные узла вместе с выбранными результатами сборки |
-| create_symlinks | true | Создавать симлинки в директории с исходниками |
-| force_build_depends | false | Строить по DEPENDS в любом случае |
-| ignore_recurses | false | Не строить по RECURSES |
-| install_dir | "None" | Путь для сохранения результирующих бинарных файлов и библиотек |
-| output_root | "None" | Директория для вывода результат сборки |
-| suppress_outputs | [] | Не выводить/копировать файлы с указанными суффиксами |
-| symlink_root | "None" | Корневая директория для сохранения результатов в виде символических ссылок |
+| add_host_result | [] | Process selected host build output as a result |
+| add_result | [] | Process selected build output as a result |
+| all_outputs_to_result | false | Process all outputs of the node along with selected build output as a result |
+| create_symlinks | true | Do not create any symlink in source directory |
+| force_build_depends | false | Build by DEPENDS anyway |
+| ignore_recurses | false | Do not build by RECURSES |
+| install_dir | "None" | Path to accumulate resulting binaries and libraries |
+| output_root | "None" | Directory with build results |
+| suppress_outputs | [] | Do not symlink/copy output for files with given suffix, they may still be saved in cache as result |
+| symlink_root | "None" | Result store root |
 
 #### Printing settings
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| default_suppress_outputs | [".o", ".obj", ".mf", "…", ".cpf", ".cpsf", ".srclst", ".fake", ".vet.out", ".vet.txt", ".self.protodesc"] | Не выводить/копировать файлы с указанными суффиксами по умолчанию |
-| ext_progress | false | Печатать дополнительную информацию о прогрессе |
-| mask_roots | "None" | Закрывать исходные и корневые пути в stderr |
-| output_style | "ninja" | Стиль вывода информации (ninja/make) |
-| print_statistics | false | Печатать статистику выполнения сборки |
-| show_timings | false | Печатать время выполнения команд |
-| statistics_out_dir | "None" | Директория для вывода дополнительных статистических данных |
+| default_suppress_outputs | [".o", ".obj", ".mf", "…", ".cpf", ".cpsf", ".srclst", ".fake", ".vet.out", ".vet.txt", ".self.protodesc"] | Do not symlink/copy output for files with given suffix if not overriden with --add-result |
+| ext_progress | false | Print extra progress info (--show-extra-progress) |
+| mask_roots | "None" | Mask source and build root paths in stderr |
+| output_style | "ninja" | Do not rewrite output information (ninja/make) |
+| print_statistics | false | Show build execution statistics (--stat) |
+| show_timings | false | Print execution time for commands |
+| statistics_out_dir | "None" | Additional statistics output dir (--stat-dir) |
 
 #### Platform/build configuration
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| build_type | "release" | Тип сборки (debug, release, profile и т.д.) |
-| host_platform | "None" | Платформа хоста |
-| preset_disable_customization | false | Отключить кастомизацию торговли ya |
-| target_platforms | [] | Целевая платформа |
+| build_type | "release" | Build type (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) |
+| host_platform | "None" | Host platform |
+| preset_disable_customization | false | Disable ya make customization (--disable-customization) |
+| target_platforms | [] | Target platform (--target-platform) |
 
 #### Local cache
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| auto_clean_results_cache | true | Автоматическая очистка кеша результатов сборки |
-| build_cache | false | Включить кеш сборки |
-| build_cache_conf_str | [] | Переопределить конфигурации |
-| build_cache_master | false | Включить режим мастера кеша сборки |
-| cache_codec | "None" | Кодек для кеша |
-| cache_size | 322122547200 | Максимальный размер кеша |
-| new_store | true | Использовать альтернативное хранилище |
-| strip_symlinks | false | Удалить все результаты симлинков, кроме файлов из текущего графа |
-| symlinks_ttl | 604800 | Время жизни кеша результатов |
-| tools_cache | false | Включить кеш инструментов |
-| tools_cache_conf_str | [] | Переопределить конфигурационные опции |
-| tools_cache_gl_conf_str | [] | Переопределить глобальные конфигурации кеша инструментов |
-| tools_cache_ini | "None" | Переопределить встроенный ini-файл кеша инструментов |
-| tools_cache_master | false | Включить режим мастера кеша инструментов |
-| tools_cache_size | 32212254720 | Максимальный размер кеша инструментов |
+| auto_clean_results_cache | true | Auto-clear results cache |
+| build_cache | false | Enable build cache |
+| build_cache_conf_str | [] | Override configuration options |
+| build_cache_master | false | Enable build cache master mode |
+| cache_codec | "None" | Cache codec (--cache-codec) |
+| cache_size | 322122547200 | Max cache size (--cache-size) |
+| new_store | true | Try alternative storage |
+| strip_symlinks | false | Remove all symlink results except files from the current graph |
+| symlinks_ttl | 604800 | Results cache TTL |
+| tools_cache | false | Enable tools cache |
+| tools_cache_conf_str | [] | Override configuration options |
+| tools_cache_gl_conf_str | [] | Override configuration options |
+| tools_cache_ini | "None" | Override tools cache built-in ini-file |
+| tools_cache_master | false | Enable tools cache master mode |
+| tools_cache_size | 32212254720 | Max tool cache size |
 
 #### Graph generation
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
 | compress_ymake_output | false | Сжимать вывод ymake для уменьшения максимального использования памяти |
 | compress_ymake_output_codec | "zstd08_1" | Кодек для сжатия вывода ymake |
 
 #### Feature flags
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
 | dir_outputs_test_mode | false | Включить новый режим вывода директорий |
 | dump_debug_enabled | false | Включить отладочный режим дампа |
@@ -142,7 +142,7 @@ The file contains various parameters that can be configured to control the build
 | runner_dir_outputs | true | Отключить поддержку вывода директорий в раннере |
 
 #### Test settings:
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
 | cache_fs_read | false | Использовать кеш файловой системы вместо памяти (только для чтения) |
 | cache_fs_write | false | Использовать кеш файловой системы вместо памяти (только для записи) |
@@ -177,7 +177,7 @@ The file contains various parameters that can be configured to control the build
 | ytexec_wrapper_m_cpu | 250 | Требования к millicpu для distbuild. |
 
 #### Various table options
-| Опция | Значение по умолчанию | Примечания |
+| Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
 | test_types_fakeid | | Переименовывание цветов для разметки (например, bad = "light-red") |
 | terminal_profile | | Профиль терминала |
