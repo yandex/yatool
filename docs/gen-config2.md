@@ -128,62 +128,61 @@ The file contains various parameters that can be configured to control the build
 #### Graph generation
 | Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| compress_ymake_output | false | Сжимать вывод ymake для уменьшения максимального использования памяти |
-| compress_ymake_output_codec | "zstd08_1" | Кодек для сжатия вывода ymake |
+| compress_ymake_output | false | Compress ymake output to reduce max memory usage |
+| compress_ymake_output_codec | "zstd08_1" | Codec to compress ymake output with (--compress-ymake-output-codec) |
 
 #### Feature flags
 | Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| dir_outputs_test_mode | false | Включить новый режим вывода директорий |
-| dump_debug_enabled | false | Включить отладочный режим дампа |
-| local_executor | true | Использовать локальный исполнитель вместо Popen |
-| new_runner | true | Использовать альтернативный раннер |
-| platform_schema_validation | false | Не проверять целевые платформы по схеме |
-| runner_dir_outputs | true | Отключить поддержку вывода директорий в раннере |
+| dir_outputs_test_mode | false | Enable new dir outputs features |
+| dump_debug_enabled | false | Enable dump debug |
+| local_executor | true | Use local executor instead of Popen |
+| new_runner | true | Try alternative runner |
+| platform_schema_validation | false | Do not validate target-platforms |
+| runner_dir_outputs | true | Disable dir_outputs support in runner |
 
-#### Test settings:
+#### Test settings
 | Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| cache_fs_read | false | Использовать кеш файловой системы вместо памяти (только для чтения) |
-| cache_fs_write | false | Использовать кеш файловой системы вместо памяти (только для записи) |
-| cache_tests | false | Использовать кеш для тестов |
-| canonization_backend | "None" | Назначить бэкенд для канонизации с шаблоном |
-| canonization_scheme | "https" | Протокол для бэкенда канонизации (https по умолчанию) |
-| dir_outputs | true | Архивировать выходную директорию тестирования |
-| dir_outputs_in_nodes | false | Включить поддержку вывода директорий в узлах |
-| disable_flake8_migrations | true | Включить все проверки flake8 |
-| disable_jstyle_migrations | false | Включить все проверки стиля java |
-| fail_fast | false | Завершать при первом тесте с ошибкой |
-| inline_diff | false | Отключить усечение комментариев и выводить diff в терминал |
-| junit_args | "None" | Дополнительные параметры командной строки для JUnit |
-| junit_path | "None" | Путь для генерации отчета junit |
-| last_failed_tests | false | Перезапускать тесты, которые не прошли последним запуском |
-| merge_split_tests | true | Не объединять разделенные тесты в директорию ({testing_out_stuff}) c макросом FORK_*TESTS |
-| remove_implicit_data_path | false | Удалить неявный путь из макроса DATA |
-| remove_result_node | false | Удалить узел результата из графа, печатать отчет по тестам в ya |
-| remove_tos | false | Удалить верхний уровень директории {testing_out_stuff} |
-| run_tagged_tests_on_yt | false | Запускать тесты с тэгом ya:yt на YT |
-| show_passed_tests | false | Показывать пройденные тесты |
-| show_skipped_tests | false | Показывать пропущенные тесты |
-| store_original_tracefile | false | Хранить оригинальный файлы trace |
-| strip_idle_build_results | false | Удалить все узлы результата (включая узлы сборки), которые не нужны для выполнения тестов |
-| strip_skipped_test_deps | false | Не строить зависимости пропущенных тестов |
-| test_node_output_limit | "None" | Лимит размера выводных файлов тестов (в байтах) |
-| test_output_compression_filter | "zstd" | Фильтр сжатия вывода тестов (none, zstd, gzip) |
-| test_output_compression_level | 1 | Уровень сжатия вывода тестов для указанного фильтра |
-| test_stderr | false | Выводить stderr тестов в консоль в режиме реального времени |
-| test_stdout | false | Выводить stdout тестов в консоль в режиме реального времени |
-| test_traceback | "short" | Стиль backtrace для тестов ("long", "short", "line", "native", "no") |
-| ytexec_wrapper_m_cpu | 250 | Требования к millicpu для distbuild. |
+| cache_fs_read | false | Use FS cache instead of memory cache (only read) |
+| cache_fs_write | false | Use FS cache instead of memory cache (only write) |
+| cache_tests | false | Use cache for tests |
+| canonization_backend | "None" | Allows to specify backend for canonical data with pattern |
+| canonization_scheme | "https" | Allows to specify canonization backend protocol |
+| dir_outputs | true | Tar testing output dir in the intermediate machinery |
+| dir_outputs_in_nodes | false | Enable dir outputs support in nodes |
+| disable_flake8_migrations | true | Enable all flake8 checks |
+| disable_jstyle_migrations | false | Enable all java style checks |
+| fail_fast | false | Fail after the first test failure |
+| inline_diff | false | Disable truncation of the comments and print diff to the terminal |
+| junit_args | "None" |JUnit extra command line options |
+| junit_path | "None" | Path to junit report to be generated |
+| last_failed_tests | false | Restart tests which failed in last run for chosen target |
+| merge_split_tests | true | Don't merge split tests testing_out_stuff dir (with macro FORK_*TESTS) |
+| remove_implicit_data_path | false | Remove implicit path from DATA macro |
+| remove_result_node | false | Remove result node from graph, print test report in ya and report skipped suites after configure |
+| remove_tos | false | Remove top level testing_out_stuff directory |
+| run_tagged_tests_on_yt | false | Run tests marked with ya:yt tag on the YT |
+| show_passed_tests | false | Show passed tests |
+| show_skipped_tests | false | Show skipped tests |
+| store_original_tracefile | false | Store original trace file |
+| strip_idle_build_results | false | Remove all result nodes (including build nodes) that are not required for running tests |
+| strip_skipped_test_deps | false | Don't build skipped test's dependencies |
+| test_node_output_limit | "None" | Specifies output files limit (bytes) |
+| test_output_compression_filter | "zstd" | Specifies compression filter for tos.tar (none, zstd, gzip) |
+| test_output_compression_level | 1 | pecifies compression level for tos.tar using specified compression filter |
+| test_stderr | false | Output test stderr to console online |
+| test_stdout | false | Output test stdout to console online |
+| test_traceback | "short" | Test traceback style for pytests ("long", "short", "line", "native", "no") |
+| ytexec_wrapper_m_cpu | 250 | Specify millicpu requirements for distbuild. |
 
 #### Various table options
 | Option | The default value | Notes |
 |----------------|-----|----------------------------------------------------|
-| test_types_fakeid | | Переименовывание цветов для разметки (например, bad = "light-red") |
-| terminal_profile | | Профиль терминала |
-| flags | | Установка переменных (name[=val], "yes" если значение опущено) |
-| host_platform_flags | | Флаги платформы хоста |
-| test_size_timeouts | | Установка таймаутов тестов для каждого размера (small=60, medium=600, large=3600) |
+| terminal_profile | | Allows to remap markup colors (e.g., bad = "light-red") |
+| flags | | Set variables (name[=val], "yes" if val is omitted) |
+| host_platform_flags | | Host platform flag |
+| test_size_timeouts | | Set test timeout for each size (small=60, medium=600, large=3600) |
 
 Each parameter in the file begins with a key, followed by the equals sign (`=`) and the parameter value. The value ​​can be a Boolean (`true` or `false`), string (in quotes), or list (in square brackets).
 
