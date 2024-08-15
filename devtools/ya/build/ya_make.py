@@ -1950,13 +1950,14 @@ class YaMake(object):
                     (u, desc.get('exit_code', 0)),
                 )
 
-            default_download_thread_count = self.ctx.threads + (self.ctx.opts.yt_store_threads or 3)
+            net_threads = self.ctx.opts.yt_store_threads + self.ctx.opts.dist_store_threads
+            default_download_thread_count = self.ctx.threads + net_threads
             download_thread_count = self.opts.stderr_download_thread_count or default_download_thread_count
             logger.debug(
                 "Default download thread count is %i (%i + %i), actual is %i",
                 default_download_thread_count,
                 self.ctx.threads,
-                (self.ctx.opts.yt_store_threads or 3),
+                net_threads,
                 download_thread_count,
             )
 

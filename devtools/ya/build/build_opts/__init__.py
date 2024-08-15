@@ -7,6 +7,7 @@ import multiprocessing
 import app_config
 import exts.path2
 import exts.fs
+import exts.func
 
 import yalibrary.upload.consts as upload_consts
 from core.yarg.groups import (
@@ -151,6 +152,7 @@ def make_opt_consumers(opt_name, help=None, arg_opts=None, env_opts=None, cfg_op
     return result
 
 
+@exts.func.lazy
 def get_cpu_count():
     return multiprocessing.cpu_count()
 
@@ -161,7 +163,7 @@ class BuildThreadsOptions(Options):
             build_threads = get_cpu_count()
 
         self.build_threads = build_threads
-        self.link_threads = 0
+        self.link_threads = 2
 
     @staticmethod
     def consumer():
@@ -2826,6 +2828,20 @@ class DistCacheOptions(DistCacheSetupOptions):
         super(DistCacheOptions, self).postprocess()
         if self.yt_store_exclusive:
             self.yt_store = True
+
+        if self.yt_store_threads == 0 and self.yt_store:
+            raise ArgsValidatingException('YT storage is enabled but YT store max threads is set to 0')
+
+        if not self.yt_store:
+            self.yt_store_threads = 0
+
+        # YA-1354: The plan is to unify YT and Bazel store interfaces
+        # presently dist_store_threads is only a Bazel's option
+        if self.dist_store_threads == 0 and self.bazel_remote_store:
+            raise ArgsValidatingException('Bazel remote storage is enabled but dist store max threads is set to 0')
+
+        if not self.bazel_remote_store:
+            self.dist_store_threads = 0
 
 
 class JavaSpecificOptions(Options):

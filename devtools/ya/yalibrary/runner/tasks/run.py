@@ -621,8 +621,6 @@ class RunNodeTask(object):
             'NP',
         ):
             return worker_threads.ResInfo(download=1)
-        if p in ('JV',):
-            worker_threads.ResInfo(cpu=2)
         if test.const.TestSize.is_test_shorthand(p) or p == "YT":
             cpu = self._node.requirements.get('cpu', 1)
             if cpu == 'all':

@@ -129,8 +129,8 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     ienv = exit_stack.enter_context(IEnvContext())
 
     test_threads = ctx.opts.test_threads or threads
-    net_threads = ctx.opts.yt_store_threads or 3
-    io_limit = min(ctx.opts.link_threads or 2, threads)
+    net_threads = ctx.opts.yt_store_threads + ctx.opts.dist_store_threads
+    io_limit = min(ctx.opts.link_threads, threads)
     cap = worker_threads.ResInfo(
         io=io_limit, cpu=threads, test=test_threads, download=threads + net_threads, upload=net_threads
     )
