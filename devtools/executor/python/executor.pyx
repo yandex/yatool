@@ -78,7 +78,7 @@ def _get_address():
         return "unix:{}".format(_get_mount_point())
 
 
-def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False):
+def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_init=True):
     address = _get_address()
 
     env = dict(os.environ)
@@ -109,10 +109,18 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False):
                 with grpc.insecure_channel(address) as channel:
                     stub = runner_pb2_grpc.RunnerStub(channel)
                     stub.Ping(runner_pb2.TEmpty())
-                    return
             except Exception as e:
                 last_error = e
-                time.sleep(0.1)
+                time.sleep(0.05)
+            else:
+                if terminate_at_exit:
+                    def shutdown():
+                        if proc.poll() is None:
+                            proc.terminate()
+                            proc.wait()
+
+                    atexit.register(shutdown)
+                return
 
         logging.debug("Failed to connect to external executor within %d tries. Last error: %s", tries, last_error)
 
@@ -131,19 +139,14 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False):
         raise Exception(error_msg)
 
 
-    logging.debug("Waiting for initialization")
-    wait_till_initialized()
-    logging.debug("Executor initialized")
-
-    if terminate_at_exit:
-        def shutdown():
-            if proc.poll() is None:
-                proc.terminate()
-                proc.wait()
-
-        atexit.register(shutdown)
-
-    return pid, address
+    if wait_init:
+        logging.debug("Waiting for initialization")
+        wait_till_initialized()
+        logging.debug("Executor initialized")
+        return pid, address, None
+    else:
+        logging.debug("Not waiting for initialization, returning waiter function")
+        return pid, address, wait_till_initialized
 
 
 def _run_server_entry_point():
@@ -169,7 +172,7 @@ def _run_server_entry_point():
 
 @contextlib.contextmanager
 def with_executor():
-    pid, address = start_executor(terminate_at_exit=False)
+    pid, address, _ = start_executor(terminate_at_exit=False)
     yield address
     terminate_process(pid)
 

@@ -116,6 +116,19 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     # Process can hit soft limit of RLIMIT_NOFILE
     setup_ulimit()
 
+    create_local_executor = not opts.use_distbuild and opts.local_executor and not opts.executor_address
+    wait_local_executor_init_fn = local_executor_address = None
+    if create_local_executor:
+        # local executor is launched in a separate process
+        # it takes some time till it starts being available
+        # so we launch it early and check the status later
+        from devtools.executor.python import executor
+
+        # Don't cache_stderr to avoid belated reading of special tags
+        _, local_executor_address, wait_local_executor_init_fn = executor.start_executor(
+            cache_stderr=False, debug=core.config.is_test_mode(), wait_init=False
+        )
+
     ienv = sandboxing.FuseSandboxing(opts, ctx.src_dir)
 
     class IEnvContext(object):
@@ -390,21 +403,6 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.results = results
             self.fetchers_storage = fetchers_storage
 
-            if not opts.use_distbuild:
-                import yalibrary.runner.tasks.run
-
-                if opts.local_executor:
-                    if not opts.executor_address:
-                        from devtools.executor.python import executor
-
-                        # Don't cache_stderr to avoid belated reading of special tags
-                        _, opts.executor_address = executor.start_executor(
-                            cache_stderr=False, debug=core.config.is_test_mode()
-                        )
-                    self.executor_type = yalibrary.runner.tasks.run.LocalExecutor
-                else:
-                    self.executor_type = yalibrary.runner.tasks.run.PopenExecutor
-
             import yalibrary.runner.tasks.cache
 
             self.compact_cache_task = yalibrary.runner.tasks.cache.CompactCacheTask(cache, state, opts, execution_log)
@@ -458,6 +456,17 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.save_links_regex = (
                 re.compile("|".join(fnmatch.translate(e) for e in save_links_for)) if save_links_for else None
             )
+
+            if not opts.use_distbuild:
+                import yalibrary.runner.tasks.run
+
+                if opts.local_executor:
+                    if create_local_executor:
+                        wait_local_executor_init_fn()
+                        opts.executor_address = local_executor_address
+                    self.executor_type = yalibrary.runner.tasks.run.LocalExecutor
+                else:
+                    self.executor_type = yalibrary.runner.tasks.run.PopenExecutor
 
         def fast_fail(self, fatal=False):
             if fatal or not continue_on_fail:
