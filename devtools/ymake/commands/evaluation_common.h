@@ -16,6 +16,14 @@ namespace NCommands {
         bool Origin;
     };
     struct TTermNothing {};
-    using TTermValue = std::variant<TTermError, TTermNothing, TString, TVector<TString>>;
+
+    struct TTaggedString {
+        // TODO TStringBufs should be usable here (but we do not support evaluating string views yet)
+        TString Data;
+        TVector<TString> Tags = {};
+    };
+    using TTaggedStrings = TVector<TTaggedString>;
+
+    using TTermValue = std::variant<TTermError, TTermNothing, TString, TVector<TString>, TTaggedStrings>;
 
 }

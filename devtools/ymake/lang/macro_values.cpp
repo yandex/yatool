@@ -39,6 +39,7 @@ namespace {
             case EMacroFunction::LastExt:
             case EMacroFunction::KeyValue:
             case EMacroFunction::LateOut:
+            case EMacroFunction::TagsCut:
             case EMacroFunction::TODO1:
             case EMacroFunction::NoAutoSrc:
             case EMacroFunction::NoRel:
@@ -53,6 +54,8 @@ namespace {
             case EMacroFunction::HasDefaultExt:
             case EMacroFunction::Join:
             case EMacroFunction::ExtFilter:
+            case EMacroFunction::TagsIn:
+            case EMacroFunction::TagsOut:
             case EMacroFunction::Context:
             case EMacroFunction::TODO2:
                 res = 2;

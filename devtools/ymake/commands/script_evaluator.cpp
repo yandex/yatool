@@ -55,6 +55,9 @@ public:
                 arg.reserve(arg.size() + n);
                 for (auto& s : v)
                     arg += s;
+            },
+            [&](TTaggedStrings&&) {
+                throw TNotImplemented();
             }
         }, std::move(term));
     }
@@ -146,6 +149,8 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                 return TVector<TString>();
             TArgAccumulator subWriter;
             bool error = false;
+            bool hasPeerDirTags = false;
+            bool hasNoPeerDirTags = false;
             for (auto& varStr : *var) {
                 auto val = varStr.HasPrefix ? GetCmdValue(varStr.Name) : varStr.Name;
                 if (!varStr.StructCmd) {
@@ -153,6 +158,10 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                     auto args = SplitArgs(finalVal);
                     for (auto& arg : args)
                         subWriter.WriteArgument(arg);
+                    if (varStr.HasPeerDirTags)
+                        hasPeerDirTags = true;
+                    else
+                        hasNoPeerDirTags = true;
                     continue;
                 }
                 auto subExpr = AsSubexpression(val);
@@ -167,6 +176,20 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                 cmdBegin = subResult.End;
                 error |= subResult.Error;
                 Y_DEBUG_ABORT_UNLESS(cmdBegin == subExpr->GetNodes().size());
+            }
+            if (hasPeerDirTags) {
+                if (hasNoPeerDirTags)
+                  throw yexception() << "inconsistent peerdir tags detected";
+                auto& src = subWriter.Args;
+                TTaggedStrings dst(src.size());
+                std::transform(src.begin(), src.end(), dst.begin(), [](auto& s) {
+                    auto delim = s.find("$");
+                    if (delim == TString::npos)
+                        return TTaggedString{.Data = s};
+                    TVector<TString> tags = StringSplitter(TStringBuf(s.data(), delim)).Split(',').SkipEmpty();
+                    return TTaggedString{.Data = s.substr(delim), .Tags = tags};
+                });
+                return dst;
             }
             return error ? TTermError(fmt::format("while substituting as {} into", varName), false) : TTermValue(subWriter.Args);
         },
@@ -196,6 +219,10 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
             for (auto& s : v)
                 if (!s.empty())
                     writer->WriteArgument(s);
+        },
+        [&](TTaggedStrings& v) {
+            for (auto& s : v)
+                writer->WriteArgument(s.Data);
         }
     }, term);
 
@@ -341,6 +368,9 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::ExtFilter: return RenderExtFilter(args);
             case EMacroFunction::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
             case EMacroFunction::LateOut: RenderLateOut(ctx, args); return TTermNothing();
+            case EMacroFunction::TagsIn: return RenderTagFilter(args, false);
+            case EMacroFunction::TagsOut: return RenderTagFilter(args, true);
+            case EMacroFunction::TagsCut: return RenderTagCut(args);
             case EMacroFunction::TODO1: return RenderTODO1(args);
             case EMacroFunction::TODO2: return RenderTODO2(args);
             default:

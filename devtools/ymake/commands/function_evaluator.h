@@ -21,6 +21,9 @@ namespace NCommands {
     void RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderLateOut(const TEvalCtx& ctx, std::span<const TTermValue> args);
+    TTermValue RenderTagParse(std::span<const TTermValue> args);
+    TTermValue RenderTagFilter(std::span<const TTermValue> args, bool exclude);
+    TTermValue RenderTagCut(std::span<const TTermValue> args);
     TTermValue RenderRootRel(std::span<const TTermValue> args);
     TTermValue RenderCutPath(std::span<const TTermValue> args);
     TTermValue RenderCutExt(std::span<const TTermValue> args);
