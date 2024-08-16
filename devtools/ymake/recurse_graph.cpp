@@ -47,7 +47,14 @@ bool TMineRecurseVisitor::Enter(TState& state) {
                         auto topDir = *(state.end() - 1);
                         Y_ASSERT(topDir.Node()->NodeType == EMNT_Directory);
                         auto topDirNode = RecurseGraph.GetNodeById(topDir.Node()->NodeType, topDir.Node()->ElemId);
-                        RecurseGraph.AddEdge(topDirNode, addedNode.Id(), EDT_Include);
+                        RecurseGraph.AddEdge(topDirNode, addedNode.Id(),
+                            NProps::DEPENDS == propType
+                                ? EDT_BuildFrom
+                                : (NProps::RECURSES == propType
+                                    ? EDT_Include
+                                    : EDT_Search // NProps::TEST_RECURSES
+                                )
+                        );
                     }
                 }
             }
