@@ -481,10 +481,27 @@ TTermValue NCommands::RenderTagFilter(std::span<const TTermValue> args, bool exc
 TTermValue NCommands::RenderTagCut(std::span<const TTermValue> args) {
     static const char* fnName = "TagCut";
     CheckArgCount(args, 1, fnName);
-    auto items = std::get<TTaggedStrings>(args[0]);
-    TVector<TString> result(items.size());
-    std::transform(items.begin(), items.end(), result.begin(), [](auto& s) {return s.Data;});
-    return result;
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
+        },
+        [&](const TString& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
+        },
+        [&](const TVector<TString>& v) -> TTermValue {
+            // when PEERS is empty, we cannot detect its HasPeerDirTags and end up here
+            Y_DEBUG_ABORT_UNLESS(v.empty());
+            return v;
+        },
+        [&](const TTaggedStrings& v) -> TTermValue {
+            TVector<TString> result(v.size());
+            std::transform(v.begin(), v.end(), result.begin(), [](auto& s) {return s.Data;});
+            return result;
+        }
+    }, args[0]);
 }
 
 TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
