@@ -358,6 +358,7 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::Quo: return RenderQuo(args);
             case EMacroFunction::QuoteEach: return RenderQuoteEach(args);
             case EMacroFunction::ToUpper: return RenderToUpper(args);
+            case EMacroFunction::ToLower: return RenderToLower(args);
             case EMacroFunction::Cwd: RenderCwd(writer, ctx, args); return TTermNothing();
             case EMacroFunction::AsStdout: RenderStdout(writer, ctx, args); return TTermNothing();
             case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();

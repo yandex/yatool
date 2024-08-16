@@ -306,6 +306,34 @@ TTermValue NCommands::RenderToUpper(std::span<const TTermValue> args) {
     }, args[0]);
 }
 
+TTermValue NCommands::RenderToLower(std::span<const TTermValue> args) {
+    static const char* fnName = "ToLower";
+    CheckArgCount(args, 1, fnName);
+    auto apply = [](TString s) {
+        s.to_lower();
+        return s;
+    };
+    return std::visit(TOverloaded{
+        [](TTermError) -> TTermValue {
+            Y_ABORT();
+        },
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
+        },
+        [&](TString s) -> TTermValue {
+            return apply(std::move(s));
+        },
+        [&](TVector<TString> v) -> TTermValue {
+            for (auto& s : v)
+                s = apply(std::move(s));
+            return std::move(v);
+        },
+        [&](TTaggedStrings x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
+        }
+    }, args[0]);
+}
+
 void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
     static const char* fnName = "Cwd";
     CheckArgCount(args, 1, fnName);

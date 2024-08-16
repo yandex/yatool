@@ -28,6 +28,7 @@ namespace {
             {"quo",     EMacroFunction::Quo},
             {"qe",      EMacroFunction::QuoteEach},
             {"toupper", EMacroFunction::ToUpper},
+            {"tolower", EMacroFunction::ToLower},
             {"rootrel", EMacroFunction::RootRel},
             {"nopath",  EMacroFunction::CutPath},
             {"noext",   EMacroFunction::CutExt},

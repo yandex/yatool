@@ -27,6 +27,7 @@ enum class EMacroFunction: ui32 {
     Quo,
     QuoteEach,
     ToUpper,
+    ToLower,
     Cwd,
     AsStdout,
     SetEnv,

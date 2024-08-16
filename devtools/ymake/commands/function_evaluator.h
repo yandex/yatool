@@ -16,6 +16,7 @@ namespace NCommands {
     TTermValue RenderQuo(std::span<const TTermValue> args);
     TTermValue RenderQuoteEach(std::span<const TTermValue> args);
     TTermValue RenderToUpper(std::span<const TTermValue> args);
+    TTermValue RenderToLower(std::span<const TTermValue> args);
     void RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
     void RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
