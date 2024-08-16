@@ -555,82 +555,85 @@ namespace {
         });
         FORCE_TRACE(U, NEvent::TStageFinished("Visit JSON"));
 
-        plan.Resources = cmdbuilder.GetResources();
-        plan.HostResources = cmdbuilder.GetHostResources();
-        if (conf.DumpInputsMapInJSON) {
-            plan.Inputs = cmdbuilder.GetInputs(graph);
-        }
-
-        TProgressManager::Instance()->ForceUpdateRenderModulesTotal(cmdbuilder.GetModuleNodesNum());
-
-        THashSet<TNodeId> results;
-        for (const auto& startTarget : startTargets) {
-            if (conf.DependsLikeRecurse || !startTarget.IsDependsTarget || startTarget.IsRecurseTarget) {
-                TVector<TNodeId> moduleIds, glSrcIds;
-                yMake.ListTargetResults(startTarget, moduleIds, glSrcIds);
-
-                for (TNodeId moduleId : moduleIds) {
-                    const TModule* mod = yMake.Modules.Get(graph[moduleId]->ElemId);
-                    if (mod != nullptr && mod->GetAttrs().UseInjectedData) {
-                        YDebug() << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " will be injected in graph later. Noop here." << Endl;
-                        continue;
-                    }
-                    if (mod != nullptr && mod->IsFakeModule()) {
-                        YDIAG(V) << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " is fake, excluded" << Endl;
-                        continue;
-                    }
-
-                    if (cmdbuilder.Nodes.contains(moduleId)) {
-                        results.insert(moduleId);
-                    }
-                }
-                for (TNodeId glSrcId : glSrcIds) {
-                    if (cmdbuilder.Nodes.contains(glSrcId)) {
-                        results.insert(glSrcId);
-                    }
-                }
-            }
-        }
-
-        TFsPath tmpFile;
-        TFsPath cacheFile;
         {
-            YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
+            NYMake::TTraceStageWithTimer renderJsonTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
 
-            TMakePlanCache cache(yMake.Conf);
-            yMake.JSONCacheLoaded(cache.LoadFromFile());
-            plan.WriteConf();
+            plan.Resources = cmdbuilder.GetResources();
+            plan.HostResources = cmdbuilder.GetHostResources();
+            if (conf.DumpInputsMapInJSON) {
+                plan.Inputs = cmdbuilder.GetInputs(graph);
+            }
 
-            for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
-                UpdateUids(cmdbuilder, nodeId);
+            TProgressManager::Instance()->ForceUpdateRenderModulesTotal(cmdbuilder.GetModuleNodesNum());
 
-                const auto& node = cmdbuilder.Nodes.at(nodeId);
-                RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);
-                if (IsModuleType(graph[nodeId]->NodeType)) {
-                    TProgressManager::Instance()->IncRenderModulesDone();
+            THashSet<TNodeId> results;
+            for (const auto& startTarget : startTargets) {
+                if (conf.DependsLikeRecurse || !startTarget.IsDependsTarget || startTarget.IsRecurseTarget) {
+                    TVector<TNodeId> moduleIds, glSrcIds;
+                    yMake.ListTargetResults(startTarget, moduleIds, glSrcIds);
+
+                    for (TNodeId moduleId : moduleIds) {
+                        const TModule* mod = yMake.Modules.Get(graph[moduleId]->ElemId);
+                        if (mod != nullptr && mod->GetAttrs().UseInjectedData) {
+                            YDebug() << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " will be injected in graph later. Noop here." << Endl;
+                            continue;
+                        }
+                        if (mod != nullptr && mod->IsFakeModule()) {
+                            YDIAG(V) << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " is fake, excluded" << Endl;
+                            continue;
+                        }
+
+                        if (cmdbuilder.Nodes.contains(moduleId)) {
+                            results.insert(moduleId);
+                        }
+                    }
+                    for (TNodeId glSrcId : glSrcIds) {
+                        if (cmdbuilder.Nodes.contains(glSrcId)) {
+                            results.insert(glSrcId);
+                        }
+                    }
                 }
             }
 
-            TProgressManager::Instance()->ForceRenderModulesDone();
-            tmpFile = cache.SaveToFile();
-            cacheFile = cache.GetCachePath();
-            YDebug() << cache.GetStatistics() << Endl;
-        }
-        // Release cache before rename: on Windows open cache file prevents renaming
-        if (tmpFile && cacheFile) {
-            tmpFile.RenameTo(cacheFile);
-        }
+            TFsPath tmpFile;
+            TFsPath cacheFile;
+            {
+                YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
-        // after rendering all nodes
-        for (TNodeId result : results) {
-            auto resultIt = cmdbuilder.Nodes.find(result);
-            if (resultIt->second.OutTogetherDependency != TNodeId::Invalid && !resultIt->second.HasBuildCmd) {
-                resultIt = cmdbuilder.Nodes.find(resultIt->second.OutTogetherDependency);
+                TMakePlanCache cache(yMake.Conf);
+                yMake.JSONCacheLoaded(cache.LoadFromFile());
+                plan.WriteConf();
+
+                for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
+                    UpdateUids(cmdbuilder, nodeId);
+
+                    const auto& node = cmdbuilder.Nodes.at(nodeId);
+                    RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);
+                    if (IsModuleType(graph[nodeId]->NodeType)) {
+                        TProgressManager::Instance()->IncRenderModulesDone();
+                    }
+                }
+
+                TProgressManager::Instance()->ForceRenderModulesDone();
+                tmpFile = cache.SaveToFile();
+                cacheFile = cache.GetCachePath();
+                YDebug() << cache.GetStatistics() << Endl;
             }
-            plan.Results.push_back(resultIt->second.GetNodeUid());
-        }
-        std::sort(plan.Results.begin(), plan.Results.end());
+            // Release cache before rename: on Windows open cache file prevents renaming
+            if (tmpFile && cacheFile) {
+                tmpFile.RenameTo(cacheFile);
+            }
 
+            // after rendering all nodes
+            for (TNodeId result : results) {
+                auto resultIt = cmdbuilder.Nodes.find(result);
+                if (resultIt->second.OutTogetherDependency != TNodeId::Invalid && !resultIt->second.HasBuildCmd) {
+                    resultIt = cmdbuilder.Nodes.find(resultIt->second.OutTogetherDependency);
+                }
+                plan.Results.push_back(resultIt->second.GetNodeUid());
+            }
+            std::sort(plan.Results.begin(), plan.Results.end());
+        }
         yMake.SaveUids(&cmdbuilder);
         cmdbuilder.ReportCacheStats();
         if (cmdbuilder.ErrorShower.Count != 0) {
@@ -684,8 +687,6 @@ void ExportJSON(TYMake& yMake) {
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
         NYMake::TJsonWriter jsonWriter(*output.Get());
         TMakePlan plan(jsonWriter);
-
-        NYMake::TTraceStageWithTimer renderJsonTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
         RenderJSONGraph(yMake, plan);
     }
 
