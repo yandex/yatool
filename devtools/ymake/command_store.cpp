@@ -834,6 +834,8 @@ void TCommands::TInliner::InlineScalarTerms(
                                 InlineCommands(def.Definition->Script, newWriter);
                             } else
                                 InlineCommands(def.Definition->Script, newWriter);
+                            if (newBody.Script.size() == 0)
+                                return true;
                             if (newBody.Script.size() != 1)
                                 ythrow TError() << "totally unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
                             newXfm.Body = std::move(newBody.Script[0]);
