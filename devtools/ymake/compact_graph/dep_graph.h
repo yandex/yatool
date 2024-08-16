@@ -79,7 +79,20 @@ public:
         return StructureChanged_;
     }
 
+    bool GetReachable() const {
+        return Reachable_;
+    }
+
+    void SetReachable(bool isReachable = true) {
+       Reachable_ = isReachable;
+    }
+
 private:
+    // Flag if the node is reachable from the current set of start targets.
+    // This flag is stored in cache (see note for Load/Save methods of
+    // TDepTreenode below.
+    bool Reachable_ : 1 = false;
+
     // File content was changed.
     bool ContentChanged_ : 1 = false;
 
@@ -130,12 +143,28 @@ public:
         return ElemId < node.ElemId;
     }
 
-    Y_SAVELOAD_DEFINE(NodeType, ElemId);
-
     // "State" is a non-persistent dependency graph node state
     // related to the current graph instance.
     // It should not be saved and should be default initialized
     // when the new graph instance created or loaded.
+    // Note: The only exception to the written above is Reachable_ field
+    // of "State". Reachable_ flag shares the byte for NodeType in cache.
+    // Currently there is no need to save Reachable_ field of "State" in
+    // a separate chunk of data in cache.
+
+    void Load(IInputStream* input) {
+        ui8 data;
+        ::Load(input, data);
+        NodeType = static_cast<EMakeNodeType>(0x7f & data);
+        State.SetReachable(0x80 & data);
+        ::Load(input, ElemId);
+    }
+
+    void Save(IOutputStream* output) const {
+        ui8 data = static_cast<ui8>(NodeType) | static_cast<ui8>(State.GetReachable()) << 7;
+        ::Save(output, data);
+        ::Save(output, ElemId);
+    }
 };
 
 static_assert(sizeof(TDepTreeNode) == 8);

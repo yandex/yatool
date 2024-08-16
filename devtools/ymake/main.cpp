@@ -852,6 +852,8 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->ReportModulesStats();
 
+    yMake->ComputeReachableNodes();
+
     yMake->SortAllEdges();
 
     yMake->CheckBlacklist();

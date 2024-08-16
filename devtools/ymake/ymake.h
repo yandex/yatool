@@ -145,6 +145,7 @@ public:
     void JSONCacheMonEvent() const;
     void UidsCacheMonEvent() const;
     void GraphChangesPredictionEvent() const;
+    void ComputeReachableNodes();
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);
     TRestoreContext GetRestoreContext();

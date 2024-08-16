@@ -66,6 +66,7 @@ SRCS(
     command_store.cpp
     commands/function_evaluator.cpp
     commands/script_evaluator.cpp
+    compute_reachability.cpp
     conf.cpp
     config/config.cpp
     debug_log.cpp

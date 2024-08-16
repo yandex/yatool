@@ -9,6 +9,7 @@
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/compute_reachability.h>
 
 namespace {
     enum class ESortPriority {
@@ -165,4 +166,14 @@ void TYMake::AddTarget(const TString& dir) {
     TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
     auto elemId = Names.AddName(EMNT_Directory, dirPath);
     UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+}
+
+void TYMake::ComputeReachableNodes() {
+    if (DepsCacheLoaded_) {
+        NYMake::TTraceStage scopeTracer{"Reset reachable nodes"};
+        NComputeReachability::ResetReachableNodes(Graph);
+    }
+
+    NYMake::TTraceStage scopeTracer{"Set reachable nodes"};
+    NComputeReachability::ComputeReachableNodes(Graph, StartTargets);
 }
