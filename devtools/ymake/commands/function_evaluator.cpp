@@ -41,40 +41,51 @@ namespace {
             throw yexception() << name << " requires " << expected << " argument(s)";
     }
 
+    template<typename T> const char *PrintableTypeName();
+    template<> const char *PrintableTypeName<TTermNothing    >() {return "Unit";}
+    template<> const char *PrintableTypeName<TString         >() {return "String";}
+    template<> const char *PrintableTypeName<TVector<TString>>() {return "Strings";}
+    template<> const char *PrintableTypeName<TTaggedStrings  >() {return "TaggedStrings";}
+
 }
 
+#define BAD_ARGUMENT_TYPE(f, x) \
+    throw TNotImplemented() << "type " << PrintableTypeName<std::remove_cvref_t<decltype(x)>>() << " is not supported by " << f
+
 TTermValue NCommands::RenderArgs(std::span<const TTermValue> args) {
+    static const char* fnName = "Args";
     TVector<TString> result;
     for (auto& arg : args)
         result.push_back(std::visit(TOverloaded{
             [](TTermError) -> TString {
                 Y_ABORT();
             },
-            [](TTermNothing) -> TString {
-                throw TNotImplemented();
+            [](TTermNothing x) -> TString {
+                BAD_ARGUMENT_TYPE(fnName, x);
             },
             [&](const TString& s) -> TString {
                 return s;
             },
-            [&](const TVector<TString>&) -> TString {
-                throw TNotImplemented();
+            [&](const TVector<TString>& x) -> TString {
+                BAD_ARGUMENT_TYPE(fnName, x);
             },
-            [&](const TTaggedStrings&) -> TString {
-                throw TNotImplemented();
+            [&](const TTaggedStrings& x) -> TString {
+                BAD_ARGUMENT_TYPE(fnName, x);
             }
         }, arg));
     return result;
 }
 
 TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
+    static const char* fnName = "Terms";
     TString result;
     for (auto& arg : args)
         result += std::visit(TOverloaded{
             [](TTermError) -> TString {
                 Y_ABORT();
             },
-            [](TTermNothing) -> TString {
-                throw TNotImplemented();
+            [](TTermNothing x) -> TString {
+                BAD_ARGUMENT_TYPE(fnName, x);
             },
             [&](const TString& s) -> TString {
                 return s;
@@ -85,10 +96,10 @@ TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
                 else if (v.size() == 1)
                     return v.front();
                 else
-                    throw yexception() << "Nested terms should not have multiple items";
+                    throw TNotImplemented() << "Nested terms should not have multiple items";
             },
-            [&](const TTaggedStrings&) -> TString {
-                throw TNotImplemented();
+            [&](const TTaggedStrings& x) -> TString {
+                BAD_ARGUMENT_TYPE(fnName, x);
             }
         }, arg);
     return result;
@@ -99,7 +110,8 @@ TTermValue NCommands::RenderCat(std::span<const TTermValue> args) {
 }
 
 TTermValue NCommands::RenderClear(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "Clear");
+    static const char* fnName = "Clear";
+    CheckArgCount(args, 1, fnName);
     return std::visit(TOverloaded{
         [](TTermError) -> TTermValue {
             Y_ABORT();
@@ -115,14 +127,15 @@ TTermValue NCommands::RenderClear(std::span<const TTermValue> args) {
                 return TTermNothing();
             return TString();
         },
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
-    CheckArgCount(args, 2, "Pre");
+    static const char* fnName = "Pre";
+    CheckArgCount(args, 2, fnName);
     return std::visit(TOverloaded{
 
         [](TTermError) -> TTermValue {
@@ -138,8 +151,8 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
                 [](TTermError) -> TTermValue {
                     Y_ABORT();
                 },
-                [](TTermNothing) -> TTermValue {
-                    ythrow TNotImplemented() << "Unexpected empty prefix";
+                [](TTermNothing x) -> TTermValue {
+                    BAD_ARGUMENT_TYPE(fnName, x);
                 },
                 [&](const TString& prefix) -> TTermValue {
                     if (prefix.EndsWith(' ')) {
@@ -155,8 +168,8 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
                         result.push_back(prefix + body);
                     return std::move(result);
                 },
-                [&](const TTaggedStrings&) -> TTermValue {
-                    throw TNotImplemented();
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    BAD_ARGUMENT_TYPE(fnName, x);
                 }
             }, args[0]);
         },
@@ -166,8 +179,8 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
                 [](TTermError) -> TTermValue {
                     Y_ABORT();
                 },
-                [](TTermNothing) -> TTermValue {
-                    ythrow TNotImplemented() << "Unexpected empty prefix";
+                [](TTermNothing x) -> TTermValue {
+                    BAD_ARGUMENT_TYPE(fnName, x);
                 },
                 [&](const TString& prefix) -> TTermValue {
                     TVector<TString> result;
@@ -189,21 +202,22 @@ TTermValue NCommands::RenderPre(std::span<const TTermValue> args) {
                     Y_UNUSED(prefixes);
                     ythrow TNotImplemented() << "Pre arguments should not both be arrays";
                 },
-                [&](const TTaggedStrings&) -> TTermValue {
-                    throw TNotImplemented();
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    BAD_ARGUMENT_TYPE(fnName, x);
                 }
             }, args[0]);
         },
 
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
 
     }, args[1]);
 }
 
 TTermValue NCommands::RenderSuf(std::span<const TTermValue> args) {
-    CheckArgCount(args, 2, "Suf");
+    static const char* fnName = "Suf";
+    CheckArgCount(args, 2, fnName);
     auto suffix = std::get<TString>(args[0]);
     return std::visit(TOverloaded{
         [](TTermError) -> TTermValue {
@@ -222,14 +236,15 @@ TTermValue NCommands::RenderSuf(std::span<const TTermValue> args) {
                 result.push_back(body + suffix);
             return std::move(result);
         },
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[1]);
 }
 
 TTermValue NCommands::RenderJoin(std::span<const TTermValue> args) {
-    CheckArgCount(args, 2, "Join");
+    static const char* fnName = "Join";
+    CheckArgCount(args, 2, fnName);
     auto glue = std::get<TString>(args[0]);
     return std::visit(TOverloaded{
         [](TTermError) -> TTermValue {
@@ -244,8 +259,8 @@ TTermValue NCommands::RenderJoin(std::span<const TTermValue> args) {
         [&](const TVector<TString>& bodies) -> TTermValue {
             return JoinSeq(glue, bodies);
         },
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[1]);
 }
@@ -259,16 +274,13 @@ TTermValue NCommands::RenderQuo(std::span<const TTermValue> args) {
 }
 
 TTermValue NCommands::RenderQuoteEach(std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "QuoteEach requires 1 argument";
-    }
+    CheckArgCount(args, 1, "QuoteEach");
     return args[0]; // NOP for the same reason as "quo"
 }
 
 TTermValue NCommands::RenderToUpper(std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "ToUpper requires 1 argument";
-    }
+    static const char* fnName = "ToUpper";
+    CheckArgCount(args, 1, fnName);
     auto apply = [](TString s) {
         s.to_upper();
         return s;
@@ -277,8 +289,8 @@ TTermValue NCommands::RenderToUpper(std::span<const TTermValue> args) {
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return apply(std::move(s));
@@ -288,20 +300,21 @@ TTermValue NCommands::RenderToUpper(std::span<const TTermValue> args) {
                 s = apply(std::move(s));
             return std::move(v);
         },
-        [&](TTaggedStrings) -> TTermValue {
-            throw TNotImplemented();
+        [&](TTaggedStrings x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "Cwd");
+    static const char* fnName = "Cwd";
+    CheckArgCount(args, 1, fnName);
     std::visit(TOverloaded{
         [](TTermError) {
             Y_ABORT();
         },
-        [](TTermNothing) {
-            throw TNotImplemented();
+        [](TTermNothing x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TString& s) {
             writer->WriteCwd(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
@@ -312,24 +325,23 @@ void NCommands::RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, s
             else if (v.size() == 1)
                 writer->WriteCwd(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
             else
-                throw yexception() << "Cwd does not support arrays";
+                throw TNotImplemented() << "Cwd does not support arrays";
         },
-        [&](const TTaggedStrings&) {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 void NCommands::RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "StdOut requires 1 argument";
-    }
+    static const char* fnName = "StdOut";
+    CheckArgCount(args, 1, fnName);
     std::visit(TOverloaded{
         [](TTermError) {
             Y_ABORT();
         },
-        [](TTermNothing) {
-            throw TNotImplemented();
+        [](TTermNothing x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TString& s) {
             writer->WriteStdout(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
@@ -340,22 +352,23 @@ void NCommands::RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx
             else if (v.size() == 1)
                 writer->WriteStdout(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
             else
-                throw yexception() << "StdOut does not support arrays";
+                throw TNotImplemented() << "StdOut does not support arrays";
         },
-        [&](const TTaggedStrings&) {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "Env");
+    static const char* fnName = "Env";
+    CheckArgCount(args, 1, fnName);
     std::visit(TOverloaded{
         [](TTermError) {
             Y_ABORT();
         },
-        [](TTermNothing) {
-            throw TNotImplemented();
+        [](TTermNothing x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TString& s) {
             writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
@@ -366,22 +379,23 @@ void NCommands::RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, s
             else if (v.size() == 1)
                 writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
             else
-                throw yexception() << "Env does not support arrays";
+                throw TNotImplemented() << "Env does not support arrays";
         },
-        [&](const TTaggedStrings&) {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "KeyValue");
+    static const char* fnName = "KeyValue";
+    CheckArgCount(args, 1, fnName);
     std::visit(TOverloaded{
         [](TTermError) {
             Y_ABORT();
         },
-        [](TTermNothing) {
-            throw TNotImplemented();
+        [](TTermNothing x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TString& s) {
             // lifted from EMF_KeyValue processing
@@ -402,24 +416,23 @@ void NCommands::RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> 
             else if (v.size() == 1)
                 GetOrInit(ctx.CmdInfo.KV)[v[0]] = "yes";
             else
-                throw TNotImplemented();
+                throw TNotImplemented() << "bad KV item count";
         },
-        [&](const TTaggedStrings&) {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 void NCommands::RenderLateOut(const TEvalCtx& ctx, std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "LateOut requires 1 argument";
-    }
+    static const char* fnName = "LateOut";
+    CheckArgCount(args, 1, fnName);
     std::visit(TOverloaded{
         [](TTermError) {
             Y_ABORT();
         },
-        [](TTermNothing) {
-            throw TNotImplemented();
+        [](TTermNothing x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TString& s) {
             GetOrInit(ctx.CmdInfo.LateOuts).push_back(s);
@@ -428,25 +441,25 @@ void NCommands::RenderLateOut(const TEvalCtx& ctx, std::span<const TTermValue> a
             for (auto& s : v)
                 GetOrInit(ctx.CmdInfo.LateOuts).push_back(s);
         },
-        [&](const TTaggedStrings&) {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 TTermValue NCommands::RenderTagFilter(std::span<const TTermValue> args, bool exclude) {
-    auto selfName = "TagFilter";
-    CheckArgCount(args, 2, selfName);
+    static const char* fnName = "TagFilter";
+    CheckArgCount(args, 2, fnName);
     auto tags = ParseMacroTags(std::get<TString>(args[0])); // TODO preparse
     auto items = std::visit(TOverloaded{
         [](TTermError) -> TTaggedStrings {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTaggedStrings {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTaggedStrings {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
-        [&](const TString&) -> TTaggedStrings {
-            throw TNotImplemented();
+        [&](const TString& x) -> TTaggedStrings {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](const TVector<TString>& v) -> TTaggedStrings {
             // when PEERS is empty, we cannot detect its HasPeerDirTags and end up here
@@ -466,7 +479,8 @@ TTermValue NCommands::RenderTagFilter(std::span<const TTermValue> args, bool exc
 }
 
 TTermValue NCommands::RenderTagCut(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "TagCut");
+    static const char* fnName = "TagCut";
+    CheckArgCount(args, 1, fnName);
     auto items = std::get<TTaggedStrings>(args[0]);
     TVector<TString> result(items.size());
     std::transform(items.begin(), items.end(), result.begin(), [](auto& s) {return s.Data;});
@@ -474,7 +488,8 @@ TTermValue NCommands::RenderTagCut(std::span<const TTermValue> args) {
 }
 
 TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "RootRel");
+    static const char* fnName = "RootRel";
+    CheckArgCount(args, 1, fnName);
     auto apply = [](TString s) {
         // lifted from EMF_PrnRootRel processing:
         return TString(NPath::CutType(GlobalConf()->CanonPath(s)));
@@ -483,8 +498,8 @@ TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return apply(std::move(s));
@@ -505,9 +520,8 @@ TTermValue NCommands::RenderRootRel(std::span<const TTermValue> args) {
 }
 
 TTermValue NCommands::RenderCutPath(std::span<const TTermValue> args) {
-    if (args.size() != 1) {
-        throw yexception() << "Nopath requires 1 argument";
-    }
+    static const char* fnName = "Nopath";
+    CheckArgCount(args, 1, fnName);
     auto apply = [](TString s) {
         // lifted from EMF_CutPath processing:
         size_t slash = s.rfind(NPath::PATH_SEP);
@@ -519,8 +533,8 @@ TTermValue NCommands::RenderCutPath(std::span<const TTermValue> args) {
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return apply(std::move(s));
@@ -530,14 +544,15 @@ TTermValue NCommands::RenderCutPath(std::span<const TTermValue> args) {
                 s = apply(std::move(s));
             return std::move(v);
         },
-        [&](TTaggedStrings) -> TTermValue {
-            throw TNotImplemented();
+        [&](TTaggedStrings x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 TTermValue NCommands::RenderCutExt(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "NoExt");
+    static const char* fnName = "NoExt";
+    CheckArgCount(args, 1, fnName);
     auto apply = [](TString s) {
         // lifted from EMF_CutExt processing:
         size_t slash = s.rfind(NPath::PATH_SEP); //todo: windows slash!
@@ -552,8 +567,8 @@ TTermValue NCommands::RenderCutExt(std::span<const TTermValue> args) {
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return apply(std::move(s));
@@ -563,14 +578,15 @@ TTermValue NCommands::RenderCutExt(std::span<const TTermValue> args) {
                 s = apply(std::move(s));
             return std::move(v);
         },
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 TTermValue NCommands::RenderLastExt(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "LastExt");
+    static const char* fnName = "LastExt";
+    CheckArgCount(args, 1, fnName);
     auto apply = [](TString s) {
         // lifted from EMF_LastExt processing:
         // It would be nice to use some common utility function from common/npath.h,
@@ -588,8 +604,8 @@ TTermValue NCommands::RenderLastExt(std::span<const TTermValue> args) {
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return apply(std::move(s));
@@ -599,21 +615,22 @@ TTermValue NCommands::RenderLastExt(std::span<const TTermValue> args) {
                 s = apply(std::move(s));
             return std::move(v);
         },
-        [&](const TTaggedStrings&) -> TTermValue {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
 }
 
 TTermValue NCommands::RenderExtFilter(std::span<const TTermValue> args) {
-    CheckArgCount(args, 2, "ExtFilter");
+    static const char* fnName = "ExtFilter";
+    CheckArgCount(args, 2, fnName);
     auto ext = std::get<TString>(args[0]);
     return std::visit(TOverloaded{
         [](TTermError) -> TTermValue {
             Y_ABORT();
         },
-        [](TTermNothing) -> TTermValue {
-            throw TNotImplemented();
+        [](TTermNothing x) -> TTermValue {
+            BAD_ARGUMENT_TYPE(fnName, x);
         },
         [&](TString s) -> TTermValue {
             return s.EndsWith(ext) ? args[1] : TTermNothing();
@@ -630,7 +647,8 @@ TTermValue NCommands::RenderExtFilter(std::span<const TTermValue> args) {
 }
 
 TTermValue NCommands::RenderTODO1(std::span<const TTermValue> args) {
-    CheckArgCount(args, 1, "TODO1");
+    static const char* fnName = "TODO1";
+    CheckArgCount(args, 1, fnName);
     auto arg0 = std::visit(TOverloaded{
         [](TTermError) -> TString {
             Y_ABORT();
@@ -644,15 +662,16 @@ TTermValue NCommands::RenderTODO1(std::span<const TTermValue> args) {
         [&](const TVector<TString>& v) -> TString {
             return fmt::format("{}", fmt::join(v, " "));
         },
-        [&](const TTaggedStrings&) -> TString {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TString {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
     return fmt::format("TODO1({})", arg0);
 }
 
 TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
-    CheckArgCount(args, 2, "TODO2");
+    static const char* fnName = "TODO2";
+    CheckArgCount(args, 2, fnName);
     auto arg0 = std::visit(TOverloaded{
         [](TTermError) -> TString {
             Y_ABORT();
@@ -666,8 +685,8 @@ TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
         [&](const TVector<TString>& v) -> TString {
             return fmt::format("{}", fmt::join(v, " "));
         },
-        [&](const TTaggedStrings&) -> TString {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TString {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);
     auto arg1 = std::visit(TOverloaded{
@@ -683,8 +702,8 @@ TTermValue NCommands::RenderTODO2(std::span<const TTermValue> args) {
         [&](const TVector<TString>& v) -> TString {
             return fmt::format("{}", fmt::join(v, " "));
         },
-        [&](const TTaggedStrings&) -> TString {
-            throw TNotImplemented();
+        [&](const TTaggedStrings& x) -> TString {
+            BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[1]);
     return fmt::format("TODO2({}, {})", arg0, arg1);
