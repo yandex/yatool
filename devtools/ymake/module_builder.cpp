@@ -392,7 +392,14 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     }
 
     if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
-        auto compiled = Commands.Compile(command, &Conf, Vars, Vars, true, EOutputAccountingMode::Module);
+        auto compiled = [&]() {
+            try {
+                return Commands.Compile(command, &Conf, Vars, Vars, true, EOutputAccountingMode::Module);
+            } catch (std::exception& e) {
+                YConfErr(Details) << "Command processing error (module " << Module.GetUserType() << "): " << e.what() << Endl;
+                return Commands.Compile("$FAIL_MODULE_CMD", &Conf, Vars, Vars, true, EOutputAccountingMode::Module);
+            }
+        }();
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);

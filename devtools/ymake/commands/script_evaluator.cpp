@@ -379,7 +379,7 @@ TTermValue TScriptEvaluator::EvalFn(
         throw yexception()
             << "Don't know how to render configure time modifier "
             << Commands->Values.Id2Func(id);
-    } catch (yexception& e) {
+    } catch (std::exception& e) {
         ++ErrorShower->Count;
         return TTermError(e.what(), true);
     }

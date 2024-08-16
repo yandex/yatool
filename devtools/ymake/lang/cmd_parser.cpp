@@ -383,7 +383,7 @@ namespace {
             const std::string& msg,
             std::exception_ptr e
         ) override {
-            throw yexception() << "could not parse command: " << Cmd;
+            throw yexception() << "could not parse command (" << line << ":" << charPositionInLine << "): " << msg << "\n" << Cmd;
         }
     private:
         TStringBuf Cmd;
@@ -401,12 +401,14 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, 
     TCmdParserErrorListener errorListener(src);
 
     CmdLexer lexer(&input);
+    lexer.removeErrorListeners();
     lexer.addErrorListener(&errorListener);
 
     antlr4::CommonTokenStream tokens(&lexer);
     tokens.fill();
 
     CmdParser parser(&tokens);
+    parser.removeErrorListeners();
     parser.addErrorListener(&errorListener);
 
     TCmdParserVisitor_Polexpr visitor(conf, values);
