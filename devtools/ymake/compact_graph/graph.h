@@ -885,7 +885,7 @@ public:
     /// @brief Get validated mutable reference to node
     /// For invalid and out of bounds nodes exception will be thrown
     TNodeRef GetValid(TNodeId id) {
-        if (AsIdx(id) >= Size() || !Nodes_[AsIdx(id)].Valid()) {
+        if (!IsValidNode(id)) {
             ythrow yexception() << "Validated mutable access to graph node #" << ToUnderlying(id) << " failed: " << AsIdx(id) >= Size() ? "Out of bounds" : "Deleted node";
         }
         return Get(id);
@@ -894,7 +894,7 @@ public:
     /// @brief Get validated read-only reference to node
     /// For invalid and out of bounds nodes exception will be thrown
     TConstNodeRef GetValid(TNodeId id) const {
-        if (AsIdx(id) >= Size() || !Nodes_[AsIdx(id)].Valid()) {
+        if (!IsValidNode(id)) {
             ythrow yexception() << "Validated const access to graph node #" << ToUnderlying(id) << " failed: " << AsIdx(id) >= Size() ? "Out of bounds" : "Deleted node";
         }
         return Get(id);
@@ -952,7 +952,7 @@ public:
 
     /// @brief add edge between 2 existing nodes
     TEdgeRef AddEdge(TNodeId from, TNodeId to, VE value) {
-        Y_ASSERT(AsIdx(from) < Size() && AsIdx(to) < Size() && Nodes_[AsIdx(from)].IsValid() && Nodes_[AsIdx(to)].IsValid());
+        Y_ASSERT(IsValidNode(from) && IsValidNode(to));
         return (*this)[from].AddEdge(to, value);
     }
 
@@ -1035,7 +1035,7 @@ public:
 
     /// @brief change ends of a specific node's edges according to a map
     void ReplaceEdges(TNodeId nodeId, const THashMap<TNodeId, TNodeId>& replaces) {
-        Y_ASSERT(AsIdx(nodeId) < Size() && Nodes_[AsIdx(nodeId)].IsValid());
+        Y_ASSERT(IsValidNode(nodeId));
         ReplaceEdges(Nodes_[AsIdx(nodeId)], replaces);
     }
 
@@ -1055,7 +1055,7 @@ public:
     /// @brief change ends of a specific node's edges according to a map
     /// Can replace single edge with zero or multiple new edges.
     void ReplaceEdgesWithList(TNodeId nodeId, const THashMap<TNodeId, TVector<TNodeId>>& replaces) {
-        Y_ASSERT(AsIdx(nodeId) < Size() && Nodes_[AsIdx(nodeId)].IsValid());
+        Y_ASSERT(IsValidNode(nodeId));
         TN& node = Nodes_[AsIdx(nodeId)];
         const size_t edgeCnt = node.Edges().size();
         for (size_t j = 0; j < edgeCnt; ++j) {
@@ -1069,11 +1069,11 @@ public:
                     continue;
                 }
                 TNodeId newEnd = newDest[0];
-                Y_ASSERT(AsIdx(newEnd) < Size() && Nodes_[AsIdx(newEnd)].IsValid());
+                Y_ASSERT(IsValidNode(newEnd));
                 edge.SetId(newEnd);
                 for (size_t i = 1; i < newDest.size(); i++) {
                     newEnd = newDest[i];
-                    Y_ASSERT(AsIdx(newEnd) < Size() && Nodes_[AsIdx(newEnd)].IsValid());
+                    Y_ASSERT(IsValidNode(newEnd));
                     node.AddEdge(newEnd, edge.Value());
                 }
             }
@@ -1139,7 +1139,7 @@ private:
             const auto replaceIt = replaces.find(edge.Id());
             if (replaceIt != replaces.end()) {
                 const TNodeId newEdgeEnd = replaceIt->second;
-                Y_ASSERT(AsIdx(newEdgeEnd) < Size() && Nodes_[AsIdx(newEdgeEnd)].IsValid());
+                Y_ASSERT(IsValidNode(newEdgeEnd));
                 edge.SetId(newEdgeEnd);
             }
         }
@@ -1175,6 +1175,10 @@ private:
     bool HasAnythingDeletedSlow() const {
         return FindIf([](const TN& node) { return !node.IsValid(); },
                       [](const TN&, const TE& edge) { return !edge.IsValid(); });
+    }
+
+    bool IsValidNode(TNodeId id) const noexcept {
+        return AsIdx(id) < Size() && Nodes_[AsIdx(id)].IsValid();
     }
 };
 
