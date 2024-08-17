@@ -162,7 +162,7 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
         MineVarsAndExtras(addInfo, nodeId, modId);
         CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(Graph[CmdNode]->ElemId).CmdId()).KeepTargetPlatform;
         if (!skipRender) {
-            auto ignoreErrors = TErrorShowerState(EShowExpressionErrors::None);
+            auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
             RenderCmdStr(cmdFormat, &ignoreErrors);
         }
     }

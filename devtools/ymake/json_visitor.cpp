@@ -34,15 +34,6 @@
 
 #include <utility>
 
-namespace {
-    EShowExpressionErrors ParseErrorMode(TStringBuf mode) {
-        return
-            mode == "all" ? EShowExpressionErrors::All :
-            mode == "one" ? EShowExpressionErrors::One :
-            EShowExpressionErrors::None;
-    }
-}
-
 inline bool NeedToPassInputs(const TConstDepRef& dep) {
     if (dep.To()->NodeType == EMNT_Program || dep.To()->NodeType == EMNT_Library) {
         return false;
@@ -55,7 +46,7 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     : TBase{restoreContext, commands, cmdConf, startDirs}
     , GlobalVarsCollector(restoreContext)
     , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
-    , ErrorShower(ParseErrorMode(restoreContext.Conf.ExpressionErrorDetails))
+    , ErrorShower(restoreContext.Conf.ExpressionErrorDetails.value_or(TDebugOptions::EShowExpressionErrors::None))
 {
     if (JsonDepsFromMainOutputEnabled_) {
         YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;

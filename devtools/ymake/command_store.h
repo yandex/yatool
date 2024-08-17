@@ -6,6 +6,7 @@
 #include <devtools/ymake/lang/macro_values.h>
 #include <devtools/ymake/vars.h>
 #include <devtools/ymake/symbols/cmd_store.h>
+#include <devtools/ymake/options/debug_options.h>
 
 #include <util/generic/hash.h>
 #include <util/generic/strbuf.h>
@@ -29,8 +30,8 @@ enum class EOutputAccountingMode {
     Module // implicit main output
 };
 
-enum class EShowExpressionErrors {None, One, All};
 struct TErrorShowerState {
+    using EShowExpressionErrors = TDebugOptions::EShowExpressionErrors;
     EShowExpressionErrors Mode;
     size_t Depth = size_t(-1);
     size_t Count = 0;
@@ -99,7 +100,7 @@ public:
             TCommandInfo& cmd,
             const TCmdConf* cmdConf
         ) {
-            auto ignoreErrors = TErrorShowerState(EShowExpressionErrors::None);
+            auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
             commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf, &ignoreErrors);
             return *this;
         }

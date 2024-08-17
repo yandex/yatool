@@ -176,6 +176,17 @@ namespace {
     }
 }
 
+TDebugOptions::EShowExpressionErrors TDebugOptions::ParseShowExpressionErrors(TStringBuf s) {
+    if (s == "none")
+        return EShowExpressionErrors::None;
+    else if (s == "one")
+        return EShowExpressionErrors::One;
+    else if (s == "all")
+        return EShowExpressionErrors::All;
+    else
+        throw std::runtime_error("unknown expression error detail mode requested");
+}
+
 void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xx", "fully rebuild graph").SetFlag(&RebuildGraph).NoArgument();
     opts.AddLongOption("xN", "do not parse source files").SetFlag(&NoParseSrc).NoArgument();
@@ -242,7 +253,9 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xapply-zipatch", "read file content from zipatch").SetFlag(&ReadFileContentFromZipatch2).NoArgument();
     opts.AddLongOption("xexpr-error-details", "show expressions in error messages")
         .RequiredArgument("none|one|all")
-        .StoreResult(&ExpressionErrorDetails);
+        .Handler1([this](const NLastGetopt::TOptsParser* p) {
+            ExpressionErrorDetails = ParseShowExpressionErrors(p->CurValStr());
+        });
 
     auto dontWriteInternalCache = [this](){
         DontWriteInternalCache = true;
@@ -282,13 +295,4 @@ void TDebugOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
     DumpGraphStuff = DumpGraph | DumpRenderedCmds | DumpBuildables | DumpNames;
 
     SetupCaches(this);
-
-    if (!(
-        ExpressionErrorDetails == "none" ||
-        ExpressionErrorDetails == "one" ||
-        ExpressionErrorDetails == "all" ||
-        ExpressionErrorDetails == ""
-    )) {
-        throw std::runtime_error("unknown expression error detail mode requested");
-    }
 }

@@ -337,6 +337,12 @@ void TBuildConfiguration::FillMiscValues() {
 
     const auto defaultRequirementsStr = GetCmdValue(CommandConf.Get1(VAR_DEFAULT_REQUIREMENTS));
     ParseRequirements(defaultRequirementsStr, DefaultRequirements);
+
+    if (!ExpressionErrorDetails) {
+        auto _dbg_expr_diag = CommandConf.EvalValue("_DBG_EXPR_ERROR_DETAILS");
+        if (!_dbg_expr_diag.empty())
+            ExpressionErrorDetails = ParseShowExpressionErrors(_dbg_expr_diag);
+    }
 }
 
 void TBuildConfiguration::InitExcludedPeerdirs() {

@@ -115,7 +115,9 @@ struct TDebugOptions {
     TString PatchPath2;
     bool ReadFileContentFromZipatch2 = false;
 
-    TString ExpressionErrorDetails;
+    enum class EShowExpressionErrors {None, One, All};
+    EShowExpressionErrors ParseShowExpressionErrors(TStringBuf s);
+    std::optional<EShowExpressionErrors> ExpressionErrorDetails;
 
     // The Uids cache can be controlled by the Deps cache settings,
     // but this still could be overridden by --xCC=u and --xRC=u.
