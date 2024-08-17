@@ -21,6 +21,7 @@
 class IOutputStream;
 class TModules;
 struct TRestoreContext;
+class TCommands;
 
 struct TDepthData {
     size_t Depth;
@@ -99,11 +100,17 @@ public:
         SubstVarsGlobaly
     };
 
-    TDumpDartProc(const TRestoreContext& restoreContext, IOutputStream& out,
-            const TString& dartPropertyName, EOption opt = EOption::Regular)
+    TDumpDartProc(
+        const TRestoreContext& restoreContext,
+        const TCommands& commands,
+        IOutputStream& out,
+        const TString& dartPropertyName,
+        EOption opt = EOption::Regular
+    )
         : TBase{restoreContext}
         , Out(out)
         , DartPropertyName(dartPropertyName)
+        , Commands(commands)
         , Option(opt)
     {
     }
@@ -115,6 +122,7 @@ private:
     TString SubstModuleVars(const TStringBuf& data, const TModule& module) const;
 
 private:
+    const TCommands& Commands;
     EOption Option = EOption::Regular;
 };
 

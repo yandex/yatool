@@ -2,6 +2,8 @@
 #include "command_helpers.h"
 
 #include <devtools/ymake/common/npath.h>
+#include <devtools/ymake/command_store.h>
+#include <devtools/ymake/macro_processor.h>
 
 TStringBuf Get1(const TYVar* var) {
     if (!var || var->empty())
@@ -41,6 +43,28 @@ TString EvalAll(const TYVar* var) {
             result += GetCmdValue(part.Name);
         else
             result += part.Name;
+    }
+    return result;
+}
+
+TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& commands, const TCmdConf& conf) {
+    TVector<TString> result;
+    for (const auto& part : var) {
+        if (part.StructCmd) {
+            auto& expr = *commands.Get(part.Name, &conf);
+            auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
+            auto scr = TCommands::SimpleCommandSequenceWriter()
+                .Write(commands, expr, vars, {}, dummyCmdInfo, &conf)
+                .Extract();
+            for (auto& cmd : scr)
+                for (auto& arg : cmd)
+                    result.push_back(arg);
+        } else {
+            if (part.HasPrefix)
+                result.push_back(TString(GetCmdValue(part.Name)));
+            else
+                result.push_back(part.Name);
+        }
     }
     return result;
 }

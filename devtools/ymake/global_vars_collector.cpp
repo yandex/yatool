@@ -20,8 +20,20 @@ bool TGlobalVarsCollector::Start(const TStateItem& parentItem) {
 }
 
 void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData* parentData) {
+    // ideally, we would've relied on `parentData->StructCmdDetected`,
+    // but not all iterators bother updating it,
+    // so instead we repeat the detection logic right here, right now
+    auto _quasi_parentData_StructCmdDetected = false;
+    Y_UNUSED(parentData);
+
     auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
     for (const auto& dep : parentItem.Node().Edges()) {
+        if (dep.To()->NodeType == EMNT_BuildCommand && dep.Value() == EDT_BuildCommand) {
+            if (TDepGraph::GetCmdName(dep.To()).IsNewFormat()) {
+                _quasi_parentData_StructCmdDetected = true;
+            }
+            continue;
+        }
         if (!IsBuildCmdInclusion(dep)) {
             continue;
         }
@@ -41,7 +53,7 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
                 }
             } else {
                 var.push_back(TVarStr(objd));
-                var.back().StructCmd = parentData->StructCmdDetected;
+                var.back().StructCmd = _quasi_parentData_StructCmdDetected;
             }
         }
     }

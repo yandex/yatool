@@ -2179,7 +2179,7 @@ bool TDumpDartProc::Enter(TState& state) {
                 if (NYMake::IsGlobalResource(gvar.first)) {
                     auto [it, added] = globalResources.try_emplace(gvar.first);
                     if (added) {
-                        it->second = GetAll(&gvar.second);
+                        it->second = JoinSeq(" ", EvalAll(gvar.second, vars, Commands, RestoreContext.Graph.Names().CommandConf));
                     }
                 }
             }
@@ -2315,12 +2315,12 @@ void TYMake::DumpTestDart(IOutputStream& cmsg) {
     // for each directory from the list of CUSTOM-DEPENDECIES property
     // if there is one in the DEPENDS to modules closure map)
     TFilteredOutputStream out(cmsg, Graph, DependsToModulesClosure, Conf.ShouldCheckDependsInDart());
-    TDumpDartProcStartTargets proc(GetRestoreContext(), out, "DART_DATA", TDumpDartProc::SubstVarsGlobaly);
+    TDumpDartProcStartTargets proc(GetRestoreContext(), Commands, out, "DART_DATA", TDumpDartProc::SubstVarsGlobaly);
     IterateAll(Graph, StartTargets, proc, [](const TTarget& t) -> bool { return (!t.IsDependsTarget || t.IsRecurseTarget) && t.IsModuleTarget; });
 }
 
 void TYMake::DumpJavaDart(IOutputStream& cmsg) {
-    TDumpDartProc proc(GetRestoreContext(), cmsg, "JAVA_DART_DATA", TDumpDartProc::Encoded);
+    TDumpDartProc proc(GetRestoreContext(), Commands, cmsg, "JAVA_DART_DATA", TDumpDartProc::Encoded);
     IterateAll(Graph, StartTargets, proc, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 }
 

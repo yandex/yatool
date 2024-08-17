@@ -24,11 +24,15 @@
 #include <utility>
 
 struct TYVar;
+class TCommands;
+class TCmdConf;
 
 TStringBuf Get1(const TYVar* var);
 TStringBuf Eval1(const TYVar* var);
 TString GetAll(const TYVar* var);
 TString EvalAll(const TYVar* var);
+
+TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& commands, const TCmdConf& conf);
 
 namespace NYMake {
     inline bool IsTrue(TStringBuf b) {
