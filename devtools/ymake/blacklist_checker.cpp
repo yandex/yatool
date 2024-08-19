@@ -200,9 +200,17 @@ namespace {
                 TStringBuf dir;
                 TStringBuf macro;
                 if (parentNode.IsValid()) {
-                    static const TString SOME_RECURSE_LIKE_MACRO = Join('/', NMacro::RECURSE, NMacro::RECURSE_ROOT_RELATIVE, NMacro::RECURSE_FOR_TESTS, NProps::DEPENDS);
+                    const auto depType = state.IncomingDep().Value();
+                    switch (depType) {
+                        case EDT_Include:{
+                            static const TString SOME_RECURSE = Join('/', NMacro::RECURSE, NMacro::RECURSE_ROOT_RELATIVE);
+                            macro = SOME_RECURSE;
+                        }; break;
+                        case EDT_BuildFrom: macro = NProps::DEPENDS; break;
+                        case EDT_Search: macro = NMacro::RECURSE_FOR_TESTS; break;
+                        default: macro = "some recurse like macro";
+                    }
                     dir = names.FileNameById(parentNode->ElemId).GetTargetStr();
-                    macro = SOME_RECURSE_LIKE_MACRO;
                 } else {
                     dir = names.FileNameById(topNode->ElemId).GetTargetStr(); // if no parent use my ya.make as context
                     macro = "command arguments";
