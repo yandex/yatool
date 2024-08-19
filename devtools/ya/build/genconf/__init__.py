@@ -412,11 +412,11 @@ def gen_conf(
 
             err = six.ensure_str(err)
 
-            if err:
-                logger.warning('Non-empty stderr from ymake_conf.py:\n%s', err)
-
             if rc != 0:
                 raise FailedGenerationScript('Config was not generated due to errors in {}\n{}'.format(script, err))
+
+            if err:
+                logger.warning('Non-empty stderr from ymake_conf.py:\n%s', err)
 
             if extra_conf is not None:
                 out += exts.fs.read_file(extra_conf)
