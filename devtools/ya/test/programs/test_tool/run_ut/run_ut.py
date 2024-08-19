@@ -29,7 +29,7 @@ import exts.tmp
 from test.util import tools, shared
 from test.common import get_test_log_file_path
 from devtools.ya.test import facility
-from test.const import Status
+from test.const import Status, TEST_BT_COLORS
 from test.filter import make_testname_filter
 from test.test_types.common import PerformedTestSuite
 from yalibrary import display
@@ -204,7 +204,7 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
         bt = e.execution_result.process_backtrace
         if bt:
             logger.debug("Stack trace for hung process:\n%s", bt)
-            comment += "\n{}".format(cores.colorize_backtrace(cores.get_problem_stack(bt)))
+            comment += "\n{}".format(cores.colorize_backtrace(cores.get_problem_stack(bt), TEST_BT_COLORS))
 
         sys.stderr.write("Process stderr:\n{}".format(e.execution_result.stderr))
         sys.stdout.write("Process stdout:\n{}".format(e.execution_result.stdout))
@@ -221,7 +221,7 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
             if core_path:
                 bt = cores.get_gdb_full_backtrace(result.command[0], core_path, gdb_path)
                 parts.append("Problem thread backtrace:")
-                parts.append(cores.colorize_backtrace(cores.get_problem_stack(bt)))
+                parts.append(cores.colorize_backtrace(cores.get_problem_stack(bt), TEST_BT_COLORS))
 
         if result.stderr:
             parts.append("Process stderr:")
@@ -808,7 +808,7 @@ def launch_tests(
         if not res.last_test_name:
             msg = '[[bad]]Test was terminated by signal [[imp]]{}[[rst]]'.format(-res.rc)
             if backtrace:
-                msg += '\n{}'.format(cores.colorize_backtrace(cores.get_problem_stack(backtrace)))
+                msg += '\n{}'.format(cores.colorize_backtrace(cores.get_problem_stack(backtrace), TEST_BT_COLORS))
 
             global SHUTDOWN_REQUESTED
             if SHUTDOWN_REQUESTED and -res.rc == signal.SIGQUIT:
@@ -864,7 +864,7 @@ def run_symbolizer(suite, binary):
                     comment += lines_by_addr[addr[0]] + "\n"
                 else:
                     comment += comment_line + "\n"
-            return cores.colorize_backtrace(comment)
+            return cores.colorize_backtrace(comment, TEST_BT_COLORS)
 
         for test_case in suite.tests:
             test_case.comment = resolve_addresses(test_case.comment)
@@ -927,7 +927,7 @@ def post_process_suite(suite, logs, rc):
                 if 'backtrace' in test_case.logs:
                     with open(test_case.logs['backtrace']) as afile:
                         backtrace = cores.get_problem_stack(afile.read())
-                        backtrace = cores.colorize_backtrace(backtrace)
+                        backtrace = cores.colorize_backtrace(backtrace, TEST_BT_COLORS)
                         test_case.comment += "\n[[rst]]Problem thread backtrace:\n{}[[rst]]".format(backtrace)
     if "chunk" in logs:
         suite.chunk.logs = logs['chunk']
