@@ -171,7 +171,6 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                 }
 
                 DataStatement(effectiveName, args);
-                DependsStatement(effectiveName, args);
             }
         } else {
             if (ReadModuleContentOnly) {
@@ -766,17 +765,6 @@ void TDirParser::DataStatement(const TStringBuf& name, const TVector<TStringBuf>
     reportMissingAutoUpConfig("<none>");
     Y_ASSERT(Module);
     Module->AddStatement(NMacro::_DATA_FILES, dataFilesPathes);
-}
-
-void TDirParser::DependsStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (name != NProps::DEPENDS) {
-        return;
-    }
-    if (!Conf.IsolatedProjects.Empty()) {
-        for (const auto& path : args) {
-            Conf.IsolatedProjects.CheckStatementPath(name, Makefile, path);
-        }
-    }
 }
 
 void TDirParser::AddSubdir(const TStringBuf& dir, const TStringBuf& name) {

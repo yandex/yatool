@@ -11,7 +11,7 @@
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 
-class TBuildConfiguration;
+struct TRestoreContext;
 
 class TFoldersTree {
 public:
@@ -78,8 +78,11 @@ public:
         return Projects_.empty();
     }
 
+    void CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
+
     // use ymake dependecy graph + own info(Makefile*Refs_) for check existing dependency to isolated projects from another projects
-    void ReportDeps(const TDepGraph&, const TVector<TTarget>& startTargets, const TBuildConfiguration&) const;
+    void ReportDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) const;
+    void ReportRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
 
     virtual ~TIsolatedProjects() = default;
 protected:

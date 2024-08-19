@@ -59,7 +59,6 @@ private:
     bool MiscStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool KnownStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     void DataStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
-    void DependsStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool UserStatementImpl(const TStringBuf& name, const TVector<TStringBuf>& args, bool prohibitInternal);
     void AddSubdir(const TStringBuf& dir, const TStringBuf& name);
     TVector<TStringBuf> PartitionRecurse(TStringBuf name,

@@ -463,6 +463,7 @@ public:
 
     TFileView GetStoredName(TStringBuf name);
     TFileView GetName(ui32 id) const;
+    TFileView GetTargetName(ui32 elemId) const;
 
     bool HasName(TStringBuf name) const;
 

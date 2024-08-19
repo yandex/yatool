@@ -856,9 +856,11 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->SortAllEdges();
 
+    yMake->ReportForeignPlatformEvents();
+
     yMake->CheckBlacklist();
 
-    yMake->ReportForeignPlatformEvents();
+    yMake->CheckIsolatedProjects();
 
     yMake->ReportConfigureEvents();
 
@@ -901,9 +903,6 @@ int main_real(TBuildConfiguration& conf) {
     MakeUnique(yMake->StartTargets);
 
     CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
-    if (!conf.IsolatedProjects.Empty()) {
-        yMake->ReportDepsToIsolatedProjects();
-    }
 
     if (conf.DumpRecurses || conf.DumpPeers) {
         yMake->DumpDependentDirs(conf.Cmsg());

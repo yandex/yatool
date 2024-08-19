@@ -720,9 +720,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
                 TRACE(S, NEvent::TInvalidDataDir(TString{arg}));
                 YConfErr(Misconfiguration) << "Path [[imp]]" << arg << "[[rst]] inside [[alt1]]" << name << "[[rst]] section is missing." << Endl;
             }
-            if (!Conf.IsolatedProjects.Empty()) {
-                Conf.IsolatedProjects.CheckStatementPath(name, Module.GetMakefile().GetTargetStr(), arg);
-            }
             AddDataPath(arg);
         }
     } else {

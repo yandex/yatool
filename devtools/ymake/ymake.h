@@ -100,6 +100,7 @@ public:
     void AddTarget(const TString& dir);
     void SortAllEdges();
     void CheckBlacklist();
+    void CheckIsolatedProjects();
     void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false);
     void DumpSrcDeps(IOutputStream& cmsg);
     void PrintTargetDeps(IOutputStream& cmsg);
@@ -112,7 +113,6 @@ public:
     void ReportGraphBuildStats();
     void ReportModulesStats();
     void ReportMakeCommandStats();
-    void ReportDepsToIsolatedProjects();
     void FindLostIncludes();
 
     void ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& dirMods, TVector<TNodeId>& globSrcs) const;

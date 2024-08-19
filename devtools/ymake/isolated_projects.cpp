@@ -2,6 +2,9 @@
 
 #include "conf.h"
 #include "prop_names.h"
+#include "module_state.h"
+#include "module_store.h"
+#include "module_restorer.h"
 
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
@@ -50,35 +53,41 @@ namespace {
             TPathId PathId; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
         };
 
-        TDepsCollectorVisitor(const TDepGraph& graph)
-            : Graph_(graph)
-            , FileConf_(graph.Names().FileConf)
+        TDepsCollectorVisitor(const TRestoreContext& restoreContext, bool isIsolatedProjectsHashChanged)
+            : RestoreContext_(restoreContext)
+            , IsIsolatedProjectsHashChanged_(isIsolatedProjectsHashChanged)
         {
             Paths_.push_back(TNodeId::Invalid); // reserve place for EmptyPath id
         }
 
         bool Enter(TState& state) {
-            auto enter = TBase::Enter(state);
-            if (enter) {
-                auto nodeRef = state.Top().Node();
-                auto nodeId = nodeRef.Id();
-                auto nodeType = Graph_.GetType(nodeRef);
-                if (nodeType == EMNT_File || nodeType == EMNT_Directory || nodeType == EMNT_MakeFile || IsModuleType(nodeType)) {
-                    SourcesNodesStack_.emplace_back(nodeId);
-                } else if (nodeType == EMNT_BuildCommand && state.Size() >= 2 && state.Parent()->CurDep().Value() == EDT_Property) {
-                    ui64 propId;
-                    TStringBuf propType, propValue;
-                    ParseCommandLikeProperty(TDepGraph::GetCmdName(nodeRef).GetStr(), propId, propType, propValue);
-                    if (propType == NProps::LATE_GLOB) {
-                        LateGlob_.emplace_back(SourcesNodesStack_.size());
+            if (!TBase::Enter(state)) {
+                return false;
+            }
+            auto nodeRef = state.TopNode();
+            auto nodeId = nodeRef.Id();
+            auto nodeType = nodeRef->NodeType;
+            if (nodeType == EMNT_File || nodeType == EMNT_Directory || nodeType == EMNT_MakeFile || IsModuleType(nodeType)) {
+                SourcesNodesStack_.emplace_back(nodeId);
+                if (IsModuleType(nodeType)) {
+                    const auto* module = RestoreContext_.Modules.Get(nodeRef->ElemId);
+                    if (RequireModuleRecheck(module)) {
+                        YConfEraseByOwner(IslPrjs, module->GetId()); // clear all existing module isolated projects errors
                     }
                 }
+            } else if (nodeType == EMNT_BuildCommand && state.Size() >= 2 && state.Parent()->CurDep().Value() == EDT_Property) {
+                ui64 propId;
+                TStringBuf propType, propValue;
+                ParseCommandLikeProperty(TDepGraph::GetCmdName(nodeRef).GetStr(), propId, propType, propValue);
+                if (propType == NProps::LATE_GLOB) {
+                    LateGlob_.emplace_back(SourcesNodesStack_.size());
+                }
             }
-            return enter;
+            return true;
         }
 
         void Leave(TState& state) {
-            auto nodeId = state.Top().Node().Id();
+            auto nodeId = state.TopNode().Id();
             if (SourcesNodesStack_.size() && SourcesNodesStack_.back() == nodeId) {
                 if (LateGlob_.size() && LateGlob_.back() == SourcesNodesStack_.size()) {
                     LateGlob_.pop_back();
@@ -93,10 +102,11 @@ namespace {
         }
 
         bool AcceptDep(TState& state) {
+            const auto& graph = RestoreContext_.Graph;
+            const auto& fileConf = graph.Names().FileConf;
             auto depRef = state.NextDep();
             auto toNodeRef = depRef.To();
-            auto toNodeType = Graph_.GetType(toNodeRef);
-            //auto toNodeId = toNodeRef.Id();
+            auto toNodeType = toNodeRef->NodeType;
 
             if (depRef.Value() == EDT_Property) {
                 bool ignoreProperty = true;
@@ -124,8 +134,8 @@ namespace {
 
             if (toNodeType == EMNT_File || toNodeType == EMNT_Directory || toNodeType == EMNT_MakeFile || IsModuleType(toNodeType)) {
                 if (SourcesNodesStack_.size()) {
-                    ui32 fromElemId = FileConf_.GetTargetId(Graph_.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
-                    ui32 toElemId = FileConf_.GetTargetId(toNodeRef->ElemId);
+                    ui32 fromElemId = fileConf.GetTargetId(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
+                    ui32 toElemId = fileConf.GetTargetId(toNodeRef->ElemId);
                     Y_ASSERT(fromElemId);
                     Y_ASSERT(toElemId);
                     Deps_.emplace_back(TSourceDep{fromElemId, toElemId}); // store dep here
@@ -150,8 +160,9 @@ namespace {
         }
 
         void SortDepsByTo() {
-            auto comp = [this](TSourceDep left, TSourceDep right) -> bool {
-                return FileConf_.GetName(left.To).CutAllTypes() < FileConf_.GetName(right.To).CutAllTypes();
+            const auto& fileConf = RestoreContext_.Graph.Names().FileConf;
+            auto comp = [&fileConf](TSourceDep left, TSourceDep right) -> bool {
+                return NPath::CutAllTypes(fileConf.GetTargetName(left.To).GetTargetStr()) < NPath::CutAllTypes(fileConf.GetTargetName(right.To).GetTargetStr());
             };
             std::sort(Deps_.begin(), Deps_.end(), comp);
         }
@@ -161,14 +172,16 @@ namespace {
         }
 
         void PrintDepWithPath(IOutputStream& os, const TSourceDep& dep) const {
+            const auto& graph = RestoreContext_.Graph;
+            const auto& fileConf = graph.Names().FileConf;
             TStack<TStringBuf> fullPath;  // use for print path elements in reverse order
-            fullPath.emplace(FileConf_.GetName(dep.To).GetTargetStr());
+            fullPath.emplace(fileConf.GetName(dep.To).GetTargetStr());
 
             if (dep.PathId) {
                 for (auto pathId = dep.PathId;; ++pathId) {
                     auto nodeId = Paths_[pathId];
-                    auto nodeRef = Graph_.Get(TNodeId{ToUnderlying(nodeId) & 0x7fffffff});
-                    TStringBuf name = Graph_.ToTargetStringBuf(nodeRef);
+                    auto nodeRef = graph.Get(TNodeId{ToUnderlying(nodeId) & 0x7fffffff});
+                    TStringBuf name = graph.ToTargetStringBuf(nodeRef);
                     if (nodeRef->NodeType == EMNT_BuildCommand) {
                         name = SkipId(name);
                     }
@@ -179,7 +192,7 @@ namespace {
                 }
             }
 
-            auto prev = Graph_.Names().FileConf.GetName(dep.From).GetTargetStr();
+            auto prev = fileConf.GetName(dep.From).GetTargetStr();
             while (fullPath.size()) {
                 // emulate TDependencyPathFormatter (transitive_requirements_check.cpp) format here
                 os << Endl << "    "sv << prev << " -> "sv << fullPath.top();
@@ -205,8 +218,7 @@ namespace {
         }
 
     private:
-        const TDepGraph& Graph_;
-        const TFileConf& FileConf_;
+        const TRestoreContext& RestoreContext_;
         TVector<TNodeId> SourcesNodesStack_;
         TVector<size_t> LateGlob_;
         TVector<TSourceDep> Deps_;
@@ -215,8 +227,49 @@ namespace {
         // also for space economy use bit-marker for end of path (isolated node in path has set LastPathNodeBit)
         TDeque<TNodeId> Paths_;
         TMap<size_t, size_t> PathsLengthStat_;
+        bool IsIsolatedProjectsHashChanged_;
+
+        bool RequireModuleRecheck(const TModule* module) {
+            // Recheck require if isolated projects changed OR module reconstructed
+            // OR module has some errors in cache (some files may be removed, we must clear errors for they)
+            // ELSE module isolated projects errors must be valid from cache
+            return IsIsolatedProjectsHashChanged_ || !module->IsLoaded() || YConfHasMessagesByOwner(IslPrjs, module->GetId());
+        }
     };
 
+    class TRecurseIsolatedProjectsVisitor: public TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>> {
+    public:
+        using TBase = TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>>;
+        using TState = typename TBase::TState;
+
+        TRecurseIsolatedProjectsVisitor(const TRestoreContext& restoreContext)
+            : RestoreContext_(restoreContext)
+        {}
+
+        bool AcceptDep(TState& state) {
+            bool result = TBase::AcceptDep(state);
+            const auto& dep = state.NextDep();
+            return result && IsDirType(dep.To()->NodeType);
+        }
+
+        bool Enter(TState& state) {
+            const auto& topNode = state.TopNode();
+            if (!TBase::Enter(state)) {
+                return false;
+            }
+            const auto& parentNode = state.ParentNode();
+            if (parentNode.IsValid() && state.Parent()->CurDep().Value() == EDT_BuildFrom/* DEPENDS */) {
+                auto& fileConf = RestoreContext_.Graph.Names().FileConf;
+                auto path = fileConf.GetTargetName(topNode->ElemId).GetTargetStr();
+                auto makefile = NPath::SmartJoin(fileConf.GetTargetName(parentNode->ElemId).GetTargetStr(), "ya.make");
+                RestoreContext_.Conf.IsolatedProjects.CheckStatementPath(NProps::DEPENDS, makefile, path);
+            }
+            return true;
+        }
+
+    private:
+        const TRestoreContext& RestoreContext_;
+    };
 }
 
 void TFoldersTree::Add(TStringBuf path) {
@@ -339,66 +392,72 @@ void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TStri
     }
 }
 
-
-void TIsolatedProjects::ReportDeps(const TDepGraph& graph, const TVector<TTarget>& startTargets, const TBuildConfiguration& conf) const {
+void TIsolatedProjects::CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const {
+    const auto& conf = restoreContext.Conf;
     if (Empty()) {
-        return;
+        if (conf.IsIsolatedProjectsHashChanged()) {
+            // Was some isolated projects, but now it empty, we must clear all isolated projects errors
+            YConfErase(IslPrjs);
+        }
+        return; // no isolated projects, do nothing
     }
+    ReportDeps(restoreContext, startTargets);
+    ReportRecurseDeps(recurseRestoreContext, recurseStartTargets);
+}
 
-    TDepsCollectorVisitor visitor(graph);
-    {
-        TTraceStage stage("Isolated Projects: get all deps");
-        IterateAll(
-            graph,
-            startTargets,
-            visitor,
-            [&conf](const TTarget& target) -> bool {
-                return !(target.IsModuleTarget
-                    || (conf.SkipAllRecurses && !target.IsUserTarget)
-                    || target.IsNonDirTarget
-                    || (target.IsDependsTarget && !target.IsRecurseTarget && conf.SkipDepends)
-                );
-            }
-        );
-    }
+void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) const {
+    const auto& conf = restoreContext.Conf;
+    const auto& graph = restoreContext.Graph;
+    TDepsCollectorVisitor visitor(restoreContext, conf.IsIsolatedProjectsHashChanged());
+    IterateAll(
+        graph,
+        startTargets,
+        visitor,
+        [&conf](const TTarget& target) -> bool {
+            return !(target.IsModuleTarget
+                || (conf.SkipAllRecurses && !target.IsUserTarget)
+                || target.IsNonDirTarget
+                || (target.IsDependsTarget && !target.IsRecurseTarget && conf.SkipDepends)
+            );
+        }
+    );
 
     YDebug() << "Isolated projects validator stats: " << visitor.StringDebugStatistics() << Endl;
 
-    {
-        TTraceStage stage("Isolated Projects: sort graph deps");
-        visitor.SortDepsByTo();
-    }
+    visitor.SortDepsByTo();
 
-    {
-        TTraceStage stage("Isolated Projects: check graph deps");
-        // use parallel walk by isolated projects list & sorted deps for find deps leads to isolated projects and check it's isolation
-        // NOTE: we use reverse iteration, because need process long project names before short (as example 'projecta' before 'project')
-        auto itProject = Projects().rbegin();
-        auto itDeps = visitor.Deps().rbegin();
-        auto& fileConf = graph.Names().FileConf;
-        while (itProject != Projects_.rend() && itDeps != visitor.Deps().rend()) {
-            TStringBuf toName = fileConf.GetName(itDeps->To).CutAllTypes();
-            auto res = toName.compare(0, itProject->length(), *itProject);
-            if (res < 0) {
-                ++itProject;
-            } else if (res > 0) {
-                ++itDeps;
-            } else { // res == 0
-                if (itProject->length() == toName.length() || toName[itProject->length()] == '/') {
-                    // found dependency lead inside isolated project
-                    TStringBuf fromName = fileConf.GetName(itDeps->From).CutAllTypes();
-                    if (fromName.compare(0, itProject->length(), *itProject) == 0
-                        && (itProject->length() == fromName.length() || fromName[itProject->length()] == '/')
-                    ) {
-                        // has deps from isolated projects to itself, it's ok
-                    } else {
-                        OnDepToIsolatedProject(*itProject, fromName, visitor.StringDepWithPath(*itDeps));
-                    }
+    // use parallel walk by isolated projects list & sorted deps for find deps leads to isolated projects and check it's isolation
+    // NOTE: we use reverse iteration, because need process long project names before short (as example 'projecta' before 'project')
+    auto itProject = Projects().rbegin();
+    auto itDeps = visitor.Deps().rbegin();
+    auto& fileConf = graph.Names().FileConf;
+    while (itProject != Projects_.rend() && itDeps != visitor.Deps().rend()) {
+        TStringBuf toName = fileConf.GetName(itDeps->To).CutAllTypes();
+        auto res = toName.compare(0, itProject->length(), *itProject);
+        if (res < 0) {
+            ++itProject;
+        } else if (res > 0) {
+            ++itDeps;
+        } else { // res == 0
+            if (itProject->length() == toName.length() || toName[itProject->length()] == '/') {
+                // found dependency lead inside isolated project
+                TStringBuf fromName = fileConf.GetName(itDeps->From).CutAllTypes();
+                if (fromName.compare(0, itProject->length(), *itProject) == 0
+                    && (itProject->length() == fromName.length() || fromName[itProject->length()] == '/')
+                ) {
+                    // has deps from isolated projects to itself, it's ok
+                } else {
+                    OnDepToIsolatedProject(*itProject, fromName, visitor.StringDepWithPath(*itDeps));
                 }
-                ++itDeps;
             }
+            ++itDeps;
         }
     }
+}
+
+void TIsolatedProjects::ReportRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const {
+    TRecurseIsolatedProjectsVisitor recurseIsolateProjectsVisitor(recurseRestoreContext);
+    IterateAll(recurseRestoreContext.Graph, recurseStartTargets, recurseIsolateProjectsVisitor);
 }
 
 void TIsolatedProjects::LoadFromString(TProjectPathToSources& projectToSources, TStringBuf content, TStringBuf file) {

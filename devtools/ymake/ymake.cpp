@@ -65,22 +65,27 @@ bool TNodeEdgesComparator::operator() (const TDepGraph::TEdge& edge1, const TDep
 }
 
 void TYMake::SortAllEdges() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Sort edges"));
+    NYMake::TTraceStage stageTracer{"Sort edges"};
     for (auto node: Graph.Nodes()) {
         if (node.IsValid()) {
             node.SortEdges(TNodeEdgesComparator{node});
         }
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Sort edges"));
 }
 
 void TYMake::CheckBlacklist() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Check blacklist"));
+    NYMake::TTraceStage stageTracer{"Check blacklist"};
     TRestoreContext restoreContext(Conf, Graph, Modules);
     TRestoreContext recurseRestoreContext(Conf, RecurseGraph, Modules);
     TBlacklistChecker blacklistChecker(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
     blacklistChecker.CheckAll();
-    FORCE_TRACE(U, NEvent::TStageFinished("Check blacklist"));
+}
+
+void TYMake::CheckIsolatedProjects() {
+    NYMake::TTraceStage stageTracer{"Check isolated projects"};
+    TRestoreContext restoreContext(Conf, Graph, Modules);
+    TRestoreContext recurseRestoreContext(Conf, RecurseGraph, Modules);
+    Conf.IsolatedProjects.CheckAll(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
 }
 
 void TYMake::TransferStartDirs() {
@@ -147,10 +152,6 @@ void TYMake::ReportModulesStats() {
 
 void TYMake::ReportMakeCommandStats() {
     TMakeCommand::ReportStats();
-}
-
-void TYMake::ReportDepsToIsolatedProjects() {
-    Conf.IsolatedProjects.ReportDeps(Graph, StartTargets, Conf);
 }
 
 void TYMake::AddStartTarget(const TString& dir) {

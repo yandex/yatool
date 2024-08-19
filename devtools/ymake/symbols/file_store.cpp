@@ -783,6 +783,10 @@ TFileView TFileConf::GetName(ui32 elemId) const {
     return target.IsValid() ? TFileView{&NameStore, fileId.GetElemId()} : TFileView{};
 }
 
+TFileView TFileConf::GetTargetName(ui32 elemId) const {
+    return TBase::GetName(TFileId::Create(elemId).GetTargetId());
+}
+
 bool TFileConf::HasName(TStringBuf name) const {
     bool isLink = NPath::IsLink(name);
     return isLink ? TBase::HasName(NPath::GetTargetFromLink(name)) : TBase::HasName(name);
