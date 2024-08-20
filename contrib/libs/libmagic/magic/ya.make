@@ -6,6 +6,8 @@ LICENSE(BSD-2-Clause)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
+VERSION(5.45)
+
 SRCDIR(contrib/libs/libmagic/magic/Magdir)
 
 RESOURCE(

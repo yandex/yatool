@@ -2,6 +2,8 @@
 
 LIBRARY()
 
+VERSION(5.45)
+
 LICENSE(
     BSD-2-Clause AND
     Bsd-Simplified-Darwin AND
