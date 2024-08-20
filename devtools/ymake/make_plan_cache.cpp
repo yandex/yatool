@@ -328,15 +328,6 @@ void TMakeCmdCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template <>
-auto TMakeNodeCached::PrepareMap(const TKeyValueMap<NCache::TCached>& map) {
-#if !defined(NEW_UID_COMPARE)
-    return map;
-#else
-#   error "Sorting map not implemented yet"
-#endif
-}
-
 template<>
 void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
@@ -414,7 +405,7 @@ void TMakeNodeCached::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const 
 
 template<>
 void TMakeNodeCached::WriteKVMap(TJsonWriterFuncArgs&& funcArgs) const {
-    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(KV));
+    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), KV);
 }
 
 template<>
@@ -424,7 +415,7 @@ void TMakeNodeCached::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const
     writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
     auto reqMap = writer.OpenMap();
     size_t intValue;
-    for (const auto [cachedKey, cachedValue] : PrepareMap(Requirements)) {
+    for (const auto [cachedKey, cachedValue] : Requirements) {
         const auto bufKey = context->GetBuf(cachedKey);
         const auto bufValue = context->GetBuf(cachedValue);
         if (TryFromString<size_t>(bufValue, intValue)) {
@@ -439,13 +430,13 @@ void TMakeNodeCached::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const
 template<>
 void TMakeNodeCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
     if (!OldEnv.empty()) {
-        WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(OldEnv));
+        WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), OldEnv);
     }
 }
 
 template<>
 void TMakeNodeCached::WriteTargetPropertiesMap(TJsonWriterFuncArgs&& funcArgs) const {
-    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), PrepareMap(TargetProps));
+    WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), TargetProps);
 }
 
 template<>

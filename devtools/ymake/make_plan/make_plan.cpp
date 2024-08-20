@@ -81,17 +81,6 @@ bool TMakeNode::operator!=(const TMakeNode& rhs) const {
 }
 
 template <>
-auto TMakeNode::PrepareMap(const TKeyValueMap<NCache::TOriginal>& map) {
-#if !defined(NEW_UID_COMPARE)
-    return map;
-#else
-    TVector<std::pair<TString, TString>> sorted{map.begin(), map.end()};
-    Sort(sorted);
-    return sorted;
-#endif
-}
-
-template <>
 void TMakeNode::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, Uid);
 }
@@ -145,7 +134,7 @@ void TMakeNode::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
 
 template <>
 void TMakeNode::WriteKVMap(TJsonWriterFuncArgs&& funcArgs) const {
-    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(KV));
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, KV);
 }
 
 template <>
@@ -154,7 +143,7 @@ void TMakeNode::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const {
     writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
     auto reqMap = writer.OpenMap();
     size_t value;
-    for (const auto& kv : PrepareMap(Requirements)) {
+    for (const auto& kv : Requirements) {
         if (TryFromString<size_t>(kv.second, value)) {
             writer.WriteMapKeyValue(reqMap, kv.first, value);
         } else {
@@ -167,13 +156,13 @@ void TMakeNode::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const {
 template <>
 void TMakeNode::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
     if (!OldEnv.empty()) {
-        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(OldEnv));
+        funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, OldEnv);
     }
 }
 
 template <>
 void TMakeNode::WriteTargetPropertiesMap(TJsonWriterFuncArgs&& funcArgs) const {
-    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, PrepareMap(TargetProps));
+    funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, TargetProps);
 }
 
 template <>

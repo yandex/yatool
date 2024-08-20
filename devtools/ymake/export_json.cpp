@@ -366,41 +366,7 @@ namespace {
         }
     };
 
-    TString RenderMakeNode(const TMakeNode& node) {
-        TStringStream out;
-        NYMake::TJsonWriter jsonWriter(out);
-        node.WriteAsJson(jsonWriter);
-        jsonWriter.Flush();
-        return out.Str();
-    };
-
-    bool RestoreJsonNodeFromCache(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* node) {
-        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, node);
-
-        const auto cacheUid = renderer.CalculateCacheUid();
-        return cache.RestoreByCacheUid(cacheUid, node);
-    }
-
-    TString RestoreJsonNodeFromCacheString(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo) {
-        TMakeNode makeNode;
-        if (!RestoreJsonNodeFromCache(yMake, cmdbuilder, cache, nodeId, nodeInfo, &makeNode))
-            return TString{};
-        return RenderMakeNode(makeNode);
-    }
-
-    void RenderJsonNodeFull(TYMake& yMake, TJSONVisitor& cmdbuilder, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* node) {
-        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, node);
-        renderer.RenderNodeDelayed();
-        renderer.CompleteRendering();
-    }
-
-    TString RenderJsonNodeFullString(TYMake& yMake, TJSONVisitor& cmdbuilder, const TNodeId nodeId, const TJSONEntryStats& nodeInfo) {
-        TMakeNode makeNode;
-        RenderJsonNodeFull(yMake, cmdbuilder, nodeId, nodeInfo, &makeNode);
-        return RenderMakeNode(makeNode);
-    }
-
-    void RenderOrRestoreJSONNodeImpl(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
+    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
         TMakeNode node;
         TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node);
 
@@ -432,45 +398,6 @@ namespace {
         cache.AddRenderedNode(node, nodeName, cacheUid, TString{});
         cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
         jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
-    }
-
-    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
-        try {
-            RenderOrRestoreJSONNodeImpl(yMake, cmdbuilder, plan, cache, nodeId, nodeInfo, jsonWriter);
-#if defined(NEW_UID_COMPARE)
-            TString currentRender = RenderMakeNode(plan.Nodes.back());
-            TString fullRender = RenderJsonNodeFullString(yMake, cmdbuilder, nodeId, nodeInfo);
-            if (currentRender != fullRender) {
-                Cerr << "JSON renders differ\n";
-                Cerr << "Actual: " << currentRender << '\n';
-                Cerr << "Expected: " << fullRender << '\n';
-            }
-#endif
-        } catch (const std::exception& renderError) {
-#if !defined (YMAKE_DEBUG)
-            Y_UNUSED(renderError, RenderJsonNodeFullString, RestoreJsonNodeFromCacheString);
-            throw;
-#else
-            Cerr << "JSON rendering failed: " << renderError.what() << '\n';
-
-            try {
-                TString fullRender = RenderJsonNodeFullString(yMake, cmdbuilder, nodeId, nodeInfo);
-                Cerr << "Full JSON render: " << fullRender << '\n';
-            } catch (const std::exception& fullRenderError) {
-                Cerr << "Full JSON rendering failed: " << fullRenderError.what() << '\n';
-            }
-
-            try {
-                TString fromCache = RestoreJsonNodeFromCacheString(yMake, cmdbuilder, cache, nodeId, nodeInfo);
-                if (!fromCache.Empty())
-                    Cerr << "JSON node in cache: " << fromCache << '\n';
-            } catch (const std::exception& restoreError) {
-                Cerr << "JSON restore from cache failed: " << restoreError.what() << '\n';
-            }
-
-            throw;
-#endif
-        }
     }
 
     void ComputeFullUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
