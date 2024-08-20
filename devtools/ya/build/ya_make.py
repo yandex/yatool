@@ -450,16 +450,8 @@ class CacheFactory(object):
         )
 
     def _can_use_yt_dist_cache(self):
-        try:
-            import app_config
-
-            yt_store_enabled = app_config.in_house
-        except ImportError:
-            yt_store_enabled = False
-
         return all(
             (
-                yt_store_enabled,
                 getattr(self._opts, 'build_threads') > 0,
                 getattr(self._opts, 'yt_store', False),
                 not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'yt_readonly', False)),

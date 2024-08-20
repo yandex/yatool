@@ -2565,7 +2565,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.dist_cache_max_file_size = 0
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
         self.dist_cache_late_fetch = False
-        self.yt_store = True
+        self.yt_store = True if app_config.in_house else False  # should be false for opensource
         self.yt_create_tables = False
         self.yt_cache_filter = None
         self.yt_store_codec = None
