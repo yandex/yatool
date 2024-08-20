@@ -49,7 +49,7 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
     def _get_subtests_info(cls, list_cmd_result):
         result = []
         if list_cmd_result.exit_code == 0:
-            for x in list_cmd_result.std_err.split():
+            for x in list_cmd_result.std_err.splitlines():
                 if test.const.TEST_SUBTEST_SEPARATOR in x:
                     testname, subtest = x.split(test.const.TEST_SUBTEST_SEPARATOR, 1)
                     result.append(test_common.SubtestInfo(testname, subtest))
