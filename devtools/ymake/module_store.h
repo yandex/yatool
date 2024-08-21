@@ -92,9 +92,17 @@ public:
     /// This requires Symbols to be already loaded
     void Load(const TBlob& blob);
 
+    /// Load dependency management cache
+    /// This requires Symbols and Graph to be already loaded
+    void LoadDMCache(IInputStream* input, const TDepGraph& graph);
+
     /// Save modules cache
     /// This shall be done before Symbols are saved since it may write to symTab
     void Save(IOutputStream* output);
+
+    /// Save dependency management cache
+    /// This shall be done after Modules table are saved and dep management algorithm is done
+    void SaveDMCache(IOutputStream* output, const TDepGraph& graph);
 
     void NotifyMakefileReparsed(ui32 makefileId);
 
@@ -153,5 +161,4 @@ public:
 
 private:
     void SaveFilteredModules(TModulesSaver& saver);
-
 };

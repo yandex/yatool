@@ -3,6 +3,7 @@
 #include "module_state.h"
 #include "module_store.h"
 #include "prop_names.h"
+#include "ymake.h"
 
 #include <devtools/ymake/ymake.h>
 #include <devtools/ymake/compact_graph/iter_direct_peerdir.h>
@@ -1763,12 +1764,22 @@ namespace NDetail {
     }
 }
 
-void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets) {
+void TYMake::ApplyDependencyManagement() {
+    if (Conf.ShouldUseGrandBypass() && !HasGraphStructuralChanges_) {
+        LoadDMCache();
+        if (DMCacheLoaded_) {
+            YDebug() << "Use Dependency management cache" << Endl;
+            return;
+        }
+    }
+
     FORCE_TRACE(U, NEvent::TStageStarted("Apply Dependency Management"));
-    TDependencyManagementCollector collector{restoreContext};
+    Modules.ResetTransitiveInfo();
+    TDependencyManagementCollector collector{GetRestoreContext()};
     TDependencyManagementCollectingVisitor collectorVisitor{collector};
     TDependencyManagementCollectingVisitor::TState collectorState;
-    IterateAll(restoreContext.Graph, startTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
+    IterateAll(Graph, StartTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
+    SaveDepManagementCache();
     FORCE_TRACE(U, NEvent::TStageFinished("Apply Dependency Management"));
     collector.LogStats();
 }

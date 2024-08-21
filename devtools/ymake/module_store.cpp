@@ -1,10 +1,24 @@
 #include "module_store.h"
 #include "module_state.h"
 #include "dependency_management.h"
+#include "json_saveload.h"
 
 #include <devtools/ymake/diag/progress_manager.h>
 
 #include <util/stream/format.h>
+
+namespace {
+    const TStringBuf DM_VAR_NAMES[] = {
+        "RUN_JAVA_PROGRAM_MANAGED",
+        "NON_NAMAGEABLE_PEERS",
+        "DART_CLASSPATH_DEPS",
+        "MANAGED_PEERS",
+        "MANAGED_PEERS_CLOSURE",
+        "DART_CLASSPATH",
+        "TEST_CLASSPATH_MANAGED",
+        "UNITTEST_MOD"
+    };
+}
 
 TModule& TModules::Create(const TStringBuf& dir, const TStringBuf& makefile, const TStringBuf& tag) {
     TModule* module = new TModule(Symbols.FileConf.GetStoredName(dir), makefile, tag, CreationContext);
@@ -96,11 +110,73 @@ void TModules::Load(const TBlob& blob) {
     Load(&input);
 }
 
+void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
+    ResetTransitiveInfo();
+
+    ui32 modulesCount = LoadFromStream<ui32>(input);
+    for (ui32 i = 0; i < modulesCount; ++i) {
+        ui32 modId = LoadFromStream<ui32>(input);
+        auto module = Get(modId);
+        Y_ASSERT(module);
+
+        TVector<ui32> uniqPeersIds, directPeersIds;
+        THashMap<TString, TString> dmVars;
+        ::Load(input, uniqPeersIds);
+        ::Load(input, directPeersIds);
+        ::Load(input, dmVars);
+        auto& moduleLists = GetModuleNodeIds(modId);
+        for (auto peer : uniqPeersIds) {
+            TFileView peerFileView = Symbols.FileConf.GetName(peer);
+            TNodeId nodeId = graph.GetFileNode(peerFileView).Id();
+            GetNodeListStore().AddToList(moduleLists.UniqPeers, nodeId);
+        }
+        for (auto peer : directPeersIds) {
+            TFileView peerFileView = Symbols.FileConf.GetName(peer);
+            TNodeId nodeId = graph.GetFileNode(peerFileView).Id();
+            GetNodeListStore().AddToList(moduleLists.ManagedDirectPeers, nodeId);
+        }
+        for (const auto& [name, value] : dmVars) {
+            module->Set(name, value);
+        }
+        module->SetPeersComplete();
+    }
+}
+
 void TModules::Save(IOutputStream* output) {
     TModulesSaver saver;
     saver.Data.reserve(ModulesById.size());
     SaveFilteredModules(saver);
     saver.Save(output);
+}
+
+void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
+    ui32 modCount = ModulesById.size();
+    output->Write(&modCount, sizeof(modCount));
+
+    for (const auto& [modId, module] : ModulesById) {
+        output->Write(&modId, sizeof(modId));
+
+        const auto& moduleLists = GetModuleNodeIds(modId);
+        const auto& uniqPeers = GetNodeListStore().GetList(moduleLists.UniqPeers);
+        const auto& managedDirectPeers = GetNodeListStore().GetList(moduleLists.ManagedDirectPeers);
+        TVector<ui32> uniqPeersIds, managedDirectPeersIds;
+        for (auto peer : uniqPeers) {
+            uniqPeersIds.push_back(graph.Get(peer)->ElemId);
+        }
+        for (auto peer : managedDirectPeers) {
+            managedDirectPeersIds.push_back(graph.Get(peer)->ElemId);
+        }
+        THashMap<TString, TString> dmVars;
+        for (auto varName : DM_VAR_NAMES) {
+            TStringBuf value = module->Get(varName);
+            if (!value.empty()) {
+                dmVars.emplace(varName, value);
+            }
+        }
+        ::Save(output, uniqPeersIds);
+        ::Save(output, managedDirectPeersIds);
+        ::Save(output, dmVars);
+    }
 }
 
 void TModules::SaveFilteredModules(TModulesSaver& saver) {

@@ -115,6 +115,7 @@ static void SafeRemove(const TFsPath& path) {
 
 TYMake::~TYMake() {
     SafeRemove(DepCacheTempFile);
+    SafeRemove(DMCacheTempFile);
     SafeRemove(UidsCacheTempFile);
 }
 

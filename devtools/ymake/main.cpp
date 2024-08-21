@@ -760,6 +760,8 @@ int main_real(TBuildConfiguration& conf) {
         conf.WriteFsCache = false;
         conf.WriteDepsCache = false;
         conf.WriteJsonCache = false;
+        conf.WriteDepManagementCache = false;
+        conf.WriteUidsCache = false;
     } else {
         cachePath = conf.YmakeCache;
     }
@@ -774,6 +776,7 @@ int main_real(TBuildConfiguration& conf) {
     };
     dumpCacheFlags("FS", conf.ReadFsCache, conf.WriteFsCache);
     dumpCacheFlags("Deps", conf.ReadDepsCache, conf.WriteDepsCache);
+    dumpCacheFlags("DepManagement", conf.ReadDepManagementCache, conf.WriteDepManagementCache);
     dumpCacheFlags("Json", conf.ReadJsonCache, conf.WriteJsonCache);
     dumpCacheFlags("Uids", conf.ReadUidsCache, conf.WriteUidsCache);
 
@@ -876,7 +879,7 @@ int main_real(TBuildConfiguration& conf) {
 
     bool hasBadLoops = yMake->DumpLoops();
 
-    ApplyDependencyManagement(yMake->GetRestoreContext(), yMake->StartTargets);
+    yMake->ApplyDependencyManagement();
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         return BR_CONFIGURE_FAILED;

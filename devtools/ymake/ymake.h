@@ -65,11 +65,13 @@ public:
 
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
+    TFsPath DMCacheTempFile;      // Name of temporary file with delayed save data
     TFsPath UidsCacheTempFile;      // Name of temporary file with delayed save data
     TString PrevDepsFingerprint;
     TString CurrDepsFingerprint;
     bool FSCacheLoaded_{false};
     bool DepsCacheLoaded_{false};
+    bool DMCacheLoaded_{false};
     bool JSONCacheLoaded_{false};
     bool UidsCacheLoaded_{false};
 
@@ -83,6 +85,7 @@ private:
     void TransferStartDirs();
 
     void AnalyzeGraphChanges(IChanges& changes);
+    void SaveDepManagementCache();
 public:
     explicit TYMake(TBuildConfiguration& conf);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
@@ -114,6 +117,7 @@ public:
     void ReportModulesStats();
     void ReportMakeCommandStats();
     void FindLostIncludes();
+    void ApplyDependencyManagement();
 
     void ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& dirMods, TVector<TNodeId>& globSrcs) const;
     bool ResolveRelationTargets(const TVector<TString>& targets, THashSet<TNodeId>& result);
@@ -135,6 +139,7 @@ public:
     bool Load(const TFsPath& file);
     bool LoadPatch();
     void LoadUids(TUidsCachable* uidsCachable);
+    void LoadDMCache();
     void Save(const TFsPath& file, bool delayed);
     void SaveStartDirs(TCacheFileWriter& writer);
     void SaveUids(TUidsCachable* uidsCachable);

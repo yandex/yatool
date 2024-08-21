@@ -18,8 +18,6 @@ struct TDependencyManagementModuleInfo {
     TVector<TNodeId> AppliedExcludes;
 };
 
-void ApplyDependencyManagement(TRestoreContext restoreContext, const TVector<TTarget>& startTargets);
-
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots);
 void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EManagedPeersDepth depth = EManagedPeersDepth::Transitive);
 void DumpFDM(const TVars& globalVars, bool asJson);

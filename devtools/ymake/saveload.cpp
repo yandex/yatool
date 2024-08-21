@@ -24,6 +24,7 @@
 
 namespace {
     const ui64 ImageVersion = 44;
+    const ui64 DMCacheVersion = 0;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -742,6 +743,54 @@ void TYMake::LoadUids(TUidsCachable* cachable) {
     UidsCacheLoaded_ = TryLoadUids(cachable);
 }
 
+void TYMake::LoadDMCache() {
+    if (!Conf.ReadDepManagementCache) {
+        return;
+    }
+
+    if (PrevDepsFingerprint.Empty() || !Conf.YmakeDMCache.Exists()) {
+        return;
+    }
+
+    NYMake::TTraceStage loadDMStage{"Load Dependency management cache"};
+    YDebug() << "Loading dependency management cache" << Endl;
+
+    TCacheFileReader cacheReader(Conf, false, false);
+    if (cacheReader.Read(Conf.YmakeDMCache) != TCacheFileReader::EReadResult::Success) {
+        return;
+    }
+
+    if (cacheReader.HasNextBlob()) {
+        TBlob blob = cacheReader.GetNextBlob();
+        if (*(ui64*)blob.Begin() != DMCacheVersion) {
+            YDebug() << "Dependency management cache version is incompatible" << Endl;
+            return;
+        }
+    } else {
+        return;
+    }
+
+    if (cacheReader.HasNextBlob()) {
+        TBlob blob = cacheReader.GetNextBlob();
+        TString prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
+        if (prevDepsFingerprint != PrevDepsFingerprint) {
+            YDebug() << "Dependency management cache fingerprint mismatch: " << prevDepsFingerprint << " != " << PrevDepsFingerprint << Endl;
+            return;
+        }
+    } else {
+        return;
+    }
+
+    if (cacheReader.HasNextBlob()) {
+        TBlob blob = cacheReader.GetNextBlob();
+        TMemoryInput input(blob.Data(), blob.Length());
+        Modules.LoadDMCache(&input, Graph);
+
+        DMCacheLoaded_ = true;
+        YDebug() << "Dependency management cache has been loaded..." << Endl;
+    }
+}
+
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
     if (!PrevDepsFingerprint.Empty() && Conf.YmakeUidsCache.Exists()) {
         NYMake::TTraceStage loadUidsStage{"Load Uids cache"};
@@ -832,6 +881,27 @@ void TYMake::SaveUids(TUidsCachable* uidsCachable) {
     }
 }
 
+void TYMake::SaveDepManagementCache() {
+    if (!Conf.WriteDepManagementCache || !(Conf.WriteFsCache && Conf.WriteDepsCache)) {
+        return;
+    }
+
+    NYMake::TTraceStage stage("Save Dependency management cache");
+
+    TCacheFileWriter cacheWriter(Conf, Conf.YmakeDMCache);
+    cacheWriter.AddBlob(new TBlobSaverMemory(&DMCacheVersion, sizeof(ui64)));
+    cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
+
+    TString dmData;
+    TStringOutput dmOutput(dmData);
+    Modules.SaveDMCache(&dmOutput, Graph);
+    cacheWriter.AddBlob(new TBlobSaverMemory(dmData.data(), dmData.size()));
+
+    DMCacheTempFile = cacheWriter.Flush(true);
+
+    YDebug() << "Dependency management cache has been saved..." << Endl;
+}
+
 void TYMake::CommitCaches() {
     if (Conf.WriteFsCache || Conf.WriteDepsCache) {
         if (DepCacheTempFile.IsDefined()) {
@@ -841,8 +911,13 @@ void TYMake::CommitCaches() {
             DepCacheTempFile = {};
             Conf.OnDepsCacheSaved();
         }
+        if (DMCacheTempFile.IsDefined()) {
+            DMCacheTempFile.RenameTo(Conf.YmakeDMCache);
+            DMCacheTempFile = {};
+        }
     } else {
         Y_ASSERT(!DepCacheTempFile.IsDefined());
+        Y_ASSERT(!DMCacheTempFile.IsDefined());
     }
 
     if (Conf.WriteUidsCache) {

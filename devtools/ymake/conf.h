@@ -125,6 +125,10 @@ public:
         return UseGraphChangesPredictor;
     }
 
+    bool ShouldUseGrandBypass() const noexcept {
+        return UseGrandBypass;
+    }
+
     bool MainOutputAsExtra() const noexcept {
         return MainOutputAsExtra_;
     }
@@ -186,6 +190,7 @@ private:
     bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = false;
     bool UseGraphChangesPredictor = false;
+    bool UseGrandBypass = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
 
