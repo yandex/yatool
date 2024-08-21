@@ -203,7 +203,13 @@ class YtStoreClient(object):
             'sum(1) as file_count',
             self._metadata_table,
         )
-        rows = list(self._client.select_rows(query))
+        rows = list(
+            self._client.select_rows(
+                query,
+                input_row_limit=consts.YT_CACHE_SELECT_INPUT_ROW_LIMIT,
+                output_row_limit=consts.YT_CACHE_SELECT_OUTPUT_ROW_LIMIT,
+            )
+        )
         if len(rows) == 0:
             return {'min_access_time': 0, 'total_data_size': 0, 'file_count': 0}
         if len(rows) > 1:
@@ -229,7 +235,13 @@ class YtStoreClient(object):
                 query += ' order by {}'.format(order_by)
             if limit:
                 query += ' limit {}'.format(limit)
-            rows = list(self._client.select_rows(query))
+            rows = list(
+                self._client.select_rows(
+                    query,
+                    input_row_limit=consts.YT_CACHE_SELECT_INPUT_ROW_LIMIT,
+                    output_row_limit=consts.YT_CACHE_SELECT_OUTPUT_ROW_LIMIT,
+                )
+            )
         logger.debug("Fetched %d metadata rows from YT", len(rows))
         return rows
 
