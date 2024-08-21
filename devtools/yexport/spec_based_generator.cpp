@@ -2,6 +2,8 @@
 #include "yexport_spec.h"
 #include "internal_attributes.h"
 
+#include <contrib/libs/jinja2cpp/include/jinja2cpp/generic_list_iterator.h>
+
 #include <spdlog/spdlog.h>
 
 #include <regex>
@@ -230,10 +232,113 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
         /*argsInfos=*/ { jinja2::ArgInfo{MAP} }
     });
 
+    // Handmade exts function
+    static const std::string STRING_LIST = "string_list";
+    static const std::string ENDS = "ends";
+    auto filterByEnds = [](const jinja2::UserCallableParams& params, bool select) {
+        jinja2::ValuesList filteredList;
+        const auto ends = params[ENDS];
+        std::vector<std::string> svEnds;
+        if (ends.isList()) {
+            auto onEnd = [&svEnds](const jinja2::Value& end) {
+                if (end.isString()) {
+                    svEnds.emplace_back(std::string_view{end.asString()});
+                } else if (std::holds_alternative<std::string_view>(end.data())) {
+                    svEnds.emplace_back(end.get<std::string_view>());
+                } else {
+                    throw std::runtime_error(ENDS + " item is not a string");
+                }
+            };
+            const auto* endsGenList = ends.getPtr<jinja2::GenericList>();
+            if (endsGenList) {
+                for (const auto& end: *endsGenList) {
+                    onEnd(end);
+                }
+            } else {
+                for (const auto& end: ends.asList()) {
+                    onEnd(end);
+                }
+            }
+        } else if (ends.isString()) {
+            svEnds.emplace_back(ends.asString());
+        } else if (std::holds_alternative<std::string_view>(ends.data())) {
+            svEnds.emplace_back(ends.get<std::string_view>());
+        } else {
+            throw std::runtime_error(ENDS + " is not list and not string");
+        }
+        const auto list = params[STRING_LIST];
+        if (!list.isList()) {
+            throw std::runtime_error(STRING_LIST + " is not list");
+        }
+        auto onItem = [&filteredList, &svEnds, &select](const jinja2::Value& item) {
+            std::string_view svItem;
+            if (item.isString()) {
+                svItem = item.asString();
+            } else if (std::holds_alternative<std::string_view>(item.data())) {
+                svItem = item.get<std::string_view>();
+            } else {
+                throw std::runtime_error(STRING_LIST + " item is not a string");
+            }
+            bool foundEnd = false;
+            for (const auto& svEnd: svEnds) {
+                if (svItem.ends_with(svEnd)) {
+                    foundEnd = true;
+                    break;
+                }
+            }
+            if ((select && foundEnd) || (!select and !foundEnd)) {
+                filteredList.emplace_back(item);
+            }
+        };
+        const auto* genList = list.getPtr<jinja2::GenericList>();
+        if (genList) {// workaround for GenericMap, asMap generate bad_variant_access for it
+            for (const auto& item: *genList) {
+                onItem(item);
+            }
+        } else {
+            for (const auto& item : list.asList()) {
+                onItem(item);
+            }
+        }
+        return filteredList;
+    };
+
+    // Handmade string list filter function by exts
+    static const std::string SELECT_BY_ENDS = "select_by_ends";
+    static const std::string REJECT_BY_ENDS = "reject_by_ends";
+    JinjaEnv->AddGlobal(SELECT_BY_ENDS, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            try {
+                return filterByEnds(params, true);
+            } catch (const std::exception& e) {
+                onHandmadeException(SELECT_BY_ENDS, params.args, e);
+                return jinja2::Value{""};
+            }
+        },
+        /*argsInfos=*/ {
+            jinja2::ArgInfo{STRING_LIST},
+            jinja2::ArgInfo{ENDS},
+        }
+    });
+    JinjaEnv->AddGlobal(REJECT_BY_ENDS, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            try {
+                return filterByEnds(params, false);
+            } catch (const std::exception& e) {
+                onHandmadeException(REJECT_BY_ENDS, params.args, e);
+                return jinja2::Value{""};
+            }
+        },
+        /*argsInfos=*/ {
+            jinja2::ArgInfo{STRING_LIST},
+            jinja2::ArgInfo{ENDS},
+        }
+    });
+
     // Handmade dump any variable function for debug jinja2 code
     static const std::string DUMP = "dump";
     static const std::string VAR = "var";
-    JinjaEnv->AddGlobal("dump", jinja2::UserCallable{
+    JinjaEnv->AddGlobal(DUMP, jinja2::UserCallable{
         /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
             try {
                 return jinja2::Value{NYexport::Dump(params[VAR])};
