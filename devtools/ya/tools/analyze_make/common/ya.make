@@ -5,6 +5,9 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/zstandard
+
+    devtools/ya/core/config
     devtools/ya/exts
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/evlog

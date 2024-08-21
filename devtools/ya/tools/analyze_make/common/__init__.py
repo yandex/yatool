@@ -2,7 +2,9 @@ import os
 import sys
 import logging
 
+import zstandard as zstd
 
+import core.config as core_config
 import yalibrary.display
 import yalibrary.evlog
 import yalibrary.formatter
@@ -31,6 +33,23 @@ def get_cmd_from_evlog(filename: str) -> str:
     for node in reader:
         if node['event'] == 'init':
             return ' '.join(node['value']['args'])
+
+
+def get_latest_evlog():
+    def filter_func(filename, root):
+        evlog_path = os.path.join(root, filename)
+        reader = yalibrary.evlog.EvlogReader(evlog_path)
+        try:
+            for node in reader:
+                if node['namespace'] == 'ymake' and node['value']['StageName'] == 'ymake run':
+                    return True
+        except zstd.ZstdError:
+            return False
+        return False
+
+    finder = yalibrary.evlog.EvlogFileFinder(core_config.evlogs_root(), filter_func=filter_func)
+
+    return finder.get_latest()
 
 
 def load_from_file(evlog_reader, mode, detailed=False):
@@ -148,10 +167,8 @@ def set_zero_start(nodes):
         yield x
 
 
-def load_evlog(
-    opts, display: yalibrary.display.Display, latest_evlog_loader: tp.Callable, check_for_distbuild=False
-) -> tuple[str, list[Node]]:
-    evlog_file = opts.analyze_evlog_file or latest_evlog_loader()
+def load_evlog(opts, display: yalibrary.display.Display, check_for_distbuild=False) -> tuple[str, list[Node]]:
+    evlog_file = opts.analyze_evlog_file or get_latest_evlog()
     distbuild_file = opts.analyze_distbuild_json_file
 
     if not (evlog_file or distbuild_file):
@@ -163,7 +180,7 @@ def load_evlog(
 
     if evlog_file:
         display.emit_message(
-            f"Using evlog from this command: [[imp]]{get_cmd_from_evlog(evlog_file)}[[rst]] for analysis"
+            f"Using evlog from this command: [[imp]]{get_cmd_from_evlog(evlog_file)}[[rst]] from [[imp]]{evlog_file}[[rst]] for analysis"
         )
 
     filepath = distbuild_file or evlog_file

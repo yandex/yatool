@@ -31,9 +31,7 @@ TREEMAP_CSS = 'webtreemap.css'
 INDEX_HTML = 'index.html'
 HMTL_LEGEND_PLACEHOLDER = '<!--LEGEND-->'
 JSON_PLACEHOLDER = '<!--JSON-->'
-HTML_LEGEND_TEMPLATE = (
-    '<div class="webtreemap-node webtreemap-type-{entry}">{entry}<span class="tooltip">{hint}</span></div>'
-)
+HTML_LEGEND_TEMPLATE = '<div class="webtreemap-node webtreemap-type-{entry}" style="filter: hue-rotate(-{hue_rotate}deg); z-index: 100;">{entry}<span class="tooltip">{hint}</span></div>'
 
 Color = collections.namedtuple('Color', ['type', 'color'])
 
@@ -258,10 +256,10 @@ class TreeNode(object):
         else:
             return self._do_insert(node)
 
-    def iter_nodes(self) -> tp.Iterator[tp.Self]:
-        yield self
+    def iter_nodes(self, level=0) -> tp.Iterator[tp.Tuple[tp.Self, int]]:
+        yield self, level
         for child in self.children.values():
-            yield from child.iter_nodes()
+            yield from child.iter_nodes(level + 1)
 
     def max_level(self, level=0) -> int:
         levels = [-1]
@@ -309,6 +307,7 @@ class ColorType(enum.StrEnum):
     DEFAULT = "default"
     OTHER = "other"
     MAINTHREAD = "mainthread"
+    TESTS = "tests"
 
     @staticmethod
     def color(node: TreeNode) -> str:
@@ -316,11 +315,14 @@ class ColorType(enum.StrEnum):
             ColorType.DEFAULT: "#8DA0CB",
             ColorType.OTHER: "#ADFF00",
             ColorType.MAINTHREAD: "#1BBEAE",
+            ColorType.TESTS: "#FF8225",
         }
         return MAP[ColorType.css_name(node)]
 
     @staticmethod
     def css_name(node: TreeNode) -> tp.Self:
+        if "test-results" in node.path:
+            return ColorType.TESTS
         if node.node is None:
             if not node.is_root:
                 return ColorType.OTHER
@@ -356,26 +358,26 @@ def find_nodes_to_normalize(root: TreeNode) -> list[TreeNode]:
     seen = set()
     to_normalize = []
 
-    for node in root.iter_nodes():
+    for node, _ in root.iter_nodes():
         added = False
         if node in seen:
             continue
         seen.add(node)
         for child in node.children.values():
-            if ColorType.css_name(child) == ColorType.OTHER:
+            if ColorType.css_name(child) in {ColorType.OTHER, ColorType.TESTS}:
                 to_normalize.append(node)
                 added = True
                 break
         if added:
-            for child in node.iter_nodes():
+            for child, _ in node.iter_nodes():
                 seen.add(child)
     return to_normalize
 
 
 def gather_color_statistics(root: TreeNode) -> dict[Color, int]:
-    colors = collections.defaultdict(int)
-    for node in root.iter_nodes():
-        colors[ColorType.color_as_type(node)] += 1
+    colors = collections.defaultdict(lambda: float('inf'))
+    for node, level in root.iter_nodes():
+        colors[ColorType.color_as_type(node)] = min(colors[ColorType.color_as_type(node)], level)
 
     return colors
 
@@ -392,14 +394,21 @@ def get_css_colors_and_legend(colors: dict[Color, int], n_top=9, levels=10) -> t
         ColorType.DEFAULT: "Total execution time",
         ColorType.MAINTHREAD: "Duration of a stage",
         ColorType.OTHER: "Sum of durations of children or stage duration, what is longer",
+        ColorType.TESTS: "Tests duration",
     }
 
     color_list = []
     legend = []
-    for color, _ in list(sorted(colors.items(), key=lambda x: -x[1])):
+    for color, level_first_seen in list(sorted(colors.items(), key=lambda x: x[0])):
         color_list.append(CSS_TYPE_ENTRY % dict(type=color.type, color=color.color))
         if len(legend) < n_top:
-            legend.append(HTML_LEGEND_TEMPLATE.format(entry=color.type, hint=hint_map[color.type]))
+            legend.append(
+                HTML_LEGEND_TEMPLATE.format(
+                    entry=color.type,
+                    hint=hint_map[color.type],
+                    hue_rotate=sum(range(level_first_seen + 1)),
+                )
+            )
 
     for level in range(levels):
         color_list.append(CSS_LEVEL_ENTRY % dict(level=level, val=level))
@@ -407,11 +416,9 @@ def get_css_colors_and_legend(colors: dict[Color, int], n_top=9, levels=10) -> t
 
 
 def main(opts):
-    import app_ctx
-
     display = common.get_display(sys.stdout)
 
-    file_name, nodes = common.load_evlog(opts, display, app_ctx.evlog.get_latest, check_for_distbuild=True)
+    file_name, nodes = common.load_evlog(opts, display, check_for_distbuild=True)
 
     if not nodes:
         raise RuntimeError(f"No nodes could be parsed from {file_name}")

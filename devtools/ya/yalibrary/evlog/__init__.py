@@ -188,14 +188,14 @@ class EvlogWriter(object):
 
 
 class EvlogFileFinder(object):
-    def __init__(self, evlog_dir, filter_func=lambda x: True):
+    def __init__(self, evlog_dir, filter_func=lambda x, y: True):
         self._evlog_dir = evlog_dir
         self._filter_func = filter_func
 
     def __iter__(self):
         for root, dirs, files in os2.fastwalk(self._evlog_dir):
             for f in files:
-                if f.endswith(EvlogSuffix.all()) and self._filter_func(f):
+                if f.endswith(EvlogSuffix.all()) and self._filter_func(f, root):
                     yield os.path.join(root, f)
 
     def get_latest(self):
@@ -216,7 +216,7 @@ class EvlogFacade(object):
         logging.debug('Event log file is %s', filepath)
 
         self.writer = EvlogWriter(filepath, replacements)
-        self.file_finder = EvlogFileFinder(evlog_dir, lambda f: f != os.path.basename(filepath))
+        self.file_finder = EvlogFileFinder(evlog_dir, lambda f, r: f != os.path.basename(filepath))
 
     @property
     def filepath(self):

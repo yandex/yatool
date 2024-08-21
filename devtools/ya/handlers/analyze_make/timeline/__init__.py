@@ -34,11 +34,9 @@ def convert_to_chromium_trace(nodes):
 
 
 def main(opts):
-    import app_ctx
-
     display = common.get_display(sys.stdout)
 
-    file_name, nodes = common.load_evlog(opts, display, app_ctx.evlog.get_latest, check_for_distbuild=True)
+    file_name, nodes = common.load_evlog(opts, display, check_for_distbuild=True)
 
     if nodes:
         fname = file_name + '.json'
