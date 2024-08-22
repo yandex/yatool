@@ -8,7 +8,7 @@ For successful build it is required to have `docker` and `python3.9+` installed 
 
 ## Launching bootstrap
 
-Bootstrap is launched with `run_bootstrap` script
+Bootstrap is launched with `run_bootstrap.py` script
 
 It has several flags, as follows:
 
@@ -35,11 +35,7 @@ Here:
 * `build_root` - Path to the directory, where all build results will be stored;
 * `results_root` - Path to the directory, where final results will be stored.
 
-{% note info %}
-
 This script uses system libraries, thus tools built, for example, with `Ubuntu 22.04`, will not work on earlier Ubuntu's
-
-{% endnote %}
 
 This script invokes `graph_executor.py`, which downloads build graph from S3 and executes it, then moves `ya`, `ymake` and `libiconv.so` from `build_root` to `$results_root/stage1`.
 
@@ -50,11 +46,7 @@ python3 graph_executor.py <source_root> <build_root> <threads> [<path/to/local/g
 
 The last argument is optional and sohuld be used only in debug purposes.
 
-{% note warning %}
-
-Python 3.9 or newer is required for this script.
-
-{% endnote %}
+**Important!** Python 3.9 or newer is required for this script.
 
 ### Stage two
 
@@ -101,9 +93,7 @@ docker run \
 
 Graph is obtained with `gen_graph/gg` script and uploaded to S3.
 
-This allows to avoid large diffs compared to committing graph straight into a repo
-
-{% note warning %}
+This allows to avoid large diffs compared to committing graph straight into a repo.
 
 This script requires to have `clang-14` and `clang++-14` in user's system.
 
@@ -115,5 +105,3 @@ source_root=path/to/repo PATH=path/to/clangs:$PATH ./gen_graph/gg > fname
 ```
 
 `PATH` setting is required only when compilers are in a custom directories.
-
-{% endnote %}

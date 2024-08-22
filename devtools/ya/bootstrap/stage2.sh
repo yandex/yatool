@@ -21,6 +21,7 @@ export FLAGS="
 --host-platform-flag=OPENSOURCE=yes -DOPENSOURCE=yes
 --host-platform-flag=OPENSOURCE_PROJECT="ya" -DOPENSOURCE_PROJECT="ya"
 --host-platform-flag=YMAKE_USE_PY3="yes" -DYMAKE_USE_PY3=yes
+--musl
 "
 
 for platform in $(cat ${SR}/devtools/ya/bootstrap/platform_list); do
