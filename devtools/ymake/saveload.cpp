@@ -23,7 +23,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 44;
+    const ui64 ImageVersion = 45;
     const ui64 DMCacheVersion = 0;
 
     template <size_t HashSize>
@@ -284,6 +284,7 @@ namespace {
                 SaveIsolatedProjectsHash();
                 SaveDiagnostics();
                 YMake.SaveStartDirs(Writer);
+                YMake.SaveStartTargets(Writer);
             }
 
             Stats.Set(NStats::EInternalCacheSaverStats::TotalCacheSize, Writer.GetBuilder().GetLength());
@@ -381,6 +382,13 @@ namespace {
         ev.SetHasChangelist(value);
         FORCE_TRACE(U, ev);
     }
+
+    struct TCachedTarget {
+        ui32 ElemId_;
+        decltype(TTarget::AllFlags) AllFlags_;
+
+        Y_SAVELOAD_DEFINE(ElemId_, AllFlags_);
+    };
 }
 
 TFsPath MakeTempFilename(const TString& basePath) {
@@ -625,7 +633,18 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             TDebugTimer timer("start dirs");
             TBlob blob = cacheReader.GetNextBlob();
             TMemoryInput inputStartDirs(blob.Data(), blob.Length());
-            TSerializer<decltype(PrevStartDirs_)>::Load(&inputStartDirs, PrevStartDirs_);
+            ::Load(&inputStartDirs, PrevStartDirs_);
+        }
+        if (cacheReader.HasNextBlob()) {
+            TDebugTimer timer("start targets");
+            TBlob blob = cacheReader.GetNextBlob();
+            TMemoryInput inputStartTargets(blob.Data(), blob.Length());
+            TVector<TCachedTarget> cachedTargets;
+            ::Load(&inputStartTargets, cachedTargets);
+            PrevStartTargets_.clear();
+            for (const auto cached : cachedTargets) {
+                PrevStartTargets_.emplace_back(Graph.GetFileNodeById(cached.ElemId_).Id(), cached.AllFlags_);
+            }
         } else {
             return false;
         }
@@ -839,7 +858,18 @@ void TYMake::FixStartTargets(const TVector<ui32>& elemIds) {
 void TYMake::SaveStartDirs(TCacheFileWriter& writer) {
     TBuffer buffer;
     TBufferOutput output(buffer);
-    TSerializer<decltype(CurStartDirs_)>::Save(&output, CurStartDirs_);
+    ::Save(&output, CurStartDirs_);
+    writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
+}
+
+void TYMake::SaveStartTargets(TCacheFileWriter& writer) {
+    TBuffer buffer;
+    TBufferOutput output(buffer);
+    TVector<TCachedTarget> elemIds(Reserve(StartTargets.size()));
+    for (const auto& target : StartTargets) {
+        elemIds.push_back(TCachedTarget{.ElemId_=Graph[target.Id]->ElemId, .AllFlags_=target.AllFlags});
+    }
+    ::Save(&output, elemIds);
     writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
 }
 

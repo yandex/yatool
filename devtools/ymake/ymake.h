@@ -77,6 +77,7 @@ private:
 
     TVector<ui32> PrevStartDirs_;
     TVector<ui32> CurStartDirs_;
+    TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
 
     TVector<ui32> PreserveStartTargets() const;
@@ -142,6 +143,10 @@ public:
     void LoadDMCache();
     void Save(const TFsPath& file, bool delayed);
     void SaveStartDirs(TCacheFileWriter& writer);
+    void SaveStartTargets(TCacheFileWriter& writer);
+    void SetStartTargetsFromCache() {
+        StartTargets = std::move(PrevStartTargets_);
+    }
     void SaveUids(TUidsCachable* uidsCachable);
     void CommitCaches();
     void JSONCacheLoaded(bool jsonCacheLoaded);
