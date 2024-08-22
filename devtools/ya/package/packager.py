@@ -23,6 +23,7 @@ import core.common_opts
 import core.config
 import core.error
 import core.profiler
+import core.stage_tracer as stage_tracer
 import core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
@@ -61,6 +62,7 @@ if app_config.in_house:
     from devtools.ya.yalibrary.yandex.sandbox.misc.fix_logging import fix_logging
 
 logger = logging.getLogger(__name__)
+stager = stage_tracer.get_tracer("ya-package")
 
 SOURCE_ELEMENTS = {
     'BUILD_OUTPUT': package.source.BuildOutputSource,
@@ -381,7 +383,8 @@ def prepare_package(
                 files_comparator,
                 params,
             )
-            element.prepare(apply_attributes=format != const.PackageFormat.DEBIAN)
+            with stager.scope(str(element), tag="prepare-data-element"):
+                element.prepare(apply_attributes=format != const.PackageFormat.DEBIAN)
 
             source_elements.append(element)
     if 'postprocess' in parsed_package:
@@ -407,7 +410,8 @@ def prepare_package(
                     params,
                     formaters,
                 )
-                element.run()
+                with stager.scope(str(element), "run-postprocess-element"):
+                    element.run()
 
     package.fs_util.cleanup(temp)
 

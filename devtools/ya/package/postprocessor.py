@@ -51,6 +51,9 @@ class Postprocessor(object):
             package.display.emit_message('{}[[good]]POSTPROCESS OUTPUT[[rst]]: {}'.format(package.PADDING, out))
             package.display.emit_message('{}[[good]]POSTPROCESS ERROR[[rst]]: {}'.format(package.PADDING, err))
 
+    def __str__(self):
+        return str(self.data)
+
 
 class BuildOutputPostprocessor(Postprocessor):
     def _get_binary(self):

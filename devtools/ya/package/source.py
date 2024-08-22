@@ -438,6 +438,9 @@ class Source(object):
                         if attr in actions:
                             actions[attr](p, value)
 
+    def __str__(self):
+        return str(self.data)
+
 
 class BuildOutputSource(Source):
     def _prepare(self):

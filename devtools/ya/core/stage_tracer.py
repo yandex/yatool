@@ -48,11 +48,11 @@ class StagesProfilerConsumer(Consumer):
 
     def start(self, event):
         # type: (StageTracer._StartEvent) -> None
-        stages_profiler.stage_started(event.name, event.time)
+        stages_profiler.stage_started(event.tag, event.time)
 
     def finish(self, event):
         # type: (StageTracer._FinishEvent) -> None
-        stages_profiler.stage_finished(event.name, event.time)
+        stages_profiler.stage_finished(event.tag, event.time)
 
 
 class ProfilerConsumer(Consumer):
@@ -62,11 +62,11 @@ class ProfilerConsumer(Consumer):
 
     def start(self, event):
         # type: (StageTracer._StartEvent) -> None
-        profiler.profile_step_started(event.name, event.time)
+        profiler.profile_step_started(event.tag, event.time)
 
     def finish(self, event):
         # type: (StageTracer._FinishEvent) -> None
-        profiler.profile_step_finished(event.name, event.time)
+        profiler.profile_step_finished(event.tag, event.time)
 
 
 class LoggerConsumer(Consumer):
@@ -76,11 +76,11 @@ class LoggerConsumer(Consumer):
 
     def start(self, event):
         # type: (StageTracer._StartEvent) -> None
-        logger.debug("Start stage name={}, group={}, time={}".format(event.name, event.group, event.time))
+        logger.debug("Start stage tag={}, group={}, time={}".format(event.tag, event.group, event.time))
 
     def finish(self, event):
         # type: (StageTracer._FinishEvent) -> None
-        logger.debug("Finish stage name={}, group={}, time={}".format(event.name, event.group, event.time))
+        logger.debug("Finish stage tag={}, group={}, time={}".format(event.tag, event.group, event.time))
 
 
 class EvLogConsumer(Consumer):
@@ -105,7 +105,7 @@ class EvLogConsumer(Consumer):
                 '_timestamp': event.time,
                 'name': event.name,
                 'time': (event.start_time, event.time),
-                'tag': event.name,
+                'tag': event.tag,
             }
             self.__evlog_writer(event['_typename'], **event)
 
@@ -123,17 +123,23 @@ class StageTracer(object):
             return copy.deepcopy(self.__dict__)
 
     class Stage(object):
-        def __init__(self, stage_tracer, name, group):
-            # type: (StageTracer, str, str) -> None
+        def __init__(self, stage_tracer, name, group, tag=None):
+            # type: (StageTracer, str, str, str) -> None
+            '''
+            XXX
+            :param name: Additional info, transforms into .Args.name in timeline
+            :param tag: short name, transforns into Title in timeline
+            '''
             self.__stager = stage_tracer
             self.__name = name
             self.__group = group
             self.__finished = False
+            self.__tag = tag
 
         def finish(self, finish_time=None):
             # type: (float | None) -> None
             if not self.__finished:
-                self.__stager.finish(self.__name, self.__group, finish_time)
+                self.__stager.finish(self.__name, self.__group, finish_time, self.__tag)
                 self.__finished = True
 
     class GroupStageTracer(object):
@@ -146,13 +152,13 @@ class StageTracer(object):
             # type: (str, float) -> StageTracer.Stage
             return self.__parent.start(name, self.__group, start_time)
 
-        def finish(self, name, finish_time=None):
-            # type: (str, float) -> None
-            return self.__parent.finish(name, self.__group, finish_time)
+        def finish(self, name, finish_time=None, tag=None):
+            # type: (str, float, str) -> None
+            return self.__parent.finish(name, self.__group, finish_time, tag)
 
-        def scope(self, name):
-            # type: (str) -> None
-            return self.__parent.scope(name, self.__group)
+        def scope(self, name, tag=None):
+            # type: (str, str) -> None
+            return self.__parent.scope(name, self.__group, tag)
 
     def __init__(self, consumers=None):
         # type: (list[Consumer]) -> None
@@ -170,21 +176,21 @@ class StageTracer(object):
                 for event in self.__events:
                     self._consume_event(event, [consumer])
 
-    def start(self, name, group=DEFAULT_GROUP, start_time=None):
-        # type: (str, str, float) -> StageTracer.Stage
+    def start(self, name, group=DEFAULT_GROUP, start_time=None, tag=None):
+        # type: (str, str, float, str) -> StageTracer.Stage
         start_time = start_time or time.time()
         with self.__lock:
-            event = self._StartEvent(name, group, start_time)
+            event = self._StartEvent(name, group, start_time, tag or name)
             self._add_event(event)
             self.__started[(name, group)] = start_time
-            return self.Stage(self, name, group)
+            return self.Stage(self, name, group, tag)
 
-    def finish(self, name, group=DEFAULT_GROUP, finish_time=None):
-        # type: (str, str, float) -> None
+    def finish(self, name, group=DEFAULT_GROUP, finish_time=None, tag=None):
+        # type: (str, str, float, str) -> None
         finish_time = finish_time or time.time()
         with self.__lock:
             start_time = self.__started.pop((name, group), None)
-            event = self._FinishEvent(name, group, finish_time, start_time)
+            event = self._FinishEvent(name, group, finish_time, start_time, tag or name)
             self._add_event(event)
             if start_time:
                 stat = self.__stat.setdefault(group, {}).setdefault(name, StageTracer.Stat())
@@ -192,9 +198,9 @@ class StageTracer(object):
                 stat.intervals.append((start_time, finish_time))
 
     @contextlib.contextmanager
-    def scope(self, name, group=DEFAULT_GROUP):
-        # type: (str, str) -> types.GeneratorType
-        stage = self.start(name, group)
+    def scope(self, name, group=DEFAULT_GROUP, tag=None):
+        # type: (str, str, str) -> types.GeneratorType
+        stage = self.start(name, group, tag=tag)
         try:
             yield None
         finally:
@@ -211,8 +217,8 @@ class StageTracer(object):
     def get_all_stat(self):
         return copy.deepcopy(self.__stat)
 
-    _StartEvent = collections.namedtuple("Event", ["name", "group", "time"])
-    _FinishEvent = collections.namedtuple("Event", ["name", "group", "time", "start_time"])
+    _StartEvent = collections.namedtuple("Event", ["name", "group", "time", "tag"])
+    _FinishEvent = collections.namedtuple("Event", ["name", "group", "time", "start_time", "tag"])
 
     def _add_event(self, event):
         # type: (StageTracer._StartEvent | StageTracer._FinishEvent) -> None
