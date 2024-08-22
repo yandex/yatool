@@ -740,6 +740,7 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
 bool TYMake::LoadPatch() {
     ArcChangesEvent(!Conf.PatchPath.Empty());
     if (!Conf.PatchPath) {
+        HasGraphStructuralChanges_ = true;
         return true;
     }
 
@@ -751,7 +752,10 @@ bool TYMake::LoadPatch() {
         AnalyzeGraphChanges(*changes);
         Names.FileConf.UseExternalChanges(std::move(changes));
         GraphChangesPredictionEvent();
+    } else {
+        HasGraphStructuralChanges_ = true;
     }
+
     return true;
 }
 
