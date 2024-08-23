@@ -1233,7 +1233,7 @@ def import_unified(
 
     request_artifacts = artifacts_to_import
 
-    repos = get_repos(opts, repos_file)
+    repos = opts.remote_repos
 
     with tmp.temp_dir() as local_repo:
         local_repo = os.environ.get('YA_JBUILD_LOCAL_MAVEN_REPO', local_repo)
