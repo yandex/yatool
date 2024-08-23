@@ -865,25 +865,11 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->CheckIsolatedProjects();
 
-    yMake->ReportConfigureEvents();
-
-    FORCE_TRACE(U, NEvent::TStageStarted("Save and compact"));
-    if (conf.WriteFsCache || conf.WriteDepsCache) {
-        yMake->Save(conf.YmakeCache, true);
-    } else {
-        yMake->Graph.Compact();
-    }
-
-    yMake->Modules.Compact();
-    FORCE_TRACE(U, NEvent::TStageFinished("Save and compact"));
+    yMake->Compact();
 
     bool hasBadLoops = yMake->DumpLoops();
 
     yMake->ApplyDependencyManagement();
-
-    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        return BR_CONFIGURE_FAILED;
-    }
 
     if (!conf.ManagedDepTreeRoots.empty()) {
         THashSet<TNodeId> roots;
@@ -974,6 +960,12 @@ int main_real(TBuildConfiguration& conf) {
 
     if (conf.WriteOwners) {
         yMake->DumpOwners();
+    }
+
+    yMake->ReportConfigureEvents();
+
+    if (conf.WriteFsCache || conf.WriteDepsCache) {
+        yMake->Save(conf.YmakeCache, true);
     }
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {

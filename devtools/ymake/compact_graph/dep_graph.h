@@ -505,10 +505,7 @@ public:
     }
 
     /// @brief comapct graph and save it
-    void Save(TMultiBlobBuilder& builder, bool needCompact = true) {
-        if (needCompact) {
-            Compact();
-        }
+    void Save(TMultiBlobBuilder& builder) {
         TString graphData;
         {
             TStringOutput graphOutput(graphData);
