@@ -809,11 +809,21 @@ int main_real(TBuildConfiguration& conf) {
     // This should be called after Load
     yMake->PostInit();
 
+    if (yMake->CanBypassConfigure()) {
+        // FIXME: Currently we are implementing plan "B" for Grand Bypass,
+        // that is we do not want to save caches when Grand Bypass occurs
+        conf.WriteFsCache = false;
+        conf.WriteDepsCache = false;
+        conf.WriteJsonCache = false;
+        conf.WriteDepManagementCache = false;
+        conf.WriteUidsCache = false;
+    }
+
     {
         TBuildGraphScope scope(*yMake.Get());
 
         TMaybe<EBuildResult> configureBuildRes;
-        if (useOnlyYmakeCache) {
+        if (useOnlyYmakeCache || yMake->CanBypassConfigure()) {
             configureBuildRes = StaticConfigureGraph(yMake);
         } else {
             yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
@@ -844,20 +854,28 @@ int main_real(TBuildConfiguration& conf) {
             return BR_FATAL_ERROR;
         }
 
-        yMake->AddRecursesToStartTargets();
+        if (yMake->CanBypassConfigure()) {
+            yMake->SetStartTargetsFromCache();
 
-        yMake->AddModulesToStartTargets();
+            yMake->UpdateExternalFilesChanges();
+        } else {
+            yMake->AddRecursesToStartTargets();
 
-        yMake->FindLostIncludes();
+            yMake->AddModulesToStartTargets();
+
+            yMake->FindLostIncludes();
+        }
 
         yMake->ReportGraphBuildStats();
     }
 
     yMake->ReportModulesStats();
 
-    yMake->ComputeReachableNodes();
+    if (!yMake->CanBypassConfigure()) {
+        yMake->ComputeReachableNodes();
 
-    yMake->SortAllEdges();
+        yMake->SortAllEdges();
+    }
 
     yMake->ReportForeignPlatformEvents();
 
@@ -865,7 +883,9 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->CheckIsolatedProjects();
 
-    yMake->Compact();
+    if (!yMake->CanBypassConfigure()) {
+        yMake->Compact();
+    }
 
     bool hasBadLoops = yMake->DumpLoops();
 

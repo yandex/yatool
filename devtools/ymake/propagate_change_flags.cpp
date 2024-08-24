@@ -179,3 +179,28 @@ void PropagateChangeFlags(TDepGraph& graph, const TGraphLoops& loops, TVector<TT
     ev.SetHasContentChanges(hasContentChanges);
     FORCE_TRACE(U, ev);
 }
+
+namespace NSetLocalChangesForGrandBypass {
+    using TStateItem = TGraphIteratorStateItemBase<false>;
+
+    class TVisitor: public TDirectPeerdirsVisitor<TEntryStats, TStateItem> {
+    public:
+        using TBase = TDirectPeerdirsVisitor<TEntryStats, TStateItem>;
+
+    public:
+        bool Enter(TState& state) {
+            bool fresh  = TBase::Enter(state);
+
+            if (fresh) {
+                state.TopNode()->State.SetLocalChanges(false, false);
+            }
+
+            return fresh;
+        }
+    };
+}
+
+void SetLocalChangesForGrandBypass(TDepGraph& graph, const TVector<TTarget>& startTargets) {
+    NSetLocalChangesForGrandBypass::TVisitor visitor;
+    IterateAll(graph, startTargets, visitor);
+}

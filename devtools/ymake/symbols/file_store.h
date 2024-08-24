@@ -555,6 +555,10 @@ public:
     TFileView ResolveLink(TFileView view) const;
     TFileView ResolveLink(ui32 id) const;
 
+    const THashSet<ui32>& GetExternalChanges() const {
+        return ExternalChanges;
+    }
+
     static TFileView ConstructLink(ELinkType context, TFileView target);
     static TString ConstructLink(ELinkType context, TStringBuf target);
     static TString ConstructPathWithLink(ELinkType context, TStringBuf target, NPath::ERoot root);

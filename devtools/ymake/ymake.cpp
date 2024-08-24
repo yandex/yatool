@@ -10,6 +10,7 @@
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/compute_reachability.h>
+#include <devtools/ymake/propagate_change_flags.h>
 
 namespace {
     enum class ESortPriority {
@@ -178,4 +179,26 @@ void TYMake::ComputeReachableNodes() {
 
     NYMake::TTraceStage scopeTracer{"Set reachable nodes"};
     NComputeReachability::ComputeReachableNodes(Graph, StartTargets);
+}
+
+void TYMake::UpdateExternalFilesChanges() {
+    NYMake::TTraceStage scopeTracer{"Update External changes for Grand Bypass"};
+
+    SetLocalChangesForGrandBypass(Graph, StartTargets);
+
+    auto& fileConf = Names.FileConf;
+    auto externalChanges = fileConf.GetExternalChanges();
+    for (auto id : externalChanges) {
+        for (ui8 i = 0; i < static_cast<ui8>(ELinkType::ELT_COUNT); ++i) {
+            auto linkType = static_cast<ELinkType>(i);
+            auto elemId = TFileId::CreateElemId(linkType, id);
+            auto node = Graph.GetFileNodeById(elemId);
+            if (node.IsValid()) {
+                if (node->State.GetReachable() && node->NodeType == EMNT_File) {
+                    fileConf.GetFileById(elemId)->GetContent();
+                    node->State.SetLocalChanges(false, true);
+                }
+            }
+        }
+    }
 }

@@ -157,6 +157,11 @@ public:
     void UidsCacheMonEvent() const;
     void GraphChangesPredictionEvent() const;
     void ComputeReachableNodes();
+    bool CanBypassConfigure() const {
+        // --xcompletely-trust-fs-cache can't be passed without --patch-path
+        return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_;
+    }
+    void UpdateExternalFilesChanges();
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);
     TRestoreContext GetRestoreContext();
