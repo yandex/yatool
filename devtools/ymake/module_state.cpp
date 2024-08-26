@@ -54,7 +54,6 @@ namespace {
         TStringBuf("EXCLUDE_VALUE"),
         TStringBuf("IGNORE_JAVA_DEPENDENCIES_CONFIGURATION"),
         TStringBuf("JAVA_DEPENDENCIES_CONFIGURATION_VALUE"),
-        TStringBuf("RUN_JAVA_PROGRAM_VALUE"),
         TStringBuf("TEST_CLASSPATH_VALUE"),
         TStringBuf("NON_NAMAGEABLE_PEERS"),
         TStringBuf("DART_CLASSPATH_DEPS"),

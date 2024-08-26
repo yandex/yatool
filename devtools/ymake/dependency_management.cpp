@@ -33,8 +33,6 @@ namespace {
     constexpr TStringBuf _FORCED_DEPENDENCY_MANAGEMENT_EXCEPTIONS = "_FORCED_DEPENDENCY_MANAGEMENT_EXCEPTIONS";
     constexpr TStringBuf DEPENDENCY_MANAGEMENT_VALUE = "DEPENDENCY_MANAGEMENT_VALUE";
     constexpr TStringBuf EXCLUDE_VALUE = "EXCLUDE_VALUE";
-    constexpr TStringBuf RUN_JAVA_PROGRAM_VALUE = "RUN_JAVA_PROGRAM_VALUE";
-    constexpr TStringBuf RUN_JAVA_PROGRAM_MANAGED = "RUN_JAVA_PROGRAM_MANAGED";
     constexpr TStringBuf JAVA_DEPENDENCIES_CONFIGURATION_VALUE = "JAVA_DEPENDENCIES_CONFIGURATION_VALUE";
     constexpr TStringBuf IGNORE_JAVA_DEPENDENCIES_CONFIGURATION = "IGNORE_JAVA_DEPENDENCIES_CONFIGURATION";
     constexpr TStringBuf FORBID_DIRECT_PEERDIRS = "FORBID_DIRECT_PEERDIRS";
@@ -45,18 +43,7 @@ namespace {
     constexpr TStringBuf REQUIRE_DM = "REQUIRE_DM";
     constexpr TStringBuf TEST_CLASSPATH_VALUE = "TEST_CLASSPATH_VALUE";
     constexpr TStringBuf TEST_CLASSPATH_MANAGED = "TEST_CLASSPATH_MANAGED";
-    constexpr TStringBuf RUN_JAVA_PROGRAMM_CLASSPATH_KEY = "CLASSPATH";
-    constexpr TStringBuf RUN_JAVA_PROGRAMM_FAKE_OUT_KEY = "FAKE_OUT";
     constexpr TStringBuf FAKE_OUT_FOR_TEST = "fake.out.java_test_cmd";
-    constexpr TStringBuf RUN_JAVA_PROGRAMM_OTHER_KEYS[] = {
-        TStringBuf("IN"),
-        TStringBuf("IN_DIR"),
-        TStringBuf("OUT"),
-        TStringBuf("OUT_DIR"),
-        TStringBuf("CWD"),
-        TStringBuf("CP_USE_COMMAND_FILE"),
-        TStringBuf("ADD_SRCS_TO_CLASSPATH"),
-    };
 
     bool IsGhost(const TModule& parent, const TModule& peer) noexcept {
         return parent.GhostPeers.contains(peer.GetDirId());
@@ -719,25 +706,6 @@ namespace {
             Y_ASSERT(parent);
             ModulesWithDepMng += parent->GetAttrs().RequireDepManagement;
 
-            for (TStringBuf elem: StringSplitter(parent->Get(RUN_JAVA_PROGRAM_VALUE)).Split(' ').SkipEmpty()) {
-                const bool success = IterateJsonStrArray(Base64Decode(elem), [&, readingClaspath = false, readingFakeOut = false](TStringBuf item) mutable {
-                    if (item == RUN_JAVA_PROGRAMM_CLASSPATH_KEY) {
-                        readingClaspath = true;
-                    } else if (item == RUN_JAVA_PROGRAMM_FAKE_OUT_KEY) {
-                        readingClaspath = false;
-                        readingFakeOut = true;
-                    } else if (Find(RUN_JAVA_PROGRAMM_OTHER_KEYS, item) != std::end(RUN_JAVA_PROGRAMM_OTHER_KEYS)) {
-                        readingClaspath = false;
-                    } else if (readingClaspath) {
-                        parentItem.DepsDict.emplace(item, TNodeId::Invalid);
-                    } else if (std::exchange(readingFakeOut, false)) {
-                        parentItem.ManageableCommands.emplace(item, TNodeId::Invalid);
-                    }
-                });
-                if (!success) {
-                    YConfErr(KnownBug) << RUN_JAVA_PROGRAM_VALUE << " contains macro invocation info in wrong format. Check if 'build/plugins' directory is consistent with ymake binary." << Endl;
-                }
-            }
             const auto testClasspath = parent->Get(TEST_CLASSPATH_VALUE);
             if (!testClasspath.empty()) {
                 parentItem.ManageableCommands.emplace(FAKE_OUT_FOR_TEST, TNodeId::Invalid);
@@ -782,9 +750,6 @@ namespace {
                 }
             }
             ManagePeersClosure(rules, record, *parent, parentItem);
-            if (!parent->Get(RUN_JAVA_PROGRAM_VALUE).empty()) {
-                parent->Set(RUN_JAVA_PROGRAM_MANAGED, ManageRunJavaProgram(*parent, parentItem));
-            }
 
             // If finished start module, print all DM configuration errors
             if ((parentItem.IsStart) && (!DMConfErrors.empty())) {
@@ -1088,75 +1053,6 @@ namespace {
                 ManageCmdTools(parentItem.Node().Id(), cmdIt->second, peersClosure);
             }
             parent.Set(TEST_CLASSPATH_MANAGED, ToPeerListVar(peersClosure, EPathType::Moddir));
-        }
-
-        TString ManageRunJavaProgram(TModule& parent, const TStateItem& parentItem) {
-            TString res;
-            for (TStringBuf elem: StringSplitter(parent.Get(RUN_JAVA_PROGRAM_VALUE)).Split(' ').SkipEmpty()) {
-                NJsonWriter::TBuf jsonBuf{NJsonWriter::HEM_UNSAFE};
-                jsonBuf.BeginList();
-                TVector<TNodeId> roots;
-                TString fakeOut;
-                const bool success = IterateJsonStrArray(Base64Decode(elem), [&, readingClaspath = false, readingFakeOut = false](TStringBuf item) mutable {
-                    if (item == RUN_JAVA_PROGRAMM_CLASSPATH_KEY) {
-                        readingClaspath = true;
-                        return;
-                    } else if (item == RUN_JAVA_PROGRAMM_FAKE_OUT_KEY) {
-                        readingFakeOut = true;
-                        readingClaspath = false;
-                        return;
-                    } else if (Find(RUN_JAVA_PROGRAMM_OTHER_KEYS, item) != std::end(RUN_JAVA_PROGRAMM_OTHER_KEYS)) {
-                        readingClaspath = false;
-                    } else if (std::exchange(readingFakeOut, false)) {
-                        fakeOut = item;
-                        return;
-                    }
-
-                    if (readingClaspath) {
-                        const auto it = parentItem.DepsDict.find(item);
-                        if (it == parentItem.DepsDict.end() || it->second == TNodeId::Invalid) {
-                            YConfErr(KnownBug)
-                                << fmt::format(
-                                    "[[alt1]]RUN_JAVA_PROGRAM[[rst]] CLASSPATH element '{}' is not reacable via direct tool dependency from '{}'",
-                                    item,
-                                    parent.GetDir().GetTargetStr())
-                                << Endl;
-                        } else {
-                            roots.push_back(it->second);
-                        }
-                    } else {
-                        jsonBuf.WriteString(item);
-                    }
-                });
-                if (!success) {
-                    YConfErr(KnownBug) << RUN_JAVA_PROGRAM_VALUE << " contains macro invocation info in wrong format. Check if 'build/plugins' directory is consistent with ymake binary." << Endl;
-                    continue;
-                }
-
-
-                jsonBuf.WriteString(RUN_JAVA_PROGRAMM_CLASSPATH_KEY);
-                if (roots.size() == 1) {
-                    const auto* prog = GetModule(roots.front());
-                    jsonBuf.WriteString(prog->GetDir().GetTargetStr());
-                    for (TStringBuf item: StringSplitter(prog->Get(MANAGED_PEERS_CLOSURE)).Split(' ').SkipEmpty()) {
-                        jsonBuf.WriteString(item);
-                    }
-                    // TODO(svidyuk): tool deps are not modified here for now. It might be changed after complete RUN_JAVA_PROGRAM migration to ymake.
-                } else if (!roots.empty()) {
-                    const auto peersClosure = ManageMultipleRoots(roots);
-                    for (const auto& item: peersClosure) {
-                        jsonBuf.WriteString(GetModule(item)->GetDir().GetTargetStr());
-                    }
-                    if (const auto cmdIt = parentItem.ManageableCommands.find(fakeOut); cmdIt != parentItem.ManageableCommands.end()) {
-                        ManageCmdTools(parentItem.Node().Id(), cmdIt->second, peersClosure);
-                    }
-                }
-
-                jsonBuf.EndList();
-                res += res.empty() ? "" : " ";
-                res += Base64Encode(jsonBuf.Str());
-            }
-            return res;
         }
 
         TVector<TResolvedPeer> ManageLocalPeers(
