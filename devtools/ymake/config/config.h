@@ -109,6 +109,7 @@ struct TModuleConf {
     bool HasSemantics = false;
     bool HasSemanticsForGlobals = false;
     bool StructCmd = false; // Marker requiring to use structured command representation DEVTOOLS-8280
+    bool StructCmdSet = false;
 
     THashSet<TString> Restricted;
     THashSet<TString> Ignored;

@@ -298,7 +298,7 @@ void TModuleConf::Inherit(const TModuleConf& parent) {
         GlobalCmd = parent.GlobalCmd;
     }
 
-    if (!StructCmd && parent.StructCmd) {
+    if (!StructCmdSet) {
         StructCmd = parent.StructCmd;
     }
 
@@ -533,11 +533,15 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
     } else if (name == NOptions::USE_PEERS_LATE_OUTS) {
         ApplyBoolProperty(UsePeersLateOuts, key, name, value);
     } else if (name == NOptions::STRUCT_CMD) {
-        if (!renderSemantics)
+        if (!renderSemantics) {
             ApplyBoolProperty(StructCmd, key, name, value);
+            StructCmdSet = true;
+        }
     } else if (name == NOptions::STRUCT_SEM) {
-        if (renderSemantics)
+        if (renderSemantics) {
             ApplyBoolProperty(StructCmd, key, name, value);
+            StructCmdSet = true;
+        }
     } else if (name == NOptions::INCLUDE_TAG) {
         ApplyBoolProperty(IncludeTag, key, name, value);
     } else if (name == NOptions::FINAL_TARGET) {
