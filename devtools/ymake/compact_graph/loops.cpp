@@ -201,7 +201,7 @@ public:
         }
         std::sort(loopSrt.begin(), loopSrt.end());
         // continuous loop enumeration makes other code simpler
-        TVector<size_t> loopSz;
+        TNodesData<size_t, TVector> loopSz;
         TNodeId newId, curId = loopSrt[0].first;
         loopSz.push_back(0);
         for (size_t n = 0; n < loopSrt.size(); n++) {
@@ -211,19 +211,19 @@ public:
             }
             loopSz.back()++;
         }
-        loop2Nodes.resize(loopSz.size() + 1);
+        loop2Nodes.resize(loopSz.size());
         // loop id 0 is reserved for 'no loop' flag
         newId = TNodeId::MinValid, curId = loopSrt[0].first;
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
                 newId++;
-                loop2Nodes[AsIdx(newId)].reserve(loopSz[AsIdx(newId) - 1]);
+                loop2Nodes[AsIdx(newId)].reserve(loopSz[newId]);
                 curId = loopSrt[n].first;
             }
             node2Loop[loopSrt[n].second] = newId;
             loop2Nodes[AsIdx(newId)].push_back(loopSrt[n].second);
         }
-        Y_ASSERT(AsIdx(newId) == loopSz.size());
+        Y_ASSERT(newId == loopSz.MaxNodeId());
         YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
     }
 };

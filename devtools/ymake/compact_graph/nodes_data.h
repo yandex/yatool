@@ -24,6 +24,14 @@ public:
         return Storage_[ToUnderlying(id)];
     }
 
+    const T& back() const noexcept {
+        return Storage_.back();
+    }
+
+    T& back() noexcept {
+        return Storage_.back();
+    }
+
     bool contains(TNodeId id) const noexcept {return ToUnderlying(id) < Storage_.size();}
 
     iterator begin() {return Storage_.begin();}
@@ -37,6 +45,10 @@ public:
 
     size_t size() const noexcept {
         return Storage_.size();
+    }
+
+    TNodeId MaxNodeId() const noexcept {
+        return static_cast<TNodeId>(Storage_.size() - 1);
     }
 
     void clear() {
