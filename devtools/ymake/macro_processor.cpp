@@ -38,6 +38,7 @@
 #include <util/stream/output.h>
 #include <util/stream/str.h>
 #include <util/string/cast.h>
+#include <util/string/escape.h>
 #include <util/string/split.h>
 #include <util/string/subst.h>
 #include <util/string/vector.h>
@@ -1802,8 +1803,11 @@ void TCommandInfo::SubstData(
                     .Extract();
                 TVector<TString> cmds;
                 cmds.reserve(argses.size());
-                for (auto& args : argses)
+                for (auto& args : argses) {
+                    for (auto& arg : args)
+                        arg = "\"" + EscapeC(arg) + "\"";
                     cmds.push_back(JoinSeq(' ', args));
+                }
                 nextsubst.Name = JoinSeq(" && ", cmds);
             }
         }
