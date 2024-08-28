@@ -542,7 +542,7 @@ void TJSONVisitorNew::UpdateReferences(TState& state) {
 }
 
 void TJSONVisitorNew::CheckStructureUidChanged() {
-    if (CurrData->GetStructureUid().GetRawData() != CurrData->GetPreStructureUid().GetRawData()) {
+    if (CurrData->GetStructureUid().GetRawSig() != CurrData->GetPreStructureUid().GetRawSig()) {
         CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 0); // at least one node rendered
     } else {
         // TODO Research and try load it from cache
