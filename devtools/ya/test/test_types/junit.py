@@ -244,7 +244,11 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         test_outputs_root = os.path.join(suite_work_dir, test_const.TESTING_OUT_DIR_NAME)
         trace_file_path = os.path.join(suite_work_dir, test_const.TRACE_FILE_NAME)
         runner_log_file_path = os.path.join(test_outputs_root, 'run.log')
-        tests_tmp_dir = os.path.join(suite_work_dir, 'tests_tmp_dir')
+        if test_const.YaTestTags.JavaTmpInRamDisk in self.tags:
+            # it's resolved in run_junit.py from context file
+            tests_tmp_dir = "${YA_TEST_JAVA_TMP_DIR}"
+        else:
+            tests_tmp_dir = os.path.join(suite_work_dir, 'tests_tmp_dir')
 
         return commands.run_test(
             self.classpath_file,
