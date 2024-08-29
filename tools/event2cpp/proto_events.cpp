@@ -1,7 +1,6 @@
 #include <google/protobuf/compiler/cpp/helpers.h>
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/io/printer.h>
-#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -13,6 +12,50 @@
 #include <library/cpp/eventlog/proto/events_extension.pb.h>
 
 #include "proto_events.h"
+
+
+template <typename ITR>
+static inline
+void SplitStringToIteratorUsing(const TProtoStringType& full,
+                                const char* delim,
+                                ITR& result) {
+  // Optimize the common case where delim is a single character.
+  if (delim[0] != '\0' && delim[1] == '\0') {
+    char c = delim[0];
+    const char* p = full.data();
+    const char* end = p + full.size();
+    while (p != end) {
+      if (*p == c) {
+        ++p;
+      } else {
+        const char* start = p;
+        while (++p != end && *p != c);
+        *result++ = TProtoStringType(start, p - start);
+      }
+    }
+    return;
+  }
+
+  TProtoStringType::size_type begin_index, end_index;
+  begin_index = full.find_first_not_of(delim);
+  while (begin_index != TProtoStringType::npos) {
+    end_index = full.find_first_of(delim, begin_index);
+    if (end_index == TProtoStringType::npos) {
+      *result++ = full.substr(begin_index);
+      return;
+    }
+    *result++ = full.substr(begin_index, (end_index - begin_index));
+    begin_index = full.find_first_not_of(delim, end_index);
+  }
+}
+
+static void SplitStringUsing(const TProtoStringType& full,
+                      const char* delim,
+                      std::vector<TProtoStringType>* result) {
+  std::back_insert_iterator< std::vector<TProtoStringType> > it(*result);
+  SplitStringToIteratorUsing(full, delim, it);
+}
+
 
 namespace NProtoBuf::NCompiler::NPlugins {
 
@@ -635,7 +678,7 @@ namespace NInternal {
                     printer->Print("{\n");
 
                     printer->Indent();
-                    printer->Print("SharedCtor(nullptr, false);\n");
+                    printer->Print("SharedCtor(nullptr);\n");
                     GenerateFieldInitializers(printer, /* prefix = */ "");
                     printer->Outdent();
 
