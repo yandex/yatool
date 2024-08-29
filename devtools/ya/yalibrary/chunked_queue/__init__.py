@@ -6,6 +6,7 @@ import exts.yjson as json
 import random
 import logging
 import datetime as dt
+from pytz import UTC
 
 from exts import fs
 from exts import filelock
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def uniq_name():
-    return "{}_{}".format(dt.datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S'), uniq_id.gen8())
+    return "{}_{}".format(dt.datetime.now(tz=UTC).strftime('%Y_%m_%d_%H_%M_%S'), uniq_id.gen8())
 
 
 class ActiveChunk(object):

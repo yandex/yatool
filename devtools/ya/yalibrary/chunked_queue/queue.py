@@ -6,6 +6,8 @@ from exts import fs
 from exts import uniq_id
 from exts import filelock
 
+from pytz import UTC
+
 
 __all__ = ['Queue']
 
@@ -17,7 +19,7 @@ UNIQ_ID = 0
 def uniq_name():
     global UNIQ_ID
     UNIQ_ID += 1
-    return "{}__{:08d}__{}".format(dt.datetime.utcnow().strftime(DATE_FMT), UNIQ_ID, uniq_id.gen8())
+    return "{}__{:08d}__{}".format(dt.datetime.now(tz=UTC).strftime(DATE_FMT), UNIQ_ID, uniq_id.gen8())
 
 
 def unpack_date(uniq_id):

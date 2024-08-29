@@ -10,6 +10,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
+    contrib/python/pytz
 )
 
 END()
