@@ -1460,7 +1460,7 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         processors = list(compile.iter_processors(target.plain))
         javac_flags = []
         for k, v in compile.get_ya_make_flags(target.plain, consts.JAVAC_FLAGS).items():
-            if re.match(r'Xep:[^:]+:[^:]+', k):
+            if k.startswith("Xep"):
                 continue
             if k == 's' and v and v.startswith(consts.BUILD_ROOT):
                 continue
