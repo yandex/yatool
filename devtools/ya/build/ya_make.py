@@ -20,7 +20,6 @@ import build.build_plan as bp
 import build.build_result as br
 import build.gen_plan as gp
 import build.graph as lg
-import build.makefile as mk
 import build.owners as ow
 import build.reports.autocheck_report as ar
 import build.reports.results_listener as pr
@@ -1055,11 +1054,6 @@ class Context(object):
                     for node, full_match in lg.filter_nodes_by_output(self.graph, flt, warn=True):
                         print(json.dumps(node, sort_keys=True, indent=4, separators=(',', ': ')))
                 timer.show_step("show_command finished")
-
-            if opts.generate_makefile:
-                makefile_generator = mk.MakefileGenerator()
-                makefile_generator.gen_makefile(self.graph)
-                timer.show_step("generate_makefile finished")
 
         self._dump_graph_if_needed()
 

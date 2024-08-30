@@ -1580,32 +1580,6 @@ class YMakeDumpGraphOptions(Options):
         ]
 
 
-class YMakeGenerateMakefileOptions(Options):
-    def __init__(self):
-        self.generate_makefile = False
-
-    @staticmethod
-    def consumer():
-        return [
-            ArgConsumer(
-                ['-M', '--makefile'],
-                help='Generate Makefile',
-                hook=SetConstValueHook('generate_makefile', True),
-                group=OPERATIONAL_CONTROL_GROUP,
-                visible=HelpLevel.INTERNAL,
-            )
-        ]
-
-    def postprocess2(self, params):
-        if self.generate_makefile:
-            for flags in [params.flags, params.host_flags]:
-                flags['NO_YMAKE'] = 'yes'
-            for flags in [params.flags, params.host_platform_flags]:
-                if 'USE_PREBUILT_TOOLS' not in flags:
-                    flags['USE_PREBUILT_TOOLS'] = 'no'
-                params.host_flags['USE_PREBUILT_TOOLS'] = params.flags['USE_PREBUILT_TOOLS']
-
-
 class YWarnModeOptions(Options):
     def __init__(self, warn_mode=None):
         self.warn_mode = warn_mode or ['dirloops', 'ChkPeers']
@@ -3174,7 +3148,6 @@ def ya_make_options(  # compat
             CustomGraphAndContextOptions(),
             IgnoreNodesExitCode(),
             YMakeDumpGraphOptions(),
-            YMakeGenerateMakefileOptions(),
             CrossCompilationOptions(),
             GraphFilterOutputResultOptions(),
             GraphOperateResultsOptions(),

@@ -11,7 +11,6 @@ PY_SRCS(
     gen_plan2.py
     graph.py
     graph_path.py
-    makefile.py
     targets_deref.py
     test_results_console_printer.py
     ya_make.py
