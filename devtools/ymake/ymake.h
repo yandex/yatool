@@ -142,7 +142,6 @@ public:
     void LoadUids(TUidsCachable* uidsCachable);
     void LoadDMCache();
     void Save(const TFsPath& file, bool delayed);
-    void Compact();
     void SaveStartDirs(TCacheFileWriter& writer);
     void SaveStartTargets(TCacheFileWriter& writer);
     void SetStartTargetsFromCache() {

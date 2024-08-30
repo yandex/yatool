@@ -38,7 +38,7 @@ TDisplay* Display();
 
 // Use these for user-intended messages, that are not related to graph nodes
 // and should not be persisted in graph cache
-#define YErr(var) (*Display()->NewConfMsg(EConfMsgType::Error,  #var))
+#define YErr() (*Display()->NewConfMsg(EConfMsgType::Error, TStringBuf()))
 #define YWarn() (*Display()->NewConfMsg(EConfMsgType::Warning, TStringBuf()))
 #define YInfo() (*Display()->NewConfMsg(EConfMsgType::Info, TStringBuf()))
 //TODO(kikht): YDebug should probably be replaced with YDIAG

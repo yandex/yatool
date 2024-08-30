@@ -9,8 +9,6 @@
 #include <util/generic/hash_set.h>
 #include <util/stream/format.h>
 
-#include <fmt/format.h>
-
 struct TLoopId {
     TNodeId LoopId;
     bool IsFile;
@@ -315,9 +313,9 @@ void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TC
         out << ss.Str();
 
         if (Diag()->ShowBuildLoops && BuildLoops.contains(loopId)) {
-            YErr(ShowBuildLoops) << ss.Str();
+            YConfErr(ShowBuildLoops) << ss.Str();
         } else if (Diag()->ShowDirLoops && DirLoops.contains(loopId)) {
-            YErr(ShowDirLoops) << ss.Str();
+            YConfErr(ShowDirLoops) << ss.Str();
         }
     }
 
@@ -414,13 +412,15 @@ void TGraphLoops::RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTarget
     startTargets = std::move(newStartTargets);
 
     // 2. Remove bad nodes with connected edges and print error messages
+    const TStringBuf errorMessage = "the module will not be built due to deprecated loop";
     for (const auto& target : nodesForRemove) {
         const TDepGraph::TConstNodeRef node = graph.Get(target);
         if (node.IsValid() && IsModuleType(node.Value().NodeType)) {
+            TScopedContext context(graph.GetFileName(node));
             if (Diag()->ShowBuildLoops) {
-                YErr(ShowBuildLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
+                YConfErr(ShowBuildLoops) << errorMessage << Endl;
             } else {
-                YErr(ShowDirLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
+                YConfErr(ShowDirLoops) << errorMessage << Endl;
             }
         }
         graph.DeleteNode(target);

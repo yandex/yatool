@@ -878,8 +878,9 @@ void TYMake::SaveStartTargets(TCacheFileWriter& writer) {
 }
 
 void TYMake::Save(const TFsPath& file, bool delayed) {
-    NYMake::TTraceStage stage{"Save internal graph and tables"};
     // Graph.Save() requires no references into graph
+    Modules.ResetTransitiveInfo();
+    TVector<ui32> stIds = PreserveStartTargets();
 
     TCacheFileWriter cacheWriter(Conf, file);
 
@@ -892,15 +893,8 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
         Conf.OnDepsCacheSaved();
     }
 
+    FixStartTargets(stIds);
     IncParserManager.Cache.Clear();
-}
-
-void TYMake::Compact() {
-    NYMake::TTraceStage stage{"Compact internal graph and modules table"};
-    auto stID = PreserveStartTargets();
-    Graph.Compact();
-    Modules.Compact();
-    FixStartTargets(stID);
 }
 
 void TYMake::SaveUids(TUidsCachable* uidsCachable) {

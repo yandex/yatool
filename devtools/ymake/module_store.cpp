@@ -147,7 +147,6 @@ void TModules::Save(IOutputStream* output) {
     saver.Data.reserve(ModulesById.size());
     SaveFilteredModules(saver);
     saver.Save(output);
-    ClearRawIncludes();
 }
 
 void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
@@ -209,6 +208,7 @@ void TModules::Compact() {
     for (auto module: outdated) {
          Destroy(*module);
     }
+    ClearRawIncludes();
 }
 
 void TModules::ReportStats() const {
