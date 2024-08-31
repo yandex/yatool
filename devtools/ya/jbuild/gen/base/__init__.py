@@ -261,22 +261,6 @@ def path_provides_external_jar(path, ctx):
     return False, None
 
 
-def path_provides_run_java_program(path, ctx):
-    import jbuild.gen.actions.run_programs as rp
-
-    programs = []
-    if path in ctx.by_path and consts.RUN_MANAGED in ctx.by_path[path].plain:
-        for program in ctx.by_path[path].plain[consts.RUN_MANAGED]:
-            _, _, _, current = rp.parse_words(program)
-            current = dict(current)
-            if None in current.keys():
-                current['CMD'] = current[None]
-                del current[None]
-            programs.append(current)
-        return programs, programs or None
-    return False, None
-
-
 def resolve_java_srcs(
     srcdir, include_patterns, exclude_patterns=None, all_resources=False, resolve_kotlin=False, resolve_groovy=False
 ):
