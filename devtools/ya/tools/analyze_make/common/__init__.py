@@ -41,7 +41,7 @@ def get_latest_evlog():
         reader = yalibrary.evlog.EvlogReader(evlog_path)
         try:
             for node in reader:
-                if node['namespace'] == 'ymake' and node['value']['StageName'] == 'ymake run':
+                if node['namespace'] == 'ymake' and node['value'].get('StageName') == 'ymake run':
                     return True
         except zstd.ZstdError:
             return False
