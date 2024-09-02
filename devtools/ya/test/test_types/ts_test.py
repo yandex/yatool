@@ -496,6 +496,8 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
             self._ts_config_path,
             "--tracefile",
             os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
+            "--log-path",
+            os.path.join(test_work_dir, test_const.TESTING_OUT_DIR_NAME, "run_tsc_typecheck.log"),
         ]
         ts_files = [f for f in self._files if os.path.splitext(f)[1] in TscTypecheckTestSuite.TS_FILES_EXTS]
         cmd += ts_files[self._modulo_index :: self._modulo]
