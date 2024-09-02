@@ -1027,6 +1027,7 @@ class AuthOptions(Options):
             self.username = config.get_user()
         self._read_token_file()
 
+    # TODO: Use devtools/libs/ya_token here
     def _read_token_file(self):
         if self.oauth_token:
             # Ignore token_path
