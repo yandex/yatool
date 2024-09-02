@@ -155,6 +155,10 @@ def prepare_work_dir(
     external_local_files=None,
     project_path=None,
 ):
+    # Convert to unified slashes style
+    build_root = os.path.abspath(build_root)
+    work_dir = os.path.abspath(work_dir)
+
     if sandbox_resources:
         for entry in sandbox_resources:
             resource_id, _, _ = str(entry).partition('=')
@@ -174,7 +178,7 @@ def prepare_work_dir(
 def _prepare_external_local_files(build_root, external_local_files, work_dir, project_path):
     for entry in external_local_files:
         src = os.path.join(build_root, "external_local", entry)
-        dst = os.path.join(work_dir, os.path.relpath(entry, project_path))
+        dst = os.path.abspath(os.path.join(work_dir, os.path.relpath(entry, project_path)))
 
         dst_dir = os.path.dirname(dst)
         if not os.path.exists(dst_dir):
