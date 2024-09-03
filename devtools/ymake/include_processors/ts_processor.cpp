@@ -11,6 +11,7 @@ namespace {
     std::initializer_list<TString> FileImportExts = {
         "",
         ".ts",
+        ".d.ts",
         ".js",
         ".tsx",
         ".jsx",
@@ -18,6 +19,7 @@ namespace {
 
     std::initializer_list<TString> DirImportExts = {
         ".ts",
+        ".d.ts",
         ".js",
         ".tsx",
         ".jsx",
