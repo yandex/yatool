@@ -191,6 +191,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.custom_build_directory = params.custom_build_directory
     if app_config.in_house:
         build_options.use_distbuild = params.use_distbuild
+        build_options.distbuild_patch = params.distbuild_patch
         build_options.dist_priority = params.dist_priority
         build_options.cluster_type = params.cluster_type
         build_options.download_artifacts = True
