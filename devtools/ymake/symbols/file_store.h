@@ -118,6 +118,7 @@ enum ELinkType : ui8 {
     ELT_Default = 0,
     ELT_MKF, // makefiles
     ELT_Text,
+    ELT_Action,
     ELT_COUNT
 };
 
@@ -129,6 +130,7 @@ public:
         ""sv,
         "MKF"sv,
         "TEXT"sv,
+        "ACTION"sv,
     };
 
     /// Link type to prefix table
@@ -136,6 +138,7 @@ public:
         ""sv,
         "$L/MKF/"sv,
         "$L/TEXT/"sv,
+        "$L/ACTION/"sv,
     };
 
     /// Convert name of link to link type

@@ -70,6 +70,7 @@ struct TNodeAddCtx : public TAddDepAdaptor {
     const TIndDepsRule* DepsRule = nullptr;
     bool DepsRuleSet = false;
     bool FlushDone = false;
+    TNodeAddCtx* Action = nullptr;
 
     THolder<TFlushState> FlushState;
 

@@ -180,13 +180,16 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
 
     const auto node = Graph[nodeId];
     Y_ASSERT(UseFileId(node->NodeType)); //
-    MainFileName = Graph.GetFileName(node).GetTargetStr();
+    auto mainFileView = Graph.GetFileName(node);
+    MainFileName = mainFileView.GetTargetStr();
     YDIAG(MkCmd) << "Build: " << MainFileName << Endl;
     bool isModule = nodeId == modId;
     TVarStrEx mainOut = TVarStrEx(RealPathEx(node), node->ElemId, true);
 
     TVector<TVarStrEx> output;
-    output.push_back(mainOut);
+    if (mainFileView.GetLinkType() != ELT_Action)
+        output.push_back(mainOut);
+
     if (isModule) {
         // For module TARGET is always a first output.
         CmdInfo.AddOutputInternal(mainOut);

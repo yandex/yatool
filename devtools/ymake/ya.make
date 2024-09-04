@@ -53,6 +53,7 @@ ELSE()
 ENDIF()
 
 SRCS(
+    action.cpp
     add_dep_adaptor.cpp
     add_iter_debug.cpp
     add_iter.cpp

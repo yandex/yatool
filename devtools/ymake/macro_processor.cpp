@@ -950,7 +950,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     };
 
     const bool hasExtraOuts = GetOutput().size() > startCountOuts;
-    const bool mainOutAsExtra = hasExtraOuts && Conf->MainOutputAsExtra();
+    const bool mainOutAsExtra = hasExtraOuts && Conf->MainOutputAsExtra() && !IsModuleType(mainOutType);
 
     auto makeMainNodes = [&]() {
         if (mainOutAsExtra) {
@@ -959,10 +959,10 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             Graph->Names().FileConf.GetName(mainOutId).GetStr(mainOutName);
 
             // Это пока очень временный способ пометить специальный узел, в котором будут общие свойства команды.
-            static constexpr TStringBuf actionPrefix = "ACTION:"sv;
+            static constexpr TStringBuf actionPrefix = "$L/ACTION/"sv;
             ui32 actionId = Graph->Names().FileConf.Add(actionPrefix + mainOutName);
 
-            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, mainOutType, false);
+            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, false);
             TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
 
             return std::make_pair(std::ref(actionNode), std::ref(mainOutNode));
@@ -1048,6 +1048,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
         if (mainOutAsExtra || !mainOut) {
             YDIAG(Star) << "Linking main " << actionNode.ElemId << " <-> " << outNode.ElemId << Endl;
+            outNode.SetAction(&actionNode);
             outNode.AddDepIface(EDT_OutTogether, actionNode.NodeType, actionNode.ElemId);
             actionNode.AddDepIface(EDT_OutTogetherBack, outNode.NodeType, outNode.ElemId);
         }

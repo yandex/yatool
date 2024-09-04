@@ -20,6 +20,7 @@ private:
 
 protected:
     const TCmdConf& CmdConf;
+    const bool MainOutputAsExtra;
 
 public:
 

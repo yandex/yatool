@@ -110,7 +110,7 @@ void TModuleBuilder::RecursiveAddInputs() {
         }
         TCommandInfo& info = *cmdInfo;
         if (const auto* mainOut = cmdInfo->GetMainOutput()) {
-            AddOutput(mainOut->ElemId, EMNT_NonParsedFile, false).GetModuleData().CmdInfo = cmdInfo;
+            AddOutput(mainOut->ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
         }
         QueueCommandOutputs(info);
     }
@@ -409,7 +409,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
 
         if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
             AddGlobalVarDeps(node, true);
-            node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetModuleData().CmdInfo = cmdInfo;
+            node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
         } else {
             YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
             if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
@@ -455,7 +455,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     cmdInfo->SetCmdType(TCommandInfo::MacroImplInp);
 
     if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
-        node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetModuleData().CmdInfo = cmdInfo;
+        node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
     } else {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
         if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {

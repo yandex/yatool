@@ -12,6 +12,7 @@
 #include "vars.h"
 #include "ymake.h"
 
+#include <devtools/ymake/action.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/common/json_writer.h>
@@ -195,7 +196,7 @@ namespace {
                 NodeDeps.reserve(NodeInfo.NodeDeps.Get()->size());
                 for (const auto& depId : *NodeInfo.NodeDeps.Get()) {
                     TFileView name = Graph.GetFileName(Graph.Get(depId));
-                    Y_ASSERT(!name.IsLink());
+                    Y_ASSERT(!name.IsLink() || name.GetContextType() == ELT_Action);
                     NodeDeps.push_back({name.GetTargetStr(), depId});
                 }
                 Sort(NodeDeps);
@@ -400,7 +401,7 @@ namespace {
         jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
     }
 
-    void ComputeFullUID(TJSONVisitor& cmdBuilder, TNodeId nodeId) {
+    void ComputeFullUID(const TDepGraph& graph, TJSONVisitor& cmdBuilder, TNodeId nodeId) {
         auto& nodeInfo = cmdBuilder.Nodes.at(nodeId);
         if (nodeInfo.IsFullUidCompleted()) {
             return;
@@ -416,10 +417,22 @@ namespace {
                 const auto depIt = cmdBuilder.Nodes.find(dep);
                 Y_ASSERT(depIt != cmdBuilder.Nodes.end());
 
+                TNodeId depNodeId = depIt->first;
                 const TJSONEntryStats& depData = depIt->second;
 
+                auto isBuildDep = [&]() {
+                    if (depData.HasBuildCmd)
+                        return true;
+                    if (depData.OutTogetherDependency == TNodeId::Invalid)
+                        return false;
+                    return !IsMainOutput(graph, depNodeId, depData.OutTogetherDependency);
+                };
+
+                if (!isBuildDep())
+                    continue;
+
                 if (!depData.IsFullUidCompleted()) {
-                    ComputeFullUID(cmdBuilder, dep);
+                    ComputeFullUID(graph, cmdBuilder, dep);
                 }
                 const TMd5SigValue& depFullUid = depData.GetFullUid();
                 md5.Update(depFullUid, "ComputeFullUID::<depFullUid>"sv);
@@ -446,9 +459,9 @@ namespace {
         nodeInfo.SetSelfUid(md5);
     }
 
-    void UpdateUids(TJSONVisitor& cmdbuilder, TNodeId nodeId) {
+    void UpdateUids(const TDepGraph& graph, TJSONVisitor& cmdbuilder, TNodeId nodeId) {
         ComputeSelfUID(cmdbuilder, nodeId);
-        ComputeFullUID(cmdbuilder, nodeId);
+        ComputeFullUID(graph, cmdbuilder, nodeId);
     }
 
     void RenderJSONGraph(TYMake& yMake, TMakePlan& plan) {
@@ -532,7 +545,7 @@ namespace {
                 plan.WriteConf();
 
                 for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
-                    UpdateUids(cmdbuilder, nodeId);
+                    UpdateUids(yMake.Graph, cmdbuilder, nodeId);
 
                     const auto& node = cmdbuilder.Nodes.at(nodeId);
                     RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);

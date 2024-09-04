@@ -35,4 +35,19 @@ public:
     virtual TPropertiesState& GetProps() = 0;
     virtual TModAddData& GetModuleData() = 0;
     virtual const TIndDepsRule* SetDepsRuleByName(TStringBuf /* name */) = 0;
+
+    TAddDepAdaptor& GetAction() {
+        if (Action_) {
+            return *Action_;
+        } else {
+            return *this;
+        }
+    }
+
+    void SetAction(TAddDepAdaptor* action) {
+        Action_ = action;
+    }
+
+private:
+    TAddDepAdaptor* Action_ = nullptr;
 };

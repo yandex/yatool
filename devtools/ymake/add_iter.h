@@ -435,11 +435,12 @@ public:
         const TUpdEntryStats &parentState,
         EMakeNodeType prntNodeType,
         EMakeNodeType chldNodeType,
-        EDepType edgeType
+        EDepType edgeType,
+        bool mainOutputAsExtra
     )
     {
         ReceiveFromChildIntents_ = CalcIntentsToReceiveFromChild(
-            parentState, prntNodeType, chldNodeType, edgeType
+            parentState, prntNodeType, chldNodeType, edgeType, mainOutputAsExtra
         );
         BINARY_LOG(IPRP, NIter::TSetupReceiveFromChildIntents, DebugGraph, DebugNode, chldNodeType, edgeType, ReceiveFromChildIntents_);
     }
@@ -505,7 +506,8 @@ private:
         const TUpdEntryStats& parentState,
         EMakeNodeType prntNodeType,
         EMakeNodeType chldNodeType,
-        EDepType edgeType
+        EDepType edgeType,
+        bool mainOutputAsExtra
     );
 };
 
@@ -687,7 +689,7 @@ struct TDGIterAddable: public TUpdIterStBase {
         return graph.ToString(Node);
     }
 
-    inline void SetupPropsPassing(TDGIterAddable* parentIterState);
+    inline void SetupPropsPassing(TDGIterAddable* parentIterState, bool mainOutputAsExtra);
 
     void UseProps(TYMake& ymake, const TPropertiesState& props, TUsingRules restrictedProps);
     /// trick DGIter into processing additional nodes as current node's children
@@ -734,6 +736,7 @@ public:
     ui32 LastElem = 0;
     EMakeNodeType LastType;
     TModule* ParentModule = nullptr;
+    bool MainOutputAsExtra = false;
 
     bool Enter(TState& state);
     void Leave(TState& state);
@@ -890,17 +893,14 @@ struct TUpdReiter: public TDepthDGIter<TUpdReIterSt> {
     bool UnflushedFilled = false;
     EMakeNodeType LastType;
     ui32 LastElem = 0;
+    bool MainOutputAsExtra = false;
 
-    TUpdReiter(TUpdIter& parentIter)
-        : TDepthDGIter<TUpdReIterSt>(parentIter.Graph, TNodeId::Invalid)
-        , ParentIter(parentIter)
-        , CurEnt(nullptr)
-    {
-    }
+    TUpdReiter(TUpdIter& parentIter);
 
     ~TUpdReiter() override {
         Clear();
     }
+
     void Clear() {
         for (TVector<TUpdIter::TNodes::iterator>::iterator j = EnteredNodes.begin(); j != EnteredNodes.end(); ++j)
             (*j)->second.ReIterOnceEnt = false;

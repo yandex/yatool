@@ -1,5 +1,6 @@
 #include "json_visitor.h"
 
+#include "action.h"
 #include "vars.h"
 #include "module_restorer.h"
 #include "prop_names.h"
@@ -581,8 +582,17 @@ bool TJSONVisitor::AcceptDep(TState& state) {
 
     if (*dep == EDT_OutTogetherBack) {
         if (!currDone) {
-            TStringBuf additionalOutputName = graph.ToTargetStringBuf(dep.To());
-            currState.Hash->StructureMd5Update(additionalOutputName, additionalOutputName);
+            bool addOutputName = true;
+            if (MainOutputAsExtra) {
+                if (IsMainOutput(graph, currNode.Id(), dep.To().Id())) {
+                    addOutputName = false;
+                }
+            }
+
+            if (addOutputName) {
+                TStringBuf additionalOutputName = graph.ToTargetStringBuf(dep.To());
+                currState.Hash->StructureMd5Update(additionalOutputName, additionalOutputName);
+            }
         }
         return false;
     }

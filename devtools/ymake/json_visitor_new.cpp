@@ -1,5 +1,6 @@
 #include "json_visitor_new.h"
 
+#include "action.h"
 #include "module_restorer.h"
 #include "parser_manager.h"
 
@@ -7,6 +8,7 @@ TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommand
     : TBase{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Commands(commands)
     , CmdConf(cmdConf)
+    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
 {
@@ -149,8 +151,15 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
     // include extra output names to parent entry
     for (auto dep : CurrNode.Edges()) {
         if (*dep == EDT_OutTogetherBack) {
-            TStringBuf depName = Graph->ToTargetStringBuf(dep.To());
-            UpdateCurrent(state, depName, "Include extra output name to structure uid");
+            bool addOutputName = true;
+            if (MainOutputAsExtra) {
+                if (IsMainOutput(*Graph, CurrNode.Id(), dep.To().Id())) {
+                    addOutputName = false;
+                }
+            }
+
+            if (addOutputName)
+                UpdateCurrent(state, Graph->ToTargetStringBuf(dep.To().Id()), "Include extra output name to structure uid");
         }
     }
 
@@ -180,13 +189,19 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         // include managed peers closure to structure hash
         if (CurrState->Module->IsDependencyManagementApplied() && CurrData->NodeDeps) {
             for (TNodeId nodeId : *CurrData->NodeDeps) {
-                const auto depNode = RestoreContext.Graph.Get(nodeId);
-                const auto name = RestoreContext.Graph.ToTargetStringBuf(depNode);
-                UpdateCurrent(state, name, "Include managed peer name to structure hash");
-
                 const TNodeData* chldState = Nodes.FindPtr(nodeId);
                 Y_ASSERT(chldState);
+
                 if (chldState) {
+                    const auto depNode = RestoreContext.Graph.Get(nodeId);
+
+                    if (IsMainOutput(*Graph, depNode.Id(), chldState->OutTogetherDependency)) {
+                        continue;
+                    }
+
+                    const auto name = RestoreContext.Graph.ToTargetStringBuf(depNode);
+                    UpdateCurrent(state, name, "Include managed peer name to structure hash");
+
                     CurrState->Hash->IncludeStructureMd5Update(
                         chldState->GetIncludeStructureUid(),
                         "Pass IncludeStructure for managed peer"
@@ -211,8 +226,17 @@ void TJSONVisitorNew::FinishCurrent(TState& state) {
         // will change too, specifically theirs "inputs" sections.
         // TODO: This is a workaround, and should be removed when "inputs" sections
         // no more contain spurious dependency main outputs.
-        TStringBuf mainOutputName = Graph->ToTargetStringBuf(Graph->Get(CurrData->OutTogetherDependency));
-        CurrState->Hash->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
+        bool addOutputName = true;
+        if (MainOutputAsExtra) {
+            if (IsMainOutput(*Graph, CurrNode.Id(), CurrData->OutTogetherDependency)) {
+                addOutputName = false;
+            }
+        }
+
+        if (addOutputName) {
+            TStringBuf mainOutputName = Graph->ToTargetStringBuf(Graph->Get(CurrData->OutTogetherDependency));
+            CurrState->Hash->IncludeStructureMd5Update(mainOutputName, "Include main output name"sv);
+        }
     }
 
     // Node name will be in $AUTO_INPUT for the consumer of this node.
