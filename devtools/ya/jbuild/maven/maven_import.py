@@ -146,13 +146,13 @@ def contrib_location(artifact):
     else:
         suffix = '-' + artifact.classifier
 
-    return os.path.join(
+    return graph_base.hacked_path_join(
         *([get_contrib_path()] + artifact.group_id.split('.') + [artifact.artifactId + suffix, artifact.version])
     )
 
 
 def contrib_location_bom(artifact):
-    return os.path.join(
+    return graph_base.hacked_path_join(
         *(
             [get_contrib_path()]
             + artifact.group_id.split('.')
@@ -776,7 +776,7 @@ def populate_contrib_unified(
             if arcadia.exists(os.path.join(parent_path, v))
         ]
         max_version = max(contrib_versions, key=lambda v: vf.listify_version(v))
-        max_peerdir = get_peerdir(os.path.join(parent_path, max_version), forced_deps)
+        max_peerdir = get_peerdir(graph_base.hacked_path_join(parent_path, max_version), forced_deps)
 
         if arcadia.exists(parent_path):
             parent_project = arcadia[parent_path].makelist()
