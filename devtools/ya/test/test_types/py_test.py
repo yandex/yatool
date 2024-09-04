@@ -113,7 +113,6 @@ class PyTestSuite(common.PythonTestSuite):
             os.path.join('$(BUILD_ROOT)', "tmp"),
             "--capture",
             "no",
-            "-vv",
             # avoid loading custom pytest.ini files for now
             "-c",
             self._get_ini_file_path(),
