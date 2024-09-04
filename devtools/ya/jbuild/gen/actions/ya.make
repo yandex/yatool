@@ -16,7 +16,6 @@ PY_SRCS(
     missing_dirs.py
     move_matches.py
     parse.py
-    run_programs.py
     sonar.py
 )
 

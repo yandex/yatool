@@ -1,7 +1,5 @@
 import collections
 import string
-import json
-import base64
 
 import six
 
@@ -13,28 +11,6 @@ import yalibrary.graph.base as graph_base
 
 def strip_root(s):
     return s[3:]
-
-
-def iter_run_java_managed_tools(run_calls):
-    from jbuild.gen.actions import parse
-
-    for words in run_calls:
-        _, ws = parse.extract_word(words, consts.R_CWD)
-        _, ws = parse.extract_flag(ws, consts.R_ADD_SRCS)
-
-        kv = parse.extract_words(
-            ws,
-            {
-                consts.R_IN,
-                consts.R_IN_DIR,
-                consts.R_OUT,
-                consts.R_OUT_DIR,
-                consts.R_CLASSPATH,
-                consts.R_CP_USE_COMMAND_FILE,
-            },
-        )
-        for x in kv[consts.R_CLASSPATH]:
-            yield strip_root(x)
 
 
 def default_vars(path):
@@ -165,10 +141,6 @@ def obtain_targets_graph2(dart, cpp_graph):
         non_manageable_peers = (
             entry[consts.NON_NAMAGEABLE_PEERS].split() if consts.NON_NAMAGEABLE_PEERS in entry else []
         )
-        run_java_program_value = entry[consts.RUN_MANAGED].strip().split() if consts.RUN_MANAGED in entry else []
-        run_java_program_value = [
-            list(map(str, json.loads(base64.b64decode(call), encoding='utf-8'))) for call in run_java_program_value
-        ]
         jdk_version = entry[consts.JDK_RESOURCE_PREFIX] if consts.JDK_RESOURCE_PREFIX in entry else None
         if jdk_version and not jdk_version.endswith('_DEFAULT'):
             try:
@@ -198,7 +170,6 @@ def obtain_targets_graph2(dart, cpp_graph):
             | set(map(strip_root, managed_peers_closure))
             | set(map(strip_root, test_classpath))
         )
-        all_java_peerdirs |= set(iter_run_java_managed_tools(run_java_program_value))
 
         for words in entry.get(consts.JAVA_SRCS, []):
             try:
@@ -214,7 +185,6 @@ def obtain_targets_graph2(dart, cpp_graph):
         plain[consts.MANAGED_PEERS] = [managed_peers]
         plain[consts.MANAGED_PEERS_CLOSURE] = [managed_peers_closure]
         plain[consts.NON_NAMAGEABLE_PEERS] = [non_manageable_peers]
-        plain[consts.RUN_MANAGED] = run_java_program_value
         plain[module_type] = [module_args]
         if sbr_resources:
             plain[consts.TEST_DATA_SANDBOX] = [sbr_resources]
