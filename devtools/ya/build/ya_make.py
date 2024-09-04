@@ -409,6 +409,7 @@ class CacheFactory(object):
 
         password = self._get_bazel_password()
         fits_filter = self._get_fits_filter()
+        connection_pool_size = self._get_connection_pool_size()
 
         return bazel_store.BazelStore(
             base_uri=getattr(self._opts, 'bazel_remote_baseuri'),
@@ -416,7 +417,7 @@ class CacheFactory(object):
             password=password,
             readonly=getattr(self._opts, 'bazel_remote_readonly', True),
             max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
-            max_connections=getattr(self._opts, 'dist_store_threads', 24),
+            max_connections=connection_pool_size,
             fits_filter=fits_filter,
         )
 
@@ -489,6 +490,9 @@ class CacheFactory(object):
             return is_dist_cache_suitable(node, None, self._opts)
 
         return fits_filter
+
+    def _get_connection_pool_size(self):
+        return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0)
 
 
 def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
