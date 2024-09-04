@@ -637,9 +637,10 @@ class TraceFileWatcher(object):
                 for testcase in result.tests:
                     if (
                         testcase.status not in [test.common.Status.NOT_LAUNCHED, test.common.Status.DESELECTED]
-                        and testcase not in self._displayed_tests
+                        and (testcase, testcase.status) not in self._displayed_tests
                     ):
-                        msg = ">> " + testcase.name
+                        msg = self._get_testcase_msg(testcase)
+
                         if self.pid:
                             msg += " (pid: {})".format(self.pid)
                         if self._test_cwd:
@@ -651,9 +652,23 @@ class TraceFileWatcher(object):
 
                         app_ctx.display.emit_status(status_msg)
 
-                        self._displayed_tests.add(testcase)
+                        self._displayed_tests.add((testcase, testcase.status))
             except Exception:
                 logger.warning("Error while processing chunk of the trace file: %s", traceback.format_exc())
+
+    def _get_testcase_msg(self, testcase):
+        status_as_str = test.const.Status.TO_STR[testcase.status]
+        status_color = test.const.StatusColorMap[status_as_str]
+
+        # We set CRASHED status and the comment by default in case segfault occurred
+        # so if wee see it like that, then we're sure test is being running
+        # that's why we display it without status
+        if (
+            testcase.status == test.const.Status.CRASHED
+            and testcase.comment == test.const.DEFAULT_CRASHED_STATUS_COMMENT
+        ):
+            return ">> " + testcase.name
+        return ">> " + testcase.name + " [[[" + status_color + "]]" + status_as_str.upper() + "[[rst]]]"
 
 
 class CompositeProcessWatcher(object):

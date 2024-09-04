@@ -124,7 +124,7 @@ class TestEventParser(object):
             facility.TestCase(
                 testname,
                 const.Status.CRASHED,
-                "Test crashed",
+                const.DEFAULT_CRASHED_STATUS_COMMENT,
                 0,
                 None,
                 None,
