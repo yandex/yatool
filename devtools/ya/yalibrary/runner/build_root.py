@@ -10,6 +10,7 @@ import time
 import six
 
 import exts.func
+import exts.windows
 
 from exts import archive
 from exts import uniq_id
@@ -449,6 +450,23 @@ class BuildRootSet(object):
         except Exception:
             pass
 
+    def _rm_rf_root(self):
+        # XXX See DEVTOOLSSUPPORT-41205
+        try:
+            import signal
+            from library.python.prctl import prctl
+
+            def pdeath():
+                prctl.set_pdeathsig(signal.SIGTERM)
+
+        except ImportError:
+            pdeath = None
+
+        subprocess.call(
+            ["rm", "-rf", fs.fix_path_encoding(self._build_root)],
+            preexec_fn=pdeath,
+        )
+
     def cleanup(self):
         if self._keep:
             return
@@ -460,24 +478,13 @@ class BuildRootSet(object):
                 acquired = self._flock.acquire(blocking=False)
                 if acquired:
                     logger.debug('Removing root %s', self._build_root)
-                    # XXX See DEVTOOLSSUPPORT-41205
-                    try:
-                        import signal
-                        from library.python.prctl import prctl
-
-                        def pdeath():
-                            prctl.set_pdeathsig(signal.SIGTERM)
-
-                    except ImportError:
-                        pdeath = None
-
-                    try:
-                        subprocess.call(
-                            ["rm", "-rf", fs.fix_path_encoding(self._build_root)],
-                            preexec_fn=pdeath,
-                        )
-                    except OSError:
+                    if exts.windows.on_win():
                         fs.remove_tree_safe(self._build_root)
+                    else:
+                        try:
+                            self._rm_rf_root()
+                        except OSError:
+                            fs.remove_tree_safe(self._build_root)
                 else:
                     logger.debug('Not removing root %s, lock was not acquired', self._build_root)
             finally:
