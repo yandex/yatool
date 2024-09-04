@@ -437,6 +437,7 @@ class CacheFactory(object):
             max_cache_size=self._opts.yt_max_cache_size,
             ttl=self._opts.yt_store_ttl,
             heater_mode=not self._opts.yt_store_wt,
+            stager=stager,
         )
 
     def _can_use_bazel_remote_cache(self):

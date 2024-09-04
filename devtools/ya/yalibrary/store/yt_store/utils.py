@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import logging
 import sys
@@ -55,3 +56,9 @@ def check_cancel_state():
     if 'app_ctx' in sys.modules:
         # raises exception if application is stopped
         sys.modules['app_ctx'].state.check_cancel_state()
+
+
+class DummyStager:
+    @contextlib.contextmanager
+    def scope(self, *args, **kwargs):
+        yield None

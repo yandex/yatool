@@ -39,6 +39,7 @@ class YtStore(DistStore):
         max_file_size=0,
         fits_filter=None,
         heater_mode=False,
+        **kwargs
     ):
         super(YtStore, self).__init__(
             name='yt-store',
@@ -76,6 +77,8 @@ class YtStore(DistStore):
             self._prepare_tables_future = asyncthread.future(
                 lambda: self._prepare_tables(create_tables, readonly, proxy, ttl)
             )
+
+        self._stager = kwargs.get("stager", utils.DummyStager())
 
     @property
     def is_disabled(self):
@@ -124,31 +127,32 @@ class YtStore(DistStore):
             self._load_meta(uids, refresh_on_read)
 
     def _load_meta(self, uids, refresh_on_read=False):
-        self.wait_until_tables_ready()
+        with self._stager.scope('loading-yt-meta'):
+            self.wait_until_tables_ready()
 
-        try:
-            with AccumulateTime(lambda x: self._inc_time(x, 'get-meta')):
-                refresh_access_time = not self.readonly() and refresh_on_read
-                self._meta = self._client.get_metadata(uids, refresh_access_time=refresh_access_time)
-                if self._time_to_first_recv_meta is None:
-                    self._time_to_first_recv_meta = time.time()
-            # logger.debug('YT cache has: %s', ', '.join(self._meta.keys()))
-        except Exception as e:
-            raise YtInitException('Can\'t read metadata at {}: {}'.format(self._proxy, str(e)))
+            try:
+                with AccumulateTime(lambda x: self._inc_time(x, 'get-meta')):
+                    refresh_access_time = not self.readonly() and refresh_on_read
+                    self._meta = self._client.get_metadata(uids, refresh_access_time=refresh_access_time)
+                    if self._time_to_first_recv_meta is None:
+                        self._time_to_first_recv_meta = time.time()
+                # logger.debug('YT cache has: %s', ', '.join(self._meta.keys()))
+            except Exception as e:
+                raise YtInitException('Can\'t read metadata at {}: {}'.format(self._proxy, str(e)))
 
-        self._cache_hit = {'requested': len(uids), 'found': len(self._meta)}
+            self._cache_hit = {'requested': len(uids), 'found': len(self._meta)}
 
-        if self._max_cache_size and not self.readonly():
-            size = self.get_used_size()
-            if size > self._max_cache_size:
-                if self._heater_mode:
-                    raise YtInitException(
-                        "Cannot update yt store due to size, limit: {}, {}".format(size, self._max_cache_size)
+            if self._max_cache_size and not self.readonly():
+                size = self.get_used_size()
+                if size > self._max_cache_size:
+                    if self._heater_mode:
+                        raise YtInitException(
+                            "Cannot update yt store due to size, limit: {}, {}".format(size, self._max_cache_size)
+                        )
+                    logger.warning(
+                        'Cache size (%s) exceeds limit of %s bytes, switch to readonly mode', size, self._max_cache_size
                     )
-                logger.warning(
-                    'Cache size (%s) exceeds limit of %s bytes, switch to readonly mode', size, self._max_cache_size
-                )
-                self._readonly = True
+                    self._readonly = True
 
     def get_used_size(self):
         return self._client.get_tables_size()
