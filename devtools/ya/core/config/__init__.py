@@ -296,7 +296,11 @@ def mapping():
     if has_mapping():
         mappings = [_get_config(name="mapping.conf.json")]
         try:
-            mappings.append(_get_config(name="ext_mapping.conf.json"))
+            ext_mapping_file = os.environ.get('YA_TOOLS_EXT_CONFIG_FILE')
+            if ext_mapping_file is not None:
+                mappings.append(config_from_arc_rel_path(ext_mapping_file))
+            else:
+                mappings.append(_get_config(name="ext_mapping.conf.json"))
         except MissingConfigError:
             pass
 
