@@ -10,6 +10,9 @@ RUN_JAVA_PROGRAM(
 {% for repo in remote_repos -%}
         --remote-repo {{ repo }}
 {% endfor -%}
+{% for artifact in skip_artifacts -%}
+        --skip-artifact {{ artifact }}
+{% endfor -%}
 {% if resolve_type == "unified" -%}
         --unified
 {% elif resolve_type == "check" -%}
@@ -17,6 +20,9 @@ RUN_JAVA_PROGRAM(
 {% endif -%}
 {% if minimal_pom_validation -%}
         --minimal-pom-validation
+{% endif -%}
+{% if import_dm -%}
+        --import-dm
 {% endif -%}
 {% if repo_auth_username -%}
         --repo-auth-username {{ repo_auth_username }}

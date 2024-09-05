@@ -757,10 +757,12 @@ class MavenImportOptions(SandboxUploadOptions):
         self.dry_run = False
         self.unified_mode = True
         self.replace_version = {}
+        self.skip_artifacts = []
         self.write_licenses = True
         self.canonize_licenses = True
         self.minimal_pom_validation = True
         self.local_jar_resources = not app_config.in_house
+        self.import_dm = False
         self.repo_auth_username = None
         self.repo_auth_password = None
 
@@ -818,6 +820,12 @@ class MavenImportOptions(SandboxUploadOptions):
                 group=MAVEN_OPT_GROUP,
             ),
             ArgConsumer(
+                ['--skip'],
+                help='Skip artifacts that cause error during import',
+                hook=SetAppendHook('skip_artifacts'),
+                group=MAVEN_OPT_GROUP,
+            ),
+            ArgConsumer(
                 ['--no-write-licenses'],
                 help='Write contribs licenses into ya.make\'s',
                 hook=SetConstValueHook('write_licenses', False),
@@ -845,6 +853,12 @@ class MavenImportOptions(SandboxUploadOptions):
                 ['--local-resources'],
                 help='Local resources in repo instead upload to sandbox',
                 hook=SetConstValueHook('local_jar_resources', True),
+                group=MAVEN_OPT_GROUP,
+            ),
+            ArgConsumer(
+                ['--import-managed-deps'],
+                help='Import artifacts from Dependency Managements',
+                hook=SetConstValueHook('import_dm', True),
                 group=MAVEN_OPT_GROUP,
             ),
             ArgConsumer(
