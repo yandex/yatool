@@ -239,7 +239,7 @@ namespace {
                     return *arg0;
                 };
 
-                // TODO: get rid of escaping in Args followed by unescaping in Input/Output
+                // TODO: get rid of escaping in Args followed by unescaping in Input/Output/CutPath/CutExt
 
                 switch (fnIdx) {
                     case EMacroFunction::Args: {
@@ -326,6 +326,13 @@ namespace {
                     case EMacroFunction::CutPath: {
                         checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() != 1) {
+                            throw std::runtime_error{"nopath modifier requires a single argument"};
+                        }
+                        // one does not simply reuse the original argument,
+                        // for it might have been transformed (e.g., dequoted)
+                        arg0 = names.front();
                         // cf. EMF_CutPath processing
                         size_t slash = arg0.rfind(NPath::PATH_SEP);
                         if (slash != TString::npos)
@@ -336,6 +343,13 @@ namespace {
                     case EMacroFunction::CutExt: {
                         checkArgCount(1);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
+                        auto names = SplitArgs(TString(arg0));
+                        if (names.size() != 1) {
+                            throw std::runtime_error{"noext modifier requires a single argument"};
+                        }
+                        // one does not simply reuse the original argument,
+                        // for it might have been transformed (e.g., dequoted)
+                        arg0 = names.front();
                         // cf. RenderCutExt()
                         size_t slash = arg0.rfind(NPath::PATH_SEP); //todo: windows slash!
                         if (slash == TString::npos)
@@ -358,14 +372,20 @@ namespace {
                         checkArgCount(2);
                         auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
                         auto context = TFileConf::GetContextType(arg0);
-                        auto arg1 = std::get_if<TMacroValues::TInputs>(&unwrappedArgs[1]);
-                        if (!arg1)
-                            throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid input sequence";
-                        for (auto& coord : arg1->Coords)
-                            UpdateCoord(Sink.Inputs, coord, [=](auto& var) {
+                        if (auto arg1 = std::get_if<TMacroValues::TInputs>(&unwrappedArgs[1])) {
+                            for (auto& coord : arg1->Coords)
+                                UpdateCoord(Sink.Inputs, coord, [=](auto& var) {
+                                    var.Context = context;
+                                });
+                            return *arg1;
+                        }
+                        if (auto arg1 = std::get_if<TMacroValues::TInput>(&unwrappedArgs[1])) {
+                            UpdateCoord(Sink.Inputs, arg1->Coord, [=](auto& var) {
                                 var.Context = context;
                             });
-                        return *arg1;
+                            return *arg1;
+                        }
+                        throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid input sequence";
                     }
                     case EMacroFunction::NoAutoSrc:
                         return updateOutput([](auto& x) {x.NoAutoSrc = true;});
