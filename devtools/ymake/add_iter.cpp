@@ -1613,7 +1613,7 @@ inline void TUpdIter::Left(TState& state) {
             missingProps = missingProps & st_.IntentsToReceiveFromChild();
         }
 
-        if (!missingProps.Empty()) {
+        if (!missingProps.Empty() || !MainOutputAsExtra) {
             YDIAG(IPRP) << "      Rescan " << Endl;
             Rescan(st_);
             // TODO/FIXME: this may report "<invalid node>" when dealing with not-yet-flushed nodes (use extra outputs in module commands to reproduce)
