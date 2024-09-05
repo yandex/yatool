@@ -5,4 +5,5 @@ RECURSE(
     hello-test
     hello-dm
     hello-deptree
+    hello-kotlin
 )
