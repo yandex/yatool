@@ -98,12 +98,6 @@ private:
     THashMap<EDepType, TNodeToDeps> DepTypeToNodeDeps;
 };
 
-#if !defined(YMAKE_OLD_PROPS)
-constexpr bool NewPropsMode = true;
-#else
-constexpr bool NewPropsMode = false;
-#endif
-
 TString DumpProps(const TDepGraph& graph, const TNodeProperties& props);
 
 inline TIntents GetNonRuntimeIntents() {
@@ -123,9 +117,7 @@ public:
         , Values_(nodeDebug)
     {
         TNotReadyLogger notReadyLogger{*this, ENotReadyLocation::Constructor};
-        if constexpr (NewPropsMode) {
-            NotReadyIntents_ = GetNonRuntimeIntents();
-        }
+        NotReadyIntents_ = GetNonRuntimeIntents();
     }
 
     void SetupRequiredIntents(EMakeNodeType nodeType) {
@@ -285,9 +277,7 @@ public:
         Values_.Clear();
         // Практически все случаи вызова этого метода свидетельствуют о ситуации
         // сброса состояния узла. Пока более явного определения этой ситуации у нас нет.
-        if constexpr (NewPropsMode) {
-            NotReadyIntents_ = GetNonRuntimeIntents();
-        }
+        NotReadyIntents_ = GetNonRuntimeIntents();
     }
 
     void ClearValues(TIntents intents) {
@@ -468,14 +458,9 @@ public:
     }
 
     void ResetFetchIntents(bool parentHasChanges, const TPropertiesState& parentState, TPropertiesIterState& parentIterState) {
-        TIntents requiredByParent;
-        if constexpr (NewPropsMode) {
-            TIntents requiredByParent = parentState.GetRequiredIntents();
-            if (!parentHasChanges) {
-                requiredByParent.Remove(GetNonRuntimeIntents());
-            }
-        } else {
-            requiredByParent = parentHasChanges ? parentState.GetRequiredIntents() : TIntents::None();
+        TIntents requiredByParent = parentState.GetRequiredIntents();
+        if (!parentHasChanges) {
+            requiredByParent.Remove(GetNonRuntimeIntents());
         }
         FetchIntents_ = (parentIterState.FetchIntents_ & parentIterState.ReceiveFromChildIntents_) | requiredByParent;
         BINARY_LOG(IPRP, NIter::TResetFetchIntents, DebugGraph, DebugNode, FetchIntents_, ELocation::IterEnter);
@@ -751,7 +736,7 @@ public:
     TNodeId RecursiveAddNode(EMakeNodeType type, const TStringBuf& name, TModule* module);
     TNodeId RecursiveAddNode(EMakeNodeType type, ui64 id, TModule* module);
 
-    void Rescan(TDGIterAddable& from, TIntents missingProps);
+    void Rescan(TDGIterAddable& from);
 
     // Retieve node representation during graph construction depending on
     // the graph being constructed

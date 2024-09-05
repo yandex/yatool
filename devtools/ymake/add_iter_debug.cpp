@@ -26,8 +26,8 @@ namespace NDebugEvents::NIter {
     {
     }
 
-    TRescanEvent::TRescanEvent(const TDepGraph& graph, TDepTreeNode node, TIntents intents)
-        : Node(graph, node), Intents(intents)
+    TRescanEvent::TRescanEvent(const TDepGraph& graph, TDepTreeNode node)
+        : Node(graph, node)
     {
     }
 

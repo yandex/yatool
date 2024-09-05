@@ -222,11 +222,7 @@ bool TUpdIterStBase::NodeToProps(TDepGraph& graph, TDelayedSearchDirDeps& delaye
                 << " timestamp= " << int(stamp)
                 << " useAddCtx=" << useAddCtx << Endl;
     if (!ShouldFetchIntent(intentId) && !useAddCtx) {
-        bool skip = true;
-        if constexpr (NewPropsMode) {
-            skip = GetNonRuntimeIntents().Has(intentId);
-        }
-        if (skip) {
+        if (GetNonRuntimeIntents().Has(intentId)) {
             entry.Props.SetIntentNotReady(intentId, 0, TPropertiesState::ENotReadyLocation::NodeToProps);
             return false;
         }
@@ -689,14 +685,12 @@ inline void TDGIterAddable::StartEdit(TYMake& yMake, TUpdIter& dgIter) {
     Entry().HasChanges = true;
     Entry().OnceProcessedAsFile = true;
 
-    if constexpr (NewPropsMode) {
-        if (!CurDep) {
-            // В это место мы попадаем при «первом» входе в узел. «Первых» входов
-            // может быть несколько, например, после сброса узла мы также попадём сюда.
-            // В любом случае сбрасываем состояние свойств — это либо no-op, либо
-            // корректная очистка после сброса узла.
-            Entry().Props.ClearValues();
-        }
+    if (!CurDep) {
+        // В это место мы попадаем при «первом» входе в узел. «Первых» входов
+        // может быть несколько, например, после сброса узла мы также попадём сюда.
+        // В любом случае сбрасываем состояние свойств — это либо no-op, либо
+        // корректная очистка после сброса узла.
+        Entry().Props.ClearValues();
     }
 
     bool isMod;
@@ -1240,10 +1234,8 @@ inline bool TUpdIter::Enter(TState& state) {
         // а если бы получал правильные значения, то это приводило бы к большому количеству ненужных повторных
         // разборов makefile-ов. Нужно сначала эту ситуацию исследовать, убрать или корректно изменить
         // зависимость StartEdit от FetchIntents и после этого перенести вызов SetupPropsPassing в более правильное место.
-        if constexpr (NewPropsMode) {
-            st.SetupPropsPassing(prev, MainOutputAsExtra);
-            propsPassingSetupDone = true;
-        }
+        st.SetupPropsPassing(prev, MainOutputAsExtra);
+        propsPassingSetupDone = true;
 
         if (!isModule && IsModuleType(st.Node.NodeType)) {
             // StartEdit have changed NodeType
@@ -1273,13 +1265,11 @@ inline bool TUpdIter::Enter(TState& state) {
 
             if ((st.Node.NodeType == EMNT_BuildCommand || st.Node.NodeType == EMNT_Property) && IsPropDep(state)) {
                 if (st.NodeToProps(Graph, DelayedSearchDirDeps, st.Add.Get())) {
-                    if constexpr (NewPropsMode) {
-                        ui8 timestamp = 0;
-                        if (UseFileId(prev->Node.NodeType)) {
-                            timestamp = prev->Entry().IncModStamp;
-                        }
-                        st.Entry().Props.SetIntentsReady(TIntents::All(), timestamp, TPropertiesState::ENotReadyLocation::NodeToProps);
+                    ui8 timestamp = 0;
+                    if (UseFileId(prev->Node.NodeType)) {
+                        timestamp = prev->Entry().IncModStamp;
                     }
+                    st.Entry().Props.SetIntentsReady(TIntents::All(), timestamp, TPropertiesState::ENotReadyLocation::NodeToProps);
                 }
                 if (!st.IsEdited() && st.Node.NodeType == EMNT_BuildCommand && state.size() > 2 && IsModuleType(prev->Node.NodeType)) {
                     const auto prop = Graph.GetCmdName(st.Node.NodeType, st.Node.ElemId).GetStr();
@@ -1601,13 +1591,9 @@ inline void TUpdIter::Left(TState& state) {
     // Неготовые свойства дочернего узла, которые текущий узел должен использовать или передать родительским узлам.
     TIntents missingProps = chldProps.GetNotReadyIntents() & (st_.IntentsToReceiveFromChild() | currProps.GetRequiredIntents());
 
-    if constexpr (!NewPropsMode) {
-        currProps.SetIntentsNotReady(missingProps, TPropertiesState::ENotReadyLocation::MissingFromChild);
-    } else {
-        // Ставим флаг неготовности всем runtime-свойствам текущего узла, которые мы использовали или передавали бы.
-        // Графовым свойствам такой флаг ставить не нужно, их всегда можно запросить через Rescan.
-        currProps.SetIntentsNotReady(missingProps & GetRuntimeIntents(), TPropertiesState::ENotReadyLocation::MissingFromChild);
-    }
+    // Ставим флаг неготовности всем runtime-свойствам текущего узла, которые мы использовали или передавали бы.
+    // Графовым свойствам такой флаг ставить не нужно, их всегда можно запросить через Rescan.
+    currProps.SetIntentsNotReady(missingProps & GetRuntimeIntents(), TPropertiesState::ENotReadyLocation::MissingFromChild);
 
     if ((needEdit || st_.IsEdited()) && missingProps.NonEmpty()) {
         bool makefileRescan = missingProps.Has(EVI_GetModules) && st_.IsAtDirMkfDep(LastType);
@@ -1620,26 +1606,22 @@ inline void TUpdIter::Left(TState& state) {
             return;
         }
 
-        if constexpr (NewPropsMode) {
-            // Делаем Rescan только для тех свойств, которые понадобятся в текущем узле.
-            // Если родительским узлам понадобятся другие свойства, они сами сделают Rescan.
-            missingProps = chldProps.GetNotReadyIntents() & currProps.GetRequiredIntents() & GetNonRuntimeIntents();
-            if (MainOutputAsExtra) {
-                missingProps = missingProps & st_.IntentsToReceiveFromChild();
-            }
+        // Делаем Rescan только для тех свойств, которые понадобятся в текущем узле.
+        // Если родительским узлам понадобятся другие свойства, они сами сделают Rescan.
+        missingProps = chldProps.GetNotReadyIntents() & currProps.GetRequiredIntents() & GetNonRuntimeIntents();
+        if (MainOutputAsExtra) {
+            missingProps = missingProps & st_.IntentsToReceiveFromChild();
         }
 
         if (!missingProps.Empty()) {
-            YDIAG(IPRP) << "      Rescan " << missingProps << Endl;
-            Rescan(st_, missingProps);
+            YDIAG(IPRP) << "      Rescan " << Endl;
+            Rescan(st_);
             // TODO/FIXME: this may report "<invalid node>" when dealing with not-yet-flushed nodes (use extra outputs in module commands to reproduce)
             YDIAG(IPRP) << "After Rescan from " << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << ": "
                         << "FromProps[ " << chldProps.DumpValues(Graph) << " ] "
                         << " Not ready " << chldProps.DumpNotReadyIntents() << Endl;
 
-            if constexpr (NewPropsMode) {
-                Y_ASSERT((chldProps.GetNotReadyIntents() & currProps.GetRequiredIntents() & GetNonRuntimeIntents()).Empty());
-            }
+            Y_ASSERT((chldProps.GetNotReadyIntents() & currProps.GetRequiredIntents() & GetNonRuntimeIntents()).Empty());
         }
     }
     TDGIterAddable& st = state.back();
@@ -1699,29 +1681,22 @@ inline void TUpdIter::Left(TState& state) {
             // Но на данный момент UseProps сам проверяет это условие.
             st.UseProps(YMake, childProps, restrictedProps);
 
-            TIntents copyIntents;
-            if constexpr (NewPropsMode) {
-                // Передаём все готовые runtime-свойства из дочернего узла.
-                // Мы должны передать их все при первом же выходе, потому что TUpdIter
-                // не будет повторно спускаться в дочерние узлы. И если в текущий узел
-                // мы придём по другой дуге, по которой нужно будет передавать
-                // другие runtime свойства, у нас уже не будет возможности их получить.
-                TIntents receiveAllRuntimeIntentsFromChild = GetRuntimeIntents() & st.IntentsToReceiveFromChild();
+            // Передаём все готовые runtime-свойства из дочернего узла.
+            // Мы должны передать их все при первом же выходе, потому что TUpdIter
+            // не будет повторно спускаться в дочерние узлы. И если в текущий узел
+            // мы придём по другой дуге, по которой нужно будет передавать
+            // другие runtime свойства, у нас уже не будет возможности их получить.
+            TIntents receiveAllRuntimeIntentsFromChild = GetRuntimeIntents() & st.IntentsToReceiveFromChild();
 
-                // Раньше здесь был перенос только готовых свойств.
-                //
-                // copyIntents = receiveAllRuntimeIntentsFromChild.Without(chldProps.GetNotReadyIntents());
-                //
-                // Однако в старой реализации хоть флаг not ready и передавался отдельно от самих свойств,
-                // сами значения свойств тоже распространялись отдельным вызовом Rescan.
-                // Сейчас Rescan для runtime свойств не производится, поэтому сразу распространяем
-                // их значения даже вместе с флагом not ready.
-
-                copyIntents = receiveAllRuntimeIntentsFromChild;
-            } else {
-                copyIntents = st.IntentsToReceiveFromChild().Without(chldProps.GetNotReadyIntents());
-            }
-            currStats.Props.CopyProps(chldStats.Props, copyIntents, restrictedProps);
+            // Раньше здесь был перенос только готовых свойств.
+            //
+            // copyIntents = receiveAllRuntimeIntentsFromChild.Without(chldProps.GetNotReadyIntents());
+            //
+            // Однако в старой реализации хоть флаг not ready и передавался отдельно от самих свойств,
+            // сами значения свойств тоже распространялись отдельным вызовом Rescan.
+            // Сейчас Rescan для runtime свойств не производится, поэтому сразу распространяем
+            // их значения даже вместе с флагом not ready.
+            currStats.Props.CopyProps(chldStats.Props, receiveAllRuntimeIntentsFromChild, restrictedProps);
             YDIAG(IPRP) << "UpdIter: after adding: "
                         << "Props[ " << currProps.DumpValues(Graph) << " ] " << Endl;
         } else {
@@ -2020,26 +1995,20 @@ inline bool TUpdReiter::Enter(TState& state) {
         st.Add = i->second.AddCtx;
 
         TIntents fetchIntents;
-        if constexpr (NewPropsMode) {
-            if (!prev) {
-                fetchIntents = i->second.Props.GetNotReadyIntents() & GetNonRuntimeIntents();
-            } else {
-                // Правильно было бы запрашивать только передаваемые через ребро intent-ы,
-                // но тогда нужно сделать в одном обходе возможность входить в каждый
-                // узел неколько раз (по количеству intent-ов).
-                // fetchIntents = prev->GetFetchIntents() & prev->IntentsToReceiveFromChild();
-                fetchIntents = i->second.Props.GetNotReadyIntents() & GetNonRuntimeIntents();
-            }
-            Y_ASSERT((fetchIntents & GetRuntimeIntents()).Empty());
+        if (!prev) {
+            fetchIntents = i->second.Props.GetNotReadyIntents() & GetNonRuntimeIntents();
         } else {
-            fetchIntents = i->second.Props.GetNotReadyIntents();
+            // Правильно было бы запрашивать только передаваемые через ребро intent-ы,
+            // но тогда нужно сделать в одном обходе возможность входить в каждый
+            // узел неколько раз (по количеству intent-ов).
+            // fetchIntents = prev->GetFetchIntents() & prev->IntentsToReceiveFromChild();
+            fetchIntents = i->second.Props.GetNotReadyIntents() & GetNonRuntimeIntents();
         }
+        Y_ASSERT((fetchIntents & GetRuntimeIntents()).Empty());
         st.ResetFetchIntents(fetchIntents, TPropertiesIterState::ELocation::ReIterEnter);
-        if constexpr (NewPropsMode) {
-            if (!st.HasIntentsToFetch()) {
-                st.EntryPtr = CurEnt = &*i;
-                return false;
-            }
+        if (!st.HasIntentsToFetch()) {
+            st.EntryPtr = CurEnt = &*i;
+            return false;
         }
 
         if (st.NodeStart == TNodeId::Invalid) {
@@ -2078,10 +2047,8 @@ inline void TUpdReiter::Leave(TState& state) {
     BINARY_LOG(Iter, NIter::TLeaveEvent, Graph, state.back().Node, EIterType::ReIter);
 
     TUpdReIterSt& st = state.back();
-    if constexpr (NewPropsMode) {
-        if (st.EntryPtr) {
-            st.Entry().Props.SetIntentsReady(st.GetFetchIntents(), TPropertiesState::ENotReadyLocation::ReIterLeave);
-        }
+    if (st.EntryPtr) {
+        st.Entry().Props.SetIntentsReady(st.GetFetchIntents(), TPropertiesState::ENotReadyLocation::ReIterLeave);
     }
 
     LastType = st.Node.NodeType;
@@ -2130,21 +2097,11 @@ const TNodeAddCtx* TUpdReiter::FindUnflushedNode(TDepsCacheId cacheId) {
     return i ? i->second : nullptr;
 }
 
-void TUpdIter::Rescan(TDGIterAddable& from, TIntents missingProps) {
+void TUpdIter::Rescan(TDGIterAddable& from) {
     TUpdReiter it(*this);
     it.Restart(from.Dep);
-    BINARY_LOG(Iter, NIter::TRescanEvent, Graph, from.Dep.DepNode, missingProps);
+    BINARY_LOG(Iter, NIter::TRescanEvent, Graph, from.Dep.DepNode);
     while (it.Next(it)) {
-    }
-
-    if constexpr (!NewPropsMode) {
-        for (size_t intentNumber = 0; intentNumber < EVI_MaxId; intentNumber++) {
-            const auto intent = static_cast<EVisitIntent>(intentNumber);
-
-            if (missingProps.Has(intent)) {
-                from.Entry().Props.UpdateIntentTimestamp(intent, YMake.TimeStamps.CurStamp());
-            }
-        }
     }
 }
 

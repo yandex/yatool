@@ -88,12 +88,11 @@ namespace NDebugEvents::NIter {
 
     struct TRescanEvent {
         TNodeIdLog Node;
-        TIntents Intents;
 
-        Y_SAVELOAD_DEFINE(Node, Intents);
+        Y_SAVELOAD_DEFINE(Node);
 
         TRescanEvent() = default;
-        TRescanEvent(const TDepGraph& graph, TDepTreeNode node, TIntents intents);
+        TRescanEvent(const TDepGraph& graph, TDepTreeNode node);
     };
 
     enum class ENotReadyLocation {
