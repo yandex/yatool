@@ -16,6 +16,8 @@ from exts.timer import AccumulateTime
 from yalibrary.store.dist_store import DistStore
 
 logger = logging.getLogger(__name__)
+# Suppress spam
+compress.logger.setLevel(logging.INFO)
 
 
 class YtInitException(Exception):
