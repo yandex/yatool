@@ -2400,8 +2400,13 @@ class DistCacheSetupOptions(LocalCacheOptions):
     def __init__(self):
         super(DistCacheSetupOptions, self).__init__()
 
-        self.yt_proxy = 'hahn.yt.yandex.net'
-        self.yt_dir = '//home/devtools/cache'
+        if app_config.in_house:
+            self.yt_proxy = 'hahn.yt.yandex.net'
+            self.yt_dir = '//home/devtools/cache'
+        else:
+            self.yt_proxy = ''
+            self.yt_dir = ''
+
         self.yt_token = None
         self.yt_token_path = os.path.expanduser('~/.yt/token')
         self.yt_readonly = True
