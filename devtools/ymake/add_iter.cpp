@@ -1198,7 +1198,14 @@ inline bool TUpdIter::Enter(TState& state) {
             FORCE_UNIQ_CONFIGURE_TRACE(Graph.GetFileName(st.Node.ElemId), H, NEvent::TNeedDirHint(TString(Graph.GetFileName(st.Node.ElemId).CutType())));
         }
 
+        EMakeNodeType oldNodeType = st.Node.NodeType;
         st.StartEdit(YMake, *this);
+
+        if (st.Node.NodeType != oldNodeType) {
+            // πάντα ρεῖ...
+            i->second.Props.SetupRequiredIntents(st.Node.NodeType);
+        }
+
         // StartEdit may insert to Nodes new elements.
         // Depending on Nodes type it may also invalidate existing iterators. Then uncomment the following:
         // i = Nodes.find(id);
