@@ -255,6 +255,10 @@ class VSCodeProject(object):
                         OrderedDict(
                             (
                                 (
+                                    "build.arcadiaIndexDirs",
+                                    self.params.abs_targets,
+                                ),
+                                (
                                     "build.env",
                                     {
                                         "CGO_ENABLED": "0",

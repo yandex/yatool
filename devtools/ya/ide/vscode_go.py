@@ -347,6 +347,10 @@ def gen_vscode_workspace(params):
                             OrderedDict(
                                 (
                                     (
+                                        "build.arcadiaIndexDirs",
+                                        params.abs_targets,
+                                    ),
+                                    (
                                         "build.env",
                                         {
                                             "CGO_ENABLED": "0",
