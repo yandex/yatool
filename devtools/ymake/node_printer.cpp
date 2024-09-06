@@ -1605,7 +1605,7 @@ public:
             TScopedContext context(modName); // to use LWARN here
             TModuleRestorer restorer(RestoreContext, st.Node());
             restorer.RestoreModule();
-            auto peers = restorer.GetPeers();
+            const auto& peers = restorer.GetPeers();
             for (const auto& modulesGroup : *CurEnt->ModulesInIncls) {
                 TString modErrMsg;
                 bool resolved = CurEnt->Modules.Empty();
