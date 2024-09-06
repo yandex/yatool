@@ -28,6 +28,8 @@ ENDIF()
 
 END()
 
-RECURSE_FOR_TESTS(
-    tests
-)
+IF (NOT OS_WINDOWS)  # YA-1973
+    RECURSE_FOR_TESTS(
+        tests
+    )
+ENDIF()
