@@ -64,10 +64,24 @@ namespace NYMake {
             TVector<TStringBuf>::const_iterator bucketStart = params.cbegin();
             TVector<TStringBuf>::const_iterator path = params.cend();
             bool useTextContext = false;
-            if (bucketStart != params.cend() && *bucketStart == "DONT_PARSE") {
-                useTextContext = true;
-                bucketStart++;
+            bool dontCompress = false;
+
+            while (true) {
+                // Allow at most one of each in any order
+                if (!useTextContext && bucketStart != params.cend() && *bucketStart == "DONT_PARSE"sv) {
+                    useTextContext = true;
+                    bucketStart++;
+                    continue;
+                }
+                if (!dontCompress && bucketStart != params.cend() && *bucketStart == "DONT_COMPRESS"sv) {
+                    dontCompress = true;
+                    bucketStart++;
+                    continue;
+                }
+                break;
             }
+
+            dontCompress = dontCompress || unit.Enabled("ARCH_AARCH64"sv) || unit.Enabled("ARCH_ARM"sv) || unit.Enabled("ARCH_PPC64LE"sv);
 
             if (IsSemanticsRendering) {
                 TVector<TStringBuf> keys;
@@ -159,8 +173,7 @@ namespace NYMake {
                 length = 0;
             };
 
-            bool isExoticArch = unit.Enabled("ARCH_AARCH64"sv) || unit.Enabled("ARCH_ARM"sv) || unit.Enabled("ARCH_PPC64LE"sv);
-            if (isExoticArch) {
+            if (dontCompress) {
                 rawKeys.reserve(params.size());
             }
 
@@ -178,7 +191,7 @@ namespace NYMake {
 
                 length += additionalLength;
 
-                if (isExoticArch) {
+                if (dontCompress) {
                     rawGen.push_back(*path);
 
                     if (*path != "-") {
