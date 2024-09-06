@@ -9,7 +9,6 @@
 
 namespace {
     const TStringBuf DM_VAR_NAMES[] = {
-        "RUN_JAVA_PROGRAM_MANAGED",
         "NON_NAMAGEABLE_PEERS",
         "DART_CLASSPATH_DEPS",
         "MANAGED_PEERS",
