@@ -121,9 +121,11 @@ void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
 
         TVector<ui32> uniqPeersIds, directPeersIds;
         THashMap<TString, TString> dmVars;
+        bool isPeersComplete;
         ::Load(input, uniqPeersIds);
         ::Load(input, directPeersIds);
         ::Load(input, dmVars);
+        ::Load(input, isPeersComplete);
         auto& moduleLists = GetModuleNodeIds(modId);
         for (auto peer : uniqPeersIds) {
             TFileView peerFileView = Symbols.FileConf.GetName(peer);
@@ -138,7 +140,9 @@ void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
         for (const auto& [name, value] : dmVars) {
             module->Set(name, value);
         }
-        module->SetPeersComplete();
+        if (isPeersComplete) {
+            module->SetPeersComplete();
+        }
     }
 }
 
@@ -176,6 +180,7 @@ void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
         ::Save(output, uniqPeersIds);
         ::Save(output, managedDirectPeersIds);
         ::Save(output, dmVars);
+        ::Save(output, bool(module->IsPeersComplete()));
     }
 }
 
