@@ -314,6 +314,7 @@ void TBuildConfiguration::FillMiscValues() {
 
     MainOutputAsExtra_ = NYMake::IsTrue(CommandConf.EvalValue("MAIN_OUTPUT_AS_EXTRA"));
     YDebug() << "MainOutputAsExtra " << (MainOutputAsExtra_ ? "enabled" : "disabled") << Endl;
+    CheckForIncorrectLoops_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_CHECK_FOR_INCORRECT_LOOPS"));
 
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
         ReportMissingAddincls = !NYMake::IsTrue(val);

@@ -133,6 +133,10 @@ public:
         return MainOutputAsExtra_;
     }
 
+    bool CheckForIncorrectLoops() const noexcept {
+        return CheckForIncorrectLoops_;
+    }
+
     TStringBuf GetUidsSalt() const {
         return UidsSalt;
     }
@@ -189,6 +193,7 @@ private:
     bool ReportMissingAddincls = true;
     bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = false;
+    bool CheckForIncorrectLoops_ = false;
     bool UseGraphChangesPredictor = false;
     bool UseGrandBypass = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules

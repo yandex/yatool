@@ -4,6 +4,72 @@
 #include "module_restorer.h"
 #include "parser_manager.h"
 
+#include <devtools/ymake/diag/dbg.h>
+
+namespace {
+    bool IsWrongEdge(bool mainOutputAsExtra, TDepGraph::TConstEdgeRef edgeRef) {
+        if (mainOutputAsExtra) {
+            return *edgeRef != EDT_Include;
+        } else {
+            return !IsIn({EDT_Include, EDT_OutTogether, EDT_OutTogetherBack}, *edgeRef);
+        }
+    }
+
+    void DumpLoop(const TDepGraph& graph, const TGraphLoop& loop, IOutputStream& out) {
+        THashSet<TNodeId> loopNodeIds{loop.begin(), loop.end()};
+        for (TNodeId nodeId : loop) {
+            auto nodeRef = graph[nodeId];
+            out << '\t' << nodeRef->NodeType << ' ' << graph.ToString(nodeRef) << '\n';
+            for (auto edgeRef : nodeRef.Edges()) {
+                const char* mark = "";
+                if (IsIn(loopNodeIds, edgeRef.To().Id())) {
+                    mark = "* ";
+                }
+                out << "\t\t" << mark << *edgeRef << ' ' << graph.ToString(edgeRef.To()) << '\n';
+            }
+        }
+    }
+
+    bool IsCorrectLoop(const TDepGraph& graph, bool mainOutputAsExtra, const TGraphLoop& loop) {
+        THashSet<TNodeId> loopNodeIds{loop.begin(), loop.end()};
+        for (TNodeId nodeId : loop) {
+            auto nodeRef = graph[nodeId];
+            for (auto edgeRef : nodeRef.Edges()) {
+                if (IsIn(loopNodeIds, edgeRef.To().Id())) {
+                    if (IsWrongEdge(mainOutputAsExtra, edgeRef)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    void CheckLoops(const TDepGraph& graph, bool mainOutputAsExtra, const TGraphLoops& loops) {
+        bool first = true;
+        size_t count = 0;
+
+        for (const TGraphLoop& loop : loops) {
+            if (!IsCorrectLoop(graph, mainOutputAsExtra, loop)) {
+                if (first) {
+                    TStringStream out;
+                    DumpLoop(graph, loop, out);
+                    YDebug() << "Found incorrect loop\n" << out.Str() << Endl;
+                    first = false;
+                }
+                ++count;
+            }
+        }
+
+        if (count > 0) {
+            YDebug() << "Incorrect loops count: " << count << Endl;
+        } else {
+            YDebug() << "No incorrect loops found" << Endl;
+        }
+    }
+}
+
 TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf &cmdConf, const TVector<TTarget>& startDirs)
     : TBase{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Commands(commands)
@@ -14,6 +80,9 @@ TJSONVisitorNew::TJSONVisitorNew(const TRestoreContext& restoreContext, TCommand
 {
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
     Loops.FindLoops(RestoreContext.Graph, startDirs, false);
+    if (restoreContext.Conf.CheckForIncorrectLoops()) {
+        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
+    }
 }
 
 
