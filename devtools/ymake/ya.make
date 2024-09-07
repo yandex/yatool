@@ -110,7 +110,6 @@ SRCS(
     json_entry_stats.cpp
     json_md5.cpp
     json_subst.cpp
-    json_visitor_new.cpp
     json_visitor.cpp
     lang/plugin_facade.cpp # XXX
     licenses_conf.cpp

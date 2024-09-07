@@ -1,10 +1,7 @@
 #pragma once
 
-#include "module_restorer.h"
 #include "json_entry_stats.h"
-
-#include "json_visitor_new.h"
-
+#include "module_restorer.h"
 #include "saveload.h"
 
 #include <devtools/ymake/command_store.h>
@@ -17,8 +14,8 @@
 
 #include <devtools/libs/yaplatform/platform_map.h>
 
-#include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/deprecated/autoarray/autoarray.h>
+#include <library/cpp/digest/md5/md5.h>
 
 #include <util/generic/fwd.h>
 #include <util/generic/hash.h>
@@ -39,15 +36,23 @@ class TSaveBuffer;
 class TLoadBuffer;
 
 
-class TJSONVisitor final : public TJSONVisitorNew, public TUidsCachable {
-protected:
-    using TBase = TJSONVisitorNew;
-
+class TJSONVisitor final : public TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>, public TUidsCachable {
 private:
+    using TBase = TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>;
+    using TNodeData = TJSONEntryStats;
+
+    const TCommands& Commands;
+    const TCmdConf& CmdConf;
+
+    const bool MainOutputAsExtra;
+    const bool JsonDepsFromMainOutputEnabled_ = false;
+
     ui64 NumModuleNodesForRendering = 0;
     TVector<TNodeId> SortedNodesForRendering;
 
+    TGraphLoops Loops;
     autoarray<TLoopCnt> LoopCnt;
+    autoarray<TLoopCnt> LoopsHash;
 
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;
@@ -58,7 +63,17 @@ private:
     THashSet<TNodeId> StartModules;
     TGlobalVarsCollector GlobalVarsCollector;
 
-    const bool JsonDepsFromMainOutputEnabled_ = false;
+    NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
+
+    bool HasParent = false;
+    TDepGraph::TConstEdgeRef Edge;
+    TDepGraph::TConstNodeRef CurrNode;
+    TNodeData* CurrData = nullptr;
+    TNodeData* PrntData = nullptr;
+    TStateItem* CurrState = nullptr;
+    TStateItem* PrntState = nullptr;
+    EMakeNodeType CurrType = EMNT_Last;
+    const TDepGraph& Graph;
 
 public:
     TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
@@ -83,15 +98,35 @@ public:
     const TVector<TNodeId>& GetOrderedNodes() const { return SortedNodesForRendering; }
     ui64 GetModuleNodesNum() const { return NumModuleNodesForRendering; }
 
-public:
+    void ReportCacheStats();
+
     TErrorShowerState ErrorShower;
 
-protected:
+private:
     void PrepareLeaving(TState& state);
 
-private:
+    // Node was entered first time, no children visited
+    void PrepareCurrent(TState& state);
+    // Node was leaved first time, all children visited and finished
+    void FinishCurrent(TState& state);
+    // Returning from a child node. The child node should be finished, while the parent is not.
+    void PassToParent(TState& state);
+
     void SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph);
     bool LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph);
 
     bool NeedAddToOuts(const TState& state, const TDepTreeNode& node) const;
+
+    void UpdateParent(TState& state, TStringBuf value, TStringBuf description);
+    void UpdateParent(TState& state, const TMd5SigValue& value, TStringBuf description);
+
+    void UpdateCurrent(TState& state, TStringBuf value, TStringBuf description);
+
+    void AddAddincls(TState& state);
+    void AddGlobalVars(TState& state);
+
+    void ComputeLoopHash(TNodeId loopId);
+
+    void UpdateReferences(TState& state);
+    void CheckStructureUidChanged();
 };
