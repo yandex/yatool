@@ -119,41 +119,6 @@ namespace {
             RenderedWithoutSubst = false;
         }
 
-        TString CalculateRenderId() {
-            Y_ASSERT(RenderedWithoutSubst);
-
-            TMd5Value md5{NodeDebug, "TJSONRenderer::CalculateRenderId::<md5>"sv};
-            md5.Update(RenderId, "TJSONRenderer::CalculateRenderId::<RenderId>"sv);
-
-            TVector<std::pair<TStringBuf, const TYVar*>> vars;
-            vars.reserve(MakeCommand.Vars.size());
-            for (const auto& varIt : MakeCommand.Vars) {
-                vars.push_back(std::make_pair(TStringBuf(varIt.first), &varIt.second));
-            }
-            Sort(vars);
-
-            for (const auto& [name, var] : vars) {
-                if (name == "UID") {
-                    continue;
-                }
-                md5.Update(name, "TJSONRenderer::CalculateRenderId::<name>"sv);
-                md5.Update(&(var->Flags), sizeof(var->Flags), "TJSONRenderer::CalculateRenderId::<var->Flags>"sv);
-                bool needExpandVar = !IsInternalReservedVar(name) && !Conf.CommandConf.IsReservedName(name);
-                for (const auto& varStr : *var) {
-                    TStringBuf value = varStr.Name;
-                    if (needExpandVar) {
-                        value = GetCmdValue(value);
-                    }
-                    md5.Update(value, "TJSONRenderer::CalculateRenderId::<value>"sv);
-                    md5.Update(&varStr.AllFlags, sizeof(varStr.AllFlags), "TJSONRenderer::CalculateRenderId::<varStr.AllFlags>"sv);
-                }
-            }
-
-            TMd5SigValue sign{NodeDebug, "TJSONRenderer::CalculateRenderId::<sign>"sv};
-            sign.MoveFrom(std::move(md5));
-            return sign.ToBase64();
-        };
-
         TString CalculateCacheUid() {
             const TModule* mod = GetModule();
             if (mod && ModuleId == NodeId && mod->GetAttrs().UsePeersLateOuts) {
@@ -170,14 +135,6 @@ namespace {
             FillNodeDeps(node);
             ReplaceNodeInputs();
             RestoreLateOutsFromNode(nodeSavedState, context);
-        }
-
-        void RefreshPartiallyRestoredNode(TMakeNode& node) {
-            node.Deps.clear();
-            node.Inputs.clear();
-            node.ToolDeps.clear();
-            ReplaceNodeInputs();
-            Subst2Json.FakeFinish(MakeCommand.CmdInfo);
         }
 
         void RestoreLateOutsFromNode(const TMakeNodeSavedState& nodeSavedState, NCache::TConversionContext& context) {
@@ -243,15 +200,6 @@ namespace {
 
                 Subst2Json.UpdateInputs();
             }
-        }
-
-        TMd5Value CalculateDepsId() {
-            TMd5Value md5{TNodeDebugOnly{Graph, NodeId}, "TJSONRenderer::CalculateDepsId::<md5>"sv};
-            for (const auto& [depName, _] : NodeDeps) {
-                md5.Update(depName, "TJSONRenderer::CalculateDepsId::<depName>"sv);
-            }
-            // Note: we rely here on the fact that tools are also included into deps
-            return md5;
         }
 
         void PrepareNodeForRendering() {
