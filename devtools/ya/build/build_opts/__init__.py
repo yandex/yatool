@@ -2836,6 +2836,12 @@ class DistCacheOptions(DistCacheSetupOptions):
         if not self.bazel_remote_store:
             self.dist_store_threads = 0
 
+        if self.yt_store:
+            if not self.yt_proxy:
+                raise ArgsValidatingException('YT storage is enabled but YT proxy is not set')
+            if not self.yt_dir:
+                raise ArgsValidatingException('YT storage is enabled but YT dir is not set')
+
 
 class JavaSpecificOptions(Options):
     def __init__(self):
