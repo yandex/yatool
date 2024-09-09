@@ -91,6 +91,16 @@ def stringify_memoize(orig_func, cache_kwarg=None):
     return wrapper
 
 
+def get_sandbox_token():
+    try:
+        import app_ctx
+
+        _, _, sandbox_token = app_ctx.fetcher_params
+        return sandbox_token
+    except (ImportError, AttributeError):
+        return None
+
+
 class ProgressPrinter(object):
     def __init__(self, progress_callback, finish_callback=lambda: None):
         self._progress = progress_callback

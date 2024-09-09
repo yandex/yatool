@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import sys
 
 from exts import uniq_id, http_client
 from exts.hashing import md5_value
@@ -12,19 +13,18 @@ from core import config
 
 from yalibrary.fetcher.uri_parser import parse_resource_uri
 
-from .common import (
-    RENAME,
-    UNTAR,
-    ProgressPrinter,
-    clean_dir,
-    deploy_tool,
-)
+from .common import RENAME, UNTAR, ProgressPrinter, clean_dir, deploy_tool
 
 from .cache_helper import install_resource
 
 
 class MissingResourceError(Exception):
     mute = True
+
+
+IS_PY3 = sys.version_info[0] >= 3
+CAN_USE_UNIVERSAL_FETCHER = IS_PY3 and os.name != "nt"
+FALLBACK_MSG_LOGGED = False
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,26 @@ def fetch_resource_if_need(
     force_refetch=False,
     keep_directory_packed=False,
     strip_prefix=None,
+    force_universal_fetcher=False,
 ):
+    global FALLBACK_MSG_LOGGED
+
+    use_universal_fetcher = force_universal_fetcher
+    if not use_universal_fetcher:
+        try:
+            import app_ctx
+
+            use_universal_fetcher = app_ctx.use_universal_fetcher_everywhere
+        except (ImportError, AttributeError):
+            pass
+
+    if use_universal_fetcher and not CAN_USE_UNIVERSAL_FETCHER:
+        if not FALLBACK_MSG_LOGGED:
+            FALLBACK_MSG_LOGGED = True
+            logger.info("Can't use universal fetcher. Fallback to default mode.")
+
+        use_universal_fetcher = False
+
     parsed_uri = parse_resource_uri(resource_uri)
     post_process, target_is_tool_dir = install_params
     resource_dir = get_resource_dir_name(resource_uri, strip_prefix)
@@ -80,12 +99,20 @@ def fetch_resource_if_need(
         )
     )
 
-    downloader = _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed)
+    downloader = _get_downloader(
+        fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher
+    )
 
     def do_deploy(download_to, resource_info):
         deploy_tool(download_to, result_dir, post_process, resource_info, resource_uri, binname, strip_prefix)
 
-    return _do_fetch_resource_if_need(result_dir, downloader, do_deploy, target_is_tool_dir, force_refetch)
+    return _do_fetch_resource_if_need(
+        result_dir,
+        downloader,
+        do_deploy,
+        target_is_tool_dir,
+        force_refetch,
+    )
 
 
 def select_resource(item, platform=None):
@@ -108,7 +135,14 @@ def select_resource(item, platform=None):
         raise Exception('Incorrect resource format')
 
 
-def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed):
+def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher):
+    if use_universal_fetcher:
+        import yalibrary.fetcher.ufetcher as ufetcher
+
+        return ufetcher.UFetcherDownloader(
+            ufetcher.get_ufetcher(), parsed_uri.resource_uri, progress_callback, state, keep_directory_packed
+        )
+
     try:
         import app_ctx
 
@@ -126,23 +160,27 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
             default_resource_info['file_name'] = 'resource'
             integrity = parsed_uri.fetcher_meta.get('integrity')
             return _HttpDownloaderWithIntegrity(parsed_uri.resource_url, integrity, default_resource_info)
-        else:
-            return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, default_resource_info)
+        return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, default_resource_info)
 
     elif parsed_uri.resource_type in normal_fetched_schemas:
         if config.has_mapping():
             return _HttpDownloaderWithConfigMapping(parsed_uri.resource_id, default_resource_info)
-        else:
-            return _DefaultDownloader(fetcher, parsed_uri.resource_id, progress_callback, state, keep_directory_packed)
+        return _DefaultDownloader(fetcher, parsed_uri.resource_id, progress_callback, state, keep_directory_packed)
 
-    else:
-        raise Exception('Unsupported resource_uri {}'.format(parsed_uri.resource_uri))
+    raise Exception('Unsupported resource_uri {}'.format(parsed_uri.resource_uri))
 
 
-def _do_fetch_resource_if_need(result_dir, downloader, deployer, target_is_tool_dir=True, force_refetch=False):
+def _do_fetch_resource_if_need(
+    result_dir,
+    downloader,
+    deployer,
+    target_is_tool_dir=True,
+    force_refetch=False,
+):
     def do_install():
         guards.update_guard(guards.GuardTypes.FETCH)
-        download_to = os.path.join(result_dir, 'resource.' + uniq_id.gen8())
+        filename = 'resource.' + uniq_id.gen8()
+        download_to = os.path.join(result_dir, filename)
         resource_info = downloader(download_to)
         deployer(download_to, resource_info)
 

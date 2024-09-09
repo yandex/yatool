@@ -13,6 +13,12 @@ PEERDIR(
     devtools/libs/yaplatform/python
 )
 
+IF (PYTHON3 AND NOT OS_WINDOWS)
+    PEERDIR(
+        devtools/ya/yalibrary/fetcher/ufetcher
+    )
+ENDIF()
+
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/yandex/sandbox
@@ -32,6 +38,10 @@ PY_SRCS(
 )
 
 END()
+
+RECURSE(
+    ufetcher
+)
 
 RECURSE_FOR_TESTS(
     tests

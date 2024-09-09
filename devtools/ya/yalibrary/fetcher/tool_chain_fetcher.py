@@ -17,11 +17,7 @@ from core import config
 
 from yalibrary.fetcher.uri_parser import parse_resource_uri
 
-from .common import (
-    BINARY,
-    stringify_memoize,
-    ProgressPrinter,
-)
+from .common import BINARY, stringify_memoize, ProgressPrinter, get_sandbox_token
 from .cache_helper import (
     install_symlink,
     installed,
@@ -717,7 +713,7 @@ def _do_sandbox_method(method, **kwargs):
     from yalibrary.yandex.sandbox import SandboxClient
 
     try:
-        return method(SandboxClient(token=_get_sandbox_token(), rest_params=rest_params), **kwargs)
+        return method(SandboxClient(token=get_sandbox_token(), rest_params=rest_params), **kwargs)
     except requests.HTTPError as e:
         logger.debug("Error connecting to sandbox: %s", e)
         if e.response.status_code != 403:
@@ -732,16 +728,6 @@ def _get_cancel_checker():
         import app_ctx
 
         return app_ctx.state.check_cancel_state
-    except (ImportError, AttributeError):
-        return None
-
-
-def _get_sandbox_token():
-    try:
-        import app_ctx
-
-        _, _, sandbox_token = app_ctx.fetcher_params
-        return sandbox_token
     except (ImportError, AttributeError):
         return None
 

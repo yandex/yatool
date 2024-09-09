@@ -137,6 +137,8 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('vcs_type', configure_vcs_type(ctx)),
             ('self_info', configure_self_info()),
             ('fetcher_params', configure_fetcher_params(ctx)),
+            # TODO: kuzmich321@ (ufetcher) rm when migrated
+            ('use_universal_fetcher_everywhere', configure_use_universal_fetcher_everywhere(ctx)),
             ('hide_token2', token_suppressions.configure(ctx)),
             ('fetchers_storage', configure_fetchers_storage(ctx)),
             ('fetcher', configure_fetcher(ctx)),
@@ -433,6 +435,12 @@ def configure_profiler_support(ctx):
     return profiler.with_profiler_support(ctx)
 
 
+# TODO: kuzmich321@ (ufetcher) remove when full migration to universal fetcher completed
+def configure_use_universal_fetcher_everywhere(app_ctx):
+    should_use = getattr(app_ctx.params, 'use_universal_fetcher_everywhere', False)
+    yield should_use
+
+
 def configure_fetcher_params(app_ctx):
     custom_fetcher = None
     fetcher_opts = getattr(app_ctx.params, 'flags', {}).get('FETCHER_OPTS')
@@ -478,10 +486,12 @@ def configure_fetcher_params(app_ctx):
     yield custom_fetcher, fetcher_params, oauth_token
 
 
+# TODO: kuzmich321@ (ufetcher) remove when full migration to universal fetcher completed
 def configure_fetcher(app_ctx):
     yield app_ctx.fetchers_storage.get_default()  # in the name of legacy
 
 
+# TODO: kuzmich321@ (ufetcher) remove when full migration to universal fetcher completed
 def configure_fetchers_storage(app_ctx):
     import yalibrary.fetcher.fetchers_storage as fetchers_storage
 

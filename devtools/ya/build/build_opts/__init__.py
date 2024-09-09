@@ -1671,23 +1671,23 @@ class SonarOptions(Options):
 
 class UniversalFetcherOptions(Options):
     def __init__(self):
-        self.universal_fetcher = False
+        self.use_universal_fetcher_everywhere = False
 
     @staticmethod
     def consumer():
         return [
             ArgConsumer(
-                ['--universal-fetcher'],
+                ['--use-universal-fetcher-everywhere'],
                 help='Universal fetcher impl',
-                hook=SetConstValueHook('universal_fetcher', True),
+                hook=SetConstValueHook('use_universal_fetcher_everywhere', True),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
             EnvConsumer(
-                'YA_UNIVERSAL_FETCHER',
-                hook=SetConstValueHook('universal_fetcher', True),
+                'YA_USE_UNIVERSAL_FETCHER_EVERYWHERE',
+                hook=SetValueHook('use_universal_fetcher_everywhere', return_true_if_enabled),
             ),
-            ConfigConsumer('universal_fetcher', hook=SetConstValueHook('universal_fetcher', True)),
+            ConfigConsumer('use_universal_fetcher_everywhere'),
         ]
 
 
