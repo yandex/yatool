@@ -147,7 +147,7 @@ class RunTestOptions(core.yarg.Options):
                 help='Fail after the first test failure',
                 hook=core.yarg.SetConstValueHook('fail_fast', True),
                 subgroup=RUN_TEST_SUBGROUP,
-                visible=help_level.HelpLevel.ADVANCED,
+                visible=help_level.HelpLevel.BASIC,
             ),
             core.yarg.ConfigConsumer('fail_fast'),
             TestArgConsumer(
