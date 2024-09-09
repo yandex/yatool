@@ -2,6 +2,9 @@ PY23_LIBRARY()
 
 LICENSE(Apache-2.0)
 
+# there is no external sources
+VERSION(Service-proxy-version)
+
 PEERDIR(
     build/plugins/lib/test_const
     contrib/tools/cython/Cython
