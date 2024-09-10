@@ -53,6 +53,8 @@ def _get_transports_order() -> list:
 def get_ufetcher() -> universal_fetcher.UniversalFetcher:
     default_retry_policy = universal_fetcher.RetryPolicy()
 
+    http_config = universal_fetcher.HttpConfig(universal_fetcher.HttpParams(), default_retry_policy)
+
     sandbox_config = None
 
     if app_config.in_house:
@@ -77,20 +79,9 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         )
 
     if sandbox_config:
-        cfg = universal_fetcher.FetchersConfig(
-            sandbox_config,
-            universal_fetcher.HttpConfig(
-                universal_fetcher.HttpParams(),
-                default_retry_policy,
-            ),
-        )
+        cfg = universal_fetcher.FetchersConfig(sandbox_config, http_config)
     else:
-        cfg = universal_fetcher.FetchersConfig(
-            universal_fetcher.HttpConfig(
-                universal_fetcher.HttpParams(),
-                default_retry_policy,
-            ),
-        )
+        cfg = universal_fetcher.FetchersConfig(http_config)
 
     json_conf = cfg.build()
 
@@ -111,7 +102,6 @@ class UFetcherDownloader:
         self._keep_dir_packed = keep_directory_packed
 
     def __call__(self, download_to: str) -> dict:
-        # TODO: kuzmich321@ (ufetcher) fix this when fully migrated to ufetcher
         dst_path = os.path.dirname(download_to)
         filename = os.path.basename(download_to)
 
@@ -121,7 +111,7 @@ class UFetcherDownloader:
         return res_info
 
     def _post_process_res_info(self, res_info: dict, download_to: str) -> None:
-        # TODO: kuzmich321@ (ufetcher) make universal fetcher return full resource info
+        # TODO: kuzmich321@ (ufetcher) YA-2028
 
         try:
             orig_fname = res_info['last_attempt']['result']['resource_info']['attrs']['original_filename']
@@ -130,7 +120,7 @@ class UFetcherDownloader:
             should_unpack = res_info['multifile'] and not self._keep_dir_packed
 
             if should_unpack:
-                # TODO: kuzmich321@ (ufetcher) do we need to make it more consisent? extract to tmp + os.move
+                # TODO: kuzmich321@ (ufetcher) YA-2028
                 exts.archive.extract_from_tar(download_to, download_to)
         except KeyError as err:
             logger.debug("{} not present in resource info.".format(err))
