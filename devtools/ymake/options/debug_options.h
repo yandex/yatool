@@ -97,16 +97,8 @@ struct TDebugOptions {
     bool WriteJsonCache = true;
     bool ReadDepManagementCache = true;
     bool WriteDepManagementCache = true;
-
-// This is temporary control of Uids cache default setup
-// for the sake of convinient debugging.
-#if !defined (UIDS_CACHE_ENABLED)
     bool ReadUidsCache = false;
     bool WriteUidsCache = false;
-#else
-    bool ReadUidsCache = true;
-    bool WriteUidsCache = true;
-#endif
 
     bool UidsCacheWasSetExplicitly = false;
 
