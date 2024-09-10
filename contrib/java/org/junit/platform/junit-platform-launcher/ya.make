@@ -1,7 +1,7 @@
 JAVA_CONTRIB_PROXY()
 
 PEERDIR(
-    contrib/java/org/junit/platform/junit-platform-launcher/1.10.2
+    contrib/java/org/junit/platform/junit-platform-launcher/1.10.3
 )
 
 END()
@@ -26,4 +26,5 @@ RECURSE(
     1.10.1
     1.9.0
     1.10.2
+    1.10.3
 )
