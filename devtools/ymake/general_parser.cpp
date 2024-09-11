@@ -12,6 +12,7 @@
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/diag/trace.h>
 
+#include <devtools/ymake/common/split.h>
 #include <devtools/ymake/common/uniq_vector.h>
 
 #include <devtools/ymake/lang/resolve_include.h>
@@ -125,6 +126,24 @@ namespace {
             mod->GetModule().SelfPeers = selfPeers.Take();
         }
     }
+
+    TGeneralParser::TModuleConstraints MakeModuleConstraintChecker(const TVars& confVars) {
+        if (!confVars.Contains("EXPLICIT_VERSION_PREFIXES"))
+            return [](const TModuleDef&){};
+        TVector<TStringBuf> prefixes;
+        for (TStringBuf prefix: SplitBySpace(GetCmdValue(confVars.Get1("EXPLICIT_VERSION_PREFIXES")))) {
+            prefixes.push_back(prefix);
+        }
+
+        return [prefixes = std::move(prefixes)](const TModuleDef& modDef) {
+            for (TStringBuf prefix: prefixes) {
+                if (!modDef.IsVersionSet() && NPath::IsPrefixOf(prefix, modDef.GetModule().GetDir().CutType())) {
+                    TScopedContext context(modDef.GetModule().GetName());
+                    YConfErr(Misconfiguration) << "Explicit VERSION must be specified for modules inside " << prefix << " directory" << Endl;
+                }
+            }
+        };
+    }
 }
 
 TFileView MakefileNodeNameForDir(TFileConf& fileConf, TFileView dir) {
@@ -140,6 +159,7 @@ TGeneralParser::TGeneralParser(TYMake& yMake)
     : YMake(yMake)
     , Graph(yMake.Graph)
     , Conf(yMake.Conf)
+    , ModuleConstraintsChecker(MakeModuleConstraintChecker(yMake.Conf.CommandConf))
     , YaMakeContentProvider(yMake.Names.FileConf)
 {
 }
@@ -431,6 +451,9 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
 
     TDirParser parser(YMake, fileConf.Parent(resolvedName), resolvedName.GetTargetStr(), modules, recurses, testRecurses, &YaMakeContentProvider);
     parser.Load();
+    for (const auto* modDef: parser.GetModules()) {
+        ModuleConstraintsChecker(*modDef);
+    }
 
     if (const auto multiModuleName = parser.GetMultiModuleName(); !multiModuleName.empty()) {
         TDepsCacheId propId = MakeDepsCacheId(EMNT_Property, Graph.Names().AddName(EMNT_Property, FormatProperty(MULTIMODULE_PROP_NAME, multiModuleName)));

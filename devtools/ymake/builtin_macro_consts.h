@@ -4,6 +4,7 @@
 
 namespace NMacro {
 
+constexpr TStringBuf VERSION = "VERSION";
 constexpr TStringBuf IF = "IF";
 constexpr TStringBuf ELSE = "ELSE";
 constexpr TStringBuf ELSEIF = "ELSEIF";

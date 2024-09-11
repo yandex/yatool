@@ -81,6 +81,7 @@ private:
     const TStringBuf Makefile;              // Reference to Module.Makefile
     TUniqVector<TString> MakelistPeers;  // References to some Module.Peers
     bool NeverCache = false;
+    bool HasVersion = false;
 
     bool IsMacroAllowed(const TStringBuf& name) {
         return ModuleConf.Allowed.contains(name) || !ModuleConf.Restricted.contains(name);
@@ -159,6 +160,8 @@ public:
     bool IsUserMacro(const TStringBuf& name) const;
     bool IsMulti(const TStringBuf& name) const; //not merge all calls in one
     bool IsNeverCache() const noexcept {return NeverCache;}
+    bool IsVersionSet() const noexcept {return HasVersion;}
+    void VersionSet(bool val) noexcept {HasVersion = val;}
 
     template <typename TMacroHandler>
     void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler handler) {

@@ -13,12 +13,15 @@
 #include <util/generic/strbuf.h>
 
 class TYMake;
+class TModuleDef;
 class TModule;
 struct TNodeAddCtx;
 struct TModuleGlobInfo;
 
 class TGeneralParser {
 public:
+    using TModuleConstraints = std::function<void(const TModuleDef&)>;
+
     explicit TGeneralParser(TYMake& yMake);
     ~TGeneralParser() = default;
 
@@ -46,6 +49,7 @@ private:
     TYMake& YMake;
     TDepGraph& Graph;
     const TBuildConfiguration& Conf;
+    TModuleConstraints ModuleConstraintsChecker;
     TCachedFileConfContentProvider YaMakeContentProvider;
     NStats::TGeneralParserStats Stats{"ya.make parsing stats"};
 };
