@@ -146,6 +146,7 @@ def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targ
         graph = json.load(f)
         f.close()
 
+    # Нормализуем пути
     rel_targets_with_slash = []  # Relative targets for export as source to gradle project with slash at end
     for rel_target in params.rel_targets:
         if '/' == rel_target[-1:]:
@@ -155,9 +156,11 @@ def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targ
 
     arcadia_root = params.arc_root
     project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
+    # Пути для сборки yamake'ом
     build_rel_targets = []  # Relative paths to targets for build
     build_rel_targets.extend(additional_run_java_targets)
     for node in graph['data']:
+        # additional - пути для симлинков внутри проекта, outside - пути для симлинков вне проекта
         validated, additional_targets, outside_targets = NodeValidator(rel_targets_with_slash, arcadia_root).validate(
             node
         )
@@ -169,7 +172,9 @@ def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targ
                 recursive_symlinks(arcadia_root, gradle_project_root, outside_target)
 
         rel_target = node['Name'].replace('$B/', '').replace('$S/', '')  # Relative target - some *.jar
+        # если путь проекта является префиксом для таргета
         if in_rel_targets(rel_target, rel_targets_with_slash):
+            # если генерим проект в отдельную директорию - вне Аркадии
             if project_outside_arcadia:
                 # Target for export as sources, make symlinks to all sources in export folder
                 rel_target_srcs = [os.path.join(os.path.dirname(rel_target), 'src')]
@@ -177,9 +182,11 @@ def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targ
                 # TODO Add other non-standard sources from jar_source_set semantic to rel_target_srcs
                 for rel_target_src in rel_target_srcs:
                     recursive_symlinks(arcadia_root, gradle_project_root, rel_target_src)
+        # если в режиме сборки контрибов
         elif params.build_contribs:
             build_rel_targets.append(rel_target)
         else:
+            # если не в режиме сборки контриба и не нашли семантику контриба, то собираем
             contrib = False
             for semantic in node['semantics']:
                 if (
@@ -215,15 +222,17 @@ def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targ
             opts.rel_targets.append(rel_dir)
             opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
 
+        # получаем сборочный граф
         logger.info("Making building graph with opts\n")
         with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
             graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, display=app_ctx.display)
-
+        # собираем, что есть в сборочном графе
         builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
         exit_code = builder.go()
         if exit_code != 0:
             sys.exit(exit_code)
 
+        # если генерим не в Аркадию, то переносим все собранные модули в одну директорию
         if project_outside_arcadia:
             # Make symlinks to all built targets
             for build_rel_target in build_rel_targets:
