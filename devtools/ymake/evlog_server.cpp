@@ -40,6 +40,7 @@ namespace NEvlogServer {
     }
 
     EHandlerResult AllForeignPlatformsReportedEventHandler(const TString&, THolder<TYMake>&) {
+        YDebug() << "DONE" << Endl;
         return EHandlerResult::AllDone;
     }
 

@@ -53,6 +53,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 build.build_opts.YMakeDebugOptions(),
                 build.build_opts.YMakeBinOptions(),
                 build.build_opts.YMakeRetryOptions(),
+                build.build_opts.YMakeModeOptions(),
                 build.build_opts.ExecutorOptions(),
                 build.build_opts.ForceDependsOptions(),
                 build.build_opts.IgnoreRecursesOptions(),

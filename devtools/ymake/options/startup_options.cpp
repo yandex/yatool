@@ -114,6 +114,8 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
             throw TConfigurationError() << "explicit --source-root is required for --targets-from-evlog";
         }
 
+        // TODO: check SourceRoot.Exists() && SourceRoot.IsDirectory() && SourceRoot.IsAbsolute()
+
         return;
     }
 
@@ -125,6 +127,7 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
         SourceRoot = FindSourceRootByTarget(targets[0]);
     }
 
+    // TODO: check SourceRoot.IsAbsolute()
     if (!SourceRoot || !SourceRoot.Exists() || !SourceRoot.IsDirectory()) {
         throw TConfigurationError() << "source root " << SourceRoot << " is incorrect";
     }
@@ -137,17 +140,18 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
 
 void TStartUpOptions::AddTarget(const TFsPath& target) {
     // TODO: check target inside source root
-    TFsPath targetDir = target.Parent();
-    if (!target.IsDirectory() && !targetDir.IsDirectory()) {
-        throw TConfigurationError() << "No directory for target " << target;
+    auto absTarget = target.IsAbsolute() ? target : SourceRoot / target;
+    TFsPath absTargetDir = absTarget.Parent();
+    if (!absTarget.IsDirectory() && !absTargetDir.IsDirectory()) {
+        throw TConfigurationError() << "No directory for target " << absTarget;
     }
 
-    Targets.push_back(target.IsAbsolute() ? target.RelativeTo(SourceRoot) : target);
+    Targets.push_back(absTarget.RelativeTo(SourceRoot));
     if (!Targets.back().IsDefined()) { // fix this in util
         Targets.back() = ".";
         StartDirs.push_back(".");
     } else {
-        StartDirs.push_back(target.IsDirectory() ? Targets.back() : targetDir.IsAbsolute() ? targetDir.RelativeTo(SourceRoot) : targetDir);
+        StartDirs.push_back(absTarget.IsDirectory() ? Targets.back() : absTargetDir.RelativeTo(SourceRoot));
         if (!StartDirs.back().IsDefined()) // fix this in util
             StartDirs.back() = ".";
     }

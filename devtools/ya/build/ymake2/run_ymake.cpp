@@ -7,6 +7,7 @@
 #include <util/generic/scope.h>
 #include <util/stream/file.h>
 #include <util/stream/str.h>
+#include <util/stream/walk.h>
 #include <util/system/platform.h>
 
 #ifdef  _win_
@@ -55,13 +56,42 @@ namespace {
         }
         return result;
     }
+
+    TString CallProvider(PyObject* lineProvider) {
+        PyGILState_STATE gilState = PyGILState_Ensure();
+        Y_DEFER {PyGILState_Release(gilState);};
+        TPyObjectPtr result{PyObject_CallFunctionObjArgs(lineProvider, nullptr)};
+        if (!result.Get()) {
+            throw yexception() << "lineProvider() failed";
+        }
+#if PY_MAJOR_VERSION == 3
+        return PyUnicode_AsUTF8(result.Get());
+#else
+        return PyBytes_AsString(result.Get());
+#endif
+    }
+
+    class TInputStreamFromCallback : public IWalkInput {
+    public:
+        TInputStreamFromCallback(PyObject* providerCallback) : ProviderCallback_{providerCallback} {};
+    protected:
+        size_t DoUnboundedNext(const void** ptr) override {
+            CurrentStr_ = CallProvider(ProviderCallback_);
+            *ptr = CurrentStr_.c_str();
+            return CurrentStr_.size();
+        }
+    private:
+        PyObject* ProviderCallback_;
+        TString CurrentStr_;
+    };
 }
 
 TRunYMakeResultPtr RunYMake(
     TStringBuf binary,
     const TList<TString>& args,
     const THashMap<TString, TString>& env,
-    PyObject* stderrLineReader
+    PyObject* stderrLineReader,
+    PyObject* stdinLineProvider
 ) {
 #ifdef  _win_
     // disable message box
@@ -81,6 +111,11 @@ TRunYMakeResultPtr RunYMake(
 
     TStringStream output{};
     options.SetOutputStream(&output);
+    THolder<TInputStreamFromCallback> input;
+    if (stdinLineProvider != Py_None) {
+        input = MakeHolder<TInputStreamFromCallback>(stdinLineProvider);
+        options.SetInputStream(input.Get());
+    }
 
     TShellCommand shCmd{binary, args, options};
     shCmd.Run();

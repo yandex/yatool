@@ -124,6 +124,9 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         core.yarg.Param('checkout_data_by_ya', default_value=False),
         core.yarg.Param('dump_java', default_value=None),
         core.yarg.Param('disable_customization', default_value=False),
+        core.yarg.Param('source_root', default_value=None),
+        core.yarg.Param('stdin_line_provider', default_value=None),
+        core.yarg.Param('targets_from_evlog', default_value=False),
     ]
 
 
@@ -263,6 +266,14 @@ def _cons_ymake_args(**kwargs):
     output_dir = kwargs.pop('output_dir', None)  # XXX
     if output_dir:
         ret += ['--build-root', output_dir]
+
+    source_root = kwargs.pop('source_root', None)
+    if source_root:
+        ret += ['--source-root', source_root]
+
+    targets_from_evlog = kwargs.pop('targets_from_evlog', False)
+    if targets_from_evlog:
+        ret += ['--targets-from-evlog']
 
     continue_on_fail = kwargs.pop('continue_on_fail', False)
     if continue_on_fail:
@@ -521,7 +532,7 @@ def _run_ymake(**kwargs):
 
     meta_data = {}
 
-    arc_root = core.config.find_root_from(kwargs.get('abs_targets', None))
+    arc_root = kwargs.get('source_root', None) or core.config.find_root_from(kwargs.get('abs_targets', None))
     if arc_root:
         plugins_roots = [os.path.join(arc_root, build.genconf.ymake_build_dir())]
         if not kwargs.pop('disable_customization', False):
@@ -581,6 +592,7 @@ def _run_ymake(**kwargs):
                 kwargs['json_compression_codec'] = compress_ymake_output_codec
                 is_output_compressed = True
 
+            stdin_line_provider = kwargs.pop('stdin_line_provider', None)
             args = (
                 _cons_ymake_args(**kwargs)
                 + ['--quiet']
@@ -599,6 +611,7 @@ def _run_ymake(**kwargs):
                 env,
                 stderr_listener,
                 raw_cpp_stdout=is_cpp_consumer,
+                stdin_line_provider=stdin_line_provider,
             )
             _stat_info_execution['finish'] = time.time()
             _stat_info_execution['duration'] = _stat_info_execution['finish'] - _stat_info_execution['start']

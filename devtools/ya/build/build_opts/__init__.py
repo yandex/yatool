@@ -1427,6 +1427,31 @@ class ArcPrefetchOptions(Options):
         ]
 
 
+class YMakeModeOptions(Options):
+    def __init__(self):
+        self.ymake_tool_servermode = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--ymake-tool-servermode'],
+                help='Pass targets to tool ymake via evlog',
+                hook=SetConstValueHook('ymake_tool_servermode', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--no-ymake-tool-servermode'],
+                help='Pass targets to tool ymake via command line',
+                hook=SetConstValueHook('ymake_tool_servermode', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ConfigConsumer('ymake_tool_servermode'),
+        ]
+
+
 class YMakeBinOptions(Options):
     def __init__(self):
         self.ymake_bin = None
@@ -3167,6 +3192,7 @@ def ya_make_options(  # compat
             ConfigureDebugOptions(),
             YMakeBinOptions(),
             YMakeRetryOptions(),
+            YMakeModeOptions(),
             LocalConfOptions(),
             BuildRootOptions(random_build_root),
             BuildThreadsOptions(build_threads=None),

@@ -1011,17 +1011,17 @@ class _AsyncContext(object):
 
 class _ToolTargetsQueue(object):
     def __init__(self):
-        self.__queue = queue.Queue()
-        self.__sources_ids = {}
+        self._queue = queue.Queue()
+        self._sources_ids = {}
         self.__app_ctx = sys.modules.get("app_ctx")
-        self.__logger = logging.getLogger(self.__class__.__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
 
     def add_source(self, func, debug_id):
-        source_id = len(self.__sources_ids)
-        self.__sources_ids[source_id] = debug_id
+        source_id = len(self._sources_ids)
+        self._sources_ids[source_id] = debug_id
 
         def _putter(val, async_result=None):
-            self.__queue.put((source_id, val, async_result))
+            self._queue.put((source_id, val, async_result))
 
         def _wrapper(*args, **kwargs):
             async_result = core_async.wrap(func, *args, **kwargs)
@@ -1031,32 +1031,70 @@ class _ToolTargetsQueue(object):
 
         return _wrapper, _putter
 
+    def done(self):
+        return not self._sources_ids
+
     def get(self):
         targets = set()
-        while self.__sources_ids:
+        while self._sources_ids:
             (source_id, res, async_result) = self._interruptable_queue_get()
             # Receives either res or async_result
             assert bool(res is None) != bool(async_result is None)
             if res is not None:
-                assert source_id in self.__sources_ids, "Unknown or already received source_id={}".format(source_id)
-                self.__logger.debug(
-                    "Source_id={} ({}). Tool targets: {}".format(source_id, self.__sources_ids[source_id], res)
+                assert source_id in self._sources_ids, "Unknown or already received source_id={}".format(source_id)
+                self._logger.debug(
+                    "Source_id={} ({}). Tool targets: {}".format(source_id, self._sources_ids[source_id], res)
                 )
                 targets |= res
-                del self.__sources_ids[source_id]
-            elif async_result is not None and source_id in self.__sources_ids:
+                del self._sources_ids[source_id]
+            elif async_result is not None and source_id in self._sources_ids:
                 core_async.unwrap(async_result)  # does nothing or raises thread error
                 raise RuntimeError("Thread has terminated before tool targets sending")
         return targets
 
     def _interruptable_queue_get(self):
         if not self.__app_ctx:
-            return self.__queue.get()
+            return self._queue.get()
         while True:
             try:
-                return self.__queue.get(timeout=1)
+                return self._queue.get(timeout=1)
             except queue.Empty:
                 self.__app_ctx.state.check_cancel_state()
+
+
+class _ToolTargetsQueueServerMode(_ToolTargetsQueue):
+    def __init__(self):
+        super(_ToolTargetsQueueServerMode, self).__init__()
+
+    def done(self):
+        return self._queue.qsize() == 0 and not self._sources_ids
+
+    def get(self):
+        (source_id, res, async_result) = self._interruptable_queue_get()
+        assert bool(res is None) != bool(async_result is None)
+        if res is not None:
+            assert source_id in self._sources_ids, "Unknown source_id={}".format(source_id)
+            self._logger.debug("Source_id={} ({}). Event: {}".format(source_id, self._sources_ids[source_id], res))
+            typename = res["_typename"]
+            if typename == "NEvent.TAllForeignPlatformsReported":
+                del self._sources_ids[source_id]
+                if self._sources_ids:
+                    res = ""  # report AllForeignPlatformsReported only for last source (prone to races though)
+        elif async_result is not None and source_id in self._sources_ids:
+            core_async.unwrap(async_result)  # does nothing or raises thread error
+            raise RuntimeError("Thread has terminated before sending TAllForeignPlatformsReported")
+        return res
+
+
+def should_use_servermode_for_tools(opts):
+    return opts.ymake_tool_servermode
+
+
+def create_tool_event_queue(opts):
+    if should_use_servermode_for_tools(opts):
+        return _ToolTargetsQueueServerMode()
+    else:
+        return _ToolTargetsQueue()
 
 
 class _GraphKind(Enum):
@@ -1070,25 +1108,50 @@ class _ToolEventListener(object):
 
     def __init__(self, ev_listener, queue_putter):
         self.__prev_ev_listener = ev_listener
-        self.__queue_putter = queue_putter
+        self._queue_putter = queue_putter
         self.__tool_targets = set()
         self.__done = False
+
+    def _process_target_event(self, event):
+        if event["Reachable"] == 1:
+            self.__tool_targets.add(event["Dir"])
+
+    def _process_final_event(self, _):
+        self._queue_putter(self.__tool_targets)
 
     def __call__(self, event):
         typename = event["_typename"]
         if typename == "NEvent.TForeignPlatformTarget":
             if self.__done:
                 logger.warning("NEvent.TForeignPlatformTarget event comes after NEvent.TAllForeignPlatformsReported")
-            elif event["Platform"] == self.TOOL_PLATFORM and event["Reachable"] == 1:
-                self.__tool_targets.add(event["Dir"])
+            elif event["Platform"] == self.TOOL_PLATFORM:
+                self._process_target_event(event)
         elif typename == "NEvent.TAllForeignPlatformsReported":
             if self.__done:
                 logger.warning("Duplicate NEvent.TAllForeignPlatformsReported event")
             else:
-                self.__queue_putter(self.__tool_targets)
+                self._process_final_event(event)
                 self.__done = True
         else:
             self.__prev_ev_listener(event)
+
+
+class _ToolEventListenerServerMode(_ToolEventListener):
+    def __init__(self, ev_listener, queue_putter):
+        super(_ToolEventListenerServerMode, self).__init__(ev_listener, queue_putter)
+
+    def _process_target_event(self, event):
+        self._queue_putter(event)
+
+    def _process_final_event(self, event):
+        self._queue_putter(event)
+
+
+def create_tool_event_listener(opts, *args):
+    if should_use_servermode_for_tools(opts):
+        return _ToolEventListenerServerMode(*args)
+    else:
+        return _ToolEventListener(*args)
 
 
 def build_graph_and_tests(opts, check, event_queue=None, display=None):
@@ -1213,12 +1276,13 @@ class _GraphMaker(object):
     def make_graphs(
         self,
         target_tc,
-        abs_targets,
+        abs_targets=None,
         graph_kind=_GraphKind.TARGET,
         debug_id=None,
         enabled_events=YmakeEvents.DEFAULT.value,
         extra_conf=None,
         tool_targets_queue=None,
+        ymake_opts=None,
     ):
         is_cross_tools = graph_kind == _GraphKind.TOOLS or graph_kind == _GraphKind.GLOBAL_TOOLS
         is_global_tools = graph_kind == _GraphKind.GLOBAL_TOOLS
@@ -1286,6 +1350,7 @@ class _GraphMaker(object):
                     no_caches_on_retry=self._opts.no_caches_on_retry,
                     no_ymake_retry=self._opts.no_ymake_retry,
                     tool_targets_queue_putter=pic_queue_putter,
+                    ymake_opts=ymake_opts,
                 )
 
             pic = self._exit_stack.enter_context(_AsyncContext(core_async.future(gen_pic, daemon=False)))
@@ -1311,6 +1376,7 @@ class _GraphMaker(object):
                     no_caches_on_retry=self._opts.no_caches_on_retry,
                     no_ymake_retry=self._opts.no_ymake_retry,
                     tool_targets_queue_putter=no_pic_queue_putter,
+                    ymake_opts=ymake_opts,
                 )
 
             no_pic = self._exit_stack.enter_context(_AsyncContext(core_async.future(gen_no_pic, daemon=False)))
@@ -1382,6 +1448,7 @@ class _GraphMaker(object):
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        ymake_opts=None,
     ):
         return self._prepare_graph(
             flags,
@@ -1396,6 +1463,7 @@ class _GraphMaker(object):
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
             tool_targets_queue_putter=tool_targets_queue_putter,
+            ymake_opts=ymake_opts,
         )
 
     def _build_no_pic(
@@ -1411,6 +1479,7 @@ class _GraphMaker(object):
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        ymake_opts=None,
     ):
         flags = copy.deepcopy(flags)
         flags['FORCE_NO_PIC'] = 'yes'
@@ -1427,6 +1496,7 @@ class _GraphMaker(object):
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
             tool_targets_queue_putter=tool_targets_queue_putter,
+            ymake_opts=ymake_opts,
         )
 
     def _prepare_graph(
@@ -1443,6 +1513,7 @@ class _GraphMaker(object):
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        ymake_opts=None,
     ):
         cache_subdir = None
         if cache_dir:
@@ -1462,6 +1533,7 @@ class _GraphMaker(object):
                 no_caches_on_retry=no_caches_on_retry,
                 no_ymake_retry=no_ymake_retry,
                 tool_targets_queue_putter=tool_targets_queue_putter,
+                ymake_opts=ymake_opts,
             )
         result.graph.set_tags(tags + ([extra_tag] if extra_tag else []))
         result.graph.set_platform(platform)
@@ -1480,6 +1552,7 @@ class _GraphMaker(object):
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        ymake_opts=None,
     ):
         flags = copy.deepcopy(flags)
         flags['IS_CROSS_SANITIZE'] = 'yes'
@@ -1499,30 +1572,40 @@ class _GraphMaker(object):
 
         current_ev_listener = self._event_queue
         if tool_targets_queue_putter is not None:
-            current_ev_listener = _ToolEventListener(self._event_queue, tool_targets_queue_putter)
+            current_ev_listener = create_tool_event_listener(self._opts, self._event_queue, tool_targets_queue_putter)
             enabled_events += YmakeEvents.TOOLS.value
 
         with stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
-            ymake_opts = self._gen_opts(
-                flags,
-                tc,
-                test_dart_path,
-                java_dart_path,
-                make_files_dart_path,
-                current_ev_listener,
-                abs_targets,
-                debug_id=debug_id,
-                enabled_events=enabled_events,
-                extra_conf=extra_conf,
-                cache_dir=cache_dir,
-                change_list=change_list,
-                no_caches_on_retry=no_caches_on_retry,
-                no_ymake_retry=no_ymake_retry,
+            ymake_opts = dict(
+                self._gen_opts(
+                    flags,
+                    tc,
+                    test_dart_path,
+                    java_dart_path,
+                    make_files_dart_path,
+                    current_ev_listener,
+                    abs_targets,
+                    debug_id=debug_id,
+                    enabled_events=enabled_events,
+                    extra_conf=extra_conf,
+                    cache_dir=cache_dir,
+                    change_list=change_list,
+                    no_caches_on_retry=no_caches_on_retry,
+                    no_ymake_retry=no_ymake_retry,
+                ),
+                **(ymake_opts or {})
             )
 
         # return res, tc_tests, java_darts, make_files_map
         with stager.scope("gen-graph-json-{}".format(_shorten_debug_id(debug_id))):
             graph = self._gen_graph_json(ymake_opts, purpose=debug_id)
+
+        if not bg.is_system(tc) and not bg.is_local(tc):
+            tc_tool = _resolve_tool(tc, self._res_dir)
+            graph.add_resource(tc_tool)
+
+        if not graph.size():
+            return _GenGraphResult(graph=graph, tc_tests=tc_tests, java_darts=[], make_files_map=[])
 
         if should_run_tc_tests:
             with stager.scope("gen-tests-{}".format(_shorten_debug_id(debug_id))):
@@ -1550,10 +1633,6 @@ class _GraphMaker(object):
 
         with open(make_files_dart_path) as dart:
             make_files_map = bml.parse_make_files_dart(dart)
-
-        if not bg.is_system(tc) and not bg.is_local(tc):
-            tc_tool = _resolve_tool(tc, self._res_dir)
-            graph.add_resource(tc_tool)
 
         if should_run_tc_tests:
             platform = tc.get('platform', {})
@@ -2008,7 +2087,7 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
     )
 
     graph_handles = []
-    tool_targets_queue = _ToolTargetsQueue()
+    tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
@@ -2029,7 +2108,7 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
         graph_handles.append(target_graph)
 
     with stager.scope("get-tools"):
-        graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc)
+        graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc, opts)
 
     graph_maker.disable_changelist()
 
@@ -2655,22 +2734,46 @@ def _gen_merge_nodes(nodes):
     return merging_nodes, alone_nodes
 
 
-def _get_tools(tool_targets_queue, graph_maker, arc_root, host_tc):
-    with stager.scope("waiting-tool-targets"):
-        tools_targets = tool_targets_queue.get()
-    abs_targets = [os.path.join(arc_root, tt) for tt in tools_targets]
+def _get_tools(tool_targets_queue, graph_maker, arc_root, host_tc, opts):
+    if should_use_servermode_for_tools(opts):
 
-    if not abs_targets:
-        logger.debug("Empty tool targets list")
-        return ccgraph.get_empty_graph()
+        def stdin_line_provider():
+            # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.
+            # So we must not block here if we know there wont be any new events in the queue.
+            # Returning an empty string effectively closes the stream.
+            # TODO: we should throw an exception here instead to make the user responsible of closing the stream.
+            if tool_targets_queue.done():
+                return ''
+            return json.dumps(tool_targets_queue.get()) + '\n'
+
+        kwargs = {
+            'abs_targets': [],
+            'ymake_opts': {
+                'targets_from_evlog': True,
+                'source_root': arc_root,
+                'stdin_line_provider': stdin_line_provider,
+            },
+        }
+    else:
+        with stager.scope("waiting-tool-targets"):
+            tools_targets = tool_targets_queue.get()
+        abs_targets = [os.path.join(arc_root, tt) for tt in tools_targets]
+
+        if not abs_targets:
+            logger.debug("Empty tool targets list")
+            return ccgraph.get_empty_graph()
+
+        kwargs = {
+            'abs_targets': abs_targets,
+        }
 
     with stager.scope('build-tool-graphs'):
         tg = graph_maker.make_graphs(
             host_tc,
-            abs_targets,
             graph_kind=_GraphKind.TOOLS,
             debug_id='tools-{ispic}',
             enabled_events=EVENTS_WITH_PROGRESS,
+            **kwargs
         )
         graph_tools = tg.pic().graph
 

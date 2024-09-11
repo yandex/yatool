@@ -54,6 +54,7 @@ from core.imprint import imprint
 from build.build_opts import (
     YMakeDebugOptions,
     YMakeBinOptions,
+    YMakeModeOptions,
     FlagsOptions,
     CustomFetcherOptions,
     ToolsOptions,
@@ -89,6 +90,7 @@ class DumpYaHandler(CompositeHandler):
             SandboxAuthOptions(),
             YMakeBinOptions(),
             YMakeRetryOptions(),
+            YMakeModeOptions(),
             CrossCompilationOptions(),
             BuildTypeOptions('release'),
             ContinueOnFailOptions(),

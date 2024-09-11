@@ -28,11 +28,12 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
         TStringBuf binary,
         const TList[TString]& args,
         const THashMap[TString, TString]& env,
-        object stderrLineReader
+        object stderrLineReader,
+        object stdinLineProvider
     ) nogil except +
 
 
-def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False):
+def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_provider=None):
     cdef TString binary_c = six.ensure_binary(binary)
     cdef TList[TString] args_c
     cdef THashMap[TString, TString] env_c
@@ -53,7 +54,7 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False):
             env_c[six.ensure_binary(k)] = six.ensure_binary(v)
 
     with nogil:
-        res = RunYMake(binary_c, args_c, env_c, stderr_line_reader)
+        res = RunYMake(binary_c, args_c, env_c, stderr_line_reader, stdin_line_provider)
 
     output = None
     if raw_cpp_stdout:

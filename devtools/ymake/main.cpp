@@ -850,6 +850,10 @@ int main_real(TBuildConfiguration& conf) {
             return BR_OK;
         }
 
+        if (conf.ReadStartTargetsFromEvlog && conf.StartDirs.empty()) {
+            return BR_OK;
+        }
+
         if (!yMake->InitTargets()) {
             return BR_FATAL_ERROR;
         }

@@ -20,5 +20,6 @@ TRunYMakeResultPtr RunYMake(
     TStringBuf binary,
     const TList<TString>& args,
     const THashMap<TString, TString>& env,
-    PyObject* stderrLineReader
+    PyObject* stderrLineReader,
+    PyObject* stdinLineProvider
 );
