@@ -103,7 +103,7 @@ public:
         return true;
     }
 
-    bool HasIncludeChanges(TFileContentHolder&) override {
+    bool HasIncludeChanges(TFileContentHolder&) const override {
         return true;
     }
 

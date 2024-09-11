@@ -26,9 +26,9 @@ struct TRagelInclude {
 class TRagelIncludesParser: public TIncludesParserBase {
 public:
     TRagelIncludesParser();
-    void Parse(IContentHolder& file, TVector<TRagelInclude>& includes);
+    void Parse(IContentHolder& file, TVector<TRagelInclude>& includes) const;
 
 protected:
-    void ScanIncludes(TVector<TRagelInclude>& nativeIncludes, IContentHolder& incFile);
-    bool ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) override;
+    void ScanIncludes(TVector<TRagelInclude>& nativeIncludes, IContentHolder& incFile) const;
+    bool ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const override;
 };

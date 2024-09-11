@@ -5,11 +5,11 @@ TAsmLikeIncludesParser::TAsmLikeIncludesParser() {
     CommentSign = "//";
 }
 
-bool TAsmLikeIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) {
+bool TAsmLikeIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const {
     return TIncludesParserBase::IsPrefixMatches(parts, incPrefix);
 }
 
-bool TAsmIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) {
+bool TAsmIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const {
     if (TIncludesParserBase::IsPrefixMatches(parts, incPrefix)) {
         return true;
     }

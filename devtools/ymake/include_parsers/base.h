@@ -40,10 +40,10 @@ public:
     virtual ~TIncludesParserBase() = default;
 
 protected:
-    bool ParseIncludeLineBase(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile, const TString& incPrefix, const TString& commentSign);
-    virtual bool ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile);
-    virtual bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix);
-    virtual bool ParseCppIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile);
+    bool ParseIncludeLineBase(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile, const TString& incPrefix, const TString& commentSign) const;
+    virtual bool ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const;
+    virtual bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const;
+    virtual bool ParseCppIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const;
 };
 
 void ChopIncludeComment(TStringBuf& lineBuf, const TStringBuf& commentSign);

@@ -8,15 +8,15 @@ TCppLikeIncludesParser::TCppLikeIncludesParser()
 {
 }
 
-bool TCppLikeIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) {
+bool TCppLikeIncludesParser::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const {
     return parts[0] == incPrefix || (parts.size() > 2 && parts[0] == TStringBuf("#") && parts[1] == TStringBuf("include"));
 }
 
-bool TCppLikeIncludesParser::ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) {
+bool TCppLikeIncludesParser::ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const {
     return ParseIncludeLineBase(lineBuf, inc, incFile, IncPrefix, CommentSign);
 }
 
-void TCppLikeIncludesParser::ScanIncludes(TVector<TString>& includes, IContentHolder& incFile) {
+void TCppLikeIncludesParser::ScanIncludes(TVector<TString>& includes, IContentHolder& incFile) const {
     static TCompactStrSpn spn(" \t");
 
     size_t i = 0;
@@ -40,12 +40,12 @@ void TCppLikeIncludesParser::ScanIncludes(TVector<TString>& includes, IContentHo
     }
 }
 
-void TCppLikeIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TCppLikeIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     includes.reserve(64);
     ScanIncludes(includes, file);
 }
 
-void TCppOnlyIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TCppOnlyIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     TStringBuf input = file.GetContent();
     includes.reserve(64);
     ScanCppIncludes(input, includes);

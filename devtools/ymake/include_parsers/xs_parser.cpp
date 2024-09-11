@@ -10,7 +10,7 @@ namespace {
     const NPcre::TPcre INDUCED_PATTERN = R"re(^#include\s*["<]([^">]+)[>"])re";
 }
 
-void TXsIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) {
+void TXsIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) const {
     TStringBuf line;
     TStringBuf input = file.GetContent();
 

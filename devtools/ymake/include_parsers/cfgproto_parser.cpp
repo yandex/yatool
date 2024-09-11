@@ -10,7 +10,7 @@ namespace {
     const NPcre::TPcre INDUCED_PATTERN = R"re(^option\s+\(\s*NProtoConfig\.Include\s*\)\s*=\s*"([^"]+)")re";
 }
 
-void TCfgprotoIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) {
+void TCfgprotoIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) const {
     TStringBuf line;
     TStringBuf input = file.GetContent();
 

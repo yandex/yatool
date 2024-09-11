@@ -7,10 +7,10 @@ public:
     TAsmLikeIncludesParser();
 
 protected:
-    bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) override;
+    bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const override;
 };
 
 class TAsmIncludesParser: public TAsmLikeIncludesParser {
 protected:
-    bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) override;
+    bool IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const override;
 };

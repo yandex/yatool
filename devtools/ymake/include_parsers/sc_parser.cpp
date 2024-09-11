@@ -10,7 +10,7 @@ namespace {
     const NPcre::TPcre INCLUDE_PATTERN = R"re(^include\s+"([^"]+)"\s*;)re";
 }
 
-void TScIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TScIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     TStringBuf line;
     TStringBuf input = file.GetContent();
 

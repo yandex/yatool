@@ -10,11 +10,11 @@ TRagelIncludesParser::TRagelIncludesParser()
 {
 }
 
-void TRagelIncludesParser::Parse(IContentHolder& file, TVector<TRagelInclude>& includes) {
+void TRagelIncludesParser::Parse(IContentHolder& file, TVector<TRagelInclude>& includes) const {
     ScanIncludes(includes, file);
 }
 
-void TRagelIncludesParser::ScanIncludes(TVector<TRagelInclude>& includes, IContentHolder& incFile) {
+void TRagelIncludesParser::ScanIncludes(TVector<TRagelInclude>& includes, IContentHolder& incFile) const {
     size_t i = 0;
     TStringBuf lineBuf;
     bool inSpecification = false;
@@ -54,7 +54,7 @@ void TRagelIncludesParser::ScanIncludes(TVector<TRagelInclude>& includes, IConte
     }
 }
 
-bool TRagelIncludesParser::ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) {
+bool TRagelIncludesParser::ParseNativeIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const {
     ChopIncludeComment(lineBuf, CommentSign);
 
     TVector<TStringBuf> parts;

@@ -9,7 +9,7 @@ namespace {
     const NPcre::TPcre INCLUDE_PATTERN = R"re(^include\s+'([^']+)')re";
 }
 
-void TFortranIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TFortranIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     TStringBuf line;
     TStringBuf input = file.GetContent();
 

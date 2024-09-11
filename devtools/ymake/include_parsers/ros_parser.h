@@ -23,5 +23,5 @@ struct TRosDep {
 
 class TRosIncludeParser {
 public:
-    void Parse(IContentHolder& file, TVector<TRosDep>& parsedIncludes);
+    void Parse(IContentHolder& file, TVector<TRosDep>& parsedIncludes) const;
 };

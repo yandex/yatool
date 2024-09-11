@@ -4,7 +4,7 @@
 #include <util/string/subst.h>
 
 
-void TYDLIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TYDLIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     TStringBuf input = file.GetContent();
 
     TVector<TString> imports;

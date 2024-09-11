@@ -27,6 +27,6 @@ struct TParsedFile {
 
 class TGoImportParser {
 public:
-    void Parse(IContentHolder& file, TVector<TParsedFile>& parsedFiles);
+    void Parse(IContentHolder& file, TVector<TParsedFile>& parsedFiles) const;
 };
 

@@ -8,5 +8,5 @@
 
 class TEmptyIncludesParser {
 public:
-    void Parse(const IContentHolder&, TVector<TString>&);
+    void Parse(const IContentHolder&, TVector<TString>&) const;
 };

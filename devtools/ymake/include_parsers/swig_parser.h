@@ -6,5 +6,5 @@
 
 class TSwigIncludesParser {
 public:
-    void Parse(IContentHolder& file, TVector<TInclDep>& includes);
+    void Parse(IContentHolder& file, TVector<TInclDep>& includes) const;
 };

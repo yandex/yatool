@@ -11,7 +11,7 @@ namespace {
     const NPcre::TPcre INCLUDE_PATTERN = R"re(^%(include|import|insert\s*\([^\)]*\))\s*([<"].*?[">]))re";
 }
 
-void TSwigIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) {
+void TSwigIncludesParser::Parse(IContentHolder& file, TVector<TInclDep>& includes) const {
     TStringBuf line;
     bool inBlock = false;
 

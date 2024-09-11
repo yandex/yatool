@@ -31,7 +31,7 @@ struct TCythonDep {
 
 class TCythonIncludesParser {
 public:
-    void Parse(IContentHolder& file, TVector<TCythonDep>& includes);
+    void Parse(IContentHolder& file, TVector<TCythonDep>& includes) const;
 };
 
 // For pybuild.py, parses only native includes

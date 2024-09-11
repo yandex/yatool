@@ -6,5 +6,5 @@
 
 class TNlgIncludesParser {
 public:
-    void Parse(IContentHolder& file, TVector<TInclDep>& imports);
+    void Parse(IContentHolder& file, TVector<TInclDep>& imports) const;
 };

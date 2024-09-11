@@ -102,7 +102,7 @@ main := ( (ws* statement ws* comment?) '\n' @ProcessImport)* $err(SkipLine);
 %% write data;
 
 //TODO(kikht): maybe include <> into cdef includes for better resolving
-void TCythonIncludesParser::Parse(IContentHolder& file, TVector<TCythonDep>& includes) {
+void TCythonIncludesParser::Parse(IContentHolder& file, TVector<TCythonDep>& includes) const {
     int cs;
     const char* start = static_cast<const char*>(file.GetContent().Data());
     const char* p = start;

@@ -33,11 +33,11 @@ TIncludesParserBase::TIncludesParserBase(const TString& includePrefix, const TSt
 {
 }
 
-bool TIncludesParserBase::ParseNativeIncludeLine(TStringBuf& /* lineBuf */, TString& /* inc */, IContentHolder& /* incFile */) {
+bool TIncludesParserBase::ParseNativeIncludeLine(TStringBuf& /* lineBuf */, TString& /* inc */, IContentHolder& /* incFile */) const {
     return false;
 }
 
-bool TIncludesParserBase::ParseIncludeLineBase(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile, const TString& incPrefix, const TString& commentSign) {
+bool TIncludesParserBase::ParseIncludeLineBase(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile, const TString& incPrefix, const TString& commentSign) const {
     ChopIncludeComment(lineBuf, commentSign);
 
     TVector<TStringBuf> parts;
@@ -65,10 +65,10 @@ bool TIncludesParserBase::ParseIncludeLineBase(TStringBuf& lineBuf, TString& inc
     return true;
 }
 
-bool TIncludesParserBase::ParseCppIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) {
+bool TIncludesParserBase::ParseCppIncludeLine(TStringBuf& lineBuf, TString& inc, IContentHolder& incFile) const {
     return ParseIncludeLineBase(lineBuf, inc, incFile, CPP_INCLUDE_PREFIX, CPP_COMMENT_SIGN);
 }
 
-bool TIncludesParserBase::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) {
+bool TIncludesParserBase::IsPrefixMatches(const TVector<TStringBuf>& parts, const TString& incPrefix) const {
     return parts[0] == incPrefix;
 }

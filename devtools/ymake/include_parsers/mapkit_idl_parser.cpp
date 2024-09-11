@@ -16,7 +16,7 @@ namespace {
     const NPcre::TPcre Y_IGNORE_PATTERN = R"re(//\s*Y_IGNORE\s*$$)re";
 }
 
-void TMapkitIdlIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) {
+void TMapkitIdlIncludesParser::Parse(IContentHolder& file, TVector<TString>& includes) const {
     TStringBuf line;
     NPcre::TPcreMatches result;
 

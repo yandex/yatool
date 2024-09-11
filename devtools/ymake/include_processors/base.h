@@ -116,7 +116,7 @@ public:
                                        TFileView incFileName,
                                        const TVector<TString>& includes) const = 0;
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
-    virtual bool HasIncludeChanges(TFileContentHolder& incFile) = 0;
+    virtual bool HasIncludeChanges(TFileContentHolder& incFile) const = 0;
     virtual const TIndDepsRule* DepsTransferRules() const = 0;
     virtual void SetLanguageId(TLangId) {};
     virtual void SetParserType(EIncludesParserType) {};
@@ -180,7 +180,7 @@ public:
         return !useCachedResult;
     }
 
-    bool HasIncludeChanges(TFileContentHolder& incFile) override {
+    bool HasIncludeChanges(TFileContentHolder& incFile) const override {
         TVector<TInclude> cachedIncludes;
         auto cacheResultId = NParsersCache::GetResultId(GetParserId().GetId(), incFile.GetTargetId());
         if (!ParsersCache) {

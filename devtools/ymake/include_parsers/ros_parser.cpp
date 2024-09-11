@@ -37,7 +37,7 @@ namespace {
 
 } // namespace
 
-void TRosIncludeParser::Parse(IContentHolder& file, TVector<TRosDep>& parsedIncludes) {
+void TRosIncludeParser::Parse(IContentHolder& file, TVector<TRosDep>& parsedIncludes) const {
     TStringBuf input = file.GetContent();
     TStringBuf line;
 

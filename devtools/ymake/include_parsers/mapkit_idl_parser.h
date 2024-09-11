@@ -7,5 +7,5 @@ class IContentHolder;
 
 class TMapkitIdlIncludesParser {
 public:
-    void Parse(IContentHolder& file, TVector<TString>& includes);
+    void Parse(IContentHolder& file, TVector<TString>& includes) const;
 };
