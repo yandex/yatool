@@ -70,7 +70,7 @@ def make_headers(headers=None):
 
 
 def download_file(url, path, mode=0, expected_md5=None, headers=None):
-    # type: (str, str, int, str, dict[str, str] | None) -> None
+    # type: (str, str, int, str | None, dict[str, str] | None) -> None
     # This value emulates old logic when expected integrity is not provided
     # but md5 sum has to be calculated
     integrity = 'md5-'
