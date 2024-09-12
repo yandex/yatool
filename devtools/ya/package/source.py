@@ -496,6 +496,12 @@ class ArcadiaSource(Source):
     def _prepare(self):
         source = os.path.join(self.arcadia_root, self.source_path())
         destination = os.path.join(self.result_dir, self.destination_path())
+        if os.path.abspath(source) == os.path.abspath(self.arcadia_root):
+            logger.warning(
+                "['source']['path'] in your ARCADIA data equals to arcadia root. \
+It will cause to scan full arcadia repo, so it will be very slow. \
+Please consider defining your data paths more explicitly"
+            )
         self.copy(source, destination)
 
 
