@@ -15,7 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 def setup(
-    content_dir, result_dir, publish_to_list, access_key, secret_key, wheel_python3, wheel_platform, package_version
+    content_dir,
+    result_dir,
+    publish_to_list,
+    access_key,
+    secret_key,
+    wheel_python3,
+    wheel_platform,
+    wheel_limited_api,
+    package_version,
 ):
     setup_script = os.path.join(content_dir, "setup.py")
     if not os.path.exists(setup_script):
@@ -27,6 +35,9 @@ def setup(
     cmd = ["setup.py", "bdist_wheel"]
     if wheel_platform:
         cmd += ["--plat-name", wheel_platform]
+    if wheel_limited_api:
+        cmd += ["--py-limited-api", wheel_limited_api]
+
     package.process.run_process(python, cmd, cwd=content_dir, env=env)
 
     if os.path.exists(os.path.join(content_dir, "dist")):

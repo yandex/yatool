@@ -744,6 +744,10 @@
                     "description": "Set wheel package platform",
                     "type": "string"
                 },
+                "wheel_limited_api": {
+                    "description": "Set wheel package limited api version",
+                    "type": "string"
+                },
                 "wheel_python3": {
                     "description": "Use python3 when building wheel package",
                     "type": "boolean"

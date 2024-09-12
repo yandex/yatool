@@ -359,6 +359,7 @@ class PackageCustomizableOptions(core.yarg.Options):
         self.store_debian = True
         self.strip = False
         self.wheel_platform = ""
+        self.wheel_limited_api = ""
         self.wheel_python3 = False
         self.package_filename = None
 
@@ -384,6 +385,14 @@ class PackageCustomizableOptions(core.yarg.Options):
                 visible=True,
                 help='Set wheel package platform',
                 hook=core.yarg.SetValueHook('wheel_platform'),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=PYTHON_WHEEL_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--wheel-limited-api'],
+                visible=True,
+                help='Set wheel package limited api version',
+                hook=core.yarg.SetValueHook('wheel_limited_api'),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=PYTHON_WHEEL_SUBGROUP,
             ),

@@ -904,6 +904,7 @@ def create_package(package_context, output_root, builds):
                     params.wheel_secret_key_path,
                     params.wheel_python3,
                     params.wheel_platform,
+                    params.wheel_limited_api,
                     package_version,
                 )
 
