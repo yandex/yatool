@@ -940,7 +940,9 @@ void TJSONVisitor::FinishCurrent(TState& state) {
     CurrData->SetIncludeStructureUid(CurrState->Hash->GetIncludeStructureMd5());
     CurrData->Finished = true;
     CurrData->Completed = true;
-    CheckStructureUidChanged();
+    if (CurrData->LoopId == TNodeId::Invalid) {
+        CheckStructureUidChanged(*CurrData);
+    }
 }
 
 void TJSONVisitor::PassToParent(TState& state) {
@@ -1254,7 +1256,7 @@ void TJSONVisitor::ComputeLoopHash(TNodeId loopId) {
         }
         nodeData.Finished = true;
         nodeData.Completed = true;
-        CheckStructureUidChanged();
+        CheckStructureUidChanged(nodeData);
     }
 }
 
@@ -1281,8 +1283,8 @@ void TJSONVisitor::UpdateReferences(TState& state) {
     CurrType = CurrNode->NodeType;
 }
 
-void TJSONVisitor::CheckStructureUidChanged() {
-    if (CurrData->GetStructureUid().GetRawSig() != CurrData->GetPreStructureUid().GetRawSig()) {
+void TJSONVisitor::CheckStructureUidChanged(const TJSONEntryStats& data) {
+    if (data.GetStructureUid().GetRawSig() != data.GetPreStructureUid().GetRawSig()) {
         CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 0); // at least one node rendered
     } else {
         // TODO Research and try load it from cache

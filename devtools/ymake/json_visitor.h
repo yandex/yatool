@@ -128,5 +128,5 @@ private:
     void ComputeLoopHash(TNodeId loopId);
 
     void UpdateReferences(TState& state);
-    void CheckStructureUidChanged();
+    void CheckStructureUidChanged(const TJSONEntryStats& data);
 };
