@@ -29,14 +29,15 @@ void TGraphChangesPredictor::AnalyzeChanges() {
             return;
         }
 
-        if (!IncParserManager_.HasParserFor(fileView)) {
-            return;
-        }
-        auto fileContent = FileConf_.GetFileByName(fileView);
-        if (IncParserManager_.HasIncludeChanges(*fileContent)) {
-            HasChanges_ = true;
-            YDebug() << "Graph has structural changes because " << change.Name << " file has includes changes" << Endl;
-            return;
+        if (const auto* parser = IncParserManager_.GetParserFor(fileView);
+            parser != nullptr && parser->GetParserId().GetType() != EIncludesParserType::EmptyParser)
+        {
+            auto fileContent = FileConf_.GetFileByName(fileView);
+            if (IncParserManager_.HasIncludeChanges(*fileContent, parser)) {
+                HasChanges_ = true;
+                YDebug() << "Graph has structural changes because " << change.Name << " file has includes changes" << Endl;
+                return;
+            }
         }
     };
 

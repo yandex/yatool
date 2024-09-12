@@ -66,7 +66,7 @@ public:
     void InitManager(const TParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
 
     void ProcessFile(TFileContentHolder& incFile, TFileProcessContext context) const;
-    bool HasIncludeChanges(TFileContentHolder& incFile) const;
+    bool HasIncludeChanges(TFileContentHolder& incFile, const TParserBase* parser) const;
     void ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const;
     bool ProcessOutputIncludes(TFileView outputFileName,
                                const TVector<TString>& includes,
@@ -77,6 +77,8 @@ public:
     void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
     bool HasParserFor(TStringBuf fileName) const;
     bool HasParserFor(TFileView fileName) const;
+    TParserBase* GetParserFor(TStringBuf fileName) const;
+    TParserBase* GetParserFor(TFileView fileName) const;
     void SetDefaultParserSameAsFor(TFileView fileName);
     void ResetDefaultParser() {
         ExtForDefaultParser.clear();

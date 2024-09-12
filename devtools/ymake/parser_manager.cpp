@@ -328,14 +328,7 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
     }
 }
 
-bool TIncParserManager::HasIncludeChanges(TFileContentHolder& incFile) const {
-    TStringBuf ext = incFile.GetName().Extension();
-
-    if (ext == "in") {
-        ext = NPath::Extension(incFile.GetName().NoExtension()); // e.g. x.cpp.in -> x.cpp, ext=cpp
-    }
-
-    TParserBase* parser = ParserByExt(ext);
+bool TIncParserManager::HasIncludeChanges(TFileContentHolder& incFile, const TParserBase* parser) const {
     if (parser) {
         return parser->HasIncludeChanges(incFile);
     }
@@ -374,15 +367,23 @@ void TIncParserManager::AddParsers(const TParsersList& parsersList) {
 }
 
 bool TIncParserManager::HasParserFor(TStringBuf fileName) const {
-    TStringBuf ext = NPath::Extension(fileName);
-    if (ext == "in") {
-        ext = NPath::Extension(NPath::NoExtension(fileName));
-    }
-    return Ext2Parser.contains(ext);
+    return GetParserFor(fileName) != nullptr;
 }
 
-bool TIncParserManager::HasParserFor(TFileView file) const {
-    return HasParserFor(file.Basename());
+bool TIncParserManager::HasParserFor(TFileView fileName) const {
+    return GetParserFor(fileName) != nullptr;
+}
+
+TParserBase* TIncParserManager::GetParserFor(TStringBuf fileName) const {
+    TStringBuf ext = NPath::Extension(fileName);
+    if (ext == "in"sv) {
+        ext = NPath::Extension(NPath::NoExtension(fileName));
+    }
+    return ParserByExt(ext);
+}
+
+TParserBase* TIncParserManager::GetParserFor(TFileView fileName) const {
+    return GetParserFor(fileName.Basename());
 }
 
 void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
