@@ -1,7 +1,12 @@
 from collections import namedtuple
 import hashlib
 
+
 SUPPORTED_INTEGRITY_ALG = {'md5', 'sha1', 'sha512'}
+
+
+class MissingResourceError(Exception):
+    mute = True
 
 
 class InvalidHttpUriException(Exception):
@@ -89,3 +94,27 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
         return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url=None, fetcher_meta=None)
     else:
         raise InvalidUriSchemaException(accepted_schemas, resource_uri)
+
+
+def get_mapped_parsed_uri_and_info(parsed_uri, mapping, resource_info):
+    # type: (ParsedResourceUri, dict, dict) -> tuple[ParsedResourceUri, dict]
+
+    resource_id = parsed_uri.resource_id
+
+    if resource_id not in mapping.get("resources", {}):
+        raise MissingResourceError("Resource mapping doesn't have required resource: {}".format(resource_id))
+
+    if resource_id in mapping.get("resources_info", []):
+        resource_info = mapping["resources_info"][resource_id]
+
+    new_url = mapping["resources"][resource_id]
+
+    new_parsed_uri = ParsedResourceUri(
+        resource_type=parsed_uri.resource_type,
+        resource_uri=parsed_uri.resource_uri,
+        resource_id=parsed_uri.resource_id,
+        resource_url=new_url,
+        fetcher_meta=parsed_uri.fetcher_meta,
+    )
+
+    return new_parsed_uri, resource_info

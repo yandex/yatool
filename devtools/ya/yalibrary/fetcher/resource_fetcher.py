@@ -11,7 +11,7 @@ from devtools.libs.yaplatform.python.platform_map import get_resource_dir_name
 
 from core import config
 
-from yalibrary.fetcher.uri_parser import parse_resource_uri
+from yalibrary.fetcher.uri_parser import parse_resource_uri, get_mapped_parsed_uri_and_info
 
 from .common import RENAME, UNTAR, ProgressPrinter, clean_dir, deploy_tool
 
@@ -136,11 +136,21 @@ def select_resource(item, platform=None):
 
 
 def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher):
+    resource_info = {
+        'file_name': parsed_uri.resource_id[:20],
+        'id': parsed_uri.resource_id,
+    }
+
+    if config.has_mapping():
+        parsed_uri, resource_info = get_mapped_parsed_uri_and_info(parsed_uri, config.mapping(), resource_info)
+
     if use_universal_fetcher:
         import yalibrary.fetcher.ufetcher as ufetcher
 
+        # TODO: kuzmich321 (ufetcher) seems like there can be a better way?
+        what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
         return ufetcher.UFetcherDownloader(
-            ufetcher.get_ufetcher(), parsed_uri.resource_uri, progress_callback, state, keep_directory_packed
+            ufetcher.get_ufetcher(), what_to_download, progress_callback, state, keep_directory_packed
         )
 
     try:
@@ -150,21 +160,16 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
     except (ImportError, AttributeError):  # internal tests can have no app_ctx or configured fetchers_storage
         normal_fetched_schemas = {'sbr', 'http', 'https'}
 
-    default_resource_info = {
-        'file_name': parsed_uri.resource_id[:20],
-        'id': parsed_uri.resource_id,
-    }
-
     if parsed_uri.resource_type == 'http':
         if parsed_uri.fetcher_meta:
-            default_resource_info['file_name'] = 'resource'
+            resource_info['file_name'] = 'resource'
             integrity = parsed_uri.fetcher_meta.get('integrity')
-            return _HttpDownloaderWithIntegrity(parsed_uri.resource_url, integrity, default_resource_info)
-        return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, default_resource_info)
+            return _HttpDownloaderWithIntegrity(parsed_uri.resource_url, integrity, resource_info)
+        return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, resource_info)
 
     elif parsed_uri.resource_type in normal_fetched_schemas:
         if config.has_mapping():
-            return _HttpDownloaderWithConfigMapping(parsed_uri.resource_id, default_resource_info)
+            return _HttpDownloader(parsed_uri.resource_url, None, resource_info)
         return _DefaultDownloader(fetcher, parsed_uri.resource_id, progress_callback, state, keep_directory_packed)
 
     raise Exception('Unsupported resource_uri {}'.format(parsed_uri.resource_uri))
@@ -218,23 +223,6 @@ class _HttpDownloaderWithIntegrity(DownloaderBase):
     def __call__(self, download_to):
         http_client.download_file_with_integrity(url=self._url, path=download_to, integrity=self._integrity)
         return self._info
-
-
-class _HttpDownloaderWithConfigMapping(_HttpDownloader):
-    def __init__(self, resource_id, resource_info):
-        assert config.has_mapping()
-        mapping = config.mapping()
-        if resource_id in mapping.get("resources_info", []):
-            resource_info = mapping["resources_info"][resource_id]
-
-        if resource_id not in mapping["resources"]:
-            raise MissingResourceError("Resource mapping doesn't have required resource: {}".format(resource_id))
-
-        url = mapping["resources"][resource_id]
-
-        super(_HttpDownloaderWithConfigMapping, self).__init__(
-            resource_url=url, resource_md5=None, resource_info=resource_info
-        )
 
 
 class _DefaultDownloader(DownloaderBase):
