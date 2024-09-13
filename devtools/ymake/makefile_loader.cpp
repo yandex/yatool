@@ -1,5 +1,6 @@
 #include "makefile_loader.h"
 
+#include "autoincludes_conf.h"
 #include "builtin_macro_consts.h"
 #include "module_loader.h"
 #include "prop_names.h"
@@ -167,7 +168,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                 Module->ProcessMakelistStatement(effectiveName, args);
 
                 if (!IsFileExtRule(data)) {
-                    Module->ProcessModuleMacroCalls(effectiveName, args);
+                    Module->ProcessModuleMacroCalls(effectiveName, args, !IncludeStack.empty() && NPath::Basename(IncludeStack.back()) == YA_COMMON);
                 }
 
                 DataStatement(effectiveName, args);
@@ -206,6 +207,18 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
             if (isNukedModule) {
                 // Skip the following conditions
             } else {
+                size_t prefixLen;
+                TString YaCommon;
+                if (Conf.AutoincludePathsTrie.FindLongestPrefix(Dir + NPath::PATH_SEP_S, &prefixLen, &YaCommon)) {
+                    if (!TFsPath(Conf.RealPathEx(YaCommon)).Exists()) {
+                        TRACE(P, NEvent::TInvalidFile(YaCommon, {Dir}, TString{"File not found"}));
+                        YConfErr(Misconfiguration) << "ya.common file not found at [[imp]]" << YaCommon << Endl;
+                    } else {
+                        auto includeCtr = OnInclude(YaCommon, Makefile);
+                        Y_ASSERT(!includeCtr.Ignored());
+                        ReadMakeFile(YaCommon);
+                    }
+                }
                 // Process module EPILOGUE statement if there is one
                 if (const auto& epilogue = Module->GetModuleConf().Epilogue; !epilogue.empty()) {
                     UserStatementImpl(epilogue, TVector<TStringBuf>(), /* prohibitInternal */ false);

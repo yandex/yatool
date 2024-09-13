@@ -895,7 +895,8 @@ namespace {
                 }
             } else {
                 if (name == NOptions::ADDINCL ||
-                    name == NOptions::PEERDIR)
+                    name == NOptions::PEERDIR ||
+                    name == NOptions::ALLOWED_IN_COMMON)
                 {
                     // Do nothing
                 } else if (name == NOptions::GEN_FROM_FILE ||

@@ -26,6 +26,7 @@ PEERDIR(
     devtools/ymake/yndex
     library/cpp/blockcodecs
     library/cpp/containers/absl_flat_hash
+    library/cpp/containers/comptrie
     library/cpp/containers/top_keeper
     library/cpp/string_utils/levenshtein_diff
     library/cpp/deprecated/autoarray
@@ -113,6 +114,7 @@ SRCS(
     json_visitor.cpp
     lang/plugin_facade.cpp # XXX
     licenses_conf.cpp
+    autoincludes_conf.cpp
     list_modules.cpp
     macro_processor.cpp
     macro_string.cpp

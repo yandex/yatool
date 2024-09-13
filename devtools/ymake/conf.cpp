@@ -2,6 +2,7 @@
 
 #include "sysincl_conf.h"
 #include "licenses_conf.h"
+#include "autoincludes_conf.h"
 
 #include <devtools/ymake/macro.h>
 #include <devtools/ymake/macro_processor.h>
@@ -28,6 +29,7 @@ namespace {
     constexpr TStringBuf VAR_EXCLUDED_PEERDIRS = "EXCLUDED_PEERDIRS"sv;
     constexpr TStringBuf VAR_FOLDABLE_VARS = "_FOLDABLE_VARS"sv;
     constexpr TStringBuf VAR_EXPORT_SRC_ROOT = "EXPORT_SOURCE_ROOT"sv;
+    constexpr TStringBuf VAR_AUTOINCLUDE_PATHS = "AUTOINCLUDE_PATHS"sv;
 
     void FoldGlobalCommands(TBuildConfiguration* conf) {
         Y_ASSERT(conf != nullptr);
@@ -199,6 +201,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
     LoadLicenses(extraData);
+    LoadAutoincludes(extraData);
     TMd5Sig rules;
     rulesData.Final(rules.RawData);
     extraData.Update(rules.RawData);
@@ -250,6 +253,13 @@ void TBuildConfiguration::LoadLicenses(MD5& confData) {
         licensesFiles.emplace_back(SourceRoot / it.Token());
     }
     Licenses = ::LoadLicenses(licensesFiles, confData);
+}
+
+void TBuildConfiguration::LoadAutoincludes(MD5& confData) {
+    TFsPath autoincludeFile = GetCmdValue(CommandConf.Get1(VAR_AUTOINCLUDE_PATHS));
+    if (autoincludeFile) {
+        AutoincludePathsTrie = ::LoadAutoincludes(SourceRoot / autoincludeFile, confData);
+    }
 }
 
 void TBuildConfiguration::LoadPeersRules(MD5& confData) {

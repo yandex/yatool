@@ -7,6 +7,7 @@ namespace NOptions {
 constexpr TStringBuf ADDINCL = "ADDINCL";
 constexpr TStringBuf ALIASES = "ALIASES";
 constexpr TStringBuf ALLOWED = "ALLOWED";
+constexpr TStringBuf ALLOWED_IN_COMMON = "ALLOWED_IN_COMMON";
 constexpr TStringBuf ALL_INS_TO_OUT = "ALL_INS_TO_OUT";
 constexpr TStringBuf ARGS_PARSER = "ARGS_PARSER";
 constexpr TStringBuf CMD = "CMD";

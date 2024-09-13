@@ -23,6 +23,7 @@
 
 #include <library/cpp/getopt/small/last_getopt.h>
 #include <library/cpp/digest/md5/md5.h>
+#include <library/cpp/containers/comptrie/comptrie_builder.h>
 
 #include <util/folder/path.h>
 #include <util/generic/hash.h>
@@ -60,6 +61,7 @@ public:
     TBlackList BlackList;
     TIsolatedProjects IsolatedProjects;
     THashSet<TString> ExcludedPeerdirs;
+    TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
 
 public:
@@ -173,6 +175,7 @@ private:
     void GenerateCustomData(const TStringBuf genCustomData);
     void LoadSystemHeaders(MD5& confData);
     void LoadLicenses(MD5& confData);
+    void LoadAutoincludes(MD5& confData);
     void LoadPeersRules(MD5& confData);
     void LoadBlackLists(MD5& confHash, MD5& anotherConfHash, bool addToAnother);
     void LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother);
