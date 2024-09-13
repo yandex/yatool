@@ -810,6 +810,8 @@ int main_real(TBuildConfiguration& conf) {
     yMake->PostInit();
 
     if (yMake->CanBypassConfigure()) {
+        FORCE_TRACE(T, NEvent::TBypassConfigure{});
+
         // FIXME: Currently we are implementing plan "B" for Grand Bypass,
         // that is we do not want to save caches when Grand Bypass occurs
         conf.WriteFsCache = false;

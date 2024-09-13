@@ -308,3 +308,7 @@ message TArcChanges {
     option (message_id) = 50;
     required bool HasChangelist = 1;
 };
+
+message TBypassConfigure {
+    option (message_id) = 51;
+};
