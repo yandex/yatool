@@ -130,16 +130,22 @@ namespace {
     TGeneralParser::TModuleConstraints MakeModuleConstraintChecker(const TVars& confVars) {
         if (!confVars.Contains("EXPLICIT_VERSION_PREFIXES"))
             return [](const TModuleDef&){};
-        TVector<TStringBuf> prefixes;
+        TVector<TStringBuf> prefixes, exceptions;
         for (TStringBuf prefix: SplitBySpace(GetCmdValue(confVars.Get1("EXPLICIT_VERSION_PREFIXES")))) {
             prefixes.push_back(prefix);
         }
+        for (TStringBuf except: SplitBySpace(GetCmdValue(confVars.Get1("EXPLICIT_VERSION_EXCEPTIONS")))) {
+            exceptions.push_back(except);
+        }
 
-        return [prefixes = std::move(prefixes)](const TModuleDef& modDef) {
-            for (TStringBuf prefix: prefixes) {
-                if (!modDef.IsVersionSet() && NPath::IsPrefixOf(prefix, modDef.GetModule().GetDir().CutType())) {
+        return [prefixes = std::move(prefixes), exceptions = std::move(exceptions)](const TModuleDef& modDef) {
+            const TStringBuf moddir = modDef.GetModule().GetDir().CutType();
+            const auto isModPrefix = [moddir](TStringBuf prefix) {return NPath::IsPrefixOf(prefix, moddir);};
+            if (!modDef.IsVersionSet()) {
+                auto it = std::ranges::find_if(prefixes, isModPrefix);
+                if (it != prefixes.end() && !std::ranges::any_of(exceptions, isModPrefix)) {
                     TScopedContext context(modDef.GetModule().GetName());
-                    YConfErr(Misconfiguration) << "Explicit VERSION must be specified for modules inside " << prefix << " directory" << Endl;
+                    YConfErr(Misconfiguration) << "Explicit VERSION must be specified for modules inside " << *it << " directory" << Endl;
                 }
             }
         };
