@@ -141,7 +141,7 @@ namespace {
         return [prefixes = std::move(prefixes), exceptions = std::move(exceptions)](const TModuleDef& modDef) {
             const TStringBuf moddir = modDef.GetModule().GetDir().CutType();
             const auto isModPrefix = [moddir](TStringBuf prefix) {return NPath::IsPrefixOf(prefix, moddir);};
-            if (!modDef.IsVersionSet()) {
+            if (!modDef.IsVersionSet() && modDef.GetModule().Get("SKIP_VERSION_REQUIREMENTS") != "yes") {
                 auto it = std::ranges::find_if(prefixes, isModPrefix);
                 if (it != prefixes.end() && !std::ranges::any_of(exceptions, isModPrefix)) {
                     TScopedContext context(modDef.GetModule().GetName());
