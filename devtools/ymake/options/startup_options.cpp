@@ -40,8 +40,6 @@ static TString FindSourceRootByTarget(const TFsPath& path) {
 void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     TRootsOptions::AddOptions(opts);
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
-    opts.AddLongOption("cache-info-file", "fullname of cache info file for current ymake run").StoreResult(&CacheInfoFile);
-    opts.AddLongOption("cache-info-name", "basename for cache info output file").StoreResult(&CacheInfoName);
     opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
 }
 
@@ -59,21 +57,6 @@ void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
 
     if (BuildRoot == SourceRoot || SourceRoot.IsSubpathOf(BuildRoot)) {
         throw TConfigurationError() << "source root cannot be inside of build root";
-    }
-
-    if (CacheInfoFile.IsDefined() && !CacheInfoFile.IsFile()) {
-        throw TConfigurationError() << "cache info file " << CacheInfoFile << " is incorrect";
-    }
-
-    if (CacheInfoName.IsDefined() && CacheInfoName != CacheInfoName.Basename()) {
-        throw TConfigurationError() << "cache info name " << CacheInfoName << " is incorrect";
-    }
-
-    if (CacheInfoName.IsDefined()) {
-        CacheInfoOutputFile = BuildRoot / CacheInfoName;
-        if (CacheInfoFile.IsDefined() && CacheInfoFile == CacheInfoOutputFile) {
-            throw TConfigurationError() << "cache info file " << CacheInfoFile << " must be different from cache info output file";
-        }
     }
 
     YmakeCache = BuildRoot / "ymake.cache";
@@ -157,20 +140,6 @@ void TStartUpOptions::AddTarget(const TFsPath& target) {
     }
 }
 
-void TStartUpOptions::OnDepsCacheEnabled() const {
-    if (CacheInfoOutputFile.IsDefined()) {
-        CacheInfoOutputFile.DeleteIfExists();
-    } else {
-        // Magic ortopedia - remove commit hash by known basename
-        auto const KnownCacheInfoOutputFile = BuildRoot / "hash";
-        KnownCacheInfoOutputFile.DeleteIfExists();
-    }
-}
-
 void TStartUpOptions::OnDepsCacheSaved() const {
-    if (CacheInfoFile.IsDefined() && CacheInfoOutputFile.IsDefined()) {
-        // Use CopyTo instead RenameTo, because few ymake run may use one CacheInfoFile
-        CacheInfoFile.CopyTo(CacheInfoOutputFile, true);
-    }
     FORCE_TRACE(C, NEvent::TReadyForUpdateCacheInfo{});
 }

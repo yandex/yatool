@@ -780,10 +780,6 @@ int main_real(TBuildConfiguration& conf) {
     dumpCacheFlags("Json", conf.ReadJsonCache, conf.WriteJsonCache);
     dumpCacheFlags("Uids", conf.ReadUidsCache, conf.WriteUidsCache);
 
-    if (conf.WriteDepsCache) {
-        conf.OnDepsCacheEnabled();
-    }
-
     bool loadGraph = updateGraph || conf.ReadFsCache || conf.ReadDepsCache;
 
     if (!cachePath.Exists()) {
