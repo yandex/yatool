@@ -12,6 +12,20 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+DEFAULT_TRANSPORT_ORDER = [
+    universal_fetcher.SandboxTransportType.HTTP,
+    universal_fetcher.SandboxTransportType.SKYNET,
+    universal_fetcher.SandboxTransportType.MDS,
+]
+
+FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE = {
+    "proxy": universal_fetcher.SandboxTransportType.HTTP,
+    "sandbox": universal_fetcher.SandboxTransportType.HTTP,
+    "skynet": universal_fetcher.SandboxTransportType.SKYNET,
+    "mds": universal_fetcher.SandboxTransportType.MDS,
+}
+
+
 class UnableToFetchError(Exception):
     mute = True
 
@@ -26,26 +40,19 @@ def _get_sandbox_token() -> str:
         return ""
 
 
-def _get_transports_order() -> list:
+def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
     try:
         import app_ctx
 
         fetcher_params = app_ctx.fetcher_params[1]
     except (ImportError, AttributeError, IndexError):
-        return ["http", "skynet", "mds"]
-
-    fetcher_param_to_ufetcher_sandbox_transport_type = {
-        "proxy": "http",
-        "sandbox": "http",
-        "skynet": "skynet",
-        "mds": "mds",
-    }
+        return DEFAULT_TRANSPORT_ORDER
 
     order = []
     for param in fetcher_params:
         param_name = param["name"]
-        if param_name in fetcher_param_to_ufetcher_sandbox_transport_type:
-            order.append(fetcher_param_to_ufetcher_sandbox_transport_type[param_name])
+        if param_name in FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE:
+            order.append(FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE[param_name])
     return order
 
 
@@ -61,13 +68,13 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         transports_order = _get_transports_order()
         sandbox_config_payload = []
 
-        if "http" in transports_order:
+        if universal_fetcher.SandboxTransportType.HTTP in transports_order:
             sandbox_config_payload.append(universal_fetcher.HttpParams())
 
-        if "skynet" in transports_order:
+        if universal_fetcher.SandboxTransportType.SKYNET in transports_order:
             sandbox_config_payload.append(universal_fetcher.SkynetParams())
 
-        if "mds" in transports_order:
+        if universal_fetcher.SandboxTransportType.MDS in transports_order:
             sandbox_config_payload.append(universal_fetcher.MdsParams())
 
         sandbox_config_payload.append(default_retry_policy)
@@ -93,7 +100,7 @@ class UFetcherDownloader:
         self,
         ufetcher: universal_fetcher.UniversalFetcher,
         parsed_uri: str,
-        progress_callback: tp.Any,
+        progress_callback: tp.Callable[..., None] | None,
         state: tp.Any,
         keep_directory_packed: bool,
     ):
@@ -116,14 +123,14 @@ class UFetcherDownloader:
         try:
             orig_fname = res_info['last_attempt']['result']['resource_info']['attrs']['original_filename']
             res_info['filename'] = res_info['file_name'] = orig_fname
-            res_info['multifile'] = res_info['last_attempt']['result']['res_info']['attrs']['multifile']
+            res_info['multifile'] = res_info['last_attempt']['result']['resource_info']['attrs']['multifile']
             should_unpack = res_info['multifile'] and not self._keep_dir_packed
 
             if should_unpack:
                 # TODO: kuzmich321@ (ufetcher) YA-2028
                 exts.archive.extract_from_tar(download_to, download_to)
         except KeyError as err:
-            logger.debug("{} not present in resource info.".format(err))
+            logger.exception("{} not present in resource info.".format(err))
 
     @staticmethod
     def _handle_error(res_info: dict) -> None:
@@ -131,5 +138,5 @@ class UFetcherDownloader:
             error = res_info['last_attempt']['result']['error']
             if error is not None:
                 raise UnableToFetchError(error)
-        except KeyError:
-            raise UnableToFetchError("No attempt was made.")
+        except KeyError as err:
+            raise UnableToFetchError(f'No attempt was made: {err}')

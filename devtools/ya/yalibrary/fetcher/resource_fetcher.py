@@ -94,9 +94,8 @@ def fetch_resource_if_need(
     result_dir = os.path.join(root_dir, resource_dir)
 
     logger.debug(
-        "Fetching {} from {} to {} dir, post_process={})".format(
-            parsed_uri.resource_id, parsed_uri.resource_uri, result_dir, post_process
-        )
+        "Fetching %s from %s to %s dir, post_process=%s)"
+        % (parsed_uri.resource_id, parsed_uri.resource_uri, result_dir, post_process)
     )
 
     downloader = _get_downloader(
