@@ -27,7 +27,6 @@
 #include <devtools/ymake/vars.h>
 
 #include <library/cpp/containers/top_keeper/top_keeper.h>
-#include <library/cpp/deprecated/autoarray/autoarray.h>
 #include <library/cpp/json/writer/json.h>
 #include <library/cpp/string_utils/levenshtein_diff/levenshtein_diff.h>
 
