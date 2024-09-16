@@ -1,6 +1,5 @@
 #include "yexport_generator.h"
 
-#include "cmake_generator.h"
 #include "jinja_generator.h"
 #include "generators.h"
 #include "py_requirements_generator.h"
@@ -14,9 +13,7 @@ namespace NYexport {
 THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir,
     const std::optional<TDumpOpts> dumpOpts, const std::optional<TDebugOpts> debugOpts
 ) {
-    if (generator == NGenerators::HARDCODED_CMAKE_GENERATOR) {
-        return TCMakeGenerator::Load(arcadiaRoot, generator, configDir);
-    } else if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
+    if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py3);
     } else if (generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
         return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py2);
@@ -44,7 +41,7 @@ TExportFileManager* TYexportGenerator::GetExportFileManager(){
 }
 
 TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot) {
-    TVector<std::string> generators{NGenerators::HARDCODED_CMAKE_GENERATOR, NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR, NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR};
+    TVector<std::string> generators{NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR, NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR};
     if (arcadiaRoot.empty()) {
         return generators;
     }

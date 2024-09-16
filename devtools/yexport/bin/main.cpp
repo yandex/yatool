@@ -39,7 +39,7 @@ int main(int argc, char** argv) try {
             opts.Generator = GetDefaultGenerator(yexportToml);
         }
         if (!opts.Generator.has_value()) {
-            opts.Generator = NGenerators::HARDCODED_CMAKE_GENERATOR;
+            opts.Generator = "cmake";
         }
     }
 

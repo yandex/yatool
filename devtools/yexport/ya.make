@@ -3,7 +3,6 @@ LIBRARY()
 SRCS(
     attribute.cpp
     attributes.cpp
-    cmake_generator.cpp
     debug.cpp
     dir_cleaner.cpp
     dump.cpp
@@ -16,7 +15,6 @@ SRCS(
     project.cpp
     py_requirements_generator.cpp
     read_sem_graph.cpp
-    render_cmake.cpp
     sem_graph.cpp
     spec_based_generator.cpp
     std_helpers.cpp
