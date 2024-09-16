@@ -57,7 +57,7 @@ namespace NYndex {
                 "The macro adds the directories to include/import search path to compilation flags of the current project.\n"
                 "By default settings apply to C/C++ compilation namely sets -I<library path> flag, use FOR argument to change target command.\n"
             "@params:\n"
-                "`FOR <lang>` - adds inclues/import serach path for othe language. E.g. `FOR proto` adds import search path for .proto files processing.\n"
+                "`FOR <lang>` - adds includes/import search path for other language. E.g. `FOR proto` adds import search path for .proto files processing.\n"
                 "`GLOBAL` - extends the search for headers (-I) on the dependent projects." },
         { "DLL_FOR",
             "@usage: DLL_FOR(path/to/lib [libname] [major_ver [minor_ver]] [EXPORTS symlist_file])  #builtin\n\n"
