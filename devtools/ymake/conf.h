@@ -177,8 +177,8 @@ private:
     void LoadLicenses(MD5& confData);
     void LoadAutoincludes(MD5& confData);
     void LoadPeersRules(MD5& confData);
-    void LoadBlackLists(MD5& confHash, MD5& anotherConfHash, bool addToAnother);
-    void LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother);
+    void LoadBlackLists(MD5& confHash);
+    void LoadIsolatedProjects(MD5& confHash);
     void FillMiscValues();
     void InitExcludedPeerdirs();
     void CompileAndRecalcAllConditions();

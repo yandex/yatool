@@ -192,12 +192,12 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     LoadPeersRules(rulesData);
     if (Diag()->BlckLst) {
         // Add blacklist hash to only blacklist hash (new behavior) and rules (current behavior - deprecated) by config switch
-        LoadBlackLists(blacklistHash, rulesData, NYMake::IsTrue(CommandConf.EvalValue("INCLUDE_BLACKLIST_TO_CONF_HASH")));
+        LoadBlackLists(blacklistHash);
         blacklistHash.Final(YmakeBlacklistHash.RawData);
     }
     if (Diag()->IslPrjs) {
         // Add isolated projects hash to only isolated projects hash (new behavior) and rules (current behavior - deprecated) by config switch
-        LoadIsolatedProjects(isolatedProjectsHash, rulesData, NYMake::IsTrue(CommandConf.EvalValue("INCLUDE_ISOLATED_PROJECTS_TO_CONF_HASH")));
+        LoadIsolatedProjects(isolatedProjectsHash);
         isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
     LoadLicenses(extraData);
@@ -285,16 +285,16 @@ void TBuildConfiguration::LoadPeersRules(MD5& confData) {
     PeersRules.Finalize();
 }
 
-void TBuildConfiguration::LoadBlackLists(MD5& confHash, MD5& anotherConfHash, bool addToAnother) {
+void TBuildConfiguration::LoadBlackLists(MD5& confHash) {
     const TString blacklistsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_BLACKLISTS, CommandConf);
     TVector<TStringBuf> blacklistFiles = StringSplitter(blacklistsVar).Split(' ').SkipEmpty();
-    BlackList.Load(SourceRoot, blacklistFiles, confHash, anotherConfHash, addToAnother);
+    BlackList.Load(SourceRoot, blacklistFiles, confHash);
 }
 
-void TBuildConfiguration::LoadIsolatedProjects(MD5& confData, MD5& anotherConfData, bool addAnother) {
+void TBuildConfiguration::LoadIsolatedProjects(MD5& confData) {
     const TString isolatedProjectsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_ISOLATED_PROJECTS, CommandConf);
     TVector<TStringBuf> isolatedProjectsFiles = StringSplitter(isolatedProjectsVar).Split(' ').SkipEmpty();
-    IsolatedProjects.Load(SourceRoot, isolatedProjectsFiles, confData, anotherConfData, addAnother);
+    IsolatedProjects.Load(SourceRoot, isolatedProjectsFiles, confData);
 }
 
 void TBuildConfiguration::FillMiscValues() {
