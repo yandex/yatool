@@ -9,7 +9,8 @@ enum class ETraceEvent: ui64 {
     D = 0x010,
     S = 0x020,
     P = 0x040,
-    d = L | U | E | D | S | P,
+    C = 0x200,
+    d = L | U | E | D | S | P | C,
 
     H = 0x004,
     G = 0x080,

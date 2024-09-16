@@ -172,5 +172,5 @@ void TStartUpOptions::OnDepsCacheSaved() const {
         // Use CopyTo instead RenameTo, because few ymake run may use one CacheInfoFile
         CacheInfoFile.CopyTo(CacheInfoOutputFile, true);
     }
-    FORCE_TRACE(T, NEvent::TReadyForUpdateCacheInfo{});
+    FORCE_TRACE(C, NEvent::TReadyForUpdateCacheInfo{});
 }
