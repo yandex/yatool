@@ -79,6 +79,7 @@ private:
     TVector<ui32> CurStartDirs_;
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
+    bool HasErrorsOnPrevLaunch_{false};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
@@ -88,7 +89,7 @@ private:
     void AnalyzeGraphChanges(IChanges& changes);
     void SaveDepManagementCache();
 public:
-    explicit TYMake(TBuildConfiguration& conf);
+    explicit TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
     ~TYMake();
 
@@ -158,7 +159,7 @@ public:
     void ComputeReachableNodes();
     bool CanBypassConfigure() const {
         // --xcompletely-trust-fs-cache can't be passed without --patch-path
-        return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_;
+        return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_ && !HasErrorsOnPrevLaunch_;
     }
     void UpdateExternalFilesChanges();
 

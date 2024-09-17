@@ -2,6 +2,7 @@
 #include "builtin_macro_consts.h"
 #include "conf.h"
 #include "dependency_management.h"
+#include "diag_reporter.h"
 #include "export_json.h"
 #include "managed_deps_iter.h"
 #include "node_printer.h"
@@ -74,7 +75,7 @@ namespace {
     }
 }
 
-TYMake::TYMake(TBuildConfiguration& conf)
+TYMake::TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch)
     : Conf(conf)
     , Graph(Names)
     , RecurseGraph(Names)
@@ -83,6 +84,7 @@ TYMake::TYMake(TBuildConfiguration& conf)
     , IncParserManager(conf, Names)
     , Yndex(Conf.CommandDefinitions)
     , Modules(Names, conf.PeersRules, Conf)
+    , HasErrorsOnPrevLaunch_(hasErrorsOnPrevLaunch)
 {
     TimeStamps.StartSession();
     Diag()->Where.clear();
@@ -752,6 +754,7 @@ int main_real(TBuildConfiguration& conf) {
         return BR_OK;
     }
 
+    TErrorsGuard errorsGuard(conf);
     bool updateGraph = !conf.RebuildGraph && conf.WriteYdx.empty();
     bool useOnlyYmakeCache = conf.CachePath.size();
     TFsPath cachePath;
@@ -790,7 +793,7 @@ int main_real(TBuildConfiguration& conf) {
         loadGraph = false;
     }
 
-    THolder<TYMake> yMake(new TYMake(conf));
+    THolder<TYMake> yMake(new TYMake(conf, errorsGuard.HasConfigureErrorsOnPrevLaunch()));
 
     if (loadGraph) {
         if (!yMake->Load(cachePath)) {
@@ -798,7 +801,7 @@ int main_real(TBuildConfiguration& conf) {
                 YErr() << "Cache was not loaded. Stop." << Endl;
                 return BR_FATAL_ERROR;
             }
-            yMake.Reset(new TYMake(conf));
+            yMake.Reset(new TYMake(conf, errorsGuard.HasConfigureErrorsOnPrevLaunch()));
         }
     }
 

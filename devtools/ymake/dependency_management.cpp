@@ -1661,7 +1661,7 @@ namespace NDetail {
 }
 
 void TYMake::ApplyDependencyManagement() {
-    if (Conf.ShouldUseGrandBypass() && !HasGraphStructuralChanges_) {
+    if (CanBypassConfigure()) {
         LoadDMCache();
         if (DMCacheLoaded_) {
             YDebug() << "Use Dependency management cache" << Endl;
