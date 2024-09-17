@@ -12,6 +12,7 @@ import test.util.tools as test_tools
 JEST_TEST_TYPE = "jest"
 HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
+PLAYWRIGHT_LARGE_TEST_TYPE = "playwright_large"
 
 
 def get_nodejs_res(meta):
@@ -153,6 +154,64 @@ class HermioneTestSuite(BaseTestSuite):
         generic_cmd = test_tools.get_test_tool_cmd(
             opts,
             "run_hermione",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd = (
+            generic_cmd
+            + common_cmd_opts
+            + [
+                "--config",
+                self.meta.config_path,
+            ]
+        )
+
+        if getattr(opts, "tests_filters", None):
+            for flt in opts.tests_filters:
+                cmd += ["--test-filter", flt]
+
+        files_filter = getattr(opts, "test_files_filter", None)
+        if files_filter:
+            specified_test_paths = [os.path.normpath(f) for f in files_filter]
+            cmd += specified_test_paths
+        else:
+            test_for_path = self.meta.ts_test_for_path
+            cmd += [os.path.relpath(f, test_for_path) for f in test_files]
+
+        if self._modulo > 1:
+            cmd += [
+                "--chunks-count",
+                str(self._modulo),
+                "--run-chunk",
+                str(self._modulo_index + 1),
+            ]
+
+        return cmd
+
+
+class PlaywrightLargeTestSuite(BaseTestSuite):
+    def get_type(self):
+        return PLAYWRIGHT_LARGE_TEST_TYPE
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
+
+    def support_splitting(self, opts=None):
+        return True
+
+    @property
+    def supports_coverage(self):
+        return True
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
+        test_files = sorted(self.meta.test_files)
+        generic_cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_playwright_large",
             self.global_resources,
             wrapper=True,
             run_on_target_platform=True,

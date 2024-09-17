@@ -49,6 +49,7 @@ SUITE_MAP = {  # type: dict[str, types_common.AbstractTestSuite]
     'junit5.test': junit.Junit5TestSuite,
     'ktlint': java_style.KtlintTestSuite,
     'playwright': ts_test.PlaywrightTestSuite,
+    'playwright_large': ts_test.PlaywrightLargeTestSuite,
     'py.imports': py_test.CheckImportsTestSuite,
     'py3test.bin': py_test.Py3TestBinSuite,
     'pytest.bin': py_test.PyTestBinSuite,
