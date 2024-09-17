@@ -29,8 +29,17 @@ void TGraphChangesPredictor::AnalyzeChanges() {
             return;
         }
 
-        if (const auto* parser = IncParserManager_.GetParserFor(fileView);
-            parser != nullptr && parser->GetParserId().GetType() != EIncludesParserType::EmptyParser)
+        const auto* parser = IncParserManager_.GetParserFor(fileView);
+        if (parser == nullptr) {
+            // Here we rely on the fact that a file is parsed only once and in one context and,
+            // moreover, there can't be more than one entry in the parsers' cache
+            if (auto parserType = IncParserManager_.Cache.GetParserType(fileView.GetTargetId());
+                parserType !=  EIncludesParserType::BAD_PARSER)
+            {
+                parser = IncParserManager_.GetParserByType(parserType);
+            }
+        }
+        if (parser != nullptr && parser->GetParserId().GetType() != EIncludesParserType::EmptyParser)
         {
             auto fileContent = FileConf_.GetFileByName(fileView);
             if (IncParserManager_.HasIncludeChanges(*fileContent, parser)) {

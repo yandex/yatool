@@ -3,6 +3,7 @@
 #include <devtools/ymake/common/content_holder.h>
 
 #include <util/generic/string.h>
+#include <util/generic/ylimits.h>
 
 enum class EIncludesParserType : ui32 {
     EmptyParser = 0,
@@ -26,7 +27,7 @@ enum class EIncludesParserType : ui32 {
     TsParser,
     RosParser,
     PARSERS_COUNT,
-    BAD_PARSER = PARSERS_COUNT
+    BAD_PARSER = Max<ui32>()
 };
 
 class TIncludesParserBase {

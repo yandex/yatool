@@ -5,8 +5,13 @@
 #include <devtools/ymake/include_parsers/ros_parser.h>
 #include <devtools/ymake/symbols/name_store.h>
 
+#include <util/generic/hash.h>
 #include <util/generic/variant.h>
+#include <util/generic/vector.h>
+#include <util/generic/ylimits.h>
 #include <util/system/types.h>
+
+#include <functional>
 
 namespace NParsersCache {
     struct TIncludeSavedState {
@@ -62,6 +67,7 @@ class TParsersCache {
 private:
     TNameStore Names;
     THashMap<ui64, NParsersCache::TParseResult> ResultsMap;
+    std::function<ui32(EIncludesParserType)> ParserTypeToParserIdMapper;
 
 public:
     static constexpr const ui32 BAD_PARSER_ID = Max<ui32>();
@@ -119,6 +125,10 @@ public:
     }
 
     EIncludesParserType GetParserType(ui32 fileId) const;
+
+    void SetParserTypeToParserIdMapper(std::function<ui32(EIncludesParserType)>&& mapper) {
+        ParserTypeToParserIdMapper = std::move(mapper);
+    }
 
     void Save(TMultiBlobBuilder& builder);
 

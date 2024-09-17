@@ -110,10 +110,12 @@ namespace NParsersCache {
 }
 
 EIncludesParserType TParsersCache::GetParserType(ui32 fileId) const {
-    ui32 parsersCount = static_cast<ui32>(EIncludesParserType::PARSERS_COUNT);
-    for (ui32 parserId = 0; parserId < parsersCount; parserId++) {
-        if (ResultsMap.contains(NParsersCache::GetResultId(parserId, fileId))) {
-            return static_cast<EIncludesParserType>(parserId);
+    ui32 parserTypesCount = static_cast<ui32>(EIncludesParserType::PARSERS_COUNT);
+    for (ui32 i = 0; i < parserTypesCount; i++) {
+        EIncludesParserType parserType = static_cast<EIncludesParserType>(i);
+        ui32 parserId = ParserTypeToParserIdMapper(parserType);
+        if (parserId != BAD_PARSER_ID && ResultsMap.contains(NParsersCache::GetResultId(parserId, fileId))) {
+            return parserType;
         }
     }
     return EIncludesParserType::BAD_PARSER;

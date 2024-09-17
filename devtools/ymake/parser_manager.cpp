@@ -352,8 +352,10 @@ bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
 }
 
 void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type) {
+    Y_ASSERT(type < EIncludesParserType::PARSERS_COUNT);
     parser->SetLanguageId(NLanguages::GetLanguageIdByParserType(type));
     parser->SetParserType(type);
+    ParsersByType[static_cast<ui32>(type)] = parser;
     for (const auto& ext : extensions) {
         Ext2Parser[ext] = parser;
     }
@@ -393,6 +395,14 @@ void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
 void TIncParserManager::InitManager(const TParsersList& parsersList) {
     TVarsEvaluator evaluator(Conf.CommandConf);
     auto* cache = &Cache;
+
+    ParsersByType.resize(static_cast<ui32>(EIncludesParserType::PARSERS_COUNT), nullptr);
+    Cache.SetParserTypeToParserIdMapper([this](EIncludesParserType type) {
+        if (auto parser = GetParserByType(type)) {
+            return parser->GetParserId().GetId();
+        }
+        return TParsersCache::BAD_PARSER_ID;
+    });
 
     for (const auto& [parserType, _, exts, constructor] : GetParsersAndExtensions()) {
         AddParser(constructor(cache, evaluator, Names), {exts.begin(), exts.end()}, parserType);

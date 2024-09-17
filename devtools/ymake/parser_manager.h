@@ -53,6 +53,7 @@ struct TFileProcessContext {
 class TIncParserManager {
 private:
     THashMap<TString, TParserBaseRef> Ext2Parser;
+    TVector<TParserBaseRef> ParsersByType;
     const TBuildConfiguration& Conf;
     TSymbols& Names;
     TString ExtForDefaultParser;
@@ -79,6 +80,10 @@ public:
     bool HasParserFor(TFileView fileName) const;
     TParserBase* GetParserFor(TStringBuf fileName) const;
     TParserBase* GetParserFor(TFileView fileName) const;
+    inline TParserBase* GetParserByType(EIncludesParserType parserType) const {
+        Y_ASSERT(parserType < EIncludesParserType::PARSERS_COUNT);
+        return ParsersByType[static_cast<ui32>(parserType)].Get();
+    }
     void SetDefaultParserSameAsFor(TFileView fileName);
     void ResetDefaultParser() {
         ExtForDefaultParser.clear();
