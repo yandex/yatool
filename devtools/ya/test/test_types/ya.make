@@ -10,6 +10,7 @@ PY_SRCS(
     common.py
     cov_test.py
     custom_lint.py
+    detekt.py
     ext_resource.py
     fuzz_test.py
     go_test.py
