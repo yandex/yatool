@@ -2,9 +2,9 @@
 
 import os
 
-from test import const, common as test_common
-from test.test_types.py_test import LintTestSuite
-from test.util import tools
+from devtools.ya.test import const, common as test_common
+from devtools.ya.test.test_types.py_test import LintTestSuite
+from devtools.ya.test.util import tools
 from yalibrary.graph.const import BUILD_ROOT
 
 
