@@ -6,17 +6,17 @@ import build.gen_plan as gen_plan
 
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
-import devtools.ya.test.test_node.cmdline as cmdline
+from . import cmdline
 
 if app_config.in_house:
     import devtools.ya.test.dependency.sandbox_storage as sandbox_storage
-    import devtools.ya.test.test_node.sandbox as sandbox
+    from . import sandbox
 
-import test.const
-import test.system.env as sysenv
-import test.test_types.fuzz_test as fuzz_test
-import test.util.shared as util_shared
-import test.util.tools as util_tools
+import devtools.ya.test.const
+import devtools.ya.test.system.env as sysenv
+import devtools.ya.test.test_types.fuzz_test as fuzz_test
+import devtools.ya.test.util.shared as util_shared
+import devtools.ya.test.util.tools as util_tools
 
 
 def inject_fuzz_postprocess_nodes(arc_root, graph, suites, opts):
@@ -37,15 +37,15 @@ def inject_fuzz_postprocess_nodes(arc_root, graph, suites, opts):
         if suite.get_type() != fuzz_test.FUZZ_TEST_TYPE:
             continue
 
-        output_file = suite.work_dir(test.const.GENERATED_CORPUS_DIR_NAME + ".tar")
+        output_file = suite.work_dir(devtools.ya.test.const.GENERATED_CORPUS_DIR_NAME + ".tar")
 
         resources = get_corpus_resources(suite)
-        should_minimize = len(resources) > test.const.MAX_CORPUS_RESOURCES_ALLOWED
+        should_minimize = len(resources) > devtools.ya.test.const.MAX_CORPUS_RESOURCES_ALLOWED
 
         if (
             getattr(opts, 'fuzz_minimization_only', False)
             or getattr(opts, 'fuzz_force_minimization', False)
-            or test.const.YaTestTags.AlwaysMinimize in suite.tags
+            or devtools.ya.test.const.YaTestTags.AlwaysMinimize in suite.tags
             or (should_minimize and not suite.corpus_parts_limit_exceeded)
         ):
             node, output_file = inject_fuzz_minimization_node(graph, suite, output_file, resources, opts)
@@ -102,7 +102,7 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
         node_cmd += ["--transport", opts.canonization_transport]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [input_path],
         "uid": uid_gen.get_uid(deps, "fuzz_upload"),
@@ -192,7 +192,7 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": testdeps.unique(inputs),
         "uid": uid_gen.get_uid(suite.result_uids, "fuzz_minimize"),
@@ -270,7 +270,7 @@ def inject_fuzz_result_node(arc_root, graph, suites, upload_nodes, input_files, 
         node_cmd += ["--write-results-inplace"]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": input_files,
         "uid": node_uid,

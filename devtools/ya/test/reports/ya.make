@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE test.reports
     __init__.py
     allure_support.py
     console.py

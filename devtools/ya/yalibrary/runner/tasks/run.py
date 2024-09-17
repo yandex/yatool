@@ -12,7 +12,7 @@ import six.moves.queue as Queue
 
 import six
 
-import test.const
+import devtools.ya.test.const
 
 from devtools.libs.parse_number.python import parse_number
 
@@ -621,7 +621,7 @@ class RunNodeTask(object):
             'NP',
         ):
             return worker_threads.ResInfo(download=1)
-        if test.const.TestSize.is_test_shorthand(p) or p == "YT":
+        if devtools.ya.test.const.TestSize.is_test_shorthand(p) or p == "YT":
             cpu = self._node.requirements.get('cpu', 1)
             if cpu == 'all':
                 cpu = self._test_threads

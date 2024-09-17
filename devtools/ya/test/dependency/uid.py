@@ -7,7 +7,7 @@ import exts.tmp
 import exts.uniq_id
 from . import testdeps
 from core.imprint import imprint
-import test.const as const
+import devtools.ya.test.const as const
 
 logger = logging.getLogger(__name__)
 

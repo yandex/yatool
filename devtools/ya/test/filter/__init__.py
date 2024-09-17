@@ -6,10 +6,10 @@ import fnmatch
 import logging
 import inspect
 
-import test.const
+import devtools.ya.test.const
 import exts.func
 
-import test.test_types.common as common_suites
+import devtools.ya.test.test_types.common as common_suites
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,9 @@ class FilterException(Exception):
 
 
 def fix_filter(flt):
-    if test.const.TEST_SUBTEST_SEPARATOR not in flt and "*" not in flt:
+    if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR not in flt and "*" not in flt:
         # user wants to filter by test module name
-        flt = flt + test.const.TEST_SUBTEST_SEPARATOR + "*"
+        flt = flt + devtools.ya.test.const.TEST_SUBTEST_SEPARATOR + "*"
     return flt
 
 
@@ -149,17 +149,17 @@ def tags_filter(tags, list_mode=False):
     logger.debug("Tags filter include set:%s exclude set:%s", list(include), list(exclude))
 
     # Disable filtering
-    if test.const.ServiceTags.AnyTag in include:
+    if devtools.ya.test.const.ServiceTags.AnyTag in include:
         return lambda x: True
 
     # Implies ya:manual tag it isn't specified explicitly to avoid running ya:manual tests by default
-    if test.const.YaTestTags.Manual not in include and not list_mode:
-        exclude.add(test.const.YaTestTags.Manual)
+    if devtools.ya.test.const.YaTestTags.Manual not in include and not list_mode:
+        exclude.add(devtools.ya.test.const.YaTestTags.Manual)
 
     def filter_function(test_suite):
         suite_tags = set(test_suite.tags)
         if not suite_tags:
-            suite_tags.add(test.const.YaTestTags.Notags)
+            suite_tags.add(devtools.ya.test.const.YaTestTags.Notags)
 
         fit = True
         if include:
@@ -260,7 +260,7 @@ def filter_suites(suites, opts, tc):
                     reason = filter_description(suite)
                 else:
                     reason = "skipped by {}".format(filter_description)
-                suite.add_suite_error(reason, test.const.Status.SKIPPED)
+                suite.add_suite_error(reason, devtools.ya.test.const.Status.SKIPPED)
                 skipped.append(common_suites.SkippedTestSuite(suite))
         if len(filtered) != len(suites):
             skipped_suites.extend(skipped)
@@ -269,7 +269,11 @@ def filter_suites(suites, opts, tc):
     skipped_suites = []
     test_size_filters = tc.get("test_size_filters") or opts.test_size_filters
     if not test_size_filters:
-        sizes = [test.const.TestSize.Small, test.const.TestSize.Medium, test.const.TestSize.Large]
+        sizes = [
+            devtools.ya.test.const.TestSize.Small,
+            devtools.ya.test.const.TestSize.Medium,
+            devtools.ya.test.const.TestSize.Large,
+        ]
         test_size_filters.extend(sizes[: opts.run_tests])
     else:
         test_size_filters = [f.lower() for f in test_size_filters]

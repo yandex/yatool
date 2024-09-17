@@ -10,7 +10,7 @@ import exts.fs
 import exts.func
 import exts.archive
 from devtools.ya.test.programs.test_tool.lib import runtime
-from test.util import shared
+from devtools.ya.test.util import shared
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 from library.python.testing import coverage_utils as coverage_utils_library
 

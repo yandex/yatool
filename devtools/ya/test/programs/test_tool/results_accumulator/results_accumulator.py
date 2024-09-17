@@ -17,12 +17,12 @@ import exts.archive
 import exts.fs
 import exts.uniq_id
 import exts.tmp as yatemp
-import test.const
-from test.util import shared
+import devtools.ya.test.const
+from devtools.ya.test.util import shared
 from devtools.ya.test.programs.test_tool.lib import coverage
 import library.python.cores as cores
-from test.test_types import common
-from test import const
+from devtools.ya.test.test_types import common
+from devtools.ya.test import const
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +248,7 @@ def merge_meta_jsons(args, files, dst):
     for filename in files:
         with open(filename) as file:
             file_content = file.read()
-            if test.const.NO_LISTED_TESTS in file_content:
+            if devtools.ya.test.const.NO_LISTED_TESTS in file_content:
                 logger.debug("no tests were run")
                 continue
             data = json.loads(file_content)
@@ -273,11 +273,11 @@ def merge_meta_jsons(args, files, dst):
 
         exit_codes.append(data["exit_code"])
         logger.debug("Split test '%s' has ended with exit code %d", filename, data["exit_code"])
-        start_time = min(start_time, datetime.strptime(data["start_time"], test.const.TIMESTAMP_FORMAT))
-        end_time = max(end_time, datetime.strptime(data["end_time"], test.const.TIMESTAMP_FORMAT))
+        start_time = min(start_time, datetime.strptime(data["start_time"], devtools.ya.test.const.TIMESTAMP_FORMAT))
+        end_time = max(end_time, datetime.strptime(data["end_time"], devtools.ya.test.const.TIMESTAMP_FORMAT))
 
-    result["start_time"] = start_time.strftime(test.const.TIMESTAMP_FORMAT)
-    result["end_time"] = end_time.strftime(test.const.TIMESTAMP_FORMAT)
+    result["start_time"] = start_time.strftime(devtools.ya.test.const.TIMESTAMP_FORMAT)
+    result["end_time"] = end_time.strftime(devtools.ya.test.const.TIMESTAMP_FORMAT)
     result["elapsed"] = (end_time - start_time).total_seconds()
     # consider that rc may be negative
     finalrc = sorted(exit_codes, key=abs)[-1]

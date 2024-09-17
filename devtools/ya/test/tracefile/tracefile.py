@@ -10,7 +10,7 @@ import io
 import six
 
 from library.python import strings
-from test import const
+from devtools.ya.test import const
 from devtools.ya.test import facility
 from yalibrary.formatter import term
 

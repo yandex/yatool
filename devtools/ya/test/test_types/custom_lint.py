@@ -1,12 +1,12 @@
 import math
 import os
 
-import test.common
-import test.const
-import test.util.shared
-import test.util.tools
+import devtools.ya.test.common
+import devtools.ya.test.const
+import devtools.ya.test.util.shared
+import devtools.ya.test.util.tools
 
-from test.test_types.py_test import LintTestSuite
+from devtools.ya.test.test_types.py_test import LintTestSuite
 from yalibrary.graph.const import BUILD_ROOT, SOURCE_ROOT
 
 
@@ -41,14 +41,14 @@ class CustomLintTestSuite(LintTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     @property
     def salt(self):
         return self._lint_name + " ".join(self._configs) + ";".join(self._extra_params)
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
-        work_dir = test.common.get_test_suite_work_dir(
+        work_dir = devtools.ya.test.common.get_test_suite_work_dir(
             BUILD_ROOT,
             self.project_path,
             self.name,
@@ -59,7 +59,7 @@ class CustomLintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, "run_custom_lint", self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             "--source-root",
@@ -69,9 +69,9 @@ class CustomLintTestSuite(LintTestSuite):
             "--project-path",
             os.path.join(SOURCE_ROOT, self.project_path),
             "--trace-path",
-            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--out-path",
-            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             "--lint-name",
             self._lint_name,
             "--linter",

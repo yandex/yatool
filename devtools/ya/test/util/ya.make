@@ -1,7 +1,6 @@
 PY23_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE test.util
     shared.py
     tools.py
     CYTHONIZE_PY

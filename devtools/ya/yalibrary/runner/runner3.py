@@ -20,7 +20,7 @@ import exts.process
 import exts.shlex2
 import exts.timer
 import exts.windows
-import test.const
+import devtools.ya.test.const
 
 from yalibrary import status_view
 from yalibrary.active_state import Cancelled
@@ -83,7 +83,7 @@ def get_link_outputs(res_nodes):
     link_outputs = set()
     for n in res_nodes:
         for o in n.outputs:
-            if not o.endswith(test.const.TRACE_FILE_NAME):
+            if not o.endswith(devtools.ya.test.const.TRACE_FILE_NAME):
                 link_outputs.add(os.path.basename(o))
     return list(link_outputs)
 

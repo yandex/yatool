@@ -12,7 +12,7 @@ import ujson as json
 
 from exts import func
 from devtools.ya.test.programs.test_tool.lib import runtime
-from test.util import shared
+from devtools.ya.test.util import shared
 from library.python.testing import coverage_utils as coverage_utils_library
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 

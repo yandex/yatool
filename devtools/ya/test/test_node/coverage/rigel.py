@@ -3,9 +3,9 @@ import logging
 
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
-import test.common as test_common
-import test.const
-import test.util.tools as util_tools
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const
+import devtools.ya.test.util.tools as util_tools
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def get_suite_binary_deps(suite, graph, skip_module_lang=None):
                 outputs = [outputs[0]]
 
             for output in outputs:
-                if os.path.splitext(output)[1] in test.const.FAKE_OUTPUT_EXTS:
+                if os.path.splitext(output)[1] in devtools.ya.test.const.FAKE_OUTPUT_EXTS:
                     continue
 
                 # verify there is only one output
@@ -70,7 +70,7 @@ def inject_coverage_merge_node(graph, tests, source_filename, result_filename, o
     result_cmd += ['-no-merge', 'report.exec']
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": cache_node,
         "broadcast": False,
         "inputs": [merge_coverage_script],
@@ -111,7 +111,7 @@ def inject_unified_coverage_merger_node(graph, suite, resolved_filename, opts):
     for cov_path in resolved_coverage_paths:
         cmd += ["--coverage-paths", cov_path]
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": resolved_coverage_paths,
@@ -149,7 +149,9 @@ def inject_inplace_coverage_merger_node(graph, coverage_uids, suites, opts):
             suite_wd_has_resolved_coverage = True
         elif suite.get_type() == 'jest' and getattr(opts, "ts_coverage", False):
             suite_wd_has_resolved_coverage = True
-        elif suite.get_type() in test.const.CLANG_COVERAGE_TEST_TYPES and getattr(opts, "clang_coverage", False):
+        elif suite.get_type() in devtools.ya.test.const.CLANG_COVERAGE_TEST_TYPES and getattr(
+            opts, "clang_coverage", False
+        ):
             suite_wd_has_resolved_coverage = True
         elif suite.get_type() in ['pytest', "py3test"] and getattr(opts, "python_coverage", False):
             suite_wd_has_resolved_coverage = True
@@ -171,7 +173,7 @@ def inject_inplace_coverage_merger_node(graph, coverage_uids, suites, opts):
     for cov_path in resolved_coverage_paths:
         cmd += ["--coverage-paths", cov_path]
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": resolved_coverage_paths,

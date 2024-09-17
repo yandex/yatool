@@ -17,9 +17,9 @@ import time
 import six
 
 import exts.tmp
-from test import const
-from test.util import tools
-from test.system import process
+from devtools.ya.test import const
+from devtools.ya.test.util import tools
+from devtools.ya.test.system import process
 from library.python import cores
 
 from yalibrary import formatter

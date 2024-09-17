@@ -1,11 +1,11 @@
 import os
 
 import exts
-import test.const
-import test.util.tools
-from test import common as test_common
-import test.system.process as process
-from test.test_types import common as common_types
+import devtools.ya.test.const
+import devtools.ya.test.util.tools
+from devtools.ya.test import common as test_common
+import devtools.ya.test.system.process as process
+from devtools.ya.test.test_types import common as common_types
 
 
 GBENCHMARK_TEST_TYPE = "g_benchmark"
@@ -50,8 +50,8 @@ class AbstractBenchmarkSuite(common_types.AbstractTestSuite):
         result = []
         if list_cmd_result.exit_code == 0:
             for x in list_cmd_result.std_err.splitlines():
-                if test.const.TEST_SUBTEST_SEPARATOR in x:
-                    testname, subtest = x.split(test.const.TEST_SUBTEST_SEPARATOR, 1)
+                if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in x:
+                    testname, subtest = x.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
                     result.append(test_common.SubtestInfo(testname, subtest))
             return result
         raise Exception(list_cmd_result.std_err)
@@ -67,7 +67,7 @@ class GBenchmarkSuite(AbstractBenchmarkSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -79,15 +79,15 @@ class GBenchmarkSuite(AbstractBenchmarkSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_g_benchmark', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             '--binary',
             self.binary_path('$(BUILD_ROOT)'),
             '--tracefile',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--project-path',
             self.project_path,
             '--verbose',
@@ -123,7 +123,7 @@ class YBenchmarkSuite(AbstractBenchmarkSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -135,15 +135,15 @@ class YBenchmarkSuite(AbstractBenchmarkSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_y_benchmark', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             '--binary',
             self.binary_path('$(BUILD_ROOT)'),
             '--tracefile',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--project-path',
             self.project_path,
             '--verbose',

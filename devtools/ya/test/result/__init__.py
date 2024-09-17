@@ -10,8 +10,8 @@ import exts.archive
 import exts.func
 import exts.fs
 import exts.windows
-import test.common as test_common
-import test.const
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const
 from yalibrary import platform_matcher
 from library.python import strings
 
@@ -87,7 +87,7 @@ class TestPackedResultView(BaseTestSuiteRunResult):
 
     @exts.func.lazy_property
     def trace_report_path(self):
-        return self._output_path(test.const.TRACE_FILE_NAME)
+        return self._output_path(devtools.ya.test.const.TRACE_FILE_NAME)
 
     @exts.func.lazy_property
     def stderr(self):
@@ -107,7 +107,7 @@ class TestPackedResultView(BaseTestSuiteRunResult):
 
     @exts.func.lazy_property
     def test_size(self):
-        return self._meta.get('test_size', test.const.TestSize.Small)
+        return self._meta.get('test_size', devtools.ya.test.const.TestSize.Small)
 
     @exts.func.lazy_property
     def test_tags(self):
@@ -150,9 +150,9 @@ def load_suite_from_output(output, resolver):
 
 
 def load_suite_from_result(result, output, resolver):
-    import test.test_types.common
+    import devtools.ya.test.test_types.common
 
-    suite = test.test_types.common.PerformedTestSuite(
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(
         result.suite_name,
         result.suite_project_path,
         size=result.test_size,
@@ -170,13 +170,13 @@ def load_suite_from_result(result, output, resolver):
 
 def convert_distbuild_to_test_status(status_node, strict=False):
     error_convention = {
-        node_status.EResultStatus.RS_TIMEOUT: test.const.Status.TIMEOUT,
-        node_status.EResultStatus.RS_CANCELED: test.const.Status.INTERNAL,
-        node_status.EResultStatus.RS_SIZE_LIMIT_EXCEEDED: test.const.Status.FAIL,
-        node_status.EResultStatus.RS_INCORRECT_OUTPUT: test.const.Status.INTERNAL,
-        node_status.EResultStatus.RS_RAM_REQUIREMENTS_EXCEEDED: test.const.Status.FAIL,
-        node_status.EResultStatus.RS_INFRASTRUCTURE_ERROR: test.const.Status.INTERNAL,
-        node_status.EResultStatus.RS_FAIL: test.const.Status.INTERNAL,
+        node_status.EResultStatus.RS_TIMEOUT: devtools.ya.test.const.Status.TIMEOUT,
+        node_status.EResultStatus.RS_CANCELED: devtools.ya.test.const.Status.INTERNAL,
+        node_status.EResultStatus.RS_SIZE_LIMIT_EXCEEDED: devtools.ya.test.const.Status.FAIL,
+        node_status.EResultStatus.RS_INCORRECT_OUTPUT: devtools.ya.test.const.Status.INTERNAL,
+        node_status.EResultStatus.RS_RAM_REQUIREMENTS_EXCEEDED: devtools.ya.test.const.Status.FAIL,
+        node_status.EResultStatus.RS_INFRASTRUCTURE_ERROR: devtools.ya.test.const.Status.INTERNAL,
+        node_status.EResultStatus.RS_FAIL: devtools.ya.test.const.Status.INTERNAL,
     }
 
     if status_node in error_convention:
@@ -184,7 +184,7 @@ def convert_distbuild_to_test_status(status_node, strict=False):
     elif strict:
         raise NodeStatusConvertionError()
     else:
-        return test.const.Status.INTERNAL
+        return devtools.ya.test.const.Status.INTERNAL
 
 
 def fill_suites_results(suites, builder, results_root, resolver=None):
@@ -226,7 +226,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
     def build_broken_deps_report(uid, node_errors, limit=4):
         if not node_errors:
             return (
-                test.const.Status.INTERNAL,
+                devtools.ya.test.const.Status.INTERNAL,
                 "Infrastructure error - contact devtools@ for details. Node {} treated to be broken, but has no broken deps".format(
                     uid
                 ),
@@ -243,17 +243,17 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
             # Exit codes are provided by local runner
             exit_codes = [1] + [builder.build_result.exit_code_map.get(u, 1) for u, _ in node_errors]
             exit_code = core.error.merge_exit_codes(exit_codes)
-            if exit_code == test.const.TestRunExitCode.InfrastructureError:
-                test_status = test.const.Status.INTERNAL
+            if exit_code == devtools.ya.test.const.TestRunExitCode.InfrastructureError:
+                test_status = devtools.ya.test.const.Status.INTERNAL
             else:
-                test_status = test.const.Status.FAIL
+                test_status = devtools.ya.test.const.Status.FAIL
 
         # Sandbox resource fetching node has retries and failure in most cases
         # is caused by a missing resource, which should be treated as
         # regular fail - it's user side problem.
         # XXX waiting for YA-433
         if all(u.startswith('sandbox-resource') for u, _ in node_errors):
-            test_status = test.const.Status.FAIL
+            test_status = devtools.ya.test.const.Status.FAIL
 
         lines = [
             "Node {} wasn't executed due to broken {}".format(
@@ -273,7 +273,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         # XXX
         header_approximate_size = 300
         node_snippet_limit = (
-            test.const.CONSOLE_SNIPPET_LIMIT // min(len(node_errors), limit)
+            devtools.ya.test.const.CONSOLE_SNIPPET_LIMIT // min(len(node_errors), limit)
         ) - header_approximate_size
 
         for uid, err_msg in node_errors[:limit]:
@@ -321,12 +321,14 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
                 msg = "Infrastructure error - contact devtools@.\nFailed to fill suite results:{}\n".format(
                     traceback.format_exc()
                 )
-                suite.add_suite_error(msg, test.const.Status.INTERNAL)
+                suite.add_suite_error(msg, devtools.ya.test.const.Status.INTERNAL)
                 logging.debug(msg)
         else:
             errs = collect_errors_for_suite(suite)
             if errs:
-                suite.add_suite_error("Depends on broken: {}".format("\n".join(errs)), test.const.Status.MISSING)
+                suite.add_suite_error(
+                    "Depends on broken: {}".format("\n".join(errs)), devtools.ya.test.const.Status.MISSING
+                )
             elif uid in builder.build_result.node_build_errors:
                 # TODO
                 # Successful chunk run and tests within it should be fully reported,
@@ -360,7 +362,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
                 if node_errors:
                     msg += "\n{}".format("\n".join(node_errors))
                 logger.warning("%s (uid=%s): %s", suite, suite.uid, msg)
-                suite.add_suite_error(msg, test.const.Status.INTERNAL)
+                suite.add_suite_error(msg, devtools.ya.test.const.Status.INTERNAL)
 
             if resolver:
                 suite.fix_roots(resolver)

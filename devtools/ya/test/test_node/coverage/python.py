@@ -2,8 +2,8 @@ from . import rigel
 
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
-import test.util.tools as util_tools
-import test.const
+import devtools.ya.test.util.tools as util_tools
+import devtools.ya.test.const
 
 
 def inject_python_coverage_nodes(graph, suites, resolvers_map, opts, platform_descriptor):
@@ -42,7 +42,7 @@ def inject_python_coverage_nodes(graph, suites, resolvers_map, opts, platform_de
                 graph, [suite], 'py3.coverage.tar', merged_coverage_filename, opts=opts
             )
 
-            resolved_filename = test.const.COVERAGE_RESOLVED_FILE_NAME_PATTERN.format("py3")
+            resolved_filename = devtools.ya.test.const.COVERAGE_RESOLVED_FILE_NAME_PATTERN.format("py3")
             uid = inject_python_coverage_resolve_nodes(
                 graph,
                 suite,
@@ -82,7 +82,7 @@ def inject_python_coverage_merge_node(graph, suites, source_filename, output_pat
     cmd += coverage_paths
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [],
@@ -135,7 +135,7 @@ def inject_create_python_coverage_report_node(graph, suites, py_bin_deps, merge_
     uid = uid_gen.get_uid(deps, "pycov-report")
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid,
@@ -189,7 +189,7 @@ def inject_python_coverage_resolve_nodes(
     uid = uid_gen.get_uid(deps, "resolve_pycov")
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [coverage_tar_path],

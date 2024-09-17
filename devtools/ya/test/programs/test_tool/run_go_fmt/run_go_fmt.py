@@ -6,12 +6,12 @@ import subprocess
 import six
 
 import exts.fs
-import test.system.process
-import test.common
-import test.test_types.common
-import test.const
-import test.util.shared
-import test.filter as test_filter
+import devtools.ya.test.system.process
+import devtools.ya.test.common
+import devtools.ya.test.test_types.common
+import devtools.ya.test.const
+import devtools.ya.test.util.shared
+import devtools.ya.test.filter as test_filter
 from devtools.ya.test import facility
 import library.python.cores as cores
 
@@ -57,7 +57,7 @@ def main():
         cmd = [args.gofmt, path]
         elapsed = 0.0
         try:
-            res = test.system.process.execute(cmd, check_exit_code=True)
+            res = devtools.ya.test.system.process.execute(cmd, check_exit_code=True)
             elapsed = res.elapsed
             formatted = six.ensure_str(res.std_out)
             with open(path) as f:
@@ -91,11 +91,11 @@ def main():
             logs = {'logsdir': logs_dir}
 
             if out_lines:
-                out_path = test.common.get_unique_file_path(logs_dir, "{}.gofmt.out".format(test_name))
+                out_path = devtools.ya.test.common.get_unique_file_path(logs_dir, "{}.gofmt.out".format(test_name))
                 exts.fs.write_file(out_path, std_out, binary=False)
                 logs["stdout"] = out_path
             if err_lines:
-                err_path = test.common.get_unique_file_path(logs_dir, "{}.gofmt.err".format(test_name))
+                err_path = devtools.ya.test.common.get_unique_file_path(logs_dir, "{}.gofmt.err".format(test_name))
                 exts.fs.write_file(err_path, std_err, binary=False)
                 logs["stderr"] = err_path
 
@@ -103,7 +103,7 @@ def main():
 
             test_case = facility.TestCase(
                 "{}::gofmt".format(test_name),
-                test.const.Status.FAIL if failed else test.const.Status.GOOD,
+                devtools.ya.test.const.Status.FAIL if failed else devtools.ya.test.const.Status.GOOD,
                 cores.colorize_backtrace(snippet),
                 elapsed,
                 logs=logs,
@@ -111,7 +111,7 @@ def main():
             )
             tests.append(test_case)
 
-    suite = test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
     suite.set_work_dir(os.getcwd())
     suite.register_chunk()
     suite.chunk.tests = tests

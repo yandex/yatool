@@ -21,11 +21,11 @@ import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import devtools.ya.test.error as test_error
-import devtools.ya.test.test_node.cmdline as cmdline
-import devtools.ya.test.test_node.coverage as coverage
-import devtools.ya.test.test_node.fuzzing as fuzzing
+from . import coverage
+from . import cmdline
+from . import fuzzing
 
-import devtools.ya.test.test_node.sandbox as sandbox_node
+from . import sandbox as sandbox_node
 
 import exts.fs
 import exts.func
@@ -35,16 +35,16 @@ import exts.timer
 import exts.uniq_id
 import exts.windows
 
-import test.canon.data as canon_data
-import test.common as test_common
-import test.common.ytest_common_tools as ytest_common_tools
-import test.const
-import test.filter as test_filter
-import test.system.env as sysenv
-import test.test_types.fuzz_test as fuzz_test
-import test.util.shared as util_shared
-import test.util.tools as test_tools
-import test.util.tools as util_tools
+import devtools.ya.test.canon.data as canon_data
+import devtools.ya.test.common as test_common
+import devtools.ya.test.common.ytest_common_tools as ytest_common_tools
+import devtools.ya.test.const
+import devtools.ya.test.filter as test_filter
+import devtools.ya.test.system.env as sysenv
+import devtools.ya.test.test_types.fuzz_test as fuzz_test
+import devtools.ya.test.util.shared as util_shared
+import devtools.ya.test.util.tools as test_tools
+import devtools.ya.test.util.tools as util_tools
 
 import yalibrary.last_failed.last_failed as last_failed
 import yalibrary.upload.consts
@@ -84,7 +84,7 @@ def inject_mds_resource_to_graph(graph, resource, opts):
         backend = opts.canonization_backend
         uid_data.append(backend)
     else:
-        backend = test.const.DEFAULT_CANONIZATION_BACKEND
+        backend = devtools.ya.test.const.DEFAULT_CANONIZATION_BACKEND
     uid = uid_gen.get_uid(uid_data, 'mds-resource')
 
     if not graph.get_node_by_uid(uid):
@@ -107,7 +107,7 @@ def inject_mds_resource_to_graph(graph, resource, opts):
         ]
 
         node = {
-            "node-type": test.const.NodeType.TEST_AUX,
+            "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "broadcast": False,
             "inputs": [FETCH_FROM_MDS_SCRIPT, FETCH_FROM_SCRIPT],
             "uid": uid,
@@ -194,7 +194,7 @@ class TestFramer(object):
         )
 
         if coverage.cpp.is_cpp_coverage_requested(self.opts):
-            suite.set_timeout(int(suite.timeout * test.const.COVERAGE_TESTS_TIMEOUT_FACTOR))
+            suite.set_timeout(int(suite.timeout * devtools.ya.test.const.COVERAGE_TESTS_TIMEOUT_FACTOR))
 
         if self.opts.test_size_timeouts:
             suite.set_timeout(self.opts.test_size_timeouts.get(suite.test_size, suite.timeout))
@@ -246,7 +246,7 @@ class TestFramer(object):
             flags = dict(self.platform.get('flags', {}))
             flags.update(self.opts.flags)
             # Restrict build flags usage in tests. Each flag affects test uid.
-            flags = {k: v for k, v in flags.items() if k in test.const.BUILD_FLAGS_ALLOWED_IN_CONTEXT}
+            flags = {k: v for k, v in flags.items() if k in devtools.ya.test.const.BUILD_FLAGS_ALLOWED_IN_CONTEXT}
 
             # Common context contains suite-agnostic data, mostly test build info
             context = {
@@ -257,14 +257,14 @@ class TestFramer(object):
             if sanitizer:
                 context['sanitizer'] = sanitizer
 
-            output = '$(BUILD_ROOT)/' + test.const.COMMON_CONTEXT_FILE_NAME
+            output = '$(BUILD_ROOT)/' + devtools.ya.test.const.COMMON_CONTEXT_FILE_NAME
             ctx_str = json.dumps(context, indent=2, sort_keys=True, separators=(",", ": "))
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
             tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
 
             node = {
-                "node-type": test.const.NodeType.TEST_AUX,
+                "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
@@ -326,7 +326,7 @@ def create_test_node(
 
     outputs = list(outputs_map.values())
 
-    test_output_dir = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
+    test_output_dir = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
 
     is_for_distbuild = opts.use_distbuild
 
@@ -352,13 +352,13 @@ def create_test_node(
         "--test-ci-type",
         suite.get_ci_type_name(),
         "--context-filename",
-        "$(BUILD_ROOT)/" + test.const.COMMON_CONTEXT_FILE_NAME,
+        "$(BUILD_ROOT)/" + devtools.ya.test.const.COMMON_CONTEXT_FILE_NAME,
         # "--log-level", "DEBUG"
     ]
 
     if opts and opts.test_prepare:
         runner_cmd += ["--prepare-only"]
-        test_context_output = os.path.join(work_dir, test.const.SUITE_CONTEXT_FILE_NAME)
+        test_context_output = os.path.join(work_dir, devtools.ya.test.const.SUITE_CONTEXT_FILE_NAME)
         outputs.append(test_context_output)
 
     runner_cmd += cmdline.get_environment_relative_options(suite, opts)
@@ -376,7 +376,7 @@ def create_test_node(
         runner_cmd += ["--autocheck-mode"]
 
     if opts and opts.fuzzing:
-        corpus_tar = os.path.join(work_dir, test.const.GENERATED_CORPUS_DIR_NAME + ".tar")
+        corpus_tar = os.path.join(work_dir, devtools.ya.test.const.GENERATED_CORPUS_DIR_NAME + ".tar")
         outputs.append(corpus_tar)
         runner_cmd += ["--fuzz-corpus-tar", corpus_tar]
 
@@ -484,16 +484,16 @@ def create_test_node(
 
     # Disable dumping test environment when ya:dirty is specified to avoid traversing entire arcadia
     if (
-        opts.dump_test_environment or test.const.YaTestTags.DumpTestEnvironment in suite.tags
-    ) and test.const.YaTestTags.Dirty not in suite.tags:
+        opts.dump_test_environment or devtools.ya.test.const.YaTestTags.DumpTestEnvironment in suite.tags
+    ) and devtools.ya.test.const.YaTestTags.Dirty not in suite.tags:
         runner_cmd += ["--dump-test-environment"]
 
-    if test.const.YaTestTags.DumpNodeEnvironment in suite.tags:
+    if devtools.ya.test.const.YaTestTags.DumpNodeEnvironment in suite.tags:
         runner_cmd += ["--dump-node-environment"]
 
-    if test.const.YaTestTags.CopyDataRO in suite.tags:
+    if devtools.ya.test.const.YaTestTags.CopyDataRO in suite.tags:
         runner_cmd += ["--data-to-environment", "copyro"]
-    elif test.const.YaTestTags.CopyData in suite.tags:
+    elif devtools.ya.test.const.YaTestTags.CopyData in suite.tags:
         runner_cmd += ["--data-to-environment", "copy"]
 
     if opts and getattr(opts, 'max_test_comment_size'):
@@ -541,7 +541,7 @@ def create_test_node(
         for tag in suite.tags:
             runner_cmd += ["--tag", tag]
 
-    if test.const.YaTestTags.TraceOutput in suite.tags:
+    if devtools.ya.test.const.YaTestTags.TraceOutput in suite.tags:
         tracelog = os.path.join(test_output_dir, "trace_output.log")
         runner_cmd += ["--trace-output-filename", tracelog]
 
@@ -563,7 +563,7 @@ def create_test_node(
         runner_cmd += ["--test-param={}={}".format(key, value)]
 
     if getattr(opts, 'test_allow_graceful_shutdown', True):
-        if test.const.YaTestTags.NoGracefulShutdown in suite.tags:
+        if devtools.ya.test.const.YaTestTags.NoGracefulShutdown in suite.tags:
             # Use SIGQUIT to generate core dump immediately
             runner_cmd += ["--smooth-shutdown-signals", "SIGQUIT"]
         else:
@@ -596,10 +596,10 @@ def create_test_node(
     for resource in suite.get_global_resources():
         runner_cmd += ["--global-resource", resource]
 
-    node_timeout = suite.timeout + test.const.TEST_NODE_FINISHING_TIME
+    node_timeout = suite.timeout + devtools.ya.test.const.TEST_NODE_FINISHING_TIME
 
     if is_for_distbuild:
-        runner_cmd += ["--node-timeout", str(node_timeout or test.const.DEFAULT_TEST_NODE_TIMEOUT)]
+        runner_cmd += ["--node-timeout", str(node_timeout or devtools.ya.test.const.DEFAULT_TEST_NODE_TIMEOUT)]
 
     env = sysenv.get_common_py_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
@@ -643,7 +643,7 @@ def create_test_node(
 
         if not graph.get_node_by_uid(uid):
             node = {
-                "node-type": test.const.NodeType.TEST_AUX,
+                "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
@@ -695,7 +695,7 @@ def create_test_node(
                     corpus_data = {}
 
             nparts = len(corpus_data.get("corpus_parts", []))
-            if nparts > test.const.MAX_CORPUS_RESOURCES_ALLOWED * 2:
+            if nparts > devtools.ya.test.const.MAX_CORPUS_RESOURCES_ALLOWED * 2:
                 suite.corpus_parts_limit_exceeded = nparts
 
             if app_config.have_sandbox_fetcher:
@@ -708,22 +708,22 @@ def create_test_node(
     requirements = suite.default_requirements
     requirements.update(suite.requirements)
 
-    if suite.test_size == test.const.TestSize.Large:
+    if suite.test_size == devtools.ya.test.const.TestSize.Large:
         requirements["network"] = 'full'
         node_tag = "large"
 
-    default_requirements = test.const.TestSize.get_default_requirements(suite.test_size)
+    default_requirements = devtools.ya.test.const.TestSize.get_default_requirements(suite.test_size)
 
-    default_ram_requirements = default_requirements.get(test.const.TestRequirements.Ram)
-    if requirements.get(test.const.TestRequirements.Kvm):
-        default_ram_requirements = test.const.DEFAULT_RAM_REQUIREMENTS_FOR_KVM
+    default_ram_requirements = default_requirements.get(devtools.ya.test.const.TestRequirements.Ram)
+    if requirements.get(devtools.ya.test.const.TestRequirements.Kvm):
+        default_ram_requirements = devtools.ya.test.const.DEFAULT_RAM_REQUIREMENTS_FOR_KVM
         requirements["kvm"] = True
-    suite_ram_requirements = requirements.get(test.const.TestRequirements.Ram)
+    suite_ram_requirements = requirements.get(devtools.ya.test.const.TestRequirements.Ram)
     requirements["ram"] = suite_ram_requirements or default_ram_requirements
 
-    suite_cpu_requirements = requirements.get(test.const.TestRequirements.Cpu)
+    suite_cpu_requirements = requirements.get(devtools.ya.test.const.TestRequirements.Cpu)
 
-    default_cpu_requirements = default_requirements.get(test.const.TestRequirements.Cpu)
+    default_cpu_requirements = default_requirements.get(devtools.ya.test.const.TestRequirements.Cpu)
     # Disallow other nodes from execution while user will interact with debugger
     if getattr(opts, 'debugger_requested'):
         requirements["cpu"] = "all"
@@ -746,22 +746,22 @@ def create_test_node(
     if getattr(opts, 'use_throttling'):
         requirements["throttle_cpu"] = True
 
-    suite_ram_disk_requirements = requirements.get(test.const.TestRequirements.RamDisk)
-    default_ram_disk_requirements = default_requirements.get(test.const.TestRequirements.RamDisk)
+    suite_ram_disk_requirements = requirements.get(devtools.ya.test.const.TestRequirements.RamDisk)
+    default_ram_disk_requirements = default_requirements.get(devtools.ya.test.const.TestRequirements.RamDisk)
     requirements["ram_disk"] = suite_ram_disk_requirements or default_ram_disk_requirements
 
-    suite_network_requirements = requirements.get(test.const.TestRequirements.Network)
+    suite_network_requirements = requirements.get(devtools.ya.test.const.TestRequirements.Network)
     if suite_network_requirements:
         requirements["network"] = suite_network_requirements
 
-    if test.const.YaTestTags.HugeLogs in suite.tags:
+    if devtools.ya.test.const.YaTestTags.HugeLogs in suite.tags:
         requirements["test_output_limit"] = 1024**3  # 1GiB
 
     ram_limit = requirements.get('ram', 0)
     if (
-        test.const.YaTestTags.NotAutocheck not in suite.tags
+        devtools.ya.test.const.YaTestTags.NotAutocheck not in suite.tags
         and ram_limit
-        and ram_limit != test.const.TestRequirementsConstants.All
+        and ram_limit != devtools.ya.test.const.TestRequirementsConstants.All
     ):
         runner_cmd += ["--ram-limit-gb", str(ram_limit)]
 
@@ -774,7 +774,7 @@ def create_test_node(
     kv.update({('needs_resource' + r): True for r in suite.get_resources(opts)})
 
     if add_list_node(opts, suite):
-        runner_cmd += ["--test-list-path", suite.work_dir(test.const.TEST_LIST_FILE)]
+        runner_cmd += ["--test-list-path", suite.work_dir(devtools.ya.test.const.TEST_LIST_FILE)]
 
     if suite.meta.canonize_sub_path:
         runner_cmd += ["--sub-path", suite.meta.canonize_sub_path]
@@ -786,10 +786,10 @@ def create_test_node(
     save_test_outputs = getattr(opts, 'save_test_outputs', True)
     dir_outputs = getattr(opts, 'dir_outputs', False)
     if save_test_outputs:
-        testing_out_tar = os.path.join(work_dir, test.const.TESTING_OUT_TAR_NAME)
+        testing_out_tar = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_TAR_NAME)
         if dir_outputs:
             runner_cmd += ["--dir-outputs"]
-            dir_outputs_content.append(os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME))
+            dir_outputs_content.append(os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME))
             if _stable_dir_outputs(suite, opts):
                 runner_cmd += ["--should-tar-dir-outputs"]
                 stable_dir_outputs = True
@@ -831,7 +831,7 @@ def create_test_node(
         "env": env.dump(),
         "inputs": testdeps.unique(inputs),
         "kv": kv,
-        "node-type": test.const.NodeType.TEST,
+        "node-type": devtools.ya.test.const.NodeType.TEST,
         "outputs": outputs,
         "priority": _get_suite_priority(suite),
         "requirements": requirements,
@@ -860,7 +860,7 @@ def create_test_node(
 
 def get_test_kv(suite, **kwargs):
     kv = {
-        "p": test.const.TestSize.get_shorthand(suite.test_size),
+        "p": devtools.ya.test.const.TestSize.get_shorthand(suite.test_size),
         "pc": "yellow",
         "show_out": True,
         "path": os.path.join(suite.project_path, suite.name),
@@ -906,10 +906,10 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
 
     elif suite.special_runner.startswith('android.'):
         android_sdk_root = suite.global_resources.get(
-            test.const.ANDROID_SDK_ROOT, '$({})'.format(test.const.ANDROID_SDK_ROOT)
+            devtools.ya.test.const.ANDROID_SDK_ROOT, '$({})'.format(devtools.ya.test.const.ANDROID_SDK_ROOT)
         )
         android_avd_root = suite.global_resources.get(
-            test.const.ANDROID_AVD_ROOT, '$({})'.format(test.const.ANDROID_AVD_ROOT)
+            devtools.ya.test.const.ANDROID_AVD_ROOT, '$({})'.format(devtools.ya.test.const.ANDROID_AVD_ROOT)
         )
         runner_cmd['cmd_args'] += [
             '--android-app',
@@ -926,7 +926,7 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
     elif suite.special_runner == 'yt' and opts.run_tagged_tests_on_yt:
         # Wrap test node with YT test node runner
         inputs = []
-        output_tar = os.path.join(test_out_dir, test.const.YT_RUN_TEST_TAR_NAME)
+        output_tar = os.path.join(test_out_dir, devtools.ya.test.const.YT_RUN_TEST_TAR_NAME)
         ytexec_tool = opts.ytexec_bin or "$(YTEXEC)/ytexec/ytexec"
         # yt_run_test steals args from run_test, no need to duplicate args
         ytexec_desc = "[TS-{uid}] {project_path}({test_type}) - chunk{split_index}"
@@ -1043,7 +1043,7 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         '--log-path',
         outputs_map['run_test.log'],
         '--trace',
-        outputs_map[test.const.TRACE_FILE_NAME],
+        outputs_map[devtools.ya.test.const.TRACE_FILE_NAME],
         '--build-root',
         '$(BUILD_ROOT)',
         '--test-suite-name',
@@ -1073,7 +1073,7 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         runner_cmd += ['--node-timeout', str(timeout)]
 
     node = {
-        "node-type": test.const.NodeType.TEST,
+        "node-type": devtools.ya.test.const.NodeType.TEST,
         "backup": False,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
@@ -1151,8 +1151,8 @@ def make_ios_cmds(origin_cmd, uid, simctl_path, profiles_path, opts):
 
 
 def _get_suite_priority(suite):
-    if suite.test_size in test.const.TestSize.DefaultPriorities:
-        return test.const.TestSize.get_default_priorities(suite.test_size)
+    if suite.test_size in devtools.ya.test.const.TestSize.DefaultPriorities:
+        return devtools.ya.test.const.TestSize.get_default_priorities(suite.test_size)
     return 0
 
 
@@ -1216,7 +1216,7 @@ def get_node_out_dirs(node):
     dirs = [
         os.path.dirname(filename)
         for filename in node["outputs"]
-        if os.path.basename(filename) == test.const.TRACE_FILE_NAME
+        if os.path.basename(filename) == devtools.ya.test.const.TRACE_FILE_NAME
     ]
     assert dirs, "Failed to find node output dirs: {}".format(node["outputs"])
     return dirs
@@ -1263,13 +1263,13 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     if opts.merge_split_tests:
         skip_outputs = None
     else:
-        skip_outputs = [test.const.YT_RUN_TEST_TAR_NAME]
+        skip_outputs = [devtools.ya.test.const.YT_RUN_TEST_TAR_NAME]
         if opts.dir_outputs:
-            skip_outputs.append(test.const.TESTING_OUT_DIR_NAME)
+            skip_outputs.append(devtools.ya.test.const.TESTING_OUT_DIR_NAME)
             if _stable_dir_outputs(suite, opts):
-                skip_outputs.append(test.const.TESTING_OUT_TAR_NAME)
+                skip_outputs.append(devtools.ya.test.const.TESTING_OUT_TAR_NAME)
         else:
-            skip_outputs.append(test.const.TESTING_OUT_TAR_NAME)
+            skip_outputs.append(devtools.ya.test.const.TESTING_OUT_TAR_NAME)
 
     # test_nodes has the same outputs, so we can take any node as source of output samples
     test_node = test_nodes[0]
@@ -1325,14 +1325,16 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     if opts.save_test_outputs and not opts.merge_split_tests:
         for node in test_nodes:
             if not opts.dir_outputs or _stable_dir_outputs(suite, opts):
-                filename = os.path.join(get_test_node_out_dir(node), test.const.TESTING_OUT_TAR_NAME)
+                filename = os.path.join(get_test_node_out_dir(node), devtools.ya.test.const.TESTING_OUT_TAR_NAME)
                 outputs.append(filename)
                 if not opts.dir_outputs:
                     tared_outputs.append(filename)
             if opts.dir_outputs:
-                filename = os.path.join(get_test_node_out_dir(node), test.const.TESTING_OUT_DIR_NAME)
+                filename = os.path.join(get_test_node_out_dir(node), devtools.ya.test.const.TESTING_OUT_DIR_NAME)
                 dir_outputs.append(filename)
-            yt_run_test_filename = os.path.join(get_test_node_out_dir(node), test.const.YT_RUN_TEST_TAR_NAME)
+            yt_run_test_filename = os.path.join(
+                get_test_node_out_dir(node), devtools.ya.test.const.YT_RUN_TEST_TAR_NAME
+            )
             if yt_run_test_filename in node["outputs"]:
                 outputs.append(yt_run_test_filename)
                 tared_outputs.append(yt_run_test_filename)
@@ -1351,10 +1353,10 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     dirs_to_skip = set()
     if not opts.merge_split_tests:
         if not opts.dir_outputs or _stable_dir_outputs(suite, opts):
-            files_to_skip = {test.const.TESTING_OUT_TAR_NAME}
+            files_to_skip = {devtools.ya.test.const.TESTING_OUT_TAR_NAME}
         if opts.dir_outputs:
-            dirs_to_skip = {test.const.TESTING_OUT_DIR_NAME}
-        files_to_skip.add(test.const.YT_RUN_TEST_TAR_NAME)
+            dirs_to_skip = {devtools.ya.test.const.TESTING_OUT_DIR_NAME}
+        files_to_skip.add(devtools.ya.test.const.YT_RUN_TEST_TAR_NAME)
     for filename in node_inputs:
         basename = os.path.basename(filename)
         if basename in cov_inputs:
@@ -1407,7 +1409,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
             cmds.append({'cmd_args': cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
-        "node-type": test.const.NodeType.TEST,
+        "node-type": devtools.ya.test.const.NodeType.TEST,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
@@ -1467,7 +1469,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
     for test_node in test_nodes:
         for filename in test_node["outputs"]:
             basename = os.path.basename(filename)
-            if basename in test.const.TEST_NODE_OUTPUT_RESULTS:
+            if basename in devtools.ya.test.const.TEST_NODE_OUTPUT_RESULTS:
                 outputs.add(filename)
                 tared_outputs.add(filename)
             else:
@@ -1514,7 +1516,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
         cmd += ["--output", work_dir]
 
     node = {
-        "node-type": test.const.NodeType.TEST,
+        "node-type": devtools.ya.test.const.NodeType.TEST,
         "cache": _should_cache_suite(suite, opts),
         "target_properties": {
             "module_lang": suite.meta.module_lang,
@@ -1547,12 +1549,14 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
 def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_descriptor):
     test_nodes = []
     tests_retries = (
-        1 if (test.const.YaTestTags.Noretries in suite.tags or not suite.support_retries()) else opts.tests_retries
+        1
+        if (devtools.ya.test.const.YaTestTags.Noretries in suite.tags or not suite.support_retries())
+        else opts.tests_retries
     )
-    if opts.tests_retries > 1 and test.const.YaTestTags.Noretries in suite.tags:
+    if opts.tests_retries > 1 and devtools.ya.test.const.YaTestTags.Noretries in suite.tags:
         logger.warning(
             "{} is tagged with {} and will be scheduled for execution only once despite --test-retires={}".format(
-                suite, test.const.YaTestTags.Noretries, opts.tests_retries
+                suite, devtools.ya.test.const.YaTestTags.Noretries, opts.tests_retries
             )
         )
     for i in range(tests_retries):
@@ -1575,7 +1579,7 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
 def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_descriptor):
     # type: (tp.Any, tp.Any, Suite, tp.Any, tp.Any, tp.Any) -> tp.Any
     acc_nodes = []
-    tests_retries = 1 if test.const.YaTestTags.Noretries in suite.tags else opts.tests_retries
+    tests_retries = 1 if devtools.ya.test.const.YaTestTags.Noretries in suite.tags else opts.tests_retries
     if suite.fork_test_files_requested(opts) and opts.test_files_filter:
         suite.save_old_canondata = True
     for i in range(tests_retries):
@@ -1751,7 +1755,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
 
         if suite.special_runner == 'sandbox' and opts.run_tagged_tests_on_sandbox:
             # For more info see https://st.yandex-team.ru/DEVTOOLS-5990#5dfa5ff7a0fc417baad0fc56
-            if test.const.YaTestTags.Dirty in suite.tags:
+            if devtools.ya.test.const.YaTestTags.Dirty in suite.tags:
                 logger.info(
                     "%s won't be launched on Sandbox due specified tag ya:dirty (--run-tagged-tests-on-sandbox doesn't support it)",
                     suite,
@@ -1763,7 +1767,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                 else:
                     ctx['sandbox_run_test_result_uids'].append(suite.uid)
 
-        elif opts.use_distbuild and test.const.YaTestTags.Dirty in suite.tags:
+        elif opts.use_distbuild and devtools.ya.test.const.YaTestTags.Dirty in suite.tags:
             logger.info(
                 "%s might work incorrectly on Distbuild due specified tag ya:dirty (--dist mode doesn't support it)",
                 suite,
@@ -1876,11 +1880,11 @@ def create_populate_token_to_sandbox_vault_node(global_resources, opts):
         '--log-path',
         node_log_path,
         '--secret-name',
-        test.const.SANDBOX_RUN_TEST_YT_TOKEN_VALUE_NAME,
+        devtools.ya.test.const.SANDBOX_RUN_TEST_YT_TOKEN_VALUE_NAME,
     ]
 
     return {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_random_uid("populate_token_2_sb_vault"),
@@ -1937,7 +1941,7 @@ def create_upload_frepkage_node(filename, global_resources, opts):
         node_cmd += ["--transport", opts.canonization_transport]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [filename],
         # Don't cache this node - it has external temporary file as input
@@ -1979,7 +1983,7 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
         cmd += ["--filter-description", filter_descr]
 
     canonization_result_node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
@@ -2082,7 +2086,7 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
         allure_cmd += ["--allure-tars", allure_tar]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": allure_tars,
@@ -2161,7 +2165,7 @@ def inject_result_node(
         result_cmd += ["--inline-diff"]
 
     if opts.run_tagged_tests_on_sandbox:
-        result_cmd += ['--show-suite-logs-for-tags', test.const.YaTestTags.ForceSandbox]
+        result_cmd += ['--show-suite-logs-for-tags', devtools.ya.test.const.YaTestTags.ForceSandbox]
 
     if opts and opts.tests_filters:
         for tf in opts.tests_filters:
@@ -2178,7 +2182,7 @@ def inject_result_node(
         result_cmd += ["--filter-description", tests_filter_descr]
 
     node = {
-        "node-type": test.const.NodeType.TEST_RESULTS,
+        "node-type": devtools.ya.test.const.NodeType.TEST_RESULTS,
         "cache": opts.cache_tests if opts else True,
         "broadcast": False,
         "inputs": PROJECTS_FILE_INPUTS,
@@ -2207,7 +2211,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     uid = uid_gen.get_uid(suite.output_uids, "canonize")
     test_out_path = suite.work_dir()
     node_log_path = os.path.join(test_out_path, "canonize.log")
-    node_result_path = os.path.join(test_out_path, test.const.CANONIZATION_RESULT_FILE_NAME)
+    node_result_path = os.path.join(test_out_path, devtools.ya.test.const.CANONIZATION_RESULT_FILE_NAME)
     node_cmd = util_tools.get_test_tool_cmd(opts, "canonize", suite.global_resources) + [
         "--source-root",
         "$(SOURCE_ROOT)",
@@ -2234,11 +2238,11 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     if opts.dir_outputs:
         node_cmd += ["--dir-outputs"]
         for output in suite_node["dir_outputs"]:
-            if os.path.basename(output) == test.const.TESTING_OUT_DIR_NAME:
+            if os.path.basename(output) == devtools.ya.test.const.TESTING_OUT_DIR_NAME:
                 node_cmd += ["--input", os.path.dirname(output)]
     else:
         for output in suite_node["outputs"]:
-            if os.path.basename(output) == test.const.TESTING_OUT_TAR_NAME:
+            if os.path.basename(output) == devtools.ya.test.const.TESTING_OUT_TAR_NAME:
                 node_cmd += ["--input", os.path.dirname(output)]
 
     if owner:
@@ -2280,7 +2284,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "outputs": [node_log_path, node_result_path],
         'kv': {
             "p": "CANONIZE",
@@ -2367,7 +2371,7 @@ def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
             # to obtain corpus.json file. However, it might no be presented in the repository
             # (there was no initial commit with fuzz data) and checkout node will fail.
             # That's why we try to checkout such weak deps and don't fail if they are not presented
-            elif p.startswith(test.const.CORPUS_DATA_ROOT_DIR):
+            elif p.startswith(devtools.ya.test.const.CORPUS_DATA_ROOT_DIR):
                 arcadia_weak_dirs.append(p)
             elif p.startswith(arcadia):
                 arcadia_dirs.append(exts.strings.left_strip(p, arcadia))
@@ -2397,7 +2401,7 @@ def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
 
 def strip_fake_outputs(data):
     # drop metainfo and fake files
-    return [o for o in data if os.path.splitext(o)[1] not in test.const.FAKE_OUTPUT_EXTS]
+    return [o for o in data if os.path.splitext(o)[1] not in devtools.ya.test.const.FAKE_OUTPUT_EXTS]
 
 
 def get_outputs(graph, uid):
@@ -2422,9 +2426,9 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
     env = sysenv.get_common_py_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
-    log_path = os.path.join("$(BUILD_ROOT)", suite.project_path, test.const.LIST_NODE_LOG_FILE)
-    list_out_dir = suite.work_dir(test.const.LIST_NODE_RESULT_FILE)
-    test_list_file = suite.work_dir(test.const.TEST_LIST_FILE)
+    log_path = os.path.join("$(BUILD_ROOT)", suite.project_path, devtools.ya.test.const.LIST_NODE_LOG_FILE)
+    list_out_dir = suite.work_dir(devtools.ya.test.const.LIST_NODE_RESULT_FILE)
+    test_list_file = suite.work_dir(devtools.ya.test.const.TEST_LIST_FILE)
     output = [log_path]
     list_cmd = util_tools.get_test_tool_cmd(
         opts, "list_tests", suite.global_resources, run_on_target_platform=False
@@ -2534,10 +2538,10 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         cmds = [wrap_cmd(origin_cmd)]
     elif suite.special_runner.startswith('android.'):
         android_sdk_root = suite.global_resources.get(
-            test.const.ANDROID_SDK_ROOT, '$({})'.format(test.const.ANDROID_SDK_ROOT)
+            devtools.ya.test.const.ANDROID_SDK_ROOT, '$({})'.format(devtools.ya.test.const.ANDROID_SDK_ROOT)
         )
         android_avd_root = suite.global_resources.get(
-            test.const.ANDROID_AVD_ROOT, '$({})'.format(test.const.ANDROID_AVD_ROOT)
+            devtools.ya.test.const.ANDROID_AVD_ROOT, '$({})'.format(devtools.ya.test.const.ANDROID_AVD_ROOT)
         )
         origin_cmd += [
             '--android-app',
@@ -2625,7 +2629,7 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
         "deps": testdeps.unique(list_node_uids),
         "target_properties": {},
         "outputs": [
-            os.path.join("$(BUILD_ROOT)", test.const.LIST_RESULT_NODE_LOG_FILE),
+            os.path.join("$(BUILD_ROOT)", devtools.ya.test.const.LIST_RESULT_NODE_LOG_FILE),
         ],
         'kv': {
             "p": "TL",

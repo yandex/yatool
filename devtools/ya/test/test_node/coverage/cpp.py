@@ -8,9 +8,9 @@ import build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import exts.hashing
-import test.common as test_common
-import test.const
-import test.util.tools as util_tools
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const
+import devtools.ya.test.util.tools as util_tools
 import yalibrary.tools as tools
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ def inject_calc_coverage_node(
         for arg in opts.sonar_java_args:
             sonar_cmd += ['--java-args', arg]
         node = {
-            "node-type": test.const.NodeType.TEST_AUX,
+            "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "broadcast": False,
             "inputs": [gcov_report, sonar_script],
             "uid": uid_gen.get_random_uid("sonar"),
@@ -174,7 +174,7 @@ def inject_calc_coverage_node(
         graph.append_node(node, add_to_result=True)
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": inputs,
         "uid": uid,
@@ -220,7 +220,7 @@ def inject_collect_gcno_node(graph, opts=None):
     result_cmd = [find_and_tar_script, output_path, '.gcno']
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [find_and_tar_script],
         "uid": uid,
@@ -291,7 +291,7 @@ def inject_sancov_resolve_nodes(graph, suites, coverage_tar_name, result_filenam
                 inputs.add(output)
 
         node = {
-            "node-type": test.const.NodeType.TEST_AUX,
+            "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "cache": True,
             "broadcast": False,
             "inputs": list(inputs),
@@ -335,7 +335,7 @@ def inject_create_sancov_coverage_report_node(graph, resolve_node_uids, inputs, 
         cmd += ["--coverage-path", coverage_path]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": inputs,
         "uid": uid,
@@ -394,7 +394,7 @@ def inject_clang_coverage_unify_node(graph, suite, clang_resolver_uid, raw_resol
     )
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [input_filename],
@@ -465,7 +465,7 @@ def inject_clang_coverage_resolve_node(
         cmd += ["--log-level", "DEBUG"]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [input_filename, binary_path],
@@ -568,7 +568,7 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
     )
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": list(inputs),
         "uid": uid,
@@ -601,7 +601,7 @@ def inject_sancov_coverage_nodes(graph, suites, resolvers_map, opts, platform_de
         graph,
         suites,
         'coverage.tar',
-        test.const.CPP_COVERAGE_RESOLVED_FILE_NAME,
+        devtools.ya.test.const.CPP_COVERAGE_RESOLVED_FILE_NAME,
         opts=opts,
         platform_descriptor=platform_descriptor,
     )
@@ -615,8 +615,8 @@ def inject_sancov_coverage_nodes(graph, suites, resolvers_map, opts, platform_de
 
 
 def inject_clang_coverage_nodes(graph, suites, resolvers_map, opts, platform_descriptor):
-    resolved_pattern = "%s.{}%s" % os.path.splitext(test.const.CPP_COVERAGE_RESOLVED_FILE_NAME)
-    target_suites = [s for s in suites if s.get_type() in test.const.CLANG_COVERAGE_TEST_TYPES]
+    resolved_pattern = "%s.{}%s" % os.path.splitext(devtools.ya.test.const.CPP_COVERAGE_RESOLVED_FILE_NAME)
+    target_suites = [s for s in suites if s.get_type() in devtools.ya.test.const.CLANG_COVERAGE_TEST_TYPES]
 
     result = []
     for suite in target_suites:
@@ -683,7 +683,7 @@ def inject_coverage_resolve_awaiting_node(graph, suite, deps, opts=None):
     ]
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [script_append_file],

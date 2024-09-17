@@ -11,11 +11,11 @@ import six
 
 from six.moves import urllib as urllib2
 import exts.fs
-import test.common
+import devtools.ya.test.common
 from devtools.ya.test import facility
-import test.system.process
-import test.test_types.common
-import test.filter as test_filter
+import devtools.ya.test.system.process
+import devtools.ya.test.test_types.common
+import devtools.ya.test.filter as test_filter
 
 from devtools.ya.test.programs.test_tool.lib.migrations_config import load_yaml_config, MigrationsConfig
 
@@ -145,7 +145,7 @@ def execute(java_cmd, config_file, input_file, lock_file, logs_dir):
             if repeat >= 10:
                 raise
             logger.debug("Can't connect to jstyle-server: %s", e)
-            proc = test.system.process.execute(
+            proc = devtools.ya.test.system.process.execute(
                 java_cmd,
                 check_exit_code=False,
                 wait=False,
@@ -227,7 +227,7 @@ def main():
     setup_logging(args.verbose)
     logger.debug('Total cases:\n' + '\n'.join(test_cases.values()))
 
-    suite = test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
     suite.set_work_dir(os.getcwd())
     suite.register_chunk()
 
@@ -260,7 +260,7 @@ def main():
             if args.verbose:
                 java_cmd.append('-d')
             java_cmd.append(checkstyle_input)
-            res = test.system.process.execute(java_cmd, check_exit_code=False)
+            res = devtools.ya.test.system.process.execute(java_cmd, check_exit_code=False)
 
         logger.debug('executed in %s sec', res.elapsed)
         logger.debug('jstyle-runner stdout:\n' + res.std_out or '')
@@ -322,12 +322,14 @@ def main():
                 assert file_name in test_cases.values()
                 file_name = [i for i in test_cases.keys() if test_cases[i] == file_name][0]
                 try_again = {
-                    'file': test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(file_name, TEST_TYPE)),
+                    'file': devtools.ya.test.common.get_unique_file_path(
+                        logs_dir, "{}.{}.out".format(file_name, TEST_TYPE)
+                    ),
                     'data': [line],
                 }
                 test_case = facility.TestCase(
                     '{}::{}'.format(file_name, TEST_TYPE),
-                    test.const.Status.FAIL,
+                    devtools.ya.test.const.Status.FAIL,
                     checkstyle_exception + ' was thrown',
                     res.elapsed,
                     logs={'logsdir': logs_dir, 'stdout': try_again['file']},
@@ -342,20 +344,20 @@ def main():
         for tc in sorted(test_cases):
             logs = {'logsdir': logs_dir}
             snippet = ''
-            status = test.const.Status.GOOD
+            status = devtools.ya.test.const.Status.GOOD
 
             if tc in err_dict:
-                out_path = test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(tc, TEST_TYPE))
+                out_path = devtools.ya.test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(tc, TEST_TYPE))
                 exts.fs.write_file(out_path, '\n'.join(err_dict[tc]), binary=False)
                 logs['stdout'] = out_path
                 snippet = err_dict[tc][:3]
                 if len(err_dict[tc]) > 3:
                     snippet.append('...and {} more, see stdout for details'.format(len(err_dict[tc]) - 3))
                 snippet = '\n'.join(snippet)
-                status = test.const.Status.FAIL
+                status = devtools.ya.test.const.Status.FAIL
             if tc in skipped_files:
                 snippet = "Skipped by migrations config"
-                status = test.const.Status.SKIPPED
+                status = devtools.ya.test.const.Status.SKIPPED
 
             test_case = facility.TestCase(
                 '{}::{}'.format(tc, TEST_TYPE),

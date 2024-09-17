@@ -10,7 +10,7 @@ import six
 from six.moves import queue
 import sys
 import tempfile
-import test.const as test_consts
+import devtools.ya.test.const as test_consts
 import threading
 import traceback
 
@@ -35,7 +35,7 @@ import core.report
 import core.event_handling
 from core.imprint import imprint
 from core import stage_tracer
-import test.const as tconst
+import devtools.ya.test.const as tconst
 
 import yalibrary.platform_matcher as pm
 import yalibrary.graph.commands as graph_cmd
@@ -55,7 +55,6 @@ from build.ymake2.consts import YmakeEvents
 import build.genconf as bg
 from build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
-import devtools.ya.test.test_node.cmdline as cmdline
 
 import devtools.libs.yaplatform.python.platform_map as platform_map
 
@@ -169,6 +168,8 @@ class _NodeGen(object):
         return node.get('cache', not node.get('kv', {}).get('disable_cache', False))
 
     def gen_rename_node(self, node, suffix):
+        import devtools.ya.test.test_node.cmdline as cmdline
+
         inputs = node['outputs']
         outputs = [inp + suffix for inp in inputs]
 
@@ -1821,7 +1822,7 @@ class _GraphMaker(object):
         return event_listener_debug_id_wrapper
 
     def _gen_tests(self, dart, tc):
-        import test.explore as te
+        import devtools.ya.test.explore as te
 
         timer = exts.timer.Timer('gen_tests')
 
@@ -3030,8 +3031,8 @@ def _build_merged_graph(
 
 def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests, tpc, test_opts):
     assert test_opts is not None
-    import test.filter as test_filter
-    import test.test_node
+    import devtools.ya.test.filter as test_filter
+    import devtools.ya.test.test_node
     import build.build_plan
 
     timer = exts.timer.Timer('inject_tests')
@@ -3039,13 +3040,13 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
 
     tests = test_filter.filter_suites(tests, test_opts, tpc)
     if test_opts.last_failed_tests and not test_opts.tests_filters:
-        tests = test.test_node.filter_last_failed(tests, opts)
+        tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
 
     logger.debug("Generating build plan")
     plan = build.build_plan.BuildPlan(graph)
 
     logger.debug("Preparing test suites")
-    test_framer = test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
+    test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
     tests = test_framer.prepare_suites(tests)
 
     logger.debug("Stripping clang-tidy irrelevant deps")
@@ -3055,7 +3056,7 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     requested, stripped = _split_stripped_tests(tests, test_opts)
     # Some tests may have unmet dependencies, so they won't be injected into the graph.
     # Thus the returned set can be lesser than input one. (See DEVTOOLS-6384 for additional details).
-    requested = test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc)
+    requested = devtools.ya.test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc)
     timer.show_step('inject tests for {}'.format(_get_target_platform_descriptor(tpc, opts)))
     logger.debug('injected %s tests for %s', len(requested), _get_target_platform_descriptor(tpc, opts))
 
@@ -3063,13 +3064,13 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
 
 
 def _split_stripped_tests(tests, opts):
-    import test.test_node
+    import devtools.ya.test.test_node
 
-    return test.test_node.split_stripped_tests(tests, opts)
+    return devtools.ya.test.test_node.split_stripped_tests(tests, opts)
 
 
 def _inject_tests_result_node(src_dir, graph, tests, opts):
-    import test.test_node
+    import devtools.ya.test.test_node
     import build.build_plan
 
     buildplan = build.build_plan.BuildPlan(graph)
@@ -3079,7 +3080,7 @@ def _inject_tests_result_node(src_dir, graph, tests, opts):
     if opts.strip_skipped_test_deps:
         _strip_skipped_results(graph, buildplan, tests)
 
-    test.test_node.inject_tests_result_node(src_dir, buildplan, tests, opts)
+    devtools.ya.test.test_node.inject_tests_result_node(src_dir, buildplan, tests, opts)
 
 
 def _strip_idle_build_results(graph, plan, tests):
@@ -3160,7 +3161,7 @@ def _strip_skipped_results(graph, plan, tests):
 
 
 def _get_test_opts(opts):
-    import test.filter as test_filter
+    import devtools.ya.test.filter as test_filter
 
     test_opts = copy.deepcopy(opts)
     project_path_filters = test_filter.get_project_path_filters(test_opts)

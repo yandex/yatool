@@ -6,7 +6,7 @@ import os
 import shutil
 import exts.archive
 import sys
-from test.util import shared
+from devtools.ya.test.util import shared
 from yatest.common import process
 
 logger = logging.getLogger(__name__)

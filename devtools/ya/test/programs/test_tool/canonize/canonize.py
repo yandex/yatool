@@ -19,13 +19,13 @@ from devtools.ya.test.dependency import mds_storage
 
 import exts.archive
 
-import test.canon.data
-import test.const
-import test.filter
-import test.reports
-import test.result
-import test.test_types.common
-import test.util.shared
+import devtools.ya.test.canon.data
+import devtools.ya.test.const
+import devtools.ya.test.filter
+import devtools.ya.test.reports
+import devtools.ya.test.result
+import devtools.ya.test.test_types.common
+import devtools.ya.test.util.shared
 
 logger = logging.getLogger(__name__)
 
@@ -119,12 +119,12 @@ def get_task_state_printer():
 
 def main():
     options, _ = get_options()
-    test.util.shared.setup_logging(
+    devtools.ya.test.util.shared.setup_logging(
         options.log_level, options.log_path, ["yalibrary.upload.uploader.progress", "yalibrary.yandex.sandbox.progress"]
     )
     fix_logging.fix_logging()
 
-    oauth_token = test.util.shared.get_oauth_token(options)
+    oauth_token = devtools.ya.test.util.shared.get_oauth_token(options)
 
     resources_root = options.build_root
     if app_config.in_house:
@@ -138,7 +138,7 @@ def main():
         storage = None
         mdsstorage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
 
-    canonical_data = test.canon.data.CanonicalData(
+    canonical_data = devtools.ya.test.canon.data.CanonicalData(
         arc_path=options.custom_canondata_path or options.source_root,
         sandbox_url=options.sandbox_url,
         sandbox_token=oauth_token,
@@ -164,9 +164,9 @@ def main():
         ("$(BUILD_ROOT)", options.build_root),
         ("$(SOURCE_ROOT)", options.source_root),
     ]
-    resolver = test.reports.TextTransformer(replacements)
+    resolver = devtools.ya.test.reports.TextTransformer(replacements)
 
-    suite = test.result.load_suite_from_output(options.output, resolver)
+    suite = devtools.ya.test.result.load_suite_from_output(options.output, resolver)
     if options.save_old_canondata:
         suite.save_old_canondata = True
     if suite.tests:
@@ -175,12 +175,14 @@ def main():
             for input_dir in options.inputs:
                 # extract testing_output_stuff to get canonical output
                 exts.archive.extract_from_tar(
-                    os.path.join(input_dir, test.const.TESTING_OUT_TAR_NAME),
-                    os.path.join(input_dir, test.const.TESTING_OUT_DIR_NAME),
+                    os.path.join(input_dir, devtools.ya.test.const.TESTING_OUT_TAR_NAME),
+                    os.path.join(input_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
                 )
 
     if canonical_data.canonize(suite):
-        canonical_data_path = os.path.join(options.source_root, suite.project_path, test.const.CANON_DATA_DIR_NAME)
+        canonical_data_path = os.path.join(
+            options.source_root, suite.project_path, devtools.ya.test.const.CANON_DATA_DIR_NAME
+        )
         if canonical_data.repo().name:
             helper_command = "run '{} st {}'".format(canonical_data.repo().name, canonical_data_path)
         else:

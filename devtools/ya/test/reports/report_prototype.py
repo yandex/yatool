@@ -5,9 +5,9 @@ import os
 import six
 
 import cityhash
-from test import const as constants
-import test.common as test_common
-from test.const import Status
+from devtools.ya.test import const as constants
+import devtools.ya.test.common as test_common
+from devtools.ya.test.const import Status
 from exts.hashing import md5_value
 import exts.yjson as json
 

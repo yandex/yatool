@@ -6,7 +6,7 @@ import jbuild.gen.node as node
 
 import yalibrary.graph.commands as graph_commands
 
-import test.util.tools as util_tools
+import devtools.ya.test.util.tools as util_tools
 
 
 def fetch_test_data(path, target, ctx):

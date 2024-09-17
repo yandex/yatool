@@ -1,6 +1,6 @@
 import os
 
-import test.const as tconst
+import devtools.ya.test.const as tconst
 
 # Roots
 BUILD_ROOT = '$(BUILD_ROOT)'

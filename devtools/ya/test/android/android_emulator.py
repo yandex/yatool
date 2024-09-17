@@ -9,7 +9,7 @@ import time
 
 import exts.fs
 import exts.archive
-import test.system.process as process
+import devtools.ya.test.system.process as process
 
 from yatest.common.network import PortManager
 from yatest.common.process import InvalidExecutionStateError

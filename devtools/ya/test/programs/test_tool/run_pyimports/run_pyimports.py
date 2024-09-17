@@ -11,7 +11,7 @@ import six
 
 import devtools.ya.test.programs.test_tool.lib.runtime as runtime
 import library.python.cores as cores
-from test import const
+from devtools.ya.test import const
 
 
 def colorize(text):

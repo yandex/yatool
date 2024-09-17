@@ -4,7 +4,7 @@ import logging
 import os
 
 from yatest.common import cores
-from test.util import shared
+from devtools.ya.test.util import shared
 
 logger = logging.getLogger(__name__)
 

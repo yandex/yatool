@@ -7,8 +7,8 @@ import build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import library.python.func
-import test.const
-import test.util.tools as util_tools
+import devtools.ya.test.const
+import devtools.ya.test.util.tools as util_tools
 
 
 @library.python.func.lazy
@@ -18,7 +18,7 @@ def get_graph_timestamp():
 
 @library.python.func.lazy
 def get_coverage_table_chunks_count():
-    return int(os.environ.get('YA_COVERAGE_TABLE_CHUNKS', test.const.COVERAGE_TABLE_CHUNKS))
+    return int(os.environ.get('YA_COVERAGE_TABLE_CHUNKS', devtools.ya.test.const.COVERAGE_TABLE_CHUNKS))
 
 
 def get_svn_version():
@@ -26,9 +26,11 @@ def get_svn_version():
 
 
 def get_upload_yt_table_root(arc_root, chunk, snap_shot_name):
-    table_name = "{}_{}".format(test.const.COVERAGE_YT_TABLE_PREFIX, chunk)
+    table_name = "{}_{}".format(devtools.ya.test.const.COVERAGE_YT_TABLE_PREFIX, chunk)
     snap_shot_name = snap_shot_name or str(get_svn_version())
-    return "/".join([test.const.COVERAGE_YT_ROOT_PATH, "v1", snap_shot_name, str(get_graph_timestamp()), table_name])
+    return "/".join(
+        [devtools.ya.test.const.COVERAGE_YT_ROOT_PATH, "v1", snap_shot_name, str(get_graph_timestamp()), table_name]
+    )
 
 
 # create root node only once (otherwise may hit the queue limit for yt account)
@@ -55,13 +57,13 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
     ] + tables
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_uid([root_path], 'coverage_create_table'),
         "cwd": "$(BUILD_ROOT)",
         "env": {
-            "YT_PROXY": test.const.COVERAGE_YT_PROXY,
+            "YT_PROXY": devtools.ya.test.const.COVERAGE_YT_PROXY,
         },
         "secrets": ['YA_COVERAGE_YT_TOKEN'],
         "priority": 0,
@@ -144,13 +146,13 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
         cmds.append({"cmd_args": pusher_cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [input_file],
         "uid": node_uid,
         "cwd": "$(BUILD_ROOT)",
         "env": {
-            "YT_PROXY": test.const.COVERAGE_YT_PROXY,
+            "YT_PROXY": devtools.ya.test.const.COVERAGE_YT_PROXY,
         },
         "secrets": ['YA_COVERAGE_YT_TOKEN'],
         "priority": 0,

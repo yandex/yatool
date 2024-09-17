@@ -10,24 +10,24 @@ import collections
 import exts.fs
 import exts.tmp
 
-import test.const
-import test.explore
-import test.filter as test_filter
-import test.test_types.boost_test
-import test.test_types.cov_test
-import test.test_types.fuzz_test
-import test.test_types.go_test
-import test.test_types.gtest
-import test.test_types.java_style
-import test.test_types.junit
-import test.test_types.library_ut
-import test.test_types.py_test
-import test.util.shared
+import devtools.ya.test.const
+import devtools.ya.test.explore
+import devtools.ya.test.filter as test_filter
+import devtools.ya.test.test_types.boost_test
+import devtools.ya.test.test_types.cov_test
+import devtools.ya.test.test_types.fuzz_test
+import devtools.ya.test.test_types.go_test
+import devtools.ya.test.test_types.gtest
+import devtools.ya.test.test_types.java_style
+import devtools.ya.test.test_types.junit
+import devtools.ya.test.test_types.library_ut
+import devtools.ya.test.test_types.py_test
+import devtools.ya.test.util.shared
 
 from devtools.ya.test import facility
-from test import common as test_common
+from devtools.ya.test import common as test_common
 from devtools.ya.test.programs.test_tool.lib import testroot
-from test.util import tools
+from devtools.ya.test.util import tools
 from yatest_lib import test_splitter
 
 from devtools.ya.test.dependency import sandbox_storage
@@ -113,18 +113,18 @@ def main():
     if options.test_type == "exectest" and options.test_param:
         test_params = dict(x.split("=", 1) for x in options.test_param)
         test_context["runtime"]["test_params"] = test_params
-    context_path = os.path.join(options.build_root, test.const.SUITE_CONTEXT_FILE_NAME)
+    context_path = os.path.join(options.build_root, devtools.ya.test.const.SUITE_CONTEXT_FILE_NAME)
     with open(context_path, 'w') as afile:
         json.dump(test_context, afile)
     os.environ["YA_TEST_CONTEXT_FILE"] = context_path
 
     cwd = os.getcwd()
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
 
-    suite_classes = list(test.explore.SUITE_MAP.values())
+    suite_classes = list(devtools.ya.test.explore.SUITE_MAP.values())
 
     # XXX
-    suite_classes.append(test.test_types.common.DiffTestSuite)
+    suite_classes.append(devtools.ya.test.test_types.common.DiffTestSuite)
 
     suite_class = None
     for klass in suite_classes:
@@ -162,7 +162,7 @@ def main():
         multi_target_platform_run=options.multi_target_platform_run,
     )
 
-    out_dir = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
+    out_dir = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
     exts.fs.create_dirs(out_dir)
 
     if options.create_clean_environment:
@@ -197,12 +197,12 @@ def main():
         )
         return
 
-    list_cmd = test.util.shared.change_cmd_root(list_cmd, source_root, new_source_root, build_root)
+    list_cmd = devtools.ya.test.util.shared.change_cmd_root(list_cmd, source_root, new_source_root, build_root)
 
     env = os.environ.copy()
     env.update(entry.split("=", 1) for entry in options.test_env)
     # change roots in the env's PYTHONPATH
-    python_paths = test.util.shared.change_cmd_root(
+    python_paths = devtools.ya.test.util.shared.change_cmd_root(
         options.test_related_paths, source_root, new_source_root, build_root
     )
     python_dirs = set()

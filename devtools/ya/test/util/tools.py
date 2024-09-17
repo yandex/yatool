@@ -9,7 +9,7 @@ import logging
 
 import exts.fs
 import exts.windows
-from test import const
+from devtools.ya.test import const
 
 from yalibrary.loggers.file_log import TokenFilterFormatter
 

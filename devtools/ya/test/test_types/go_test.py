@@ -1,11 +1,11 @@
 import os
 import six
 
-import test.const
-import test.util.tools
-from test import common as test_common
-from test.system import process
-from test.test_types import common as common_types
+import devtools.ya.test.const
+import devtools.ya.test.util.tools
+from devtools.ya.test import common as test_common
+from devtools.ya.test.system import process
+from devtools.ya.test.test_types import common as common_types
 
 
 GO_TEST_TYPE = "go_test"
@@ -48,7 +48,7 @@ class GoTestSuite(common_types.AbstractTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_go_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             '--binary',
@@ -56,7 +56,7 @@ class GoTestSuite(common_types.AbstractTestSuite):
             '--test-work-dir',
             test_work_dir,
             '--tracefile',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--modulo',
             str(self._modulo),
             '--modulo-index',
@@ -64,7 +64,7 @@ class GoTestSuite(common_types.AbstractTestSuite):
             '--partition-mode',
             self.get_fork_partition_mode(),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--project-path',
             self.project_path,
             '--timeout',
@@ -97,10 +97,10 @@ class GoTestSuite(common_types.AbstractTestSuite):
         if self.wine_path:
             cmd += ["--wine-path", self.wine_path]
 
-        if test.const.YaTestTags.GoNoSubtestReport in self.tags:
+        if devtools.ya.test.const.YaTestTags.GoNoSubtestReport in self.tags:
             cmd.append('--no-subtest-report')
 
-        if test.const.YaTestTags.GoTotalReport in self.tags:
+        if devtools.ya.test.const.YaTestTags.GoTotalReport in self.tags:
             cmd.append('--total-report')
 
         if opts.canonize_tests:
@@ -116,7 +116,7 @@ class GoTestSuite(common_types.AbstractTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']
@@ -130,8 +130,8 @@ class GoTestSuite(common_types.AbstractTestSuite):
         result = []
         if list_cmd_result.exit_code == 0:
             for x in list_cmd_result.std_err.split():
-                if test.const.TEST_SUBTEST_SEPARATOR in x:
-                    testname, subtest = x.split(test.const.TEST_SUBTEST_SEPARATOR, 1)
+                if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in x:
+                    testname, subtest = x.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
                     result.append(test_common.SubtestInfo(testname, subtest))
             return result
         raise Exception(list_cmd_result.std_err)
@@ -167,4 +167,4 @@ class GoBenchSuite(GoTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR

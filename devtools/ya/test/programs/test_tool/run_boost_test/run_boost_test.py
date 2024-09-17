@@ -13,14 +13,14 @@ from xml.parsers.expat import ExpatError
 import yalibrary.display
 import yalibrary.formatter
 
-from test.system import process
-from test.common import get_test_log_file_path, strings_to_utf8
+from devtools.ya.test.system import process
+from devtools.ya.test.common import get_test_log_file_path, strings_to_utf8
 from devtools.ya.test import facility
-from test.const import Status
-from test.test_types.common import PerformedTestSuite
-from test.util import shared
+from devtools.ya.test.const import Status
+from devtools.ya.test.test_types.common import PerformedTestSuite
+from devtools.ya.test.util import shared
 
-import test.filter as test_filter
+import devtools.ya.test.filter as test_filter
 import test.ios.simctl_control as ios_simctl_control
 import test.android.android_emulator as android_control
 import exts.uniq_id

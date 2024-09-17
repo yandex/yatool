@@ -10,16 +10,16 @@ import argparse
 import collections
 from datetime import datetime
 
-from test import common as test_common
-from test import reports
-from test.util import shared
+from devtools.ya.test import common as test_common
+from devtools.ya.test import reports
+from devtools.ya.test.util import shared
 import exts.archive
 import exts.fs
 import exts.tmp as yatemp
 import exts.uniq_id
-from test import const
-import test.result
-import test.test_types.common as types_common
+from devtools.ya.test import const
+import devtools.ya.test.result
+import devtools.ya.test.test_types.common as types_common
 
 import six
 
@@ -339,8 +339,8 @@ def merge(
 
     logger.debug("Extracting results for %d outputs", len(outputs))
     for output in outputs:
-        result = test.result.TestPackedResultView(output)
-        suite = test.result.load_suite_from_result(result, output, resolver)
+        result = devtools.ya.test.result.TestPackedResultView(output)
+        suite = devtools.ya.test.result.load_suite_from_result(result, output, resolver)
         suites.append(suite)
 
     # TODO

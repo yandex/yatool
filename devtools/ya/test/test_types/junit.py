@@ -7,7 +7,7 @@ import base64
 
 import six
 
-import test.test_types.common as test_types
+import devtools.ya.test.test_types.common as test_types
 import jbuild.commands as commands
 from library.python import func
 
@@ -15,9 +15,9 @@ import exts.func
 from jbuild.gen import consts
 from jbuild.gen import base
 from jbuild.gen.actions import compile
-from test.common import ytest_common_tools as yct
-from test.common import ytest_common_tools as yc
-import test.const as test_const
+from devtools.ya.test.common import ytest_common_tools as yct
+from devtools.ya.test.common import ytest_common_tools as yc
+import devtools.ya.test.const as test_const
 import jbuild.gen.makelist_parser2 as mp2
 
 import yalibrary.graph.base as graph_base

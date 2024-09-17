@@ -4,7 +4,7 @@ import sys
 import exts.fs
 import exts.archive
 
-import test.system.process as process
+import devtools.ya.test.system.process as process
 
 
 def prepare(simctl_bin, profiles_path, test_cwd, device_name, ios_app_tar, device_type, runtime):

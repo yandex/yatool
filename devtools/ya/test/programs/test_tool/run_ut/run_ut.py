@@ -26,12 +26,12 @@ from yatest.common import process
 from yatest_lib import test_splitter
 import exts.fs
 import exts.tmp
-from test.util import tools, shared
-from test.common import get_test_log_file_path
+from devtools.ya.test.util import tools, shared
+from devtools.ya.test.common import get_test_log_file_path
 from devtools.ya.test import facility
-from test.const import Status, TEST_BT_COLORS
-from test.filter import make_testname_filter
-from test.test_types.common import PerformedTestSuite
+from devtools.ya.test.const import Status, TEST_BT_COLORS
+from devtools.ya.test.filter import make_testname_filter
+from devtools.ya.test.test_types.common import PerformedTestSuite
 from yalibrary import display
 
 logger = logging.getLogger(__name__)

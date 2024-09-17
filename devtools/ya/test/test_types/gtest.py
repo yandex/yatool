@@ -1,5 +1,5 @@
-import test.const
-from test.test_types import library_ut
+import devtools.ya.test.const
+from devtools.ya.test.test_types import library_ut
 
 
 GTEST_TYPE = "gtest"
@@ -19,4 +19,4 @@ class GUnitTestSuite(library_ut.UnitTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR

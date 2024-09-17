@@ -2,12 +2,12 @@ import logging
 import optparse
 import os
 
-import test.common
-import test.const
-import test.reports
-import test.result
-import test.test_types.common
-import test.util.shared
+import devtools.ya.test.common
+import devtools.ya.test.const
+import devtools.ya.test.reports
+import devtools.ya.test.result
+import devtools.ya.test.test_types.common
+import devtools.ya.test.util.shared
 
 import exts.archive
 
@@ -35,14 +35,14 @@ def get_options():
 
 def main():
     options, _ = get_options()
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
     for allure_tar in options.allure_tars:
         allure_dirname = os.path.dirname(allure_tar)
         exts.archive.extract_from_tar(allure_tar, os.path.join(allure_dirname, "allure"))
         logger.info("Allure report successfully finished")
     try:
-        test.reports.AllureReportGenerator().create(os.getcwd(), options.allure_report)
-    except test.reports.AllureReportNotFoundError:
+        devtools.ya.test.reports.AllureReportGenerator().create(os.getcwd(), options.allure_report)
+    except devtools.ya.test.reports.AllureReportNotFoundError:
         logger.exception("Allure results not found\n")
     return 0
 

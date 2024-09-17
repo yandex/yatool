@@ -27,12 +27,12 @@ import devtools.ya.core.sec as sec
 import exts.fs
 import exts.archive
 import yatest.common
-from test import const
-from test.util import tools, shared
-from test.system import env as environment
+from devtools.ya.test import const
+from devtools.ya.test.util import tools, shared
+from devtools.ya.test.system import env as environment
 from devtools.ya.test import facility
-from test.const import Status
-from test.test_types.common import PerformedTestSuite
+from devtools.ya.test.const import Status
+from devtools.ya.test.test_types.common import PerformedTestSuite
 
 logger = logging.getLogger(__name__)
 

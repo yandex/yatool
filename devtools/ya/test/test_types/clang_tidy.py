@@ -1,9 +1,9 @@
 import os
 
-import test.const
-import test.util.tools
-from test import common as test_common
-from test.test_types import common as common_types
+import devtools.ya.test.const
+import devtools.ya.test.util.tools
+from devtools.ya.test import common as test_common
+from devtools.ya.test.test_types import common as common_types
 
 
 CLANG_TIDY_TEST_TYPE = "clang_tidy"
@@ -97,13 +97,13 @@ class ClangTidySuite(common_types.AbstractTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_clang_tidy', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             '--tracefile',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--project-path',
             self.project_path,
         ]
@@ -118,7 +118,7 @@ class ClangTidySuite(common_types.AbstractTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     def global_tidy_library(self):
         library_path = self.meta.global_library_path.replace("$B", "$(BUILD_ROOT)")

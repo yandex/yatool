@@ -7,7 +7,7 @@ import ujson as json
 
 import exts.archive as archive
 
-from test.util import shared
+from devtools.ya.test.util import shared
 
 
 logger = logging.getLogger(__name__)

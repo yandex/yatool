@@ -6,15 +6,15 @@ import sys
 import time
 
 from devtools.ya.test import facility
-from test.util import shared
+from devtools.ya.test.util import shared
 import devtools.ya.test.programs.test_tool.lib.runtime as runtime
 import library.python.cores as cores
-import test.common
-import test.const
-import test.filter as test_filter
-import test.system.process
-import test.test_types.common
-import test.util.shared
+import devtools.ya.test.common
+import devtools.ya.test.const
+import devtools.ya.test.filter as test_filter
+import devtools.ya.test.system.process
+import devtools.ya.test.test_types.common
+import devtools.ya.test.util.shared
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,9 @@ def main():
     )
 
     args = parser.parse_args()
-    test.util.shared.setup_logging(args.log_level, args.log_path, fmt="%(asctime)s: %(levelname)s: %(message)s")
+    devtools.ya.test.util.shared.setup_logging(
+        args.log_level, args.log_path, fmt="%(asctime)s: %(levelname)s: %(message)s"
+    )
 
     logger.debug("run_check has started")
 
@@ -105,8 +107,12 @@ def main():
     for test_name, test_path, checker_args in get_test_cases():
         cmd = [sys.executable] + args.checker.split(" ") + checker_args
 
-        out_path = test.common.get_unique_file_path(logs_dir, "{}.{}.out".format(test_name, args.check_name))
-        err_path = test.common.get_unique_file_path(logs_dir, "{}.{}.err".format(test_name, args.check_name))
+        out_path = devtools.ya.test.common.get_unique_file_path(
+            logs_dir, "{}.{}.out".format(test_name, args.check_name)
+        )
+        err_path = devtools.ya.test.common.get_unique_file_path(
+            logs_dir, "{}.{}.err".format(test_name, args.check_name)
+        )
 
         started = time.time()
         with runtime.bypass_signals(["SIGQUIT", "SIGUSR2"]) as reg:
@@ -134,11 +140,11 @@ def main():
                 snippet += err
 
         if res.returncode == 0:
-            status = test.const.Status.GOOD
-        elif res.returncode == test.const.TestRunExitCode.TimeOut:
-            status = test.const.Status.TIMEOUT
+            status = devtools.ya.test.const.Status.GOOD
+        elif res.returncode == devtools.ya.test.const.TestRunExitCode.TimeOut:
+            status = devtools.ya.test.const.Status.TIMEOUT
         else:
-            status = test.const.Status.FAIL
+            status = devtools.ya.test.const.Status.FAIL
 
         test_case = facility.TestCase(
             "{}::{}".format(test_name, args.check_name),
@@ -152,7 +158,7 @@ def main():
 
     logger.debug("testing completed")
 
-    suite = test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
     suite.set_work_dir(os.getcwd())
     suite.register_chunk()
     suite.chunk.tests = tests

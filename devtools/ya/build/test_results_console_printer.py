@@ -1,5 +1,5 @@
-import test.const
-from test.util.shared import build_filter_message
+import devtools.ya.test.const
+from devtools.ya.test.util.shared import build_filter_message
 
 
 def get_skipped_tests_annotations(suites):
@@ -34,7 +34,9 @@ def get_suites_to_show(suites, fail_fast=False, report_skipped_suites=False):
     suites_to_show = remove_empty_suites(suites_to_show)
     if fail_fast:
         try:
-            suites_to_show = [[suite for suite in suites_to_show if suite.get_status() != test.const.Status.GOOD][0]]
+            suites_to_show = [
+                [suite for suite in suites_to_show if suite.get_status() != devtools.ya.test.const.Status.GOOD][0]
+            ]
         except IndexError:
             pass
     return suites_to_show
@@ -43,7 +45,7 @@ def get_suites_to_show(suites, fail_fast=False, report_skipped_suites=False):
 def print_tests_results_to_console(builder, suites):
     filter_description = ", ".join(get_skipped_tests_annotations(suites))
     suites_to_show = get_suites_to_show(suites, builder.opts.fail_fast, builder.opts.report_skipped_suites)
-    reporter = test.reports.ConsoleReporter(
+    reporter = devtools.ya.test.reports.ConsoleReporter(
         show_passed=builder.opts.show_passed_tests,
         show_deselected=builder.opts.show_deselected_tests,
         show_skipped=builder.opts.show_skipped_tests,
@@ -52,7 +54,7 @@ def print_tests_results_to_console(builder, suites):
         truncate=not builder.opts.inline_diff,
         omitted_test_statuses=builder.opts.omitted_test_statuses,
         show_suite_logs_for_tags=(
-            [test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else []
+            [devtools.ya.test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else []
         ),
     )
 

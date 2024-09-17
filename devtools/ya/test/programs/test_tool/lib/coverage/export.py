@@ -10,7 +10,7 @@ import six
 from . import util
 
 import ujson as json
-import iter_cov_json
+import devtools.ya.test.programs.test_tool.lib.coverage.iter_cov_json.lib
 from library.python.reservoir_sampling import reservoir_sampling
 
 
@@ -88,7 +88,10 @@ def export_llvm_coverage(cmd, process_func, output_filename=None, cancel_func=No
     discreet_reader = DiscreetReader(cmd, output_filename, cancel_func)
     try:
         with discreet_reader as afile:
-            for target_block, block in iter_cov_json.iter_coverage_json(afile):
+            for (
+                target_block,
+                block,
+            ) in devtools.ya.test.programs.test_tool.lib.coverage.iter_cov_json.lib.iter_coverage_json(afile):
                 # skip irrelevant data
                 if not target_block:
                     continue

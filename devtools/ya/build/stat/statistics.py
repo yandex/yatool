@@ -18,7 +18,7 @@ import core.report
 from humanfriendly import format_size
 
 from core import profiler, stage_tracer
-import test.const as test_const
+import devtools.ya.test.const as test_const
 from build.stat.graph import CopyTask, get_critical_path
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log
 from functools import cmp_to_key

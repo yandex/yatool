@@ -11,9 +11,9 @@ from hashlib import new
 import six
 
 from dateutil import parser as date_parser
-from test.system import process
-from test import const
-from test.util import shared
+from devtools.ya.test.system import process
+from devtools.ya.test import const
+from devtools.ya.test.util import shared
 
 import core.config
 import exts.archive

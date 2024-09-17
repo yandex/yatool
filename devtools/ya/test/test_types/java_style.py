@@ -1,17 +1,17 @@
 import os
 import logging
 
-import test.test_types.common as test_types
-import test.util.tools as test_tools
-import test.common
-import test.const
-import test.system.process
+import devtools.ya.test.test_types.common as test_types
+import devtools.ya.test.util.tools as test_tools
+import devtools.ya.test.common
+import devtools.ya.test.const
+import devtools.ya.test.system.process
 
 from jbuild.gen import base
 from jbuild import commands
-from test import common as test_common
-from test.system import process
-from test.test_types.py_test import LintTestSuite
+from devtools.ya.test import common as test_common
+from devtools.ya.test.system import process
+from devtools.ya.test.test_types.py_test import LintTestSuite
 
 import yalibrary.graph.base as graph_base
 from yalibrary.graph.const import BUILD_ROOT, SOURCE_ROOT
@@ -64,7 +64,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     @property
     def cache_test_results(self):
@@ -75,7 +75,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         return [_f for _f in set(self.deps) if _f]
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
-        work_dir = test.common.get_test_suite_work_dir(
+        work_dir = devtools.ya.test.common.get_test_suite_work_dir(
             BUILD_ROOT,
             self.project_path,
             self.name,
@@ -92,9 +92,9 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
             '--source-root',
             SOURCE_ROOT,
             '--trace-path',
-            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--out-path',
-            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--java',
             commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_resource),
             '--runner-lib-path',
@@ -134,10 +134,10 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
     @classmethod
     def list(cls, cmd, cwd):
         result = []
-        list_cmd_result = test.system.process.execute(cmd, cwd=cwd)
+        list_cmd_result = devtools.ya.test.system.process.execute(cmd, cwd=cwd)
         if list_cmd_result.exit_code == 0:
             for line in [_f for _f in [line.strip() for line in list_cmd_result.std_out.split(os.linesep)] if _f]:
-                result.append(test.common.SubtestInfo(line, cls.__name__))
+                result.append(devtools.ya.test.common.SubtestInfo(line, cls.__name__))
             return result
         raise Exception(list_cmd_result.std_err)
 
@@ -225,7 +225,7 @@ class KtlintTestSuite(LintTestSuite):
             remove_tos=opts.remove_tos,
         )
         editorconfig = os.path.join(SOURCE_ROOT, "build/platform/java", self._ktlint_folder_name(), ".editorconfig")
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_ktlint_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             "--srclist-path",
@@ -233,13 +233,13 @@ class KtlintTestSuite(LintTestSuite):
             "--binary",
             self.meta.ktlint_binary,
             "--trace-path",
-            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--source-root",
             SOURCE_ROOT,
             "--project-path",
             self.project_path,
             "--output-dir",
-            os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             "--editorconfig",
             editorconfig,
         ]
@@ -262,7 +262,7 @@ class KtlintTestSuite(LintTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     def get_list_cmd(self, arc_root, build_root, opts):
         return self.get_run_cmd(opts) + ['--test-list']
@@ -276,8 +276,8 @@ class KtlintTestSuite(LintTestSuite):
         result = []
         if list_cmd_result.exit_code == 0:
             for x in list_cmd_result.std_err.split():
-                if test.const.TEST_SUBTEST_SEPARATOR in x:
-                    testname, subtest = x.split(test.const.TEST_SUBTEST_SEPARATOR, 1)
+                if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in x:
+                    testname, subtest = x.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
                     result.append(test_common.SubtestInfo(testname, subtest))
             return result
         raise Exception(list_cmd_result.std_err)

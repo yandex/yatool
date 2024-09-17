@@ -70,7 +70,7 @@ from build.build_opts import (
 )
 from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
 from core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
-from test.explore import generate_tests_by_dart
+from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 
 import app

@@ -14,16 +14,16 @@ import shlex
 
 from yalibrary import display
 
-from test import const
-from test.system import process
-from test.common import get_test_log_file_path, strings_to_utf8
+from devtools.ya.test import const
+from devtools.ya.test.system import process
+from devtools.ya.test.common import get_test_log_file_path, strings_to_utf8
 from devtools.ya.test import facility
-from test.test_types.common import PerformedTestSuite
-from test.util import shared
+from devtools.ya.test.test_types.common import PerformedTestSuite
+from devtools.ya.test.util import shared
 from yatest_lib import test_splitter
 from exts import fs
 import exts.windows
-import test.filter as test_filter
+import devtools.ya.test.filter as test_filter
 
 
 logger = logging.getLogger(__name__)

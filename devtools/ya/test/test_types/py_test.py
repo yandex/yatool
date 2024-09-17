@@ -10,12 +10,12 @@ import jbuild.gen.consts as consts
 
 import exts.yjson as json
 
-from test.system import process
-from test import common as test_common
-from test.test_types import common
-import test.const
-import test.util.shared
-import test.util.tools
+from devtools.ya.test.system import process
+from devtools.ya.test import common as test_common
+from devtools.ya.test.test_types import common
+import devtools.ya.test.const
+import devtools.ya.test.util.shared
+import devtools.ya.test.util.tools
 import devtools.ya.test.test_node.cmdline as cmdline
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class PyTestSuite(common.PythonTestSuite):
                 seen.add(uid)
 
                 for o in outputs:
-                    if not os.path.splitext(o)[1] in test.const.FAKE_OUTPUT_EXTS:
+                    if not os.path.splitext(o)[1] in devtools.ya.test.const.FAKE_OUTPUT_EXTS:
                         self.pytest_output_dir_deps.add(os.path.dirname(o))
 
     def get_type(self):
@@ -88,7 +88,7 @@ class PyTestSuite(common.PythonTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     @staticmethod
     def _get_ini_file_path():
@@ -107,7 +107,7 @@ class PyTestSuite(common.PythonTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        output_dir = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
+        output_dir = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
         cmd = [
             "--basetemp",
             os.path.join('$(BUILD_ROOT)', "tmp"),
@@ -120,7 +120,7 @@ class PyTestSuite(common.PythonTestSuite):
             "no:factor",
             "--doctest-modules",
             "--ya-trace",
-            os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--build-root",
             '$(BUILD_ROOT)',
             "--source-root",
@@ -132,8 +132,8 @@ class PyTestSuite(common.PythonTestSuite):
             "--project-path",
             self.project_path,
             "--test-tool-bin",
-            test.util.tools.get_test_tool_path(
-                opts, self.global_resources, test.const.TEST_TOOL_TARGET in self.global_resources
+            devtools.ya.test.util.tools.get_test_tool_path(
+                opts, self.global_resources, devtools.ya.test.const.TEST_TOOL_TARGET in self.global_resources
             ),
             # XXX
             # version allows library/python/pytest/plugins/ya.py stay compatible with ya and ya-dev
@@ -371,7 +371,7 @@ class Py3TestBinSuite(PyTestBinSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
 
 class ExecTest(PyTestBinSuite):
@@ -380,7 +380,7 @@ class ExecTest(PyTestBinSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     @property
     def name(self):
@@ -400,7 +400,7 @@ class ExecTest(PyTestBinSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=False):
         cmd = ["--test-param", "commands={}".format(self.meta.blob)]
-        cmd += test.util.tools.get_test_tool_cmd(
+        cmd += devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True
         )
         cmd += self.get_run_cmd_args(opts, retry, for_dist_build)
@@ -494,10 +494,10 @@ class PyLintTestSuite(LintTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        out_path = os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME)
+        out_path = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
 
         cmd = (
-            test.util.tools.get_test_tool_cmd(
+            devtools.ya.test.util.tools.get_test_tool_cmd(
                 opts, 'run_check', self.global_resources, wrapper=True, run_on_target_platform=True
             )
             + [
@@ -508,7 +508,7 @@ class PyLintTestSuite(LintTestSuite):
                 "--check-name",
                 self.get_type(),
                 "--trace-path",
-                os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+                os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
                 "--out-path",
                 out_path,
                 "--log-path",
@@ -600,7 +600,7 @@ class GoFmtTestSuite(PyLintTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     def get_test_dependencies(self):
         return []
@@ -616,20 +616,22 @@ class GoFmtTestSuite(PyLintTestSuite):
             remove_tos=opts.remove_tos,
         )
         cmd = (
-            test.util.tools.get_test_tool_cmd(
+            devtools.ya.test.util.tools.get_test_tool_cmd(
                 opts, 'run_go_fmt', self.global_resources, wrapper=True, run_on_target_platform=True
             )
             + [
                 "--gofmt",
                 '{}/bin/gofmt'.format(
-                    self.global_resources.get(test.const.GO_TOOLS_RESOURCE, test.const.GO_TOOLS_RESOURCE)
+                    self.global_resources.get(
+                        devtools.ya.test.const.GO_TOOLS_RESOURCE, devtools.ya.test.const.GO_TOOLS_RESOURCE
+                    )
                 ),
                 "--source-root",
                 "$(SOURCE_ROOT)",
                 "--trace-path",
-                os.path.join(work_dir, test.const.TRACE_FILE_NAME),
+                os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
                 "--out-path",
-                os.path.join(work_dir, test.const.TESTING_OUT_DIR_NAME),
+                os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             ]
             + self._get_files(opts)
         )
@@ -656,7 +658,7 @@ class GoVetTestSuite(PyLintTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     def get_test_dependencies(self):
         return [self.project_path]
@@ -698,7 +700,7 @@ class ClasspathClashTestSuite(PyLintTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.STYLE
+        return devtools.ya.test.const.SuiteClassType.STYLE
 
     def get_type(self):
         return CLASSPATH_CLASH_TYPE

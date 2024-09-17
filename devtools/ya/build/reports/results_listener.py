@@ -13,10 +13,10 @@ from collections import defaultdict
 
 import build.build_plan as bp
 import build.stat.graph_metrics as st
-import test.const as test_const
-import test.common as test_common
-import test.result as test_result
-import test.reports as test_reports
+import devtools.ya.test.const as test_const
+import devtools.ya.test.common as test_common
+import devtools.ya.test.result as test_result
+import devtools.ya.test.reports as test_reports
 
 
 class BuildResultsListener(object):

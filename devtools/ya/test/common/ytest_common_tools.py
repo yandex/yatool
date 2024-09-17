@@ -7,8 +7,8 @@ import math
 import functools
 
 import six
-import test.const
-from test.const import Status
+import devtools.ya.test.const
+from devtools.ya.test.const import Status
 import yatest.common as yac
 
 
@@ -46,7 +46,7 @@ def get_test_suite_work_dir(
         if remove_tos:
             paths += subpaths
         else:
-            paths += [test.const.TESTING_OUT_DIR_NAME] + subpaths
+            paths += [devtools.ya.test.const.TESTING_OUT_DIR_NAME] + subpaths
     return to_utf8(os.path.join(*paths))
 
 
@@ -88,7 +88,7 @@ class SubtestInfo(object):
         else:
             skipped = False
 
-        return SubtestInfo(*s.rsplit(test.const.TEST_SUBTEST_SEPARATOR, 1), skipped=skipped)
+        return SubtestInfo(*s.rsplit(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1), skipped=skipped)
 
     @classmethod
     def from_json(cls, d):
@@ -107,7 +107,7 @@ class SubtestInfo(object):
         if self.skipped:
             s += SubtestInfo.skipped_prefix
 
-        return s + test.const.TEST_SUBTEST_SEPARATOR.join([self.test, self.subtest])
+        return s + devtools.ya.test.const.TEST_SUBTEST_SEPARATOR.join([self.test, self.subtest])
 
     def __repr__(self):
         return str(self)
@@ -272,7 +272,7 @@ def get_test_log_file_path(output_dir, test_name, extension="log"):
         # to reduce it's length on windows
         filename = test_name
     else:
-        filename = test_name.replace(test.const.TEST_SUBTEST_SEPARATOR, ".")
+        filename = test_name.replace(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, ".")
     if not filename:
         filename = "test"
     filename += "." + extension

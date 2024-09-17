@@ -18,8 +18,8 @@ except NameError:
     long = int
 
 
-from test import common
-from test import const
+from devtools.ya.test import common
+from devtools.ya.test import const
 from yalibrary.display import strip_markup
 from library.python import strings
 from devtools.ya.test import facility

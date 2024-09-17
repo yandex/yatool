@@ -2,8 +2,8 @@ import os
 
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
-import test.const
-import test.util.tools as util_tools
+import devtools.ya.test.const
+import devtools.ya.test.util.tools as util_tools
 
 
 def inject_go_coverage_nodes(graph, suites, resolvers_map, opts, platform_descriptor):
@@ -15,7 +15,7 @@ def inject_go_coverage_nodes(graph, suites, resolvers_map, opts, platform_descri
         result.append(report_node_uid)
 
     for suite in [s for s in suites if s.get_type() == "go_test"]:
-        resolved_filename = test.const.GO_COVERAGE_RESOLVED_FILE_NAME
+        resolved_filename = devtools.ya.test.const.GO_COVERAGE_RESOLVED_FILE_NAME
         uid = inject_go_coverage_resolve_nodes(graph, suite, gocov_filename, resolved_filename, opts=opts)
         result.append(uid)
 
@@ -31,7 +31,7 @@ def inject_create_go_coverage_report_node(graph, suites, coverage_path, opts):
     go_path = str()
     for suite in suites:
         all_resources.update(suite.global_resources)
-        go_path = suite.global_resources.get(test.const.GO_TOOLS_RESOURCE)
+        go_path = suite.global_resources.get(devtools.ya.test.const.GO_TOOLS_RESOURCE)
     cmd = util_tools.get_test_tool_cmd(opts, "build_go_coverage_report", all_resources) + [
         "--output",
         output_path,
@@ -53,7 +53,7 @@ def inject_create_go_coverage_report_node(graph, suites, coverage_path, opts):
     uid = uid_gen.get_uid(deps, "gocov-report")
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [],
         "uid": uid,
@@ -103,7 +103,7 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar_path, resolved_f
         cmd.extend(['--exclude-regexp', opts.coverage_exclude_regexp])
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": [coverage_tar_path],

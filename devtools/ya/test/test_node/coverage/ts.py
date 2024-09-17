@@ -1,8 +1,8 @@
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import logging
-import test.const
-import test.util.tools as util_tools
+import devtools.ya.test.const
+import devtools.ya.test.util.tools as util_tools
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def inject_ts_coverage_nodes(graph, suites, resolvers_map, opts, platform_descri
     if jest_suites:
         for suite in jest_suites:
             suite_res_cov_filename = suite.work_dir(COVERAGE_TAR_RESULT)
-            cov_resolved_filename = test.const.TS_COVERAGE_RESOLVED_FILE_NAME
+            cov_resolved_filename = devtools.ya.test.const.TS_COVERAGE_RESOLVED_FILE_NAME
             cov_resolve_uid = inject_ts_coverage_resolve_node(
                 graph,
                 suite,
@@ -75,7 +75,7 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     uid = uid_gen.get_uid(deps, "tscov-report")
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": inputs_for_node,
@@ -123,7 +123,7 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
     uid = uid_gen.get_uid(deps, "resolve_tscov")
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
         "broadcast": False,
         "inputs": [coverage_tar_path],

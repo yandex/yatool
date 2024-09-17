@@ -6,8 +6,8 @@ import re
 
 from . import trace_comment
 from exts import func
-from test import common
-from test import const
+from devtools.ya.test import common
+from devtools.ya.test import const
 
 
 logger = logging.getLogger(__name__)

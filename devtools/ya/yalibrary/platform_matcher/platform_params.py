@@ -1,7 +1,7 @@
 import json
 import logging
 
-import test.const
+import devtools.ya.test.const
 from .matcher import stringize_platform
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def stringize_toolchain(tc):
         for size in sorted(tc['test_size_filters']):
             platform.append('test-size={}'.format(size))
     if 'test_class_filters' in tc:
-        if {test.const.SuiteClassType.REGULAR} == set(tc['test_class_filters']):
+        if {devtools.ya.test.const.SuiteClassType.REGULAR} == set(tc['test_class_filters']):
             platform.append('regular-tests')
     if 'test_type_filters' in tc:
         for test_type in sorted(tc['test_type_filters']):

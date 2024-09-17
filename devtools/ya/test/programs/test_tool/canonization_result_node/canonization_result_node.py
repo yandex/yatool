@@ -4,8 +4,8 @@ import os
 import json
 import optparse
 
-import test.const
-import test.util.shared
+import devtools.ya.test.const
+import devtools.ya.test.util.shared
 
 
 def get_options():
@@ -36,10 +36,10 @@ def get_number_of_empty_suites(projects):
 
 
 def load_projects():
-    project_paths = test.util.shared.get_projects_from_file("projects.txt")
+    project_paths = devtools.ya.test.util.shared.get_projects_from_file("projects.txt")
     projects = []
     for path in project_paths:
-        canonization_res = os.path.join(path, test.const.CANONIZATION_RESULT_FILE_NAME)
+        canonization_res = os.path.join(path, devtools.ya.test.const.CANONIZATION_RESULT_FILE_NAME)
         with open(canonization_res) as tests_list_file:
             projects.append(json.load(tests_list_file))
     return projects
@@ -50,11 +50,11 @@ def main():
     import app_ctx
 
     options, _ = get_options()
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
 
     projects = load_projects()
 
-    filter_message = test.util.shared.build_filter_message(
+    filter_message = devtools.ya.test.util.shared.build_filter_message(
         options.filter_description, options.test_name_filters, get_number_of_empty_suites(projects)
     )
     if filter_message:

@@ -7,12 +7,12 @@ import signal
 import six
 
 import exts
-import test.filter as test_filter
-from test import const
+import devtools.ya.test.filter as test_filter
+from devtools.ya.test import const
 from devtools.ya.test import facility
 from devtools.ya.test.programs.test_tool.lib import benchmark
-from test.util import shared
-from test.system import process
+from devtools.ya.test.util import shared
+from devtools.ya.test.system import process
 
 logger = logging.getLogger(__name__)
 BENCH_STDOUT = "benchmark.out"

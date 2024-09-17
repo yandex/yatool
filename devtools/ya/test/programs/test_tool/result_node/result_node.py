@@ -2,12 +2,12 @@ import collections
 import logging
 import optparse
 
-import test.common
-import test.const
-import test.reports
-import test.result
-import test.test_types.common
-import test.util.shared
+import devtools.ya.test.common
+import devtools.ya.test.const
+import devtools.ya.test.reports
+import devtools.ya.test.result
+import devtools.ya.test.test_types.common
+import devtools.ya.test.util.shared
 
 logger = logging.getLogger(__name__)
 
@@ -85,19 +85,19 @@ def merge_suites(suites):
 
 
 def get_suites(options):
-    outputs = test.util.shared.get_projects_from_file("projects.txt")
+    outputs = devtools.ya.test.util.shared.get_projects_from_file("projects.txt")
     logger.debug("Running result node for %s outputs", outputs)
 
     replacements = [
         ("$(BUILD_ROOT)", options.result_root),
         ("$(SOURCE_ROOT)", options.source_root or "arcadia-for-test"),
     ]
-    resolver = test.reports.TextTransformer(replacements)
+    resolver = devtools.ya.test.reports.TextTransformer(replacements)
 
     suites = []
     for output in outputs:
-        result = test.result.TestPackedResultView(output)
-        suite = test.result.load_suite_from_result(result, output, resolver)
+        result = devtools.ya.test.result.TestPackedResultView(output)
+        suite = devtools.ya.test.result.load_suite_from_result(result, output, resolver)
         if not suite.is_skipped() or options.show_discovered:
             suites.append(suite)
 
@@ -110,7 +110,7 @@ def main():
     import app_ctx
 
     options, _ = get_options()
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
     # ensure output file is created
     with open(options.out_path, "w") as f:
         f.write("")
@@ -118,12 +118,12 @@ def main():
     suites = get_suites(options)
 
     statuses = set([suite.get_status() for suite in suites if not suite.is_skipped()])
-    if not statuses or statuses == {test.common.Status.GOOD}:
+    if not statuses or statuses == {devtools.ya.test.common.Status.GOOD}:
         exit_code = 0
         if options.show_failed:
             return exit_code
-    elif test.common.Status.INTERNAL in statuses:
-        exit_code = test.const.TestRunExitCode.InfrastructureError
+    elif devtools.ya.test.common.Status.INTERNAL in statuses:
+        exit_code = devtools.ya.test.const.TestRunExitCode.InfrastructureError
     else:
         exit_code = int(options.fail_exit_code)
 
@@ -133,7 +133,7 @@ def main():
         out_path = options.out_path
 
     truncate = not options.inline_diff
-    reporter = test.reports.ConsoleReporter(
+    reporter = devtools.ya.test.reports.ConsoleReporter(
         show_passed=options.show_passed,
         show_deselected=options.show_deselected,
         show_skipped=options.show_skipped,
@@ -145,7 +145,7 @@ def main():
         out_path=out_path,
     )
 
-    filter_message = test.util.shared.build_filter_message(
+    filter_message = devtools.ya.test.util.shared.build_filter_message(
         options.filter_description, options.test_name_filters, get_number_of_empty_suites(suites)
     )
     if filter_message:

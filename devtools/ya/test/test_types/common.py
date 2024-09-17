@@ -19,15 +19,15 @@ import exts.log
 import exts.windows
 import exts.tmp
 import exts.hashing as hashing
-import test.util.shared
+import devtools.ya.test.util.shared
 from devtools.ya.test import facility
 from devtools.ya.test import tracefile
 from devtools.ya.test.dependency import external_tools
-from test import common as test_common
-from test.system import process
+from devtools.ya.test import common as test_common
+from devtools.ya.test.system import process
 from yatest_lib import external
-import test.const
-import test.util.tools
+import devtools.ya.test.const
+import devtools.ya.test.util.tools
 import build.plugins.lib._metric_resolvers as mr
 
 
@@ -68,7 +68,7 @@ class AbstractTestSuite(facility.Suite):
         """
         Type of the suite (style, regular, etc)
         """
-        return test.const.SuiteClassType.UNCLASSIFIED
+        return devtools.ya.test.const.SuiteClassType.UNCLASSIFIED
 
     @classmethod
     def get_ci_type_name(cls):
@@ -137,9 +137,9 @@ class AbstractTestSuite(facility.Suite):
         self.global_resources = self.meta.global_resources.copy()
 
         self.special_runner = ''
-        if test.const.YaTestTags.YtRunner in self.tags:
+        if devtools.ya.test.const.YaTestTags.YtRunner in self.tags:
             self.special_runner = 'yt'
-        elif test.const.YaTestTags.ForceSandbox in self.tags:
+        elif devtools.ya.test.const.YaTestTags.ForceSandbox in self.tags:
             self.special_runner = 'sandbox'
 
     def need_wine(self):
@@ -307,7 +307,7 @@ class AbstractTestSuite(facility.Suite):
             timeout = timeout.strip()
         if timeout and int(timeout):
             return int(timeout)
-        return test.const.TestSize.get_default_timeout(self.test_size)
+        return devtools.ya.test.const.TestSize.get_default_timeout(self.test_size)
 
     @property
     def timeout(self):
@@ -344,7 +344,7 @@ class AbstractTestSuite(facility.Suite):
 
     @property
     def test_size(self):
-        tsize = self.meta.size or test.const.TestSize.Small
+        tsize = self.meta.size or devtools.ya.test.const.TestSize.Small
         return tsize.lower()
 
     @property
@@ -523,7 +523,7 @@ class AbstractTestSuite(facility.Suite):
         """
         Path to test outputs (logs etc)
         """
-        return os.path.join(self.work_dir(), test.const.TESTING_OUT_DIR_NAME, *path)
+        return os.path.join(self.work_dir(), devtools.ya.test.const.TESTING_OUT_DIR_NAME, *path)
 
     def get_list_cmd(self, arc_root, build_root, opts):
         """
@@ -598,7 +598,8 @@ class AbstractTestSuite(facility.Suite):
             suite_event = {}
             if self._errors:
                 suite_event['errors'] = [
-                    (test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in self._errors
+                    (devtools.ya.test.const.Status.TO_STR[status], test_common.to_utf8(msg))
+                    for status, msg in self._errors
                 ]
             if self.logs:
                 suite_event['logs'] = self.logs
@@ -616,7 +617,8 @@ class AbstractTestSuite(facility.Suite):
                     chunk_event['metrics'] = chunk.metrics
                 if chunk._errors:
                     chunk_event['errors'] = [
-                        (test.const.Status.TO_STR[status], test_common.to_utf8(msg)) for status, msg in chunk._errors
+                        (devtools.ya.test.const.Status.TO_STR[status], test_common.to_utf8(msg))
+                        for status, msg in chunk._errors
                     ]
 
                 if chunk_event:
@@ -635,7 +637,7 @@ class AbstractTestSuite(facility.Suite):
                     message = {
                         'class': class_name,
                         'cwd': self.work_dir(),
-                        'status': test.const.Status.TO_STR[test_case.status],
+                        'status': devtools.ya.test.const.Status.TO_STR[test_case.status],
                         'subtest': subtest_name,
                         'time': test_case.elapsed,
                     }
@@ -663,13 +665,13 @@ class AbstractTestSuite(facility.Suite):
                         message['tags'] = test_case.tags
                     trace('subtest-finished', message)
 
-    def add_suite_error(self, msg, status=test.const.Status.FAIL):
+    def add_suite_error(self, msg, status=devtools.ya.test.const.Status.FAIL):
         self.add_error(msg, status)
 
     def add_suite_info(self, msg):
         self.add_info(msg)
 
-    def add_chunk_error(self, msg, status=test.const.Status.FAIL):
+    def add_chunk_error(self, msg, status=devtools.ya.test.const.Status.FAIL):
         self.chunk.add_error(msg, status)
 
     def add_chunk_info(self, msg):
@@ -689,12 +691,12 @@ class AbstractTestSuite(facility.Suite):
         return chunks
 
     def is_skipped(self):
-        return not self.tests and len(self._errors) == 1 and self._errors[0][0] == test.const.Status.SKIPPED
+        return not self.tests and len(self._errors) == 1 and self._errors[0][0] == devtools.ya.test.const.Status.SKIPPED
 
     def get_status(self, relaxed=False):
         # the suite was skipped for some reason in errors
         if self.is_skipped():
-            return test.const.Status.SKIPPED
+            return devtools.ya.test.const.Status.SKIPPED
         return super(AbstractTestSuite, self).get_status(relaxed)
 
     def fix_roots(self, resolver):
@@ -833,27 +835,33 @@ class AbstractTestSuite(facility.Suite):
             name_original, val_original = entry.strip().split(":", 1)
             name_lower, val_lower = name_original.lower(), val_original.lower()
 
-            if name_lower not in test.const.TestRequirements.enumerate():
+            if name_lower not in devtools.ya.test.const.TestRequirements.enumerate():
                 yatest_logger.warning("Unknown requirement: %s in %s", name_lower, self.project_path)
                 continue
-            elif name_lower in (test.const.TestRequirements.SbVault, test.const.TestRequirements.YavSecret):
+            elif name_lower in (
+                devtools.ya.test.const.TestRequirements.SbVault,
+                devtools.ya.test.const.TestRequirements.YavSecret,
+            ):
                 req_value = val_original
-            elif name_lower in (test.const.TestRequirements.DiskUsage, test.const.TestRequirements.RamDisk):
+            elif name_lower in (
+                devtools.ya.test.const.TestRequirements.DiskUsage,
+                devtools.ya.test.const.TestRequirements.RamDisk,
+            ):
                 req_value = mr.resolve_value(val_lower)
             # XXX
-            elif name_lower == test.const.TestRequirements.Ram:
-                if val_lower == test.const.TestRequirementsConstants.All:
+            elif name_lower == devtools.ya.test.const.TestRequirements.Ram:
+                if val_lower == devtools.ya.test.const.TestRequirementsConstants.All:
                     req_value = val_lower
                 else:
                     req_value = mr.resolve_value(val_lower)
-            elif name_lower == test.const.TestRequirements.Network:
+            elif name_lower == devtools.ya.test.const.TestRequirements.Network:
                 req_value = val_lower
-            elif name_lower == test.const.TestRequirements.Dns:
+            elif name_lower == devtools.ya.test.const.TestRequirements.Dns:
                 req_value = val_lower
-            elif name_lower == test.const.TestRequirements.Kvm:
+            elif name_lower == devtools.ya.test.const.TestRequirements.Kvm:
                 req_value = True
             else:
-                if val_lower == test.const.TestRequirementsConstants.All:
+                if val_lower == devtools.ya.test.const.TestRequirementsConstants.All:
                     req_value = val_lower
                 else:
                     try:
@@ -917,7 +925,7 @@ class AbstractTestSuite(facility.Suite):
 
     def get_configuration_errors(self):
         errors = []
-        default_timeout = test.const.TestSize.get_default_timeout(self.test_size)
+        default_timeout = devtools.ya.test.const.TestSize.get_default_timeout(self.test_size)
         if self.timeout > default_timeout:
             errors.append(
                 "Test timeout {} exceeds maximum allowed timeout {} for size {}".format(
@@ -1002,7 +1010,7 @@ class PerformedTestSuite(AbstractTestSuite):
         self,
         name=None,
         project_path=None,
-        size=test.const.TestSize.Small,
+        size=devtools.ya.test.const.TestSize.Small,
         tags=None,
         target_platform_descriptor=None,
         suite_type=None,
@@ -1094,8 +1102,8 @@ class DiffTestSuite(AbstractTestSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir('$(BUILD_ROOT)', self.project_path, self.name)
-        output_dir = os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME)
-        cmd = test.util.tools.get_test_tool_cmd(
+        output_dir = os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_diff_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             "--suite-name",
@@ -1107,7 +1115,7 @@ class DiffTestSuite(AbstractTestSuite):
             "--work-dir",
             test_work_dir,
             "--trace-path",
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--source-root",
             opts.arc_root,
             "--revision",
@@ -1117,7 +1125,7 @@ class DiffTestSuite(AbstractTestSuite):
             cmd += ["--filter", flt]
         if opts.custom_fetcher:
             cmd += ["--custom-fetcher", opts.custom_fetcher]
-        cmd += test.util.shared.get_oauth_token_options(opts)
+        cmd += devtools.ya.test.util.shared.get_oauth_token_options(opts)
 
         return cmd
 
@@ -1172,11 +1180,11 @@ class SkippedTestSuite(object):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir('$(BUILD_ROOT)', self.project_path, self.name)
-        cmd = test.util.tools.get_test_tool_cmd(
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_skipped_test', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             "--trace-path",
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--reason",
             self.get_comment(),
         ]

@@ -1,7 +1,7 @@
 import json
 import logging
 
-from test import const
+from devtools.ya.test import const
 
 logger = logging.getLogger(__name__)
 

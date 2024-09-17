@@ -10,11 +10,11 @@ import logging
 import six
 import traceback
 
-import test.common as common
+import devtools.ya.test.common as common
 from . import compare as test_canon_compare
-import test.util.tools as test_tools
-import test.const as test_const
-import test.system.process
+import devtools.ya.test.util.tools as test_tools
+import devtools.ya.test.const as test_const
+import devtools.ya.test.system.process
 import exts.fs
 import exts.func
 import exts.uniq_id
@@ -24,7 +24,7 @@ from exts import tmp
 import yalibrary.upload.consts
 from yalibrary.display import strip_markup
 from yatest_lib import external
-from test import const
+from devtools.ya.test import const
 
 try:
     from yalibrary.vcs import detect
@@ -130,7 +130,9 @@ class HgRepo(VCS):
 
     def __init__(self, arcadia_root):
         self._active = (
-            test.system.process.execute([tools.tool('hg'), "branch"], cwd=arcadia_root, check_exit_code=False).exit_code
+            devtools.ya.test.system.process.execute(
+                [tools.tool('hg'), "branch"], cwd=arcadia_root, check_exit_code=False
+            ).exit_code
             == 0
         )
 
@@ -138,7 +140,7 @@ class HgRepo(VCS):
         return self._active
 
     def apply(self, test_canonical_dir):
-        st = test.system.process.execute(
+        st = devtools.ya.test.system.process.execute(
             [tools.tool('hg'), "status", test_canonical_dir, "-T", "json"], cwd=test_canonical_dir
         )
         status = json.loads(st.std_out)
@@ -151,9 +153,9 @@ class HgRepo(VCS):
             elif rec["status"] == "!":
                 to_be_removed.append(path)
         if to_be_added:
-            test.system.process.execute([tools.tool('hg'), "add"] + to_be_added)
+            devtools.ya.test.system.process.execute([tools.tool('hg'), "add"] + to_be_added)
         if to_be_removed:
-            test.system.process.execute([tools.tool('hg'), "rm"] + to_be_removed)
+            devtools.ya.test.system.process.execute([tools.tool('hg'), "rm"] + to_be_removed)
 
 
 class ArcRepo(VCS):
@@ -162,7 +164,7 @@ class ArcRepo(VCS):
     def __init__(self, arcadia_root):
         self.arcadia_root = arcadia_root
         self._active = (
-            test.system.process.execute(
+            devtools.ya.test.system.process.execute(
                 [tools.tool('arc'), "branch"], cwd=arcadia_root, check_exit_code=False
             ).exit_code
             == 0
@@ -172,7 +174,7 @@ class ArcRepo(VCS):
         return self._active
 
     def apply(self, test_canonical_dir):
-        test.system.process.execute([tools.tool('arc'), "add", "."], cwd=test_canonical_dir)
+        devtools.ya.test.system.process.execute([tools.tool('arc'), "add", "."], cwd=test_canonical_dir)
 
 
 class DummyRepo(VCS):

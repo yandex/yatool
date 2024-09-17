@@ -3,10 +3,10 @@ import logging
 import sys
 
 from devtools.ya.test import facility
-from test import const
-from test.test_types.common import PerformedTestSuite
-from test.util import shared
-from test.system import process
+from devtools.ya.test import const
+from devtools.ya.test.test_types.common import PerformedTestSuite
+from devtools.ya.test.util import shared
+from devtools.ya.test.system import process
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import argparse
 import exts.fs
 import yalibrary.vcs as vcs
 
-from test.util import shared, tools
+from devtools.ya.test.util import shared, tools
 from devtools.ya.yalibrary.vcs import arc
 
 try:

@@ -12,16 +12,16 @@ from itertools import chain
 import six
 
 import core.error
-import test.common as test_common
+import devtools.ya.test.common as test_common
 import yalibrary.term.console as term_console
 from build.reports import configure_error as ce
 from exts.fs import create_dirs, ensure_removed
 import build.owners as ow
-from test import const as constants
-from test.const import Status, TestSize
-from test.reports import trace_comment
-import test.reports.report_prototype as rp
-import test.util.tools as tut
+from devtools.ya.test import const as constants
+from devtools.ya.test.const import Status, TestSize
+from devtools.ya.test.reports import trace_comment
+import devtools.ya.test.reports.report_prototype as rp
+import devtools.ya.test.util.tools as tut
 from yalibrary import formatter
 from yalibrary import platform_matcher
 
@@ -650,7 +650,7 @@ class ReportGenerator(object):
             external.apply(resolve_external_path, entry["result"])
 
     def _add_test_result(self, suite, node_errors, links, report_prototype):
-        import test.const as test_const
+        import devtools.ya.test.const as test_const
 
         with self._processed_lock:
             if suite.uid in self._processed_uids:
@@ -683,7 +683,7 @@ class ReportGenerator(object):
             (self._build_root, results_root),
             ('$(BUILD_ROOT)', results_root),
         ]
-        import test.reports as test_reports
+        import devtools.ya.test.reports as test_reports
 
         resolver = test_reports.TextTransformer(replacements)
 

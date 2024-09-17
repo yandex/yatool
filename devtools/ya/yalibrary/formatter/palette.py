@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from test.const import Highlight, Colors
+from devtools.ya.test.const import Highlight, Colors
 
 
 DEFAULT_PALETTE = {

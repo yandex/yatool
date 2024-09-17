@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE test.test_types
     benchmark.py
     boost_test.py
     clang_tidy.py

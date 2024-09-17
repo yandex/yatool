@@ -8,10 +8,10 @@ import logging
 import argparse
 import subprocess
 
-from test.util import shared
-from test import const
+from devtools.ya.test.util import shared
+from devtools.ya.test import const
 from devtools.ya.test import facility
-from test.test_types.common import PerformedTestSuite
+from devtools.ya.test.test_types.common import PerformedTestSuite
 
 logger = logging.getLogger(__name__)
 

@@ -3,10 +3,10 @@ import os
 
 import jbuild.gen.consts
 
-import test.common as test_common
-import test.const as test_const
-import test.test_types.common as common_types
-import test.util.tools as test_tools
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const as test_const
+import devtools.ya.test.test_types.common as common_types
+import devtools.ya.test.util.tools as test_tools
 
 
 JEST_TEST_TYPE = "jest"

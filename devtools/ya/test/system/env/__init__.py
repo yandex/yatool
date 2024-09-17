@@ -3,7 +3,7 @@
 import os
 import six
 
-from test import const
+from devtools.ya.test import const
 import library.python.func
 import devtools.ya.core.sec as sec
 

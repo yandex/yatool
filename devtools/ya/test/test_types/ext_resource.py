@@ -1,4 +1,4 @@
-from test.test_types import py_test
+from devtools.ya.test.test_types import py_test
 
 
 VALIDATE_RESOURCE_TEST_TYPE = "validate_resource"

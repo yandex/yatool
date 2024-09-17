@@ -2,9 +2,9 @@ import sys
 import logging
 import argparse
 
-import test.common
-import test.test_types.common
-import test.const
+import devtools.ya.test.common
+import devtools.ya.test.test_types.common
+import devtools.ya.test.const
 
 
 def setup_logging(verbose):
@@ -20,8 +20,8 @@ def main():
     args = parser.parse_args()
     setup_logging(False)
 
-    suite = test.test_types.common.PerformedTestSuite(None, None, None)
-    suite.add_suite_error(args.reason, status=test.const.Status.SKIPPED)
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
+    suite.add_suite_error(args.reason, status=devtools.ya.test.const.Status.SKIPPED)
     suite.generate_trace_file(args.trace_path)
 
     return 0

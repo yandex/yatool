@@ -1,6 +1,6 @@
 import six
 
-from test import const
+from devtools.ya.test import const
 
 DEFAULT_CHUNK_NAME = 'sole chunk'
 

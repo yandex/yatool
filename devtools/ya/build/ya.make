@@ -47,6 +47,7 @@ PEERDIR(
     devtools/ya/test/explore
     devtools/ya/test/opts
     devtools/ya/test/test_node/coverage
+    devtools/ya/test/test_node/cmdline
     devtools/ya/yalibrary/debug_store
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/graph

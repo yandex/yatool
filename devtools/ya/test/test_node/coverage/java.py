@@ -4,10 +4,10 @@ import build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import exts.path2 as path2
-import test.common as test_common
-import test.const
-import test.test_types.junit as junit
-import test.util.tools as util_tools
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const
+import devtools.ya.test.test_types.junit as junit
+import devtools.ya.test.util.tools as util_tools
 
 COVERAGE_MERGED_TAR_FILENAME = "java.coverage-merged.tar"
 CREATE_COVERAGE_REPORT_SCRIPT = "$(SOURCE_ROOT)/build/scripts/create_jcoverage_report.py"
@@ -34,7 +34,7 @@ def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_
             output_path,
         ]
         node = {
-            "node-type": test.const.NodeType.TEST_AUX,
+            "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "cache": cache_nodes,
             "broadcast": False,
             "inputs": [script_path],
@@ -114,7 +114,7 @@ def inject_create_java_coverage_report_node(
     cmds.append({'cmd_args': create_report_cmd, 'cwd': '$(BUILD_ROOT)'})
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
         "inputs": [CREATE_COVERAGE_REPORT_SCRIPT],
         "uid": uid,
@@ -184,7 +184,7 @@ def inject_java_coverage_nodes(graph, suites, resolvers_map, opts, platform_desc
     coverage_prefix_filter = getattr(opts, 'coverage_prefix_filter', None)
     coverage_exclude_regexp = getattr(opts, 'coverage_exclude_regexp', None)
 
-    resolved_filename = test.const.JAVA_COVERAGE_RESOLVED_FILE_NAME
+    resolved_filename = devtools.ya.test.const.JAVA_COVERAGE_RESOLVED_FILE_NAME
     result = []
     for suite in [s for s in suites if s.get_type() == "java" and hasattr(s, 'classpath_package_files')]:
         uid = inject_java_coverage_resolve_node(
@@ -302,7 +302,7 @@ def inject_java_coverage_resolve_node(
         node_cmds = extra_cmds + node_cmds
 
     node = {
-        "node-type": test.const.NodeType.TEST_AUX,
+        "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
         "broadcast": False,
         "inputs": inputs,

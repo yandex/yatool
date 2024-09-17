@@ -3,7 +3,7 @@ import os
 
 import exts.func
 from .sandbox_resource import Reference
-from test.util import path as util_path
+from devtools.ya.test.util import path as util_path
 from yalibrary.large_files import ExternalFile
 from yalibrary.yandex.distbuild import distbs_consts
 

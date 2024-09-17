@@ -15,8 +15,8 @@ import exts.archive
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 from devtools.common import libmagic
 from devtools.ya.test.programs.test_tool.lib import runtime
-from test.util import shared
-from test import const
+from devtools.ya.test.util import shared
+from devtools.ya.test import const
 from yatest.common import process
 
 import six

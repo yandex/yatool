@@ -7,7 +7,6 @@ PEERDIR(
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE test.const
     __init__.py
 )
 

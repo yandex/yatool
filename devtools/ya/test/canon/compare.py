@@ -5,8 +5,8 @@ import traceback
 import difflib
 import typing  # noqa: F401
 
-from test import const
-from test.common import ytest_common_tools
+from devtools.ya.test import const
+from devtools.ya.test.common import ytest_common_tools
 from yatest_lib import external
 import diff_match_patch
 import exts.func
@@ -14,8 +14,8 @@ import exts.hashing
 import exts.os2
 import exts.tmp
 import exts.windows
-import test.common
-import test.system.process
+import devtools.ya.test.common
+import devtools.ya.test.system.process
 import yalibrary.display
 import yalibrary.formatter
 import yalibrary.tools
@@ -172,7 +172,7 @@ class ResultsComparer(object):
 
         if type(given) is not type(expected):
             if isinstance(given, six.string_types) and isinstance(expected, external.ExternalDataInfo):
-                given_checksum = exts.hashing.md5_value(test.common.to_utf8(given))
+                given_checksum = exts.hashing.md5_value(devtools.ya.test.common.to_utf8(given))
                 expected_file_path, expected_checksum = self._get_expected_external_path_and_checksum(expected)
                 if given_checksum != expected_checksum:
                     with open(expected_file_path) as expected_file:
@@ -292,7 +292,7 @@ class ResultsComparer(object):
         output_dir = os.path.join(self._output_dir, self.test_name)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        filename = test.common.get_unique_file_path(output_dir, filename)
+        filename = devtools.ya.test.common.get_unique_file_path(output_dir, filename)
         diff = six.ensure_str(diff)
         with open(filename, "w") as afile:
             afile.write(diff)
@@ -368,7 +368,7 @@ class ResultsComparer(object):
             fast_diff += ".exe"
         if (
             os.path.exists(fast_diff)
-            and test.system.process.execute([fast_diff, "--help"], check_exit_code=False).exit_code == 1
+            and devtools.ya.test.system.process.execute([fast_diff, "--help"], check_exit_code=False).exit_code == 1
         ):
             return [fast_diff]
         return None
@@ -389,7 +389,7 @@ class ResultsComparer(object):
 
     def _get_file_diff_via_diff(self, diff_tool_path, given, expected, diff_diff_tool_timeout):
         try:
-            res = test.system.process.execute(
+            res = devtools.ya.test.system.process.execute(
                 diff_tool_path + [expected, given],
                 check_exit_code=False,
                 timeout=diff_diff_tool_timeout or self._diff_timeout,

@@ -3,12 +3,12 @@ import os
 import re
 import sys
 
-import test.const
-from test.test_types.common import PerformedTestSuite
+import devtools.ya.test.const
+from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test import facility
-from test import const
-from test.util import shared
-import test.filter as test_filter
+from devtools.ya.test import const
+from devtools.ya.test.util import shared
+import devtools.ya.test.filter as test_filter
 
 
 def parse_args():
@@ -84,9 +84,9 @@ def run_ktlint(suite, tests_to_run, args):
                 errors[error_name] = []
             errors[error_name].append(line)
     for test_name, full_test_name in tests_to_run.items():
-        status = test.const.Status.FAIL if test_name in errors else test.const.Status.GOOD
+        status = devtools.ya.test.const.Status.FAIL if test_name in errors else devtools.ya.test.const.Status.GOOD
         message = ""
-        if status == test.const.Status.FAIL:
+        if status == devtools.ya.test.const.Status.FAIL:
             message = '\n' + '\n'.join([colorize(line.strip()) for line in errors[test_name]])
         suite.chunk.tests.append(facility.TestCase(full_test_name, status, message, path=args.project_path))
 

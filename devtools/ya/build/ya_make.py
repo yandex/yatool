@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import typing as tp  # noqa
-from test import const
+from devtools.ya.test import const
 
 import six
 import six.moves.cPickle as cPickle
@@ -42,8 +42,8 @@ import exts.timer
 import exts.tmp
 import exts.windows
 import exts.yjson as json
-import test.common as test_common
-import test.util.tools as test_tools
+import devtools.ya.test.common as test_common
+import devtools.ya.test.util.tools as test_tools
 from build import build_facade, frepkage, test_results_console_printer
 from build.evlog.progress import (
     get_print_status_func,
@@ -998,7 +998,7 @@ class Context(object):
                 # Don't waste time preparing frepkage if -j0 is requested
                 frepkage_file = 'frepkage_was_not_generated_due_-j0'
 
-            from test import test_node
+            from devtools.ya.test import test_node
 
             # All tests have same global resources
             test_global_resources = self.tests[0].global_resources

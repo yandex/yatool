@@ -4,11 +4,11 @@ import os
 
 import exts.windows
 
-import test.const
-from test.util import tools, shared
-from test import common as test_common
-from test.system import process
-from test.test_types import common as common_types
+import devtools.ya.test.const
+from devtools.ya.test.util import tools, shared
+from devtools.ya.test import common as test_common
+from devtools.ya.test.system import process
+from devtools.ya.test.test_types import common as common_types
 
 
 FUZZ_TEST_TYPE = "fuzz"
@@ -44,13 +44,13 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
             '--binary',
             self.binary_path('$(BUILD_ROOT)'),
             '--tracefile',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--modulo',
             str(self._modulo),
             '--modulo-index',
             str(self._modulo_index),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--project-path',
             self.project_path,
             '--source-root',
@@ -86,8 +86,11 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
             cmd += ["--fuzz-runs", str(opts.fuzz_runs)]
 
         if opts and getattr(opts, "fuzzing", False):
-            cmd += ["--output-corpus-dir", os.path.join(test_work_dir, test.const.GENERATED_CORPUS_DIR_NAME)]
-            cmd += ["--workers", str(self.requirements.get(test.const.TestRequirements.Cpu, 0))]
+            cmd += [
+                "--output-corpus-dir",
+                os.path.join(test_work_dir, devtools.ya.test.const.GENERATED_CORPUS_DIR_NAME),
+            ]
+            cmd += ["--workers", str(self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 0))]
             for filename in self.get_fuzz_dicts():
                 cmd += ["--fuzz-dict-path", os.path.join('$(SOURCE_ROOT)', filename)]
 
@@ -104,7 +107,7 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     @property
     def name(self):

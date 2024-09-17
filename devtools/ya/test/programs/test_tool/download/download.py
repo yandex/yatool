@@ -11,7 +11,7 @@ import sys
 
 import app_config
 import core.error
-import test.util.shared
+import devtools.ya.test.util.shared
 from devtools.ya.test.dependency import sandbox_storage
 
 logger = logging.getLogger(__name__)
@@ -101,12 +101,12 @@ def setup_timeout(timeout):
 
 def main():
     options, _ = get_options()
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
 
     setup_timeout(options.timeout)
     build_root = options.build_root
     resource_id = options.resource_id
-    token = test.util.shared.get_oauth_token(options)
+    token = devtools.ya.test.util.shared.get_oauth_token(options)
     try:
         # XXX static resource info is provided from a resource mapping in case of OSS build.
         if options.resource_file:

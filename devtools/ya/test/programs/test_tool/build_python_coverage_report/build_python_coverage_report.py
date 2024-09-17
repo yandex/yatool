@@ -9,7 +9,7 @@ import coverage
 
 import exts.archive
 import exts.tmp
-from test.util import shared
+from devtools.ya.test.util import shared
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 
 

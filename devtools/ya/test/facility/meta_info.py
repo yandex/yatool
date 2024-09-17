@@ -1,5 +1,5 @@
 import jbuild.gen.consts
-import test.const
+import devtools.ya.test.const
 
 
 class MetaInfo(object):
@@ -145,7 +145,7 @@ class MetaInfo(object):
 
     @property
     def module_lang(self):
-        return self._module_lang or test.const.ModuleLang.UNKNOWN
+        return self._module_lang or devtools.ya.test.const.ModuleLang.UNKNOWN
 
     @property
     def no_check(self):

@@ -4,17 +4,17 @@ import logging
 import os
 import sys
 
-import test.common
-import test.filter
-import test.test_types.common
+import devtools.ya.test.common
+import devtools.ya.test.filter
+import devtools.ya.test.test_types.common
 from devtools.ya.test import facility
-from test.system import process
+from devtools.ya.test.system import process
 
 
 STATUSES = {
-    "GOOD": test.common.Status.GOOD,
-    "FAIL": test.common.Status.FAIL,
-    "SKIPPED": test.common.Status.SKIPPED,
+    "GOOD": devtools.ya.test.common.Status.GOOD,
+    "FAIL": devtools.ya.test.common.Status.FAIL,
+    "SKIPPED": devtools.ya.test.common.Status.SKIPPED,
 }
 
 
@@ -63,12 +63,12 @@ def main():
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="%(asctime)s: %(levelname)s: %(message)s")
 
     output_path = args.out_path
-    suite = test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
     suite.register_chunk()
 
     logger.debug("Test filters: %s", args.tests_filters)
     if args.tests_filters:
-        filter_func = test.filter.make_testname_filter(args.tests_filters)
+        filter_func = devtools.ya.test.filter.make_testname_filter(args.tests_filters)
     else:
         filter_func = _dummy_filter
 

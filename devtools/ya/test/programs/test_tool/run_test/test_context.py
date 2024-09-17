@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from test import const
+from devtools.ya.test import const
 
 import six
 

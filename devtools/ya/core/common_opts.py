@@ -43,7 +43,7 @@ from core.yarg import ShowHelpOptions  # noqa: F401
 import exts.func
 import exts.path2
 
-import test.const
+import devtools.ya.test.const
 import core.config as cc
 
 import yalibrary.upload.consts
@@ -876,7 +876,9 @@ class CrossCompilationOptions(Options):
                 ['--target-platform-regular-tests'],
                 help='Run only regular test types for the last target platform',
                 hook=CrossCompilationOptions.PlatformsSetConstExtraExtendParamHook(
-                    'target_platform_regular_tests', 'test_class_filters', [test.const.SuiteClassType.REGULAR]
+                    'target_platform_regular_tests',
+                    'test_class_filters',
+                    [devtools.ya.test.const.SuiteClassType.REGULAR],
                 ),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.EXPERT,

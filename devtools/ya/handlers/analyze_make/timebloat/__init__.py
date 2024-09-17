@@ -8,7 +8,7 @@ import collections
 import typing as tp
 
 import devtools.ya.tools.analyze_make.common as common
-import test.filter as test_filter
+import devtools.ya.test.filter as test_filter
 import tqdm
 
 import library.python.resource as resource

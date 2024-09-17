@@ -4,7 +4,7 @@ import os
 import logging
 
 from devtools.ya.test import dartfile
-from test.test_types import (
+from devtools.ya.test.test_types import (
     benchmark,
     boost_test,
     clang_tidy,
@@ -22,7 +22,7 @@ from test.test_types import (
     py_test,
     ts_test,
 )
-from test.util import tools
+from devtools.ya.test.util import tools
 
 logger = logging.getLogger(__name__)
 

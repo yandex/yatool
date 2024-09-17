@@ -35,11 +35,11 @@ from devtools.ya.test.programs.test_tool.lib import tmpfs
 from devtools.ya.test.programs.test_tool.lib import unshare
 from devtools.ya.test.programs.test_tool.lib.report import chunk_result
 from library.python.testing import system_info
-from test import common as test_common
-from test import const
-from test.system import process, env as system_env
-from test.util import shared
-from test.util import tools
+from devtools.ya.test import common as test_common
+from devtools.ya.test import const
+from devtools.ya.test.system import process, env as system_env
+from devtools.ya.test.util import shared
+from devtools.ya.test.util import tools
 from yalibrary import term, formatter
 from yalibrary.display import strip_markup
 from yatest.common import cores
@@ -50,11 +50,11 @@ from devtools.ya.test.dependency import sandbox_storage
 import exts.archive
 import exts.fs
 import exts.uniq_id
-import test.common
-import test.reports
-import test.result
-import test.test_types.common
-import test.util.shared
+import devtools.ya.test.common
+import devtools.ya.test.reports
+import devtools.ya.test.result
+import devtools.ya.test.test_types.common
+import devtools.ya.test.util.shared
 
 logger = logging.getLogger(__name__)
 
@@ -629,14 +629,15 @@ class TraceFileWatcher(object):
         if full:
             try:
                 if self._test_stderr:
-                    reporter = test.reports.StdErrReporter()
+                    reporter = devtools.ya.test.reports.StdErrReporter()
                 else:
                     reporter = None
 
                 result = tracefile.TestTraceParser.parse_from_string(full, reporter=reporter, relaxed=True)
                 for testcase in result.tests:
                     if (
-                        testcase.status not in [test.common.Status.NOT_LAUNCHED, test.common.Status.DESELECTED]
+                        testcase.status
+                        not in [devtools.ya.test.common.Status.NOT_LAUNCHED, devtools.ya.test.common.Status.DESELECTED]
                         and (testcase, testcase.status) not in self._displayed_tests
                     ):
                         msg = self._get_testcase_msg(testcase)
@@ -657,15 +658,15 @@ class TraceFileWatcher(object):
                 logger.warning("Error while processing chunk of the trace file: %s", traceback.format_exc())
 
     def _get_testcase_msg(self, testcase):
-        status_as_str = test.const.Status.TO_STR[testcase.status]
-        status_color = test.const.StatusColorMap[status_as_str]
+        status_as_str = devtools.ya.test.const.Status.TO_STR[testcase.status]
+        status_color = devtools.ya.test.const.StatusColorMap[status_as_str]
 
         # We set CRASHED status and the comment by default in case segfault occurred
         # so if wee see it like that, then we're sure test is being running
         # that's why we display it without status
         if (
-            testcase.status == test.const.Status.CRASHED
-            and testcase.comment == test.const.DEFAULT_CRASHED_STATUS_COMMENT
+            testcase.status == devtools.ya.test.const.Status.CRASHED
+            and testcase.comment == devtools.ya.test.const.DEFAULT_CRASHED_STATUS_COMMENT
         ):
             return ">> " + testcase.name
         return ">> " + testcase.name + " [[[" + status_color + "]]" + status_as_str.upper() + "[[rst]]]"
@@ -782,7 +783,7 @@ def replace_roots(suite, new_source_root, command_cwd, build_root):
     except ValueError as e:
         logger.debug("Could not add command_cwd_source_root_rel_path replacement: %s", e)
 
-    resolver = test.reports.TextTransformer(real_replacements)
+    resolver = devtools.ya.test.reports.TextTransformer(real_replacements)
     logger.debug("Fixing roots using resolver %s", resolver)
     suite.fix_roots(resolver)
 
@@ -790,7 +791,9 @@ def replace_roots(suite, new_source_root, command_cwd, build_root):
 def fix_python_path(env, test_related_paths, source_root, new_source_root, build_root, with_wine=False):
     logger.debug("Changing python paths: %s", tools.get_python_paths(env))
 
-    python_paths = test.util.shared.change_cmd_root(test_related_paths, source_root, new_source_root, build_root)
+    python_paths = devtools.ya.test.util.shared.change_cmd_root(
+        test_related_paths, source_root, new_source_root, build_root
+    )
     python_dirs = set()
     for p in python_paths:
         if os.path.isfile(p):
@@ -806,7 +809,7 @@ def fix_python_path(env, test_related_paths, source_root, new_source_root, build
 
 
 def generate_suite(options, work_dir):
-    suite = test.test_types.common.PerformedTestSuite(
+    suite = devtools.ya.test.test_types.common.PerformedTestSuite(
         options.test_suite_name,
         options.project_path,
         size=options.test_size,
@@ -1220,7 +1223,7 @@ def main():
         except ImportError:
             logger.debug("Output tracing disabled on this platform")
 
-    test.util.shared.setup_logging(options.log_level, options.log_path)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
     logger.debug('Host %s, cwd %s, subreaper_set_error: %s', socket.gethostname(), cwd, subreaper_set_error)
     logger.debug(
         'Uid: %s; Retry: %s; chunk %s (of %s); split file: %s',
@@ -1250,7 +1253,7 @@ def main():
         signal.alarm(timeout)
 
     try:
-        logger.debug('Available memory: %sM', test.util.shared.get_available_memory_in_mb())
+        logger.debug('Available memory: %sM', devtools.ya.test.util.shared.get_available_memory_in_mb())
     except Exception as e:
         logger.debug('Available memory unknown: %s', e)
 
@@ -1403,7 +1406,7 @@ def main():
         # change roots in the command arguments
         logger.debug("Changing roots in the test command %s: %s -> %s", cmd, source_root, new_source_root)
         for old_root, new_root in [(source_root, new_source_root)]:
-            cmd = test.util.shared.change_cmd_root(
+            cmd = devtools.ya.test.util.shared.change_cmd_root(
                 cmd, old_root, new_root, build_root, skip_list=[sys.argv[0]], skip_args=["--test-param"]
             )
         logger.debug("Changed command: %s", cmd)
@@ -1417,7 +1420,7 @@ def main():
 
             logger.debug("Changing test cwd: %s", test_run_cwd)
             for old_root, new_root in [(source_root, new_source_root)]:
-                test_run_cwd = test.util.shared.change_root(test_run_cwd, old_root, new_root, build_root)
+                test_run_cwd = devtools.ya.test.util.shared.change_root(test_run_cwd, old_root, new_root, build_root)
             logger.debug("Changed test cwd: %s, %s", test_run_cwd, os.listdir(test_run_cwd))
 
         # change roots in the env's PYTHONPATH
@@ -1900,7 +1903,7 @@ def main():
                 )
             dump_wrapper_stderr = True
 
-        test.util.shared.adjust_test_status(
+        devtools.ya.test.util.shared.adjust_test_status(
             suite,
             exit_status,
             testing_finished,
@@ -1993,7 +1996,7 @@ def main():
 
         if suite.chunk.tests:
             if options.supports_canonization and any(t.result is not None for t in suite.chunk.tests):
-                import test.canon.data as canon_data
+                import devtools.ya.test.canon.data as canon_data
 
                 stages.stage("canonical_data_verification")
                 canonical_data = canon_data.CanonicalData(
@@ -2087,7 +2090,11 @@ def get_exit_code(suite):
         return (
             0
             if suite.get_status()
-            in {test.common.Status.GOOD, test.common.Status.SKIPPED, test.common.Status.DESELECTED}
+            in {
+                devtools.ya.test.common.Status.GOOD,
+                devtools.ya.test.common.Status.SKIPPED,
+                devtools.ya.test.common.Status.DESELECTED,
+            }
             else TESTS_FAILED_EXIT_CODE
         )
     return 0
@@ -2144,7 +2151,7 @@ def stop_monitors(mem_monitor, ram_limit_gb, tmpfs_monitor, suite, autocheck_mod
         if proc_tree_str:
             parts.append(proc_tree_str)
         if autocheck_mode:
-            suite.add_chunk_error('\n'.join(parts), test.common.Status.FAIL)
+            suite.add_chunk_error('\n'.join(parts), devtools.ya.test.common.Status.FAIL)
         else:
             suite.add_chunk_info('\n'.join(parts))
 
@@ -2241,7 +2248,7 @@ def finalize(options, suite, work_dir, test_rc, start_time, end_time, coverage, 
     archive_postprocess = (
         None
         if options.keep_temps or options.should_tar_dir_outputs
-        else test.util.shared.archive_postprocess_unlink_files
+        else devtools.ya.test.util.shared.archive_postprocess_unlink_files
     )
 
     for cov_type, data in coverage.items():

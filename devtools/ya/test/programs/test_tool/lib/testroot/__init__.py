@@ -5,8 +5,8 @@ import stat
 
 from devtools.ya.test.dependency import testdeps, sandbox_resource
 
-from test.util import tools
-from test import const as constants
+from devtools.ya.test.util import tools
+from devtools.ya.test import const as constants
 import exts.fs
 import exts.windows
 

@@ -1,4 +1,4 @@
-from iter_cov_json import _iter_cov_json
+from devtools.ya.test.programs.test_tool.lib.coverage.iter_cov_json.lib import _iter_cov_json
 
 
 # XXX quickfix to prevent memory exhaustion

@@ -2,10 +2,10 @@
 
 import os
 
-from test.util import tools, shared
-from test import const, common as test_common
-from test.system import process
-from test.test_types import common as common_types
+from devtools.ya.test.util import tools, shared
+from devtools.ya.test import const, common as test_common
+from devtools.ya.test.system import process
+from devtools.ya.test.test_types import common as common_types
 
 
 COVERAGE_EXTRACTOR_TEST_TYPE = "coverage_extractor"

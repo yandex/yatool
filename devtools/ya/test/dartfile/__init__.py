@@ -5,7 +5,7 @@ import shlex
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from test.test_types.common import AbstractTestSuite  # noqa
+    from devtools.ya.test.test_types.common import AbstractTestSuite  # noqa
 
 MERGE_FIELDS = ["FILES", "TEST-FILES"]
 HASH_FIELDS = ["SCRIPT-REL-PATH", "SOURCE-FOLDER-PATH", "TEST-NAME"]

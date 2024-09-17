@@ -5,9 +5,9 @@ import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
 import devtools.ya.test.dependency.sandbox_storage as sandbox_storage
 
 import app_config
-import test.system.env as sysenv
-import test.util.shared as util_shared
-import test.util.tools as util_tools
+import devtools.ya.test.system.env as sysenv
+import devtools.ya.test.util.shared as util_shared
+import devtools.ya.test.util.tools as util_tools
 
 
 def inject_download_sandbox_resource_node(graph, resource, opts, global_resources):

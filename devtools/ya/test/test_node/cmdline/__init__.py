@@ -1,6 +1,6 @@
 import devtools.ya.test.dependency.testdeps as testdeps
 
-import test.const
+import devtools.ya.test.const
 
 import typing as tp
 
@@ -38,7 +38,7 @@ def get_environment_relative_options(suite, opts):
         for path in atd_paths:
             options += ["--test-data-path", path]
 
-    if not suite.supports_clean_environment or test.const.YaTestTags.Dirty in suite.tags:
+    if not suite.supports_clean_environment or devtools.ya.test.const.YaTestTags.Dirty in suite.tags:
         options += ["--no-clean-environment"]
 
     if suite.target_platform_descriptor:

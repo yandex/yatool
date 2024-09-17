@@ -2,11 +2,11 @@ import os
 import six
 
 import exts.windows
-import test.common as test_common
-import test.const
-from test.system import process
-from test.test_types import common as common_types
-from test.util import tools, shared
+import devtools.ya.test.common as test_common
+import devtools.ya.test.const
+from devtools.ya.test.system import process
+from devtools.ya.test.test_types import common as common_types
+from devtools.ya.test.util import tools, shared
 
 
 UNITTEST_TYPE = "unittest"
@@ -46,9 +46,9 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             '--binary',
             self.binary_path('$(BUILD_ROOT)'),
             '--trace-path',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             '--output-dir',
-            os.path.join(test_work_dir, test.const.TESTING_OUT_DIR_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--modulo',
             str(self._modulo),
             '--modulo-index',
@@ -66,7 +66,7 @@ class UnitTestSuite(common_types.AbstractTestSuite):
         if not exts.windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
-        if test.const.YaTestTags.SequentialRun in self.tags:
+        if devtools.ya.test.const.YaTestTags.SequentialRun in self.tags:
             cmd.append("--sequential-launch")
 
         if getattr(opts, 'gdb', False) and not for_dist_build:
@@ -115,7 +115,7 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
     @property
     def class_type(self):
-        return test.const.SuiteClassType.REGULAR
+        return devtools.ya.test.const.SuiteClassType.REGULAR
 
     # TODO remove property when dartinfo's TEST-NAME will be 'unittest' for library_ut
     @property
@@ -143,7 +143,7 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             '--project-path',
             self.project_path,
             '--trace-path',
-            os.path.join(test_work_dir, test.const.TRACE_FILE_NAME),
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
         ]
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:

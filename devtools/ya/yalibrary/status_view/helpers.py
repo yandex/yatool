@@ -2,7 +2,7 @@ import os
 import logging
 import string
 
-import test.const
+import devtools.ya.test.const
 
 import yalibrary.roman as roman
 import library.python.func as func
@@ -146,7 +146,7 @@ def format_paths(inputs, outputs, kv):
         if p in ('AR', 'LD'):
             return outputs
 
-        if test.const.TestSize.is_test_shorthand(p):
+        if devtools.ya.test.const.TestSize.is_test_shorthand(p):
             if kv.get("path"):
                 return [kv["path"]]
 

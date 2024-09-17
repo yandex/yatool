@@ -8,9 +8,9 @@ import json
 import optparse
 import collections
 
-import test.util.shared
-import test.const
-from test.common import ytest_common_tools as yct
+import devtools.ya.test.util.shared
+import devtools.ya.test.const
+from devtools.ya.test.common import ytest_common_tools as yct
 
 
 def get_options():
@@ -72,10 +72,10 @@ def sort_suites(projects):
 
 def get_projects(report_skipped_suites):
     projects = []
-    for project_path in test.util.shared.get_projects_from_file("projects.txt"):
-        list_json_path = os.path.join(project_path, test.const.LIST_NODE_RESULT_FILE)
+    for project_path in devtools.ya.test.util.shared.get_projects_from_file("projects.txt"):
+        list_json_path = os.path.join(project_path, devtools.ya.test.const.LIST_NODE_RESULT_FILE)
         with open(list_json_path) as tests_list_file:
-            loaded = test.common.strings_to_utf8(json.load(tests_list_file))
+            loaded = devtools.ya.test.common.strings_to_utf8(json.load(tests_list_file))
         projects.append(loaded)
 
     projects = merge_suites(projects)
@@ -97,10 +97,10 @@ def main():
     display = app_ctx.display
 
     options, _ = get_options()
-    test.util.shared.setup_logging(options.log_level, test.const.LIST_RESULT_NODE_LOG_FILE)
+    devtools.ya.test.util.shared.setup_logging(options.log_level, devtools.ya.test.const.LIST_RESULT_NODE_LOG_FILE)
 
     projects = get_projects(options.report_skipped_suites)
-    filter_message = test.util.shared.build_filter_message(
+    filter_message = devtools.ya.test.util.shared.build_filter_message(
         options.filter_description, options.test_name_filters, get_number_of_empty_suites(projects)
     )
     if filter_message:
@@ -120,7 +120,7 @@ def main():
         failed |= bool(list_error)
 
         message = '[[imp]]{}[[rst]] <[[unimp]]{}[[rst]]>'.format(project_path, test_type)
-        if test_size and test_size != test.const.TestSize.Small:
+        if test_size and test_size != devtools.ya.test.const.TestSize.Small:
             message += " [size:[[imp]]{}[[rst]]]".format(test_size)
         if suite_tags:
             message += format_tags(suite_tags)
