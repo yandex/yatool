@@ -962,7 +962,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             static constexpr TStringBuf actionPrefix = "$L/ACTION/"sv;
             ui32 actionId = Graph->Names().FileConf.Add(actionPrefix + mainOutName);
 
-            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, false);
+            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, !finalTargetCmd);
             TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
 
             return std::make_pair(std::ref(actionNode), std::ref(mainOutNode));
