@@ -1,7 +1,10 @@
 #pragma once
 
+#include "parser_id.h"
+
 #include <devtools/ymake/include_parsers/base.h>
 #include <devtools/ymake/include_parsers/cython_parser.h>
+#include <devtools/ymake/include_parsers/includes_parser_type.h>
 #include <devtools/ymake/include_parsers/ros_parser.h>
 #include <devtools/ymake/symbols/name_store.h>
 
@@ -58,19 +61,19 @@ namespace NParsersCache {
         return result;
     }
 
-    ui64 GetResultId(ui32 parserId, ui32 fileId);
+    ui64 GetResultId(TParserId parserId, ui32 fileId);
     ui32 GetFileIdFromResultId(ui64 resultId);
-    ui32 GetParserIdFromResultId(ui64 resultId);
+    TParserId GetParserIdFromResultId(ui64 resultId);
 }
 
 class TParsersCache {
 private:
     TNameStore Names;
     THashMap<ui64, NParsersCache::TParseResult> ResultsMap;
-    std::function<ui32(EIncludesParserType)> ParserTypeToParserIdMapper;
+    std::function<TParserId(EIncludesParserType)> ParserTypeToParserIdMapper;
 
 public:
-    static constexpr const ui32 BAD_PARSER_ID = Max<ui32>();
+    static constexpr const TParserId BAD_PARSER_ID = TParserId{Max<ui32>()};
 
 public:
     template <typename TParsedInclude>
@@ -126,7 +129,7 @@ public:
 
     EIncludesParserType GetParserType(ui32 fileId) const;
 
-    void SetParserTypeToParserIdMapper(std::function<ui32(EIncludesParserType)>&& mapper) {
+    void SetParserTypeToParserIdMapper(std::function<TParserId(EIncludesParserType)>&& mapper) {
         ParserTypeToParserIdMapper = std::move(mapper);
     }
 

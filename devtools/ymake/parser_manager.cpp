@@ -399,7 +399,7 @@ void TIncParserManager::InitManager(const TParsersList& parsersList) {
     ParsersByType.resize(static_cast<ui32>(EIncludesParserType::PARSERS_COUNT), nullptr);
     Cache.SetParserTypeToParserIdMapper([this](EIncludesParserType type) {
         if (auto parser = GetParserByType(type)) {
-            return parser->GetParserId().GetId();
+            return parser->GetParserId();
         }
         return TParsersCache::BAD_PARSER_ID;
     });

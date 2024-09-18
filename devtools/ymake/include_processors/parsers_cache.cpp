@@ -96,16 +96,16 @@ namespace NParsersCache {
         return saved;
     }
 
-    ui64 GetResultId(ui32 parserId, ui32 fileId) {
-        return static_cast<ui64>(parserId) << 32 | fileId;
+    ui64 GetResultId(TParserId parserId, ui32 fileId) {
+        return static_cast<ui64>(parserId.GetId()) << 32 | fileId;
     }
 
     ui32 GetFileIdFromResultId(ui64 resultId) {
         return static_cast<ui32>(resultId);
     }
 
-    ui32 GetParserIdFromResultId(ui64 resultId) {
-        return static_cast<ui32>(resultId >> 32);
+    TParserId GetParserIdFromResultId(ui64 resultId) {
+        return static_cast<TParserId>(resultId >> 32);
     }
 }
 
@@ -113,7 +113,7 @@ EIncludesParserType TParsersCache::GetParserType(ui32 fileId) const {
     ui32 parserTypesCount = static_cast<ui32>(EIncludesParserType::PARSERS_COUNT);
     for (ui32 i = 0; i < parserTypesCount; i++) {
         EIncludesParserType parserType = static_cast<EIncludesParserType>(i);
-        ui32 parserId = ParserTypeToParserIdMapper(parserType);
+        TParserId parserId = ParserTypeToParserIdMapper(parserType);
         if (parserId != BAD_PARSER_ID && ResultsMap.contains(NParsersCache::GetResultId(parserId, fileId))) {
             return parserType;
         }

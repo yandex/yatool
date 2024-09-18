@@ -1,7 +1,6 @@
 #pragma once
 
 #include <util/generic/string.h>
-#include <util/generic/vector.h>
 
 struct TInclDep {
     TString Path;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "include.h"
+#include "parser_id.h"
 #include "parsers_cache.h"
 
 #include <devtools/ymake/symbols/symbols.h>
@@ -10,8 +11,6 @@
 #include <devtools/ymake/induced_props.h>
 
 #include <devtools/ymake/include_parsers/incldep.h>
-
-#include <util/generic/bitops.h>
 
 class TModuleWrapper;
 class TModuleResolver;
@@ -85,30 +84,6 @@ public:
                          const TVector<TString>& includes) const;
 };
 
-class TParserId {
-public:
-    using TIdType = ui32;
-
-    explicit TParserId(TIdType id = 0) : Id(id) {
-        static_assert(0 < CodeBitsSize, "violated: CodeBitsSize > 0");
-        static_assert(CodeBitsSize < sizeof(TIdType) * 8, "violated: CodeBitsSize < sizeof(TIdType) * 8");
-    }
-
-    TIdType GetId() const { return Id; }
-    void SetType(EIncludesParserType type) { SetBits<0, CodeBitsSize, TIdType>(Id, static_cast<ui32>(type)); }
-    EIncludesParserType GetType() const {
-        ui32 id = SelectBits<0, CodeBitsSize, TIdType>(Id);
-        return static_cast<EIncludesParserType>(id);
-    }
-    void SetVersion(ui32 version) { SetBits<CodeBitsSize, VersionBitsSize, TIdType>(Id, version); }
-    ui32 GetVersion() const { return SelectBits<CodeBitsSize, VersionBitsSize, TIdType>(Id); }
-private:
-    static constexpr size_t CodeBitsSize = 16;
-    static constexpr size_t VersionBitsSize = sizeof(TIdType) * 8 - CodeBitsSize;
-
-    ui32 Id;
-};
-
 class TParserBase {
 public:
     virtual bool ProcessOutputIncludes(TAddDepAdaptor& node,
@@ -164,7 +139,7 @@ public:
 
     bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) override {
         TVector<TInclude> includes;
-        auto cacheResultId = NParsersCache::GetResultId(GetParserId().GetId(), incFile.GetTargetId());
+        auto cacheResultId = NParsersCache::GetResultId(GetParserId(), incFile.GetTargetId());
         auto useCachedResult = ParsersCache && !incFile.CheckForChanges(ECheckForChangesMethod::PRECISE);
         if (useCachedResult) {
             useCachedResult = ParsersCache->Get(cacheResultId, includes);
@@ -182,7 +157,7 @@ public:
 
     bool HasIncludeChanges(TFileContentHolder& incFile) const override {
         TVector<TInclude> cachedIncludes;
-        auto cacheResultId = NParsersCache::GetResultId(GetParserId().GetId(), incFile.GetTargetId());
+        auto cacheResultId = NParsersCache::GetResultId(GetParserId(), incFile.GetTargetId());
         if (!ParsersCache) {
             return true;
         }

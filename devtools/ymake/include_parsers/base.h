@@ -1,34 +1,11 @@
 #pragma once
 
-#include <devtools/ymake/common/content_holder.h>
+#include "includes_parser_type.h"
 
+#include <util/generic/strbuf.h>
 #include <util/generic/string.h>
-#include <util/generic/ylimits.h>
 
-enum class EIncludesParserType : ui32 {
-    EmptyParser = 0,
-    CppOnlyParser,
-    AsmParser,
-    ProtoParser,
-    LexParser,
-    RagelParser,
-    MapkitIdlParser,
-    FortranParser,
-    XsParser,
-    XsynParser,
-    SwigParser,
-    CythonParser,
-    FlatcParser,
-    GoParser,
-    ScParser,
-    YDLParser,
-    NlgParser,
-    CfgprotoParser,
-    TsParser,
-    RosParser,
-    PARSERS_COUNT,
-    BAD_PARSER = Max<ui32>()
-};
+class IContentHolder;
 
 class TIncludesParserBase {
 protected:
