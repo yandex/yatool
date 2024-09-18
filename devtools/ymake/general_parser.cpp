@@ -37,7 +37,7 @@ namespace {
                 auto& globNode = entryStats.GetAddCtx(node.Module, node.YMake);
                 globNode.NodeType = EMNT_BuildCommand;
                 globNode.ElemId = globInfo.GlobId;
-                entryStats.OnceEntered = false;
+                entryStats.SetOnceEntered(false);
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
             }

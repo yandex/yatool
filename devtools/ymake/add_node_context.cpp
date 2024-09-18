@@ -214,7 +214,7 @@ TCreateParsedInclsResult TNodeAddCtx::CreateParsedIncls(
         pi->second.SetReassemble(true);
         YDIAG(IPRP) << "TNodeAddCtx::CreateParsedIncls reassemble for " << cmdElemId << Endl;
     }
-    pi->second.OnceEntered = false;
+    pi->second.SetOnceEntered(false);
     res.Node->ElemId = propElemId;
     res.Node->NodeType = propType;
     return res;
@@ -243,7 +243,7 @@ void TNodeAddCtx::AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propNam
     auto propNodeIt = UpdIter.Nodes.Insert(propNodeCacheId, &YMake, Module);
     auto& propNodeDelayedDeps = UpdIter.DelayedSearchDirDeps.GetDepsByType(EDT_Search)[propNodeCacheId];
 
-    propNodeIt->second.OnceEntered = false;
+    propNodeIt->second.SetOnceEntered(false);
     propNodeIt->second.Props.ClearValues();
     propNodeIt->second.SetReassemble(true);
     propNodeDelayedDeps.clear();

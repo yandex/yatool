@@ -371,7 +371,7 @@ void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId) {
     entry->second.AddCtx->ElemId = elemId;
     if (/*true*/ entry->second.AddCtx->Module == module) { // TODO: fix this condition. Id must be module id, not Makefile id.
         entry->second.SetReassemble(true);
-        entry->second.OnceEntered = false;
+        entry->second.SetOnceEntered(false);
     }
 }
 
@@ -1147,7 +1147,7 @@ void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
         auto& globNode = entryStats.GetAddCtx(Module, UpdIter->YMake);
         globNode.NodeType = EMNT_BuildCommand;
         globNode.ElemId = globInfo.GlobId;
-        entryStats.OnceEntered = false;
+        entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
     };

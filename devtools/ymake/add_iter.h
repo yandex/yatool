@@ -408,6 +408,10 @@ struct TUpdEntryStats : public TNodeDebugOnly {
         Reassemble = reassemble;
     }
 
+    void SetOnceEntered(bool onceEntered) {
+        OnceEntered = onceEntered;
+    }
+
     ~TUpdEntryStats() {
         if (AddCtxOwned) {
             delete AddCtx;

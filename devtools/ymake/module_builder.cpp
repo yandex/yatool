@@ -482,7 +482,7 @@ void TModuleBuilder::AddFileGroupVars() {
     for (auto& [varId, cmdInfo] : FileGroupCmds) {
         Node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, varId);
         auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, varId), &UpdIter.YMake, &Module);
-        entryStats.OnceEntered = false;
+        entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         auto& cmdNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
 
@@ -495,7 +495,7 @@ void TModuleBuilder::AddDartsVars() {
     for (const auto& [propId, vars] : DartIdToGroupVars) {
         Node.AddDepIface(EDT_Property, EMNT_Property, propId);
         auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_Property, propId), &UpdIter.YMake, &Module);
-        entryStats.OnceEntered = false;
+        entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         auto& propNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
         for (auto varName : vars) {
@@ -981,7 +981,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         auto& globNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
         globNode.NodeType = EMNT_BuildCommand;
         globNode.ElemId = globInfo.GlobId;
-        entryStats.OnceEntered = false;
+        entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
         Y_ASSERT(lateExpansionVar);

@@ -19,7 +19,7 @@ void TAllSrcsContext::InitializeNode(TModuleBuilder& builder) {
     Node = &entryStats.GetAddCtx(&builder.Module, builder.UpdIter.YMake);
     Node->NodeType = NodeType;
     Node->ElemId = nameId;
-    entryStats.OnceEntered = false;
+    entryStats.SetOnceEntered(false);
     entryStats.SetReassemble(true);
 
     // Process items added before Node was initialized

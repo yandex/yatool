@@ -1151,7 +1151,7 @@ inline bool TUpdIter::Enter(TState& state) {
 
         st.EntryPtr = CurEnt = &*i; // used in functions
         i->second.Props.SetupRequiredIntents(st.Node.NodeType);
-        i->second.OnceEntered = true;
+        i->second.SetOnceEntered(true);
 
         if (i->second.AddCtx) {
             i->second.AddCtxOwned = false;
@@ -1382,7 +1382,7 @@ inline void TUpdIter::Leave(TState& state) {
                 } else if (propName == NProps::GLOB) {
                     if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node))) {
                         prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
-                        st.Entry().OnceEntered = false;
+                        st.Entry().SetOnceEntered(false);
                         st.ForceReassemble();
                     }
                 }
@@ -1393,12 +1393,12 @@ inline void TUpdIter::Leave(TState& state) {
             (IsMakeFileType(prev.Node.NodeType) || IsModuleType(prev.Node.NodeType)) && IsPropertyDep(prev.Node.NodeType, prev.Dep.DepType, st.Node.NodeType)
         ) {
             prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
-            st.Entry().OnceEntered = false;
+            st.Entry().SetOnceEntered(false);
             st.ForceReassemble();
         }
         else if (isMakefileIncludeFile && !prev.Entry().HasChanges && CurEnt->second.HasChanges) {
             prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
-            st.Entry().OnceEntered = false;
+            st.Entry().SetOnceEntered(false);
             st.ForceReassemble();
         }
     }
@@ -1608,7 +1608,7 @@ inline void TUpdIter::Left(TState& state) {
 
         if (makefileRescan && freshRescan) {
             YDIAG(IPRP) << "Have to rescan " << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << ", force reassemble" << Endl;
-            chldStats.OnceEntered = false;
+            chldStats.SetOnceEntered(false);
             st_.ForceReassemble();
             return;
         }
@@ -1813,7 +1813,7 @@ void TUpdIter::NukeModuleDir(TState& state) {
             st.Add->NukeModule();
         }
         st.Entry().Props.ClearValues();
-        st.Entry().OnceEntered = false;
+        st.Entry().SetOnceEntered(false);
         Y_ASSERT(Diag()->Where.back().first == st.Node.ElemId &&
                  Diag()->Where.back().second == Graph.GetFileName(st.Node).GetTargetStr());
         Diag()->Where.pop_back();
@@ -1840,7 +1840,7 @@ void TUpdIter::NukeModuleDir(TState& state) {
                 }
             }
             nodeIt->second.Props.ClearValues();
-            nodeIt->second.OnceEntered = false;
+            nodeIt->second.SetOnceEntered(false);
         }
         st.NextDep();
     }

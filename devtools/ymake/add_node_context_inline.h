@@ -60,7 +60,7 @@ Y_FORCE_INLINE TAddDepAdaptor& TNodeAddCtx::AddOutput(ui64 elemId, EMakeNodeType
             modData.Added = true;
         }
 
-        nodeData.OnceEntered = false;
+        nodeData.SetOnceEntered(false);
 
         if (!nodeData.AddCtx->NeedInit2) {
             // This was already processed, thus unusable.

@@ -61,7 +61,7 @@ public:
         i->second.Reassemble = true;
         if (addToOwn) {
             OwnEntries.insert(fid);
-            i->second.OnceEntered = false;
+            i->second.SetOnceEntered(false);
         }
         return add;
         */
