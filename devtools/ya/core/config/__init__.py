@@ -323,6 +323,11 @@ def get_ya_token_path():
 
 
 @func.lazy
+def get_docker_config_path():
+    return os.path.join(home_dir(), '.docker', 'config.json')
+
+
+@func.lazy
 def get_arc_token_path():
     return os.environ.get('ARC_TOKEN_PATH', os.path.join(home_dir(), '.arc', 'token'))
 

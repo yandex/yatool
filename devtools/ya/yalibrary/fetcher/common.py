@@ -101,6 +101,10 @@ def get_sandbox_token():
         return None
 
 
+def need_universal_fetcher(resource_type):
+    return resource_type == 'docker'
+
+
 class ProgressPrinter(object):
     def __init__(self, progress_callback, finish_callback=lambda: None):
         self._progress = progress_callback

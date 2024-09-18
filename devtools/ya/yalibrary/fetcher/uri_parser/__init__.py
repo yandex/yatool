@@ -1,6 +1,9 @@
+import re
+
 from collections import namedtuple
 import hashlib
 
+import devtools.ya.test.const as test_const
 
 SUPPORTED_INTEGRITY_ALG = {'md5', 'sha1', 'sha512'}
 
@@ -90,7 +93,10 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
     elif resource_type == 'base64':
         return ParsedResourceUri(resource_type, resource_uri, resource_id=None, resource_url=rest, fetcher_meta=None)
     elif resource_type in accepted_schemas:
-        resource_id = rest
+        if resource_type == 'docker':
+            resource_id = get_docker_resource_id(resource_uri)
+        else:
+            resource_id = rest
         return ParsedResourceUri(resource_type, resource_uri, resource_id, resource_url=None, fetcher_meta=None)
     else:
         raise InvalidUriSchemaException(accepted_schemas, resource_uri)
@@ -118,3 +124,11 @@ def get_mapped_parsed_uri_and_info(parsed_uri, mapping, resource_info):
     )
 
     return new_parsed_uri, resource_info
+
+
+def get_docker_resource_id(resource_uri):
+    res = re.match(test_const.DOCKER_LINK_RE, resource_uri)
+    fqdn = res.group(2)
+    digest = res.group(4)
+    digest_prefix_len = 12
+    return fqdn + '-' + digest[:digest_prefix_len]

@@ -3,6 +3,11 @@ import devtools.ya.test.const
 
 
 class MetaInfo(object):
+
+    @property
+    def docker_images(self):
+        return self._docker_images or []
+
     @property
     def meta_dict(self):
         return self._meta_dict
@@ -328,6 +333,7 @@ class DartInfo(MetaInfo):
         self._classpath = dart_info.get('CLASSPATH')
         self._config_path = dart_info.get("CONFIG-PATH")
         self._custom_dependencies = dart_info.get('CUSTOM-DEPENDENCIES')
+        self._docker_images = dart_info.get('DOCKER-IMAGES')
         self._eslint_config_path = dart_info.get("ESLINT_CONFIG_PATH")
         self._files = dart_info.get("FILES")
         self._fork_mode = dart_info.get('FORK-MODE')

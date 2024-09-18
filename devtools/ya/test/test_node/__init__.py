@@ -48,6 +48,7 @@ import devtools.ya.test.util.tools as util_tools
 
 import yalibrary.last_failed.last_failed as last_failed
 import yalibrary.upload.consts
+import yalibrary.fetcher.uri_parser as uri_parser
 
 import typing as tp
 
@@ -58,6 +59,8 @@ logger = logging.getLogger(__name__)
 
 # Don't use sys.maxint - it can't be serialized to yson (ya:yt mode)
 MAX_TIMEOUT = 2**32
+
+FETCH_DOCKER_IMAGE_SCRIPT = '$(SOURCE_ROOT)/build/scripts/fetch_from_docker_repo.py'
 FETCH_FROM_MDS_SCRIPT = '$(SOURCE_ROOT)/build/scripts/fetch_from_mds.py'
 FETCH_FROM_SCRIPT = '$(SOURCE_ROOT)/build/scripts/fetch_from.py'
 SCRIPT_APPEND_FILE = '$(SOURCE_ROOT)/build/scripts/append_file.py'
@@ -75,6 +78,73 @@ def get_mds_storage(storage_root):
 
 def add_list_node(opts, suite):
     return opts.list_before_test and suite.support_list_node()
+
+
+def inject_download_docker_image_node(graph, image, opts):
+    link, tag = image
+
+    fake_id = 5
+    uid = "docker-image-{}-{}".format(imprint.combine_imprints(link, tag), fake_id)
+    output_dir = os.path.join("images", imprint.combine_imprints(tag))
+    output_image_path = os.path.join("$(BUILD_ROOT)", output_dir, 'image.tar')
+    output_info_path = os.path.join("$(BUILD_ROOT)", output_dir, 'image_info.json')
+    resource_id = uri_parser.get_docker_resource_id(link)
+    preloaded_path = "$(RESOURCE_ROOT)/docker/{}/resource".format(resource_id)
+
+    cmd = test_common.get_python_cmd(opts=opts) + [
+        FETCH_DOCKER_IMAGE_SCRIPT,
+        '--link',
+        link,
+        '--tag',
+        tag,
+        '--output-image-path',
+        output_image_path,
+        '--output-info-path',
+        output_info_path,
+        '--preloaded-path',
+        preloaded_path,
+    ]
+
+    node_requirements = gen_plan.get_requirements(opts)
+
+    if opts.use_distbuild:
+        timeout = 900
+    else:
+        timeout = 0
+
+    if not graph.get_node_by_uid(uid):
+        node = {
+            "timeout": timeout,
+            "node-type": devtools.ya.test.const.NodeType.DOWNLOAD,
+            "broadcast": False,
+            "inputs": [],
+            "uid": uid,
+            "cwd": "$(BUILD_ROOT)",
+            "priority": 0,
+            "deps": [],
+            "env": sysenv.get_common_py_env().dump(),
+            "target_properties": {},
+            "outputs": [output_image_path, output_info_path],
+            'kv': {
+                "p": "IM",
+                "pc": 'light-cyan',
+                "show_out": True,
+            },
+            "requirements": node_requirements,
+            "resources": [
+                {"uri": link},
+            ],
+            "cmds": [
+                {
+                    "cmd_args": cmd,
+                    "cwd": "$(BUILD_ROOT)",
+                },
+            ],
+        }
+
+        graph.append_node(node, add_to_result=False)
+
+    return uid
 
 
 def inject_mds_resource_to_graph(graph, resource, opts):
@@ -628,6 +698,10 @@ def create_test_node(
 
     runner_cmd += ["--uid", str(suite.uid)]
 
+    def add_docker_image_dep(image):
+        image_node_uid = inject_download_docker_image_node(graph, image, opts)
+        deps.append(image_node_uid)
+
     def add_sandbox_resource_dep(sandbox_resource):
         runner_cmd.extend(["--sandbox-resource", str(sandbox_resource)])
         resource_node_uid = sandbox_node.inject_download_sandbox_resource_node(
@@ -674,6 +748,9 @@ def create_test_node(
 
     for resource in testdeps.get_test_ext_sbr_resources(suite, arc_root):
         add_sandbox_resource_dep(resource)
+
+    for image in testdeps.get_docker_images(suite):
+        add_docker_image_dep(image)
 
     for file_path in testdeps.get_test_ext_file_resources(suite, arc_root):
         abs_path = os.path.join(arc_root, file_path)

@@ -19,6 +19,7 @@ namespace NYa::NTool {
 
     const TStringBuf UNSUPPORTED_OPTIONS[] = {
         "--custom-fetcher",
+        "--docker-config-path",
         "--fetcher-params",
         "--use-universal-fetcher-everywhere",
         "--force-refetch",

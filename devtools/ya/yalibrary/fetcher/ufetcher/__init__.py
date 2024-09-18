@@ -40,6 +40,16 @@ def _get_sandbox_token() -> str:
         return ""
 
 
+def _get_docker_config() -> str:
+    try:
+        import app_ctx
+
+        docker_config_path = app_ctx.docker_config_path
+        return docker_config_path or ""
+    except (ImportError, AttributeError):
+        return ""
+
+
 def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
     try:
         import app_ctx
@@ -63,6 +73,18 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
     http_config = universal_fetcher.HttpConfig(universal_fetcher.HttpParams(), default_retry_policy)
 
     sandbox_config = None
+    docker_config = None
+
+    configs = []
+
+    docker_config_path = _get_docker_config()
+    if docker_config_path:
+        docker_config = universal_fetcher.DockerConfig(
+            universal_fetcher.DockerParams(
+                auth_json_file=docker_config_path,
+            ),
+            default_retry_policy,
+        )
 
     if app_config.in_house:
         transports_order = _get_transports_order()
@@ -86,9 +108,15 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         )
 
     if sandbox_config:
-        cfg = universal_fetcher.FetchersConfig(sandbox_config, http_config)
-    else:
-        cfg = universal_fetcher.FetchersConfig(http_config)
+        configs.append(sandbox_config)
+
+    if http_config:
+        configs.append(http_config)
+
+    if docker_config:
+        configs.append(docker_config)
+
+    cfg = universal_fetcher.FetchersConfig(*configs)
 
     json_conf = cfg.build()
 

@@ -423,6 +423,16 @@ class AbstractTestSuite(facility.Suite):
 
         return self._test_data_map[data_type]
 
+    def get_test_docker_images(self):
+        """
+        DOCKER_IMAGE (
+            <link1>=TAG1
+            <link2>=TAG2
+        )
+        return value:  [(<link1>, TAG1), (<link2>, TAG2), ...]
+        """
+        return [x.rsplit('=', 1) for x in self.meta.docker_images]
+
     @property
     def python_paths(self):
         return [_f for _f in self.meta.python_paths if _f]

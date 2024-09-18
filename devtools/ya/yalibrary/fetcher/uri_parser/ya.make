@@ -7,6 +7,10 @@ PY_SRCS(
     __init__.py
 )
 
+PEERDIR(
+    devtools/ya/test/const
+)
+
 END()
 
 RECURSE_FOR_TESTS(

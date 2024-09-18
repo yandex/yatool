@@ -992,6 +992,7 @@ class AuthOptions(Options):
         self._extra_env_vars = extra_env_vars
         self.oauth_token = None
         self.oauth_token_path = None
+        self.docker_config_path = None
         self.username = None
         self.ssh_keys = []
         self.ssh_key_option_name = ssh_key_option_name
@@ -1019,6 +1020,14 @@ class AuthOptions(Options):
                 'YA_OAUTH_EXCHANGE_SSH_KEYS',
                 hook=SetValueHook('oauth_exchange_ssh_keys', return_true_if_enabled),
             ),
+            ArgConsumer(
+                ['--docker-config-path'],
+                help='Path to docker config file. Use ~/.docker/config.json by default',
+                hook=SetValueHook('docker_config_path'),
+                group=AUTH_OPT_GROUP,
+            ),
+            ConfigConsumer('docker_config_path'),
+            EnvConsumer('YA_DOCKER_CONFIG_PATH', hook=SetValueHook('docker_config_path')),
         ]
         if self._extra_env_vars:
             res.extend(EnvConsumer(var, hook=SetValueHook('oauth_token')) for var in self._extra_env_vars)
@@ -1028,6 +1037,14 @@ class AuthOptions(Options):
         if self.username is None:
             self.username = config.get_user()
         self._read_token_file()
+        self._find_docker_config()
+
+    def _find_docker_config(self):
+        if self.docker_config_path:
+            return
+        docker_config_path = core.config.get_docker_config_path()
+        if os.path.exists(docker_config_path):
+            self.docker_config_path = docker_config_path
 
     # TODO: Use devtools/libs/ya_token here
     def _read_token_file(self):

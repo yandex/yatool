@@ -31,6 +31,7 @@ PEERDIR(
     devtools/ya/test/util
     devtools/ya/yalibrary/last_failed
     devtools/ya/yalibrary/upload/consts
+    devtools/ya/yalibrary/fetcher/uri_parser
 )
 
 END()

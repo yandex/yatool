@@ -83,17 +83,28 @@ namespace NYa {
         throw yexception() << "Wrong uri. Meta should include integrity: " << uri;
     }
 
+    TString DockerResourceDirName(TStringBuf uri, TStringBuf dockerPrefix) {
+        TStringBuf digest = uri.substr(uri.rfind(":") + 1);
+        TStringBuf fqdn = uri.substr(dockerPrefix.size() + 2);
+        fqdn = fqdn.substr(0, fqdn.find('/'));
+        return ToString(fqdn) + "-" + ToString(digest.substr(0, 12));
+    }
+
     TString ResourceDirName(TStringBuf uri, ui32 stripPrefix) {
         constexpr TStringBuf sbrPrefix{"sbr:"};
         constexpr TStringBuf trsPrefix{"trs:"};
         constexpr TStringBuf httpPrefix{"http:"};
         constexpr TStringBuf httpsPrefix{"https:"};
+        constexpr TStringBuf dockerPrefix{"docker:"};
+
 
         TString dirName;
         if (uri.StartsWith(sbrPrefix)) {
             dirName = uri.substr(sbrPrefix.size());
         } else if (uri.StartsWith(trsPrefix)) {
             dirName = uri.substr(trsPrefix.size());
+        } else if (uri.StartsWith(dockerPrefix)) {
+            dirName = DockerResourceDirName(uri, dockerPrefix);
         } else if (uri.StartsWith(httpPrefix) || uri.StartsWith(httpsPrefix)) {
             dirName = HttpResourceDirName(uri);
         } else {

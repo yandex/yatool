@@ -88,6 +88,10 @@ def remove_redundant_paths(paths):
     return res
 
 
+def get_docker_images(test):
+    return test.get_test_docker_images()
+
+
 def get_test_sandbox_resources(test):
     """
     Gets the declared by test sandbox ids

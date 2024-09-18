@@ -139,6 +139,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('fetcher_params', configure_fetcher_params(ctx)),
             # TODO: kuzmich321@ (ufetcher) rm when migrated
             ('use_universal_fetcher_everywhere', configure_use_universal_fetcher_everywhere(ctx)),
+            ('docker_config_path', configure_docker_config_path(ctx)),
             ('hide_token2', token_suppressions.configure(ctx)),
             ('fetchers_storage', configure_fetchers_storage(ctx)),
             ('fetcher', configure_fetcher(ctx)),
@@ -441,6 +442,11 @@ def configure_use_universal_fetcher_everywhere(app_ctx):
     yield should_use
 
 
+def configure_docker_config_path(app_ctx):
+    user_config_path = getattr(app_ctx.params, 'docker_config_path', None)
+    yield user_config_path or ""
+
+
 def configure_fetcher_params(app_ctx):
     custom_fetcher = None
     fetcher_opts = getattr(app_ctx.params, 'flags', {}).get('FETCHER_OPTS')
@@ -525,6 +531,8 @@ def configure_fetchers_storage(app_ctx):
 
     if not app_config.in_house:
         storage.register(['sbr'], None)  # for opensource ya
+
+    storage.register(['docker'], None)
 
     yield storage
 
