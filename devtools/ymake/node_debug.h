@@ -58,6 +58,9 @@ struct TNodeDebug : public TGraphDebug {
     }
 
     TString DumpDebugNode() const {
+        if (DebugNode == TDepsCacheId::None) {
+            return "<None>";
+        }
         return DebugGraph.ToStringByCacheId(DebugNode);
     }
 };
