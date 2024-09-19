@@ -159,7 +159,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
         const auto& part = *it;
         const auto isLastPart = it + 1 == Parts.end();
 
-        TRegExMatch regex(part.Type == TGlobPart::EGlobType::Pattern ? part.Data : nullptr, REG_NOSUB);
+        TRegExMatch regex(part.Type == TGlobPart::EGlobType::Pattern ? part.Data : TString(), REG_NOSUB);
         auto match = [&part, &regex](TStringBuf name) {
             if (part.Type == TGlobPart::EGlobType::Anything) {
                 return true;
