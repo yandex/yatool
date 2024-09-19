@@ -8,6 +8,7 @@
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 #include <util/generic/yexception.h>
+#include <util/string/join.h>
 #include <util/string/split.h>
 #include <util/string/subst.h>
 #include <util/system/defaults.h>
@@ -252,12 +253,9 @@ inline TString Relative(TStringBuf path, TStringBuf root) {
 }
 
 // omit heavy fspath for simple operations (two overloads to fix ambiguity).
-inline TString Join(TStringBuf path, TStringBuf file) {
-    return TString::Join(path, PATH_SEP_S, file);
-}
-
-inline TString Join(TStringBuf path, TStringBuf dir, TStringBuf file) {
-    return TString::Join(path, PATH_SEP_S, dir, PATH_SEP_S, file);
+template<typename ...Ts>
+TString Join(Ts&&... items) {
+    return ::Join(PATH_SEP_S, std::forward<Ts>(items)...);
 }
 
 // `using namespace NPath' required
