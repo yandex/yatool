@@ -311,4 +311,5 @@ message TArcChanges {
 
 message TBypassConfigure {
     option (message_id) = 51;
+    required bool Enabled = 1;
 };

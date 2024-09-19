@@ -747,6 +747,7 @@ bool TYMake::LoadPatch() {
     ArcChangesEvent(!Conf.PatchPath.Empty());
     if (!Conf.PatchPath) {
         HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because of PatchPath" << Endl;
         return true;
     }
 
@@ -760,6 +761,7 @@ bool TYMake::LoadPatch() {
         GraphChangesPredictionEvent();
     } else {
         HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because we can't get changes" << Endl;
     }
 
     return true;

@@ -808,20 +808,34 @@ int main_real(TBuildConfiguration& conf) {
     // This should be called after Load
     yMake->PostInit();
 
-    if (yMake->CanBypassConfigure()) {
-        FORCE_TRACE(T, NEvent::TBypassConfigure{});
-
-        // FIXME: Currently we are implementing plan "B" for Grand Bypass,
-        // that is we do not want to save caches when Grand Bypass occurs
-        conf.WriteFsCache = false;
-        conf.WriteDepsCache = false;
-        conf.WriteJsonCache = false;
-        conf.WriteDepManagementCache = false;
-        conf.WriteUidsCache = false;
-    }
-
     {
         TBuildGraphScope scope(*yMake.Get());
+
+        if (conf.ReadStartTargetsFromEvlog) {
+            yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
+            NEvlogServer::TServer evlogServer{*yMake, conf};
+            // For now it's a synchronous reader w/o any buffering.
+            // The client must ensure they use non-blocking writes on their side,
+            // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
+            evlogServer.ProcessStreamBlocking(Cin);
+        }
+
+        // This should be called after collecting StartDirs
+        yMake->PredictChanges();
+
+        if (yMake->CanBypassConfigure()) {
+            FORCE_TRACE(C, NEvent::TBypassConfigure{true});
+
+            // FIXME: Currently we are implementing plan "B" for Grand Bypass,
+            // that is we do not want to save caches when Grand Bypass occurs
+            conf.WriteFsCache = false;
+            conf.WriteDepsCache = false;
+            conf.WriteJsonCache = false;
+            conf.WriteDepManagementCache = false;
+            conf.WriteUidsCache = false;
+        } else {
+            FORCE_TRACE(C, NEvent::TBypassConfigure{false});
+        }
 
         TMaybe<EBuildResult> configureBuildRes;
         if (useOnlyYmakeCache || yMake->CanBypassConfigure()) {
@@ -829,13 +843,6 @@ int main_real(TBuildConfiguration& conf) {
         } else {
             yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
             YDIAG(IPRP) << "Start of configure. CurStamp: " << int(yMake->TimeStamps.CurStamp()) << Endl;
-            if (conf.ReadStartTargetsFromEvlog) {
-                NEvlogServer::TServer evlogServer;
-                // For now it's a synchronous reader w/o any buffering.
-                // The client must ensure they use non-blocking writes on their side,
-                // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
-                evlogServer.ProcessStreamBlocking(Cin, yMake);
-            }
             configureBuildRes = ConfigureGraph(yMake);
         }
         if (configureBuildRes.Defined()) {

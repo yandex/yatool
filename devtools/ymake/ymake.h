@@ -36,7 +36,13 @@ public:
     bool operator() (const TDepGraph::TEdge& edge1, const TDepGraph::TEdge& edge2) const noexcept;
 };
 
-class TYMake {
+class ITargetConfigurator {
+public:
+    virtual void AddStartTarget(const TString& dir) = 0;
+    virtual void AddTarget(const TString& dir) = 0;
+};
+
+class TYMake final : public ITargetConfigurator {
 public:
     static const ui64 ImageVersion;
     TBuildConfiguration& Conf;
@@ -91,6 +97,7 @@ private:
 public:
     explicit TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
+    void PredictChanges(); // Call this after StartDirs are fully known: this may rely on them
     ~TYMake();
 
     // Returns true if directory loops found
@@ -101,8 +108,8 @@ public:
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void AddPackageOutputs();
-    void AddStartTarget(const TString& dir);
-    void AddTarget(const TString& dir);
+    void AddStartTarget(const TString& dir) override;
+    void AddTarget(const TString& dir) override;
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

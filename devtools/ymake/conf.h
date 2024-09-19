@@ -131,6 +131,14 @@ public:
         return UseGrandBypass;
     }
 
+    void DisableGrandBypass() noexcept {
+        UseGrandBypass = false;
+    }
+
+    void EnableGrandBypass() noexcept {
+        UseGrandBypass = true;
+    }
+
     bool MainOutputAsExtra() const noexcept {
         return MainOutputAsExtra_;
     }

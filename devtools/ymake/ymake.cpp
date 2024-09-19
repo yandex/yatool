@@ -97,12 +97,15 @@ void TYMake::TransferStartDirs() {
 }
 
 void TYMake::PostInit() {
-    TransferStartDirs();
     IncParserManager.InitManager(Conf.ParserPlugins);
-    LoadPatch();
     Names.FileConf.InitAfterCacheLoading();
     FSCacheMonEvent();
     DepsCacheMonEvent();
+}
+
+void TYMake::PredictChanges() {
+    TransferStartDirs();
+    LoadPatch();
 }
 
 static void SafeRemove(const TFsPath& path) {

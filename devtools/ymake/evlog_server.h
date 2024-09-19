@@ -10,17 +10,31 @@ namespace NEvlogServer {
         AllDone,
     };
 
-    EHandlerResult ForeignPlatformTargetEventHandler(const TString& line, THolder<TYMake>& yMake);
-    EHandlerResult AllForeignPlatformsReportedEventHandler(const TString& line, THolder<TYMake>& yMake);
+    enum class EMode {
+        Configure,
+        CollectOnly,
+    };
 
     class TServer {
     public:
-        void ProcessStreamBlocking(IInputStream& input, THolder<TYMake>& yMake);
+        TServer(ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf) {};
+        void ProcessStreamBlocking(IInputStream& input);
 
     private:
-        const THashMap<TString, class std::function<EHandlerResult(const TString&, THolder<TYMake>&)>> HandlerMap_ {
-            {"NEvent.TAllForeignPlatformsReported", AllForeignPlatformsReportedEventHandler},
-            {"NEvent.TForeignPlatformTarget", ForeignPlatformTargetEventHandler},
+        EHandlerResult ForeignPlatformTargetEventHandler(const TString& line);
+        EHandlerResult AllForeignPlatformsReportedEventHandler(const TString& line);
+        EHandlerResult BypassConfigureEventHandler(const TString& line);
+
+        const THashMap<TString, class std::function<EHandlerResult(const TString&)>> HandlerMap_ {
+            {"NEvent.TAllForeignPlatformsReported", std::bind(&TServer::AllForeignPlatformsReportedEventHandler, this, std::placeholders::_1)},
+            {"NEvent.TForeignPlatformTarget", std::bind(&TServer::ForeignPlatformTargetEventHandler, this, std::placeholders::_1)},
+            {"NEvent.TBypassConfigure", std::bind(&TServer::BypassConfigureEventHandler, this, std::placeholders::_1)},
         };
+
+        ITargetConfigurator& Configurator_;
+        TBuildConfiguration& Conf_;
+        TMaybe<EMode> Mode_;
+        TVector<TString> ReachableTargets_;
+        TVector<TString> PossibleTargets_;
     };
 } // namespace NEvlogServer
