@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import sys
 import time
 import traceback
@@ -682,7 +683,7 @@ def create_package(package_context, output_root, builds):
                 if build_raw_package:
                     package_path = package_context.get_raw_package_path()
                     exts.fs.ensure_removed(package_path)
-                    exts.fs.copytree3(content_dir, package_path, symlinks=True)
+                    shutil.move(content_dir, package_path)
                     package.display.emit_message(
                         'Package content is stored in [[imp]]{}'.format(os.path.abspath(package_path))
                     )
