@@ -722,19 +722,25 @@ bool TYMake::LoadImpl(const TFsPath& file) {
 }
 
 void TYMake::AnalyzeGraphChanges(IChanges& changes) {
+    if (! Conf.ShouldUseGraphChangesPredictor()) {
+        HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because because predictor is disabled" << Endl;
+        return;
+    }
     if (!DepsCacheLoaded_) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
+        return;
     }
     if (PrevStartDirs_ != CurStartDirs_) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because start dirs are different" << Endl;
+        return;
     }
-    if (!HasGraphStructuralChanges_ && Conf.ShouldUseGraphChangesPredictor()) {
-        TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
-        predictor.AnalyzeChanges();
-        HasGraphStructuralChanges_ = predictor.HasChanges();
-    }
+
+    TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
+    predictor.AnalyzeChanges();
+    HasGraphStructuralChanges_ = predictor.HasChanges();
 }
 
 bool TYMake::LoadPatch() {
