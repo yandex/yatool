@@ -258,14 +258,6 @@ TString Join(Ts&&... items) {
     return ::Join(PATH_SEP_S, std::forward<Ts>(items)...);
 }
 
-// `using namespace NPath' required
-inline TString operator/(TStringBuf path, TStringBuf file) {
-    return Join(path, file);
-}
-inline TString operator/(const TString& path, const TString& file) {
-    return Join(path, file);
-}
-
 inline bool NeedFix(TStringBuf s) {
 /*
     return s.EndsWith("/.") || s.find("..") != TString::npos || s.find("/./") != TString::npos || s.find("//") != TString::npos;

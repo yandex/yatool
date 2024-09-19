@@ -175,7 +175,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
         for (const auto& dir : dirs) {
             switch (part.Type) {
                 case TGlobPart::EGlobType::Fixed: {
-                    auto path = dir.GetTargetStr() / part.Data;
+                    auto path = NPath::Join(dir.GetTargetStr(), part.Data);
                     if (NeedFix(path)) {
                         path = Reconstruct(path);
                     }
