@@ -728,6 +728,13 @@ bool TYMake::DumpLoops() {
     return Loops.HasBadLoops();
 }
 
+void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
+    NEvent::TBypassConfigure bypassEvent;
+    bypassEvent.SetMaybeEnabled(conf.ShouldUseGrandBypass());
+    bypassEvent.SetEnabled(yMake.CanBypassConfigure());
+    FORCE_TRACE(C, bypassEvent);
+};
+
 int main_real(TBuildConfiguration& conf) {
     if (conf.DumpLicensesInfo || conf.DumpLicensesMachineInfo) {
         NSPDX::EPeerType peerType;
@@ -823,9 +830,8 @@ int main_real(TBuildConfiguration& conf) {
         // This should be called after collecting StartDirs
         yMake->PredictChanges();
 
+        TraceBypassEvent(conf, *yMake);
         if (yMake->CanBypassConfigure()) {
-            FORCE_TRACE(C, NEvent::TBypassConfigure{true});
-
             // FIXME: Currently we are implementing plan "B" for Grand Bypass,
             // that is we do not want to save caches when Grand Bypass occurs
             conf.WriteFsCache = false;
@@ -833,8 +839,6 @@ int main_real(TBuildConfiguration& conf) {
             conf.WriteJsonCache = false;
             conf.WriteDepManagementCache = false;
             conf.WriteUidsCache = false;
-        } else {
-            FORCE_TRACE(C, NEvent::TBypassConfigure{false});
         }
 
         TMaybe<EBuildResult> configureBuildRes;
