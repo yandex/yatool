@@ -4,6 +4,7 @@ PEERDIR(
     contrib/python/contextlib2
     contrib/python/toolz
     contrib/python/requests
+    devtools/ya/app_config
     devtools/ya/exts
     devtools/ya/core/config
     devtools/ya/yalibrary/fetcher/uri_parser
@@ -13,7 +14,7 @@ PEERDIR(
     devtools/libs/yaplatform/python
 )
 
-IF (PYTHON3 AND NOT OS_WINDOWS)
+IF (PYTHON3 AND NOT OS_WINDOWS AND NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/fetcher/ufetcher
     )
