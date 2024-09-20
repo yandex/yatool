@@ -136,8 +136,12 @@ void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
             TNodeId nodeId = graph.GetFileNode(peerFileView).Id();
             GetNodeListStore().AddToList(moduleLists.ManagedDirectPeers, nodeId);
         }
-        for (const auto& [name, value] : dmVars) {
-            module->Set(name, value);
+        for (const auto& varName : DM_VAR_NAMES) {
+            if (dmVars.contains(varName)) {
+                module->Set(varName, dmVars[varName]);
+            } else {
+                module->Set(varName, TString());
+            }
         }
         if (isPeersComplete) {
             module->SetPeersComplete();
