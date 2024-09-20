@@ -154,6 +154,11 @@ public:
     void SaveStartTargets(TCacheFileWriter& writer);
     void SetStartTargetsFromCache() {
         StartTargets = std::move(PrevStartTargets_);
+        for (const auto& target: StartTargets) {
+            if (IsModuleType(Graph.Get(target.Id)->NodeType)) {
+                ModuleStartTargets.insert(target);
+            }
+        }
     }
     void SaveUids(TUidsCachable* uidsCachable);
     void CommitCaches();
