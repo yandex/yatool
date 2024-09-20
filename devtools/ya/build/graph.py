@@ -1063,12 +1063,14 @@ class _ToolTargetsQueue(object):
                 self.__app_ctx.state.check_cancel_state()
 
 
-class _ToolTargetsQueueServerMode(_ToolTargetsQueue):
+class _ToolEventsQueueServerMode(_ToolTargetsQueue):
     def __init__(self):
-        super(_ToolTargetsQueueServerMode, self).__init__()
+        super(_ToolEventsQueueServerMode, self).__init__()
+        self.__bypasses_received = 0
+        self.__finals_received = set()
 
     def done(self):
-        return self._queue.qsize() == 0 and not self._sources_ids
+        return self._queue.qsize() == 0 and len(self.__finals_received) == len(self._sources_ids)
 
     def get(self):
         (source_id, res, async_result) = self._interruptable_queue_get()
@@ -1078,10 +1080,19 @@ class _ToolTargetsQueueServerMode(_ToolTargetsQueue):
             self._logger.debug("Source_id={} ({}). Event: {}".format(source_id, self._sources_ids[source_id], res))
             typename = res["_typename"]
             if typename == "NEvent.TAllForeignPlatformsReported":
-                del self._sources_ids[source_id]
-                if self._sources_ids:
-                    res = ""  # report AllForeignPlatformsReported only for last source (prone to races though)
-        elif async_result is not None and source_id in self._sources_ids:
+                self.__finals_received.add(source_id)
+                if len(self.__finals_received) < len(self._sources_ids):
+                    res = {}  # report AllForeignPlatformsReported only for last source (prone to races though)
+            elif typename == "NEvent.TBypassConfigure":
+                if self.__bypasses_received == len(self._sources_ids):
+                    res = {}  # skip others if we already had False
+                elif res["Enabled"] is False:
+                    self.__bypasses_received = len(self._sources_ids)
+                else:
+                    self.__bypasses_received += 1
+                    if self.__bypasses_received < len(self._sources_ids):
+                        res = {}  # report BypassConfigure only for last source when all was True
+        elif async_result is not None and source_id not in self.__finals_received:
             core_async.unwrap(async_result)  # does nothing or raises thread error
             raise RuntimeError("Thread has terminated before sending TAllForeignPlatformsReported")
         return res
@@ -1093,7 +1104,7 @@ def should_use_servermode_for_tools(opts):
 
 def create_tool_event_queue(opts):
     if should_use_servermode_for_tools(opts):
-        return _ToolTargetsQueueServerMode()
+        return _ToolEventsQueueServerMode()
     else:
         return _ToolTargetsQueue()
 
@@ -1146,6 +1157,14 @@ class _ToolEventListenerServerMode(_ToolEventListener):
 
     def _process_final_event(self, event):
         self._queue_putter(event)
+
+    def _process_bypass_event(self, event):
+        self._queue_putter(event)
+
+    def __call__(self, event):
+        super(_ToolEventListenerServerMode, self).__call__(event)
+        if event["_typename"] == "NEvent.TBypassConfigure":
+            self._process_bypass_event(event)
 
 
 def create_tool_event_listener(opts, *args):
