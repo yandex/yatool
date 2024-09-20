@@ -55,6 +55,9 @@ namespace NEvlogServer {
         if (!Mode_.Defined()) {
             YDebug() << "EvlogServer: bypass state is unknown, continue in regular mode" << Endl;
             Conf_.ReadStartTargetsFromEvlog = false;
+        } else if (Mode_ == EMode::CollectOnly) {
+            YDebug() << "EvlogServer: external bypass is enabled, continue in regular mode" << Endl;
+            Conf_.ReadStartTargetsFromEvlog = false;
         }
         YDebug() << "EvlogServer: DONE" << Endl;
         return EHandlerResult::AllDone;
