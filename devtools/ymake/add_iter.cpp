@@ -1745,11 +1745,13 @@ inline void TUpdIter::Left(TState& state) {
                         break;
                     case EPeerSearchStatus::DeprecatedByRules:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from [[imp]]" << node->Module->GetDir() << "[[rst]] to [[imp]]"
-                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited by peerdir policy" << Endl;
+                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited by peerdir policy." << Endl
+                                         << "See https://docs.yandex-team.ru/ya-make/manual/common/peerdir_rules#policy for details" << Endl;
                         break;
                     case EPeerSearchStatus::DeprecatedByInternal:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from [[imp]]" << node->Module->GetDir() << "[[rst]] to [[imp]]"
-                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited since latter is `internal` and former is not its sibling" << Endl;
+                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited since latter is `internal` and former is not its sibling." << Endl
+                                         << "See https://docs.yandex-team.ru/ya-make/manual/common/peerdir_rules#internal for details" << Endl;
                         break;
                     case EPeerSearchStatus::DeprecatedByFilter:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] to [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is not allowed: module types are incompatible" << Endl;
