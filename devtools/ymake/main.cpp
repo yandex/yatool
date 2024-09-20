@@ -885,15 +885,15 @@ int main_real(TBuildConfiguration& conf) {
 
     if (!yMake->CanBypassConfigure()) {
         yMake->ComputeReachableNodes();
-
         yMake->SortAllEdges();
     }
 
     yMake->ReportForeignPlatformEvents();
 
-    yMake->CheckBlacklist();
-
-    yMake->CheckIsolatedProjects();
+    if (!yMake->CanBypassConfigure()) {
+        yMake->CheckBlacklist();
+        yMake->CheckIsolatedProjects();
+    }
 
     yMake->ReportConfigureEvents();
 
