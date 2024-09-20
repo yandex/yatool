@@ -3,6 +3,7 @@ import time
 
 import core.error
 import yalibrary.worker_threads as worker_threads
+from yalibrary.runner.tasks.enums import WorkerPoolType
 
 
 def get_link_filename(filename):
@@ -11,6 +12,7 @@ def get_link_filename(filename):
 
 class PutInDistCacheTask(object):
     node_type = 'PutInDistCache'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, build_root, dist_cache, dist_cache_codec, fmt_node, execution_log):
         self._node = node
@@ -63,6 +65,7 @@ class PutInDistCacheTask(object):
 
 class RestoreFromDistCacheTask(object):
     node_type = 'RestoreFromDistCache'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, build_root_set, ctx, dist_cache, fmt_node, execution_log, save_links_for_files):
         self._node = node

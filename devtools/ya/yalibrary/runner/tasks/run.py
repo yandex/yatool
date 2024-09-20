@@ -5,33 +5,31 @@ import os
 import subprocess
 import threading
 import time
-
 import typing as tp
 
-import six.moves.queue as Queue
-
+import exts.shlex2
 import six
 
 import devtools.ya.test.const
+import six.moves.queue as Queue
+import yalibrary.runner
+import yalibrary.worker_threads as worker_threads
 
 from devtools.libs.parse_number.python import parse_number
-
 from exts import strings
 from exts import hashing
-import exts.shlex2
-
-import yalibrary.runner
-from yalibrary import formatter
-import yalibrary.worker_threads as worker_threads
 from exts.fs import create_dirs, ensure_removed, hardlink_tree, remove_tree_with_perm_update
+from yalibrary import formatter
 from yalibrary.runner.build_root import BuildRootError
 
 if tp.TYPE_CHECKING:
     from yalibrary.runner.build_root import BuildRoot  # noqa
-
+from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.runner.timeline_store import DetailedTimelineStore, DetailedStages
 
+
 logger = logging.getLogger(__name__)
+
 
 INTERNAL_ERROR_EXIT_CODE = 3
 
@@ -265,6 +263,7 @@ class LocalExecutor(ExecutorBase):
 
 class RunNodeTask(object):
     node_type = 'RunNode'
+    worker_pool_type = WorkerPoolType.BASE
 
     def __init__(
         self,

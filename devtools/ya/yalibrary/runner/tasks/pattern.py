@@ -9,12 +9,15 @@ import six
 
 import core.error
 
-from yalibrary.fetcher import resource_fetcher
 from yalibrary.active_state import Cancelled
+from yalibrary.fetcher import resource_fetcher
+from yalibrary.runner.tasks.enums import WorkerPoolType
 import yalibrary.worker_threads as worker_threads
 
 
 class PreparePattern(object):
+    worker_pool_type = WorkerPoolType.SERVICE
+
     def __init__(
         self, pattern, ctx, res_dir, build_root, resources_map, fetchers_storage, fetch_resource_if_need, execution_log
     ):

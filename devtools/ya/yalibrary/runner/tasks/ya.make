@@ -6,6 +6,7 @@ PY_SRCS(
     NAMESPACE yalibrary.runner.tasks
     cache.py
     dist_cache.py
+    enums.py
     pattern.py
     prepare.py
     resource_display.py

@@ -4,11 +4,12 @@ import logging
 import time
 
 import core.error
-
-from yalibrary.fetcher.uri_parser import parse_resource_uri
-from yalibrary.fetcher import common as fetcher_common
-from yalibrary.active_state import Cancelled
 import yalibrary.worker_threads as worker_threads
+
+from yalibrary.active_state import Cancelled
+from yalibrary.fetcher import common as fetcher_common
+from yalibrary.fetcher.uri_parser import parse_resource_uri
+from yalibrary.runner.tasks.enums import WorkerPoolType
 
 import exts.yjson as json
 import exts.fs as fs
@@ -31,6 +32,8 @@ class _ExternalResource(object):
 
 
 class PrepareResource(object):
+    worker_pool_type = WorkerPoolType.SERVICE
+
     def __init__(
         self, uri_description, ctx, resource_root, fetchers_storage, fetch_resource_if_need, execution_log, cache
     ):

@@ -32,8 +32,10 @@ from yalibrary.runner import statcalc
 from yalibrary.runner import worker_threads
 from yalibrary.runner import task_cache
 from yalibrary.runner.command_file.python import command_file as cf
-import yalibrary.runner.sandboxing as sandboxing
+from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.status_view.helpers import format_paths
+
+import yalibrary.runner.sandboxing as sandboxing
 
 
 logger = logging.getLogger(__name__)
@@ -148,9 +150,14 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         io=io_limit, cpu=threads, test=test_threads, download=threads + net_threads, upload=net_threads
     )
 
-    worker_threads_count = threads + 1 + net_threads
+    worker_pools = {WorkerPoolType.BASE: threads, WorkerPoolType.SERVICE: net_threads + 1}
+
     workers = worker_threads.WorkerThreads(
-        state, worker_threads_count, worker_threads.ResInfo(), cap, getattr(app_ctx, 'evlog', None)
+        state=state,
+        worker_pools=worker_pools,
+        zero=worker_threads.ResInfo(),
+        cap=cap,
+        evlog=getattr(app_ctx, 'evlog', None),
     )
 
     class WorkersContext(object):

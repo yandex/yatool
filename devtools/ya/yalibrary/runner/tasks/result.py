@@ -9,6 +9,8 @@ import exts.archive
 import yalibrary.worker_threads as worker_threads
 import yalibrary.runner.fs
 
+from yalibrary.runner.tasks.enums import WorkerPoolType
+
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +163,7 @@ def process_output(
 
 class ResultNodeTask(object):
     node_type = 'ResultNode'
+    worker_pool_type = WorkerPoolType.BASE
 
     def __init__(
         self,

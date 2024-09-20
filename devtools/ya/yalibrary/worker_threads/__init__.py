@@ -13,6 +13,9 @@ logger.setLevel('INFO')
 
 
 class Action(object):
+    """Basic action executed by workers"""
+
+    worker_pool_type = 'BASIC'
     __slots__ = ['_action', '_res', '_prio']
 
     def __init__(self, action, res=None, prio=0):
@@ -40,6 +43,8 @@ class Action(object):
 
 
 class ResInfo(object):
+    """Represents resource required to execute a task"""
+
     def __init__(self, *args, **kwargs):
         self.__d = dict(*args, **kwargs)
         self._hash = hash(tuple(sorted(self.__d.items())))
@@ -69,7 +74,7 @@ class ResInfo(object):
 
 
 class WorkerThreads(object):
-    def __init__(self, state, threads, zero, cap, evlog):
+    def __init__(self, state, worker_pools, zero, cap, evlog):
         self._all_threads = []
         self._state = state
         self._out_q = Queue.Queue()
@@ -80,17 +85,26 @@ class WorkerThreads(object):
         self._condition = threading.Condition(threading.Lock())
         self._evlog_writer = evlog.get_writer(__name__) if evlog else lambda *a, **kw: None
 
-        def exec_target():
+        def exec_target(worker_pool_type):
             def take_or_wait():
                 while self._state.check_cancel_state():
                     with self._condition:
-                        max_prio = None
-                        best_key = None
+                        best_actions = {}
                         for k, v in self._active_set.items():
                             if v and k + self._active_res_usage[0] <= cap:
-                                if max_prio is None or max_prio < -v[0][0]:
-                                    max_prio = -v[0][0]
-                                    best_key = k
+                                action_type = v[0][-1].worker_pool_type
+                                prio = -v[0][0]
+                                if action_type not in best_actions or best_actions[action_type][0] < prio:
+                                    best_actions[action_type] = (prio, k)
+
+                        if worker_pool_type in best_actions:
+                            # prefer its type
+                            max_prio, best_key = best_actions.pop(worker_pool_type)
+                        elif best_actions:
+                            # but take other types too to avoid thread locks
+                            _, (max_prio, best_key) = best_actions.popitem()
+                        else:
+                            max_prio = best_key = None
 
                         if best_key is not None:
                             self._active_res_usage[0] += best_key
@@ -118,10 +132,15 @@ class WorkerThreads(object):
 
             self._out_q.put(asyncthread.wrap(execute))
 
-        for i in range(1, threads + 1):
-            exec_thr = threading.Thread(target=exec_target, name="Worker-{:03d}".format(i))
-            exec_thr.start()
-            self._all_threads.append(exec_thr)
+        thread_num = 0
+        for worker_pool_type, threads_num in worker_pools.items():
+            for _ in range(threads_num):
+                exec_thr = threading.Thread(
+                    target=exec_target, args=(worker_pool_type,), name="Worker-{:03d}".format(thread_num + 1)
+                )
+                exec_thr.start()
+                self._all_threads.append(exec_thr)
+                thread_num += 1
 
     def __execute_action(self, action, res, inline=False):
         logger.debug('Run %s with res %s', action, res)

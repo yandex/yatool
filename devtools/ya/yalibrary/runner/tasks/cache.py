@@ -2,11 +2,13 @@ import sys
 import time
 
 import yalibrary.worker_threads as worker_threads
+from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.toolscache import tc_force_gc
 
 
 class CompactCacheTask(object):
     node_type = 'CompactCache'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, cache, state, opts, execution_log):
         self._cache = cache
@@ -59,6 +61,7 @@ class CompactCacheTask(object):
 
 class CleanSymresTask(object):
     node_type = 'CleanSymres'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, symlink_store, state, opts, execution_log):
         self._symlink_store = symlink_store
@@ -115,6 +118,7 @@ class CleanSymresTask(object):
 
 class CleanBuildRootTask(object):
     node_type = 'CleanBuildRoot'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, build_root_set, state, opts, execution_log):
         self._build_root_set = build_root_set
@@ -154,6 +158,7 @@ class CleanBuildRootTask(object):
 
 class PutInCacheTask(object):
     node_type = 'PutInCache'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, build_root, cache, cache_codec, execution_log, dir_outputs_test_mode=False):
         self._node = node
@@ -208,6 +213,7 @@ class PutInCacheTask(object):
 
 class RestoreFromCacheTask(object):
     node_type = 'RestoreFromCache'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, build_root, ctx, cache, dist_cache, execution_log):
         self._node = node
@@ -277,6 +283,7 @@ class RestoreFromCacheTask(object):
 
 class WriteThroughCachesTask(object):
     node_type = 'WriteThroughCaches'
+    worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, ctx, cache, dist_cache, build_root):
         self._node = node

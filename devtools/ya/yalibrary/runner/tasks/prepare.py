@@ -6,6 +6,7 @@ import core.error
 import exts.uniq_id
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner import topo
+from yalibrary.runner.tasks.enums import WorkerPoolType
 
 from .resource import PrepareResource
 
@@ -52,6 +53,7 @@ class UniqueTask(object):
 
 class PrepareAllNodesTask(UniqueTask):
     node_type = 'PrepareAllNodes'
+    worker_pool_type = WorkerPoolType.BASE
 
     class _ResolveError(RuntimeError):
         pass
@@ -182,6 +184,7 @@ class PrepareAllNodesTask(UniqueTask):
 
 class PrepareAllDistNodesTask(UniqueTask):
     node_type = 'PrepareAllDistNodes'
+    worker_pool_type = WorkerPoolType.BASE
 
     def __init__(self, nodes, ctx, download_artifacts, results):
         self._nodes = nodes
@@ -220,6 +223,7 @@ class PrepareAllDistNodesTask(UniqueTask):
 
 class PrepareNodeTask(object):
     node_type = 'PrepareNode'
+    worker_pool_type = WorkerPoolType.BASE
 
     def __init__(self, node, ctx, cache, dist_cache):
         self._node = node
