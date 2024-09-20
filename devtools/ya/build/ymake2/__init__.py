@@ -505,6 +505,9 @@ def _run_ymake(**kwargs):
                 _run_info["has_changelist"] = j.get("HasChangelist", None)
             elif _type == "NEvent.TNodeChanges":
                 _run_info["has_rendered_node_changes"] = j.get("HasRenderedNodeChanges", None)
+            elif _type == "NEvent.TBypassConfigure":
+                _run_info["bypass_is_enabled"] = j.get("MaybeEnabled", None)
+                _run_info["bypass_is_triggered"] = j.get("Enabled", None)
 
         except Exception:
             logger.exception("While processing event: `%s`", j)
