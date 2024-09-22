@@ -894,8 +894,10 @@ int main_real(TBuildConfiguration& conf) {
 
     yMake->ReportForeignPlatformEvents();
 
-    if (!yMake->CanBypassConfigure()) {
+    if (!yMake->CanBypassConfigure() || conf.IsBlacklistHashChanged()) {
         yMake->CheckBlacklist();
+    }
+    if (!yMake->CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged()) {
         yMake->CheckIsolatedProjects();
     }
 

@@ -722,7 +722,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
 }
 
 void TYMake::AnalyzeGraphChanges(IChanges& changes) {
-    if (! Conf.ShouldUseGraphChangesPredictor()) {
+    if (!Conf.ShouldUseGraphChangesPredictor()) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because because predictor is disabled" << Endl;
         return;
