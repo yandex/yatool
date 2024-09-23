@@ -55,7 +55,6 @@ def get_options():
     parser.add_argument("--skip-file", dest='skip_files', help="Skip specified files", default=[], action="append")
     parser.add_argument("--skip-dir", dest='skip_dirs', help="Skip specified dirs", default=[], action="append")
     parser.add_argument("--truncate", help="Truncate test output's data", default=False, action="store_true")
-    parser.add_argument("--uid", action='store', default=None)
     parser.add_argument("--fast-clang-coverage-merge", help="Use fast cov merge and specify path to the log file")
     parser.add_argument("--gdb-path")
     parser.add_argument("--keep-temps", default=False, action="store_true")
@@ -258,6 +257,7 @@ def merge_meta_jsons(args, files, dst):
                 "Cannot merge meta.json correctly - it contains unknown fields '{}'".format(", ".join(unknown_fields))
             )
 
+        result["uid"] = data["uid"]
         result["project"] = data["project"]
         result["test_timeout"] = data["test_timeout"]
         result["name"] = data["name"]
@@ -283,7 +283,6 @@ def merge_meta_jsons(args, files, dst):
     finalrc = sorted(exit_codes, key=abs)[-1]
     logger.debug("Common exit code is set to %d", finalrc)
     result["exit_code"] = finalrc
-    result["uid"] = args.uid
 
     with open(dst, "w") as file:
         json.dump(result, file, indent=4, sort_keys=True)

@@ -473,7 +473,6 @@ def parse_args(args=None):
     parser.add_argument("--requires-ram-disk", dest="requires_ram_disk", action="store_true", default=False)
     parser.add_argument("--ram-limit-gb", type=int, default=0)
     parser.add_argument("--global-resource", dest="global_resources", action="append", default=[])
-    parser.add_argument("--uid", action='store', default=None)
     parser.add_argument("--setup-pythonpath-env", action='store_true', default=False)
     parser.add_argument("--pdb", action="store_true", default=False)
     parser.add_argument("--gdb-debug", action="store_true", help="Test under gdb")
@@ -549,6 +548,8 @@ def parse_args(args=None):
         limit = os.environ.get('YA_TEST_NODE_OUTPUT_LIMIT_IN_BYTES')
         if limit is not None:
             args.truncate_files_limit = int(limit)
+
+    args.uid = os.environ.get('TEST_NODE_SUITE_UID')
 
     return args
 

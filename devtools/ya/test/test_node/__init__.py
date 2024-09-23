@@ -696,7 +696,8 @@ def create_test_node(
     if not is_for_distbuild:
         env["TESTING_SAVE_OUTPUT"] = "yes"
 
-    runner_cmd += ["--uid", str(suite.uid)]
+    # pass it as env variable because we hash command in static_uid
+    env["TEST_NODE_SUITE_UID"] = str(suite.uid)
 
     def add_docker_image_dep(image):
         image_node_uid = inject_download_docker_image_node(graph, image, opts)
@@ -1135,8 +1136,6 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         suite.get_ci_type_name(),
         '--test-type',
         suite.get_type(),
-        '--uid',
-        str(suite.uid),
     ]
 
     if suite.target_platform_descriptor:
@@ -1149,6 +1148,9 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
     if timeout:
         runner_cmd += ['--node-timeout', str(timeout)]
 
+    env = test_node["env"].copy()
+    # pass it as env variable because we hash command in static_uid
+    env['TEST_NODE_SUITE_UID'] = str(suite.uid)
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST,
         "backup": False,
@@ -1165,7 +1167,7 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         "deps": testdeps.unique(deps),
         # FS stands for ya:force_sandbox
         "kv": get_test_kv(suite, p="FS"),
-        "env": test_node["env"],
+        "env": env,
         "outputs": orig_node["outputs"] + [output_tar],
         "tared_outputs": orig_node["tared_outputs"] + [output_tar],
         "dir_outputs": orig_node["dir_outputs"],
@@ -1374,8 +1376,6 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         # yt_run_test log
         "--concatenate-binaries",
         "operation.log",
-        "--uid",
-        uid,
         # "--log-level", "DEBUG"
     ]
 
@@ -1563,8 +1563,6 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
         "$(SOURCE_ROOT)",
         "--log-path",
         node_log_path,
-        "--uid",
-        uid,
         # "--log-level", "DEBUG"
     ]
 

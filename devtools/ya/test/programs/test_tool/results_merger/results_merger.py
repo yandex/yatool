@@ -49,12 +49,11 @@ def get_options():
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    parser.add_argument("--uid", action='store', default=None)
     parser.add_argument("--keep-temps", action='store_true', default=False)
     return parser.parse_args()
 
 
-def merge_meta_files(files, dst, uid):
+def merge_meta_files(files, dst):
     logger.debug("Merging %d meta files", len(files))
 
     timestamp_format = "%Y-%m-%d %H:%M:%S.%f"
@@ -78,7 +77,7 @@ def merge_meta_files(files, dst, uid):
     # meta with most actual info
     latest_meta = sorted(all_metas, key=lambda x: x.get("start_time", ""))[-1]
     merged = {
-        "uid": uid,
+        "uid": latest_meta["uid"],
         "project": latest_meta["project"],
         "cwd": os.getcwd(),
         "end_time": end_time,
@@ -317,7 +316,6 @@ def merge(
     outputs,
     target_platform_descriptor,
     multi_target_platform_run,
-    uid,
     keep_temps,
 ):
     result_path = test_common.get_test_suite_work_dir(
@@ -362,7 +360,6 @@ def merge(
     merge_meta_files(
         [os.path.join(output, 'meta.json') for output in outputs],
         os.path.join(result_path, 'meta.json'),
-        uid,
     )
     shared.concatenate_files(
         [os.path.join(output, 'run_test.log') for output in outputs],
@@ -437,7 +434,6 @@ def main():
         args.outputs,
         args.target_platform_descriptor,
         args.multi_target_platform_run,
-        args.uid,
         args.keep_temps,
     )
 
