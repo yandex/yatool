@@ -2007,7 +2007,7 @@ void TBuildTargetDepsPrinter::Leave(TState& state) {
             YDIAG(Dev) << graph.GetFileName(node) << " is in loop " << CurEnt->LoopId << Endl;
             bool sameLoop = state.HasIncomingDep() && ((TBuildTargetDepsEntStats*)(*state.Parent()).Cookie)->LoopId == CurEnt->LoopId;
             if (!sameLoop) {
-                TGraphLoop& loop = Loops[AsIdx(CurEnt->LoopId)];
+                TGraphLoop& loop = Loops[CurEnt->LoopId];
                 if (!loop.DepsDone) {
                     for (auto l : loop) {
                         if (l != node.Id()) { //not elegantly but working

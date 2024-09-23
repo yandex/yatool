@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dep_graph.h"
+#include "nodes_data.h"
 
 #include <util/stream/output.h>
 #include <util/generic/vector.h>
@@ -21,7 +22,7 @@ struct TGraphLoop: public TVector<TNodeId> {
     bool DepsDone = false;
 };
 
-class TGraphLoops: public TVector<TGraphLoop> {
+class TGraphLoops: public TNodesData<TGraphLoop, TVector> {
 private:
     THashSet<TNodeId> DirLoops;
     THashSet<TNodeId> BuildLoops;

@@ -185,7 +185,7 @@ public:
         return acc;
     }
 
-    void CollectLoops(THashMap<TNodeId, TNodeId>& node2Loop, TVector<TGraphLoop>& loop2Nodes) {
+    void CollectLoops(THashMap<TNodeId, TNodeId>& node2Loop, TNodesData<TGraphLoop, TVector>& loop2Nodes) {
         TVector<std::pair<TNodeId, TNodeId>> loopSrt;
         for (const auto& node : Nodes) {
             TNodeId loopId = node.second.LoopId;
@@ -209,17 +209,17 @@ public:
             }
             loopSz.back()++;
         }
-        loop2Nodes.resize(loopSz.size());
+        loop2Nodes.SetMaxNodeIdByResize(loopSz.MaxNodeId());
         // loop id 0 is reserved for 'no loop' flag
         newId = TNodeId::MinValid, curId = loopSrt[0].first;
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
                 newId++;
-                loop2Nodes[AsIdx(newId)].reserve(loopSz[newId]);
+                loop2Nodes[newId].reserve(loopSz[newId]);
                 curId = loopSrt[n].first;
             }
             node2Loop[loopSrt[n].second] = newId;
-            loop2Nodes[AsIdx(newId)].push_back(loopSrt[n].second);
+            loop2Nodes[newId].push_back(loopSrt[n].second);
         }
         Y_ASSERT(newId == loopSz.MaxNodeId());
         YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
@@ -239,7 +239,7 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
     IterateAll(graph, startTargets, ls, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
     ls.CollectLoops(Node2Loop, *this);
 
-    for (size_t loopNum = 1; loopNum < size(); ++loopNum) {
+    for (TNodeId loopNum = TNodeId::MinValid; loopNum <= MaxNodeId(); ++loopNum) {
         TGraphLoop curLoop = (*this)[loopNum];
 
         bool isDirLoop = false;
@@ -251,14 +251,14 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
             const auto& node = graph.Get(curNode);
 
             if (!isDirLoop && node->NodeType == EMNT_Directory) {
-                DirLoops.insert(static_cast<TNodeId>(loopNum));
+                DirLoops.insert(loopNum);
                 isDirLoop = true;
             }
 
             if (!isBuildLoop) {
                 for (const auto& edge : node.Edges()) {
                     if (*edge == EDT_BuildFrom && nodesInLoop.contains(edge.To().Id())) {
-                        BuildLoops.insert(static_cast<TNodeId>(loopNum));
+                        BuildLoops.insert(loopNum);
                         isBuildLoop = true;
                         break;
                     }
@@ -300,7 +300,7 @@ void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TC
 
     size_t loopNumber = 1;
     for (const auto& loopId : loopIds) {
-        const TGraphLoop& curLoop = (*this)[AsIdx(loopId)];
+        const TGraphLoop& curLoop = (*this)[loopId];
 
         TStringStream ss;
         ss << "Loop " << loopNumber++ << " (size: " << curLoop.size() << (isLoopBad(loopId) ? ", bad" : "") << "): ";
@@ -324,7 +324,7 @@ void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TC
         for (const auto& loopId : loopIds) {
             NEvent::TLoopDetected ev;
             ev.SetLoopId(loopNumber++);
-            TGraphLoop curLoop = (*this)[AsIdx(loopId)];
+            TGraphLoop curLoop = (*this)[loopId];
             for (const auto& curNodeId : curLoop) {
                 NEvent::TLoopItem& loopItem = *ev.AddLoopNodes();
                 const auto curNode = graph.Get(curNodeId);

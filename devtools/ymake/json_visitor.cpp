@@ -160,9 +160,10 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     }
     CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, nodesCount);
 
-    ui32 loopsCount = Loops.empty() ? 0 : Loops.size() - 1;
-    output->Write(&loopsCount, sizeof(loopsCount));
-    for (TNodeId loopId = TNodeId::MinValid; AsIdx(loopId) <= loopsCount; ++loopId) {
+    const TNodeId maxLoopId = Loops.MaxNodeId();
+    output->Write(&maxLoopId, sizeof(maxLoopId));
+    ui32 count = 0;
+    for (TNodeId loopId = TNodeId::MinValid; loopId <= Loops.MaxNodeId(); ++loopId, ++count) {
         TSaveBuffer buffer{&rawBuffer};
         SaveLoop(&buffer, loopId, graph);
 
@@ -170,10 +171,10 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
         // Если цикл не изменился, то подойдёт любой узел.
         // Если цикл изменился, каждый его узел изменится,
         // и мы не будем загружать его данные из кэша.
-        buffer.SaveNodeDataToStream(output, Loops[AsIdx(loopId)][0], graph);
+        buffer.SaveNodeDataToStream(output, Loops[loopId][0], graph);
     }
 
-    CacheStats.Set(NStats::EUidsCacheStats::SavedLoops, loopsCount);
+    CacheStats.Set(NStats::EUidsCacheStats::SavedLoops, count);
 }
 
 void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
@@ -207,9 +208,9 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
         CacheStats.Inc(NStats::EUidsCacheStats::LoadedNodes);
     }
 
-    ui32 loopsCount = LoadFromStream<ui32>(input);
+    const auto MaxLoopId = LoadFromStream<TNodeId>(input);
 
-    for (size_t i = 0; i < loopsCount; ++i) {
+    for (TNodeId i = TNodeId::MinValid; i <= MaxLoopId; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId loopNodeId;
         if (!buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph)) {
@@ -472,9 +473,9 @@ void TJSONVisitor::Left(TState& state) {
     YDIAG(Dev) << "JSON: Left from " << depName << " to " << currState.Print() << Endl;
     if (!currDone && currData.WasFresh) {
         if (currData.LoopId != TNodeId::Invalid) {
-            if (currData.LoopId != chldData->LoopId && !Loops[AsIdx(currData.LoopId)].DepsDone) {
+            if (currData.LoopId != chldData->LoopId && !Loops[currData.LoopId].DepsDone) {
                 YDIAG(Dev) << "JSON: Leftnode was in loop = " << currData.LoopId << Endl;
-                Loops[AsIdx(currData.LoopId)].Deps.push_back(chldNode);
+                Loops[currData.LoopId].Deps.push_back(chldNode);
             }
         }
     }
@@ -713,7 +714,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
 
             if (!sameLoop) {
-                TGraphLoop& loop = Loops[AsIdx(CurrData->LoopId)];
+                TGraphLoop& loop = Loops[CurrData->LoopId];
                 if (!loop.DepsDone) {
                     Y_ASSERT(LoopCnt[AsIdx(CurrData->LoopId)].Sign.Empty());
                     SortUnique(loop.Deps);
@@ -1029,7 +1030,7 @@ void TJSONVisitor::PassToParent(TState& state) {
 }
 
 void TJSONVisitor::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph) {
-    const TGraphLoop& loop = Loops[AsIdx(loopId)];
+    const TGraphLoop& loop = Loops[loopId];
 
     buffer->Save(LoopCnt[AsIdx(loopId)].SelfSign.GetRawData(), 16);
     buffer->Save(LoopCnt[AsIdx(loopId)].Sign.GetRawData(), 16);
@@ -1049,7 +1050,7 @@ bool TJSONVisitor::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDe
 
     ui32 depsCount = buffer->Load<ui32>();
 
-    TGraphLoop& loop = Loops[AsIdx(*loopId)];
+    TGraphLoop& loop = Loops[*loopId];
     loop.Deps.reserve(depsCount);
     for (size_t i = 0; i < depsCount; ++i) {
         TNodeId depNode;
@@ -1197,7 +1198,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
 }
 
 void TJSONVisitor::ComputeLoopHash(TNodeId loopId) {
-    const TGraphLoop& loop = Loops[AsIdx(loopId)];
+    const TGraphLoop& loop = Loops[loopId];
 
     TJsonMultiMd5 structureLoopHash(loopId, Graph.Names(), loop.size());
     TJsonMultiMd5 includeStructureLoopHash(loopId, Graph.Names(), loop.size());

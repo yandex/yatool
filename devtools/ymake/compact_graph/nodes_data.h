@@ -47,6 +47,10 @@ public:
         return Storage_.size();
     }
 
+    void SetMaxNodeIdByResize(TNodeId maxId) {
+        Storage_.resize(ToUnderlying(maxId) + 1);
+    }
+
     TNodeId MaxNodeId() const noexcept {
         return static_cast<TNodeId>(Storage_.size() - 1);
     }

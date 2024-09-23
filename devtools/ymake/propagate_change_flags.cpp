@@ -144,13 +144,13 @@ namespace NPropagateChangeFlags {
             TNodeState loopState;
             loopState.SetLocalChanges(false, false);
 
-            for (TNodeId id : Loops_[AsIdx(loopId)]) {
+            for (TNodeId id : Loops_[loopId]) {
                 loopState.PropagatePartialChangesFrom(Graph_.Get(id)->State);
             }
 
             loopState.SetChangedFlagsRecursiveScope();
 
-            for (TNodeId id : Loops_[AsIdx(loopId)]) {
+            for (TNodeId id : Loops_[loopId]) {
                 TNodeState& nodeState = Graph_.Get(id)->State;
                 nodeState.PropagateChangesFrom(loopState);
                 nodeState.SetChangedFlagsRecursiveScope();
