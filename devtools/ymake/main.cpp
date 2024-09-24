@@ -825,6 +825,10 @@ int main_real(TBuildConfiguration& conf) {
             // The client must ensure they use non-blocking writes on their side,
             // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
             evlogServer.ProcessStreamBlocking(Cin);
+
+            if (conf.StartDirs.empty()) {
+                return BR_OK;
+            }
         }
 
         // This should be called after collecting StartDirs
@@ -859,10 +863,6 @@ int main_real(TBuildConfiguration& conf) {
             ydxOut.Reset(new TFileOutput(conf.WriteYdx));
             yMake->Yndex.WriteJSON(*ydxOut);
             ydxOut->Finish();
-            return BR_OK;
-        }
-
-        if (conf.ReadStartTargetsFromEvlog && conf.StartDirs.empty()) {
             return BR_OK;
         }
 
