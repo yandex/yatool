@@ -169,6 +169,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     // (after an error that file is not found)
     if (!DontUsePlugins) {
         if (!PluginsRoots.empty()) {
+            TTraceStage stage("Load plugins");
             PluginConfig()->Init(SourceRoot.GetPath().c_str(), BuildRoot.GetPath().c_str());
             LoadPlugins(PluginsRoots, this);
             for (const auto& it : Plugins) {
