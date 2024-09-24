@@ -1092,9 +1092,20 @@ class _ToolEventsQueueServerMode(_ToolTargetsQueue):
                     self.__bypasses_received += 1
                     if self.__bypasses_received < len(self._sources_ids):
                         res = {}  # report BypassConfigure only for last source when all was True
-        elif async_result is not None and source_id not in self.__finals_received:
-            core_async.unwrap(async_result)  # does nothing or raises thread error
-            raise RuntimeError("Thread has terminated before sending TAllForeignPlatformsReported")
+        elif async_result is not None:
+            if source_id in self.__finals_received:
+                res = {}
+            else:
+                try:
+                    core_async.unwrap(async_result)  # does nothing or raises thread error
+                except Exception:
+                    # The thread is terminated with an error and hasn't sent TAllForeignPlatformsReported.
+                    # So we must count thread termination as a final event too.
+                    self.__finals_received.add(source_id)
+                else:
+                    # The thread is terminated w/o errors but hasn't sent TAllForeignPlatformsReported.
+                    # This should not happen, let's tell the user about that.
+                    raise RuntimeError("Thread has terminated before sending TAllForeignPlatformsReported")
         return res
 
 
