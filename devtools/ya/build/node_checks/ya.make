@@ -1,7 +1,8 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 ALL_PY_SRCS(
-    NAMESPACE build.node_checks
+    NAMESPACE
+    build.node_checks
 )
 
 END()

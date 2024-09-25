@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 STYLE_PYTHON()
 
@@ -13,7 +13,9 @@ PEERDIR(
 )
 
 IF (NOT OPENSOURCE)
-    PEERDIR(devtools/ya/yalibrary/yandex/sandbox)
+    PEERDIR(
+        devtools/ya/yalibrary/yandex/sandbox
+    )
 ENDIF()
 
 END()
