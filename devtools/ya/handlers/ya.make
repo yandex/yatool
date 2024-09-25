@@ -17,13 +17,9 @@ PEERDIR(
     devtools/ya/handlers/style
     devtools/ya/handlers/test
     devtools/ya/handlers/tool
+    devtools/ya/handlers/analyze_make
+    devtools/ya/handlers/run
 )
-
-IF (PYTHON3)
-    PEERDIR(
-        devtools/ya/handlers/analyze_make
-    )
-ENDIF()
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
@@ -53,23 +49,18 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
         devtools/ya/handlers/yav
+        devtools/ya/handlers/vim
+        devtools/ya/handlers/curl
+        devtools/ya/handlers/neovim
+        devtools/ya/handlers/gdb
+        devtools/ya/handlers/emacs
+        devtools/ya/handlers/grep
+        devtools/ya/handlers/jstyle
+        devtools/ya/handlers/nile
+        devtools/ya/handlers/sed
+        devtools/ya/handlers/ydb
+        devtools/ya/handlers/yql
     )
-    IF (PYTHON3)
-        PEERDIR(
-            devtools/ya/handlers/vim
-            devtools/ya/handlers/curl
-            devtools/ya/handlers/neovim
-            devtools/ya/handlers/gdb
-            devtools/ya/handlers/emacs
-            devtools/ya/handlers/grep
-            devtools/ya/handlers/jstyle
-            devtools/ya/handlers/nile
-            devtools/ya/handlers/run
-            devtools/ya/handlers/sed
-            devtools/ya/handlers/ydb
-            devtools/ya/handlers/yql
-        )
-    ENDIF()
 ENDIF()
 
 END()
