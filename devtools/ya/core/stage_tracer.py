@@ -1,6 +1,7 @@
 import collections
 import contextlib
 import copy
+import functools
 import logging
 import threading
 import time
@@ -9,6 +10,8 @@ from abc import ABCMeta, abstractmethod
 
 from . import stages_profiler
 from . import profiler
+
+import typing as tp  # noqa
 
 
 logger = logging.getLogger(__name__)
@@ -124,7 +127,7 @@ class StageTracer(object):
 
     class Stage(object):
         def __init__(self, stage_tracer, name, group, tag=None):
-            # type: (StageTracer, str, str, str) -> None
+            # type: (StageTracer, str, str, str | None) -> None
             '''
             XXX
             :param name: Additional info, transforms into .Args.name in timeline
@@ -149,19 +152,19 @@ class StageTracer(object):
             self.__group = group
 
         def start(self, name, start_time=None):
-            # type: (str, float) -> StageTracer.Stage
+            # type: (str, float | None) -> StageTracer.Stage
             return self.__parent.start(name, self.__group, start_time)
 
         def finish(self, name, finish_time=None, tag=None):
-            # type: (str, float, str) -> None
+            # type: (str, float | None, str | None) -> None
             return self.__parent.finish(name, self.__group, finish_time, tag)
 
         def scope(self, name, tag=None):
-            # type: (str, str) -> None
+            # type: (str, str | None) -> contextlib.AbstractContextManager
             return self.__parent.scope(name, self.__group, tag)
 
     def __init__(self, consumers=None):
-        # type: (list[Consumer]) -> None
+        # type: (list[Consumer] | None) -> None
         self.__events = []  # type: list[StageTracer._Event]
         self.__stat = {}  # type: dict[str, dict[str, StageTracer.Stat]]
         self.__consumers = consumers or []  # type: list[Consumer]
@@ -177,7 +180,7 @@ class StageTracer(object):
                     self._consume_event(event, [consumer])
 
     def start(self, name, group=DEFAULT_GROUP, start_time=None, tag=None):
-        # type: (str, str, float, str) -> StageTracer.Stage
+        # type: (str, str, float | None, str | None) -> StageTracer.Stage
         start_time = start_time or time.time()
         with self.__lock:
             event = self._StartEvent(name, group, start_time, tag or name)
@@ -186,7 +189,7 @@ class StageTracer(object):
             return self.Stage(self, name, group, tag)
 
     def finish(self, name, group=DEFAULT_GROUP, finish_time=None, tag=None):
-        # type: (str, str, float, str) -> None
+        # type: (str, str, float | None, str | None) -> None
         finish_time = finish_time or time.time()
         with self.__lock:
             start_time = self.__started.pop((name, group), None)
@@ -199,7 +202,7 @@ class StageTracer(object):
 
     @contextlib.contextmanager
     def scope(self, name, group=DEFAULT_GROUP, tag=None):
-        # type: (str, str, str) -> types.GeneratorType
+        # type: (str, str, str | None) -> tp.Generator[None, None, None]
         stage = self.start(name, group, tag=tag)
         try:
             yield None
@@ -263,3 +266,22 @@ def get_stat(group):
 def get_all_stat():
     # type: () -> dict[str, dict[str, StageTracer.Stat]]
     return stage_tracer.get_all_stat()
+
+
+def trace_with(tracer):
+    # type: (StageTracer.GroupStageTracer) -> tp.Callable
+    if not isinstance(tracer, StageTracer.GroupStageTracer):
+        raise TypeError("Use {} instead of {}".format(StageTracer.GroupStageTracer.__name__, type(tracer).__name__))
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.scope(
+                name=func.__name__ + ' in ' + threading.current_thread().name,
+                tag=func.__name__,
+            ):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

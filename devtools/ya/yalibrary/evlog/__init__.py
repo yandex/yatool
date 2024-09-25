@@ -14,6 +14,10 @@ import core.config
 import core.gsid
 from exts import fs, os2, yjson, archive
 
+import typing as tp  # noqa
+import abc
+
+
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
 DAYS_TO_SAVE = 10
@@ -82,18 +86,40 @@ class EmptyEvlogListException(Exception):
     mute = True
 
 
-class DummyEvlog(object):
-    def write(self, *args, **kwargs):
+class BaseEvlogWriter:
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def __init__(self, filepath, replacements=None):
+        # type: (str, dict | None) -> None
+        pass
+
+    @abc.abstractmethod
+    def write(self, namespace, event, **kwargs):
+        # type: (str, str) -> None
+        pass
+
+    def get_writer(self, namespace):
+        # type: (str) -> tp.Callable[[str], None]
+
+        def inner(event, **kwargs):
+            self.write(namespace, event, **kwargs)
+
+        return inner
+
+
+class DummyEvlogWriter(BaseEvlogWriter):
+    def __init__(self, filepath=None, replacements=None):
+        pass
+
+    def write(self, namespace, event, **kwargs):
         pass
 
     def __call__(self, *args, **kwargs):
         pass
 
-    def get_writer(self, *args, **kwargs):
-        return self
 
-
-class EvlogWriter(object):
+class EvlogWriter(BaseEvlogWriter):
     def __init__(self, filepath, replacements=None):
         self.filepath = filepath
         self._fileobj = self._open_file(filepath)
@@ -180,12 +206,6 @@ class EvlogWriter(object):
     def closed(self):
         return self._fileobj.closed
 
-    def get_writer(self, namespace):
-        def inner(event, **kwargs):
-            self.write(namespace, event, **kwargs)
-
-        return inner
-
 
 class EvlogFileFinder(object):
     def __init__(self, evlog_dir, filter_func=lambda x, y: True):
@@ -205,7 +225,36 @@ class EvlogFileFinder(object):
         return evlogs[-1]
 
 
-class EvlogFacade(object):
+class BaseEvlogFacade:
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def __init__(self, evlog_dir, filename=None, replacements=None, compress_evlog=True):
+        pass
+
+    @abc.abstractmethod
+    def write(self, namespace, event, **kwargs):
+        # type: (str, str) -> None
+        pass
+
+    @abc.abstractmethod
+    def get_writer(self, namespace):
+        # type: (str) -> tp.Callable[[str], None]
+        pass
+
+
+class DummyEvlogFacade(BaseEvlogFacade):
+    def __init__(self, evlog_dir=None, filename=None, replacements=None, compress_evlog=True):
+        self.writer = DummyEvlogWriter()
+
+    def write(self, namespace, event, **kwargs):
+        return self.writer.write(namespace, event, **kwargs)
+
+    def get_writer(self, namespace):
+        return self.writer.get_writer(namespace)
+
+
+class EvlogFacade(BaseEvlogFacade):
     def __init__(self, evlog_dir, filename=None, replacements=None, compress_evlog=True):
         fs.create_dirs(evlog_dir)
 

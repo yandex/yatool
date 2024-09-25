@@ -1794,8 +1794,7 @@ class _GraphMaker(object):
                     o['changelist_generator'] = (
                         self._cl_generator
                     )  # TODO: think of a proper way to pass it closer to ymake launch
-                    with stager.scope("force_changelist_creation"):
-                        o['patch_path'] = self._cl_generator.get_changelist(ya_cache_dir)
+                    o['patch_path'] = self._cl_generator.get_changelist(ya_cache_dir)
                     if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
                         o['debug_options'] = o['debug_options'] + ['completely-trust-fs-cache']
         else:
