@@ -202,7 +202,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
     LoadLicenses(extraData);
-    LoadAutoincludes(extraData);
+    LoadAutoincludes(rulesData);
     TMd5Sig rules;
     rulesData.Final(rules.RawData);
     extraData.Update(rules.RawData);
