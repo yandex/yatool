@@ -1,4 +1,5 @@
 import exts.yjson as json
+import logging
 import os
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ import build.graph_path
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.toolscache import toolscache_version
 
+
+logger = logging.getLogger(__name__)
 
 SOURCE_EXTS = ('cpp', 'c', 'cc', 'cxx')
 CLANG_NAMES = ('clang', 'clang++')
@@ -87,6 +90,13 @@ class CompilationDatabaseOptions(core.yarg.Options):
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
         ]
+
+    def postprocess(self):
+        if self.target_file is None and self.update:
+            # TODO: Raise exception when ya ide vscode is ready
+            # raise core.yarg.ArgsValidatingException("--update flag can't be used without --target-file option")
+            logger.debug("--update flag is ignored since --target-file is not specified")
+            self.update = False
 
 
 COMPILATION_DATABASE_OPTS = build.build_opts.ya_make_options(free_build_targets=True) + [CompilationDatabaseOptions()]
