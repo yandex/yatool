@@ -30,22 +30,15 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/completion
         devtools/ya/handlers/dctl
         devtools/ya/handlers/download
-        # devtools/ya/handlers/exec
-        # devtools/ya/handlers/fetch
         devtools/ya/handlers/fix_includes
         devtools/ya/handlers/notify
         devtools/ya/handlers/paste
         devtools/ya/handlers/pr
         devtools/ya/handlers/profile
         devtools/ya/handlers/project
-        # devtools/ya/handlers/remote_gdb
-        # devtools/ya/handlers/repo_check
-        # devtools/ya/handlers/shell
-        # devtools/ya/handlers/stat
         devtools/ya/handlers/svn
         devtools/ya/handlers/upload
         devtools/ya/handlers/vmctl
-        # devtools/ya/handlers/webide
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
         devtools/ya/handlers/yav
