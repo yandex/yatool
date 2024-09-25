@@ -256,6 +256,7 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
         .Handler1([this](const NLastGetopt::TOptsParser* p) {
             ExpressionErrorDetails = ParseShowExpressionErrors(p->CurValStr());
         });
+    opts.AddLongOption("xdisable-grand-bypass", "Disable Grand bypass").SetFlag(&DisableGrandBypass).NoArgument();
 
     auto dontWriteInternalCache = [this](){
         DontWriteInternalCache = true;

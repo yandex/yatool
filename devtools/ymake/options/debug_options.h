@@ -109,6 +109,8 @@ struct TDebugOptions {
     TString PatchPath2;
     bool ReadFileContentFromZipatch2 = false;
 
+    bool DisableGrandBypass = false;
+
     enum class EShowExpressionErrors {None, One, All};
     EShowExpressionErrors ParseShowExpressionErrors(TStringBuf s);
     std::optional<EShowExpressionErrors> ExpressionErrorDetails;
