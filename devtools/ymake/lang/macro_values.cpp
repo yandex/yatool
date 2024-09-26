@@ -6,10 +6,6 @@
 
 namespace {
 
-    constexpr static ui32 COORD_BITS = 20;
-    constexpr static ui32 COORD_MASK = (1 << COORD_BITS) - 1;
-    constexpr static ui32 COORD_ARRAY_FLAG = 1 << COORD_BITS;
-
     constexpr ui16 FunctionArity(EMacroFunction func) noexcept {
         ui16 res = 0;
         switch (func) {
@@ -97,7 +93,7 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
             // but a naive implementation might actually be not as efficient;
             // TODO a general array storage
             auto encoded = fmt::format("{}", fmt::join(val.Coords, " "));
-            return NPolexpr::TConstId(ST_INPUTS, Strings.Add(encoded) | COORD_ARRAY_FLAG);
+            return NPolexpr::TConstId(ST_INPUT_ARRAYS, Strings.Add(encoded));
         } else if constexpr (std::is_same_v<T, TOutput>)
             return NPolexpr::TConstId(ST_OUTPUTS, val.Coord);
         else if constexpr (std::is_same_v<T, TGlobPattern>)
@@ -113,10 +109,12 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
             return TTool {.Data = Refs.GetName<TCmdView>(id.GetIdx()).GetStr()};
         case ST_INPUTS: {
             auto idx = id.GetIdx();
-            if ((idx & COORD_ARRAY_FLAG) == 0)
-                return TInput {.Coord = idx};
+            return TInput {.Coord = idx};
+        }
+        case ST_INPUT_ARRAYS: {
+            auto idx = id.GetIdx();
             auto result = TInputs();
-            auto encoded = Strings.GetName<TCmdView>(idx & COORD_MASK).GetStr();
+            auto encoded = Strings.GetName<TCmdView>(idx).GetStr();
             for (auto coord : StringSplitter(encoded).Split(' ').SkipEmpty())
                 result.Coords.push_back(FromString<ui32>(coord.Token()));
             return result;

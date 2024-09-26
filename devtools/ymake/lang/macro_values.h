@@ -80,7 +80,8 @@ public:
         ST_TOOLS,
         ST_INPUTS,
         ST_OUTPUTS,
-        ST_GLOB
+        ST_GLOB,
+        ST_INPUT_ARRAYS,
     };
 
     NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }
