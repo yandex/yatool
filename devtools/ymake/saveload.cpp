@@ -732,7 +732,8 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
         YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
         return;
     }
-    if (PrevStartDirs_ != CurStartDirs_) {
+    // Compare order-independently since the order may vary for tool runs
+    if (TSet<ui32>{PrevStartDirs_.begin(), PrevStartDirs_.end()} != TSet<ui32>{CurStartDirs_.begin(), CurStartDirs_.end()}) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because start dirs are different" << Endl;
         return;
