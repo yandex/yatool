@@ -6,8 +6,6 @@
 
 #include <devtools/ymake/diag/dbg.h>
 
-#include <library/cpp/deprecated/autoarray/autoarray.h>
-
 #include <util/folder/path.h>
 
 #include <ctime>
@@ -45,7 +43,7 @@ struct TTimeStamps::TStampMoveDesc {
     bool CanMoveRight;
     ui8 MoveRightTo;
 
-    TStampMoveDesc() {
+    TStampMoveDesc() noexcept {
         Zero(*this);
     }
 
@@ -80,12 +78,7 @@ struct TTimeStamps::TStampMoveDesc {
     }
 };
 
-struct TTimeStamps::TMoveMap: public autoarray<TTimeStamps::TStampMoveDesc> {
-    TMoveMap()
-        : autoarray<TStampMoveDesc>(256)
-    {
-    }
-
+struct TTimeStamps::TMoveMap: public std::array<TTimeStamps::TStampMoveDesc, 256> {
     // this function changes some dates to newer ones
     void MoveStamp(ui8& stamp, size_t& mvStats) {
         if (stamp) {
@@ -128,7 +121,9 @@ void TTimeStamps::CompressTimes(THashMap<ui32, TNodeData>& nodeData) {
         return;
     }
     YDIAG(DG) << "In CompressTimes\n";
-    autoarray<TCntForPos> useCount(NumTimes, autoarray_getindex());
+    TVector<TCntForPos> useCount(Reserve(NumTimes));
+    for (size_t pos = 0; pos < NumTimes; ++pos)
+        useCount.push_back({pos});
 
     // we want to delete least used date stamps
     for (auto i = Elems.FileConf.Meta.begin(), e = Elems.FileConf.Meta.end(); i != e; ++i) {
@@ -137,7 +132,7 @@ void TTimeStamps::CompressTimes(THashMap<ui32, TNodeData>& nodeData) {
         useCount[data.RealModStamp].Count++; // old LastCheckedStamp's have no value, we don't count them
     }
     Y_ASSERT(KeepLast >= 1);
-    DoSwap(useCount[0], useCount[+useCount - 1 - KeepLast]);    // 0 is a reserved 'no stamp' stamp
+    DoSwap(useCount[0], useCount[useCount.size() - 1 - KeepLast]);    // 0 is a reserved 'no stamp' stamp
     std::sort(useCount.begin(), useCount.end() - 1 - KeepLast); // 0 and last KeepLast stamps will not be deleted
     std::sort(useCount.begin(), useCount.begin() + SingleDrop, TCntForPos::ByPos);
     size_t numFiles = 0;

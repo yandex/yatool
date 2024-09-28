@@ -14,7 +14,6 @@
 
 #include <devtools/libs/yaplatform/platform_map.h>
 
-#include <library/cpp/deprecated/autoarray/autoarray.h>
 #include <library/cpp/digest/md5/md5.h>
 
 #include <util/generic/fwd.h>
@@ -52,7 +51,7 @@ private:
 
     TGraphLoops Loops;
     TNodesData<TLoopCnt, TVector> LoopCnt;
-    autoarray<TLoopCnt> LoopsHash;
+    TVector<TLoopCnt> LoopsHash;
 
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;

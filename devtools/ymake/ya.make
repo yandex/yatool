@@ -29,8 +29,6 @@ PEERDIR(
     library/cpp/containers/comptrie
     library/cpp/containers/top_keeper
     library/cpp/string_utils/levenshtein_diff
-    library/cpp/deprecated/autoarray
-    library/cpp/deprecated/split
     library/cpp/digest/md5
     library/cpp/getopt/small
     library/cpp/iterator
