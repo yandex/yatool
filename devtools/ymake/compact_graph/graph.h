@@ -712,7 +712,7 @@ private:
 
 private:
     bool IsValid() const {
-        return AsIdx(Id_) == Graph_.Nodes_.size() || Cur().IsValid();
+        return !Graph_.Nodes_.contains(Id_) || Cur().IsValid();
     }
 
     void Advance() {
