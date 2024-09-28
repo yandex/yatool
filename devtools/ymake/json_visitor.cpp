@@ -125,7 +125,7 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
     Loops.FindLoops(RestoreContext.Graph, startDirs, false);
 
-    LoopCnt.resize(Loops.size());
+    LoopCnt.SetMaxNodeIdByResize(Loops.MaxNodeId());
 
     for (TTarget target : startDirs) {
         if (target.IsModuleTarget) {
@@ -716,7 +716,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             if (!sameLoop) {
                 TGraphLoop& loop = Loops[CurrData->LoopId];
                 if (!loop.DepsDone) {
-                    Y_ASSERT(LoopCnt[AsIdx(CurrData->LoopId)].Sign.Empty());
+                    Y_ASSERT(LoopCnt[CurrData->LoopId].Sign.Empty());
                     SortUnique(loop.Deps);
                     for (auto l : loop) {
                         if (l != CurrNode.Id()) { // TODO: THINK: just assign currentStateData.IncludedDeps to all
@@ -1032,8 +1032,8 @@ void TJSONVisitor::PassToParent(TState& state) {
 void TJSONVisitor::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph) {
     const TGraphLoop& loop = Loops[loopId];
 
-    buffer->Save(LoopCnt[AsIdx(loopId)].SelfSign.GetRawData(), 16);
-    buffer->Save(LoopCnt[AsIdx(loopId)].Sign.GetRawData(), 16);
+    buffer->Save(LoopCnt[loopId].SelfSign.GetRawData(), 16);
+    buffer->Save(LoopCnt[loopId].Sign.GetRawData(), 16);
     buffer->Save<ui32>(loop.Deps.size());
     for (TNodeId depNode : loop.Deps) {
         buffer->SaveElemId(depNode, graph);
@@ -1045,8 +1045,8 @@ bool TJSONVisitor::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDe
     if (!loopId)
         return false;
 
-    buffer->LoadMd5(&LoopCnt[AsIdx(*loopId)].SelfSign);
-    buffer->LoadMd5(&LoopCnt[AsIdx(*loopId)].Sign);
+    buffer->LoadMd5(&LoopCnt[*loopId].SelfSign);
+    buffer->LoadMd5(&LoopCnt[*loopId].Sign);
 
     ui32 depsCount = buffer->Load<ui32>();
 

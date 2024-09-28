@@ -51,7 +51,7 @@ private:
     TVector<TNodeId> SortedNodesForRendering;
 
     TGraphLoops Loops;
-    autoarray<TLoopCnt> LoopCnt;
+    TNodesData<TLoopCnt, TVector> LoopCnt;
     autoarray<TLoopCnt> LoopsHash;
 
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
