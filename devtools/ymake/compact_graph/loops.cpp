@@ -1,6 +1,7 @@
 #include "loops.h"
 
 #include "iter.h"
+#include "nodes_data.h"
 #include "query.h"
 
 #include <devtools/ymake/diag/manager.h>
@@ -9,15 +10,11 @@
 #include <util/generic/hash_set.h>
 #include <util/stream/format.h>
 
-struct TLoopId {
-    TNodeId LoopId;
-    bool IsFile;
+namespace {
 
-    TLoopId(bool isFile = false)
-        : LoopId(TNodeId::Invalid)
-        , IsFile(isFile)
-    {
-    }
+struct TLoopId {
+    TNodeId LoopId = TNodeId::Invalid;
+    bool IsFile = false;
 };
 
 using TLoopData = TVisitorStateItem<TLoopId>;
@@ -30,32 +27,33 @@ public:
     class TGluedLoops {
     private:
         struct TLoopData {
+            TLoopData() noexcept = default;
+
             TNodeId ParentLoop = TNodeId::Invalid;
             size_t Rank = 0;
         };
 
-        TVector<TLoopData> Loops;
+        TNodesData<TLoopData, TVector> Loops;
 
     public:
         TGluedLoops()
-            : Loops({TLoopData()})
+            : Loops{}
         {}
 
         TNodeId AddLoop() {
-            Loops.emplace_back();
-            return static_cast<TNodeId>(Loops.size() - 1);
+            return Loops.emplace_back();
         }
 
         TNodeId GetLoopId(TNodeId loopId) {
             TVector<TNodeId> pathToRoot;
 
-            while (Loops[AsIdx(loopId)].ParentLoop > TNodeId::Invalid) {
+            while (Loops[loopId].ParentLoop > TNodeId::Invalid) {
                 pathToRoot.push_back(loopId);
-                loopId = Loops[AsIdx(loopId)].ParentLoop;
+                loopId = Loops[loopId].ParentLoop;
             }
 
             for (const auto& loopNum : pathToRoot) {
-                Loops[AsIdx(loopNum)].ParentLoop = loopId;
+                Loops[loopNum].ParentLoop = loopId;
             }
 
             return loopId;
@@ -68,12 +66,12 @@ public:
                 return;
             }
 
-            if (Loops[AsIdx(first)].Rank < Loops[AsIdx(second)].Rank) {
+            if (Loops[first].Rank < Loops[second].Rank) {
                 std::swap(first, second);
-            } else if (Loops[AsIdx(first)].Rank == Loops[AsIdx(second)].Rank) {
-                Loops[AsIdx(first)].Rank++;
+            } else if (Loops[first].Rank == Loops[second].Rank) {
+                Loops[first].Rank++;
             }
-            Loops[AsIdx(second)].ParentLoop = first;
+            Loops[second].ParentLoop = first;
         }
     };
 
@@ -225,6 +223,8 @@ public:
         YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
     }
 };
+
+}
 
 bool TGraphLoops::HasBadLoops() const {
     return !DirLoops.empty() || !BuildLoops.empty();
