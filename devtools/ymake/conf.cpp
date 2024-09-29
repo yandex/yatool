@@ -323,9 +323,18 @@ void TBuildConfiguration::FillMiscValues() {
     UseGraphChangesPredictor = NYMake::IsTrue(CommandConf.EvalValue("USE_GRAPH_CHANGES_PREDICTOR"));
     UseGrandBypass = !TDebugOptions::DisableGrandBypass && NYMake::IsTrue(CommandConf.EvalValue("USE_GRAND_BYPASS"));
 
-    MainOutputAsExtra_ = NYMake::IsTrue(CommandConf.EvalValue("MAIN_OUTPUT_AS_EXTRA"));
-    YDebug() << "MainOutputAsExtra " << (MainOutputAsExtra_ ? "enabled" : "disabled") << Endl;
-    CheckForIncorrectLoops_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_CHECK_FOR_INCORRECT_LOOPS"));
+    auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
+        TStringBuf value = CommandConf.EvalValue(variableName);
+        if (!value.Empty()) {
+            flag = NYMake::IsTrue(value);
+        }
+        if (log) {
+            YDebug() << variableName << (flag ? " enabled" : " disabled") << (value.Empty() ? " (by default)" : "") << Endl;
+        }
+    };
+
+    updateFlag(MainOutputAsExtra_, "MAIN_OUTPUT_AS_EXTRA", true);
+    updateFlag(CheckForIncorrectLoops_, "YMAKE_CHECK_FOR_INCORRECT_LOOPS", true);
 
     if (const auto val = CommandConf.EvalValue("NON_FATAL_ADDINCL_TO_MISSING"); !val.empty()) {
         ReportMissingAddincls = !NYMake::IsTrue(val);
