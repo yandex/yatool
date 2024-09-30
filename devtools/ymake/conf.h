@@ -203,7 +203,7 @@ private:
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
     bool JsonDepsFromMainOutputEnabled_ = false;
-    bool MainOutputAsExtra_ = false;
+    bool MainOutputAsExtra_ = true;
     bool CheckForIncorrectLoops_ = false;
     bool UseGraphChangesPredictor = false;
     bool UseGrandBypass = false;
