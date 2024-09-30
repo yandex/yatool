@@ -1187,13 +1187,29 @@ class Context(object):
                 self.graph['conf']['coordinator'] = self.opts.coordinators_filter
             if self.opts.distbuild_pool:
                 self.graph['conf']['pool'] = self.opts.distbuild_pool
-            if self.opts.distbuild_tracing_context:
-                project, trace_id, span_id = self.opts.distbuild_tracing_context.split(':')
-                self.graph['conf']['trace_context'] = {
-                    'project': project,
-                    'trace_id': trace_id,
-                    'span_id': span_id,
-                }
+            if self.opts.trace_context_json:
+                # Trace context should be extracted earlier but since `ya` doesn't use OTEL tracing
+                # we extract it here and pass it directly to DistBuild.
+                try:
+                    carrier = json.loads(self.opts.trace_context_json)
+                    # The below logic should be implemented with OpenTelemetry Python API
+                    # but to avoid extra dependencies we do simplified parsing ourselves
+                    traceparent = carrier['traceparent']
+                    __, trace_id, span_id, trace_flags = traceparent.split('-')
+                    # Check if this trace branch is sampled
+                    if int(trace_flags):
+                        # Ideally we should just pass trace context's fields/headers ('traceparent', 'tracestate')
+                        # through but we need to agree this protocol change with the DistBuild team first
+                        self.graph['conf']['trace_context'] = {
+                            'project': 'distbuild',
+                            'trace_id': trace_id,
+                            'span_id': span_id,
+                        }
+                except Exception as exc:
+                    logger.warning(
+                        'Failed to load the provided trace context and propagate it to DistBuild.',
+                        exc_info=exc,
+                    )
 
     def _dump_graph_if_needed(self):
         if not self.opts.dump_graph:

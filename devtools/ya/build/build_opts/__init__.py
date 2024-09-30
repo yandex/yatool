@@ -1495,6 +1495,7 @@ class YMakeDebugOptions(Options):
         self.clear_ymake_cache = False
         self.vcs_file = None
         self.dump_file_path = None
+        self.trace_context_json = None
 
     @staticmethod
     def consumer():
@@ -1520,6 +1521,11 @@ class YMakeDebugOptions(Options):
                 hook=SetValueHook('dump_file_path'),
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YANDEX_TRACE_CONTEXT_JSON',
+                help='W3C Trace Context in JSON format',
+                hook=SetValueHook('trace_context_json'),
             ),
         ]
 
