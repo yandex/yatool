@@ -3,9 +3,11 @@ import os
 import platform
 import shutil
 from collections import OrderedDict
+from pathlib import Path, PurePath
 
 import yalibrary.platform_matcher as pm
 from ide import ide_common
+from . import consts
 from . import excludes
 
 
@@ -150,7 +152,16 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
     try:
         black_binary_path = tool_fetcher("black")[0]
     except Exception as e:
-        ide_common.emit_message("[[warn]]Could not get \"ya tool black\"[[rst]]: %s" % repr(e))
+        ide_common.emit_message(f"[[warn]]Could not get \"ya tool black\"[[rst]]: {e!r}")
+        return {}
+
+    arc_root = PurePath(arc_root)
+
+    try:
+        with open(arc_root / consts.DEFAULT_PYTHON_LINTER_CONFIGS) as afile:
+            black_config_file: str = json.load(afile)[consts.BLACK_LINTER_NAME]
+    except Exception as e:
+        ide_common.emit_message(f"[[warn]]Could not get black config path [[rst]]: {e!r}")
         return {}
 
     return OrderedDict(
@@ -166,7 +177,7 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
                 "black-formatter.args",
                 [
                     "--config",
-                    os.path.join(arc_root, "build/config/tests/py_style/config.toml"),
+                    str(arc_root / black_config_file),
                 ],
             ),
             ("black-formatter.path", [black_binary_path]),
@@ -178,42 +189,45 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
     try:
         clang_format_binary_path = tool_fetcher("clang-format")[0]
     except Exception as e:
-        ide_common.emit_message("[[warn]]Could not get \"ya tool clang-format\"[[rst]]: %s" % repr(e))
+        ide_common.emit_message(f"[[warn]]Could not get \"ya tool clang-format\"[[rst]]: {e!r}")
         return {}
 
-    config_path = os.path.join(arc_root, "build/config/tests/cpp_style/config.clang-format")
+    arc_root = Path(arc_root)
 
-    if not os.path.exists(config_path):
-        ide_common.emit_message(
-            "[[warn]]Failed to find clang-format config[[rst]]: '{}' doesn't exist".format(config_path)
-        )
+    try:
+        with open(arc_root / consts.DEFAULT_CPP_LINTER_CONFIGS) as afile:
+            config_file: str = json.load(afile)[consts.CLANG_FORMAT_LINTER_NAME]
+    except Exception as e:
+        ide_common.emit_message(f"[[warn]]Could not get clang-format config path [[rst]]: {e!r}")
         return {}
 
-    target_name = ".clang-format"
-    target_path = os.path.join(arc_root, target_name)
+    config_path = arc_root / config_file
+
+    if not config_path.exists():
+        ide_common.emit_message(f"[[warn]]Failed to find clang-format config[[rst]]: '{config_path}' doesn't exist")
+        return {}
+
+    target_path = arc_root / ".clang-format"
 
     create_symlink = False
-    if not os.path.lexists(target_path):
+    if not target_path.exists(follow_symlinks=False):
         create_symlink = True
-    elif os.path.islink(target_path):
-        link_path = os.readlink(target_path)
+    elif target_path.is_symlink():
+        link_path = target_path.readlink()
         if link_path != config_path:
             ide_common.emit_message(
-                "[[warn]]clang-format config was updated[[rst]]: '{}' was linked to the '{}', new path: '{}'".format(
-                    target_path,
-                    link_path,
-                    config_path,
-                ),
+                f"[[warn]]clang-format config was updated[[rst]]: '{target_path}' "
+                f"was linked to the '{link_path}', new path: '{config_path}'",
             )
-            os.unlink(target_path)
+            target_path.unlink()
             create_symlink = True
     else:
         ide_common.emit_message(
-            "[[warn]]Failed to create link to the clang-format config[[rst]]: '{}' is not a link".format(target_path)
+            f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{target_path}' is not a link"
         )
 
     if create_symlink:
-        os.symlink(config_path, target_path)
+        config_path.symlink_to(target_path)
 
     return OrderedDict(
         (

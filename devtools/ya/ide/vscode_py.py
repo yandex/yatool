@@ -7,6 +7,7 @@ import platform
 import shutil
 import sys
 from collections import OrderedDict
+from pathlib import PurePath
 
 import termcolor
 
@@ -275,6 +276,15 @@ class PyProject(object):
             ide_common.emit_message(termcolor.colored("Could not get 'ya tool black': %s" % repr(e), 'yellow'))
             return {}
 
+        arc_root = PurePath(self.params.arc_root)
+
+        try:
+            with open(arc_root / vscode.consts.DEFAULT_PYTHON_LINTER_CONFIGS) as afile:
+                black_config_file: str = json.load(afile)[vscode.consts.BLACK_LINTER_NAME]
+        except Exception as e:
+            ide_common.emit_message("[[warn]]Could not get black config path [[rst]]: %s" % repr(e))
+            return {}
+
         return OrderedDict(
             (
                 (
@@ -285,7 +295,7 @@ class PyProject(object):
                     "black-formatter.args",
                     [
                         "--config",
-                        os.path.join(self.params.arc_root, "build/config/tests/py_style/config.toml"),
+                        str(arc_root / black_config_file),
                     ],
                 ),
                 ("black-formatter.path", [black_binary_path]),
