@@ -13,6 +13,7 @@ struct TLoggingOpts {
     bool EnableEvlog = false;
     bool EnableStderr = true;
     fs::path EvLogFilePath;
+    bool FailOnError = false;
 };
 
 struct TOpts {

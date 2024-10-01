@@ -82,6 +82,10 @@ int main(int argc, char** argv) try {
     ECleanIgnored cleanIgnored = opts.CleanIgnored ? ECleanIgnored::Enabled : ECleanIgnored::Disabled;
     generator->RenderTo(opts.ExportRoot, cleanIgnored);
 
+    if (opts.LoggingOpts.FailOnError && IsFailOnError()) {
+        spdlog::error("There were errors during export, generate an non-success return code");
+        return 1;
+    }
     return 0;
 } catch (const TYExportException& err) {
     spdlog::error("Caught TYExportException: {}", err.what());

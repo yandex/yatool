@@ -50,6 +50,7 @@ TOpts TOpts::Parse(int argc, char** argv) {
             spdlog::error(error);
         }
     });
+    opts.AddLongOption(0, "fail-on-error", "Generate non-success return code if some errors during exporting").StoreTrue(&ret.LoggingOpts.FailOnError);
 
     NLastGetopt::TOptsParseResult{&opts, argc, argv};
 

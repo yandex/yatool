@@ -28,8 +28,7 @@ namespace {
     public:
         TFileTracer(const fs::path& logPath)
             : LogFileStream_(TFile(logPath.c_str(), CreateAlways))
-        {
-        }
+        {}
         void Trace(const TString& ev) override {
             TGuard g(Mutex_);
             LogFileStream_ << ev.c_str() << Endl;
@@ -78,16 +77,50 @@ namespace {
         }
     };
 
+
+    class TFailOnErrorSink: public spdlog::sinks::sink {
+    public:
+        TFailOnErrorSink() {
+            set_level(spdlog::level::err);
+        }
+
+        void flush() override {}
+        virtual void set_pattern(const std::string &) override {};
+        virtual void set_formatter(std::unique_ptr<spdlog::formatter>) override {};
+
+        void log(const spdlog::details::log_msg &msg) override {
+            switch (msg.level) {
+                case spdlog::level::critical:
+                case spdlog::level::err:
+                    isFailOnError_ = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        static bool IsFailOnError() {
+            return isFailOnError_;
+        }
+
+    private:
+        static bool isFailOnError_;
+    };
+
+    bool TFailOnErrorSink::isFailOnError_ = false; // non-const static data member must be initialized out of line
 }
 
 namespace NYexport {
 
 void SetupLogger(TLoggingOpts opts) {
     spdlog::default_logger()->sinks() = {};
-    if (opts.EnableStderr)
+    if (opts.EnableStderr) {
         spdlog::default_logger()->sinks().push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
+    }
     if (opts.EnableEvlog) {
         spdlog::default_logger()->sinks().push_back(std::make_shared<TEvlogSink>());
+    }
+    if (opts.FailOnError) {
+        spdlog::default_logger()->sinks().push_back(std::make_shared<TFailOnErrorSink>());
     }
     spdlog::cfg::load_env_levels();
 
@@ -101,6 +134,10 @@ void SetupLogger(TLoggingOpts opts) {
     } else {
         traceSink = MakeHolder<NYMake::TScopedTraceSink<TDefaultTracer>>();
     }
+}
+
+bool IsFailOnError() {
+    return TFailOnErrorSink::IsFailOnError();
 }
 
 }

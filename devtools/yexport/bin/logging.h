@@ -5,5 +5,6 @@
 namespace NYexport {
 
 void SetupLogger(TLoggingOpts opts);
+bool IsFailOnError();
 
 }
