@@ -1067,9 +1067,17 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
 
             if (setPassFlags) {
-                TNodeData& outNodeData = Graph->GetFileNodeData(outNode.ElemId);
-                outNodeData.PassNoInducedDeps = rule ? rule->PassNoInducedDeps : false;
-                outNodeData.PassInducedIncludesThroughFiles = rule ? rule->PassInducedIncludesThroughFiles : false;
+                auto setFlags = [&](ui32 elemId) {
+                    TNodeData& nodeData = Graph->GetFileNodeData(elemId);
+                    nodeData.PassNoInducedDeps = rule ? rule->PassNoInducedDeps : false;
+                    nodeData.PassInducedIncludesThroughFiles = rule ? rule->PassInducedIncludesThroughFiles : false;
+                };
+
+                setFlags(outNode.ElemId);
+
+                if (mainOut && mainOutAsExtra) {
+                    setFlags(actionNode.ElemId);
+                }
             }
         }
 
