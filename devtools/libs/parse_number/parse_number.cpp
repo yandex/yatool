@@ -8,7 +8,7 @@
 namespace NDistBuild {
 
     bool TryParseHumanReadableNumber(TStringBuf str, float* number) noexcept {
-        if (str.Empty()) {
+        if (str.empty()) {
             return false;
         }
 
@@ -52,7 +52,7 @@ namespace NDistBuild {
     }
 
     bool TryParseHumanReadableNumber(TStringBuf str, ui64* number) noexcept {
-        if (str.Empty()) {
+        if (str.empty()) {
             return false;
         }
 
