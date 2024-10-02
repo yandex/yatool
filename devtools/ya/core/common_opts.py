@@ -29,6 +29,7 @@ from core.yarg import (
     EnvConsumer,
     SetAppendHook,
     DictPutHook,
+    DictUpdateHook,
     ArgsValidatingException,
     SANDBOX_UPLOAD_OPT_GROUP,
     AUTH_OPT_GROUP,
@@ -800,7 +801,7 @@ class CrossCompilationOptions(Options):
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.BASIC,
             ),
-            ConfigConsumer('host_platform_flags'),
+            ConfigConsumer('host_platform_flags', hook=DictUpdateHook('host_platform_flags')),
             ArgConsumer(
                 ['--c-compiler'],
                 help='Specifies path to the custom compiler for the host and target platforms',
