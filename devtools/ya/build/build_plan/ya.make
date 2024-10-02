@@ -9,7 +9,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core
     devtools/ya/exts
     devtools/ya/yalibrary/platform_matcher
 )

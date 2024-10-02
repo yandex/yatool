@@ -5,7 +5,11 @@ PEERDIR(
     contrib/python/termcolor
     contrib/python/pygtrie
     devtools/ya/build
-    devtools/ya/core
+    devtools/ya/core/common_opts
+    devtools/ya/core/config
+    devtools/ya/core/event_handling
+    devtools/ya/core/resource
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/ide/templates
     devtools/ya/jbuild

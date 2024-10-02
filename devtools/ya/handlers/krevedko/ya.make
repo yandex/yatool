@@ -1,4 +1,3 @@
-
 PY3_LIBRARY()
 
 PY_SRCS(
@@ -8,7 +7,6 @@ PY_SRCS(
 
 PEERDIR(
     contrib/python/six
-    devtools/ya/core
     devtools/ya/core/yarg
 )
 

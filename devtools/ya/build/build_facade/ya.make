@@ -8,7 +8,8 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/build/evlog
     devtools/ya/build/genconf

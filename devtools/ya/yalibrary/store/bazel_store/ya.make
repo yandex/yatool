@@ -10,6 +10,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/store
     contrib/python/zstandard
+    contrib/python/requests
 )
 
 STYLE_PYTHON()

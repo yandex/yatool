@@ -9,7 +9,9 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/build/ymake2
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/gsid
+    devtools/ya/core/patch_tools
     devtools/ya/exts
     devtools/ya/test/dependency
     devtools/ya/yalibrary/platform_matcher

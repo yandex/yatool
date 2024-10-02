@@ -9,7 +9,9 @@ PY_SRCS(
 
 PEERDIR(
     contrib/python/humanfriendly
-    devtools/ya/core
+    devtools/ya/core/common_opts
+    devtools/ya/core/error
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/opts
     devtools/ya/yalibrary/runner

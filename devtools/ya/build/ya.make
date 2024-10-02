@@ -38,7 +38,15 @@ PEERDIR(
     devtools/ya/build/stat
     devtools/ya/build/targets
     devtools/ya/build/ymake2
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/error
+    devtools/ya/core/event_handling
+    devtools/ya/core/imprint
+    devtools/ya/core/profiler
+    devtools/ya/core/report
+    devtools/ya/core/respawn
+    devtools/ya/core/stage_tracer
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/common
     devtools/ya/test/const

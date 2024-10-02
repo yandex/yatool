@@ -14,7 +14,8 @@ PEERDIR(
     contrib/python/pygtrie
     devtools/msvs
     devtools/ya/build
-    devtools/ya/core
+    devtools/ya/core/stage_tracer
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/ide/templates
     devtools/ya/jbuild

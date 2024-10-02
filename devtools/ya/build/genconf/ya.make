@@ -8,7 +8,8 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/report
     devtools/ya/exts
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/platform_matcher

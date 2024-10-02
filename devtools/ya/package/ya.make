@@ -36,7 +36,12 @@ PEERDIR(
     contrib/python/six
     devtools/ya/app_config
     devtools/ya/build
-    devtools/ya/core
+    devtools/ya/core/common_opts
+    devtools/ya/core/config
+    devtools/ya/core/error
+    devtools/ya/core/profiler
+    devtools/ya/core/stage_tracer
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/handlers/package/opts
     devtools/ya/package/const

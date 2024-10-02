@@ -11,7 +11,7 @@ PY_SRCS(
 PEERDIR(
     contrib/python/six
     contrib/python/toml
-    devtools/ya/core
+    devtools/ya/core/common_opts
     devtools/ya/core/yarg
 )
 

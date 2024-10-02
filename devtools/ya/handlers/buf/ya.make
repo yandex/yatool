@@ -14,7 +14,6 @@ PEERDIR(
     devtools/ya/app
     devtools/ya/build/build_facade
     devtools/ya/build/build_opts
-    devtools/ya/core
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/yalibrary/tools

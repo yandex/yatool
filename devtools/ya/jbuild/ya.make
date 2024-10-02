@@ -17,7 +17,9 @@ PY_SRCS(
 PEERDIR(
     contrib/python/Jinja2
     devtools/ya/build
-    devtools/ya/core
+    devtools/ya/core/common_opts
+    devtools/ya/core/config
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/jbuild/commands
     devtools/ya/jbuild/gen

@@ -11,7 +11,15 @@ PEERDIR(
     devtools/ya/app/modules/token_suppressions
     devtools/ya/app_config
     devtools/ya/build/targets
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/error
+    devtools/ya/core/event_handling
+    devtools/ya/core/gsid
+    devtools/ya/core/logger
+    devtools/ya/core/report
+    devtools/ya/core/respawn
+    devtools/ya/core/stage_aggregator
+    devtools/ya/core/stage_tracer
     devtools/ya/core/sec
     devtools/ya/core/sig_handler
     devtools/ya/exts

@@ -7,7 +7,8 @@ PY_SRCS(
 STYLE_PYTHON()
 
 PEERDIR(
-    devtools/ya/core
+    devtools/ya/core/error
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/const
     devtools/ya/yalibrary/upload/consts

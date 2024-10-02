@@ -8,7 +8,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/app_config
-    devtools/ya/core
+    devtools/ya/core/error
     devtools/ya/test/dependency/sandbox_storage
     devtools/ya/test/util
 )

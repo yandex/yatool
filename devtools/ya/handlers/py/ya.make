@@ -1,4 +1,3 @@
-
 PY3_LIBRARY()
 
 PY_SRCS(
@@ -10,7 +9,7 @@ PEERDIR(
     devtools/ya/app
     devtools/ya/build
     devtools/ya/build/build_opts
-    devtools/ya/core
+    devtools/ya/core/common_opts
     devtools/ya/core/config
     devtools/ya/core/yarg
     devtools/ya/exts

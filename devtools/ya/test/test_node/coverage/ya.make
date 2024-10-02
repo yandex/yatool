@@ -21,6 +21,7 @@ PEERDIR(
     devtools/ya/test/dependency
     devtools/ya/test/dependency
     devtools/ya/test/util
+    devtools/ya/yalibrary/app_ctx
     devtools/ya/yalibrary/tools
     library/python/func
 )

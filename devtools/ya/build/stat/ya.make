@@ -13,7 +13,9 @@ PEERDIR(
     contrib/python/humanfriendly
     devtools/ya/exts
     devtools/ya/yalibrary/status_view
-    devtools/ya/core
+    devtools/ya/core/profiler
+    devtools/ya/core/report
+    devtools/ya/core/stage_tracer
     devtools/ya/test/const
     devtools/ya/build/node_checks
 )

@@ -8,8 +8,8 @@ import time
 
 from abc import ABCMeta, abstractmethod
 
-from . import stages_profiler
-from . import profiler
+from core import stages_profiler
+from core import profiler
 
 import typing as tp  # noqa
 

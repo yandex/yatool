@@ -10,7 +10,8 @@ PEERDIR(
     contrib/python/six
     devtools/ya/app
     devtools/ya/build/build_opts
-    devtools/ya/core
+    devtools/ya/core/common_opts
+    devtools/ya/core/config
     devtools/ya/core/resource
     devtools/ya/core/yarg
     devtools/ya/exts

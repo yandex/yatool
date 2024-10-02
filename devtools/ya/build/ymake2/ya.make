@@ -14,7 +14,10 @@ SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core
+    devtools/ya/core/config
+    devtools/ya/core/event_handling
+    devtools/ya/core/report
+    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/tools

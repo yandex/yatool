@@ -5,7 +5,7 @@ STYLE_PYTHON()
 PEERDIR(
     contrib/deprecated/python/ujson
     devtools/common/libmagic
-    devtools/ya/core
+    devtools/ya/core/resource
     devtools/ya/exts
     devtools/ya/test/programs/test_tool/lib/coverage
     devtools/ya/test/util

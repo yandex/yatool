@@ -6,7 +6,6 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/build/build_opts
-    devtools/ya/core
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/package/const

@@ -18,7 +18,7 @@ PEERDIR(
     devtools/ya/build/build_opts
     devtools/ya/build/genconf
     devtools/ya/build/ymake2
-    devtools/ya/core
+    devtools/ya/core/common_opts
     devtools/ya/core/config
     devtools/ya/core/imprint
     devtools/ya/core/yarg
