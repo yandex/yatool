@@ -1,6 +1,7 @@
 # cython: profile=True
 
 import logging
+import re
 
 from exts import http_client
 from yalibrary.status_view.helpers import format_paths
@@ -392,7 +393,6 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     graph = Graph(graph_json)
     graph.log_json = distbuild_log_json
     log = _fetch_or_return(distbuild_log_json['log'])
-    data = log.split('\n') if log else []
 
     failed_results = distbuild_log_json.get('failed_results', {})
     failed_tasks_uids = failed_results.get('results', [])
@@ -413,7 +413,8 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     prepare_types = list(map(get_prepare_type, prepare_finish_ev_types))
 
     start_time = 0
-    for i in data:
+    for match in re.finditer(r'[^\n]+', log):
+        i = match[0]
         lines = i.split(' ')
         if len(lines) < 3:
             continue
