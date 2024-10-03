@@ -585,6 +585,7 @@ void TModuleConf::Load(IInputStream* input) {
     ::Load(input, HasSemantics);
     ::Load(input, HasSemanticsForGlobals);
     ::Load(input, StructCmd);
+    ::Load(input, StructCmdSet);
 
     ::Load(input, Restricted);
     ::Load(input, Ignored);
@@ -636,6 +637,7 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, HasSemantics);
     ::Save(output, HasSemanticsForGlobals);
     ::Save(output, StructCmd);
+    ::Save(output, StructCmdSet);
 
     ::Save(output, Restricted);
     ::Save(output, Ignored);
