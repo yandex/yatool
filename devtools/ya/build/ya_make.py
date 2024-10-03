@@ -230,7 +230,7 @@ def _checkout(opts, display=None):
     from yalibrary import vcs
 
     if vcs.detect_vcs_type(opts.arc_root) != "svn":
-        logging.warn("--checkout supported only for SVN, option skipped")
+        logging.warning("--checkout supported only for SVN, option skipped")
         return
 
     from yalibrary import checkout

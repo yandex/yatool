@@ -374,7 +374,7 @@ def _cons_ymake_args(**kwargs):
 
     if kwargs:
         # TODO: raise exception
-        logger.warn('Found unused args for ymake: %s', kwargs)
+        logger.warning('Found unused args for ymake: %s', kwargs)
 
     return list(map(str, ret))
 
@@ -523,7 +523,7 @@ def _run_ymake(**kwargs):
         try:
             j = json.loads(line)
         except ValueError:
-            logger.warn(line)
+            logger.warning(line)
             return
 
         j['ymake_run_uid'] = _ymake_unique_run_id

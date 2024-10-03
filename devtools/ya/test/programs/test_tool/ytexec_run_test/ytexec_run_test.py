@@ -592,7 +592,7 @@ def print_file(filename):
         with open(filename, 'r') as afile:
             sys.stderr.write(afile.read())
     else:
-        logger.warn("{} file is not found after ytexec run".format(os.path.basename(filename)))
+        logger.warning("{} file is not found after ytexec run".format(os.path.basename(filename)))
 
 
 @exts.func.memoize()

@@ -84,22 +84,22 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
         expect_version = res['params']['gcc_version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
-                logger.warn(
+                logger.warning(
                     'You are using -DIGNORE_MISMATCHED_XCODE_VERSION. Successful compilation and launch is not guaranteed.'
                 )
             else:
-                logger.warn('Unsupported version of Xcode installed. To install supported version:')
-                logger.warn('1. Download supported version one of the ways below:')
-                logger.warn('   - Download supported version from https://xcodereleases.com/.')
-                logger.warn(
+                logger.warning('Unsupported version of Xcode installed. To install supported version:')
+                logger.warning('1. Download supported version one of the ways below:')
+                logger.warning('   - Download supported version from https://xcodereleases.com/.')
+                logger.warning(
                     '   - Download from sandbox https://sandbox.yandex-team.ru/resources?type=XCODE_ARCHIVE&limit=20&offset=0&attrs={{"version":"{version}"}}.'.format(
                         version=expect_version
                     )
                 )
-                logger.warn(
+                logger.warning(
                     '2. Select supported version with `sudo xcode-select -s <path-to-xcode-dir>/Contents/Developer`'
                 )
-                logger.warn(
+                logger.warning(
                     '\nOr you can add -DIGNORE_MISMATCHED_XCODE_VERSION for avoid this exception. Do this at your own risk.'
                 )
                 raise Exception('Unsupported Xcode version, installed = {}'.format(version))

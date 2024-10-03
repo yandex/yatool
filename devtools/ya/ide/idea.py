@@ -81,7 +81,7 @@ def get_dependencies_modules(dump_result):
 def copy_shared_index_config(jopts):
     targets = jopts.abs_targets
     if len(targets) != 1:
-        logger.warn("Unable to copy shared index config for more than one targets")
+        logger.warning("Unable to copy shared index config for more than one targets")
         return
     idea_project_root = jopts.idea_project_root
     shared_config_dst = os.path.join(idea_project_root, "intellij.yaml")

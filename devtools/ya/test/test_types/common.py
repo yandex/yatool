@@ -760,7 +760,7 @@ class AbstractTestSuite(facility.Suite):
                     suite_dep, self.project_path, self.name
                 )
                 self._dependency_errors.append(msg)
-                yatest_logger.warn(msg)
+                yatest_logger.warning(msg)
 
     def add_build_dep(self, project_path, platform, uid, tags):
         self._build_deps[uid] = {

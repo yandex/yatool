@@ -153,19 +153,19 @@ class AggregatingStreamingReport(BatchReportBase):
         target_key = (target_path, target_platform, target_name)
 
         if target_platform not in self._targets:
-            self._logger.warn('Target result %s has unknown platform %s', entry, target_platform)
+            self._logger.warning('Target result %s has unknown platform %s', entry, target_platform)
             return
 
         if target_key not in self._targets[target_platform]:
-            self._logger.warn('Target result %s has unknown target key %s', entry, target_key)
+            self._logger.warning('Target result %s has unknown target key %s', entry, target_key)
             return
 
         if target_key in self._target_results[target_platform]:
-            self._logger.warn('Target result %s was already added', entry)
+            self._logger.warning('Target result %s was already added', entry)
             return
 
         if len(self._targets_list) == 0:
-            self._logger.warn('Add targets have been already added, incoming target is %s', entry)
+            self._logger.warning('Add targets have been already added, incoming target is %s', entry)
             return
 
         self._target_results[target_platform][target_key] = entry
@@ -181,13 +181,13 @@ class AggregatingStreamingReport(BatchReportBase):
             tp = entry['type']
             types[tp] += 1
             if tp in self._closed_streams:
-                self._logger.warn('Stream %s has been already closed, ignore entry %s', tp, entry)
+                self._logger.warning('Stream %s has been already closed, ignore entry %s', tp, entry)
             elif tp in ('configure', 'test', 'style'):
                 self._add_entry(entry)
             elif tp == 'build':
                 self._add_target_result(entry)
             else:
-                self._logger.warn('Result %s has unknown type %s', entry, tp)
+                self._logger.warning('Result %s has unknown type %s', entry, tp)
 
     def trace_stage(self, build_stage):
         self._client.trace_stage(build_stage)

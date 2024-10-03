@@ -287,7 +287,7 @@ def _walk(start_node):
             elif os.path.isfile(real_name):
                 return os.path.dirname(path)
             else:
-                logger.warn('Unknown path {}'.format(real_name))
+                logger.warning('Unknown path {}'.format(real_name))
         elif path.startswith('$L') and path.count('$') > 1:
             return fix('$' + path.split('$')[-1])
         else:

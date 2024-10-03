@@ -111,7 +111,7 @@ def create_frepkage(build_context, graph, arc_root):
     # Pack external inputs
     for filename, arcname in sorted(six.iteritems(external_inputs)):
         if arcname:
-            logger.warn('Adding external input to frepkage: %s', filename)
+            logger.warning('Adding external input to frepkage: %s', filename)
             paths_to_arch.append(
                 (
                     os.path.realpath(filename),

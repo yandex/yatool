@@ -634,7 +634,7 @@ class ReportGenerator(object):
         elif tp == 'style':
             self.finish_style_report()
         else:
-            logger.warn('Unable to close report by type %s', tp)
+            logger.warning('Unable to close report by type %s', tp)
 
     def _fix_roots(self, entry, resolver):
         from yatest_lib import external

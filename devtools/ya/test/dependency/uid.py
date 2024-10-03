@@ -31,7 +31,7 @@ def get_arcadia_tests_data_repo(config):
             ARCADIA_TESTS_DATA_REPOS[key] = data[0]
         else:
             ARCADIA_TESTS_DATA_REPOS[key] = None
-            logger.warn("Cannot get info about path and revision in %s", config)
+            logger.warning("Cannot get info about path and revision in %s", config)
     return ARCADIA_TESTS_DATA_REPOS[key]
 
 
@@ -73,7 +73,7 @@ class TestUidGenerator(object):
             if not base_rev_only and not cls.Path_To_Rev:
                 raise NoATDInfoException("PathToRev is empty")
         except Exception:
-            logger.warn("Cannot use saved info for arcadia_tests_data")
+            logger.warning("Cannot use saved info for arcadia_tests_data")
 
         if not base_rev_only:
             logger.debug("Loaded {} atd revisions".format(len(cls.Path_To_Rev)))
@@ -141,7 +141,7 @@ class TestUidGenerator(object):
                 for path in tests_paths:
                     imprint_parts.append(ArcadiaTestData.generate_saved_imprint(path, path_to_rev))
             else:
-                logger.warn(
+                logger.warning(
                     "Saved info for arcadia_tests_data is unavailable. Make sure file `build/yandex_specific/atd/revisions.txt` exists"
                 )
 

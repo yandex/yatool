@@ -93,7 +93,7 @@ class SandboxStorage(object):
                 try:
                     self._sandbox_client.touch_resource(resource_id)
                 except Exception as e:
-                    logger.warn("Error while updating resource %s last usage: %s", resource_id, e)
+                    logger.warning("Error while updating resource %s last usage: %s", resource_id, e)
             # Search for cached resources provided by runner
             resource = self._get_cached_resource(resource_id, decompress_if_archive)
             if not resource:

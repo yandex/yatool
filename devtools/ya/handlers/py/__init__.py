@@ -233,20 +233,20 @@ class _Target(collections.namedtuple('Target', ('path', 'makefile', 'program')))
 def _parse_target(target, root):
     arc_project = yalibrary.makelists.ArcProject(root, target)
     if not arc_project.makelistpath():
-        logger.warn('No makelist found for: %s', target)
+        logger.warning('No makelist found for: %s', target)
         return None
     makefile = arc_project.makelist()
     try:
         project = makefile.project
     except yalibrary.makelists.mk_common.MkLibException:
-        logger.warn('Can not get project for: %s', target)
+        logger.warning('Can not get project for: %s', target)
         return None
     if project.name in ('LIBRARY', 'PROTO_LIBRARY', 'PY2_LIBRARY', 'PY23_LIBRARY', 'PY3_LIBRARY', 'SANDBOX_TASK', 'SANDBOX_PY3_TASK'):
         return _Target(target, makefile)
     elif project.name in ('PROGRAM', 'PY2_PROGRAM', 'PY3_PROGRAM', 'PY2TEST', 'PY3TEST', 'PY23_TEST'):
         return _Target(target, makefile, program=True)
     else:
-        logger.warn('Unsupported project type \'%s\': %s', project.name, target)
+        logger.warning('Unsupported project type \'%s\': %s', project.name, target)
         return None
 
 

@@ -425,7 +425,7 @@ def concatenate_files(files, dst, max_file_size=0, before_callback=None, after_c
     with open(dst, "wb") as dstfile:
         for filename in files:
             if not os.path.isfile(filename):
-                logger.warn('%s is not a regular file', filename)
+                logger.warning('%s is not a regular file', filename)
                 continue
             if max_file_size:
                 with open(filename, "rb") as afile:

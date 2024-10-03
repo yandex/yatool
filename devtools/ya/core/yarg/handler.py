@@ -363,7 +363,7 @@ class OptsHandler(BaseHandler):
                 logger.debug('Change arg %s value %s -> %s', k, args[k], v)
                 args[k] = v
             else:
-                logger.warn('Skip arg %s:%s', k, v)
+                logger.warning('Skip arg %s:%s', k, v)
         if self._use_simple_args:
             return self._action(**args)
         else:

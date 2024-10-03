@@ -325,7 +325,7 @@ def do_strip_yt_cache(opts):
     try:
         from yalibrary.store.yt_store import yt_store
     except ImportError as e:
-        logger.warn("YT store is not available: %s", e)
+        logger.warning("YT store is not available: %s", e)
 
     token = opts.yt_token or opts.oauth_token
     cache = yt_store.YtStore(

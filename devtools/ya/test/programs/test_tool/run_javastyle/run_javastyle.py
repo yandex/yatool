@@ -166,7 +166,7 @@ def get_lock_dir():
     else:
         dir = '/var/tmp'
     if not os.path.exists(dir):
-        logger.warn("Dir %s not found, use legacy mode", dir)
+        logger.warning("Dir %s not found, use legacy mode", dir)
         return None
     return dir
 

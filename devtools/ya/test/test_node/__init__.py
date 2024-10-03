@@ -1812,7 +1812,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                     platform_descriptor,
                 )
         except _DependencyException:
-            logger.warn("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
+            logger.warning("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
             return
 
         injected_tests.append(suite)
@@ -2564,7 +2564,7 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         try:
             deps += list(get_test_build_deps_or_throw(suite))
         except _DependencyException:
-            logger.warn("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
+            logger.warning("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
             return
 
         # Sanity check, we won't have sbr's in opensource by definition

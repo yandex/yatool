@@ -123,7 +123,7 @@ def gen_suite(meta, target_platform_descriptor=None, multi_target_platform_run=F
             logger.exception("%s - for %r suite", e, suite)
             raise
     else:
-        logger.warn('Unable to detect type of test by SCRIPT-REL-PATH {}'.format(script_rel_path))
+        logger.warning('Unable to detect type of test by SCRIPT-REL-PATH {}'.format(script_rel_path))
 
 
 def generate_diff_tests(opts, target_platform_descriptor):

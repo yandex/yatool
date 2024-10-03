@@ -42,7 +42,7 @@ class YaMonEvent(object):
                 IntValue=str(value),
             )
         else:
-            logger.warn("Skip unknown type YaMonEvent value with name '%s'", name)
+            logger.warning("Skip unknown type YaMonEvent value with name '%s'", name)
 
     @staticmethod
     def _send_evlog(**kwargs):
