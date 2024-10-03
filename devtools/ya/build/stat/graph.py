@@ -10,6 +10,11 @@ import six
 logger = logging.getLogger(__name__)
 
 LOCAL_HOST = 'local'
+# Current UNIX time is somewhere around 2^31,
+# it is reasonable to use 2^64 as sort of infinite value.
+# in case of undefined start time
+MAX_START_TIME = 2**64
+MIN_END_TIME = 0
 
 
 # This is abstract task without linkage to machine, just as in json graph
@@ -40,8 +45,8 @@ class ResourceNode:
         self.host = host
 
         # the time resource became available
-        self.end_time = None
-        self.start_time = None
+        self.end_time = None  # type: int | float | None
+        self.start_time = None  # type: int | float | None
 
         # graph connection
         self.depends_on_ref = []
@@ -498,12 +503,17 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     graph.resource_nodes[graph.fake_resource_node.get_key()] = [graph.fake_resource_node]
     for run_task in graph.run_tasks.values():
         graph.add_dependency_reference(graph.fake_resource_node, run_task)
-        if graph.fake_resource_node.end_time is None:
-            graph.fake_resource_node.start_time = run_task.start_time
-            graph.fake_resource_node.end_time = run_task.end_time
 
-        graph.fake_resource_node.start_time = min(graph.fake_resource_node.start_time, run_task.start_time)
-        graph.fake_resource_node.end_time = max(graph.fake_resource_node.end_time, run_task.end_time)
+        task_start_time = run_task.start_time or MAX_START_TIME
+        task_end_time = run_task.end_time or MIN_END_TIME
+        if graph.fake_resource_node.start_time is None:
+            graph.fake_resource_node.start_time = task_start_time
+
+        if graph.fake_resource_node.end_time is None:
+            graph.fake_resource_node.end_time = task_end_time
+
+        graph.fake_resource_node.start_time = min(graph.fake_resource_node.start_time, task_start_time)
+        graph.fake_resource_node.end_time = max(graph.fake_resource_node.end_time, task_end_time)
 
     for key in graph.resource_nodes:
         graph.resource_nodes[key].sort(
