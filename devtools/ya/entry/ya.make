@@ -13,8 +13,14 @@ PY_SRCS(
 PEERDIR(
     contrib/python/six
     devtools/ya/app
+    devtools/ya/core/config
+    devtools/ya/core/error
+    devtools/ya/core/logger
+    devtools/ya/core/plugin_loader
+    devtools/ya/core/respawn
     devtools/ya/core/sig_handler
-    devtools/ya/core
+    devtools/ya/core/stage_tracer
+    devtools/ya/core/yarg
     library/python/mlockall
     library/python/svn_version
 )
