@@ -63,6 +63,7 @@ PEERDIR(
     devtools/ya/yalibrary/monitoring
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/runner
+    devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/store
     devtools/ya/yalibrary/store/bazel_store
     devtools/ya/yalibrary/store/yt_store

@@ -2,6 +2,7 @@ import logging
 import time
 
 from core import stage_tracer
+from devtools.ya.yalibrary import sjson
 import exts.fs
 import exts.yjdump as yjdump
 import exts.yjson as json
@@ -76,8 +77,8 @@ def do_ya_make(params):
         context = remote_graph_generator.generate(params, app_ctx)
         builder = context.builder
     elif params.custom_context:
-        with udopen(params.custom_context) as custom_context_file:
-            custom_context_json = json.load(custom_context_file)
+        with udopen(params.custom_context, 'rb') as custom_context_file:
+            custom_context_json = sjson.load(custom_context_file)
         if params.dist_priority:
             custom_context_json['graph']['conf']['priority'] = params.dist_priority
         if params.distbuild_cluster:

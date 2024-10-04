@@ -53,8 +53,10 @@ from build.reports import build_reports as build_report
 from build.reports import configure_error as ce
 from build.reports import results_report
 from core import stage_tracer
+from devtools.ya.yalibrary import sjson
 from exts import func
 from exts.decompress import udopen
+from exts.compress import zcopen
 from yalibrary import tools
 from yalibrary.last_failed import last_failed
 from yalibrary.runner import patterns as ptrn
@@ -876,8 +878,8 @@ class Context(object):
             self.configure_errors = load_configure_errors(configure_errors)
             self.make_files = make_files or []
         elif opts.custom_json is not None and opts.custom_json:
-            with udopen(opts.custom_json) as custom_json_file:
-                self.graph = json.load(custom_json_file)
+            with udopen(opts.custom_json, "rb") as custom_json_file:
+                self.graph = sjson.load(custom_json_file)
                 lg.finalize_graph(self.graph, opts)
             self.tests = []
             self.stripped_tests = []
@@ -1878,8 +1880,8 @@ class YaMake(object):
                     upload_repository_package()
 
                 if self.opts.dump_distbuild_graph:
-                    with open(self.opts.dump_distbuild_graph, 'w') as graph_file:
-                        json.dump(graph, graph_file)
+                    with zcopen(self.opts.dump_distbuild_graph) as graph_file:
+                        sjson.dump(graph, graph_file)
 
                 def activate_callback(res=None, build_stage=None):
                     try:
