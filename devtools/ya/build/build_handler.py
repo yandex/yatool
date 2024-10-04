@@ -78,7 +78,7 @@ def do_ya_make(params):
         builder = context.builder
     elif params.custom_context:
         with udopen(params.custom_context, 'rb') as custom_context_file:
-            custom_context_json = sjson.load(custom_context_file)
+            custom_context_json = sjson.load(custom_context_file, intern_keys=True, intern_vals=True)
         if params.dist_priority:
             custom_context_json['graph']['conf']['priority'] = params.dist_priority
         if params.distbuild_cluster:
