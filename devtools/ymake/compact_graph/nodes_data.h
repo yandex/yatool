@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nodeid.h"
+#include "nodeids_range.h"
 
 #include <util/generic/deque.h>
 #include <util/ysaveload.h>
@@ -33,6 +34,8 @@ public:
     }
 
     bool contains(TNodeId id) const noexcept {return ToUnderlying(id) < Storage_.size();}
+
+    TValidNodeIds ValidIds() const noexcept {return {MaxNodeId()};}
 
     iterator begin() {return Storage_.begin();}
     iterator end() {return Storage_.end();}

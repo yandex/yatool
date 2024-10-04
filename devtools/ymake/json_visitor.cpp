@@ -163,7 +163,8 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     const TNodeId maxLoopId = Loops.MaxNodeId();
     output->Write(&maxLoopId, sizeof(maxLoopId));
     ui32 count = 0;
-    for (TNodeId loopId = TNodeId::MinValid; loopId <= Loops.MaxNodeId(); ++loopId, ++count) {
+    for (TNodeId loopId: Loops.ValidIds()) {
+        ++count;
         TSaveBuffer buffer{&rawBuffer};
         SaveLoop(&buffer, loopId, graph);
 

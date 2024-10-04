@@ -239,7 +239,7 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
     IterateAll(graph, startTargets, ls, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
     ls.CollectLoops(Node2Loop, *this);
 
-    for (TNodeId loopNum = TNodeId::MinValid; loopNum <= MaxNodeId(); ++loopNum) {
+    for (TNodeId loopNum: ValidIds()) {
         TGraphLoop curLoop = (*this)[loopNum];
 
         bool isDirLoop = false;
@@ -274,7 +274,7 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
 
 void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) {
     TVector<TNodeId> loops;
-    for (TNodeId loopNum = TNodeId::MinValid; AsIdx(loopNum) < size(); ++loopNum) {
+    for (TNodeId loopNum: ValidIds()) {
         loops.push_back(loopNum);
     }
     if (loops.size() != 0) {
