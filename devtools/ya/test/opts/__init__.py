@@ -130,7 +130,7 @@ class RunTestOptions(core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--add-peerdirs-tests'],
-                help='Peerdirs test types (' + ', '.join(peerdirs_test_types) + ')',
+                help='Peerdirs test types',
                 hook=core.yarg.SetValueHook('peerdirs_test_type', values=peerdirs_test_types),
                 subgroup=RUN_TEST_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
@@ -1005,7 +1005,7 @@ class OutputOptions(core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--test-output-compression-filter'],
-                help="Specifies compression filter for tos.tar ({})".format(', '.join(self.CompressionFilters)),
+                help="Specifies compression filter for tos.tar",
                 hook=core.yarg.SetValueHook('test_output_compression_filter', values=self.CompressionFilters),
                 subgroup=OUTPUT_SUBGROUP,
                 visible=help_level.HelpLevel.INTERNAL,
@@ -1753,19 +1753,19 @@ class PytestOptions(core.yarg.Options):
         return [
             TestArgConsumer(
                 ['--test-log-level'],
-                help='Specifies logging level for output test logs ("critical", "error", "warning", "info", "debug")',
+                help='Specifies logging level for output test logs',
                 hook=core.yarg.SetValueHook('test_log_level', values=["critical", "error", "warning", "info", "debug"]),
                 subgroup=PYTEST_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
             ),
             core.yarg.EnvConsumer(
                 'YA_TEST_LOG_LEVEL',
-                help='Specifies logging level for output test logs ("critical", "error", "warning", "info", "debug")',
+                help='Specifies logging level for output test logs',
                 hook=core.yarg.SetValueHook('test_log_level'),
             ),
             TestArgConsumer(
                 ['--test-traceback'],
-                help='Test traceback style for pytests ("long", "short", "line", "native", "no")',
+                help='Test traceback style for pytests',
                 hook=core.yarg.SetValueHook('test_traceback', values=["long", "short", "line", "native", "no"]),
                 subgroup=PYTEST_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,

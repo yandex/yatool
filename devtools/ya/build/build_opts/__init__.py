@@ -336,7 +336,7 @@ class BuildTypeOptions(Options):
             ConfigConsumer('build_type'),
             ArgConsumer(
                 ['--sanitize'],
-                help='Sanitizer type(' + ', '.join(san_values) + ')',
+                help='Sanitizer type',
                 hook=SetValueHook('sanitize', values=san_values),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.BASIC,
@@ -399,7 +399,7 @@ class BuildTypeOptions(Options):
             ),
             ArgConsumer(
                 ['--cuda'],
-                help='Cuda platform({})'.format(', '.join(cuda_values)),
+                help='Cuda platform',
                 hook=SetValueHook('cuda_platform', values=cuda_values),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.ADVANCED,
@@ -1915,7 +1915,7 @@ class TestenvReportDirOptions(Options):
 
 
 class StreamReportOptions(Options):
-    stream_types = frozenset(['configure', 'build', 'test', 'style', 'small', 'medium', 'large'])
+    stream_types = ('configure', 'build', 'test', 'style', 'small', 'medium', 'large')
 
     def __init__(self):
         self.streaming_report_id = None
@@ -1975,10 +1975,8 @@ class StreamReportOptions(Options):
             ),
             ArgConsumer(
                 ['--keep-alive-streams'],
-                help='Specify streams which should not be closed (available: {})'.format(
-                    StreamReportOptions.stream_types
-                ),
-                hook=SetValueHook('keep_alive_streams'),
+                help='Specify streams which should not be closed',
+                hook=SetValueHook('keep_alive_streams', values=StreamReportOptions.stream_types),
                 group=AUTOCHECK_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
@@ -2071,8 +2069,8 @@ class StreamReportOptions(Options):
 
     def postprocess(self):
         if self.keep_alive_streams:
-            self.keep_alive_streams = set(_f for _f in [s.strip() for s in self.keep_alive_streams.split(",")] if _f)
-            unknown = set(self.keep_alive_streams) - StreamReportOptions.stream_types
+            self.keep_alive_streams = {_f for _f in [s.strip() for s in self.keep_alive_streams.split(",")] if _f}
+            unknown = self.keep_alive_streams - set(StreamReportOptions.stream_types)
             if unknown:
                 raise ArgsValidatingException("Unknown stream types: {}".format(unknown))
         else:

@@ -225,7 +225,7 @@ class IdeaOptions(core.yarg.Options):
             ),
             core.yarg.ArgConsumer(
                 ['--group-modules'],
-                help='Group idea modules according to paths: (tree, flat)',
+                help='Group idea modules according to paths',
                 hook=core.yarg.SetValueHook('group_modules', values=('tree', 'flat')),
                 group=IdeaOptions.IDEA_OPT_GROUP,
             ),

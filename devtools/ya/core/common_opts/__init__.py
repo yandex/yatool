@@ -58,9 +58,7 @@ class BuildTypeConsumer(ArgConsumer):
     def __init__(self, names, option, short_help, visible):
         super(BuildTypeConsumer, self).__init__(
             names,
-            help=short_help
-            + ' (debug, release, profile, gprof, valgrind, valgrind-release, coverage, relwithdebinfo, minsizerel, debugnoasserts, fastdebug) '
-            + 'https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type',
+            help=short_help + ' https://docs.yandex-team.ru/ya-make/usage/ya_make/#build-type',
             hook=SetValueHook(
                 option,
                 values=[

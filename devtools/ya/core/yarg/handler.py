@@ -30,12 +30,16 @@ EXACT_MATCH_HANDLERS = [
     'tool',
 ]
 EMPTY_KEY = '__EMPTY__'
+MORE_HELP = "\n\n[[alt1]]To see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]"
 
 logger = logging.getLogger(__name__)
 
 
 def print_formatted(msg):
     build_term_display(sys.stdout, sys.stdout.isatty()).emit_message(msg)
+    if sys.stderr.isatty() and not sys.stdout.isatty():
+        # helpful when grepping
+        build_term_display(sys.stderr, sys.stderr.isatty()).emit_message(MORE_HELP)
 
 
 class SimpleHandler(object):

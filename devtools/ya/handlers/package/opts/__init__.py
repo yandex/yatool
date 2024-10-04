@@ -610,9 +610,7 @@ class PackageCustomizableOptions(core.yarg.Options):
             ),
             core.yarg.ArgConsumer(
                 names=['-z', '--debian-compression'],
-                help="deb-file compresson level ({})".format(
-                    ", ".join(list(PackageCustomizableOptions.deb_compression_levels.keys()))
-                ),
+                help="deb-file compresson level",
                 hook=core.yarg.SetValueHook(
                     'debian_compression_level', values=list(PackageCustomizableOptions.deb_compression_levels.keys())
                 ),

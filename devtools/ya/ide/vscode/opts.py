@@ -70,7 +70,7 @@ class VSCodeAllOptions(core.yarg.Options):
             ),
             core.yarg.ArgConsumer(
                 ["--files-visibility"],
-                help="Limit files visibility in VS Code Explorer/Search (\"targets\", \"targets-and-deps\", \"all\")",
+                help="Limit files visibility in VS Code Explorer/Search",
                 hook=core.yarg.SetValueHook(
                     "files_visibility",
                     values=("targets", "targets-and-deps", "all"),
@@ -124,7 +124,7 @@ class VSCodeAllOptions(core.yarg.Options):
             ),
             core.yarg.ArgConsumer(
                 ["--clangd-index-mode"],
-                help="Configure clangd background indexing (\"full\", \"only-targets\", \"disabled\")",
+                help="Configure clangd background indexing",
                 hook=core.yarg.SetValueHook(
                     "clangd_index_mode",
                     values=("full", "only-targets", "disabled"),

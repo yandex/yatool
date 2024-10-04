@@ -53,6 +53,11 @@ class BaseHook(object):
         """Used for display default value in help"""
         return None
 
+    def available_options(self, to):
+        # type: ("Options") -> tp.Optional[str]
+        """Used for display available options in help"""
+        return None
+
 
 class ValueHook(BaseHook):
     def __init__(self, values=None, *args, **kwargs):
@@ -93,9 +98,21 @@ class SetValueHook(ValueHook):
         setattr(to, c_name, getattr(to, c_name, 0) + 1)
 
     def default(self, to):
-        if getattr(to, self.name) is not None:
+        if hasattr(to, self.name):
             current_value = getattr(to, self.name)
-            return '(default: {})'.format(self.default_value(current_value) if self.default_value else current_value)
+            if self.default_value:
+                default = self.default_value(current_value)
+            elif current_value is not None:
+                default = current_value
+            else:
+                return
+            return "(default: '{}')".format(default)
+        else:
+            return None
+
+    def available_options(self, to):
+        if hasattr(to, self.name) and self.values is not FILES:
+            return "(available options: '{}')".format("', '".join(self.values))
         else:
             return None
 

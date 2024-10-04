@@ -201,8 +201,8 @@ class ArgConsumer(BaseArgConsumer):
         import yalibrary.display
 
         res = '    '
-        keys = ', '.join([transform_name(x) for x in names])
-        keys_len = len(', '.join([yalibrary.display.strip_markup(transform_name(x)) for x in names]))
+        keys = ', '.join(transform_name(x) for x in names)
+        keys_len = len(', '.join(yalibrary.display.strip_markup(transform_name(x)) for x in names))
         res += keys
         if self.help:
             if keys_len < 20:
@@ -215,6 +215,11 @@ class ArgConsumer(BaseArgConsumer):
 
         if default_ is not None:
             res += ' ' + default_
+
+        available_options = self.hook.available_options(opt)
+
+        if available_options is not None:
+            res += ' ' + available_options
 
         return res
 
