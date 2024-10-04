@@ -54,6 +54,7 @@ namespace NYa::NEdl {
                             Path_.push_back(0u);
                             return true;
                         case IN_ARRAY:
+                            StateStack_.push_back(IN_ARRAY);
                             std::get<size_t>(Path_.back())++;
                             LoaderStack_.push_back(LoaderStack_.back()->AddArrayValue());
                             LoaderStack_.back()->EnsureArray();
