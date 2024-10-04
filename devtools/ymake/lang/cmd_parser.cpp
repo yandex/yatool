@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/lang/CmdLexer.h>
 #include <devtools/ymake/lang/CmdParserBaseVisitor.h>
+#include <devtools/ymake/commands/mod_registry.h>
 #include <devtools/ymake/conf.h>
 
 #include <devtools/ymake/polexpr/variadic_builder.h>
@@ -15,9 +16,7 @@ namespace {
 
     EMacroFunction CompileFnName(TStringBuf key) {
         static const THashMap<TStringBuf, EMacroFunction> names = {
-            {"hide",    EMacroFunction::Hide},
             {"clear",   EMacroFunction::Clear},
-            {"input",   EMacroFunction::Input},
             {"output",  EMacroFunction::Output},
             {"tmp",     EMacroFunction::Tmp},
             {"tool",    EMacroFunction::Tool},
@@ -31,13 +30,11 @@ namespace {
             {"tolower", EMacroFunction::ToLower},
             {"rootrel", EMacroFunction::RootRel},
             {"nopath",  EMacroFunction::CutPath},
-            {"noext",   EMacroFunction::CutExt},
             {"lastext", EMacroFunction::LastExt},
             {"ext",     EMacroFunction::ExtFilter},
             {"cwd",     EMacroFunction::Cwd},
             {"stdout",  EMacroFunction::AsStdout},
             {"env",     EMacroFunction::SetEnv},
-            {"kv",      EMacroFunction::KeyValue},
             {"late_out",EMacroFunction::LateOut},
             {"tags_in", EMacroFunction::TagsIn},
             {"tags_out",EMacroFunction::TagsOut},
@@ -62,8 +59,9 @@ namespace {
 
     public:
 
-        TCmdParserVisitor_Polexpr(const TBuildConfiguration* conf, TMacroValues& values)
+        TCmdParserVisitor_Polexpr(const TBuildConfiguration* conf, const TModRegistry& mods, TMacroValues& values)
             : Conf(conf)
+            , Mods(mods)
             , Values(values)
         {
         }
@@ -116,7 +114,11 @@ namespace {
         // transformation pieces
 
         std::any visitXModKey(CmdParser::XModKeyContext *ctx) override {
-            GetCurrentXfm().Mods.push_back({CompileFnName(ctx->getText()), {}});
+            auto name = ctx->getText();
+            auto id = Mods.TryGetId(name);
+            if (!id)
+                id = CompileFnName(name);
+            GetCurrentXfm().Mods.push_back({*id, {}});
             return visitChildren(ctx);
         }
 
@@ -365,6 +367,7 @@ namespace {
     private:
 
         const TBuildConfiguration* Conf;
+        const TModRegistry& Mods;
         TMacroValues& Values;
         TSyntax Syntax;
         TVector<TSyntax::TCommand*> CmdStack;
@@ -396,7 +399,7 @@ namespace {
 //
 //
 
-TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, TStringBuf src) {
+TSyntax NCommands::Parse(const TBuildConfiguration* conf, const TModRegistry& mods, TMacroValues& values, TStringBuf src) {
 
     antlr4::ANTLRInputStream input(src);
     TCmdParserErrorListener errorListener(src);
@@ -412,7 +415,7 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, 
     parser.removeErrorListeners();
     parser.addErrorListener(&errorListener);
 
-    TCmdParserVisitor_Polexpr visitor(conf, values);
+    TCmdParserVisitor_Polexpr visitor(conf, mods, values);
     visitor.visit(parser.main());
 
     return visitor.Extract();
@@ -421,10 +424,10 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, 
 
 namespace {
 
-    void CompileArgs(TMacroValues& values, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
-        NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, values.Func2Id(EMacroFunction::Args));
+    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
+        NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, mods.Func2Id(EMacroFunction::Args));
         for (size_t arg = 0; arg != cmd.size(); ++arg) {
-            NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, values.Func2Id(EMacroFunction::Terms));
+            NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, mods.Func2Id(EMacroFunction::Terms));
             for (size_t term = 0; term != cmd[arg].size(); ++term) {
                 std::visit(TOverloaded{
                     [&](NPolexpr::TConstId s) {
@@ -436,13 +439,13 @@ namespace {
                     [&](const TSyntax::TTransformation& x) {
                         for (auto&& m : x.Mods) {
                             auto func = m.Name;
-                            if (values.FuncArity(func) != m.Values.size() + 1)
+                            if (mods.FuncArity(func) != m.Values.size() + 1)
                                 throw yexception()
                                     << "bad modifier argument count for " << m.Name
-                                    << " (expected " << values.FuncArity(func) - 1
+                                    << " (expected " << mods.FuncArity(func) - 1
                                     << ", given " << m.Values.size()
                                     << ")";
-                            termsBuilder.Append(values.Func2Id(func));
+                            termsBuilder.Append(mods.Func2Id(func));
                             for (auto&& v : m.Values) {
                                 if (v.size() == 1) {
                                     std::visit(TOverloaded{
@@ -454,7 +457,7 @@ namespace {
                                         }
                                     }, v[0]);
                                 } else {
-                                    NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, values.Func2Id(EMacroFunction::Cat));
+                                    NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, mods.Func2Id(EMacroFunction::Cat));
                                     for (auto&& t : v) {
                                         std::visit(TOverloaded{
                                             [&](NPolexpr::TConstId id) {
@@ -485,7 +488,7 @@ namespace {
                         } else if (auto* id = std::get_if<NPolexpr::EVarId>(justOneThing)) {
                             termsBuilder.Append(*id);
                         } else {
-                            CompileArgs(values, x.Body, termsBuilder);
+                            CompileArgs(mods, x.Body, termsBuilder);
                         }
                     },
                     [&](const TSyntax::TCall&) {
@@ -505,11 +508,11 @@ namespace {
     }
 }
 
-NPolexpr::TExpression NCommands::Compile(TMacroValues& values, const TSyntax& s) {
+NPolexpr::TExpression NCommands::Compile(const TModRegistry& mods, const TSyntax& s) {
     NPolexpr::TExpression result;
-    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, values.Func2Id(EMacroFunction::Cmds));
+    NPolexpr::TVariadicCallBuilder cmdsBuilder(result, mods.Func2Id(EMacroFunction::Cmds));
     for (size_t cmd = 0; cmd != s.Script.size(); ++cmd)
-        CompileArgs(values, s.Script[cmd], cmdsBuilder);
+        CompileArgs(mods, s.Script[cmd], cmdsBuilder);
     cmdsBuilder.Build();
     return result;
 }

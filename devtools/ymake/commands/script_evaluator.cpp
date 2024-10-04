@@ -1,5 +1,5 @@
 #include "script_evaluator.h"
-#include "function_evaluator.h"
+#include "mod_registry.h"
 #include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/polexpr/evaluate.h>
@@ -66,7 +66,7 @@ public:
 
 inline
 auto TScriptEvaluator::GetFnArgs(const NPolexpr::TExpression& expr, size_t pos, EMacroFunction expected) {
-    return NPolexpr::GetFnArgs(expr, pos, Commands->Values.Func2Id(expected));
+    return NPolexpr::GetFnArgs(expr, pos, Commands->Mods.Func2Id(expected));
 }
 
 TScriptEvaluator::TResult TScriptEvaluator::DoScript(
@@ -345,12 +345,14 @@ TTermValue TScriptEvaluator::EvalFn(
     for (auto& arg : args)
         if (std::holds_alternative<TTermError>(arg))
             return arg;
+    auto fn = Commands->Mods.Id2Func(id);
     try {
-        switch (Commands->Values.Id2Func(id)) {
-            case EMacroFunction::Args: return RenderArgs(args);
+        if (auto desc = Commands->Mods.At(fn); desc && desc->CanEvaluate) {
+            return desc->Evaluate(args, ctx, writer);
+        }
+        switch (fn) {
             case EMacroFunction::Terms: return RenderTerms(args);
             case EMacroFunction::Cat: return RenderCat(args);
-            case EMacroFunction::Hide: return TTermNothing();
             case EMacroFunction::Clear: return RenderClear(args);
             case EMacroFunction::Pre: return RenderPre(args);
             case EMacroFunction::Suf: return RenderSuf(args);
@@ -364,10 +366,8 @@ TTermValue TScriptEvaluator::EvalFn(
             case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
             case EMacroFunction::RootRel: return RenderRootRel(args);
             case EMacroFunction::CutPath: return RenderCutPath(args);
-            case EMacroFunction::CutExt: return RenderCutExt(args);
             case EMacroFunction::LastExt: return RenderLastExt(args);
             case EMacroFunction::ExtFilter: return RenderExtFilter(args);
-            case EMacroFunction::KeyValue: RenderKeyValue(ctx, args); return TTermNothing();
             case EMacroFunction::LateOut: RenderLateOut(ctx, args); return TTermNothing();
             case EMacroFunction::TagsIn: return RenderTagFilter(args, false);
             case EMacroFunction::TagsOut: return RenderTagFilter(args, true);
@@ -379,7 +379,7 @@ TTermValue TScriptEvaluator::EvalFn(
         }
         throw yexception()
             << "Don't know how to render configure time modifier "
-            << Commands->Values.Id2Func(id);
+            << Commands->Mods.Id2Func(id);
     } catch (std::exception& e) {
         ++ErrorShower->Count;
         return TTermError(e.what(), true);

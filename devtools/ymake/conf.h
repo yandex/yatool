@@ -196,7 +196,6 @@ private:
     bool TraverseDepsTests = false; // Include RECURSE_FOR_TESTS of PEERDIRs
     bool FailOnRecurse = false;
     bool TraverseDepends = false;
-    bool AddGlobalSrcToResults = false;
     bool AddPeerdirsGenTests = false;
     bool AddPeersToInputs = false;
     bool ForceListDirInResolving = false;

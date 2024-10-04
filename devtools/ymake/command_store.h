@@ -7,6 +7,7 @@
 #include <devtools/ymake/vars.h>
 #include <devtools/ymake/symbols/cmd_store.h>
 #include <devtools/ymake/options/debug_options.h>
+#include <devtools/ymake/commands/mod_registry.h>
 
 #include <util/generic/hash.h>
 #include <util/generic/strbuf.h>
@@ -59,38 +60,6 @@ class TCommands {
     friend NCommands::TScriptEvaluator;
 
 public:
-    struct TCompiledCommand {
-        struct TInput {
-            TStringBuf Name;
-            ELinkType Context = ELinkType::ELT_Default;
-            bool IsGlob = false;
-            TInput(TStringBuf name) : Name(name) {}
-            operator TStringBuf() const { return Name; }
-        };
-        struct TOutput {
-            TStringBuf Name;
-            bool IsTmp = false;
-            bool NoAutoSrc = false;
-            bool NoRel = false;
-            bool ResolveToBinDir = false;
-            TOutput(TStringBuf name): Name(name) {}
-            operator TStringBuf() const { return Name; }
-        };
-        template<typename TLink>
-        class TLinks:
-            public TUniqContainerImpl<TLink, TStringBuf, 32, TVector<TLink>, true> // basically, TUniqVector<TLink> with IsIndexed=true
-        {
-        public:
-            ui32 Base = 0;
-        };
-        using TInputs = TLinks<TInput>;
-        using TOutputs = TLinks<TOutput>;
-
-        NPolexpr::TExpression Expression;
-        TInputs Inputs;
-        TOutputs Outputs;
-    };
-
     struct SimpleCommandSequenceWriter: TCommandSequenceWriterStubs {
         auto& Write(
             const TCommands& commands,
@@ -150,7 +119,7 @@ public:
         }
         return &Commands[static_cast<ui32>(fres->second)];
     }
-    TCompiledCommand Compile(
+    NCommands::TCompiledCommand Compile(
         TStringBuf cmd,
         const TBuildConfiguration* conf,
         const TVars& inlineVars,
@@ -164,7 +133,7 @@ public:
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlightBegin = -1, size_t highlightEnd = -1) const;
     void StreamCmdRepr(const NPolexpr::TExpression& cmdExpr, std::function<void(const char* data, size_t size)> sink) const;
 
-    TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
+    NCommands::TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
 
     void WriteShellCmd(
         ICommandSequenceWriter* writer,
@@ -190,8 +159,12 @@ public:
     }
 
 protected:
-    TMacroValues& GetValues() {
+    auto& GetValues() {
         return Values;
+    }
+
+    auto& GetMods() {
+        return Mods;
     }
 
 private:
@@ -202,7 +175,7 @@ private:
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
 
-    const NCommands::TSyntax& Parse(const TBuildConfiguration* conf, TMacroValues& values, TString src);
+    const NCommands::TSyntax& Parse(const TBuildConfiguration* conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
 
     struct TCmdWriter;
     struct TInliner {
@@ -260,6 +233,7 @@ private:
     THashMap<ui64, ECmdId> Command2Id;
     THashMap<ui32, ECmdId> Elem2Cmd;
     TMacroValues Values;
+    const NCommands::TModRegistry Mods;
 
     THashMap<TString, NCommands::TSyntax> ParserCache;
 };

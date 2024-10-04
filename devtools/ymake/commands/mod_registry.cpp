@@ -1,4 +1,4 @@
-#include "function_evaluator.h"
+#include "mod_registry.h"
 
 #include <devtools/ymake/config/config.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -9,6 +9,120 @@
 #include <util/generic/yexception.h>
 
 using namespace NCommands;
+
+namespace {
+    auto& ModDescriptions() {
+        static THashMap<EMacroFunction, TModImpl*> modDescriptions;
+        return modDescriptions;
+    }
+}
+
+NCommands::TModImpl::TModImpl(TModMetadata metadata): TModMetadata(metadata) {
+    Y_ABORT_IF(ModDescriptions().contains(Id));
+    ModDescriptions().insert({Id, this});
+}
+
+NCommands::TModImpl::~TModImpl() {
+    ModDescriptions().erase(Id);
+}
+
+namespace {
+
+    constexpr ui16 FunctionArity(EMacroFunction func) noexcept {
+        ui16 res = 0;
+        switch (func) {
+            // Variadic fucntions
+            case EMacroFunction::Terms:
+            case EMacroFunction::Cat:
+                break;
+
+            // Unary functions
+            case EMacroFunction::Output:
+            case EMacroFunction::Tmp:
+            case EMacroFunction::Tool:
+            case EMacroFunction::Clear:
+            case EMacroFunction::Quo:
+            case EMacroFunction::QuoteEach:
+            case EMacroFunction::ToUpper:
+            case EMacroFunction::ToLower:
+            case EMacroFunction::Cwd:
+            case EMacroFunction::AsStdout:
+            case EMacroFunction::SetEnv:
+            case EMacroFunction::RootRel:
+            case EMacroFunction::CutPath:
+            case EMacroFunction::LastExt:
+            case EMacroFunction::LateOut:
+            case EMacroFunction::TagsCut:
+            case EMacroFunction::TODO1:
+            case EMacroFunction::NoAutoSrc:
+            case EMacroFunction::NoRel:
+            case EMacroFunction::ResolveToBinDir:
+            case EMacroFunction::Glob:
+                res = 1;
+                break;
+
+            // Binary functions
+            case EMacroFunction::Pre:
+            case EMacroFunction::Suf:
+            case EMacroFunction::HasDefaultExt:
+            case EMacroFunction::Join:
+            case EMacroFunction::ExtFilter:
+            case EMacroFunction::TagsIn:
+            case EMacroFunction::TagsOut:
+            case EMacroFunction::Context:
+            case EMacroFunction::TODO2:
+                res = 2;
+                break;
+
+            // ported out
+            case EMacroFunction::Cmds:
+            case EMacroFunction::Args:
+            case EMacroFunction::Input:
+            case EMacroFunction::Hide:
+            case EMacroFunction::KeyValue:
+            case EMacroFunction::CutExt:
+                Y_ABORT();
+
+            // suppress the "enumeration value 'Count' not handled in switch" silliness
+            case EMacroFunction::Count:
+                Y_ABORT();
+        }
+        return res;
+    }
+
+}
+
+NCommands::TModRegistry::TModRegistry() {
+    THashSet<EMacroFunction> done;
+    Descriptions.fill(nullptr);
+    for (auto& m : ModDescriptions()) {
+        auto& _m = *m.second;
+        Y_ABORT_IF(done.contains(_m.Id));
+        Y_ABORT_IF(Index.contains(_m.Name));
+        done.insert(_m.Id);
+        Descriptions.at(ToUnderlying(_m.Id)) = &_m;
+        if (!_m.Internal)
+            Index[_m.Name] = _m.Id;
+    }
+}
+
+ui16 TModRegistry::FuncArity(EMacroFunction func) const noexcept {
+    if (auto desc = At(func))
+        return desc->Arity;
+    return FunctionArity(func);
+}
+
+NPolexpr::TFuncId TModRegistry::Func2Id(EMacroFunction func) const noexcept {
+    return NPolexpr::TFuncId{FuncArity(func), static_cast<ui32>(func)};
+}
+
+EMacroFunction TModRegistry::Id2Func(NPolexpr::TFuncId id) const noexcept {
+    return static_cast<EMacroFunction>(id.GetIdx());
+}
+
+//
+//
+//
 
 namespace {
 
@@ -42,39 +156,15 @@ namespace {
     }
 
     template<typename T> const char *PrintableTypeName();
-    template<> const char *PrintableTypeName<TTermNothing    >() {return "Unit";}
-    template<> const char *PrintableTypeName<TString         >() {return "String";}
-    template<> const char *PrintableTypeName<TVector<TString>>() {return "Strings";}
-    template<> const char *PrintableTypeName<TTaggedStrings  >() {return "TaggedStrings";}
+    template<> [[maybe_unused]] const char *PrintableTypeName<TTermNothing    >() {return "Unit";}
+    template<> [[maybe_unused]] const char *PrintableTypeName<TString         >() {return "String";}
+    template<> [[maybe_unused]] const char *PrintableTypeName<TVector<TString>>() {return "Strings";}
+    template<> [[maybe_unused]] const char *PrintableTypeName<TTaggedStrings  >() {return "TaggedStrings";}
 
 }
 
 #define BAD_ARGUMENT_TYPE(f, x) \
     throw TNotImplemented() << "type " << PrintableTypeName<std::remove_cvref_t<decltype(x)>>() << " is not supported by " << f
-
-TTermValue NCommands::RenderArgs(std::span<const TTermValue> args) {
-    static const char* fnName = "Args";
-    TVector<TString> result;
-    for (auto& arg : args)
-        result.push_back(std::visit(TOverloaded{
-            [](TTermError) -> TString {
-                Y_ABORT();
-            },
-            [](TTermNothing x) -> TString {
-                BAD_ARGUMENT_TYPE(fnName, x);
-            },
-            [&](const TString& s) -> TString {
-                return s;
-            },
-            [&](const TVector<TString>& x) -> TString {
-                BAD_ARGUMENT_TYPE(fnName, x);
-            },
-            [&](const TTaggedStrings& x) -> TString {
-                BAD_ARGUMENT_TYPE(fnName, x);
-            }
-        }, arg));
-    return result;
-}
 
 TTermValue NCommands::RenderTerms(std::span<const TTermValue> args) {
     static const char* fnName = "Terms";
@@ -590,40 +680,6 @@ TTermValue NCommands::RenderCutPath(std::span<const TTermValue> args) {
             return std::move(v);
         },
         [&](TTaggedStrings x) -> TTermValue {
-            BAD_ARGUMENT_TYPE(fnName, x);
-        }
-    }, args[0]);
-}
-
-TTermValue NCommands::RenderCutExt(std::span<const TTermValue> args) {
-    static const char* fnName = "NoExt";
-    CheckArgCount(args, 1, fnName);
-    auto apply = [](TString s) {
-        // lifted from EMF_CutExt processing:
-        size_t slash = s.rfind(NPath::PATH_SEP); //todo: windows slash!
-        if (slash == TString::npos)
-            slash = 0;
-        size_t dot = s.rfind('.');
-        if (dot != TString::npos && dot >= slash)
-            s = s.substr(0, dot);
-        return s;
-    };
-    return std::visit(TOverloaded{
-        [](TTermError) -> TTermValue {
-            Y_ABORT();
-        },
-        [](TTermNothing x) -> TTermValue {
-            BAD_ARGUMENT_TYPE(fnName, x);
-        },
-        [&](TString s) -> TTermValue {
-            return apply(std::move(s));
-        },
-        [&](TVector<TString> v) -> TTermValue {
-            for (auto& s : v)
-                s = apply(std::move(s));
-            return std::move(v);
-        },
-        [&](const TTaggedStrings& x) -> TTermValue {
             BAD_ARGUMENT_TYPE(fnName, x);
         }
     }, args[0]);

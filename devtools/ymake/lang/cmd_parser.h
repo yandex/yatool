@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/polexpr/expression.h>
 #include <devtools/ymake/lang/macro_values.h>
+#include <devtools/ymake/commands/mod_registry.h>
 
 class TBuildConfiguration;
 
@@ -67,7 +68,7 @@ namespace NCommands {
 
     };
 
-    TSyntax Parse(const TBuildConfiguration* conf, TMacroValues& values, TStringBuf src);
-    NPolexpr::TExpression Compile(TMacroValues& values, const TSyntax& src);
+    TSyntax Parse(const TBuildConfiguration* conf, const TModRegistry& mods, TMacroValues& values, TStringBuf src);
+    NPolexpr::TExpression Compile(const TModRegistry& mods, const TSyntax& src);
 
 }

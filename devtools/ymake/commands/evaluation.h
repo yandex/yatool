@@ -1,8 +1,17 @@
 #pragma once
 
+#include <devtools/ymake/commands/compilation.h>
+#include <devtools/ymake/lang/macro_values.h>
 #include <devtools/ymake/macro_processor.h>
+#include <devtools/ymake/vars.h>
 
 namespace NCommands {
+
+    struct TPreevalCtx {
+        TMacroValues& Values;
+        NCommands::TCompiledCommand& Sink;
+        EMacroFunction RootFnIdx;
+    };
 
     struct TEvalCtx {
         const TVars& Vars;

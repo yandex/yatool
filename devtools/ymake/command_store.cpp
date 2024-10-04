@@ -3,6 +3,7 @@
 #include "add_dep_adaptor_inline.h"
 
 #include <devtools/ymake/command_helpers.h>
+#include <devtools/ymake/commands/compilation.h>
 #include <devtools/ymake/commands/script_evaluator.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/lang/cmd_parser.h>
@@ -14,7 +15,6 @@
 #include <fmt/args.h>
 #include <util/generic/overloaded.h>
 #include <util/generic/scope.h>
-#include <util/string/escape.h>
 #include <ranges>
 
 namespace {
@@ -23,15 +23,17 @@ namespace {
 
     struct TRefReducer {
 
-        using TInputs = TCommands::TCompiledCommand::TInputs;
-        using TOutputs = TCommands::TCompiledCommand::TOutputs;
+        using TInputs = NCommands::TCompiledCommand::TInputs;
+        using TOutputs = NCommands::TCompiledCommand::TOutputs;
 
         TRefReducer(
+            const NCommands::TModRegistry& mods,
             TMacroValues& values,
             const TVars& vars,
-            TCommands::TCompiledCommand& sink
+            NCommands::TCompiledCommand& sink
         )
-            : Values(values)
+            : Mods(mods)
+            , Values(values)
             , Vars(vars)
             , Sink(sink)
         {
@@ -42,7 +44,7 @@ namespace {
         void ReduceIf(NCommands::TSyntax& ast) {
             for (auto& cmd : ast.Script)
                 ReduceCmd(cmd);
-            Sink.Expression = NCommands::Compile(Values, ast);
+            Sink.Expression = NCommands::Compile(Mods, ast);
         }
 
     private:
@@ -53,7 +55,7 @@ namespace {
                     if (auto xfm = std::get_if<NCommands::TSyntax::TTransformation>(&term)) {
                         auto cutoff = std::find_if(
                             xfm->Mods.begin(), xfm->Mods.end(),
-                            [&](auto& mod) {return Condition(Values.Func2Id(mod.Name));}
+                            [&](auto& mod) {return Condition(Mods.Func2Id(mod.Name));}
                         );
                         if (cutoff == xfm->Mods.end()) {
                             ReduceCmd(xfm->Body);
@@ -93,9 +95,9 @@ namespace {
                 terms.reserve(arg.size());
                 for (auto& term : arg)
                     terms.push_back(EvalTerm(term));
-                args.push_back(Wrap(Evaluate(Values.Func2Id(EMacroFunction::Terms), std::span(terms))));
+                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Terms), std::span(terms))));
             }
-            return Wrap(Evaluate(Values.Func2Id(EMacroFunction::Args), std::span(args)));
+            return Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Args), std::span(args)));
         }
 
         NPolexpr::TConstId EvalTerm(const NCommands::TSyntax::TTerm& term) {
@@ -140,18 +142,19 @@ namespace {
                         },
                     }, modTerm));
                 }
-                args.push_back(Wrap(Evaluate(Values.Func2Id(EMacroFunction::Cat), std::span(catArgs))));
+                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Cat), std::span(catArgs))));
             }
             args.push_back(val);
-            return Wrap(Evaluate(Values.Func2Id(mod.Name), std::span(args)));
+            return Wrap(Evaluate(Mods.Func2Id(mod.Name), std::span(args)));
         }
 
     private:
 
         bool Condition(NPolexpr::TFuncId func) {
             RootFnIdx = static_cast<EMacroFunction>(func.GetIdx());
+            if (auto desc = Mods.At(RootFnIdx))
+                return desc->MustPreevaluate;
             return RootFnIdx == EMacroFunction::Tool
-                || RootFnIdx == EMacroFunction::Input
                 || RootFnIdx == EMacroFunction::Output
                 || RootFnIdx == EMacroFunction::Tmp
                 || RootFnIdx == EMacroFunction::Context
@@ -178,37 +181,23 @@ namespace {
 
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
 
-            auto processInput = [this](std::string_view arg0, bool isGlob) -> TMacroValues::TValue {
-                auto names = SplitArgs(TString(arg0));
-                if (names.size() == 1) {
-                    // one does not simply reuse the original argument,
-                    // for it might have been transformed (e.g., dequoted)
-                    auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                    auto input = TMacroValues::TInput {.Coord = CollectCoord(pooledName, Sink.Inputs)};
-                    UpdateCoord(Sink.Inputs, input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                    return input;
-                }
-                auto result = TMacroValues::TInputs();
-                for (auto& name : names) {
-                    auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(name)));
-                    result.Coords.push_back(CollectCoord(pooledName, Sink.Inputs));
-                    UpdateCoord(Sink.Inputs, result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                }
-                return result;
-            };
+            if (auto desc = Mods.At(fnIdx); desc && desc->CanPreevaluate) {
+                TVector<TMacroValues::TValue> unwrappedArgs;
+                unwrappedArgs.reserve(args.size());
+                for(auto&& arg : args)
+                    unwrappedArgs.push_back(Values.GetValue(arg));
+                return desc->Preevaluate({Values, Sink, RootFnIdx}, unwrappedArgs);
+            }
 
             if (
-                fnIdx == EMacroFunction::Args ||
                 fnIdx == EMacroFunction::Terms ||
                 fnIdx == EMacroFunction::Tool ||
-                fnIdx == EMacroFunction::Input ||
                 fnIdx == EMacroFunction::Output ||
                 fnIdx == EMacroFunction::Tmp ||
                 fnIdx == EMacroFunction::Pre ||
                 fnIdx == EMacroFunction::Suf ||
                 fnIdx == EMacroFunction::HasDefaultExt ||
                 fnIdx == EMacroFunction::CutPath ||
-                fnIdx == EMacroFunction::CutExt ||
                 fnIdx == EMacroFunction::Cat ||
                 fnIdx == EMacroFunction::Context ||
                 fnIdx == EMacroFunction::NoAutoSrc ||
@@ -242,19 +231,6 @@ namespace {
                 // TODO: get rid of escaping in Args followed by unescaping in Input/Output/CutPath/CutExt
 
                 switch (fnIdx) {
-                    case EMacroFunction::Args: {
-                        auto result = TString();
-                        bool first = true;
-                        for (auto& arg : unwrappedArgs) {
-                            if (!first)
-                                result += " ";
-                            result += "\"";
-                            EscapeC(std::get<std::string_view>(arg), result);
-                            result += "\"";
-                            first = false;
-                        }
-                        return Values.GetValue(Values.InsertStr(result));
-                    }
                     case EMacroFunction::Terms: {
                         auto result = TString();
                         for (auto& arg : unwrappedArgs)
@@ -272,15 +248,6 @@ namespace {
                             return TMacroValues::TTool {.Data = pooledName};
                         }
                         throw std::runtime_error{"Tool arrays are not supported"};
-                    }
-                    case EMacroFunction::Input: {
-                        checkArgCount(1);
-                        auto glob = std::get_if<TMacroValues::TGlobPattern>(&unwrappedArgs[0]);
-                        if (glob) {
-                            return processInput(glob->Data, true);
-                        }
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return processInput(arg0, false);
                     }
                     case EMacroFunction::Output:
                     case EMacroFunction::Tmp:
@@ -337,26 +304,6 @@ namespace {
                         size_t slash = arg0.rfind(NPath::PATH_SEP);
                         if (slash != TString::npos)
                             arg0 = arg0.substr(slash + 1);
-                        auto id = Values.InsertStr(arg0);
-                        return Values.GetValue(id);
-                    }
-                    case EMacroFunction::CutExt: {
-                        checkArgCount(1);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto names = SplitArgs(TString(arg0));
-                        if (names.size() != 1) {
-                            throw std::runtime_error{"noext modifier requires a single argument"};
-                        }
-                        // one does not simply reuse the original argument,
-                        // for it might have been transformed (e.g., dequoted)
-                        arg0 = names.front();
-                        // cf. RenderCutExt()
-                        size_t slash = arg0.rfind(NPath::PATH_SEP); //todo: windows slash!
-                        if (slash == TString::npos)
-                            slash = 0;
-                        size_t dot = arg0.rfind('.');
-                        if (dot != TString::npos && dot >= slash)
-                            arg0 = arg0.substr(0, dot);
                         auto id = Values.InsertStr(arg0);
                         return Values.GetValue(id);
                     }
@@ -428,9 +375,10 @@ namespace {
 
     private:
 
+        const NCommands::TModRegistry& Mods;
         TMacroValues& Values;
         const TVars& Vars;
-        TCommands::TCompiledCommand& Sink;
+        NCommands::TCompiledCommand& Sink;
         EMacroFunction RootFnIdx;
 
     };
@@ -463,10 +411,10 @@ const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *con
     return subExpr;
 }
 
-const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration* conf, TMacroValues& values, TString src) {
+const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration* conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src) {
     auto result = ParserCache.find(src);
     if (result == ParserCache.end())
-        result = ParserCache.emplace(src, NCommands::Parse(conf, values, src)).first;
+        result = ParserCache.emplace(src, NCommands::Parse(conf, mods, values, src)).first;
     return result->second;
 }
 
@@ -529,7 +477,7 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     TStringBuf cmdName;
     TStringBuf cmdValue;
     ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
-    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Values, TString(cmdValue))));
+    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue))));
     return {defs->second->back().Get(), true};
 }
 
@@ -573,7 +521,7 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
     // do the thing
 
     auto defBody = MacroDefBody(subValue);
-    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Values, TString(defBody))));
+    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(defBody))));
     return defs->second->back().Get();
 }
 
@@ -1036,7 +984,7 @@ void TCommands::TInliner::CheckDepth() {
         throw TError() << "inlining too deep";
 }
 
-TCommands::TCompiledCommand TCommands::Compile(
+NCommands::TCompiledCommand TCommands::Compile(
     TStringBuf cmd,
     const TBuildConfiguration* conf,
     const TVars& inlineVars,
@@ -1045,13 +993,13 @@ TCommands::TCompiledCommand TCommands::Compile(
     EOutputAccountingMode oam
 ) {
     auto inliner = TInliner(conf, *this, inlineVars, allVars);
-    auto& cachedAst = Parse(conf, Values, TString(cmd));
+    auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
     auto ast = inliner.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate)
         return Preevaluate(ast, allVars, oam);
     else
-        return TCompiledCommand{.Expression = NCommands::Compile(Values, ast)};
+        return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast)};
 }
 
 ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
@@ -1093,7 +1041,7 @@ TString TCommands::PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlig
             return Values.GetVarName(id);
         },
         [&](NPolexpr::TFuncId id) {
-            buf = ToString(Values.Id2Func(id));
+            buf = ToString(Mods.Id2Func(id));
             return buf;
         }
     }, highlightBegin, highlightEnd);
@@ -1192,8 +1140,8 @@ void TCommands::StreamCmdRepr(
     }
 }
 
-TCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam) {
-    TCompiledCommand result;
+NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam) {
+    NCommands::TCompiledCommand result;
     switch (oam) {
         case EOutputAccountingMode::Default:
             break;
@@ -1202,7 +1150,7 @@ TCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, con
             result.Outputs.Base = 1;
             break;
     }
-    auto reducer = TRefReducer{Values, vars, result};
+    auto reducer = TRefReducer{Mods, Values, vars, result};
     reducer.ReduceIf(expr);
     return result;
 }

@@ -64,7 +64,14 @@ SRCS(
     cmd_properties.cpp
     command_helpers.cpp
     command_store.cpp
-    commands/function_evaluator.cpp
+    commands/mods/common.cpp
+    GLOBAL commands/mods/io.cpp
+    GLOBAL commands/mods/misc.cpp
+    GLOBAL commands/mods/structurals.cpp
+    GLOBAL commands/mods/utility.cpp
+    commands/compilation.cpp
+    commands/evaluation.cpp
+    commands/mod_registry.cpp
     commands/script_evaluator.cpp
     compute_reachability.cpp
     conf.cpp

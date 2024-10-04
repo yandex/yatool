@@ -49,6 +49,8 @@ enum class EMacroFunction: ui32 {
     NoAutoSrc, // output-only, preevaluated
     NoRel, // output-only, preevaluated
     ResolveToBinDir, // output-only, preevaluated
+    //
+    Count
 };
 
 class TMacroValues {
@@ -88,9 +90,6 @@ public:
     NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }
 
     std::string_view GetVarName(NPolexpr::EVarId id) const;
-    ui16 FuncArity(EMacroFunction func) const noexcept;
-    NPolexpr::TFuncId Func2Id(EMacroFunction func) const noexcept;
-    EMacroFunction Id2Func(NPolexpr::TFuncId id) const noexcept;
 
     NPolexpr::TConstId InsertValue(const TValue& value);
     TValue GetValue(NPolexpr::TConstId id) const;

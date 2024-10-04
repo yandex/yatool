@@ -2,9 +2,9 @@
 
 #include "macro.h"
 
-#include <devtools/ymake/command_store.h>
 #include <devtools/ymake/dirs.h>
 #include <devtools/ymake/macro_vars.h>
+#include <devtools/ymake/commands/compilation.h>
 
 #include <util/generic/maybe.h>
 #include <util/generic/hash.h>
@@ -169,8 +169,8 @@ public:
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
         ui32 cmdElemId,
-        const TVector<TCommands::TCompiledCommand::TInput>& cmdInputs,
-        const TVector<TCommands::TCompiledCommand::TOutput>& cmdOutputs,
+        const TVector<NCommands::TCompiledCommand::TInput>& cmdInputs,
+        const TVector<NCommands::TCompiledCommand::TOutput>& cmdOutputs,
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
