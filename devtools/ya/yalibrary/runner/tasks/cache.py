@@ -202,6 +202,10 @@ class PutInCacheTask(object):
         return worker_threads.ResInfo(io=1)
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def short_name(self):
@@ -272,6 +276,10 @@ class RestoreFromCacheTask(object):
         return 'FromCache({})'.format(str(self._node))
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def res(self):
@@ -323,6 +331,10 @@ class WriteThroughCachesTask(object):
         return worker_threads.ResInfo()
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def short_name(self):

@@ -11,12 +11,12 @@ PY_SRCS(
     result_store.py
     ring_store.py
     runner3.py
+    runqueue.py
     statcalc.py
     task_cache.py
+    timeline_store.py
     topo.py
     uid_store.py
-    runqueue.py
-    timeline_store.py
 )
 
 PEERDIR(
@@ -30,6 +30,7 @@ PEERDIR(
     devtools/ya/yalibrary/runner/command_file/python
     devtools/ya/yalibrary/runner/fs
     devtools/ya/yalibrary/runner/sandboxing
+    devtools/ya/yalibrary/runner/schedule_strategy
     devtools/ya/yalibrary/runner/tasks
     devtools/ya/yalibrary/status_view
     devtools/ya/yalibrary/status_view
@@ -54,8 +55,9 @@ END()
 
 RECURSE(
     command_file
+    fs
     sandboxing
+    schedule_strategy
     tasks
     tests
-    fs
 )

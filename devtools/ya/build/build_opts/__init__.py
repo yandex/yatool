@@ -28,6 +28,7 @@ from core.yarg.groups import (
 )
 from core.yarg.help_level import HelpLevel
 from devtools.ya.test import opts as test_opts
+import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
 
 from core.common_opts import (
     PrintStatisticsOptions,
@@ -945,6 +946,7 @@ class ExecutorOptions(Options):
         self.use_clonefile = True
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
+        self.schedule_strategy = schedule_strategy.strategy_name(schedule_strategy.Strategies.default)
 
     @staticmethod
     def consumer():
@@ -1010,6 +1012,17 @@ class ExecutorOptions(Options):
                 visible=HelpLevel.ADVANCED,
             ),
             EnvConsumer('YA_NO_CLONEFILE', hook=SetValueHook('use_clonefile', False)),
+            ConfigConsumer('schedule_strategy'),
+            ArgConsumer(
+                ['--schedule-strategy'],
+                help=(
+                    "Order in which the runner picks up tasks ready for execution. "
+                    "To find out more about strategies see yalibrary.runner library. "
+                ),
+                hook=SetValueHook('schedule_strategy', values=schedule_strategy.strategy_names()),
+                group=ADVANCED_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
         ]
 
     def postprocess2(self, params):

@@ -10,7 +10,7 @@ import typing as tp
 import exts.shlex2
 import six
 
-import devtools.ya.test.const
+import devtools.ya.test.const as const
 import six.moves.queue as Queue
 import yalibrary.runner
 import yalibrary.worker_threads as worker_threads
@@ -497,6 +497,9 @@ class RunNodeTask(object):
                         for f in files:
                             self._build_root.add_output(os.path.join(root, f))
 
+        if self._supports_build_time_cache():
+            self._ctx.build_time_cache.touch(self._node.static_uid, id=int(finish_time - start_time))
+
         return six.ensure_str(full_stderr, errors='replace'), exit_code, (start_time, finish_time)
 
     def __call__(self, deps):
@@ -604,6 +607,10 @@ class RunNodeTask(object):
         return self._detailed_timings.dump()
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def res(self):
@@ -620,7 +627,7 @@ class RunNodeTask(object):
             'NP',
         ):
             return worker_threads.ResInfo(download=1)
-        if devtools.ya.test.const.TestSize.is_test_shorthand(p) or p == "YT":
+        if const.TestSize.is_test_shorthand(p) or p == "YT":
             cpu = self._node.requirements.get('cpu', 1)
             if cpu == 'all':
                 cpu = self._test_threads
@@ -638,3 +645,32 @@ class RunNodeTask(object):
 
     def short_name(self):
         return self._node.kv.get('p', '??')
+
+    def _supports_build_time_cache(self, other=None):
+        node = other or self._node
+        return (
+            self._ctx.build_time_cache
+            and node.static_uid is not None
+            and not const.TestSize.is_test_shorthand(node.kv.get('p'))
+        )
+
+    @property
+    def deps(self):
+        return self._node.dep_nodes()
+
+    @property
+    def build_time(self):
+        if self._supports_build_time_cache():
+            _, value = self._ctx.build_time_cache.last_usage(self._node.static_uid)
+            return value or 0
+        return 0
+
+    @property
+    def build_time_with_deps(self):
+        if self._supports_build_time_cache():
+            sum_time = self.build_time
+            for d in self.deps:
+                if self._supports_build_time_cache(other=d):
+                    sum_time += self._ctx.build_time_cache.last_usage(d.static_uid)[1] or 0
+            return sum_time
+        return 0

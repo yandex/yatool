@@ -2270,8 +2270,8 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
         imprint.stats()
     bg_cache.archive_cache_dir(opts)
 
-    with stager.scope('inject_stats_uid'):
-        gen_plan.inject_stats_uid(graph)
+    with stager.scope('inject_stats_and_static_uids'):
+        gen_plan.inject_stats_and_static_uids(graph)
 
     with stager.scope("strip-tags"):
         graph['graph'] = _strip_tags(graph['graph'])

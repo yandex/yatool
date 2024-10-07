@@ -73,8 +73,18 @@ class ResInfo(object):
         return str(self.__d)
 
 
+class PrioritizedTask(object):
+    def __init__(self, prio, schedule_strategy, action):
+        self.prio = prio
+        self.total_priority = (-prio,) + tuple(fn(action) for fn in schedule_strategy)
+        self.action = action
+
+    def __lt__(self, other):
+        return self.total_priority < other.total_priority
+
+
 class WorkerThreads(object):
-    def __init__(self, state, worker_pools, zero, cap, evlog):
+    def __init__(self, state, worker_pools, zero, cap, evlog, schedule_strategy):
         self._all_threads = []
         self._state = state
         self._out_q = Queue.Queue()
@@ -84,16 +94,17 @@ class WorkerThreads(object):
         self._active_res_usage = [zero]
         self._condition = threading.Condition(threading.Lock())
         self._evlog_writer = evlog.get_writer(__name__) if evlog else lambda *a, **kw: None
+        self._schedule_strategy = schedule_strategy
 
         def exec_target(worker_pool_type):
             def take_or_wait():
                 while self._state.check_cancel_state():
                     with self._condition:
                         best_actions = {}
-                        for k, v in self._active_set.items():
-                            if v and k + self._active_res_usage[0] <= cap:
-                                action_type = v[0][-1].worker_pool_type
-                                prio = -v[0][0]
+                        for k, pt_list in self._active_set.items():
+                            if pt_list and k + self._active_res_usage[0] <= cap:
+                                action_type = pt_list[0].action.worker_pool_type
+                                prio = pt_list[0].prio
                                 if action_type not in best_actions or best_actions[action_type][0] < prio:
                                     best_actions[action_type] = (prio, k)
 
@@ -109,10 +120,10 @@ class WorkerThreads(object):
                         if best_key is not None:
                             self._active_res_usage[0] += best_key
                             logger.debug('Active res usage %s', self._active_res_usage)
-                            _, elem = heapq.heappop(self._active_set[best_key])
+                            action = heapq.heappop(self._active_set[best_key]).action
                             self._condition.notify()
-                            logger.debug('Found job %s %s with prio %s', best_key, elem, max_prio)
-                            return best_key, elem
+                            logger.debug('Found job %s %s with prio %s', best_key, action, max_prio)
+                            return best_key, action
 
                         logger.debug(
                             'Cannot find any job from %s', dict((k, len(v)) for k, v in self._active_set.items())
@@ -179,15 +190,10 @@ class WorkerThreads(object):
                 self._active += 1
             self.__execute_action(action, res, inline=True)
         else:
+            pt = PrioritizedTask(prio=prio, schedule_strategy=self._schedule_strategy, action=action)
             with self._condition:
                 self._active += 1
-                heapq.heappush(
-                    self._active_set[res],
-                    (
-                        -prio,
-                        action,
-                    ),
-                )
+                heapq.heappush(self._active_set[res], pt)
                 if len(self._active_set[res]) == 1:
                     self._condition.notify()
 

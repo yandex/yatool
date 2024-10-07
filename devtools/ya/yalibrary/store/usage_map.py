@@ -20,7 +20,7 @@ class UsageMap(object):
 
     def touch(self, key, stamp=None, id=0):
         if stamp is None:
-            stamp = time.time()
+            stamp = int(time.time())
         self._hmap[key] = (
             stamp,
             id,
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
         washed_away = 0
         for x in six.moves.xrange(qty):
-            washed_away += 1 if mp.last_usage(str(x)) is None else 0
+            washed_away += mp.last_usage(str(x)) == (None, None)
 
         t3 = time.time()
 

@@ -21,6 +21,7 @@ import exts.shlex2
 import exts.timer
 import exts.windows
 import devtools.ya.test.const
+import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
 
 from yalibrary import status_view
 from yalibrary.active_state import Cancelled
@@ -34,6 +35,7 @@ from yalibrary.runner import task_cache
 from yalibrary.runner.command_file.python import command_file as cf
 from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.status_view.helpers import format_paths
+from yalibrary.store.usage_map import UsageMap
 
 import yalibrary.runner.sandboxing as sandboxing
 
@@ -131,6 +133,13 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             cache_stderr=False, debug=core.config.is_test_mode(), wait_init=False
         )
 
+    build_time_cache = None
+    if not opts.use_distbuild:
+        try:
+            build_time_cache = UsageMap(os.path.join(ctx.garbage_dir, 'cache', 'runner_build_time', 'rbt'))
+        except Exception as e:
+            logger.warning('Could not create build time cache due to error {!r}'.format(e))
+
     ienv = sandboxing.FuseSandboxing(opts, ctx.src_dir)
 
     class IEnvContext(object):
@@ -146,11 +155,12 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     test_threads = ctx.opts.test_threads or threads
     net_threads = ctx.opts.yt_store_threads + ctx.opts.dist_store_threads
     io_limit = min(ctx.opts.link_threads, threads)
+
     cap = worker_threads.ResInfo(
         io=io_limit, cpu=threads, test=test_threads, download=threads + net_threads, upload=net_threads
     )
-
     worker_pools = {WorkerPoolType.BASE: threads, WorkerPoolType.SERVICE: net_threads + 1}
+    strategy = schedule_strategy.Strategies.pick(opts.schedule_strategy, build_time_cache is not None)
 
     workers = worker_threads.WorkerThreads(
         state=state,
@@ -158,6 +168,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         zero=worker_threads.ResInfo(),
         cap=cap,
         evlog=getattr(app_ctx, 'evlog', None),
+        schedule_strategy=strategy,
     )
 
     class WorkersContext(object):
@@ -246,6 +257,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.is_result_node = is_result_node
             self.uid = kwargs.get('uid')
             self.self_uid = kwargs.get('self_uid', None)
+            self.static_uid = kwargs.get('static_uid', None)
             # FIXME: we need separate property in the node for this
             self.hashable = True if self.self_uid else False
             self.content_uid = None
@@ -296,9 +308,6 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             p = patterns.sub()
             p['BUILD_ROOT'] = exts.windows.win_path_fix(build_root)
             return self._command_args(build_root, p)
-
-        def prio(self):
-            return self.priority or 0
 
         def __str__(self):
             lim = 6
@@ -409,6 +418,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             self.state = state
             self.results = results
             self.fetchers_storage = fetchers_storage
+            self.build_time_cache = build_time_cache
 
             import yalibrary.runner.tasks.cache
 

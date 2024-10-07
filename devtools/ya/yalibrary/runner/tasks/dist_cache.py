@@ -49,6 +49,10 @@ class PutInDistCacheTask(object):
         return worker_threads.ResInfo(upload=1)
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def short_name(self):
@@ -165,6 +169,10 @@ class RestoreFromDistCacheTask(object):
         return 'FromDistCache({})'.format(str(self._node))
 
     def prio(self):
+        return 0
+
+    @property
+    def max_dist(self):
         return self._node.max_dist
 
     def res(self):
