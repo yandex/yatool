@@ -879,7 +879,7 @@ class Context(object):
             self.make_files = make_files or []
         elif opts.custom_json is not None and opts.custom_json:
             with udopen(opts.custom_json, "rb") as custom_json_file:
-                self.graph = sjson.load(custom_json_file)
+                self.graph = sjson.load(custom_json_file, intern_keys=True, intern_vals=True)
                 lg.finalize_graph(self.graph, opts)
             self.tests = []
             self.stripped_tests = []
