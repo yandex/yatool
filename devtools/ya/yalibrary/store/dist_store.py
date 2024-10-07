@@ -84,10 +84,10 @@ class DistStore(object):
         with AccumulateTime(lambda x: self._inc_time(x, 'has')):
             return self._do_has(*args, **kwargs)
 
-    def _do_put(self, uid, root_dir, files, codec=None):
+    def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         raise NotImplementedError()
 
-    def put(self, uid, root_dir, files, codec=None):
+    def put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         if self._exclude_filter:
             reason = self._exclude_filter(files)
             if reason:
@@ -95,7 +95,7 @@ class DistStore(object):
                 return Status.SKIPPED
 
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
-            if self._do_put(uid, root_dir, files, codec):
+            if self._do_put(self_uid, uid, root_dir, files, codec, cuid):
                 return Status.OK
             return Status.FAILED
 

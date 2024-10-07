@@ -34,6 +34,25 @@ YT_CACHE_METADATA_SCHEMA = [
     {'name': 'codec', 'type': 'string'},
 ]
 
+YT_CACHE_METADATA_V3_SCHEMA = [
+    {
+        'name': 'tablet_hash',
+        'expression': 'farm_hash(uid) % {}'.format(YT_CACHE_HASH_SPACE),
+        'type': 'uint64',
+        'sort_order': 'ascending',
+    },
+    {'name': 'self_uid', 'type': 'string', 'sort_order': 'ascending'},
+    {'name': 'uid', 'type': 'string', 'sort_order': 'ascending'},
+    {'name': 'chunks_count', 'type': 'uint64'},
+    {'name': 'data_size', 'type': 'uint64'},
+    {'name': 'access_time', 'type': 'timestamp'},
+    {'name': 'hash', 'type': 'string'},
+    {'name': 'name', 'type': 'string'},
+    {'name': 'hostname', 'type': 'string'},
+    {'name': 'GSID', 'type': 'string'},
+    {'name': 'codec', 'type': 'string'},
+]
+
 YT_CACHE_DATA_SCHEMA = [
     {
         'name': 'tablet_hash',

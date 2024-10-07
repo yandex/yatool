@@ -348,7 +348,7 @@ class BazelStore(DistStore):
         self._inc_cache_hit(found)
         return found
 
-    def _do_put(self, uid, root_dir, files, codec=None):
+    def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         if self._disabled:
             return False
 

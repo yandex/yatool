@@ -441,6 +441,7 @@ class CacheFactory(object):
             ttl=self._opts.yt_store_ttl,
             heater_mode=not self._opts.yt_store_wt,
             stager=stager,
+            with_self_uid=self._opts.yt_self_uid,
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -497,7 +498,7 @@ class CacheFactory(object):
         return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0)
 
 
-def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
+def make_dist_cache(dist_cache_future, opts, self_uids, uids, heater_mode):
     if not uids:
         return None
 
@@ -510,7 +511,13 @@ def make_dist_cache(dist_cache_future, opts, uids, heater_mode):
             # needed for catching an error in this rare scenario
             _async = not (opts.yt_store_exclusive or heater_mode)
 
-            cache.prepare(uids, refresh_on_read=opts.yt_store_refresh_on_read, _async=_async)
+            cache.prepare(
+                self_uids,
+                uids,
+                refresh_on_read=opts.yt_store_refresh_on_read,
+                content_uids=opts.force_content_uids,
+                _async=_async,
+            )
 
         logger.debug("Dist cache prepared")
         return cache
@@ -903,11 +910,14 @@ class Context(object):
         for node in self.graph['graph'] if self.graph is not None else lite_graph['graph']:
             nodes_map[node['uid']] = node
 
+        self_uids = [node.get('self_uid', uid) for uid, node in nodes_map.items()]
+        uids = nodes_map.keys()
+
         print_status("Configuring local and dist store caches")
 
         with stager.scope('configure-dist-store-cache'):
             self.dist_cache = make_dist_cache(
-                dist_cache_future, self.opts, nodes_map.keys(), heater_mode=not self.opts.yt_store_wt
+                dist_cache_future, self.opts, self_uids, uids, heater_mode=not self.opts.yt_store_wt
             )
         with stager.scope('configure-local-cache'):
             self.cache = self._cache_factory.get_local_cache_instance(self.garbage_dir)

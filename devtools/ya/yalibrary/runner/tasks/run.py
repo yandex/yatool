@@ -539,6 +539,10 @@ class RunNodeTask(object):
                     start_time = time.time()
                     if self._cache.try_restore(self._node.content_uid, self._build_root.path):
                         cached_by_content_uid = True
+                    elif self._dist_cache and self._dist_cache.has(self._node.content_uid):
+                        cached_by_content_uid = self._dist_cache.try_restore(
+                            self._node.content_uid, self._build_root.path
+                        )
                     finish_time = time.time()
 
             if not cached_by_content_uid:

@@ -41,6 +41,7 @@ class YtStore(DistStore):
         max_file_size=0,
         fits_filter=None,
         heater_mode=False,
+        with_self_uid=False,
         **kwargs
     ):
         super(YtStore, self).__init__(
@@ -74,10 +75,10 @@ class YtStore(DistStore):
         self._prepare_tables_future = None
 
         if self._heater_mode:
-            self._prepare_tables(create_tables, readonly, proxy, ttl)
+            self._prepare_tables(create_tables, readonly, proxy, ttl, with_self_uid)
         else:
             self._prepare_tables_future = asyncthread.future(
-                lambda: self._prepare_tables(create_tables, readonly, proxy, ttl)
+                lambda: self._prepare_tables(create_tables, readonly, proxy, ttl, with_self_uid)
             )
 
         self._stager = kwargs.get("stager", utils.DummyStager())
@@ -86,10 +87,10 @@ class YtStore(DistStore):
     def is_disabled(self):
         return self._client.is_disabled
 
-    def _prepare_tables(self, create_tables, readonly, proxy, ttl):
+    def _prepare_tables(self, create_tables, readonly, proxy, ttl, with_self_uid):
         if create_tables and not readonly:
             try:
-                self._client.create_tables(ttl)
+                self._client.create_tables(ttl, with_self_uid)
             except Exception as e:
                 raise YtInitException('Can\'t create tables at {}: {}'.format(proxy, str(e)))
 
@@ -122,20 +123,24 @@ class YtStore(DistStore):
             meta_to_delete = self._client.get_metadata_rows(where=where, limit=limit)
         return meta_to_delete
 
-    def prepare(self, uids, refresh_on_read=False, _async=False):
+    def prepare(self, self_uids, uids, refresh_on_read=False, content_uids=False, _async=False):
         if _async:
-            self._prepare_future = asyncthread.future(lambda: self._load_meta(uids, refresh_on_read))
+            self._prepare_future = asyncthread.future(
+                lambda: self._load_meta(self_uids, uids, refresh_on_read, content_uids)
+            )
         else:
-            self._load_meta(uids, refresh_on_read)
+            self._load_meta(self_uids, uids, refresh_on_read, content_uids)
 
-    def _load_meta(self, uids, refresh_on_read=False):
+    def _load_meta(self, self_uids, uids, refresh_on_read=False, content_uids=False):
         with self._stager.scope('loading-yt-meta'):
             self.wait_until_tables_ready()
 
             try:
                 with AccumulateTime(lambda x: self._inc_time(x, 'get-meta')):
                     refresh_access_time = not self.readonly() and refresh_on_read
-                    self._meta = self._client.get_metadata(uids, refresh_access_time=refresh_access_time)
+                    self._meta = self._client.get_metadata(
+                        self_uids, uids, refresh_access_time=refresh_access_time, content_uids=content_uids
+                    )
                     if self._time_to_first_recv_meta is None:
                         self._time_to_first_recv_meta = time.time()
                 # logger.debug('YT cache has: %s', ', '.join(self._meta.keys()))
@@ -159,11 +164,11 @@ class YtStore(DistStore):
     def get_used_size(self):
         return self._client.get_tables_size()
 
-    def _upload_data(self, stack, files, codec, root_dir, uid, name):
+    def _upload_data(self, stack, files, codec, root_dir, self_uid, uid, name, cuid):
         if codec == consts.YT_CACHE_NO_DATA_CODEC:
             raise Exception("Codec {} is not supported here".format(consts.YT_CACHE_NO_DATA_CODEC))
         data_path = self._prepare_data(stack, files, codec, root_dir)
-        return self._client.put(uid, data_path, name=name, codec=codec)
+        return self._client.put(self_uid, uid, data_path, name=name, codec=codec, cuid=cuid)
 
     def _prepare_data(self, stack, files, codec, root_dir):
         tar_path = stack.enter_context(tmp.temp_file())
@@ -180,7 +185,7 @@ class YtStore(DistStore):
             data_path = tar_path
         return data_path
 
-    def _do_put(self, uid, root_dir, files, codec=None):
+    def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         if self.is_disabled:
             return False
 
@@ -195,7 +200,7 @@ class YtStore(DistStore):
         data_size = 0
         try:
             with ExitStack() as stack:
-                meta = self._upload_data(stack, files, codec, root_dir, uid, name)
+                meta = self._upload_data(stack, files, codec, root_dir, self_uid, uid, name, cuid)
                 data_size = meta.get('data_size', 0)
                 self._inc_data_size(data_size, 'put')
                 self._meta[uid] = meta
@@ -473,9 +478,9 @@ class YndexerYtStore(YtStore):
         outputs = node["outputs"] if isinstance(node, dict) else node.outputs
         return any(out.endswith(YndexerYtStore.YDX_PB2_EXT) for out in outputs)
 
-    def _upload_data(self, stack, files, codec, root_dir, uid, name):
+    def _upload_data(self, stack, files, codec, root_dir, self_uid, uid, name, cuid):
         if codec != consts.YT_CACHE_NO_DATA_CODEC:
-            return super(YndexerYtStore, self)._upload_data(stack, files, codec, root_dir, uid, name)
+            return super(YndexerYtStore, self)._upload_data(stack, files, codec, root_dir, self_uid, uid, name, cuid)
         forced_node_size = None
 
         size_file = list(filter(lambda x: x.endswith(self.YDX_PB2_EXT), files))
@@ -498,4 +503,6 @@ class YndexerYtStore(YtStore):
         if forced_node_size is None:
             data_path = self._prepare_data(stack, files, codec, root_dir)
             forced_node_size = os.path.getsize(data_path)
-        return self._client.put(uid, None, name=name, codec=codec, forced_node_size=forced_node_size)
+        return self._client.put(
+            self_uid, uid, None, name=name, codec=codec, forced_node_size=forced_node_size, cuid=cuid
+        )

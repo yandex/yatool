@@ -2602,6 +2602,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.dist_cache_late_fetch = False
         self.yt_store = True if app_config.in_house else False  # should be false for opensource
         self.yt_create_tables = False
+        self.yt_self_uid = False
         self.yt_cache_filter = None
         self.yt_store_codec = None
         self.yt_replace_result = False
@@ -2740,6 +2741,13 @@ class DistCacheOptions(DistCacheSetupOptions):
                     ['--yt-create-tables'],
                     help='Create YT storage tables',
                     hook=SetConstValueHook('yt_create_tables', True),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--yt-self-uid'],
+                    help='Include self_uid in YT store metadata (use with --yt-create-tables)',
+                    hook=SetConstValueHook('yt_self_uid', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),

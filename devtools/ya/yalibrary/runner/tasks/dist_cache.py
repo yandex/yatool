@@ -28,7 +28,12 @@ class PutInDistCacheTask(object):
         start_time = time.time()
         try:
             status = self._dist_cache.put(
-                self._node.uid, self._build_root.path, list(self._build_root.output), codec=self._dist_cache_codec
+                self._node.self_uid or self._node.uid,
+                self._node.uid,
+                self._build_root.path,
+                list(self._build_root.output),
+                codec=self._dist_cache_codec,
+                cuid=self._node.content_uid,
             )
             if status.skipped:
                 self._skipped = True
