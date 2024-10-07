@@ -251,10 +251,13 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.cache_tests = params.cache_tests
     if params.run_tests:
         build_options.print_test_console_report = True
-        filename = 'junit_{}'.format(parsed_package["meta"]["name"])
-        if build_key:
-            filename += '_{}'.format(exts.hashing.md5_value(build_key))
-        build_options.junit_path = os.path.join(os.getcwd(), '{}.xml'.format(filename))
+        if params.junit_path:
+            build_options.junit_path = params.junit_path
+        else:
+            filename = 'junit_{}'.format(parsed_package["meta"]["name"])
+            if build_key:
+                filename += '_{}'.format(exts.hashing.md5_value(build_key))
+            build_options.junit_path = os.path.join(os.getcwd(), '{}.xml'.format(filename))
         # There might be a test which depends on program A which could be a required output for the package
         # and if this test is skipped, ya will strip out program A from a build graph.
         # There is not way to mark required binaries for package in the current version of graph,
