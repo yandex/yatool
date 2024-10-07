@@ -30,6 +30,7 @@ PEERDIR(
     devtools/ya/build/evlog
     devtools/ya/build/gen_plan
     devtools/ya/build/genconf
+    devtools/ya/build/graph_description
     devtools/ya/build/makelist
     devtools/ya/build/node_checks
     devtools/ya/build/owners

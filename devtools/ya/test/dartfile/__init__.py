@@ -35,8 +35,7 @@ def get_dart_id(dart_info):
     return tuple(dart_info[v] for v in HASH_FIELDS)
 
 
-def get_suite_id(suite):
-    # type: (AbstractTestSuite) -> tuple
+def get_suite_id(suite: "AbstractTestSuite") -> tuple[str, ...]:
     return (suite.name, type(suite).__name__, suite.project_path, suite.salt)
 
 

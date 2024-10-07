@@ -16,4 +16,10 @@ PEERDIR(
     devtools/ya/yalibrary/platform_matcher
 )
 
+IF (PYTHON2)
+    PEERDIR(
+        contrib/deprecated/python/typing
+    )
+ENDIF()
+
 END()

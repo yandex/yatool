@@ -51,10 +51,15 @@ import build.makelist as bml
 import build.node_checks as node_checks
 import build.gen_plan as gen_plan
 import build.ymake2 as ymake2
+import build.graph_description as graph_descr
 from build.ymake2.consts import YmakeEvents
 import build.genconf as bg
 from build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
+
+if tp.TYPE_CHECKING:
+    from devtools.ya.test.test_types.common import AbstractTestSuite
+
 
 import devtools.libs.yaplatform.python.platform_map as platform_map
 
@@ -154,7 +159,7 @@ class _OptimizableGraph(dict):
 
 class _NodeGen(object):
     def __init__(self):
-        self.extra_nodes = []
+        self.extra_nodes: list[graph_descr.GraphNode] = []
         self._md5_cache = {}
 
     def resolve_file_md5(self, path):
@@ -167,7 +172,7 @@ class _NodeGen(object):
     def is_cacheable_node(node):
         return node.get('cache', not node.get('kv', {}).get('disable_cache', False))
 
-    def gen_rename_node(self, node, suffix):
+    def gen_rename_node(self, node: graph_descr.GraphNode, suffix) -> graph_descr.GraphNodeUid:
         import devtools.ya.test.test_node.cmdline as cmdline
 
         inputs = node['outputs']
@@ -181,7 +186,7 @@ class _NodeGen(object):
             'broadcast': False,
             'cmds': [
                 {
-                    'cmd_args': ['$(PYTHON)/python', '$(SOURCE_ROOT)/build/scripts/move.py']
+                    'cmd_args': ["$(PYTHON)/python", '$(SOURCE_ROOT)/build/scripts/move.py']
                     + cmdline.wrap_with_cmd_file_markers(cmd_args)
                 }
             ],
@@ -339,7 +344,7 @@ def _add_json_prefix(graph, tests, prefix):
     _substitute_uids(graph, tests, old_to_new_uids)
 
 
-def _gen_rename_nodes(graph, uid_map, src_dir):
+def _gen_rename_nodes(graph: graph_descr.DictGraph, uid_map, src_dir):
     node_gen = _NodeGen()
     by_output = collections.defaultdict(list)
 
@@ -387,12 +392,17 @@ def _iter_extra_resources(g):
                     yield k, ALLOWED_EXTRA_RESOURCES[k]
 
 
-def _naive_merge(g1, g2):
+def _naive_merge(g1: graph_descr.DictGraph | None, g2: graph_descr.DictGraph | None) -> graph_descr.DictGraph:
+    assert g1 is not None or g2 is not None
+
     if node_checks.is_empty_graph(g1):
         return g2
 
     if node_checks.is_empty_graph(g2):
         return g1
+
+    g1: graph_descr.DictGraph
+    g2: graph_descr.DictGraph
 
     conf1 = g1.get('conf', {}).copy()
     conf2 = g2.get('conf', {})
@@ -421,7 +431,9 @@ def _add_resources(resources, to):
     return to
 
 
-def strip_graph(graph, result=None):
+def strip_graph(
+    graph: graph_descr.DictGraph, result: tp.Sequence[graph_descr.GraphNodeUid] | None = None
+) -> graph_descr.DictGraph:
     result = result or graph['result']
     nodes = _strip_unused_nodes(graph['graph'], result)
 
@@ -431,7 +443,9 @@ def strip_graph(graph, result=None):
     return {'conf': conf, 'inputs': graph.get('inputs', {}), 'result': list(set(result)), 'graph': nodes}
 
 
-def _strip_unused_nodes(graph_nodes, result):
+def _strip_unused_nodes(
+    graph_nodes: list[graph_descr.GraphNode], result: tp.Sequence[graph_descr.GraphNodeUid]
+) -> list[graph_descr.GraphNode]:
     by_uid = {n['uid']: n for n in graph_nodes}
 
     def visit(uid):
@@ -442,7 +456,7 @@ def _strip_unused_nodes(graph_nodes, result):
                 for xx in visit(dep):
                     yield xx
 
-    result_nodes = []
+    result_nodes: list[graph_descr.GraphNode] = []
     for uid in result:
         for node in visit(uid):
             result_nodes.append(node)
@@ -467,8 +481,26 @@ class GraphMalformedException(Exception):
 
 
 _TargetGraphsResult = collections.namedtuple("TargetGraphsResult", ["pic", "no_pic", "target_tc"])
-_MergeTargetGraphResult = collections.namedtuple("_MergeTargetGraphResult", ["graph", "test_bundle", "make_files"])
-_GenGraphResult = collections.namedtuple("_GenGraphResult", ["graph", "tc_tests", "java_darts", "make_files_map"])
+
+# class _TargetGraphsResult(tp.NamedTuple):
+#     pic
+
+
+# _MergeTargetGraphResult = collections.namedtuple("_MergeTargetGraphResult", ["graph", "test_bundle", "make_files"])
+class _MergeTargetGraphResult(tp.NamedTuple):
+    graph: ccgraph.Graph | graph_descr.DictGraph
+    test_bundle: tp.Any
+    make_files: tp.Any
+
+
+# _GenGraphResult = collections.namedtuple("_GenGraphResult", ["graph", "tc_tests", "java_darts", "make_files_map"])
+
+
+class _GenGraphResult(tp.NamedTuple):
+    graph: ccgraph.Graph
+    tc_tests: list["AbstractTestSuite"]
+    java_darts: list
+    make_files_map: list
 
 
 def _get_node_out_names_map(node):
@@ -541,7 +573,7 @@ def _resolve_tool_resid(tool, res_dir):
     return fetcher.resolve_resource_id(res_dir, tool['name'], tool['bottle_name'], formula, platform)
 
 
-def _resolve_tool(tool, res_dir):
+def _resolve_tool(tool: tools.ToolInfo, res_dir) -> graph_descr.GraphConfResourceConcreteInfo:
     if tool['params'].get('use_bundle', False):
         formula = fetcher.get_formula_value(tool['formula'])
         return platform_map.graph_json_from_resource_json(tool['params']['match_root'], json.dumps(formula))
@@ -798,7 +830,7 @@ def _add_pgo_profile_resource(graph, pgo_path):
     return hashing.fast_filehash(os.path.abspath(pgo_path))
 
 
-def _gen_filter_node(node, flt):
+def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
     mapping = _get_node_out_names_map(node)
 
     inputs = []
@@ -811,7 +843,13 @@ def _gen_filter_node(node, flt):
         inputs.append(inp)
         if renamed:
             cmd = {
-                'cmd_args': ['$(PYTHON)/python', '$(SOURCE_ROOT)/build/scripts/fs_tools.py', 'link_or_copy', inp, outp]
+                'cmd_args': [
+                    "$(PYTHON)/python",
+                    '$(SOURCE_ROOT)/build/scripts/fs_tools.py',
+                    'link_or_copy',
+                    inp,
+                    outp,
+                ]
             }
             cmds.append(cmd)
         outputs.append(outp)
@@ -833,7 +871,7 @@ def _gen_filter_node(node, flt):
     }
 
 
-def finalize_graph(graph, opts):
+def finalize_graph(graph: graph_descr.DictGraph, opts):
     if opts.add_result or opts.add_host_result:
         assert 'result' in graph
 
@@ -1584,7 +1622,7 @@ class _GraphMaker(object):
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
         ymake_opts=None,
-    ):
+    ) -> _GenGraphResult:
         flags = copy.deepcopy(flags)
         flags['IS_CROSS_SANITIZE'] = 'yes'
         tc_tests = []
@@ -1886,7 +1924,7 @@ class _GraphMaker(object):
             return text.replace('-{ispic}', '')
         return text.format(ispic=ispic)
 
-    def _gen_graph_json(self, ymake_opts, purpose):
+    def _gen_graph_json(self, ymake_opts, purpose) -> ccgraph.Graph:
         if self._heater:
             purpose = (purpose or '') + 'heater'
             diag_key = 'build-graph-cache-heater'
@@ -1932,7 +1970,9 @@ class _GraphMaker(object):
         )
 
 
-def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
+def _build_graph_and_tests(
+    opts, check, event_queue, exit_stack, display
+):  # ?, True, core.event_handling.event_queue.EventQueue, contextlib2.ExitStack, yalibrary.display.Display
     import core.config
 
     build_graph_and_tests_stage = stager.start('build_graph_and_tests')
@@ -2116,7 +2156,9 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
         cl_generator,
     )
 
-    graph_handles = []
+    host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
+
+    graph_handles: list[_TargetGraphsResult] = []
     tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
     for i, tc in enumerate(target_tcs, start=1):
@@ -2144,10 +2186,8 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
 
     any_tests = any([_should_run_tests(opts, tc) for tc in target_tcs])
 
-    host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
-
     # Note: run merge_target_graphs() in parallel (in different threads) is unsafe because graph_tools is shared between target graphs.
-    merged_target_graphs = []
+    merged_target_graphs: list[_MergeTargetGraphResult] = []
     for num, target_graph in enumerate(graph_handles, start=1):
         graph = _merge_target_graphs(
             graph_maker,
@@ -2235,7 +2275,10 @@ def _build_graph_and_tests(opts, check, event_queue, exit_stack, display):
 
     if opts.export_to_maven:
         graph = _add_global_pom(
-            _clean_maven_deploy_from_run_java_program(graph), opts.arc_root, opts.rel_targets, opts.version
+            _clean_maven_deploy_from_run_java_program(graph),
+            opts.arc_root,
+            opts.rel_targets,
+            opts.version,
         )
 
     if opts.add_modules_to_results:
@@ -2410,7 +2453,7 @@ def _get_target_platform_descriptor(target_tc, opts):
     return "-".join(tags) if tags else platform
 
 
-def _add_global_pom(graph, arc_root, start_paths, ver):
+def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
     modules = [
         n['target_properties']['module_dir'] for n in graph['graph'] if n.get('kv', {}).get('mvn_export', 'no') == 'yes'
     ]
@@ -2425,7 +2468,7 @@ def _add_global_pom(graph, arc_root, start_paths, ver):
     ]
     cmds = [
         [
-            '$(PYTHON)/python',
+            "$(PYTHON)/python",
             '$(SOURCE_ROOT)/build/scripts/writer.py',
             '--file',
             '$(BUILD_ROOT)/modules_list.txt',
@@ -2492,7 +2535,7 @@ def _clean_maven_deploy_from_run_java_program(graph):
     return graph
 
 
-def _make_yndexing_graph(graph, opts, ymake_bin, host_tool_resolver):
+def _make_yndexing_graph(graph: graph_descr.DictGraph, opts, ymake_bin, host_tool_resolver: "_HostToolResolver"):
     py_yndexing = opts.py_yndexing
     py3_yndexing = opts.py3_yndexing
 
@@ -2502,7 +2545,7 @@ def _make_yndexing_graph(graph, opts, ymake_bin, host_tool_resolver):
 
     graph['graph'].extend([_gen_ymake_yndex_node(opts, ymake_bin)])
     if py_yndexing:
-        _gen_pyndex_nodes(graph)
+        _gen_pyndex_nodes(graph)  # TODO: Remove?
     if py3_yndexing:
         _gen_py3_yndexer_nodes(graph)
 
@@ -2591,7 +2634,7 @@ def _gen_merge_node(nodes):
     }
 
 
-def _gen_ymake_yndex_node(opts, ymake_bin):
+def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
     tc = bg.gen_host_tc(getattr(opts, 'c_compiler', None), getattr(opts, 'cxx_compiler', None))
     tc_params = six.ensure_str(base64.b64encode(six.ensure_binary(json.dumps(tc, sort_keys=True))))
     conf_flags = []
@@ -2602,7 +2645,7 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
     cmds = [
         {
             'cmd_args': [
-                '$(PYTHON)/python',
+                "$(PYTHON)/python",
                 '$(SOURCE_ROOT)/build/ymake_conf.py',
                 '$(SOURCE_ROOT)',
                 'nobuild',
@@ -2641,7 +2684,7 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
     ]
 
     cmdstr = ' '.join([' '.join(cmd['cmd_args']) for cmd in cmds])
-    uid = 'yy-yndex-{}'.format(hashing.md5_value('#' + cmdstr))
+    uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(hashing.md5_value('#' + cmdstr))
     return {
         'cmds': cmds,
         'kv': {'p': 'YY', 'pc': 'magenta'},
@@ -2655,7 +2698,7 @@ def _gen_ymake_yndex_node(opts, ymake_bin):
     }
 
 
-def _gen_pyndex_nodes(graph, num_partitions=10):
+def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
     yndexer_script = '$(SOURCE_ROOT)/build/scripts/python_yndexer.py'
     pyxref = next(
         (
@@ -2673,7 +2716,7 @@ def _gen_pyndex_nodes(graph, num_partitions=10):
         for part_id in range(num_partitions):
             ydx_output = "{}.{}.ydx.pb2".format(target, part_id)
             cmd = [
-                '$(PYTHON)/python',
+                "$(PYTHON)/python",
                 yndexer_script,
                 pyxref,
                 '1500',
@@ -2764,7 +2807,7 @@ def _gen_merge_nodes(nodes):
     return merging_nodes, alone_nodes
 
 
-def _get_tools(tool_targets_queue, graph_maker, arc_root, host_tc, opts):
+def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts):
     if should_use_servermode_for_tools(opts):
 
         def stdin_line_provider():
@@ -2815,13 +2858,16 @@ def _get_tools(tool_targets_queue, graph_maker, arc_root, host_tc, opts):
 
 class _HostToolResolver(object):
     def __init__(self, parsed_host_p, res_dir):
-        host_tool = parsed_host_p.copy()
-        host_tool['toolchain'] = 'default'
-        host_tool = pm.stringize_platform(host_tool)
-        self._host_tool = host_tool
+        self._host_tool = self.generate_host_platform_str(parsed_host_p)
         self._res_dir = res_dir
 
-    def resolve(self, name, pattern):
+    @staticmethod
+    def generate_host_platform_str(parsed_host_p):
+        host_tool = parsed_host_p.copy()
+        host_tool['toolchain'] = 'default'
+        return pm.stringize_platform(host_tool)
+
+    def resolve(self, name: str, pattern: str) -> graph_descr.GraphConfResourceInfo:
         tc = tools.resolve_tool(name, self._host_tool, self._host_tool)
         tc['params'] = {'match_root': pattern}
         return _resolve_tool(tc, self._res_dir)
@@ -2893,14 +2939,14 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
 
 
 def _merge_target_graphs(
-    graph_maker,
-    conf_error_reporter,
+    graph_maker: _GraphMaker,
+    conf_error_reporter: _ConfErrorReporter,
     opts,
     any_tests,
     graph_tools,
-    target_graph,
-    graph_handles_num,
-):
+    target_graph: _TargetGraphsResult,
+    graph_handles_num: int,
+) -> _MergeTargetGraphResult:
     # merge target graphs for single target platform: tools + pic + no_pic
 
     with stager.scope('merge-target-graphs-{}'.format(graph_handles_num)):
@@ -2955,9 +3001,9 @@ def _merge_target_graphs(
 
         with stager.scope('get-graph-{}'.format(graph_handles_num)):
             # Get graph's python representation
-            graph = graph.get()
+            graph_dict = graph.get()
 
-        return _MergeTargetGraphResult(graph, test_bundle, make_files)
+        return _MergeTargetGraphResult(graph_dict, test_bundle, make_files)
 
 
 def _get_tools_from_suites(suites, ytexec_required):
@@ -2970,16 +3016,16 @@ def _get_tools_from_suites(suites, ytexec_required):
 
 
 def _build_merged_graph(
-    host_tool_resolver,
-    conf_error_reporter,
+    host_tool_resolver: _HostToolResolver,
+    conf_error_reporter: _ConfErrorReporter,
     opts,
     print_status,
     src_dir,
     any_tests,
     target_tcs,
-    merged_target_graphs,
+    merged_target_graphs: list[_MergeTargetGraphResult],
 ):
-    merged_graph = None
+    merged_graph: graph_descr.DictGraph | None = None
     ytexec_required = False
     stripped_tests = []
     injected_tests = []
@@ -2997,6 +3043,8 @@ def _build_merged_graph(
             target_graph.test_bundle,
             target_graph.make_files,
         )
+        graph: graph_descr.DictGraph
+
         if test_bundle:
             tests, tpc = test_bundle
             tpc_test_opts = _get_tpc_test_opts(test_opts, tpc)
@@ -3013,7 +3061,7 @@ def _build_merged_graph(
                 ytexec_required |= tpc_test_opts.run_tagged_tests_on_yt
 
         with stager.scope('merge-target-graphs-{}'.format(target_graph_num)):
-            merged_graph = _naive_merge(merged_graph, graph)
+            merged_graph: graph_descr.DictGraph = _naive_merge(merged_graph, graph)
 
         united_make_files = bml.union_make_files(united_make_files, make_files_by_platform)
 
@@ -3098,7 +3146,7 @@ def _split_stripped_tests(tests, opts):
     return devtools.ya.test.test_node.split_stripped_tests(tests, opts)
 
 
-def _inject_tests_result_node(src_dir, graph, tests, opts):
+def _inject_tests_result_node(src_dir, graph: graph_descr.DictGraph, tests, opts) -> None:
     import devtools.ya.test.test_node
     import build.build_plan
 
@@ -3253,8 +3301,9 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
     return graph, ctx
 
 
-def _strip_graph_results(graph, node_checker, node_type_name):
-    # type: (dict, tp.Callable[[dict], bool], str) -> dict
+def _strip_graph_results(
+    graph: graph_descr.DictGraph, node_checker: tp.Callable[[graph_descr.GraphNode], bool], node_type_name: str
+) -> graph_descr.DictGraph:
     results = set(graph['result'])
     stripped = set([node['uid'] for node in graph['graph'] if node['uid'] in results and node_checker(node)])
     logger.debug("Going to remove %d nodes from results as %s node results", len(stripped), node_type_name)

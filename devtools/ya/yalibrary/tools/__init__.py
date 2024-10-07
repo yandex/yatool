@@ -13,6 +13,14 @@ from exts import func
 import exts.path2
 import devtools.libs.yaplatform.python.platform_map as platform_map
 
+import typing as tp
+
+if six.PY2:
+    NotRequired = tp.Optional
+else:
+    from typing import NotRequired
+
+
 logger = logging.getLogger(__name__)
 
 _TOOLCHAIN_SEPARATOR = ','
@@ -257,8 +265,24 @@ def toolchain_sys_libs(name, toolchain_extra, for_platform):
     return _ToolChain(toolchain_extra).system_libs(name, for_platform)
 
 
+ToolInfo = tp.TypedDict(
+    'ToolInfo',
+    {
+        'platform': tp.Dict[str, tp.Any],
+        'env': tp.Dict[str, str],
+        'params': tp.Dict[str, str],
+        'formula': tp.Optional[tp.Dict[str, str]],
+        'name': str,
+        'bottle_name': str,
+        'executable_path': tp.List[str],
+        'tool_var': NotRequired[str],
+    },
+)
+
+
 def iter_tools(name, tn_filter=None):
-    tc = core.config.config()['toolchain']
+    # type: (str, tp.Callable | None) -> tp.Iterator[ToolInfo]
+    tc = core.config.config()['toolchain']  # type: dict[str, dict]
     bt = core.config.config()['bottles']
 
     for tn, descr in tc.items():
@@ -272,6 +296,7 @@ def iter_tools(name, tn_filter=None):
         if name in tools:
             tool = tools[name]
             bottle_name = tool.get('bottle', None)
+            executable_path = tool.get('executable', None)
 
             formula = bt[bottle_name]['formula'] if bottle_name else None
 
@@ -325,15 +350,18 @@ def iter_tools(name, tn_filter=None):
                     'formula': formula,
                     'name': trn,
                     'bottle_name': bottle_name,
-                }
+                    'executable_path': executable_path,
+                }  # type: ToolInfo
                 root = res.get('params', {}).get('match_root', None)
 
                 if root:
                     if formula and res.get('params', {}).get('use_bundle', False):
                         formula = yalibrary.fetcher.tool_chain_fetcher.get_formula_value(formula)
-                        ts = six.ensure_str(platform_map.mapping_var_name_from_json(root, json.dumps(formula)))
+                        tool_var = six.ensure_str(platform_map.mapping_var_name_from_json(root, json.dumps(formula)))
                     else:
-                        ts = pm.stringize_platform(p['target'], sep='_')
+                        tool_var = pm.stringize_platform(p['target'], sep='_')
+
+                    res['tool_var'] = tool_var
 
                     def subst(x):
                         if isinstance(x, dict):
@@ -343,9 +371,9 @@ def iter_tools(name, tn_filter=None):
                             return [subst(v) for v in x]
                         if isinstance(x, six.string_types):
                             if x == root:
-                                return ts
+                                return tool_var
 
-                            return x.replace('$(' + root + ')', '$(' + ts + ')')
+                            return x.replace('$(' + root + ')', '$(' + tool_var + ')')
 
                         return x
 

@@ -14,6 +14,7 @@ PEERDIR(
     devtools/ya/core/imprint
     devtools/ya/core/profiler
     devtools/ya/core/yarg
+    devtools/ya/core
     devtools/ya/exts
     devtools/ya/test/canon
     devtools/ya/test/common

@@ -1,3 +1,6 @@
+import build.graph_description as graph_descr
+
+
 def is_module(n):
     return 'target_properties' in n and 'module_type' in n['target_properties']
 
@@ -30,7 +33,7 @@ def is_maven_deploy(cmd):
     return maven_bin and deploy_file
 
 
-def is_empty_graph(g):
+def is_empty_graph(g: graph_descr.DictGraph) -> bool:
     if not g:
         return True
 

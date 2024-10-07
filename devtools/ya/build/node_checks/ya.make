@@ -5,4 +5,8 @@ ALL_PY_SRCS(
     build.node_checks
 )
 
+PEERDIR(
+    devtools/ya/build/graph_description
+)
+
 END()

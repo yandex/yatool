@@ -26,7 +26,7 @@ from devtools.ya.test.util import tools
 
 logger = logging.getLogger(__name__)
 
-SUITE_MAP = {  # type: dict[str, types_common.AbstractTestSuite]
+SUITE_MAP: dict[str, type[types_common.AbstractTestSuite]] = {
     'custom_lint': custom_lint.CustomLintTestSuite,
     'boost.test': boost_test.BoostTestSuite,
     'check.data': ext_resource.CheckDataSbrTestSuite,
@@ -68,14 +68,14 @@ def generate_tests_by_dart(
 ):
     darts = dartfile.parse_dart(dart_content.split('\n'))
 
-    suites = []
+    suites: list[types_common.AbstractTestSuite] = []
     darts = dartfile.merge_darts(darts)
     for dart_info in darts:
         suite = gen_suite(dart_info, target_platform_descriptor, multi_target_platform_run, with_wine)
         if suite:
             suites.append(suite)
 
-    suites_dict = {}
+    suites_dict: dict[tuple[str, ...], types_common.AbstractTestSuite] = {}
     for suite in suites:
         suite_uid = dartfile.get_suite_id(suite)
         if suite_uid in suites_dict:
@@ -99,7 +99,9 @@ def generate_tests_by_dart(
     return suites_dict.values()
 
 
-def gen_suite(meta, target_platform_descriptor=None, multi_target_platform_run=False, with_wine=None):
+def gen_suite(
+    meta, target_platform_descriptor=None, multi_target_platform_run=False, with_wine=None
+) -> types_common.AbstractTestSuite:
     # we must have a field 'SCRIPT-REL-PATH' to be able to get a suite
     # regardless of type of meta (dart etc)
     script_rel_path = meta['SCRIPT-REL-PATH']
