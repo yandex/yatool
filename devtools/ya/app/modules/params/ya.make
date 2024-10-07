@@ -8,6 +8,7 @@ PEERDIR(
     devtools/ya/core/yarg
     devtools/ya/build/targets
     devtools/ya/core/respawn
+    devtools/ya/exts
 )
 
 STYLE_PYTHON()

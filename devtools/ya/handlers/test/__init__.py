@@ -1,4 +1,4 @@
-import app
+import devtools.ya.app
 
 from build.build_handler import do_ya_make
 from build.build_opts import ya_make_options
@@ -17,7 +17,7 @@ class YaTestYaHandler(core.yarg.OptsHandler):
     def __init__(self):
         core.yarg.OptsHandler.__init__(
             self,
-            action=app.execute(action=do_ya_make),
+            action=devtools.ya.app.execute(action=do_ya_make),
             examples=[
                 core.yarg.UsageExample(
                     '{prefix}',

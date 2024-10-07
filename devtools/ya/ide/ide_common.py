@@ -11,7 +11,7 @@ import traceback
 
 import six
 
-import app
+import devtools.ya.app
 import build.build_facade
 import build.build_opts
 import build.gen_plan2
@@ -522,7 +522,7 @@ class IdeGraph(object):
         opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
         build_params = opts.initialize(ya_make_extra)
         build_params.flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'yes'
-        self.graph = build.gen_plan2.ya_make_graph(params, app, extra_ya_make_opts=build_params)
+        self.graph = build.gen_plan2.ya_make_graph(params, devtools.ya.app, extra_ya_make_opts=build_params)
         logger.debug('Mining project data')
         self._mine()
         logger.debug('Files total: %s', len(self.files))

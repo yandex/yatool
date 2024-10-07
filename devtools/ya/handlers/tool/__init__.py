@@ -21,7 +21,7 @@ from core.yarg import (
     BaseHook,
 )
 
-import app
+import devtools.ya.app
 
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
 from core.yarg.groups import PRINT_CONTROL_GROUP
@@ -59,7 +59,7 @@ class ToolYaHandler(CompositeHandler):
         )
         for x in tools():
             self[x.name] = OptsHandler(
-                action=app.execute(action=do_tool, respawn=app.RespawnType.OPTIONAL),
+                action=devtools.ya.app.execute(action=do_tool, respawn=devtools.ya.app.RespawnType.OPTIONAL),
                 description=x.description,
                 visible=x.visible,
                 opts=[ToolOptions(x.name)] + self.common_download_options(),

@@ -4,7 +4,7 @@ import os
 import itertools
 import xml.etree.ElementTree as et
 
-import app
+import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts
 import core.yarg
@@ -316,7 +316,7 @@ def do_codegen(params):
     build_params.replace_result = True
     build_params.force_build_depends = True
     build_params.continue_on_fail = True
-    app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+    devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
 
 def do_goland(params):

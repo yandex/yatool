@@ -11,7 +11,7 @@ from pathlib import PurePath
 
 import termcolor
 
-import app
+import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import core.common_opts
@@ -309,7 +309,7 @@ class PyProject(object):
         build_params.replace_result = True
         build_params.force_build_depends = True
         build_params.continue_on_fail = True
-        app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+        devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
     @property
     def venv_tmp_project(self):
@@ -329,7 +329,7 @@ class PyProject(object):
             ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_opts.venv_tmp_project))
             shutil.rmtree(venv_opts.venv_tmp_project)
         ide_common.emit_message('Generating venv: {}'.format(venv_params.venv_root))
-        app.execute(venv.gen_venv, respawn=app.RespawnType.NONE)(venv_params)
+        devtools.ya.app.execute(venv.gen_venv, respawn=devtools.ya.app.RespawnType.NONE)(venv_params)
         return os.path.join(venv_params.venv_root, 'bin', 'python')
 
     def get_srcdirs(self, modules):

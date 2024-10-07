@@ -43,7 +43,7 @@ except ImportError:
 
 from yalibrary.debug_store.processor import DumpProcessor
 
-import app
+import devtools.ya.app
 
 
 class DumpDebugProcessingOptions(Options):
@@ -221,7 +221,7 @@ def _discovery_folder(tools_cache_root, base_name, item_key):
 
 
 debug_handler = OptsHandler(
-    action=app.execute(action=do_dump_debug),
+    action=devtools.ya.app.execute(action=do_dump_debug),
     description="Utils for work with debug information stored by last ya runs",
     opts=[
         DumpDebugCommonOptions(),

@@ -6,7 +6,7 @@ from functools import partial
 import six
 import termcolor
 
-import app
+import devtools.ya.app
 import core.yarg
 import exts.fs as fs
 import yalibrary.makelists
@@ -24,9 +24,9 @@ def module_info(params):
     )
     if params.tests_enabled:
         dump_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
-    return app.execute(action=partial(handlers.dump.do_module_info, write_stdout=False), respawn=app.RespawnType.NONE)(
-        dump_params
-    ).stdout
+    return devtools.ya.app.execute(
+        action=partial(handlers.dump.do_module_info, write_stdout=False), respawn=devtools.ya.app.RespawnType.NONE
+    )(dump_params).stdout
 
 
 def removeprefix(s, prefix):

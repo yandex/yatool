@@ -73,7 +73,7 @@ from core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyle
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 
-import app
+import devtools.ya.app
 import app_config
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class DumpYaHandler(CompositeHandler):
     def __init__(self):
         CompositeHandler.__init__(self, description='Repository related information')
         self['modules'] = OptsHandler(
-            action=app.execute(action=do_modules),
+            action=devtools.ya.app.execute(action=do_modules),
             description='All modules',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -118,7 +118,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['module-info'] = OptsHandler(
-            action=app.execute(action=do_module_info),
+            action=devtools.ya.app.execute(action=do_module_info),
             description='Modules info',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -133,7 +133,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['src-deps'] = OptsHandler(
-            action=app.execute(action=do_dump_srcdeps),
+            action=devtools.ya.app.execute(action=do_dump_srcdeps),
             description='Dump of all source dependencies',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -144,7 +144,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['dir-graph'] = OptsHandler(
-            action=app.execute(action=do_dir_graph),
+            action=devtools.ya.app.execute(action=do_dir_graph),
             description='Dependencies between directories',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -160,7 +160,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['dep-graph'] = OptsHandler(
-            action=app.execute(action=do_dep_graph),
+            action=devtools.ya.app.execute(action=do_dep_graph),
             description='Dependency internal graph',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -174,7 +174,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['dot-graph'] = OptsHandler(
-            action=app.execute(action=do_dot_graph),
+            action=devtools.ya.app.execute(action=do_dot_graph),
             description='Dependency between directories in dot format',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -186,7 +186,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['json-dep-graph'] = OptsHandler(
-            action=app.execute(action=do_json_dep_graph),
+            action=devtools.ya.app.execute(action=do_json_dep_graph),
             description='Dependency graph as json',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -199,7 +199,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['build-plan'] = OptsHandler(
-            action=app.execute(action=do_build_plan),
+            action=devtools.ya.app.execute(action=do_build_plan),
             description='Build plan',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -210,17 +210,17 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['compile-commands'] = OptsHandler(
-            action=app.execute(action=dump_compilation_database),
+            action=devtools.ya.app.execute(action=dump_compilation_database),
             description='JSON compilation database',
             opts=COMPILATION_DATABASE_OPTS + [ToolsOptions(), CustomFetcherOptions(), SandboxAuthOptions()],
         )
         self['compilation-database'] = OptsHandler(
-            action=app.execute(action=dump_compilation_database),
+            action=devtools.ya.app.execute(action=dump_compilation_database),
             description='Alias for compile-commands',
             opts=COMPILATION_DATABASE_OPTS + [ToolsOptions(), CustomFetcherOptions(), SandboxAuthOptions()],
         )
         self['relation'] = OptsHandler(
-            action=app.execute(action=do_relation),
+            action=devtools.ya.app.execute(action=do_relation),
             description='PEERDIR relations.  Please don\'t run from the arcadia root.',
             opts=self.common_opts
             + self.common_build_facade_opts(False)
@@ -234,7 +234,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['all-relations'] = OptsHandler(
-            action=app.execute(action=do_all_relations),
+            action=devtools.ya.app.execute(action=do_all_relations),
             description='All relations between internal graph nodes in dot format. Please don\'t run from the arcadia root.',
             opts=self.common_opts
             + self.common_build_facade_opts(False)
@@ -249,7 +249,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['files'] = OptsHandler(
-            action=app.execute(action=do_files),
+            action=devtools.ya.app.execute(action=do_files),
             description='File list',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -263,7 +263,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['loops'] = OptsHandler(
-            action=app.execute(action=do_loops),
+            action=devtools.ya.app.execute(action=do_loops),
             description='All loops in arcadia',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -274,7 +274,7 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['peerdir-loops'] = OptsHandler(
-            action=app.execute(action=do_peerdir_loops),
+            action=devtools.ya.app.execute(action=do_peerdir_loops),
             description='Loops by peerdirs',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -285,28 +285,28 @@ class DumpYaHandler(CompositeHandler):
             ],
         )
         self['imprint'] = OptsHandler(
-            action=app.execute(action=do_imprint),
+            action=devtools.ya.app.execute(action=do_imprint),
             description='Directory imprint',
             opts=self.common_opts + [CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],
         )
         self['uids'] = OptsHandler(
-            action=app.execute(action=do_uids),
+            action=devtools.ya.app.execute(action=do_uids),
             description='All targets uids',
             opts=self.common_opts + self.common_build_facade_opts(),
             visible=False,
         )
         self['test-list'] = OptsHandler(
-            action=app.execute(action=do_test_list),
+            action=devtools.ya.app.execute(action=do_test_list),
             description='All test entries',
             opts=self.common_opts + self.common_build_facade_opts() + [DumpTestListOptions()],
         )
         self['json-test-list'] = OptsHandler(
-            action=app.execute(action=do_json_test_list),
+            action=devtools.ya.app.execute(action=do_json_test_list),
             description='All test entries as json',
             opts=self.common_opts + self.common_build_facade_opts() + [DumpTestListOptions()],
         )
         self['conf'] = OptsHandler(
-            action=app.execute(action=do_conf),
+            action=devtools.ya.app.execute(action=do_conf),
             description='Print build conf',
             opts=self.common_opts
             + [
@@ -321,7 +321,7 @@ class DumpYaHandler(CompositeHandler):
             visible=False,
         )
         self['licenses'] = OptsHandler(
-            action=app.execute(action=do_licenses),
+            action=devtools.ya.app.execute(action=do_licenses),
             description='Print known licenses grouped by their properties',
             opts=self.common_opts
             + self.common_build_facade_opts()
@@ -333,41 +333,41 @@ class DumpYaHandler(CompositeHandler):
             visible=False,
         )
         self['forced-deps'] = OptsHandler(
-            action=app.execute(action=do_forced_deps),
+            action=devtools.ya.app.execute(action=do_forced_deps),
             description='Print known forced dependency management',
             opts=FullForcedDepsOptions(),
             visible=False,
         )
         self['conf-docs'] = OptsHandler(
-            action=app.execute(action=do_conf_docs),
+            action=devtools.ya.app.execute(action=do_conf_docs),
             description='Print descriptions of entities (modules, macros, multimodules, etc.)',
             opts=self.common_opts + self.common_build_facade_opts() + [DumpDescriptionOptions()],
         )
         self['root'] = OptsHandler(
-            action=app.execute(lambda params: sys.stdout.write(params.arc_root) and 0),
+            action=devtools.ya.app.execute(lambda params: sys.stdout.write(params.arc_root) and 0),
             description='Print Arcadia root',
             opts=self.common_opts,
         )
         self['vcs-info'] = OptsHandler(
-            action=app.execute(action=do_dump_vcs_info),
+            action=devtools.ya.app.execute(action=do_dump_vcs_info),
             description='Print VCS revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
             visible=False,
         )
         self['raw-vcs-info'] = OptsHandler(
-            action=app.execute(action=do_dump_raw_vcs_info),
+            action=devtools.ya.app.execute(action=do_dump_raw_vcs_info),
             description='Print VCS revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
             visible=False,
         )
         self['svn-revision'] = OptsHandler(
-            action=app.execute(action=do_dump_svn_revision),
+            action=devtools.ya.app.execute(action=do_dump_svn_revision),
             description='Print SVN revision information.',
             opts=self.common_opts + self.common_build_facade_opts(),
             visible=False,
         )
         self['recipes'] = OptsHandler(
-            action=app.execute(action=do_recipes),
+            action=devtools.ya.app.execute(action=do_recipes),
             description='All recipes used in tests',
             opts=self.common_opts + self.common_build_facade_opts() + [DumpTestListOptions(), DumpRecipesOptions()],
         )
@@ -377,7 +377,7 @@ class DumpYaHandler(CompositeHandler):
 
             self['groups'] = arcadia_specific.GroupsHandler()
             self['atd-revisions'] = OptsHandler(
-                action=app.execute(action=arcadia_specific.do_atd_revisions),
+                action=devtools.ya.app.execute(action=arcadia_specific.do_atd_revisions),
                 description='Dump revisions of trunk/arcadia_tests_data',
                 opts=self.common_opts
                 + [DumpAtdRevisionOptions(), CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],

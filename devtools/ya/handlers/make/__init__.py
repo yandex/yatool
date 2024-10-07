@@ -4,7 +4,7 @@ from build.build_opts import ya_make_options
 
 import core.yarg
 
-import app
+import devtools.ya.app
 
 
 class MakeYaHandler(core.yarg.OptsHandler):
@@ -13,7 +13,7 @@ class MakeYaHandler(core.yarg.OptsHandler):
     def __init__(self):
         core.yarg.OptsHandler.__init__(
             self,
-            action=app.execute(action=do_ya_make),
+            action=devtools.ya.app.execute(action=do_ya_make),
             examples=[
                 core.yarg.UsageExample('{prefix} -r', 'Build current directory in release mode'),
                 core.yarg.UsageExample('{prefix} -t -j16 library', 'Build and test library with 16 threads'),

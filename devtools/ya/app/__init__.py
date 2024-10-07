@@ -24,9 +24,9 @@ from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
 from yalibrary.ya_helper.ya_utils import ya_options
 
-import devtools.ya.app.modules.evlog as evlog
-import devtools.ya.app.modules.params as params
-import devtools.ya.app.modules.token_suppressions as token_suppressions
+from .modules import evlog
+from .modules import params
+from .modules import token_suppressions
 
 
 logger = logging.getLogger(__name__)

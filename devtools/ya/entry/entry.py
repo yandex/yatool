@@ -22,14 +22,14 @@ from core.logger import init_logger
 from core.plugin_loader import explore_plugins
 from library.python import mlockall
 
-import app
+import devtools.ya.app
 
 stager = stage_tracer.get_tracer("overall-execution")
 
 
 def _mlockall():
     e = mlockall.mlockall_current()
-    app.MLOCK_STATUS_MESSAGE = "mlockall return code: {!s}".format(e)
+    devtools.ya.app.MLOCK_STATUS_MESSAGE = "mlockall return code: {!s}".format(e)
 
 
 def do_main(args, extra_help):
@@ -232,7 +232,7 @@ def main(args):
                 yield line
 
     def do_app():
-        app.execute_early(do_main)(
+        devtools.ya.app.execute_early(do_main)(
             args,
             keep_tmp_dir=a.keep_tmp,
             diag=getattr(a, "diag", False),

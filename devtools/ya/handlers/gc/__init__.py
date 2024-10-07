@@ -6,7 +6,7 @@ import sys
 import time
 import six
 
-import app
+import devtools.ya.app
 import core.yarg
 import core.common_opts
 import core.config as cc
@@ -90,7 +90,7 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
     def __init__(self):
         core.yarg.CompositeHandler.__init__(self, description='Collect garbage')
         self['cache'] = core.yarg.OptsHandler(
-            action=app.execute(action=do_cache, respawn=app.RespawnType.OPTIONAL),
+            action=devtools.ya.app.execute(action=do_cache, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description='Strip build cache and old build directories',
             opts=[
                 core.common_opts.ShowHelpOptions(),
@@ -101,7 +101,7 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
             visible=True,
         )
         self['dist_cache'] = core.yarg.OptsHandler(
-            action=app.execute(action=do_strip_yt_cache, respawn=app.RespawnType.NONE),
+            action=devtools.ya.app.execute(action=do_strip_yt_cache, respawn=devtools.ya.app.RespawnType.NONE),
             description='Strip distributed (YT) cache',
             opts=[core.common_opts.ShowHelpOptions(), DistCacheSetupOptions()],
             visible=False,

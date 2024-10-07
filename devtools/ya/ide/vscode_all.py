@@ -6,7 +6,7 @@ import platform
 import subprocess
 from collections import OrderedDict
 
-import app
+import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
@@ -140,7 +140,9 @@ class VSCodeProject(object):
         def gen(prms):
             return bc.gen_compilation_database(prms, self.app_ctx)
 
-        compilation_database = app.execute(action=gen, respawn=app.RespawnType.NONE)(build_params)
+        compilation_database = devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(
+            build_params
+        )
 
         if self.params.compile_commands_fix:
             is_windows = pm.my_platform() == "win32"
@@ -170,7 +172,7 @@ class VSCodeProject(object):
             build_params.create_symlinks = False
 
             ide_common.emit_message("Running codegen for C++")
-            app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+            devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
         languages = [lang for lang in build_params.languages if lang != "CPP"]
         if languages:
@@ -186,7 +188,7 @@ class VSCodeProject(object):
                 build_params.flags["CGO_ENABLED"] = "0"
 
             ide_common.emit_message("Running codegen")
-            app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+            devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
     def get_default_settings(self):
         settings = OrderedDict(

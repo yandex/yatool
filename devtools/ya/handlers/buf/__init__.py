@@ -18,7 +18,7 @@ from core.yarg import CompositeHandler, OptsHandler
 from core.yarg import Options, ArgConsumer, SetValueHook, ArgsValidatingException, SetConstValueHook
 
 
-import app
+import devtools.ya.app
 
 
 TARGET_CONFIG_NAME = 'buf.yaml'
@@ -40,19 +40,19 @@ class BufYaHandler(CompositeHandler):
         ]
 
         self['lint'] = OptsHandler(
-            action=app.execute(action=do_lint_protos),
+            action=devtools.ya.app.execute(action=do_lint_protos),
             description='Lint .proto files',
             opts=common_opts
         )
 
         self['build'] = OptsHandler(
-            action=app.execute(action=do_build_image),
+            action=devtools.ya.app.execute(action=do_build_image),
             description='Build all .proto files from the target and output an Image',
             opts=common_opts + [OutputImageOptions()],
         )
 
         self['check'] = OptsHandler(
-            action=app.execute(action=do_breaking),
+            action=devtools.ya.app.execute(action=do_breaking),
             description="Check that the target has no breaking changes compared to the input image",
             opts=common_opts + [InputImageOptions()],
         )

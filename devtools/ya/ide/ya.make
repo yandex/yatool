@@ -4,6 +4,7 @@ PEERDIR(
     contrib/python/six
     contrib/python/termcolor
     contrib/python/pygtrie
+    devtools/ya/app
     devtools/ya/build
     devtools/ya/core/common_opts
     devtools/ya/core/config

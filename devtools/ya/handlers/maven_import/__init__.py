@@ -3,7 +3,7 @@ import core.yarg
 import jbuild.maven.maven_import as mi
 import core.common_opts as common_opts
 import build.build_opts as build_opts
-import app
+import devtools.ya.app
 import app_config
 
 from core.yarg.help_level import HelpLevel
@@ -15,7 +15,7 @@ class MavenImportYaHandler(core.yarg.OptsHandler):
 
     def __init__(self):
         super(MavenImportYaHandler, self).__init__(
-            action=app.execute(mi.do_import),
+            action=devtools.ya.app.execute(mi.do_import),
             opts=[
                 build_opts.MavenImportOptions(visible=HelpLevel.BASIC),
                 build_opts.BuildThreadsOptions(build_threads=None),

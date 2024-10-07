@@ -149,12 +149,12 @@ def create_patterns(params, graph, app_ctx):
 
 
 def gen_compilation_database(params, app_ctx):
-    import app  # XXX
+    import devtools.ya.app  # XXX
 
     if params.file_prefixes_use_targets:
         params.file_prefixes += params.rel_targets
 
-    graph = build.gen_plan2.ya_make_graph(params, app, real_ya_make_opts=True)
+    graph = build.gen_plan2.ya_make_graph(params, devtools.ya.app, real_ya_make_opts=True)
     if params.dont_fix_roots:
         patterns = {}
     else:

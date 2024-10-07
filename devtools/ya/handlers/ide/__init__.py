@@ -27,7 +27,7 @@ import ide.vscode.opts
 
 import yalibrary.platform_matcher as pm
 
-import app
+import devtools.ya.app
 import app_config
 
 if app_config.in_house:
@@ -512,7 +512,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
     def __init__(self):
         core.yarg.CompositeHandler.__init__(self, description=self.description)
         self['clion'] = core.yarg.OptsHandler(
-            action=app.execute(ide.clion2016.do_clion),
+            action=devtools.ya.app.execute(ide.clion2016.do_clion),
             description='[[imp]]ya ide clion[[rst]] is deprecated, please use clangd-based tooling instead',
             opts=ide.ide_common.ide_via_ya_make_opts()
             + [
@@ -523,7 +523,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
 
         self['idea'] = core.yarg.OptsHandler(
-            action=app.execute(ide.idea.do_idea),
+            action=devtools.ya.app.execute(ide.idea.do_idea),
             description='Generate stub for IntelliJ IDEA',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -548,7 +548,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             unknown_args_as_free=True,
         )
         self['gradle'] = core.yarg.OptsHandler(
-            action=app.execute(ide.gradle.do_gradle),
+            action=devtools.ya.app.execute(ide.gradle.do_gradle),
             description='Generate gradle for project with yexport',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -566,7 +566,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=False,
         )
         self['yegradle'] = core.yarg.OptsHandler(
-            action=app.execute(ide.yegradle.do_yegradle),
+            action=devtools.ya.app.execute(ide.yegradle.do_yegradle),
             description='Generate gradle for project by yexport',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -584,12 +584,12 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=False,
         )
         self['qt'] = core.yarg.OptsHandler(
-            action=app.execute(self._choose_qt_handler),
+            action=devtools.ya.app.execute(self._choose_qt_handler),
             description='[[imp]]ya ide qt[[rst]] is deprecated, please use clangd-based tooling instead',
             opts=ide.qt.QT_OPTS + [core.common_opts.YaBin3Options()],
         )
         self['goland'] = core.yarg.OptsHandler(
-            action=app.execute(ide.goland.do_goland),
+            action=devtools.ya.app.execute(ide.goland.do_goland),
             description='Generate stub for Goland',
             opts=ide.ide_common.ide_via_ya_make_opts()
             + [
@@ -598,7 +598,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             ],
         )
         self['pycharm'] = core.yarg.OptsHandler(
-            action=app.execute(ide.pycharm.do_pycharm),
+            action=devtools.ya.app.execute(ide.pycharm.do_pycharm),
             description='Generate PyCharm project.',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -611,7 +611,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=(pm.my_platform() != 'win32'),
         )
         self['vscode-clangd'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_clangd.gen_vscode_workspace),
+            action=devtools.ya.app.execute(ide.vscode_clangd.gen_vscode_workspace),
             description=get_description('Generate VSCode clangd C++ project.', ref_name='c'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -628,7 +628,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=(pm.my_platform() != 'win32'),
         )
         self['vscode-go'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_go.gen_vscode_workspace),
+            action=devtools.ya.app.execute(ide.vscode_go.gen_vscode_workspace),
             description=get_description('Generate VSCode Go project.', ref_name='golang'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -642,7 +642,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             ],
         )
         self['vscode-py'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_py.gen_vscode_workspace),
+            action=devtools.ya.app.execute(ide.vscode_py.gen_vscode_workspace),
             description=get_description('Generate VSCode Python project.', ref_name='python'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -657,7 +657,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=(pm.my_platform() != 'win32'),
         )
         self['vscode-ts'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_ts.gen_vscode_workspace),
+            action=devtools.ya.app.execute(ide.vscode_ts.gen_vscode_workspace),
             description=get_description('Generate VSCode TypeScript project.', ref_name='typescript'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -672,7 +672,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             visible=(pm.my_platform() != 'win32'),
         )
         self['vscode'] = core.yarg.OptsHandler(
-            action=app.execute(ide.vscode_all.gen_vscode_workspace),
+            action=devtools.ya.app.execute(ide.vscode_all.gen_vscode_workspace),
             description=get_description('Generate VSCode multi-language project.', ref_name='multi'),
             opts=ide.ide_common.ide_minimal_opts(targets_free=True, prefetch=True)
             + [
@@ -688,7 +688,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             ],
         )
         self['venv'] = core.yarg.OptsHandler(
-            action=app.execute(ide.venv.do_venv),
+            action=devtools.ya.app.execute(ide.venv.do_venv),
             description='Create or update python venv',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
@@ -708,7 +708,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         if app_config.in_house:
             self['fix-jb-fsnotifier'] = core.yarg.OptsHandler(
-                action=app.execute(devtools.ya.ide.fsnotifier.fix_fsnotifier),
+                action=devtools.ya.app.execute(devtools.ya.ide.fsnotifier.fix_fsnotifier),
                 description='Replace fsnotifier for JB IDEs.',
                 opts=[
                     devtools.ya.ide.fsnotifier.FixFsNotifierOptions(),

@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import logging
 
-import app
+import devtools.ya.app
 import app_config
 import core.yarg
 import core.common_opts
@@ -24,7 +24,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
 
     def __init__(self):
         super(PackageYaHandler, self).__init__(
-            action=app.execute(package.packager.do_package, respawn=app.RespawnType.OPTIONAL),
+            action=devtools.ya.app.execute(package.packager.do_package, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description + ("\n" + self.in_house_docs if app_config.in_house else ""),
             examples=[
                 core.yarg.UsageExample(

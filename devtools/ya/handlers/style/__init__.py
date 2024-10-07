@@ -6,7 +6,7 @@ from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOpti
 
 from .style import run_style
 
-import app
+import devtools.ya.app
 
 
 class StyleOptions(core.yarg.Options):
@@ -117,7 +117,7 @@ class StyleYaHandler(core.yarg.OptsHandler):
     def __init__(self):
         core.yarg.OptsHandler.__init__(
             self,
-            action=app.execute(action=run_style, respawn=app.RespawnType.OPTIONAL),
+            action=devtools.ya.app.execute(action=run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description,
             opts=[
                 StyleOptions(),

@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 import termcolor
 
-import app
+import devtools.ya.app
 import build.build_opts as build_opts
 import build.build_handler as bh
 import core.common_opts
@@ -117,7 +117,7 @@ def do_codegen(params):
     build_params.force_build_depends = True
     build_params.continue_on_fail = True
     build_params.flags["CGO_ENABLED"] = "0"
-    app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+    devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
 
 def gen_run_configurations(params, modules, args, YA_PATH):

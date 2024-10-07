@@ -1,7 +1,6 @@
 PY23_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE app
     __init__.py
 )
 

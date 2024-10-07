@@ -14,7 +14,7 @@ import core.event_handling
 import core.yarg
 import exts.tmp
 
-import app
+import devtools.ya.app
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class RunYaHandler(core.yarg.OptsHandler):
     def __init__(self):
         core.yarg.OptsHandler.__init__(
             self,
-            action=app.execute(run, respawn=app.RespawnType.MANDATORY),
+            action=devtools.ya.app.execute(run, respawn=devtools.ya.app.RespawnType.MANDATORY),
             description="Compile and run a target",
             examples=[
                 core.yarg.UsageExample(

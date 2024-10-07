@@ -21,7 +21,7 @@ import yalibrary.makelists
 import yalibrary.makelists.macro_definitions
 import yalibrary.makelists.mk_common
 
-import app
+import devtools.ya.app
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class PyYaHandler(core.yarg.OptsHandler):
     def __init__(self):
         super(PyYaHandler, self).__init__(
-            action=app.execute(run),
+            action=devtools.ya.app.execute(run),
             description='Run IPython shell with python libraries baked in',
             opts=build.build_opts.ya_make_options(free_build_targets=True) + [
                 PyOptions(),

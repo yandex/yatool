@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 import termcolor
 
-import app
+import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
@@ -176,7 +176,7 @@ def do_codegen(params):
     build_params.force_build_depends = True
     build_params.continue_on_fail = True
     build_params.create_symlinks = False
-    app.execute(action=bh.do_ya_make, respawn=app.RespawnType.NONE)(build_params)
+    devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
 
 def gen_compile_commands(params, compile_commands_path):
@@ -195,7 +195,7 @@ def gen_compile_commands(params, compile_commands_path):
             app_ctx = ide_common.FakeAppCtx()
         return bc.gen_compilation_database(prms, app_ctx)
 
-    return app.execute(action=gen, respawn=app.RespawnType.NONE)(build_params)
+    return devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
 
 def gen_run_configurations(params, modules, args, YA_PATH):
