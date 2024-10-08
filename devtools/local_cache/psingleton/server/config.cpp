@@ -116,7 +116,7 @@ void NUserServicePrivate::PrepareDirs(const NConfig::TConfig& config) {
 
     for (auto e : {LogNameStr}) {
         if (section.contains(ToString(e))) {
-            if (auto file = section.At(ToString(e)).Get<TString>(); !file.Empty()) {
+            if (auto file = section.At(ToString(e)).Get<TString>(); !file.empty()) {
                 TFsPath(TFsPath(file).Dirname()).MkDirs(0755);
             }
         }

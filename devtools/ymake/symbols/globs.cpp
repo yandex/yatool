@@ -165,7 +165,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                 return true;
             }
             if (part.Type == TGlobPart::EGlobType::Pattern) {
-                return regex.Match(name.Data());
+                return regex.Match(name.data());
             }
 
             return false;

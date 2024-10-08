@@ -263,7 +263,7 @@ namespace {
         void FillRegularInputs() {
             TString moduleDir;
             auto getModuleDir = [&]() -> TStringBuf {
-                if (moduleDir.Empty()) {
+                if (moduleDir.empty()) {
                     const TFileView moduleFile = Graph.GetFileName(Graph.Get(ModuleId));
                     moduleDir = NPath::SetType(NPath::Parent(moduleFile.GetTargetStr()), NPath::Source);
                 }

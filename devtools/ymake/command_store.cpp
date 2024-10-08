@@ -1135,7 +1135,7 @@ void TCommands::StreamCmdRepr(
                 break;
         }
         sink(reinterpret_cast<const char*>(&nodeToHash), sizeof nodeToHash);
-        if (!nodeStr.Empty())
+        if (!nodeStr.empty())
             sink(nodeStr.data(), nodeStr.size());
     }
 }

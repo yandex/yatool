@@ -115,7 +115,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     Diag()->Init(WarnFlags);
 
-    if (!BinaryLogFileName.Empty()) {
+    if (!BinaryLogFileName.empty()) {
         Diag()->BinaryLog = true;
         DebugLogWriter()->SetFile(BinaryLogFileName);
     }
@@ -124,7 +124,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         Diag()->TextLog = false;
     }
 
-    if (!PatchPath2.Empty()) {
+    if (!PatchPath2.empty()) {
         PatchPath = PatchPath2;
         ReadFileContentFromZipatch = ReadFileContentFromZipatch2;
     }
@@ -325,11 +325,11 @@ void TBuildConfiguration::FillMiscValues() {
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
         TStringBuf value = CommandConf.EvalValue(variableName);
-        if (!value.Empty()) {
+        if (!value.empty()) {
             flag = NYMake::IsTrue(value);
         }
         if (log) {
-            YDebug() << variableName << (flag ? " enabled" : " disabled") << (value.Empty() ? " (by default)" : "") << Endl;
+            YDebug() << variableName << (flag ? " enabled" : " disabled") << (value.empty() ? " (by default)" : "") << Endl;
         }
     };
 

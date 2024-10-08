@@ -217,7 +217,7 @@ namespace NYMake {
                     compressed.push_back(TString(splitedPath));
                     compressed.push_back(TString(output));
                     srcsGen.push_back(TString::Join(lid, "=", splitedName));
-                    if (splitedPath.Empty() || splitedName.Empty()) {
+                    if (splitedPath.empty() || splitedName.empty()) {
                         YConfErr(Syntax) << "Syntax error: empty KEY or VALUE in RESOURCE(- KEY=VALUE), guard with \"\"" << Endl;
                     }
                 } else {

@@ -271,7 +271,7 @@ static inline TBlob SkipBOM(const TBlob& b, TStringBuf path) {
 template <typename DataT>
 inline static TMd5Sig CalcChecksum(const DataT& data) noexcept {
     TMd5Sig s;
-    const uint128 hash = CityHash128WithSeed((const char*)data.Data(), data.Size(), uint128(0, data.Size()));
+    const uint128 hash = CityHash128WithSeed((const char*)data.data(), data.size(), uint128(0, data.size()));
     s.D0 = Uint128Low64(hash);
     s.D1 = Uint128High64(hash);
     return s;

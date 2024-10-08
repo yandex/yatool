@@ -568,7 +568,7 @@ bool TYMake::Load(const TFsPath& file) {
 bool TYMake::LoadImpl(const TFsPath& file) {
     YDebug() << "load cache from " << file << Endl;
 
-    bool useYmakeCache = !Conf.CachePath.Empty();
+    bool useYmakeCache = !Conf.CachePath.empty();
     auto forceLoad = useYmakeCache || Conf.ReadFsCache && !Conf.ReadDepsCache;
     TCacheFileReader cacheReader(Conf, forceLoad, true);
 
@@ -745,7 +745,7 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
 }
 
 bool TYMake::LoadPatch() {
-    ArcChangesEvent(!Conf.PatchPath.Empty());
+    ArcChangesEvent(!Conf.PatchPath.empty());
     if (!Conf.PatchPath) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because of PatchPath" << Endl;
@@ -780,7 +780,7 @@ void TYMake::LoadDMCache() {
         return;
     }
 
-    if (PrevDepsFingerprint.Empty() || !Conf.YmakeDMCache.Exists()) {
+    if (PrevDepsFingerprint.empty() || !Conf.YmakeDMCache.Exists()) {
         return;
     }
 
@@ -824,7 +824,7 @@ void TYMake::LoadDMCache() {
 }
 
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
-    if (!PrevDepsFingerprint.Empty() && Conf.YmakeUidsCache.Exists()) {
+    if (!PrevDepsFingerprint.empty() && Conf.YmakeUidsCache.Exists()) {
         NYMake::TTraceStage loadUidsStage{"Load Uids cache"};
 
         TFileInput input(TFile{Conf.YmakeUidsCache, OpenExisting | RdOnly | Seq | NoReuse}, 1_MB);
@@ -907,15 +907,15 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
 }
 
 void TYMake::SaveUids(TUidsCachable* uidsCachable) {
-    if (Conf.WriteUidsCache && !CurrDepsFingerprint.Empty()) {
+    if (Conf.WriteUidsCache && !CurrDepsFingerprint.empty()) {
         FORCE_TRACE(U, NEvent::TStageStarted("Save Uids cache"));
 
         UidsCacheTempFile = MakeTempFilename(Conf.YmakeUidsCache.GetPath());
         TFileOutput uidsOutput{TFile{UidsCacheTempFile.GetPath(), CreateAlways | WrOnly}};
 
-        ui32 size = CurrDepsFingerprint.Size();
+        ui32 size = CurrDepsFingerprint.size();
         uidsOutput.Write(&size, sizeof(size));
-        uidsOutput.Write(CurrDepsFingerprint.Data(), size);
+        uidsOutput.Write(CurrDepsFingerprint.data(), size);
 
         uidsCachable->SaveCache(&uidsOutput, Graph);
         YDebug() << "Uids cache has been saved..." << Endl;

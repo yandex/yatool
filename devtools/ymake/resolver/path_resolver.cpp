@@ -362,7 +362,7 @@ TResolveFile::TResolveFile(TFileView fileView)
 
 /// Construct TFileId by name, linkType and resolved flag
 static TFileId MakeFileId(TFileConf& fileConf, TStringBuf name, ELinkType linkType, bool resolved) {
-    Y_ASSERT(!name.Empty());
+    Y_ASSERT(!name.empty());
     TFileView fileView;
     if (resolved) {
         if (linkType == ELT_Default) {

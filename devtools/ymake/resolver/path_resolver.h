@@ -205,7 +205,7 @@ public:
 
     /// Assume that path is resolved without any checks
     TResolveFile AssumeResolved(const TStringBuf name, ELinkType linkType = ELT_Default) const {
-        if (name.Empty()) {
+        if (name.empty()) {
             return TResolveFile();
         }
         return TResolveFile(FileConf_, name, linkType, true);
@@ -213,7 +213,7 @@ public:
 
     /// Make unresolved from TStringBuf
     TResolveFile MakeUnresolved(const TStringBuf name, ELinkType linkType = ELT_Default) const {
-        if (name.Empty()) {
+        if (name.empty()) {
             return TResolveFile();
         }
         return TResolveFile(FileConf_, name, linkType, false);

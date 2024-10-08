@@ -15,13 +15,13 @@ void NToolsCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const 
 
     out << "[" << IniSectionName() << "]" << Endl;
 
-    if (!LockFile.Empty()) {
+    if (!LockFile.empty()) {
         out << ToString(LockFileStr) << "=" << LockFile << Endl;
     }
     if (auto* val = LogName.Get()) {
         out << ToString(LogNameStr) << "=" << *val << Endl;
     }
-    if (!DBPath.Empty()) {
+    if (!DBPath.empty()) {
         out << ToString(DbPathStr) << "=" << DBPath << Endl;
     }
     if (auto* val = MasterMode.Get()) {
@@ -36,13 +36,13 @@ void NToolsCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const 
     if (auto* val = Version.Get()) {
         out << ToString(VersionStr) << "=" << *val << Endl;
     }
-    if (!SbId.Empty()) {
+    if (!SbId.empty()) {
         out << ToString(SandBoxIdStr) << "=" << SbId << Endl;
     }
-    if (!SbAltId.Empty()) {
+    if (!SbAltId.empty()) {
         out << ToString(SandBoxAltIdStr) << "=" << SbAltId << Endl;
     }
-    if (!SbPath.Empty()) {
+    if (!SbPath.empty()) {
         out << ToString(SandBoxPathStr) << "=" << SbPath << Endl;
     }
 }
@@ -137,7 +137,7 @@ void NToolsCachePrivate::CheckConfig(const NConfig::TConfig& config) {
     }
 
     for (auto e : {DbPathStr}) {
-        if (!tcSection.contains(ToString(e)) || tcSection.At(ToString(e)).Get<TString>().Empty()) {
+        if (!tcSection.contains(ToString(e)) || tcSection.At(ToString(e)).Get<TString>().empty()) {
             MissingEntryError(e);
             ythrow TTypeMismatch() << "Missing entry in ini file.";
         }
@@ -214,7 +214,7 @@ TString NToolsCachePrivate::GetDBDirectory(const NConfig::TConfig& config) {
     using namespace NConfig;
     const auto& tcSection = config.Get<TDict>().At(ToString(LocalCacheStr)).Get<TDict>().At(ToString(ToolsCacheStr)).Get<TDict>();
 
-    if (auto file = tcSection.At(ToString(DbPathStr)).Get<TString>(); !file.Empty()) {
+    if (auto file = tcSection.At(ToString(DbPathStr)).Get<TString>(); !file.empty()) {
         if (file.StartsWith("file:")) {
             // TODO: strip other URI-related components.
             file = file.substr(strlen("file:"));
@@ -230,7 +230,7 @@ void NToolsCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
 
     for (auto e : {LockFileStr, LogNameStr}) {
         if (tcSection.contains(ToString(e))) {
-            if (auto file = tcSection.At(ToString(e)).Get<TString>(); !file.Empty()) {
+            if (auto file = tcSection.At(ToString(e)).Get<TString>(); !file.empty()) {
                 TFsPath(TFsPath(file).Dirname()).MkDirs(0755);
             }
         }

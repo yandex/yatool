@@ -561,7 +561,7 @@ void TMakePlanCache::AddRenderedNode(const TMakeNode& newNode, TStringBuf name, 
 }
 
 void TMakePlanCache::LoadFromContext(const TString& context) {
-    if (!LoadFromCache || context.Empty()) {
+    if (!LoadFromCache || context.empty()) {
         return;
     }
 
@@ -639,7 +639,7 @@ void TMakePlanCache::Save(TMultiBlobBuilder& builder) {
         nodesOutput.Finish();
     }
 
-    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(nodes.Data(), nodes.Size())));
+    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(nodes.data(), nodes.size())));
 }
 
 TString TMakePlanCache::GetStatistics() const {

@@ -32,7 +32,7 @@ template<typename TEnum>
 size_t MaxEnumValueLength() {
     size_t maxLength = 0;
     for (TEnum value : GetEnumAllValues<TEnum>()) {
-        maxLength = Max(maxLength, ToString(value).Size());
+        maxLength = Max(maxLength, ToString(value).size());
     }
     return maxLength;
 }

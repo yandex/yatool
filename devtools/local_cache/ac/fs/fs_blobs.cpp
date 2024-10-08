@@ -322,7 +322,7 @@ namespace NACCache {
 
     TFsBlobProcessor::TFsInfo TFsBlobProcessor::GetInfo(EFilePlacement placement) {
         if (Mode_ == NoIO) {
-            i64 size = GetUid().Size();
+            i64 size = GetUid().size();
             return TFsInfo({size, size, 0777});
         }
         if (placement == InStore) {

@@ -315,7 +315,7 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
                 Ctx.ResolveStats.Inc(NStats::EResolveStats::ResolveAsKnownFromCache);
             }
         }
-        Y_ASSERT((!it->second.View.Empty()) || (!it->second.UnresolvedName.Empty()));
+        Y_ASSERT((!it->second.View.Empty()) || (!it->second.UnresolvedName.empty()));
         return &it->second;
     };
 
@@ -379,7 +379,7 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
     Y_ASSERT(addinclResult->Status != RESOLVE_ERROR_ABSOLUTE);
 
     TSysinclResolver::TResult sysinclResult = Conf.Sysincl.Resolve(src, include.Path);
-    Y_ASSERT(addinclResult->IsSuccess() ? !addinclResult->View.Empty() : !addinclResult->UnresolvedName.Empty());
+    Y_ASSERT(addinclResult->IsSuccess() ? !addinclResult->View.Empty() : !addinclResult->UnresolvedName.empty());
     if (!sysinclResult) {
         if (addinclResult->IsSuccess()) {
             result.emplace_back(addinclResult->View);

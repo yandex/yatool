@@ -62,7 +62,7 @@ void TCythonIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
 
     TStringBuf incFileNameStr = incFileName.GetTargetStr();
     for (const auto& inclDep : includes) {
-        if (inclDep.Path.Empty()) {
+        if (inclDep.Path.empty()) {
             continue;
         }
         switch (inclDep.Kind) {

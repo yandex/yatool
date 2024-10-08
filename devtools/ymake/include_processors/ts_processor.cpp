@@ -136,7 +136,7 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
 
         if (IsRelativeImport(include)) {
             const auto importPath = ResolveRelativeImport(module, prefix, include);
-            if (importPath.Empty()) {
+            if (importPath.empty()) {
                 YConfErr(UserErr) << "Failed to resolve import in " << importer << ": " << include;
                 continue;
             }

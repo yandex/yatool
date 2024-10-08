@@ -166,7 +166,7 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
         Save(&output, Messages);
         output.Finish();
     }
-    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(confMsgsData.Data(), confMsgsData.Size())));
+    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(confMsgsData.data(), confMsgsData.size())));
 
     TString dupSrcData;
     {
@@ -174,7 +174,7 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
         Save(&output, DupSrcMap);
         output.Finish();
     }
-    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(dupSrcData.Data(), dupSrcData.Size())));
+    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(dupSrcData.data(), dupSrcData.size())));
 
     TString confEventsData;
     {
@@ -182,7 +182,7 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
         Save(&output, Events);
         output.Finish();
     }
-    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(confEventsData.Data(), confEventsData.Size())));
+    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(confEventsData.data(), confEventsData.size())));
 }
 
 template<typename Container>

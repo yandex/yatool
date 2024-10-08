@@ -61,7 +61,7 @@ namespace {
         try {
             TString name = MakeTempName(nullptr, "psing");
             TFsPath(name).DeleteIfExists();
-            return name.Size() < sizeof(((sockaddr_un*)nullptr)->sun_path) ? name : TString("");
+            return name.size() < sizeof(((sockaddr_un*)nullptr)->sun_path) ? name : TString("");
         } catch (const yexception&) {
             // If TMPDIR is empty then util/folder/dirut.cpp throws non-specific exception
             return "";
@@ -227,7 +227,7 @@ namespace NUserService {
         Server_.Reset(builder.BuildAndStart().release());
         MyName_.SetPort(static_cast<TIpPort>(port));
         LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[SERV]") << "Starting server at " << MyName_.ToGrpcAddress() << ", pid=" << MyName_.GetPid() << Endl;
-        Y_ENSURE_EX(port > 0 || !MyName_.GetLocalSocket().Empty(), TWithBackTrace<yexception>());
+        Y_ENSURE_EX(port > 0 || !MyName_.GetLocalSocket().empty(), TWithBackTrace<yexception>());
 
         WaitThread_ = std::thread([this]() {
             // TODO: Add CondVar?, but be cautious of locks for Server_ (sighandlers, exception
@@ -492,7 +492,7 @@ namespace NUserService {
         LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[SERV]") << "Back-end services cleared" << Endl;
 
         auto socketName = MyName_.GetLocalSocket();
-        if (!socketName.Empty()) {
+        if (!socketName.empty()) {
             TFsPath(socketName).DeleteIfExists();
         }
         return finalizeProcessing();

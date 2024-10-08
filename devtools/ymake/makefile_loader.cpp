@@ -1044,7 +1044,7 @@ NJson::TJsonValue ParseBalancingConf(TFileContentHolder& balancingConfContent) {
         throw TConfigurationError() << " Cannot read file: " << balancingConfContent.GetAbsoluteName();
     }
 
-    TMemoryInput balancingConfigFile(content.Data(), content.Size());
+    TMemoryInput balancingConfigFile(content.data(), content.size());
     NJson::TJsonValue balancingConfig;
     if(!NJson::ReadJsonTree(&balancingConfigFile, &balancingConfig, false)) {
         throw TConfigurationError() << " Unable to read json tree from " << balancingConfContent.GetAbsoluteName();

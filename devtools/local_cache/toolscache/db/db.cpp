@@ -165,10 +165,10 @@ namespace NToolsCachePrivate {
         // At most one row
         if (Get(GetToolRef).Step()) {
             Y_ABORT_UNLESS(Get(GetToolRef).ColumnCount() == 2);
-            if (pattern.Empty()) {
+            if (pattern.empty()) {
                 pattern = GetColumnText(GetToolRef, 0, "Pattern");
             }
-            if (bottle.Empty()) {
+            if (bottle.empty()) {
                 bottle = GetColumnText(GetToolRef, 1, "Bottle");
             }
             Y_ABORT_UNLESS(!Get(GetToolRef).Step());
@@ -182,8 +182,8 @@ namespace NToolsCachePrivate {
     std::tuple<i64, i64, size_t> TNotifyStmts::TImpl::UpdateResourceUsage(i64 accessCnt, const TResourceUsed& msg, bool refill, TVecOut& emergencyGC) {
         // The following data is accumulated:
         EToolsSpecial special = ToolAndResource;
-        if (msg.GetPattern().Empty() != msg.GetBottle().Empty()) {
-            special = msg.GetPattern().Empty() ? Tool : Resource;
+        if (msg.GetPattern().empty() != msg.GetBottle().empty()) {
+            special = msg.GetPattern().empty() ? Tool : Resource;
         }
 
         return TBase::WrapInTransaction([this, &msg, &emergencyGC, special, accessCnt, refill]() -> std::tuple<i64, i64, size_t> {

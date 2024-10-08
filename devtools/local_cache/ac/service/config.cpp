@@ -17,10 +17,10 @@ void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
 
     out << "[" << IniSectionName() << "]" << Endl;
 
-    if (!LockFile.Empty()) {
+    if (!LockFile.empty()) {
         out << ToString(LockFileStr) << "=" << LockFile << Endl;
     }
-    if (!DBPath.Empty()) {
+    if (!DBPath.empty()) {
         out << ToString(DbPathStr) << "=" << DBPath << Endl;
     }
     if (auto* val = MasterMode.Get()) {
@@ -50,7 +50,7 @@ void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
     if (auto* val = QuiescenceTime.Get()) {
         out << ToString(QuiescenceStr) << "=" << *val << Endl;
     }
-    if (!FsStoreRoot.Empty()) {
+    if (!FsStoreRoot.empty()) {
         out << ToString(FsStoreStr) << "=" << FsStoreRoot << Endl;
     }
 }
@@ -126,7 +126,7 @@ static bool CheckFsPathParameter(const TString& s, NACCachePrivate::EConfigStrin
                 sbuf.Split(':', scheme, path);
                 return TFsPath(path).IsAbsolute();
             }
-            return s.Empty() || TFsPath(s).IsAbsolute();
+            return s.empty() || TFsPath(s).IsAbsolute();
         }
         case FsStoreStr:
             return TFsPath(s).IsAbsolute();
@@ -148,7 +148,7 @@ void NACCachePrivate::CheckConfig(const NConfig::TConfig& config) {
     }
 
     for (auto e : {FsStoreStr}) {
-        if (!acSection.contains(ToString(e)) || acSection.At(ToString(e)).Get<TString>().Empty()) {
+        if (!acSection.contains(ToString(e)) || acSection.At(ToString(e)).Get<TString>().empty()) {
             MissingEntryError(e);
             ythrow TTypeMismatch() << "Missing entry in ini file.";
         }
@@ -226,7 +226,7 @@ TString NACCachePrivate::GetDBDirectory(const NConfig::TConfig& config) {
     const auto& acSection = config.Get<TDict>().At(ToString(LocalCacheStr)).Get<TDict>().At(ToString(BuildCacheStr)).Get<TDict>();
 
     if (acSection.contains(ToString(DbPathStr))) {
-        if (auto file = acSection.At(ToString(DbPathStr)).Get<TString>(); !file.Empty()) {
+        if (auto file = acSection.At(ToString(DbPathStr)).Get<TString>(); !file.empty()) {
             if (file.StartsWith("file:")) {
                 // TODO: strip other URI-related components.
                 file = file.substr(strlen("file:"));
@@ -234,7 +234,7 @@ TString NACCachePrivate::GetDBDirectory(const NConfig::TConfig& config) {
             return TFsPath(file).Dirname();
         }
     }
-    if (auto cacheDir = acSection.At(ToString(FsStoreStr)).Get<TString>(); !cacheDir.Empty()) {
+    if (auto cacheDir = acSection.At(ToString(FsStoreStr)).Get<TString>(); !cacheDir.empty()) {
         return cacheDir;
     }
     return "";

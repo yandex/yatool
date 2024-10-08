@@ -812,7 +812,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     auto& fileConf = Graph->Names().FileConf;
     TString nodeName;
     auto getNodeName = [&]() {
-        if (nodeName.Empty()) {
+        if (nodeName.empty()) {
             Graph->GetFileName(inputNode.ElemId).GetStr(nodeName);
         };
         return TStringBuf(nodeName);
@@ -923,7 +923,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     // 0. Prepare OUTPUT_INCLUDES nodes (ParsedIncls.*)
     THashMap<TStringBuf, TCreateParsedInclsResult> outputIncludeForType;
     ApplyToOutputIncludes([&](TStringBuf type, const TSpecFileArr& outputIncludeArr){
-        if (type.Empty()) {
+        if (type.empty()) {
             type = "*";
         }
 

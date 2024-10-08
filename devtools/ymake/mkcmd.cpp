@@ -199,7 +199,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
 
     TStringBuf moduleDir;
     auto getModuleDir = [&]() {
-        if (moduleDir.Empty()) {
+        if (moduleDir.empty()) {
             moduleDir = ModuleState->CurDir.GetTargetStr();
         }
         return moduleDir;

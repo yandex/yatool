@@ -138,7 +138,7 @@ inline TString InputToPath(const TBuildConfiguration& conf, const TConstDepNodeR
     const TDepGraph& graph = TDepGraph::Graph(inputNode);
 
     TString inputPath = RealPath(conf, graph, inputNode);
-    if (!inputPath.Empty()) {
+    if (!inputPath.empty()) {
         return inputPath;
     }
 

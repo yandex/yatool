@@ -220,7 +220,7 @@ public:
             TString prefix{Reserve(64)};
             prefix.append(NProps::USED_RESERVED_VAR);
             prefix.append('=');
-            size_t prefixSize = prefix.Size();
+            size_t prefixSize = prefix.size();
 
             for (size_t i = 0; i < count; ++i) {
                 ui32 elemId = Load<ui32>();

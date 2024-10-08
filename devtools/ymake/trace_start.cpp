@@ -7,7 +7,7 @@
 void TraceYmakeStart(int argc, char** argv) {
     TString traceProgram = GetEnv("YMAKE_START_TRACE_PROGRAM");
 
-    if (traceProgram.Empty())
+    if (traceProgram.empty())
         return;
 
     TShellCommandOptions opts;

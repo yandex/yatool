@@ -36,7 +36,7 @@ TSortedReadDir::TDirItems& TSortedReadDir::ReadDir(const TString& fullPath, bool
 }
 
 bool TSortedReadDir::IsReadFailed() const {
-    return !ReadFailedMessage_.Empty();
+    return !ReadFailedMessage_.empty();
 }
 
 TStringBuf TSortedReadDir::ReadFailedMessage() const {
