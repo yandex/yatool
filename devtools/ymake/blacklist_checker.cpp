@@ -55,7 +55,8 @@ namespace {
             const auto topNode = state.TopNode();
             auto topNodeType = topNode->NodeType;
             if (IsModuleType(topNodeType)) {
-                CheckModule(RestoreContext_.Modules.Get(topNode->ElemId));
+                const auto* module = RestoreContext_.Modules.Get(topNode->ElemId);
+                CheckModule(module);
             } else if (IsSrcFileType(topNodeType)) {
                 CheckPath(RestoreContext_.Graph.GetFileName(topNode->ElemId), state);
             } else if (IsMakeFileType(topNodeType)) {

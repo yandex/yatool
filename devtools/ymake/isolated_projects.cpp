@@ -74,6 +74,11 @@ namespace {
                     if (RequireModuleRecheck(module)) {
                         YConfEraseByOwner(IslPrjs, module->GetId()); // clear all existing module isolated projects errors
                     }
+                    if (module->DataPaths) {
+                        for (const auto dirView : *module->DataPaths) {
+                            AddDep(state, dirView.GetTargetId());
+                        }
+                    }
                 }
             } else if (nodeType == EMNT_BuildCommand && state.Size() >= 2 && state.Parent()->CurDep().Value() == EDT_Property) {
                 ui64 propId;
@@ -133,30 +138,36 @@ namespace {
             }
 
             if (toNodeType == EMNT_File || toNodeType == EMNT_Directory || toNodeType == EMNT_MakeFile || IsModuleType(toNodeType)) {
-                if (SourcesNodesStack_.size()) {
-                    ui32 fromElemId = fileConf.GetTargetId(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
-                    ui32 toElemId = fileConf.GetTargetId(toNodeRef->ElemId);
-                    Y_ASSERT(fromElemId);
-                    Y_ASSERT(toElemId);
-                    Deps_.emplace_back(TSourceDep{fromElemId, toElemId}); // store dep here
-                    // store dependency path between sources
-                    size_t pathsSize = Paths_.size();
-                    for (auto it = state.Stack().rbegin(); it != state.Stack().rend(); ++it) {
-                        if (it->Node().Id() == SourcesNodesStack_.back()) {
-                            break;
-                        }
-                        Paths_.emplace_back(it->Node().Id());
-                    }
-                    if (pathsSize != Paths_.size()) {
-                        Y_ASSERT(pathsSize <= LastPathNodeBit_);
-                        Deps_.back().PathId = static_cast<typename TSourceDep::TPathId>(pathsSize);
-                        Paths_.back() = TNodeId{ToUnderlying(Paths_.back()) | LastPathNodeBit_};
-                        PathsLengthStat_[Paths_.size() - pathsSize] += 1; // collect debug/info statistic for paths length
-                    }
-                }
+                AddDep(state, fileConf.GetTargetId(toNodeRef->ElemId));
             }
 
             return TBase::AcceptDep(state);
+        }
+
+        void AddDep(TState& state, ui32 toElemId) {
+            Y_ASSERT(toElemId);
+            if (SourcesNodesStack_.empty()) {
+                return; // From absent
+            }
+            const auto& graph = RestoreContext_.Graph;
+            const auto& fileConf = graph.Names().FileConf;
+            ui32 fromElemId = fileConf.GetTargetId(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
+            Y_ASSERT(fromElemId);
+            Deps_.emplace_back(TSourceDep{fromElemId, toElemId}); // store dep here
+            // store dependency path between sources
+            size_t pathsSize = Paths_.size();
+            for (auto it = state.Stack().rbegin(); it != state.Stack().rend(); ++it) {
+                if (it->Node().Id() == SourcesNodesStack_.back()) {
+                    break;
+                }
+                Paths_.emplace_back(it->Node().Id());
+            }
+            if (pathsSize != Paths_.size()) {
+                Y_ASSERT(pathsSize <= LastPathNodeBit_);
+                Deps_.back().PathId = static_cast<typename TSourceDep::TPathId>(pathsSize);
+                Paths_.back() = TNodeId{ToUnderlying(Paths_.back()) | LastPathNodeBit_};
+                PathsLengthStat_[Paths_.size() - pathsSize] += 1; // collect debug/info statistic for paths length
+            }
         }
 
         void SortDepsByTo() {
