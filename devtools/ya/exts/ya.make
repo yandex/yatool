@@ -50,7 +50,7 @@ PEERDIR(
     contrib/python/portalocker
     contrib/python/simplejson
     contrib/python/six
-    devtools/ya/yalibrary/streaming_json_dumper
+    devtools/ya/yalibrary/sjson
     library/python/archive
     library/python/cityhash
     library/python/compress

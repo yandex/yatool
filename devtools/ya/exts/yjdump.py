@@ -4,7 +4,7 @@ import typing as tp  # noqa: F401
 import io  # noqa: F401
 
 from exts.decompress import udopen
-from devtools.ya.yalibrary.streaming_json_dumper import dump as streaming_dump
+from devtools.ya.yalibrary import sjson
 
 
 FILE_PROTO = 'file://'
@@ -16,7 +16,7 @@ def dump_graph_as_json(graph, fp):
         with udopen(graph[len(FILE_PROTO) :], 'rb') as src_fp:
             copyfileobj(src_fp, fp)
     else:
-        streaming_dump(graph, fp)
+        sjson.dump(graph, fp)
 
 
 def dump_context_as_json(context, fp):
@@ -28,4 +28,4 @@ def dump_context_as_json(context, fp):
         for k in 'graph', 'lite_graph':
             if k in context:
                 context_to_dump[k] = functools.partial(dump_graph_as_json, context[k])
-    streaming_dump(context_to_dump, fp)
+    sjson.dump(context_to_dump, fp)
