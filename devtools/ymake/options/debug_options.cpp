@@ -110,38 +110,32 @@ namespace {
     void SetupCacheConfig(TDebugOptions* opts) {
         Y_ASSERT(opts != nullptr);
 
-        TCacheFlags flags{
-            .ReadConfCache = opts->ReadConfCache,
-            .WriteConfCache = opts->WriteConfCache,
-            .ReadDepsCache = opts->ReadDepsCache,
-            .WriteDepsCache = opts->WriteDepsCache,
-            .ReadFsCache = opts->ReadFsCache,
-            .WriteFsCache = opts->WriteFsCache,
-            .ReadJsonCache = opts->ReadJsonCache,
-            .WriteJsonCache = opts->WriteJsonCache,
-            .ReadUidsCache = opts->ReadUidsCache,
-            .WriteUidsCache = opts->WriteUidsCache,
-        };
+        auto& ReadDepsCache = opts->ReadDepsCache;
+        auto& WriteDepsCache = opts->WriteDepsCache;
+        auto& ReadFsCache = opts->ReadFsCache;
+        auto& WriteFsCache = opts->WriteFsCache;
+        auto& ReadJsonCache = opts->ReadJsonCache;
+        auto& WriteJsonCache = opts->WriteJsonCache;
+        auto& ReadUidsCache = opts->ReadUidsCache;
+        auto& WriteUidsCache = opts->WriteUidsCache;
 
+        TCacheFlags flags{ReadDepsCache, WriteDepsCache, ReadFsCache, WriteFsCache, ReadJsonCache, WriteJsonCache, ReadUidsCache, WriteUidsCache};
         try {
             ParseCacheConfig(opts->CacheConfig, &flags);
         } catch (TCacheConfigParserError& e) {
             ythrow yexception() << "Invalid value for --xCC flag: " << e.what();
         }
-
-#define SET_OPT_FLAG(FlagName) { opts->FlagName = flags.FlagName; }
-        SET_OPT_FLAG(ReadConfCache);
-        SET_OPT_FLAG(WriteConfCache);
-        SET_OPT_FLAG(ReadDepsCache);
-        SET_OPT_FLAG(WriteDepsCache);
-        SET_OPT_FLAG(ReadFsCache);
-        SET_OPT_FLAG(WriteFsCache);
-        SET_OPT_FLAG(ReadJsonCache);
-        SET_OPT_FLAG(WriteJsonCache);
-        SET_OPT_FLAG(ReadUidsCache);
-        SET_OPT_FLAG(WriteUidsCache);
-#undef SET_OPT_FLAG
-
+        std::tie(ReadDepsCache, WriteDepsCache, ReadFsCache, WriteFsCache, ReadJsonCache, WriteJsonCache, ReadUidsCache, WriteUidsCache) =
+            std::make_tuple(
+                flags.ReadDepsCache,
+                flags.WriteDepsCache,
+                flags.ReadFsCache,
+                flags.WriteFsCache,
+                flags.ReadJsonCache,
+                flags.WriteJsonCache,
+                flags.ReadUidsCache,
+                flags.WriteUidsCache
+            );
         opts->ConfCacheWasSetExplicitly = opts->ConfCacheWasSetExplicitly || flags.ConfCacheWasSetExplicitly;
         opts->UidsCacheWasSetExplicitly = opts->UidsCacheWasSetExplicitly || flags.UidsCacheWasSetExplicitly;
     }
@@ -156,20 +150,14 @@ namespace {
             ythrow yexception() << "Invalid value for --xRC flag: " << e.what();
         }
 
-#define RESTRICT_OPT_FLAG(FlagName) { opts->FlagName = opts->ReadDepsCache && flags.ReadDepsCache; }
-        RESTRICT_OPT_FLAG(ReadConfCache);
-        RESTRICT_OPT_FLAG(WriteConfCache);
-        RESTRICT_OPT_FLAG(ReadDepsCache);
-        RESTRICT_OPT_FLAG(WriteDepsCache);
-        RESTRICT_OPT_FLAG(ReadFsCache);
-        RESTRICT_OPT_FLAG(WriteFsCache);
-        RESTRICT_OPT_FLAG(ReadJsonCache);
-        RESTRICT_OPT_FLAG(WriteJsonCache);
-        RESTRICT_OPT_FLAG(ReadUidsCache);
-        RESTRICT_OPT_FLAG(WriteUidsCache);
-#undef RESTRICT_OPT_FLAG
-
-        opts->ConfCacheWasSetExplicitly = opts->ConfCacheWasSetExplicitly || flags.ConfCacheWasSetExplicitly;
+        opts->ReadDepsCache = opts->ReadDepsCache && flags.ReadDepsCache;
+        opts->WriteDepsCache = opts->WriteDepsCache && flags.WriteDepsCache;
+        opts->ReadFsCache = opts->ReadFsCache && flags.ReadFsCache;
+        opts->WriteFsCache = opts->WriteFsCache && flags.WriteFsCache;
+        opts->ReadJsonCache = opts->ReadJsonCache && flags.ReadJsonCache;
+        opts->WriteJsonCache = opts->WriteJsonCache && flags.WriteJsonCache;
+        opts->ReadUidsCache = opts->ReadUidsCache && flags.ReadUidsCache;
+        opts->WriteUidsCache = opts->WriteUidsCache && flags.WriteUidsCache;
         opts->UidsCacheWasSetExplicitly = opts->UidsCacheWasSetExplicitly || flags.UidsCacheWasSetExplicitly;
     }
 
