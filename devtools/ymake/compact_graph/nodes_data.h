@@ -16,6 +16,9 @@ public:
     using const_iterator = typename TContainer<T>::const_iterator;
 
     TNodesData() {Storage_.emplace_back();}
+    explicit TNodesData(TAllNodeIds nodeIds)
+        : Storage_(nodeIds.size(), T{})
+    {}
 
     const T& operator[] (TNodeId id) const noexcept {
         return Storage_[ToUnderlying(id)];
@@ -36,6 +39,7 @@ public:
     bool contains(TNodeId id) const noexcept {return ToUnderlying(id) < Storage_.size();}
 
     TValidNodeIds ValidIds() const noexcept {return {MaxNodeId()};}
+    TAllNodeIds Ids() const noexcept {return {MaxNodeId()};}
 
     iterator begin() {return Storage_.begin();}
     iterator end() {return Storage_.end();}

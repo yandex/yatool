@@ -48,18 +48,24 @@ public:
         return {MaxIdRepr + 1};
     }
 
+protected:
+    constexpr size_t SizeFrom(TNodeId start) const noexcept {
+        return MaxIdRepr - ToUnderlying(start) + 1;
+    }
+
 private:
     ui32 MaxIdRepr = 0;
 };
 
+template<TNodeId Start>
+class TNodeIdsRange: public NDetail::TNodeIdsRangeBase {
+public:
+    constexpr NDetail::TNodeIdsIterator begin() const noexcept {return {ToUnderlying(Start)};}
+
+    constexpr size_t size() const noexcept {return SizeFrom(Start);}
+};
+
 }
 
-class TValidNodeIds: public NDetail::TNodeIdsRangeBase {
-public:
-    constexpr NDetail::TNodeIdsIterator begin() const noexcept {return {ToUnderlying(TNodeId::MinValid)};}
-};
-
-class TAllNodeIds: public NDetail::TNodeIdsRangeBase {
-public:
-    constexpr NDetail::TNodeIdsIterator begin() const noexcept {return {ToUnderlying(TNodeId::Invalid)};}
-};
+using TValidNodeIds = NDetail::TNodeIdsRange<TNodeId::MinValid>;
+using TAllNodeIds = NDetail::TNodeIdsRange<TNodeId::Invalid>;

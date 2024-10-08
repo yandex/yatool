@@ -1192,14 +1192,14 @@ void TCompactGraph<VE, VN, TE, TN>::Compact() {
         return;
     }
 
-    TVector<TNodeId> moves(Nodes_.size(), TNodeId::Invalid);
+    TNodesData<TNodeId, TVector> moves(Nodes_.Ids());
     TNodeId curOld = TNodeId::Invalid, curNew = TNodeId::Invalid;
 
     // Collect updated indices for nodes
     // using same logic as in remove
     for (auto& node : Nodes_) {
         if (curOld == TNodeId::Invalid || node.IsValid()) {
-            moves[AsIdx(curOld)] = curNew;
+            moves[curOld] = curNew;
             ++curNew;
         }
         ++curOld;
@@ -1211,7 +1211,7 @@ void TCompactGraph<VE, VN, TE, TN>::Compact() {
     // Update all Ids in edges, remove reference to deleted nodes
     for (auto& node : Nodes_) {
         for (auto& edge : node.Edges()) {
-            TNodeId newId = moves[AsIdx(edge.Id())];
+            TNodeId newId = moves[edge.Id()];
             if (newId != TNodeId::Invalid) {
                 edge = TE(newId, edge.Value());
             } else {
