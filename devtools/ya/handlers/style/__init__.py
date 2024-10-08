@@ -1,9 +1,12 @@
 from __future__ import absolute_import
+
 import core.common_opts
 import core.yarg
 
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
+import core.yarg.consumers
 
+from .enums import StylerKind
 from .style import run_style
 
 import devtools.ya.app
@@ -11,7 +14,7 @@ import devtools.ya.app
 
 class StyleOptions(core.yarg.Options):
     def __init__(self):
-        self.targets = []
+        self.targets: list[str] = []
         self.dry_run = False
         self.check = False
         self.full_output = False
@@ -71,11 +74,11 @@ class StyleOptions(core.yarg.Options):
 
 class FilterOptions(core.yarg.Options):
     def __init__(self):
-        self.file_types = []
+        self.file_types: list[str] = []
 
     @staticmethod
     def consumer():
-        checks = ['py', 'cpp', 'go', 'yamake', 'cuda']
+        checks = [kind for kind in StylerKind]
 
         return [
             core.yarg.ArgConsumer(
@@ -130,22 +133,13 @@ class StyleYaHandler(core.yarg.OptsHandler):
                 FilterOptions(),
             ],
             examples=[
-                core.yarg.UsageExample(
-                    '{prefix}',
-                    'restyle text from <stdin>, write result to <stdout>'
-                ),
-                core.yarg.UsageExample(
-                    '{prefix} .',
-                    'restyle all files in current directory'
-                ),
+                core.yarg.UsageExample('{prefix}', 'restyle text from <stdin>, write result to <stdout>'),
+                core.yarg.UsageExample('{prefix} .', 'restyle all files in current directory'),
                 core.yarg.UsageExample(
                     '{prefix} file.cpp',
                     'restyle file.cpp',
                 ),
-                core.yarg.UsageExample(
-                    '{prefix} folder/',
-                    'restyle all files in subfolders recursively'
-                )
+                core.yarg.UsageExample('{prefix} folder/', 'restyle all files in subfolders recursively'),
             ],
-            unknown_args_as_free=False
+            unknown_args_as_free=False,
         )

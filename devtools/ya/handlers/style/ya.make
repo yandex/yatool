@@ -7,7 +7,7 @@ PEERDIR(
     build/plugins/lib/tests/utils
     contrib/python/PyYAML
     contrib/python/coloredlogs
-    contrib/python/six
+    contrib/python/marisa-trie
     devtools/ya/app
     devtools/ya/build/build_opts
     devtools/ya/core/common_opts
@@ -15,6 +15,7 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/yalibrary/display
     devtools/ya/yalibrary/makelists
     devtools/ya/yalibrary/tools
     library/python/color
@@ -26,12 +27,10 @@ PEERDIR(
 PY_SRCS(
     NAMESPACE handlers.style
     __init__.py
-    style.py
-    cpp_style.py
-    golang_style.py
-    python_style.py
+    enums.py
     state_helper.py
-    ruff_config.py
+    style.py
+    styler.py
 )
 
 END()
