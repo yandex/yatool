@@ -10,29 +10,29 @@ public:
     using difference_type = std::ptrdiff_t;
 
     constexpr TNodeIdsIterator() noexcept = default;
-    constexpr TNodeIdsIterator(ui32 state) noexcept: State{state} {}
+    constexpr TNodeIdsIterator(ui32 state) noexcept: State_{state} {}
 
     constexpr std::strong_ordering operator<=> (const TNodeIdsIterator&) const noexcept = default;
 
-    constexpr value_type operator[] (difference_type off) const noexcept {return static_cast<TNodeId>(State + off);}
+    constexpr value_type operator[] (difference_type off) const noexcept {return static_cast<TNodeId>(State_ + off);}
 
-    constexpr TNodeIdsIterator& operator-= (difference_type off) noexcept {State -= off; return *this;}
-    constexpr difference_type operator- (const TNodeIdsIterator& rhs) const noexcept {return State - rhs.State;}
-    constexpr TNodeIdsIterator operator- (difference_type off) const noexcept {return {static_cast<ui32>(State - off)};}
+    constexpr TNodeIdsIterator& operator-= (difference_type off) noexcept {State_ -= off; return *this;}
+    constexpr difference_type operator- (const TNodeIdsIterator& rhs) const noexcept {return State_ - rhs.State_;}
+    constexpr TNodeIdsIterator operator- (difference_type off) const noexcept {return {static_cast<ui32>(State_ - off)};}
 
-    constexpr TNodeIdsIterator& operator+= (difference_type off) noexcept {State += off; return *this;}
-    constexpr TNodeIdsIterator operator+ (difference_type off) const noexcept {return {static_cast<ui32>(State + off)};}
+    constexpr TNodeIdsIterator& operator+= (difference_type off) noexcept {State_ += off; return *this;}
+    constexpr TNodeIdsIterator operator+ (difference_type off) const noexcept {return {static_cast<ui32>(State_ + off)};}
 
-    constexpr value_type operator* () const noexcept {return static_cast<TNodeId>(State);}
+    constexpr value_type operator* () const noexcept {return static_cast<TNodeId>(State_);}
 
-    constexpr TNodeIdsIterator& operator++ () noexcept {++State; return *this;}
-    constexpr TNodeIdsIterator operator++ (int) noexcept {return {State++};}
+    constexpr TNodeIdsIterator& operator++ () noexcept {++State_; return *this;}
+    constexpr TNodeIdsIterator operator++ (int) noexcept {return {State_++};}
 
-    constexpr TNodeIdsIterator& operator-- () noexcept {--State; return *this;}
-    constexpr TNodeIdsIterator operator-- (int) noexcept {return {State--};}
+    constexpr TNodeIdsIterator& operator-- () noexcept {--State_; return *this;}
+    constexpr TNodeIdsIterator operator-- (int) noexcept {return {State_--};}
 
 private:
-    ui32 State = 0;
+    ui32 State_ = 0;
 };
 
 TNodeIdsIterator operator+ (TNodeIdsIterator::difference_type, const TNodeIdsIterator&) noexcept;
@@ -42,19 +42,19 @@ public:
     using value_type = TNodeId;
 
     constexpr TNodeIdsRangeBase() noexcept = default;
-    constexpr TNodeIdsRangeBase(TNodeId maxNodeId) noexcept: MaxIdRepr(ToUnderlying(maxNodeId)) {}
+    constexpr TNodeIdsRangeBase(TNodeId maxNodeId) noexcept: MaxIdRepr_(ToUnderlying(maxNodeId)) {}
 
     constexpr TNodeIdsIterator end() const noexcept {
-        return {MaxIdRepr + 1};
+        return {MaxIdRepr_ + 1};
     }
 
 protected:
     constexpr size_t SizeFrom(TNodeId start) const noexcept {
-        return MaxIdRepr - ToUnderlying(start) + 1;
+        return MaxIdRepr_ - ToUnderlying(start) + 1;
     }
 
 private:
-    ui32 MaxIdRepr = 0;
+    ui32 MaxIdRepr_ = 0;
 };
 
 template<TNodeId Start>
