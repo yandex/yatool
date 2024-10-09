@@ -1,4 +1,4 @@
-from typing import TypedDict, Union, Any, NewType
+from typing import TypedDict, Union, Any, NewType, NotRequired
 
 
 class GraphConfResourceConcreteInfo(TypedDict):
@@ -35,6 +35,15 @@ class GraphConfSection(TypedDict):
 GraphNodeUid = NewType('GraphNodeUid', str)
 
 
+class GraphNodeTargetProperties(TypedDict):
+    # TODO: add all possible target_properties
+    module_type: NotRequired[str]
+    module_lang: NotRequired[str]
+    module_dir: NotRequired[str]
+    is_module: NotRequired[bool]
+    run: NotRequired[bool]
+
+
 GraphNode = TypedDict(
     'GraphNode',
     {
@@ -51,6 +60,7 @@ GraphNode = TypedDict(
         'timeout': int,
         'cache': bool,
         'type': int,
+        'target_properties': NotRequired[GraphNodeTargetProperties],
     },
 )
 

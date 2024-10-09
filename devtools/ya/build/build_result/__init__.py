@@ -1,10 +1,36 @@
 from collections import defaultdict
 
-import six
+import enum
+import dataclasses
+import collections.abc
 
 from build.build_plan import BuildPlan
+import build.graph_description as graph_description
+import build.node_checks as node_checks
 
-OK, BROKEN, BROKEN_BY_DEPS = range(3)
+import typing as tp
+
+
+type Errors = dict[graph_description.GraphNodeUid, list[str]]
+type ErrorLinks = dict[graph_description.GraphNodeUid, list[str]]
+type NodeByUid = dict[graph_description.GraphNodeUid, graph_description.GraphNode]
+type NodeCache = defaultdict[graph_description.GraphNodeUid, set[graph_description.GraphNodeUid]]
+
+
+class NodeStatus(enum.IntEnum):
+    OK = 0
+    BROKEN = 1
+    BROKEN_BY_DEPS = 2
+
+
+@dataclasses.dataclass
+class _Caches:
+    failed_deps_cache: NodeCache
+    statuses_cache: dict[graph_description.GraphNodeUid, NodeStatus]
+    build_errors_cache: defaultdict[graph_description.GraphNodeUid, set["BuildErrorWithLink"]]
+    broken_deps_cache: NodeCache
+    broken_nodes_cache: NodeCache
+
 
 ERRORS_LIMIT = 30
 BROKEN_DEPS_LIMIT = 20
@@ -19,119 +45,180 @@ class BuildErrorWithLink(object):
         return self.error.__hash__()
 
 
-def make_build_errors_by_project(graph, errors, errors_links):
-    node_by_uid = {node['uid']: node for node in graph}
+def _limited_update[T: collections.abc.Hashable](dest: set[T], source: collections.abc.Iterable[T], limit: int) -> None:
+    for x in source:
+        if len(dest) >= limit:
+            return
+        dest.add(x)
+
+
+def _calc_failed_deps(
+    uid: graph_description.GraphNodeUid,
+    errors: Errors,
+    node_by_uid: NodeByUid,
+    caches: _Caches,
+) -> set[graph_description.GraphNodeUid]:
+    failed_deps_cache = caches.failed_deps_cache
+    if uid in errors:
+        return {uid}
+    if uid in failed_deps_cache:
+        return failed_deps_cache[uid]
+    for dep in node_by_uid[uid]['deps']:
+        if _calc_failed_deps(dep, errors, node_by_uid, caches):
+            _limited_update(failed_deps_cache[uid], [dep], BROKEN_DEPS_LIMIT)
+    return failed_deps_cache[uid]
+
+
+def _define_status(
+    uid: graph_description.GraphNodeUid,
+    errors: Errors,
+    node_by_uid: NodeByUid,
+    caches: _Caches,
+) -> NodeStatus:
+    statuses_cache = caches.statuses_cache
+    if uid in statuses_cache:
+        return statuses_cache[uid]
+    if uid in errors:
+        statuses_cache[uid] = NodeStatus.BROKEN
+        return NodeStatus.BROKEN
+    for dep in _calc_failed_deps(uid, errors, node_by_uid, caches):
+        if (
+            not node_checks.is_module(node_by_uid[dep])
+            and _define_status(dep, errors, node_by_uid, caches) == NodeStatus.BROKEN
+        ):
+            statuses_cache[uid] = NodeStatus.BROKEN
+            return NodeStatus.BROKEN
+    statuses_cache[uid] = NodeStatus.BROKEN_BY_DEPS
+    return NodeStatus.BROKEN_BY_DEPS
+
+
+def _collect_build_errors(
+    uid: graph_description.GraphNodeUid,
+    errors: Errors,
+    errors_links: ErrorLinks,
+    node_by_uid: NodeByUid,
+    caches: _Caches,
+) -> tp.Iterable[BuildErrorWithLink]:
+    build_errors_cache = caches.build_errors_cache
+    if _define_status(uid, errors, node_by_uid, caches) == NodeStatus.BROKEN_BY_DEPS:
+        return set()
+    if uid in build_errors_cache:
+        return build_errors_cache[uid]
+    if uid in errors:
+        build_errors_cache[uid].add(BuildErrorWithLink(errors[uid], errors_links.get(uid, [])))
+    else:
+        for dep in _calc_failed_deps(uid, errors, node_by_uid, caches):
+            if (
+                not node_checks.is_module(node_by_uid[dep])
+                and _define_status(dep, errors, node_by_uid, caches) == NodeStatus.BROKEN
+            ):
+                _limited_update(
+                    build_errors_cache[uid],
+                    _collect_build_errors(dep, errors, errors_links, node_by_uid, caches),
+                    ERRORS_LIMIT,
+                )
+    return build_errors_cache[uid]
+
+
+def _collect_broken_project_deps(
+    uid: graph_description.GraphNodeUid,
+    errors: Errors,
+    node_by_uid: NodeByUid,
+    caches: _Caches,
+) -> tp.Iterable[graph_description.GraphNodeUid]:
+    broken_deps_cache = caches.broken_deps_cache
+    if _define_status(uid, errors, node_by_uid, caches) == NodeStatus.BROKEN:
+        return set()
+    if uid in broken_deps_cache:
+        return broken_deps_cache[uid]
+    for dep in _calc_failed_deps(uid, errors, node_by_uid, caches):
+        if node_checks.is_module(node_by_uid[dep]):
+            _limited_update(broken_deps_cache[uid], {dep}, BROKEN_DEPS_LIMIT)
+        else:
+            _limited_update(
+                broken_deps_cache[uid],
+                _collect_broken_project_deps(dep, errors, node_by_uid, caches),
+                BROKEN_DEPS_LIMIT,
+            )
+    return broken_deps_cache[uid]
+
+
+def _collect_broken_nodes(
+    uid: graph_description.GraphNodeUid,
+    errors: Errors,
+    node_by_uid: NodeByUid,
+    caches: _Caches,
+) -> tp.Iterable[graph_description.GraphNodeUid]:
+    broken_nodes_cache = caches.broken_nodes_cache
+    if uid in broken_nodes_cache:
+        return broken_nodes_cache[uid]
+    if uid in errors:
+        broken_nodes_cache[uid].add(uid)
+    else:
+        for dep in _calc_failed_deps(uid, errors, node_by_uid, caches):
+            _limited_update(
+                broken_nodes_cache[uid], _collect_broken_nodes(dep, errors, node_by_uid, caches), ERRORS_LIMIT
+            )
+    return broken_nodes_cache[uid]
+
+
+def make_build_errors_by_project(
+    graph: list[graph_description.GraphNode],
+    errors: Errors,
+    errors_links: ErrorLinks,
+):
+    node_by_uid: NodeByUid = {node['uid']: node for node in graph}
     project_by_uid = {
         node['uid']: (BuildPlan.node_name(node), BuildPlan.node_platform(node), node['uid']) for node in graph
     }
 
-    def limited_union(dest, source, limit):
-        for x in source:
-            if len(dest) >= limit:
-                return
-            dest.add(x)
-
-    def is_module(uid):
-        target_properties = node_by_uid[uid].get('target_properties', {})
-        return 'module_type' in target_properties or target_properties.get('is_module', False)
-
-    failed_deps_cache = defaultdict(set)
-
-    def calc_failed_deps(uid):
-        if uid in errors:
-            return [uid]
-        if uid in failed_deps_cache:
-            return failed_deps_cache[uid]
-        for dep in node_by_uid[uid]['deps']:
-            if calc_failed_deps(dep):
-                limited_union(failed_deps_cache[uid], [dep], BROKEN_DEPS_LIMIT)
-        return failed_deps_cache[uid]
-
-    statuses_cache = {}
-
-    def define_status(uid):
-        if uid in statuses_cache:
-            return statuses_cache[uid]
-        if uid in errors:
-            statuses_cache[uid] = BROKEN
-            return BROKEN
-        for dep in calc_failed_deps(uid):
-            if not is_module(dep) and define_status(dep) == BROKEN:
-                statuses_cache[uid] = BROKEN
-                return BROKEN
-        statuses_cache[uid] = BROKEN_BY_DEPS
-        return BROKEN_BY_DEPS
-
-    build_errors_cache = defaultdict(set)
-
-    def collect_build_errors(uid):
-        if define_status(uid) == BROKEN_BY_DEPS:
-            return set()
-        if uid in build_errors_cache:
-            return build_errors_cache[uid]
-        if uid in errors:
-            build_errors_cache[uid].add(BuildErrorWithLink(errors[uid], errors_links.get(uid, [])))
-        else:
-            for dep in calc_failed_deps(uid):
-                if not is_module(dep) and define_status(dep) == BROKEN:
-                    limited_union(build_errors_cache[uid], collect_build_errors(dep), ERRORS_LIMIT)
-        return build_errors_cache[uid]
-
-    broken_deps_cache = defaultdict(set)
-
-    def collect_broken_project_deps(uid):
-        if define_status(uid) == BROKEN:
-            return set()
-        if uid in broken_deps_cache:
-            return broken_deps_cache[uid]
-        for dep in calc_failed_deps(uid):
-            if is_module(dep):
-                limited_union(broken_deps_cache[uid], {dep}, BROKEN_DEPS_LIMIT)
-            else:
-                limited_union(broken_deps_cache[uid], collect_broken_project_deps(dep), BROKEN_DEPS_LIMIT)
-        return broken_deps_cache[uid]
-
-    broken_nodes_cache = defaultdict(set)
-
-    def collect_broken_nodes(uid):
-        if uid in broken_nodes_cache:
-            return broken_nodes_cache[uid]
-        if uid in errors:
-            broken_nodes_cache[uid].add(uid)
-        else:
-            for dep in calc_failed_deps(uid):
-                limited_union(broken_nodes_cache[uid], collect_broken_nodes(dep), ERRORS_LIMIT)
-        return broken_nodes_cache[uid]
+    caches = _Caches(
+        failed_deps_cache=defaultdict(set),
+        statuses_cache=dict(),
+        build_errors_cache=defaultdict(set),
+        broken_deps_cache=defaultdict(set),
+        broken_nodes_cache=defaultdict(set),
+    )
 
     project_failed_deps = {}
-    for uid in six.iterkeys(node_by_uid):
-        if is_module(uid) and calc_failed_deps(uid) and define_status(uid) == BROKEN_BY_DEPS:
-            project_failed_deps[project_by_uid[uid]] = sorted(map(project_by_uid.get, collect_broken_project_deps(uid)))
+    for uid, node in node_by_uid.items():
+        if (
+            node_checks.is_module(node)
+            and _calc_failed_deps(uid, errors, node_by_uid, caches)
+            and _define_status(uid, errors, node_by_uid, caches) == NodeStatus.BROKEN_BY_DEPS
+        ):
+            project_failed_deps[project_by_uid[uid]] = sorted(
+                project_by_uid.get(x) for x in _collect_broken_project_deps(uid, errors, node_by_uid, caches)
+            )
 
     project_build_errors_with_links = {}
-    for project, deps in six.iteritems(project_failed_deps):
-        deps_paths = sorted([d[0] for d in deps])
+    for project, deps in project_failed_deps.items():
+        deps_paths = sorted(d[0] for d in deps)
         project_build_errors_with_links[project] = [
             BuildErrorWithLink('Depends on broken targets:\n{}'.format('\n'.join(deps_paths)), [])
         ]
 
-    for uid in six.iterkeys(node_by_uid):
-        if is_module(uid) and calc_failed_deps(uid) and define_status(uid) == BROKEN:
+    for uid, node in node_by_uid.items():
+        if (
+            node_checks.is_module(node)
+            and _calc_failed_deps(uid, errors, node_by_uid, caches)
+            and _define_status(uid, errors, node_by_uid, caches) == NodeStatus.BROKEN
+        ):
             project_build_errors_with_links[project_by_uid[uid]] = sorted(
-                collect_build_errors(uid), key=lambda x: x.error
+                _collect_build_errors(uid, errors, errors_links, node_by_uid, caches), key=lambda x: x.error
             )
 
     project_build_errors = {
-        project: [e.error for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)
+        project: [e.error for e in errors] for project, errors in project_build_errors_with_links.items()
     }
     project_build_errors_links = {
-        project: [e.links for e in errors] for project, errors in six.iteritems(project_build_errors_with_links)
+        project: [e.links for e in errors] for project, errors in project_build_errors_with_links.items()
     }
 
     node_build_errors = {}
     node_build_errors_links = {}
-    for uid in six.iterkeys(node_by_uid):
-        node_errors = collect_broken_nodes(uid)
+    for uid in node_by_uid:
+        node_errors = _collect_broken_nodes(uid, errors, node_by_uid, caches)
         if node_errors:
             node_build_errors[uid] = []
             node_build_errors_links[uid] = []

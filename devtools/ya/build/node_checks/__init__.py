@@ -1,8 +1,10 @@
 import build.graph_description as graph_descr
 
 
-def is_module(n):
-    return 'target_properties' in n and 'module_type' in n['target_properties']
+def is_module(n: graph_descr.GraphNode) -> bool:
+    if not (target_properties := n.get('target_properties')):
+        return False
+    return 'module_type' in target_properties or target_properties.get('is_module', False)
 
 
 def is_binary(n):

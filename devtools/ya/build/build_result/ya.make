@@ -8,8 +8,9 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/six
     devtools/ya/build/build_plan
+    devtools/ya/build/graph_description
+    devtools/ya/build/node_checks
 )
 
 END()
