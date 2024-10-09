@@ -101,20 +101,17 @@ def with_custom_file_log(ctx, params, replacements):
     root = logging.getLogger()
 
     log_file = getattr(params, 'log_file', None)
-    in_memory_handler = getattr(ctx, 'file_in_memory_log', None)
+    in_memory_handler = ctx.file_in_memory_log
 
     if log_file:
         file_handler = _file_logger(log_file, replacements=replacements)
 
-        if in_memory_handler:
-            for entry in in_memory_handler.storage:
-                file_handler.emit(entry)
-
+        for entry in in_memory_handler.storage:
+            file_handler.emit(entry)
         root.addHandler(file_handler)
 
-    if in_memory_handler:
-        in_memory_handler.close()
-        root.removeHandler(in_memory_handler)
+    in_memory_handler.close()
+    root.removeHandler(in_memory_handler)
 
     yield
 
