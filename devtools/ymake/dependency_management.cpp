@@ -41,9 +41,6 @@ namespace {
     constexpr TStringBuf FORBID_CONFLICT_DM = "FORBID_CONFLICT_DM";
     constexpr TStringBuf FORBID_CONFLICT_DM_RECENT = "FORBID_CONFLICT_DM_RECENT";
     constexpr TStringBuf REQUIRE_DM = "REQUIRE_DM";
-    constexpr TStringBuf TEST_CLASSPATH_VALUE = "TEST_CLASSPATH_VALUE";
-    constexpr TStringBuf TEST_CLASSPATH_MANAGED = "TEST_CLASSPATH_MANAGED";
-    constexpr TStringBuf FAKE_OUT_FOR_TEST = "fake.out.java_test_cmd";
 
     bool IsGhost(const TModule& parent, const TModule& peer) noexcept {
         return parent.GhostPeers.contains(peer.GetDirId());
@@ -706,18 +703,6 @@ namespace {
             Y_ASSERT(parent);
             ModulesWithDepMng += parent->GetAttrs().RequireDepManagement;
 
-            const auto testClasspath = parent->Get(TEST_CLASSPATH_VALUE);
-            if (!testClasspath.empty()) {
-                parentItem.ManageableCommands.emplace(FAKE_OUT_FOR_TEST, TNodeId::Invalid);
-            }
-
-            for (TStringBuf elem: StringSplitter(testClasspath).Split(' ').SkipEmpty()) {
-                const auto [pos, inserted] = parentItem.DepsDict.emplace(elem, TNodeId::Invalid);
-                if (pos->first == parent->GetDir().CutType()) {
-                    pos->second = parentItem.Node().Id();
-                }
-            }
-
             // Follow all modules regardles of PropagateDependencyManagement attribute in order to collect tools requiring DM
             return true;
         }
@@ -776,8 +761,6 @@ namespace {
                     DMConfErrors.clear(); // clear errors for next start module
                 }
             }
-
-            ManageTestClasspath(*parent, parentItem);
 
             // DEPRECATED, used only for fill DART_CLASSPATH_DEPS
             // Real add unmanageable peers to peers closure moved to AddUnmanageablePeersToClosure
@@ -958,48 +941,6 @@ namespace {
             parent.Set(DART_CLASSPATH, ToPeerListVar(managedPeers, EPathType::Artefact));
         }
 
-        TVector<TNodeId> ManageMultipleRoots(const TVector<TNodeId>& roots) {
-            TDependencyManagementRules rules(DMConf.GetForcedLib2Ver(), DMConf.GetForcedLib2Excludes());
-            TVector<TResolvedPeer> directPeers;
-            for (TNodeId rootItem: roots) {
-                const auto* module = GetModule(rootItem);
-                Y_ASSERT(module);
-                DMConf.MergeRules(rules, *module, DMConfErrors);
-                if (DMConf.IsContribWithVer(*module)) {
-                    if (auto it = Proxies.find(module->GetId()); it != Proxies.end()) {
-                        directPeers.push_back({it->second, EPeerResolution::Default});
-                    } else {
-                        directPeers.push_back({rootItem, EPeerResolution::Direct});
-                    }
-                } else {
-                    directPeers.push_back({rootItem, EPeerResolution::Unversioned});
-                }
-            }
-
-            for (TNodeId rootItem: roots) {
-                const auto& peers = ManagedPeers.at(rootItem);
-                for (auto peer : peers.Direct) {
-                    directPeers.push_back(peer);
-                }
-            }
-
-            NDetail::TPeersClosure closure;
-            for (const auto& peer: directPeers) {
-                closure.Merge(peer.Id, ManagedPeers.at(peer.Id).Closure.Exclude(
-                    [&](TNodeId id) { return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId)); },
-                    [&](TNodeId id) -> const NDetail::TPeersClosure& { return ManagedPeers.at(id).Closure; }));
-            }
-
-            const auto resolution = ResolveConflicts(TConflictResolver{rules, ContribsDict, RestoreContext.Graph.Names().FileConf, true}, directPeers, closure);
-            TUniqVector<TNodeId> res;
-            for (TNodeId root: roots) {
-                res.Push(root);
-                PreorderSort(ManagedPeers.at(root).Direct, resolution, res);
-            }
-
-            return res.Take();
-        }
-
         void ManageCmdTools(TNodeId moduleId, TNodeId cmdId, TArrayRef<const TNodeId> toolIds) {
             auto cmd = RestoreContext.Graph[cmdId];
             THashSet<TNodeId> tooldeps;
@@ -1019,40 +960,6 @@ namespace {
                 }
             }
             cmd.SortEdges(TNodeEdgesComparator{cmd});
-        }
-
-        void ManageTestClasspath(
-            TModule& parent,
-            const TStateItem& parentItem) {
-            const auto testCP = parent.Get(TEST_CLASSPATH_VALUE);
-            if (testCP.empty()) {
-                return;
-            }
-
-            TVector<TNodeId> roots;
-            for (TStringBuf item: StringSplitter(testCP).Split(' ').SkipEmpty()) {
-                const auto it = parentItem.DepsDict.find(item);
-                if (it == parentItem.DepsDict.end() || it->second == TNodeId::Invalid) {
-                    YConfErr(KnownBug)
-                        << fmt::format(
-                            "[[alt1]]TEST_CLASSPATH_VALUE[[rst]] element '{}' is neither PEERDIR nor GHOST PEERDIR of '{}'",
-                            item,
-                            parent.GetDir().GetTargetStr())
-                        << Endl;
-                    TRACE(P, NEvent::TInvalidPeerdir(TString{item}));
-                    continue;
-                }
-                roots.push_back(it->second);
-            }
-            if (roots.empty()) {
-                return;
-            }
-
-            const auto peersClosure = ManageMultipleRoots(roots);
-            if (const auto cmdIt = parentItem.ManageableCommands.find(FAKE_OUT_FOR_TEST); cmdIt != parentItem.ManageableCommands.end() && cmdIt->second != TNodeId::Invalid) {
-                ManageCmdTools(parentItem.Node().Id(), cmdIt->second, peersClosure);
-            }
-            parent.Set(TEST_CLASSPATH_MANAGED, ToPeerListVar(peersClosure, EPathType::Moddir));
         }
 
         TVector<TResolvedPeer> ManageLocalPeers(
