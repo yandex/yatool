@@ -1,6 +1,6 @@
 class Params(object):
     def __init__(self, **entries):
-        self.__dict__.update(entries)
+        self.update(entries)
 
     def __str__(self):
         return str(self.__dict__)
@@ -10,6 +10,9 @@ class Params(object):
 
     def as_dict(self):
         return self.__dict__.copy()
+
+    def update(self, entries):
+        self.__dict__.update(entries)
 
 
 def merge_params(*params):

@@ -113,11 +113,11 @@ class RunOptsSupplement(RunOptsBase):
 
 
 def run(params):
+    import app_ctx
+
     ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
     opts = core.yarg.merge_params(ya_make_opts.initialize([]), params)
     opts.show_final_ok = False
-
-    app_ctx = sys.modules.get("app_ctx")
 
     if opts.ya_run_build_type is not None:
         opts.build_type = opts.ya_run_build_type
@@ -133,6 +133,9 @@ def run(params):
 
     if opts.build_threads == 0:
         _report_and_exit(app_ctx, "Build thread count = 0 is not allowed")
+
+    # Some modules read parameters from app_ctx.params so we must keep it up-to-date
+    app_ctx.params.update(opts.as_dict())
 
     subscribers = [
         build.ya_make.DisplayMessageSubscriber(opts, app_ctx.display),
