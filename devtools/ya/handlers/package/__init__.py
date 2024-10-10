@@ -87,6 +87,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 test_opts.LintersOptions(),
                 core.common_opts.YaBin3Options(),
                 core.common_opts.OutputStyleOptions(),
+                core.common_opts.PrintStatisticsOptions(),
             ]
             + build.build_opts.distbs_options()
             + build.build_opts.checkout_options()

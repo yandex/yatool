@@ -276,6 +276,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.checkout = getattr(params, "checkout", False)
 
     build_options.print_statistics = True
+    build_options.statistics_out_dir = params.statistics_out_dir
 
     for i in [
         "auto_clean_results_cache",
