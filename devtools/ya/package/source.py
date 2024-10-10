@@ -271,7 +271,8 @@ class Source(object):
                 # )
 
             used_patterns = set()
-            for path, pattern in filter_files(source, self.data['source']['files']):
+            expanded_files = [files.format(**self._formaters) for files in self.data['source']['files']]
+            for path, pattern in filter_files(source, expanded_files):
                 used_patterns.add(pattern)
                 source_path = os.path.join(source, path)
                 destination_path = os.path.join(destination, path)
@@ -316,7 +317,7 @@ class Source(object):
                     self.copy_file(source_path, destination_path)
                     self._destination_paths.append(destination_path)
 
-            unused_patterns = [p for p in self.data['source']['files'] if p not in used_patterns]
+            unused_patterns = [p for p in expanded_files if p not in used_patterns]
             if unused_patterns:
                 msg = "Misconfiguration: the following 'files' patterns resulted empty filesets: {}".format(
                     ", ".join(unused_patterns)
@@ -343,7 +344,8 @@ class Source(object):
 
         if 'exclude' in self.data['source']:
             used_patterns = set()
-            for path, pattern in filter_files(_strip_dir_sep(destination), self.data['source']['exclude']):
+            formatted_excludes = [exclude.format(**self._formaters) for exclude in self.data['source']['exclude']]
+            for path, pattern in filter_files(_strip_dir_sep(destination), formatted_excludes):
                 used_patterns.add(pattern)
                 destination_path = os.path.join(destination, path)
 
@@ -360,7 +362,7 @@ class Source(object):
                     if destination_path in self._destination_paths:
                         self._destination_paths.remove(destination_path)
 
-            unused_patterns = [p for p in self.data['source']['exclude'] if p not in used_patterns]
+            unused_patterns = [p for p in formatted_excludes if p not in used_patterns]
             if unused_patterns:
                 raise YaPackageSourceException(
                     "Misconfiguration: the following 'exclude' patterns resulted empty filesets: {}".format(
