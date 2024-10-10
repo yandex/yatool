@@ -670,9 +670,6 @@ namespace {
 
     struct CollectedModuleInfo {
         TVector<TNodeId> Peers;
-        THashMap<TString, TNodeId> DepsDict;
-        THashMap<TString, TNodeId> ManageableCommands; // fake.out -> command Node ID
-        THashSet<TNodeId> CheckedCommands;
         TUniqVector<TNodeId> UnmanageablePeers;
         bool UseExcludes = false;
     };
@@ -783,39 +780,10 @@ namespace {
                 return;
             }
 
-            const auto it = parentItem.DepsDict.find(peer->GetDir().CutAllTypes());
-            if (it != parentItem.DepsDict.end()) {
-                it->second = peerNode.Id();
-            }
-
             parentItem.Peers.push_back(peerNode.Id());
         }
 
-        void CollectTool(TStateItem& moduleItem, TStateItem& cmdItem, TConstDepNodeRef toolNode) {
-            const TModule* tool = RestoreContext.Modules.Get(toolNode->ElemId);
-            Y_ASSERT(tool);
-            const auto it = moduleItem.DepsDict.find(tool->GetDir().CutAllTypes());
-            if (it != moduleItem.DepsDict.end()) {
-                it->second = toolNode.Id();
-            }
-            // TODO(svidyuk): this code is hack to match commands added by RUN_JAVA_PROGRAM and java test modules and
-            // edit cmd nodes after dependency management calculation for the command roots. In pure ymake JAVA support
-            // there should be no such code
-            if (moduleItem.CheckedCommands.insert(cmdItem.Node().Id()).second) {
-                const TStringBuf cmdValue = TDepGraph::GetCmdName(cmdItem.Node()).GetStr();
-                const TStringBuf fakeOutStart = "fake.out.";
-                const auto first = cmdValue.find(fakeOutStart);
-                if (first != TStringBuf::npos) {
-                    const auto last = cmdValue.find_first_of(" \t\n\r", first + fakeOutStart.size());
-                    if (last != TStringBuf::npos) {
-                        const auto fakeOut = cmdValue.substr(first, last - first);
-                        const auto cmdIt = moduleItem.ManageableCommands.find(fakeOut);
-                        if (cmdIt != moduleItem.ManageableCommands.end()) {
-                            cmdIt->second = cmdItem.Node().Id();
-                        }
-                    }
-                }
-            }
+        void CollectTool(TStateItem&, TStateItem&, TConstDepNodeRef) {
         }
 
         const TModule* GetModule(TNodeId nodeId) const {
@@ -939,27 +907,6 @@ namespace {
             }
             parent.Set(MANAGED_PEERS_CLOSURE, ToPeerListVar(managedPeers, EPathType::Moddir));
             parent.Set(DART_CLASSPATH, ToPeerListVar(managedPeers, EPathType::Artefact));
-        }
-
-        void ManageCmdTools(TNodeId moduleId, TNodeId cmdId, TArrayRef<const TNodeId> toolIds) {
-            auto cmd = RestoreContext.Graph[cmdId];
-            THashSet<TNodeId> tooldeps;
-            for (const auto& edge: cmd.Edges()) {
-                if (IsDirectToolDep(edge)) {
-                    tooldeps.emplace(edge.To().Id());
-                }
-            }
-            for (TNodeId id: toolIds) {
-                // TODO(svidyuk): In the ideal world run test command will be some module command and this test run module
-                // command will have perrdir to test module itself. But for now
-                if (id != moduleId && tooldeps.emplace(id).second) {
-                    const ui32 toolDirElemId = GetModule(id)->GetDirId();
-                    const TNodeId toolDirId = RestoreContext.Graph.GetFileNodeById(toolDirElemId).Id();
-                    RestoreContext.Graph.AddEdge(cmd, toolDirId, EDT_Include); // Tolldir
-                    RestoreContext.Graph.AddEdge(cmd, id, EDT_Include); // DirectTooldir
-                }
-            }
-            cmd.SortEdges(TNodeEdgesComparator{cmd});
         }
 
         TVector<TResolvedPeer> ManageLocalPeers(
