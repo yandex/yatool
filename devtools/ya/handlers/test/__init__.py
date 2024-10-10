@@ -7,7 +7,7 @@ import core.yarg
 
 
 class YaTestYaHandler(core.yarg.OptsHandler):
-    description = 'Build and run all tests\n[[imp]]ya test[[rst]] is alias for [[imp]]ya make -A[[rst]]'
+    description = 'Build and run all tests\n[[imp]]ya test[[rst]] is an alias for [[imp]]ya make -A[[rst]]'
 
     extra_help = (
         "By default, [[imp]]ya test[[rst]] [[alt1]]doesn't build targets that tests do not need[[rst]].\n"
