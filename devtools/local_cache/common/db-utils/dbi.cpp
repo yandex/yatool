@@ -42,7 +42,7 @@ namespace NCachesPrivate {
                 continue;
             }
 
-            if (!token.StartsWith("--") && !token.Empty()) {
+            if (!token.StartsWith("--") && !token.empty()) {
                 spaceOnlySeen = false;
             }
 
@@ -83,7 +83,7 @@ namespace NCachesPrivate {
             TStringBuf token(v.Token());
             token = StripString(token);
 
-            if (!token.StartsWith("--") && !token.Empty()) {
+            if (!token.StartsWith("--") && !token.empty()) {
                 spaceOnlySeen = false;
             }
 

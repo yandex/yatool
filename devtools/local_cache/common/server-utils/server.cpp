@@ -38,7 +38,7 @@ namespace NCachesPrivate {
     }
 
     int TParentChildSocketChannel::SendToPeer(const TString& in) {
-        int sz = in.Size();
+        int sz = in.size();
         // Exactly one socket should be open
         Y_ABORT_UNLESS((Child_.Get() == nullptr) != (Parent_.Get() == nullptr));
         auto socket = Child_.Get() ? Child_.Get() : Parent_.Get();

@@ -66,7 +66,7 @@ namespace NToolsCache {
 // Wrapper to deal with deprecated config-files.
 inline TString GetLogName(const NConfig::TConfig& config) {
     auto logName = NUserServicePrivate::GetLogName(config);
-    if (logName.Empty()) {
+    if (logName.empty()) {
         // deprecated
         logName = NToolsCachePrivate::GetLogName(config);
     }

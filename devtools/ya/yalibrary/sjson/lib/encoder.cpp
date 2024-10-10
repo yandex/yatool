@@ -149,7 +149,7 @@ namespace NSJson {
             }
 
             void Write(TStringBuf s) {
-                Write(s.Data(), s.Size());
+                Write(s.data(), s.size());
             }
 
             void Write(char ch){
@@ -407,8 +407,8 @@ namespace NSJson {
 
                 Out_.Write('"');
 
-                const char* begin = s.Data();
-                const char* end = begin + s.Size();
+                const char* begin = s.data();
+                const char* end = begin + s.size();
                 const char* pos;
                 while ((pos = EscapedChars_.FindFirstOf(begin, end)) != end) {
                     Out_.Write(begin, pos - begin);

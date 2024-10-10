@@ -18,12 +18,12 @@ using namespace NConfig;
 TString NToolsCache::GetMiscRoot() {
     auto home = GetHomeDir();
     auto yaCache = GetEnv("YA_CACHE_DIR");
-    return yaCache.Empty() ? JoinFsPaths(home, ".ya") : yaCache;
+    return yaCache.empty() ? JoinFsPaths(home, ".ya") : yaCache;
 }
 
 TString NToolsCache::GetToolDir() {
     auto yaToolCache = GetEnv("YA_CACHE_DIR_TOOLS");
-    return JoinFsPaths(yaToolCache.Empty()
+    return JoinFsPaths(yaToolCache.empty()
                            ? JoinFsPaths(GetMiscRoot(), "tools")
                            : yaToolCache,
                        "v4");

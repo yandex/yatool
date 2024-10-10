@@ -58,7 +58,7 @@ namespace NACDigest {
         }
 
         size_t size = 0;
-        if (contentDigest.Empty()) {
+        if (contentDigest.empty()) {
             THolder<IInputStream> input{};
             if (stat.IsSymlink()) {
                 input = MakeHolder<TStringStream>(NFs::ReadLink(fileName));

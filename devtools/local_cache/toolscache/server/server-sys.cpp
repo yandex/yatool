@@ -36,10 +36,10 @@ static void SetLogBackend(const TOptions& opts, const NConfig::TConfig& config, 
     THolder<TLogBackend> logBE; // owned by logger
     auto logName = ::GetLogName(config);
 
-    if (!opts.Daemonize && (logName.Empty() || opts.Halt || opts.Verbose)) {
+    if (!opts.Daemonize && (logName.empty() || opts.Halt || opts.Verbose)) {
         logBE = MakeHolder<TStreamLogBackend>(&Cerr);
     } else {
-        if (opts.NoLogs || logName.Empty()) {
+        if (opts.NoLogs || logName.empty()) {
             logBE = MakeHolder<TNullLogBackend>();
         } else {
             auto fallbackLogName = JoinFsPaths(::GetPersistentDirectory(config), "fallback.log");
@@ -204,10 +204,10 @@ int main(int argc, const char* argv[]) {
     }
 
     if (EqualToOneOf(rc, IOEC, CriticalErrorHandlerEC, ExternalErrorEC)) {
-        if (auto marker = GetCriticalErrorMarkerFileName(config); !marker.Empty()) {
+        if (auto marker = GetCriticalErrorMarkerFileName(config); !marker.empty()) {
             try {
                 TStringBuf buf("");
-                TFile(marker, OpenAlways | WrOnly | AWUser | ARUser).Write(buf.begin(), buf.Size());
+                TFile(marker, OpenAlways | WrOnly | AWUser | ARUser).Write(buf.begin(), buf.size());
             } catch (...) {
                 // Post-pone till next failure ...
             }

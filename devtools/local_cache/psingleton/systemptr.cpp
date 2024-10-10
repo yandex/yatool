@@ -519,7 +519,7 @@ TPFileSingleton* GetClientPSingleton(TStringBuf lockFile, TStringBuf logName, bo
     static TLog clientLog(MakeHolder<TNullLogBackend>());
     static TRWMutex logMutex;
     TWriteGuard logLock(logMutex);
-    if (logName.Empty()) {
+    if (logName.empty()) {
         clientLog.ResetBackend(MakeHolder<TNullLogBackend>());
     } else {
         clientLog.ResetBackend(MakeHolder<TLogBackendWithFallback>(
