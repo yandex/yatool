@@ -507,18 +507,6 @@ def print_cache_statistics(graph, filename, display):
         )
     )
 
-    if filename is not None:
-        js_data = {
-            'cache_hit': cache_hit,
-            'cached_tasks': cached_task_count,
-            'executed_tasks': executed_task_count,
-            'all_run_tasks': all_run_tasks_count,
-        }
-        with open(filename, 'w') as output_file:
-            json.dump(js_data, output_file, indent=4, sort_keys=True)
-        display.emit_message('Cache hit ratio is saved to %s' % filename)
-    display.emit_message()
-
     stats = {
         'cache_hit': cache_hit,
         'run_tasks': all_run_tasks_count,
@@ -529,6 +517,15 @@ def print_cache_statistics(graph, filename, display):
         'failed_tasks': failed_task_count,
         'ok_tasks': not_tests_task_count,
     }
+
+    if filename is not None:
+        js_data = copy.copy(stats)
+        js_data['all_run_tasks'] = all_run_tasks_count
+
+        with open(filename, 'w') as output_file:
+            json.dump(js_data, output_file, indent=4, sort_keys=True)
+        display.emit_message('Cache hit ratio is saved to %s' % filename)
+    display.emit_message()
 
     for k, v in six.iteritems(stats):
         profiler.profile_value('statistics_{}'.format(k), v)
@@ -570,7 +567,6 @@ def print_dist_cache_statistics(graph, filename, display):
             get_count, format_size(get_data_size, binary=True), format_size(get_real_speed, binary=True)
         )
     )
-    display.emit_message()
 
     stats = {
         'cache_fullness': cache_fullness,
@@ -583,6 +579,14 @@ def print_dist_cache_statistics(graph, filename, display):
         'put_speed': put_speed,
         'put_real_speed': put_real_speed,
     }
+
+    if filename is not None:
+        with open(filename, 'w') as output_file:
+            json.dump(stats, output_file, indent=4, sort_keys=True)
+        display.emit_message('Dist cache stats are saved to %s' % filename)
+
+    display.emit_message()
+
     return stats
 
 
