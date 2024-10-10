@@ -1468,6 +1468,8 @@ class _GraphMaker(object):
                 del flags[i]
 
         target_tc.pop('targets', None)
+        target_tc.pop('executable_path', None)
+        target_tc.pop('tool_var', None)
 
         json_str = json.dumps(target_tc, sort_keys=True)
         base_name = ""
