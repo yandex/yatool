@@ -76,6 +76,10 @@ class MacroException(mk_common.MkLibException):
     pass
 
 
+class WrongProjectsCount(MacroException):
+    pass
+
+
 @functools.total_ordering
 class Node(object):
     def __init__(self, name, node_type):
@@ -570,9 +574,9 @@ class MakeList(Node):
         proj, num_proj = self._find_project()
 
         if num_proj == 0:
-            raise MacroException('error: none projects in makelist')
+            raise WrongProjectsCount('error: none projects in makelist')
         elif num_proj > 1:
-            raise MacroException('error: too many projects in makelist')
+            raise WrongProjectsCount('error: too many ({}) projects in makelist'.format(num_proj))
 
         return proj
 
