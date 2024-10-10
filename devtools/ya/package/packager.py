@@ -7,7 +7,6 @@ import os
 import random
 import re
 import shutil
-import sys
 import time
 import traceback
 
@@ -94,6 +93,17 @@ if app_config.in_house or app_config.have_sandbox_fetcher:
 
 
 class YaPackageException(Exception):
+    mute = True
+
+
+class YaPackageBuildException(YaPackageException):
+    mute = True
+
+    def __init__(self, original_error_code: int):
+        self.original_error_code = original_error_code
+
+
+class YaPackageTestException(YaPackageException):
     mute = True
 
 
@@ -338,11 +348,32 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     builder = build.targets_deref.intercept(lambda x: build.ya_make.YaMake(x, app_ctx), build_options)
     builder.go()
 
-    if builder.exit_code:
-        if builder.exit_code != core.error.ExitCodes.TEST_FAILED or not params.ignore_fail_tests:
-            sys.exit(builder.exit_code)
+    logger.info("Build finished with exit code %d, tests: %s", builder.exit_code, build_options.run_tests)
 
-    package.display.emit_message('{}Building targets: [[good]]done'.format(build_key_str))
+    # TODO: Rewrite with statuses
+    if not build_options.run_tests and builder.exit_code:
+        msg = f"{build_key_str}Building targets: [[bad]]failed"
+    elif build_options.run_tests and builder.exit_code != core.error.ExitCodes.TEST_FAILED:
+        msg = f"{build_key_str}Building targets: [[bad]]failed with exit code {builder.exit_code}[[rst]], testing: not lauched"
+    elif build_options.run_tests and builder.exit_code == core.error.ExitCodes.TEST_FAILED:
+        msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[bad]]failed"
+    elif build_options.run_tests:
+        msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[good]]done"
+    else:
+        msg = f"{build_key_str}Building targets: [[good]]done[[rst]]"
+
+    package.display.emit_message(msg)
+
+    if builder.exit_code:
+        if builder.exit_code == core.error.ExitCodes.TEST_FAILED:
+            if not params.ignore_fail_tests:
+                # stop when tests are failed, and we wont ignore that ...
+                raise YaPackageTestException()
+        else:
+            # ... or if build failed on any reason
+            raise YaPackageBuildException(build.exit_code)
+
+    return builder.exit_code
 
 
 @timeit
@@ -1528,27 +1559,36 @@ def do_package(params):
                                 package_context.set_context("platform_run_resource_id", platform_run_resource_id)
                     if params.store_debian:
                         packages_meta_info.append(package_context.context)
+            except (YaPackageBuildException, YaPackageTestException):
+                logger.info("Build or test failed, stop")
+                raise
             except Exception as e:
-                logger.debug(traceback.format_exc())
-                package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
-                raise YaPackageException("Packaging {} failed".format(package_file))
+                logger.info("Exception %s while build", e)
+                logger.debug("Traceback: ", exc_info=True)
+                package.display.emit_message(f'[[bad]]{e}[[rst]]')
+                raise YaPackageException(f"Packaging {package_file} failed")
             finally:
                 if not params.cleanup and os.path.exists(output_root):
-                    build_temp = 'build.' + package_context.package_name + '.' + str(random.random())
+                    build_temp = f"build.{package_context.package_name}.{random.random()}"
                     package.fs_util.copy_tree(output_root, build_temp)
-                    package.display.emit_message('Build temp directory: [[imp]]{}'.format(build_temp))
+                    package.display.emit_message(f'Build temp directory: [[imp]]{build_temp}')
 
         with exts.tmp.temp_dir() as output_root:
-            is_package_skipped = build_package(package_params, output_root)
-
-            if params.output_root:
-                package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
-                exts.fs.hardlink_tree(
-                    output_root,
-                    os.path.join(params.output_root, package_path),
-                    hardlink_function=package.fs_util.hardlink_or_copy,
-                    mkdir_function=exts.fs.ensure_dir,
-                )
+            try:
+                is_package_skipped = build_package(package_params, output_root)
+            except YaPackageTestException:
+                return core.error.ExitCodes.TEST_FAILED
+            except YaPackageBuildException as e:
+                return e.original_error_code
+            finally:
+                if params.output_root:
+                    package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
+                    exts.fs.hardlink_tree(
+                        output_root,
+                        os.path.join(params.output_root, package_path),
+                        hardlink_function=package.fs_util.hardlink_or_copy,
+                        mkdir_function=exts.fs.ensure_dir,
+                    )
 
         if is_package_skipped:
             continue
