@@ -227,7 +227,7 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
         )
 
     if create_symlink:
-        config_path.symlink_to(target_path)
+        target_path.symlink_to(config_path)
 
     return OrderedDict(
         (
