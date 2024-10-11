@@ -9,6 +9,7 @@ import devtools.ya.app
 
 class MakeYaHandler(core.yarg.OptsHandler):
     description = 'Build and run tests\nTo see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]'
+    stderr_help = '[[alt1]]To see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]'
 
     def __init__(self):
         core.yarg.OptsHandler.__init__(
@@ -19,6 +20,7 @@ class MakeYaHandler(core.yarg.OptsHandler):
                 core.yarg.UsageExample('{prefix} -t -j16 library', 'Build and test library with 16 threads'),
                 core.yarg.UsageExample('{prefix} --checkout -j0', 'Checkout absent directories without build'),
             ],
+            stderr_help=self.stderr_help,
             description=self.description,
             opts=ya_make_options(
                 free_build_targets=True,

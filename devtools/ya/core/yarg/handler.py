@@ -1,18 +1,18 @@
 from __future__ import print_function
-from collections import defaultdict
+
+import logging
 import os
-import exts.yjson as json
 import sys
 import traceback
-import logging
+import typing as tp  # noqa: F401
+from collections import defaultdict
 
 import core.yarg
 import core.report
 import core.config
 
 import exts.strings
-
-import typing as tp  # noqa: F401
+import exts.yjson as json
 
 from six import iteritems
 
@@ -30,16 +30,14 @@ EXACT_MATCH_HANDLERS = [
     'tool',
 ]
 EMPTY_KEY = '__EMPTY__'
-MORE_HELP = "\n\n[[alt1]]To see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]"
 
 logger = logging.getLogger(__name__)
 
 
-def print_formatted(msg):
-    build_term_display(sys.stdout, sys.stdout.isatty()).emit_message(msg)
-    if sys.stderr.isatty() and not sys.stdout.isatty():
-        # helpful when grepping
-        build_term_display(sys.stderr, sys.stderr.isatty()).emit_message(MORE_HELP)
+def print_formatted(msg, stream=None):
+    if stream is None:
+        stream = sys.stdout
+    build_term_display(stream, stream.isatty()).emit_message(msg)
 
 
 class SimpleHandler(object):
@@ -350,11 +348,13 @@ class OptsHandler(BaseHandler):
         unknown_args_as_free=False,
         use_simple_args=False,
         extra_help=None,
+        stderr_help=None,
     ):
         self._action = action
         self._opt = merge_opts(opts)  # type: Options
         self._description = description
         self._extra_help = extra_help
+        self._stderr_help = stderr_help
         self._unknown_args_as_free = unknown_args_as_free
         self._examples = examples or []
         self._visible = visible
@@ -418,6 +418,14 @@ class OptsHandler(BaseHandler):
                 usage += self._extra_help + '\n\n'
             usage += format_examples(self.opts_recursive(tuple(prefix)))
             usage += '\n' + self.format_help(exc.help_level)
+            if (
+                self._stderr_help
+                and exc.help_level is HelpLevel.BASIC
+                and sys.stderr.isatty()
+                and not sys.stdout.isatty()
+            ):
+                # helpful when grepping
+                print_formatted(self._stderr_help + '\n\n', sys.stderr)
             print_formatted(usage)
             sys.exit(0)
 
