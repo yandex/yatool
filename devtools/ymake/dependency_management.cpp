@@ -783,9 +783,6 @@ namespace {
             parentItem.Peers.push_back(peerNode.Id());
         }
 
-        void CollectTool(TStateItem&, TStateItem&, TConstDepNodeRef) {
-        }
-
         const TModule* GetModule(TNodeId nodeId) const {
             const auto* res = RestoreContext.Modules.Get(RestoreContext.Graph[nodeId]->ElemId);
             return res;
@@ -1394,12 +1391,12 @@ namespace {
         size_t ReplacementsInStack = 0;
     };
 
-    class TDependencyManagementCollectingVisitor: public TModuleDepsCollectingVisitor<TDependencyManagementCollector> {
+    class TDependencyManagementCollectingVisitor: public TPeerCollectingVisitor<TDependencyManagementCollector> {
     public:
-        using TBase = TModuleDepsCollectingVisitor<TDependencyManagementCollector>;
+        using TBase = TPeerCollectingVisitor<TDependencyManagementCollector>;
 
         TDependencyManagementCollectingVisitor(TDependencyManagementCollector& collector)
-            : TModuleDepsCollectingVisitor<TDependencyManagementCollector>{collector}
+            : TPeerCollectingVisitor<TDependencyManagementCollector>{collector}
             , ApplyExcludesProp(collector.GetAppliedExcludesProp())
         {}
 
