@@ -2,6 +2,8 @@
 
 import logging
 import re
+import sys
+from collections import defaultdict
 
 from exts import http_client
 from yalibrary.status_view.helpers import format_paths
@@ -20,27 +22,33 @@ MIN_END_TIME = 0
 
 # This is abstract task without linkage to machine, just as in json graph
 class AbstractTask:
+    __slots__ = ("uid", "meta", "status", "description", "depends_on")
+
     def __init__(self, uid, description, meta):
         self.uid = uid
         self.meta = meta
         self.status = 'OK'
         self.description = description
         self.depends_on = []
-        self.depended_by = []
-
-        self.fake = self.uid == "(root)"
-
-    def get_key(self):
-        return self.uid
-
-    def is_fake(self):
-        return self.fake
 
 
 # This abstract class represents two conceptions:
 # 1) Resource available on some machine. This resource can be created there or copied from another machine
 # 2) Node in critical path algorithm.
 class ResourceNode:
+    __slots__ = (
+        'uid',
+        'host',
+        'end_time',
+        'start_time',
+        'depends_on_ref',
+        'visited',
+        'critical',
+        'critical_time',
+        'calculating_in_progress',
+        'from_cache',
+    )
+
     def __init__(self, uid, host):
         self.uid = uid
         self.host = host
@@ -51,7 +59,6 @@ class ResourceNode:
 
         # graph connection
         self.depends_on_ref = []
-        self.depended_by_ref = []
 
         # the graph traverse needed shit
         self.visited = False
@@ -61,22 +68,17 @@ class ResourceNode:
 
         self.from_cache = False
 
-        self.fake = self.uid == "(root)"
-
     def is_fake(self):
-        return self.fake
+        return False
 
     def get_key(self):
-        return '%s->%s' % (self.uid, self.host)
+        return (self.uid, self.host)
 
     def get_type(self):
         return 'UNKNOWN'
 
     def get_dependencies(self):
         return self.depends_on_ref
-
-    def get_dependants(self):
-        return self.depended_by_ref
 
     def get_time_elapsed(self):
         if (self.start_time is None) or (self.end_time is None):
@@ -90,19 +92,41 @@ class ResourceNode:
         raise NotImplementedError(self.__class__.__name__)
 
 
+class FakeResourceNode(ResourceNode):
+    __slots__ = ()
+
+    def __init__(self):
+        super().__init__("(root)", "(fake_host)")
+
+    def is_fake(self):
+        return True
+
+
 # Todo: use @property
 class RunTask(ResourceNode):
+    __slots__ = (
+        'abstract',
+        'deploy_start_time',
+        'deployed_time',
+        'deploy_task',
+        'dynamically_resolved_cache',
+        'detailed_timings',
+        'failures',
+        'total_time',
+        'count',
+    )
+
     def __init__(self, uid, host):
-        ResourceNode.__init__(self, uid, host)
+        super().__init__(uid, host)
         self.abstract = None
         self.deploy_start_time = None
         self.deployed_time = None
-        self.start_time = None
-        self.host = host
-        self.end_time = None
         self.deploy_task = None
         self.dynamically_resolved_cache = False
         self.detailed_timings = None
+        self.failures = None
+        self.total_time = False
+        self.count = None
 
     def as_json(self):
         return {
@@ -116,12 +140,6 @@ class RunTask(ResourceNode):
             'host': self.host,
             'uid': self.uid,
         }
-
-    def get_short_description(self):
-        short_description = self.abstract.description[:120]
-        if len(short_description) == 120:
-            short_description += "... "
-        return short_description
 
     def tags(self):
         tags = [self.uid]
@@ -167,13 +185,23 @@ class RunTask(ResourceNode):
 
 
 class PrepareTask(ResourceNode):
+    __slots__ = (
+        'prepare_type',
+        'user_type',
+        'detailed_timings',
+        'failures',
+        'total_time',
+        'count',
+    )
+
     def __init__(self, prepare_type, host):
-        ResourceNode.__init__(self, prepare_type, host)
+        super().__init__(prepare_type, host)
         self.prepare_type = prepare_type
-        self.host = host
-        self.start_time = None
-        self.end_time = None
         self.user_type = None
+        self.detailed_timings = None
+        self.failures = None
+        self.total_time = False
+        self.count = None
 
     def as_json(self):
         return {
@@ -183,9 +211,6 @@ class PrepareTask(ResourceNode):
             'type': self.get_type(),
             'host': self.host,
         }
-
-    def get_short_description(self):
-        return '%s prepare on %s' % (self.prepare_type, self.host)
 
     def name(self):
         elapsed = '[{} ms] '.format(self.get_time_elapsed()) if self.get_time_elapsed() else ''
@@ -211,17 +236,24 @@ class PrepareTask(ResourceNode):
 
 
 class CopyTask(ResourceNode):
-    def __init__(self, resource, receiver, origin_host, destination_host, wait):
-        ResourceNode.__init__(self, resource, destination_host)
+    __slots__ = (
+        'resource',
+        'origin_host',
+        'destination_host',
+        'wait',
+        'can_start_after',
+        'size',
+        'stages',
+    )
+
+    def __init__(self, resource, origin_host, destination_host, wait):
+        super().__init__(resource, destination_host)
         self.resource = resource
-        self.receiver = receiver
         self.origin_host = origin_host
         self.destination_host = destination_host
         self.wait = wait
-        self.start_time = None
-        self.end_time = None
         self.can_start_after = None
-        self.size = None
+        self.size = 0
         self.stages = {}
 
     def as_json(self):
@@ -238,14 +270,6 @@ class CopyTask(ResourceNode):
 
     def setup_copy_stage(self, operation, time):
         self.stages[operation] = time
-
-    def get_short_description(self):
-        return '(sz:%s): copy(%s -> %s) result of %s' % (
-            self.size,
-            self.origin_host,
-            self.destination_host,
-            self._from_depends_get_attr("name"),
-        )
 
     def name(self):
         original = self._from_depends_get_attr("name")
@@ -276,7 +300,7 @@ class CopyTask(ResourceNode):
 
     def get_colored_name(self):
         original = (self._from_depends_get_attr("get_colored_name"),)
-        return "[%s] (size: %s bytes): copy(%s -> %s) result of %s" % (
+        return "[{}] (size: {} bytes): copy({} -> {}) result of {}".format(
             'Copy',
             self.size,
             self.origin_host,
@@ -293,8 +317,7 @@ class Graph:
         self.run_tasks = {}
         self.copy_tasks = {}
         self.prepare_tasks = {}
-        self.resource_nodes = {}
-        self.result_as_json_str = None
+        self.resource_nodes = defaultdict(list)
         self.failed_uids = set()
 
         # loading abstract dependency graph
@@ -305,20 +328,9 @@ class Graph:
             task.depends_on = node_info['deps']
 
         # adding fake root for convenience
-        self.fake_resource_node = ResourceNode("(root)", "(fake_host)")
-        self.fake_abstract_task = self.get_abstract_task('(root)', "Fake root task", {})
-        for task in self.abstract_tasks.values():
-            if task.depends_on and task.get_key() != '(root)':
-                for val in task.depends_on:
-                    self.abstract_tasks[val].depended_by.append(task)
-
-        for task in self.abstract_tasks.values():
-            task.depended_by += [self.fake_abstract_task]
-            self.fake_abstract_task.depends_on.append(task)
+        self.fake_resource_node = FakeResourceNode()
 
     def get_resource_node_list(self, node):
-        if node.get_key() not in self.resource_nodes:
-            self.resource_nodes[node.get_key()] = []
         return self.resource_nodes[node.get_key()]
 
     def get_run_or_copy_task(self, uid, host):
@@ -326,23 +338,21 @@ class Graph:
         if task.get_key() in self.run_tasks:
             return self.run_tasks[task.get_key()]
 
-        task = CopyTask(uid, None, None, host, None)
+        task = CopyTask(uid, None, host, None)
         if task.get_key() in self.copy_tasks:
             return self.copy_tasks[task.get_key()]
 
         return self.get_run_task(uid, host)
 
     def get_abstract_task(self, uid, description, meta):
-        task = AbstractTask(uid, description, meta)
-        if task.get_key() not in self.abstract_tasks:
-            self.abstract_tasks[task.get_key()] = task
-        return self.abstract_tasks[task.get_key()]
+        if uid not in self.abstract_tasks:
+            self.abstract_tasks[uid] = AbstractTask(uid, description, meta)
+        return self.abstract_tasks[uid]
 
     def get_prepare_task(self, prepare_type, host):
         task = PrepareTask(prepare_type, host)
         if task.get_key() not in self.prepare_tasks:
             self.get_resource_node_list(task).append(task)
-            # self.resource_nodes[task.get_key()] = [task]
             self.prepare_tasks[task.get_key()] = task
 
         return self.prepare_tasks[task.get_key()]
@@ -355,16 +365,14 @@ class Graph:
         if task.get_key() not in self.run_tasks:
             task.abstract = self.get_abstract_task(uid, None, {})
             self.get_resource_node_list(task).append(task)
-            # self.resource_nodes[task.get_key()] = [task]
             self.run_tasks[task.get_key()] = task
 
         return self.run_tasks[task.get_key()]
 
-    def get_copy_task(self, uid, receiver, origin_host, destination_host, wait):
-        task = CopyTask(uid, receiver, origin_host, destination_host, wait)
+    def get_copy_task(self, uid, origin_host, destination_host, wait):
+        task = CopyTask(uid, origin_host, destination_host, wait)
         if task.get_key() not in self.copy_tasks:
             self.get_resource_node_list(task).append(task)
-            # self.resource_nodes[task.get_key()] = [task]
             self.copy_tasks[task.get_key()] = task
 
         return self.copy_tasks[task.get_key()]
@@ -377,7 +385,6 @@ class Graph:
             raise Exception("adding empty dependency: dependency is None")
 
         dependant.depends_on_ref.append(dependency)
-        dependency.depended_by_ref.append(dependant)
 
     def get_total_time_elapsed(self):
         return self.fake_resource_node.get_time_elapsed()
@@ -421,11 +428,11 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
 
         time = int(lines[0])
         ev_type = lines[1]
-        uid = lines[2]
+        uid = sys.intern(lines[2])
         host = "(n/a)"
 
         if len(lines) > 3:
-            host = lines[3]
+            host = sys.intern(lines[3])
 
         start_time = min(start_time, time)
         abstract_ref = graph.abstract_tasks.get(uid)
@@ -437,19 +444,21 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
         elif ev_type == 'finished':
             graph.get_run_task(uid, host).end_time = time
         elif ev_type == 'dep_start' or ev_type == 'dep_wait':
-            # <TIME> dep_wait  <UID> <DESTINATION-HOST> <DEP-UID> <ORIGIN-HOST>
-            destination_host = host
-            original_host = lines[5]
-            dep_uid = lines[4]
+            # <TIME> dep_wait  <UID> <DESTINATION-HOST> <DEP-UID> <DEP_COUNT>
+            dep_uid = sys.intern(lines[4])
 
-            graph.get_copy_task(dep_uid, uid, original_host, destination_host, ev_type == 'dep_wait').start_time = time
+            graph.get_copy_task(dep_uid, None, host, ev_type == 'dep_wait').start_time = time
         elif ev_type == 'dep_finished':
-            # <TIME> dep_finished <UID> <DESTINATION-HOST> <DEP-UID> <ORIGIN-HOST> 194554552
-            dep_uid = lines[4]
-            original_host = lines[5]
-            size = lines[6]
+            # <TIME> dep_finished <UID> <DESTINATION-HOST> <DEP-UID> <ORIGIN-HOST> <SIZE>
+            dep_uid = sys.intern(lines[4])
+            original_host = sys.intern(lines[5])
+            try:
+                size = int(lines[6])
+            except ValueError:
+                size = 0
 
-            task = graph.get_copy_task(dep_uid, uid, original_host, host, False)
+            task = graph.get_copy_task(dep_uid, original_host, host, False)
+            task.origin_host = original_host
             task.end_time = time
             task.size = size
         elif ev_type == 'finished_from_cache':
@@ -470,17 +479,13 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
             or ev_type == 'dep_send_finish'
         ):
             # <TIME> dep_pack_start <DEP-UID> <DESTINATION-HOST> <ORIGIN-HOST>
-            dep_uid = lines[2]
-            original_host = lines[4]
-            destination_host = lines[3]
-            task = graph.get_copy_task(dep_uid, uid, original_host, destination_host, False)
+            original_host = sys.intern(lines[4])
+            task = graph.get_copy_task(uid, original_host, host, False)
             task.setup_copy_stage(ev_type, time)
         elif ev_type == 'dep_extract_queue' or ev_type == 'dep_extract_start' or ev_type == 'dep_extract_finish':
             # <TIME> dep_extract_queue <DEP-UID> <DESTINATION-HOST> <ORIGIN-HOST>
-            dep_uid = lines[2]
-            original_host = lines[4]
-            destination_host = lines[3]
-            task = graph.get_copy_task(dep_uid, uid, original_host, destination_host, False)
+            original_host = sys.intern(lines[4])
+            task = graph.get_copy_task(uid, original_host, host, False)
             task.setup_copy_stage(ev_type, time)
         elif ev_type == 'prepare_start':
             # here host goes third, not uid
@@ -501,7 +506,6 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     # we have all nodes of the graph, we should tie them with dependencies
     # first of all sort all nodes, to determine first available resource on server
 
-    graph.resource_nodes[graph.fake_resource_node.get_key()] = [graph.fake_resource_node]
     for run_task in graph.run_tasks.values():
         graph.add_dependency_reference(graph.fake_resource_node, run_task)
 
@@ -516,10 +520,8 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
         graph.fake_resource_node.start_time = min(graph.fake_resource_node.start_time, task_start_time)
         graph.fake_resource_node.end_time = max(graph.fake_resource_node.end_time, task_end_time)
 
-    for key in graph.resource_nodes:
-        graph.resource_nodes[key].sort(
-            key=lambda x: x.end_time if x.end_time is None or x.end_time == 0 else start_time + 1000000000
-        )
+    for nodes in graph.resource_nodes.values():
+        nodes.sort(key=lambda x: x.end_time or (start_time + 1000000000))
 
     dependency_count = 0
     for run_task in graph.run_tasks.values():
@@ -530,10 +532,11 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
                 dependency_count += 1
 
     for copy_task in graph.copy_tasks.values():
-        resource_nodes = graph.get_resource_node_list(ResourceNode(copy_task.resource, copy_task.origin_host))
-        if len(resource_nodes) != 0:
-            graph.add_dependency_reference(copy_task, resource_nodes[0])
-            dependency_count += 1
+        if copy_task.origin_host != copy_task.destination_host:
+            resource_nodes = graph.get_resource_node_list(ResourceNode(copy_task.resource, copy_task.origin_host))
+            if len(resource_nodes) != 0:
+                graph.add_dependency_reference(copy_task, resource_nodes[0])
+                dependency_count += 1
 
     for run_task in graph.run_tasks.values():
         prepare_tasks = graph.get_host_prepare_tasks(run_task.host)
@@ -554,7 +557,7 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     for prepare_task in graph.prepare_tasks.values():
         graph.add_dependency_reference(graph.fake_resource_node, prepare_task)
 
-    logger.debug('Node count in the dependency graph is %d.' % (len(graph.resource_nodes) - 1))
+    logger.debug('Node count in the dependency graph is %d.' % (len(graph.resource_nodes)))
     logger.debug('Dependency count in the graph is %d.' % dependency_count)
 
     return graph
@@ -610,7 +613,6 @@ def create_graph_with_local_log(graph, execution_log, failed_uids=None):
                 graph.add_dependency_reference(run_task, resource_nodes[0])
                 dependency_count += 1
 
-    graph.resource_nodes[graph.fake_resource_node.get_key()] = [graph.fake_resource_node]
     for run_task in graph.run_tasks.values():
         if run_task.start_time is not None and run_task.end_time is not None:
             graph.add_dependency_reference(graph.fake_resource_node, run_task)
@@ -621,7 +623,7 @@ def create_graph_with_local_log(graph, execution_log, failed_uids=None):
             graph.fake_resource_node.start_time = min(graph.fake_resource_node.start_time, run_task.start_time)
             graph.fake_resource_node.end_time = max(graph.fake_resource_node.end_time, run_task.end_time)
 
-    logger.debug('Node count in the dependency graph is %d.' % (len(graph.resource_nodes) - 1))
+    logger.debug('Node count in the dependency graph is %d.' % (len(graph.resource_nodes)))
     logger.debug('Dependency count in the graph is %d.' % dependency_count)
 
     return graph
@@ -692,4 +694,4 @@ def get_critical_path(graph):
     critical_path = []
     max_critical_time = calculate_critical_time(graph.fake_resource_node)
     restore_critical_path(graph.fake_resource_node, critical_path)
-    return max_critical_time, critical_path
+    return max_critical_time, [p for p in critical_path if not p.is_fake()]

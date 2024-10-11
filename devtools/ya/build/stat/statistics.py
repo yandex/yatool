@@ -145,7 +145,7 @@ def _transform_timeline(timeline):
 
 
 def _task_details(task):
-    if not getattr(task, 'total_time', None):
+    if not getattr(task, 'total_time', False):
         return '[started: %s, finished: %s]\n' % (task.start_time, task.end_time)
     if not task.get_time_elapsed() or not getattr(task, 'count', None):
         return '\n'
@@ -169,10 +169,9 @@ def print_all_tasks(graph, filename, display):
         node.critical = True
 
     tasks = []
-    for uid in graph.resource_nodes:
-        task_list = graph.resource_nodes[uid]
+    for task_list in graph.resource_nodes.values():
         for task in task_list:
-            if not task.is_fake() and task.get_time_elapsed() is not None:
+            if task.get_time_elapsed() is not None:
                 tasks.append(task)
 
     if len(tasks) > 0:
@@ -252,9 +251,7 @@ def profile_critical_path(critical_path):
         else:
             return SEP.join([node.get_type(cached_mark), str(node.abstract.description)])
 
-    to_save = [
-        (get_node_activity(node), node.get_time_elapsed(), node.host) for node in critical_path if not node.is_fake()
-    ]
+    to_save = [(get_node_activity(node), node.get_time_elapsed(), node.host) for node in critical_path]
 
     profiler.profile_value('critical_path', json.dumps(to_save))
 
@@ -271,9 +268,8 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
     total_elapsed = 0
     max_elapsed_len = 0
     for node in critical_path:
-        if not node.is_fake():
-            max_elapsed_len = max(max_elapsed_len, get_int_length(node.get_time_elapsed()))
-            total_elapsed += node.get_time_elapsed()
+        max_elapsed_len = max(max_elapsed_len, get_int_length(node.get_time_elapsed()))
+        total_elapsed += node.get_time_elapsed()
 
     elapsed_format = '[%%%dd ms] ' % max_elapsed_len
 
@@ -290,31 +286,30 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
         tests_data_prepare_elapsed = 0
         display.emit_message('Critical path:')
         for node in critical_path:
-            if not node.is_fake():
-                nodes.append(node.as_json())
-                node.critical = True
+            nodes.append(node.as_json())
+            node.critical = True
 
-                total_elapsed += node.get_time_elapsed()
-                display.emit_message(
-                    elapsed_format % node.get_time_elapsed()
-                    + node.get_colored_name()
-                    + ' '
-                    + '[started: %s (%s), finished: %s (%s)]\n'
-                    % (node.start_time - start_time, node.start_time, node.end_time - start_time, node.end_time)
-                )
+            total_elapsed += node.get_time_elapsed()
+            display.emit_message(
+                elapsed_format % node.get_time_elapsed()
+                + node.get_colored_name()
+                + ' '
+                + '[started: %s (%s), finished: %s (%s)]\n'
+                % (node.start_time - start_time, node.start_time, node.end_time - start_time, node.end_time)
+            )
 
-                node_type = node.get_type()
-                node_time_elapsed = node.get_time_elapsed()
-                if node_type == 'Copy':
-                    copying_elapsed += node_time_elapsed
-                elif node_type == 'TEST':
-                    testing_elapsed += node_time_elapsed
-                elif node_type == 'source_prepare':
-                    source_prepare_elapsed += node_time_elapsed
-                elif node_type == 'tests_data_prepare':
-                    tests_data_prepare_elapsed += node_time_elapsed
-                else:
-                    compiling_elapsed += node_time_elapsed
+            node_type = node.get_type()
+            node_time_elapsed = node.get_time_elapsed()
+            if node_type == 'Copy':
+                copying_elapsed += node_time_elapsed
+            elif node_type == 'TEST':
+                testing_elapsed += node_time_elapsed
+            elif node_type == 'source_prepare':
+                source_prepare_elapsed += node_time_elapsed
+            elif node_type == 'tests_data_prepare':
+                tests_data_prepare_elapsed += node_time_elapsed
+            else:
+                compiling_elapsed += node_time_elapsed
 
         if ymake_stats and ymake_stats.max_timestamp_ms and ymake_stats.min_timestamp_ms:
             configuration_time = ymake_stats.max_timestamp_ms - ymake_stats.min_timestamp_ms
@@ -348,21 +343,20 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
             with open(filename, 'w') as output_file:
                 total_elapsed = 0
                 for node in critical_path:
-                    if not node.is_fake():
-                        total_elapsed += node.get_time_elapsed()
+                    total_elapsed += node.get_time_elapsed()
 
-                        output_file.write('{}\n'.format(node.name()))
-                        output_file.write(
-                            '\t elapsed {}, started: {}({}), finished: {}({}), total_elapsed {}, diff {}\n'.format(
-                                node.get_time_elapsed(),
-                                node.start_time - start_time,
-                                node.start_time,
-                                node.end_time - start_time,
-                                node.end_time,
-                                total_elapsed,
-                                node.end_time - start_time - total_elapsed,
-                            )
+                    output_file.write('{}\n'.format(node.name()))
+                    output_file.write(
+                        '\t elapsed {}, started: {}({}), finished: {}({}), total_elapsed {}, diff {}\n'.format(
+                            node.get_time_elapsed(),
+                            node.start_time - start_time,
+                            node.start_time,
+                            node.end_time - start_time,
+                            node.end_time,
+                            total_elapsed,
+                            node.end_time - start_time - total_elapsed,
                         )
+                    )
 
                 output_file.write(
                     'Time from start: %s, time elapsed by graph %s, time diff %s\n'
@@ -379,50 +373,13 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
     return nodes
 
 
-def print_failed_tasks(graph, filename, display):
-    check_result_by_node = {}
-
-    def check_traverse(node):
-        if node.get_key() in check_result_by_node:
-            return check_result_by_node[node.get_key()]
-
-        check_result_by_node[node.get_key()] = 1 if node.end_time is None and node.start_time is not None else 0
-        for dependency_node in node.get_dependencies():
-            check_result_by_node[node.get_key()] += check_traverse(dependency_node)
-
-        return check_result_by_node[node.get_key()]
-
-    printed_nodes = set()
-
-    def print_traverse(f, node, level):
-        if check_traverse(node) == 0:
-            return
-
-        if not node.is_fake():
-            f.write(('  ' * level) + node.name() + '\n')
-        if node.get_key() in printed_nodes:
-            return
-        printed_nodes.add(node.get_key())
-        for dependency_node in node.get_dependencies():
-            print_traverse(f, dependency_node, level + 1)
-
-    if check_traverse(graph.fake_resource_node) != 0 and filename is not None:
-        with open(filename, 'w') as output_file:
-            print_traverse(output_file, graph.fake_resource_node, -1)
-
-    failed_tasks_qty = check_traverse(graph.fake_resource_node)
-    if failed_tasks_qty != 0:
-        display.emit_message('Found %d failed tasks.' % failed_tasks_qty)
-    profiler.profile_value('statistics_failed_tasks', failed_tasks_qty)
-
-
 def print_biggest_copy_tasks(graph, filename, display):
     tasks = []
 
     longest_tasks = []
 
     for copy_task in graph.copy_tasks.values():
-        if not copy_task.is_fake() and copy_task.get_time_elapsed() is not None:
+        if copy_task.get_time_elapsed() is not None:
             tasks.append(copy_task)
 
     if len(tasks) > 0:
@@ -661,9 +618,9 @@ def print_summary_times(graph, tasks, display):
     execution_start_time = 0
     execution_end_time = 0
     for task in tasks:
-        if not task.is_fake() and task.get_time_elapsed() is not None and task.get_time_elapsed() > 0:
+        if task.get_time_elapsed() is not None and task.get_time_elapsed() > 0:
             setup_time(task.get_type(), task.get_time_elapsed(), task)
-            if not hasattr(task, 'total_time'):
+            if not getattr(task, 'total_time', False):
                 if execution_start_time == 0:
                     execution_start_time = task.start_time
                 if execution_end_time == 0:
@@ -841,7 +798,6 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     stats['critical_path'] = print_critical_path(
         critical_data, graph, _make_file_path('critical-path'), display, ymake_stats
     )
-    # print_failed_tasks(graph, _make_file_path('failed-tasks'))
     stats['longest_tasks'] = print_longest_tasks(
         copy.copy(tasks), _make_file_path('longest-tasks'), display, ymake_stats
     )
