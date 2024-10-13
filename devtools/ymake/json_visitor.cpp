@@ -386,8 +386,8 @@ bool TJSONVisitor::Enter(TState& state) {
             }
         }
 
-        if (const auto it = Loops.Node2Loop.find(CurrNode.Id())) {
-            CurrData->LoopId = it->second;
+        if (const auto* loopId = Loops.FindLoopForNode(CurrNode.Id())) {
+            CurrData->LoopId = *loopId;
         }
 
         if (IsModule(*CurrState)) {
@@ -414,8 +414,8 @@ bool TJSONVisitor::Enter(TState& state) {
             CurrData->Fake = CurrState->Module->IsFakeModule();
         }
 
-        if (const auto it = Loops.Node2Loop.find(CurrNode.Id())) {
-            CurrData->LoopId = it->second;
+        if (const auto* loop = Loops.FindLoopForNode(CurrNode.Id())) {
+            CurrData->LoopId = *loop;
         }
     }
 
@@ -496,9 +496,8 @@ THashMap<TString, TMd5Sig> TJSONVisitor::GetInputs(const TDepGraph& graph) const
 }
 
 TSimpleSharedPtr<TUniqVector<TNodeId>>& TJSONVisitor::GetNodeInputs(TNodeId node) {
-    if (const auto it = Loops.Node2Loop.find(node)) {
-        const auto loopId = it->second;
-        return LoopsInputs[loopId];
+    if (const auto* loop = Loops.FindLoopForNode(node)) {
+        return LoopsInputs[*loop];
     } else {
         return NodesInputs[node];
     }
@@ -1042,7 +1041,7 @@ void TJSONVisitor::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph
 }
 
 bool TJSONVisitor::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph) {
-    TNodeId* loopId = Loops.Node2Loop.FindPtr(nodeFromLoop);
+    const TNodeId* loopId = Loops.FindLoopForNode(nodeFromLoop);
     if (!loopId)
         return false;
 

@@ -71,9 +71,8 @@ namespace NPropagateChangeFlags {
                 return;
             }
 
-            auto it = Loops_.Node2Loop.find(stateItem.Node().Id());
-            if (it != Loops_.Node2Loop.end()) {
-                CurEnt->LoopId = it->second;
+            if (const auto* loop = Loops_.FindLoopForNode(stateItem.Node().Id())) {
+                CurEnt->LoopId = *loop;
                 Y_ASSERT(CurEnt->LoopId != TNodeId::Invalid);
             } else {
                 CurEnt->LoopId = TNodeId::Invalid;

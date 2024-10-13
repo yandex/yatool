@@ -26,13 +26,13 @@ class TGraphLoops: public TNodesData<TGraphLoop, TVector> {
 private:
     THashSet<TNodeId> DirLoops;
     THashSet<TNodeId> BuildLoops;
-
-public:
     THashMap<TNodeId, TNodeId> Node2Loop;
 
+public:
     bool HasBadLoops() const;
     THashSet<TNodeId> GetNodesToRemove(TDepGraph& graph, TVector<TTarget>& startTargets) const;
     void RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets);
+    const TNodeId* FindLoopForNode(TNodeId node) const {return Node2Loop.FindPtr(node);}
 
     void FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
     void DumpAllLoops(const TDepGraph& graph, IOutputStream& out);

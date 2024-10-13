@@ -1989,8 +1989,8 @@ bool TBuildTargetDepsPrinter::Enter(TState& state) {
     CurEnt->WasFresh = first;
     TNodeId nodeId = state.TopNode().Id();
     if (first) {
-        if (const auto loopsIt = Loops.Node2Loop.find(nodeId)) {
-            CurEnt->LoopId = loopsIt->second;
+        if (const auto* loopId = Loops.FindLoopForNode(nodeId)) {
+            CurEnt->LoopId = *loopId;
         }
     }
     if (first && IsModule(state.Top())) {
