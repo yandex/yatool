@@ -87,7 +87,7 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_
         'Y_PYTHON_ENTRY_POINT': 'devtools.executor.python.executor:_run_server_entry_point',
     })
 
-    cmd = [sys.argv[0], address, str(int(cache_stderr))]
+    cmd = [sys.executable, address, str(int(cache_stderr))]
     logging.debug("Starting local executor with cmd: %s", cmd)
 
     if debug:
