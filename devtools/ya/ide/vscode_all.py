@@ -362,7 +362,7 @@ class VSCodeProject(object):
 
         ide_common.emit_message("Collecting modules info")
         dump_module_info_res = vscode.dump.module_info(self.params)
-        modules = vscode.dump.get_modules(dump_module_info_res)
+        modules = vscode.dump.get_modules(dump_module_info_res, skip_modules=self.params.skip_modules)
         if self.is_py3:
             ide_common.emit_message("Collecting python extra paths")
             python_srcdirs = vscode.dump.get_python_srcdirs(modules)

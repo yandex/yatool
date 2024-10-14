@@ -41,14 +41,17 @@ def shorten_module_name(module_name, rel_targets):
     return module_name
 
 
-def get_modules(module_info_res, rel_targets=None):
+def get_modules(module_info_res, rel_targets=None, skip_modules=None):
     modules = {}
     current = {}
+    skip_modules = set(skip_modules or [])
 
     def flush():
         if "Module Dir" in current:
             module_path = current.pop("Module Dir")
-            if not rel_targets or any(module_path.startswith(x) for x in rel_targets):
+            if module_path not in skip_modules and (
+                not rel_targets or any(module_path.startswith(x) for x in rel_targets)
+            ):
                 if "path" in current:
                     module_name = shorten_module_name(current["path"], rel_targets)
                     modules[module_name] = {

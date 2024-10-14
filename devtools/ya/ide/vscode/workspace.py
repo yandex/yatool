@@ -258,6 +258,7 @@ def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
             json.dump(config, f, indent=4, ensure_ascii=False)
 
     pyrightconfig = {
+        "typeCheckingMode": "off",
         "extraPaths": extraPaths,
     }
 

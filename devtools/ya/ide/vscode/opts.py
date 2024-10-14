@@ -11,6 +11,7 @@ class VSCodeAllOptions(core.yarg.Options):
         self.codegen_enabled = True
         self.debug_enabled = True
         self.tests_enabled = True
+        self.skip_modules = []
         self.black_formatter_enabled = True
         self.write_pyright_config = True
         self.python_index_enabled = True
@@ -187,6 +188,13 @@ class VSCodeAllOptions(core.yarg.Options):
                 help="Do not let pylance to index whole project",
                 hook=core.yarg.SetConstValueHook("python_index_enabled", False),
                 group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--skip-module"],
+                help="Exclude module from workspace",
+                hook=core.yarg.SetAppendHook("skip_modules"),
+                group=cls.GROUP,
+                visible=core.yarg.HelpLevel.ADVANCED,
             ),
             core.yarg.ArgConsumer(
                 ["--allow-project-inside-arc"],
