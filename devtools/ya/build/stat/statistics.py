@@ -469,6 +469,7 @@ def print_cache_statistics(graph, filename, display):
         'run_tasks': all_run_tasks_count,
         'executed_tasks': executed_task_count,
         'cached_tasks': cached_task_count,
+        'dyn_cached_tasks': dyn_cached_tasks_count,
         'not_cached_tasks': not_cached_task_count,
         'tests_tasks': tests_task_count,
         'failed_tasks': failed_task_count,
