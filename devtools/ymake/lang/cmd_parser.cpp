@@ -14,47 +14,6 @@ using namespace NCommands;
 
 namespace {
 
-    EMacroFunction CompileFnName(TStringBuf key) {
-        static const THashMap<TStringBuf, EMacroFunction> names = {
-            {"clear",   EMacroFunction::Clear},
-            {"output",  EMacroFunction::Output},
-            {"tmp",     EMacroFunction::Tmp},
-            {"tool",    EMacroFunction::Tool},
-            {"pre",     EMacroFunction::Pre},
-            {"suf",     EMacroFunction::Suf},
-            {"defext",  EMacroFunction::HasDefaultExt},
-            {"join",    EMacroFunction::Join},
-            {"quo",     EMacroFunction::Quo},
-            {"qe",      EMacroFunction::QuoteEach},
-            {"toupper", EMacroFunction::ToUpper},
-            {"tolower", EMacroFunction::ToLower},
-            {"rootrel", EMacroFunction::RootRel},
-            {"nopath",  EMacroFunction::CutPath},
-            {"lastext", EMacroFunction::LastExt},
-            {"ext",     EMacroFunction::ExtFilter},
-            {"cwd",     EMacroFunction::Cwd},
-            {"stdout",  EMacroFunction::AsStdout},
-            {"env",     EMacroFunction::SetEnv},
-            {"late_out",EMacroFunction::LateOut},
-            {"tags_in", EMacroFunction::TagsIn},
-            {"tags_out",EMacroFunction::TagsOut},
-            {"tags_cut",EMacroFunction::TagsCut},
-            {"context", EMacroFunction::Context},
-            {"noauto",  EMacroFunction::NoAutoSrc},
-            {"norel",   EMacroFunction::NoRel},
-            {"tobindir",EMacroFunction::ResolveToBinDir},
-            {"glob",    EMacroFunction::Glob},
-        };
-        auto it = names.find(key);
-        if (it == names.end())
-            throw yexception() << "unknown modifier " << key;
-        return it->second;
-    }
-
-    //
-    //
-    //
-
     class TCmdParserVisitor_Polexpr: public CmdParserBaseVisitor {
 
     public:
@@ -116,8 +75,8 @@ namespace {
         std::any visitXModKey(CmdParser::XModKeyContext *ctx) override {
             auto name = ctx->getText();
             auto id = Mods.TryGetId(name);
-            if (!id)
-                id = CompileFnName(name);
+            if (Y_UNLIKELY(!id))
+                throw yexception() << "unknown modifier " << name;
             GetCurrentXfm().Mods.push_back({*id, {}});
             return visitChildren(ctx);
         }

@@ -152,15 +152,11 @@ namespace {
 
         bool Condition(NPolexpr::TFuncId func) {
             RootFnIdx = static_cast<EMacroFunction>(func.GetIdx());
-            if (auto desc = Mods.At(RootFnIdx))
-                return desc->MustPreevaluate;
-            return RootFnIdx == EMacroFunction::Tool
-                || RootFnIdx == EMacroFunction::Output
-                || RootFnIdx == EMacroFunction::Tmp
-                || RootFnIdx == EMacroFunction::Context
-                || RootFnIdx == EMacroFunction::NoAutoSrc
-                || RootFnIdx == EMacroFunction::NoRel
-                || RootFnIdx == EMacroFunction::ResolveToBinDir;
+            auto mod = Mods.At(RootFnIdx);
+            if (Y_LIKELY(mod))
+                return mod->MustPreevaluate;
+            Y_DEBUG_ABORT();
+            return false;
         };
 
         TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
@@ -178,183 +174,19 @@ namespace {
         }
 
         TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<NPolexpr::TConstId> args) {
-
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
-
-            if (auto desc = Mods.At(fnIdx); desc && desc->CanPreevaluate) {
+            auto mod = Mods.At(fnIdx);
+            if (Y_LIKELY(mod && mod->CanPreevaluate)) {
                 TVector<TMacroValues::TValue> unwrappedArgs;
                 unwrappedArgs.reserve(args.size());
                 for(auto&& arg : args)
                     unwrappedArgs.push_back(Values.GetValue(arg));
-                return desc->Preevaluate({Values, Sink, RootFnIdx}, unwrappedArgs);
+                return mod->Preevaluate({Values, Sink, RootFnIdx}, unwrappedArgs);
             }
-
-            if (
-                fnIdx == EMacroFunction::Terms ||
-                fnIdx == EMacroFunction::Tool ||
-                fnIdx == EMacroFunction::Output ||
-                fnIdx == EMacroFunction::Tmp ||
-                fnIdx == EMacroFunction::Pre ||
-                fnIdx == EMacroFunction::Suf ||
-                fnIdx == EMacroFunction::HasDefaultExt ||
-                fnIdx == EMacroFunction::CutPath ||
-                fnIdx == EMacroFunction::Cat ||
-                fnIdx == EMacroFunction::Context ||
-                fnIdx == EMacroFunction::NoAutoSrc ||
-                fnIdx == EMacroFunction::NoRel ||
-                fnIdx == EMacroFunction::ResolveToBinDir ||
-                fnIdx == EMacroFunction::Glob
-            ) {
-
-                TVector<TMacroValues::TValue> unwrappedArgs;
-                unwrappedArgs.reserve(args.size());
-                for(auto&& arg : args)
-                    unwrappedArgs.push_back(Values.GetValue(arg));
-                auto checkArgCount = [&](size_t expected) {
-                    if (expected != 0) {
-                        if (unwrappedArgs.size() != expected)
-                            throw std::runtime_error{fmt::format("Invalid number of arguments in {}, {} expected", ToString(fnIdx), expected)};
-                    } else {
-                        if (unwrappedArgs.size() == 0)
-                            throw std::runtime_error{fmt::format("Missing arguments in {}", ToString(fnIdx))};
-                    }
-                };
-                auto updateOutput = [&](auto fn) {
-                    checkArgCount(1);
-                    auto arg0 = std::get_if<TMacroValues::TOutput>(&unwrappedArgs[0]);
-                    if (!arg0)
-                        throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid output";
-                    UpdateCoord(Sink.Outputs, arg0->Coord, std::move(fn));
-                    return *arg0;
-                };
-
-                // TODO: get rid of escaping in Args followed by unescaping in Input/Output/CutPath/CutExt
-
-                switch (fnIdx) {
-                    case EMacroFunction::Terms: {
-                        auto result = TString();
-                        for (auto& arg : unwrappedArgs)
-                            result += std::get<std::string_view>(arg);
-                        return Values.GetValue(Values.InsertStr(result));
-                    }
-                    case EMacroFunction::Tool: {
-                        checkArgCount(1);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto names = SplitArgs(TString(arg0));
-                        if (names.size() == 1) {
-                            // one does not simply reuse the original argument,
-                            // for it might have been transformed (e.g., dequoted)
-                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                            return TMacroValues::TTool {.Data = pooledName};
-                        }
-                        throw std::runtime_error{"Tool arrays are not supported"};
-                    }
-                    case EMacroFunction::Output:
-                    case EMacroFunction::Tmp:
-                    {
-                        checkArgCount(1);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto names = SplitArgs(TString(arg0));
-                        if (names.size() == 1) {
-                            // one does not simply reuse the original argument,
-                            // for it might have been transformed (e.g., dequoted)
-                            auto pooledName = std::get<std::string_view>(Values.GetValue(Values.InsertStr(names.front())));
-                            auto result = TMacroValues::TOutput {.Coord = CollectCoord(pooledName, Sink.Outputs)};
-                            if (fnIdx == EMacroFunction::Tmp)
-                                UpdateCoord(Sink.Outputs, result.Coord, [](auto& x) {x.IsTmp = true;});
-                            return result;
-                        }
-                        throw std::runtime_error{"Output arrays are not supported"};
-                    }
-                    case EMacroFunction::Pre: {
-                        checkArgCount(2);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
-                        auto id = Values.InsertStr(TString::Join(arg0, arg1));
-                        return Values.GetValue(id);
-                    }
-                    case EMacroFunction::Suf:
-                    case EMacroFunction::HasDefaultExt:
-                    {
-                        checkArgCount(2);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto arg1 = std::get<std::string_view>(unwrappedArgs[1]);
-                        if (fnIdx == EMacroFunction::HasDefaultExt) {
-                            // cf. EMF_HasDefaultExt handling
-                            size_t dot = arg1.rfind('.');
-                            size_t slash = arg1.rfind(NPath::PATH_SEP);
-                            bool hasSpecExt = slash != TString::npos ? (dot > slash) : true;
-                            if (dot != TString::npos && hasSpecExt)
-                                return Values.GetValue(Values.InsertStr(arg1));
-                        }
-                        auto id = Values.InsertStr(TString::Join(arg1, arg0));
-                        return Values.GetValue(id);
-                    }
-                    case EMacroFunction::CutPath: {
-                        checkArgCount(1);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto names = SplitArgs(TString(arg0));
-                        if (names.size() != 1) {
-                            throw std::runtime_error{"nopath modifier requires a single argument"};
-                        }
-                        // one does not simply reuse the original argument,
-                        // for it might have been transformed (e.g., dequoted)
-                        arg0 = names.front();
-                        // cf. EMF_CutPath processing
-                        size_t slash = arg0.rfind(NPath::PATH_SEP);
-                        if (slash != TString::npos)
-                            arg0 = arg0.substr(slash + 1);
-                        auto id = Values.InsertStr(arg0);
-                        return Values.GetValue(id);
-                    }
-                    case EMacroFunction::Cat: {
-                        //checkArgCount(0);
-                        auto cat = TString();
-                        for (auto&& a : unwrappedArgs)
-                            cat += std::get<std::string_view>(a);
-                        auto id = Values.InsertStr(cat);
-                        return Values.GetValue(id);
-                    }
-                    case EMacroFunction::Context: {
-                        checkArgCount(2);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        auto context = TFileConf::GetContextType(arg0);
-                        if (auto arg1 = std::get_if<TMacroValues::TInputs>(&unwrappedArgs[1])) {
-                            for (auto& coord : arg1->Coords)
-                                UpdateCoord(Sink.Inputs, coord, [=](auto& var) {
-                                    var.Context = context;
-                                });
-                            return *arg1;
-                        }
-                        if (auto arg1 = std::get_if<TMacroValues::TInput>(&unwrappedArgs[1])) {
-                            UpdateCoord(Sink.Inputs, arg1->Coord, [=](auto& var) {
-                                var.Context = context;
-                            });
-                            return *arg1;
-                        }
-                        throw TConfigurationError() << "Modifier [[bad]]" << ToString(fnIdx) << "[[rst]] must be applied to a valid input sequence";
-                    }
-                    case EMacroFunction::NoAutoSrc:
-                        return updateOutput([](auto& x) {x.NoAutoSrc = true;});
-                    case EMacroFunction::NoRel:
-                        return updateOutput([](auto& x) {x.NoRel = true;});
-                    case EMacroFunction::ResolveToBinDir:
-                        return updateOutput([](auto& x) {x.ResolveToBinDir = true;});
-                    case EMacroFunction::Glob: {
-                        checkArgCount(1);
-                        auto arg0 = std::get<std::string_view>(unwrappedArgs[0]);
-                        return TMacroValues::TGlobPattern{ .Data = arg0 };
-                    }
-                    default:
-                        break; // unreachable
-                }
-
-            }
-
+            Y_DEBUG_ABORT_UNLESS(mod);
             throw TConfigurationError()
                 << "Cannot process modifier [[bad]]" << ToString(fnIdx) << "[[rst]]"
                 << " while preevaluating [[bad]]" << ToString(RootFnIdx) << "[[rst]]";
-
         }
 
         NPolexpr::TConstId Wrap(TMacroValues::TValue value) {

@@ -51,40 +51,12 @@ namespace NCommands {
                 return {};
         }
     public:
-        ui16 FuncArity(EMacroFunction func) const noexcept;
-        NPolexpr::TFuncId Func2Id(EMacroFunction func) const noexcept;
-        EMacroFunction Id2Func(NPolexpr::TFuncId id) const noexcept;
+        ui16 FuncArity(EMacroFunction func) const;
+        NPolexpr::TFuncId Func2Id(EMacroFunction func) const;
+        EMacroFunction Id2Func(NPolexpr::TFuncId id) const;
     private:
         std::array<const TModImpl*, ToUnderlying(EMacroFunction::Count)> Descriptions;
         THashMap<TStringBuf, EMacroFunction> Index;
     };
-
-    //
-    // legacy
-    //
-
-    TTermValue RenderTerms(std::span<const TTermValue> args);
-    TTermValue RenderCat(std::span<const TTermValue> args);
-    TTermValue RenderClear(std::span<const TTermValue> args);
-    TTermValue RenderPre(std::span<const TTermValue> args);
-    TTermValue RenderSuf(std::span<const TTermValue> args);
-    TTermValue RenderJoin(std::span<const TTermValue> args);
-    TTermValue RenderQuo(std::span<const TTermValue> args);
-    TTermValue RenderQuoteEach(std::span<const TTermValue> args);
-    TTermValue RenderToUpper(std::span<const TTermValue> args);
-    TTermValue RenderToLower(std::span<const TTermValue> args);
-    void RenderCwd(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
-    void RenderStdout(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
-    void RenderEnv(ICommandSequenceWriter* writer, const TEvalCtx& ctx, std::span<const TTermValue> args);
-    void RenderKeyValue(const TEvalCtx& ctx, std::span<const TTermValue> args);
-    void RenderLateOut(const TEvalCtx& ctx, std::span<const TTermValue> args);
-    TTermValue RenderTagFilter(std::span<const TTermValue> args, bool exclude);
-    TTermValue RenderTagCut(std::span<const TTermValue> args);
-    TTermValue RenderRootRel(std::span<const TTermValue> args);
-    TTermValue RenderCutPath(std::span<const TTermValue> args);
-    TTermValue RenderLastExt(std::span<const TTermValue> args);
-    TTermValue RenderExtFilter(std::span<const TTermValue> args);
-    TTermValue RenderTODO1(std::span<const TTermValue> args);
-    TTermValue RenderTODO2(std::span<const TTermValue> args);
 
 }

@@ -347,39 +347,13 @@ TTermValue TScriptEvaluator::EvalFn(
             return arg;
     auto fn = Commands->Mods.Id2Func(id);
     try {
-        if (auto desc = Commands->Mods.At(fn); desc && desc->CanEvaluate) {
-            return desc->Evaluate(args, ctx, writer);
-        }
-        switch (fn) {
-            case EMacroFunction::Terms: return RenderTerms(args);
-            case EMacroFunction::Cat: return RenderCat(args);
-            case EMacroFunction::Clear: return RenderClear(args);
-            case EMacroFunction::Pre: return RenderPre(args);
-            case EMacroFunction::Suf: return RenderSuf(args);
-            case EMacroFunction::Join: return RenderJoin(args);
-            case EMacroFunction::Quo: return RenderQuo(args);
-            case EMacroFunction::QuoteEach: return RenderQuoteEach(args);
-            case EMacroFunction::ToUpper: return RenderToUpper(args);
-            case EMacroFunction::ToLower: return RenderToLower(args);
-            case EMacroFunction::Cwd: RenderCwd(writer, ctx, args); return TTermNothing();
-            case EMacroFunction::AsStdout: RenderStdout(writer, ctx, args); return TTermNothing();
-            case EMacroFunction::SetEnv: RenderEnv(writer, ctx, args); return TTermNothing();
-            case EMacroFunction::RootRel: return RenderRootRel(args);
-            case EMacroFunction::CutPath: return RenderCutPath(args);
-            case EMacroFunction::LastExt: return RenderLastExt(args);
-            case EMacroFunction::ExtFilter: return RenderExtFilter(args);
-            case EMacroFunction::LateOut: RenderLateOut(ctx, args); return TTermNothing();
-            case EMacroFunction::TagsIn: return RenderTagFilter(args, false);
-            case EMacroFunction::TagsOut: return RenderTagFilter(args, true);
-            case EMacroFunction::TagsCut: return RenderTagCut(args);
-            case EMacroFunction::TODO1: return RenderTODO1(args);
-            case EMacroFunction::TODO2: return RenderTODO2(args);
-            default:
-                break;
-        }
+        auto mod = Commands->Mods.At(fn);
+        if (Y_LIKELY(mod && mod->CanEvaluate))
+            return mod->Evaluate(args, ctx, writer);
+        Y_DEBUG_ABORT_UNLESS(mod);
         throw yexception()
             << "Don't know how to render configure time modifier "
-            << Commands->Mods.Id2Func(id);
+            << fn;
     } catch (std::exception& e) {
         ++ErrorShower->Count;
         return TTermError(e.what(), true);

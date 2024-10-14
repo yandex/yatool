@@ -7,24 +7,24 @@ using namespace NCommands;
 
 namespace {
 
-    class TCmds: public NCommands::TBasicModImpl {
+    class TCmds: public TBasicModImpl {
     public:
         TCmds(): TBasicModImpl({.Id = EMacroFunction::Cmds, .Name = "cmds", .Arity = 0, .Internal = true}) {
         }
-    } Cmds;
+    } Y_GENERATE_UNIQUE_ID(Mod);
 
-    class TArgs: public NCommands::TBasicModImpl {
+    class TArgs: public TBasicModImpl {
     public:
         TArgs(): TBasicModImpl({.Id = EMacroFunction::Args, .Name = "args", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& unwrappedArgs
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
-            CheckArgCount(unwrappedArgs);
+            CheckArgCount(args);
             auto result = TString();
             bool first = true;
-            for (auto& arg : unwrappedArgs) {
+            for (auto& arg : args) {
                 if (!first)
                     result += " ";
                 result += "\"";
@@ -61,6 +61,63 @@ namespace {
                 }, arg));
             return result;
         }
-    } Args;
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TTerms: public TBasicModImpl {
+    public:
+        TTerms(): TBasicModImpl({.Id = EMacroFunction::Terms, .Name = "terms", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TTerms(TModMetadata metadata): TBasicModImpl(metadata) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            auto result = TString();
+            for (auto& arg : args)
+                result += std::get<std::string_view>(arg);
+            return ctx.Values.GetValue(ctx.Values.InsertStr(result));
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            TString result;
+            for (auto& arg : args)
+                result += std::visit(TOverloaded{
+                    [](TTermError) -> TString {
+                        Y_ABORT();
+                    },
+                    [&](TTermNothing x) -> TString {
+                        throw TBadArgType(Name, x);
+                    },
+                    [&](const TString& s) -> TString {
+                        return s;
+                    },
+                    [&](const TVector<TString>& v) -> TString {
+                        if (v.empty())
+                            return {};
+                        else if (v.size() == 1)
+                            return v.front();
+                        else
+                            throw TNotImplemented() << "Nested terms should not have multiple items";
+                    },
+                    [&](const TTaggedStrings& x) -> TString {
+                        throw TBadArgType(Name, x);
+                    }
+                }, arg);
+            return result;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TCat: public TTerms {
+        // this is basically `terms` as a proper function rather than a manifestation of a syntactical element (`TSyntax::TTerm` sequence)
+    public:
+        TCat(): TTerms({.Id = EMacroFunction::Cat, .Name = "cat", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
 
 }

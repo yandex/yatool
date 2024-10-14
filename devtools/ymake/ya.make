@@ -66,8 +66,10 @@ SRCS(
     command_store.cpp
     commands/mods/common.cpp
     GLOBAL commands/mods/io.cpp
-    GLOBAL commands/mods/misc.cpp
+    GLOBAL commands/mods/paths.cpp
+    GLOBAL commands/mods/strings.cpp
     GLOBAL commands/mods/structurals.cpp
+    GLOBAL commands/mods/tagged_strings.cpp
     GLOBAL commands/mods/utility.cpp
     commands/compilation.cpp
     commands/evaluation.cpp

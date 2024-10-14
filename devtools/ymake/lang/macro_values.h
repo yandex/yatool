@@ -42,8 +42,6 @@ enum class EMacroFunction: ui32 {
     TagsOut,
     TagsCut,
     Glob,
-    TODO1,
-    TODO2,
     // markers
     Context, // input-only, preevaluated
     NoAutoSrc, // output-only, preevaluated
