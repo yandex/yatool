@@ -809,14 +809,12 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     TVersionedCmdId curCmdId(Cmd.EntryPtr ? ElemId(Cmd.EntryPtr->first) : 0);
     TStringBuf curCmdName = Get1(&Cmd);
     YDIAG(Dev) << "Process command: " << curCmdName << Endl;
-    auto& fileConf = Graph->Names().FileConf;
-    TString nodeName;
-    auto getNodeName = [&]() {
-        if (nodeName.empty()) {
-            Graph->GetFileName(inputNode.ElemId).GetStr(nodeName);
-        };
-        return TStringBuf(nodeName);
-    };
+
+    TFileConf& fileConf = Graph->Names().FileConf;
+
+    Y_ASSERT(!fileConf.GetName(inputNode.ElemId).IsLink());
+    TStringBuf inputNodeName = fileConf.GetName(inputNode.ElemId).GetTargetStr();
+
     const auto& ownEntries = mod.GetOwnEntries();
     for (auto& output : GetOutput()) {
         if (!modBuilder.FormatBuildPath(output, InputDir, BuildDir)) {
@@ -841,7 +839,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
 
             const TNodeId id = Graph->GetFileNodeById(fid).Id();
-            if (id == TNodeId::Invalid && !finalTargetCmd && getNodeName() == output.Name) {
+            if (id == TNodeId::Invalid && !finalTargetCmd && inputNodeName == output.Name) {
                 YConfErr(BadOutput) << "The name of intermediate output " << output.Name
                                     << " matches the module name. Skip command: " << SkipId(curCmdName) << Endl;
                 return false;
@@ -952,23 +950,40 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     const bool hasExtraOuts = GetOutput().size() > startCountOuts;
     const bool mainOutAsExtra = hasExtraOuts && Conf->MainOutputAsExtra() && !IsModuleType(mainOutType);
 
+    const bool addModuleNode = Conf->DedicatedModuleNode() && IsModuleType(mainOutType);
+    EMakeNodeType moduleType = EMNT_Last;
+    TAddDepAdaptor* moduleNode = nullptr;
+
     auto makeMainNodes = [&]() {
+        EMakeNodeType fileNodeType = mainOutType;
+
+        Y_ASSERT(!fileConf.GetName(mainOutId).IsLink());
+        TStringBuf mainOutName = fileConf.GetName(mainOutId).GetTargetStr();
+
+        if (addModuleNode) {
+            Y_ASSERT(finalTargetCmd);
+            fileNodeType = EMNT_NonParsedFile;
+            moduleType = mainOutType;
+
+            static constexpr TStringBuf modulePrefix = "$L/MODULE/"sv;
+            ui32 moduleId = fileConf.Add(TString::Join(modulePrefix, mainOutName));
+            moduleNode = &inputNode.AddOutput(moduleId, mainOutType);
+        }
+
         if (mainOutAsExtra) {
-            Y_ASSERT(IsFileType(mainOutType));
-            TString mainOutName;
-            Graph->Names().FileConf.GetName(mainOutId).GetStr(mainOutName);
+            Y_ASSERT(IsFileType(fileNodeType));
 
             // Это пока очень временный способ пометить специальный узел, в котором будут общие свойства команды.
             static constexpr TStringBuf actionPrefix = "$L/ACTION/"sv;
-            ui32 actionId = Graph->Names().FileConf.Add(actionPrefix + mainOutName);
+            ui32 actionId = fileConf.Add(TString::Join(actionPrefix, mainOutName));
 
             TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, !finalTargetCmd);
-            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
+            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, fileNodeType, !finalTargetCmd);
 
             return std::make_pair(std::ref(actionNode), std::ref(mainOutNode));
         } else {
 
-            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, mainOutType, !finalTargetCmd);
+            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, fileNodeType, !finalTargetCmd);
             return std::make_pair(std::ref(mainOutNode), std::ref(mainOutNode));
         }
     };
@@ -1028,7 +1043,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     // 2. Additional output files (we have to add them after the inputs or Induced deps processing will fail)
     // NOTE: this was previously after BuildCommand!
     if (hasExtraOuts) {
-        YDIAG(V) << "For " << getNodeName() << " deps.size = " << GetOutput().size() - startCountOuts << "\n";
+        YDIAG(V) << "For " << inputNodeName << " deps.size = " << GetOutput().size() - startCountOuts << "\n";
         for (auto& out : GetOutput()) {
             if (out.ElemId == mainOutId) {
                 continue;
@@ -1082,6 +1097,11 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         }
 
         mainOut = false;
+    }
+
+    if (moduleNode) {
+        actionNode.AddDepIface(EDT_OutTogether, moduleNode->NodeType, moduleNode->ElemId);
+        moduleNode->AddDepIface(EDT_OutTogetherBack, actionNode.NodeType, actionNode.ElemId);
     }
 
     if (finalTargetCmd) {

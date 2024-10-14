@@ -143,6 +143,10 @@ public:
         return MainOutputAsExtra_;
     }
 
+    bool DedicatedModuleNode() const noexcept {
+        return DedicatedModuleNode_;
+    }
+
     bool CheckForIncorrectLoops() const noexcept {
         return CheckForIncorrectLoops_;
     }
@@ -203,6 +207,7 @@ private:
     bool ReportMissingAddincls = true;
     bool JsonDepsFromMainOutputEnabled_ = false;
     bool MainOutputAsExtra_ = true;
+    bool DedicatedModuleNode_ = false;
     bool CheckForIncorrectLoops_ = false;
     bool UseGraphChangesPredictor = false;
     bool UseGrandBypass = false;
