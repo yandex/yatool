@@ -17,7 +17,7 @@ import devtools.ya.core.sec as sec
 import exts.os2
 import exts.strings
 import exts.windows
-import yalibrary.app_ctx
+import devtools.ya.yalibrary.app_ctx
 import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
@@ -65,7 +65,7 @@ def execute_early(action):
         **kwargs
     ):
         modules_initialization_early_stage = stager.start("modules-initialization-early")
-        ctx = yalibrary.app_ctx.get_app_ctx()
+        ctx = devtools.ya.yalibrary.app_ctx.get_app_ctx()
 
         fill_tracer_with_environ_stages()
 
@@ -126,7 +126,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
         if respawn == RespawnType.OPTIONAL:
             check_and_respawn_if_possible()
         with_respawn = respawn == RespawnType.MANDATORY
-        ctx = yalibrary.app_ctx.get_app_ctx()
+        ctx = devtools.ya.yalibrary.app_ctx.get_app_ctx()
         modules = [
             ('params', params.configure(parameters, with_respawn)),
             ('hide_token', token_suppressions.configure(ctx)),

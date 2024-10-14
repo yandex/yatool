@@ -1,6 +1,6 @@
 import sys
 
-from yalibrary import app_ctx
+from devtools.ya.yalibrary import app_ctx
 
 
 def configure_display():

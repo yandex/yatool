@@ -2,7 +2,7 @@ import os
 import six
 import time
 
-import yalibrary.app_ctx
+import devtools.ya.yalibrary.app_ctx
 import build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
@@ -22,7 +22,7 @@ def get_coverage_table_chunks_count():
 
 
 def get_svn_version():
-    return int(yalibrary.app_ctx.get_app_ctx().revision)
+    return int(devtools.ya.yalibrary.app_ctx.get_app_ctx().revision)
 
 
 def get_upload_yt_table_root(arc_root, chunk, snap_shot_name):

@@ -5,14 +5,14 @@ import devtools.ya.app.modules.token_suppressions as token_suppressions
 import handlers.analyze_make.timeline as timeline
 import handlers.analyze_make.timebloat as timebloat
 import os
-import yalibrary.app_ctx
+import devtools.ya.yalibrary.app_ctx
 import yalibrary.tools
 import app_config
 
 
 def execute(action):
     def helper(params):
-        ctx = yalibrary.app_ctx.get_app_ctx()
+        ctx = devtools.ya.yalibrary.app_ctx.get_app_ctx()
 
         modules = [
             ('params', params_module.configure(params, False)),
