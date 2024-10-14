@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class StagerGroups:
     OVERALL_EXECUTION = 'overall-execution'
     MODULE_LIFECYCLE = 'module-lifecycle'
+    CHANGELIST_OPERATIONS = 'build.changelist'
 
 
 class Consumer:

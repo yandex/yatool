@@ -169,6 +169,10 @@ def do_dump_debug(params):
         additional_paths.extend(_discovery_folder(build_cache_root, "fallback.log", "build_cache_log"))
         additional_paths.extend(_discovery_folder(build_cache_root, "blobs.log", "build_cache_blobs_log"))
 
+    changelist_store = item.debug_bundle_data.get('changelist_store', None)
+    if changelist_store:
+        additional_paths.append(("changelist_store", Path(changelist_store)))
+
     item.process(additional_paths, is_last=params.dump_debug_choose == 1)
 
     # In OPENSOURCE version we do not upload anything and just create archive file

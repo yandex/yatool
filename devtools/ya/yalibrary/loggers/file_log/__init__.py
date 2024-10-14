@@ -77,8 +77,24 @@ def parse_log_dir(x):
         return None
 
 
+@func.memoize()
+def log_creation_time(run_uid):
+    # type: (str) -> datetime.datetime
+    return datetime.datetime.now()
+
+
+def format_date(dt):
+    # type: (datetime.datetime) -> str
+    return dt.strftime(_LOG_DIR_NAME_FMT)
+
+
+def format_time(dt):
+    # type: (datetime.datetime) -> str
+    return dt.strftime(_LOG_FILE_NAME_FMT)
+
+
 def with_file_log(log_dir, run_uid):
-    now = datetime.datetime.now()
+    now = log_creation_time(run_uid)
 
     chunks = LogChunks(log_dir)
 
@@ -90,8 +106,8 @@ def with_file_log(log_dir, run_uid):
 
     chunks.cleanup(func.compose(older_than, parse_log_dir))
 
-    log_chunk = chunks.get_or_create(now.strftime(_LOG_DIR_NAME_FMT))
-    file_name = os.path.join(log_chunk, now.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + '.log')
+    log_chunk = chunks.get_or_create(format_date(now))
+    file_name = os.path.join(log_chunk, format_time(now) + '.' + run_uid + '.log')
     root.addHandler(_file_logger(file_name))
 
     yield file_name

@@ -71,6 +71,8 @@ def execute_early(action):
 
         modules = []
 
+        modules.append(('uid', configure_uid()))
+
         if no_logs or is_sensitive(args):
             modules.append(('null_log', configure_null_log(ctx)))
         else:
@@ -147,6 +149,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
             ('event_queue', configure_event_queue()),
+            ('changelist_store', configure_changelist_store(ctx)),
         ]
         if not getattr(parameters, 'no_evlogs', None) and not strtobool(os.environ.get('YA_NO_EVLOGS', '0')):
             modules.append(('evlog', evlog.configure(ctx)))
@@ -220,6 +223,10 @@ def aggregate_stages():
 
         stages = stage_tracer.get_stat(stage_tracer.StagerGroups.MODULE_LIFECYCLE)
         aggregator = stage_aggregator.ModuleLifecycleAggregator()
+        aggregated_stages.update(aggregator.aggregate(stages))
+
+        stages = stage_tracer.get_stat(stage_tracer.StagerGroups.CHANGELIST_OPERATIONS)
+        aggregator = stage_aggregator.ArcOperationsAggregator()
         aggregated_stages.update(aggregator.aggregate(stages))
     except Exception:
         logger.exception("While aggregating stages")
@@ -343,6 +350,11 @@ def configure_debug(app_ctx):
         except Exception as e:
             AppEvLogStore.logger.debug("While store cwd: %s", e)
 
+        try:
+            dump_store_obj['changelist_store'] = app_ctx.changelist_store
+        except Exception as e:
+            AppEvLogStore.logger.debug("While store changelist_store: %s", e)
+
         yield dump_store_obj
 
         try:
@@ -388,6 +400,10 @@ def configure_lifecycle_timestamps():
     root.debug("Exit timestamp %s (%s)", time.strftime(fmt, time.localtime()), time.strftime(fmt, time.gmtime()))
 
 
+def configure_uid():
+    yield core.gsid.uid()
+
+
 def configure_null_log(app_ctx):
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
@@ -401,8 +417,18 @@ def configure_null_log(app_ctx):
 def configure_file_log(app_ctx):
     from yalibrary.loggers import file_log
 
-    for x in file_log.with_file_log(core.config.logs_root(), core.gsid.uid()):
+    for x in file_log.with_file_log(core.config.logs_root(), app_ctx.uid):
         yield x
+
+
+def configure_changelist_store(app_ctx):
+    from devtools.ya.yalibrary.build_graph_cache import changelist_storage
+
+    if getattr(app_ctx.params, "build_graph_cache_force_local_cl", False):
+        for x in changelist_storage.with_changelist_storage(core.config.logs_root(), app_ctx.uid):
+            yield x
+    else:
+        yield
 
 
 def configure_in_memory_log(app_ctx, level=None):

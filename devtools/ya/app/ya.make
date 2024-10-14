@@ -24,6 +24,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/app_ctx
+    devtools/ya/yalibrary/build_graph_cache/changelist_storage
     devtools/ya/yalibrary/debug_store
     devtools/ya/yalibrary/debug_store/store
     devtools/ya/yalibrary/display

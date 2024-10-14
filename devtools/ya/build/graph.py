@@ -1018,7 +1018,8 @@ def _prepare_local_change_list_generator(opts):
 
     if bg_cache:
         evlog = getattr(app_ctx, "evlog", None)
-        return bg_cache.BuildGraphCacheCLFromArc(evlog, opts)
+        store = getattr(app_ctx, "changelist_store", None)
+        return bg_cache.BuildGraphCacheCLFromArc(evlog, opts, store=store)
 
 
 class _AsyncContext(object):

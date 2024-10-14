@@ -110,6 +110,11 @@ class YaScriptDownloadsAggregator(Aggregator):
             return {}
 
 
+class ArcOperationsAggregator(Aggregator):
+    name = 'arc'
+    suffix = '-operations' + Aggregator.suffix
+
+
 def get_aggregators():
     return [
         FakeYaAggregator(),
