@@ -14,7 +14,6 @@ namespace {
         "MANAGED_PEERS",
         "MANAGED_PEERS_CLOSURE",
         "DART_CLASSPATH",
-        "TEST_CLASSPATH_MANAGED",
         "UNITTEST_MOD"
     };
 }
