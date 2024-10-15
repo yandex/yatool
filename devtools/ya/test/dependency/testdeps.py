@@ -5,7 +5,7 @@ import exts.func
 from .sandbox_resource import Reference
 from devtools.ya.test.util import path as util_path
 from yalibrary.large_files import ExternalFile
-from yalibrary.yandex.distbuild import distbs_consts
+from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
 logger = logging.getLogger(__name__)
 

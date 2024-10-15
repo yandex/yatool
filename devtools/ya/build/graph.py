@@ -41,7 +41,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.graph.commands as graph_cmd
 import yalibrary.graph.const as graph_const
 import yalibrary.graph.node as graph_node
-from yalibrary.yandex.distbuild import distbs_consts
+from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.toolscache import toolscache_version
 import yalibrary.vcs.vcsversion as vcsversion
 import yalibrary.debug_store

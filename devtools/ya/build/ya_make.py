@@ -71,7 +71,7 @@ from yalibrary.toolscache import (
     tc_force_gc,
 )
 from yalibrary.ya_helper.ya_utils import CacheKind
-from yalibrary.yandex.distbuild import distbs_consts
+from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
 try:
     from yalibrary import build_graph_cache

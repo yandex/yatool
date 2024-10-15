@@ -18,7 +18,7 @@ import core.gsid
 from exts.strtobool import strtobool
 import yalibrary.platform_matcher as pm
 import yalibrary.vcs.vcsversion as vcsversion
-from yalibrary.yandex.distbuild import distbs_consts
+from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 import yalibrary.tools as tools
 import core.config as config
 import core.patch_tools as patch_tools
