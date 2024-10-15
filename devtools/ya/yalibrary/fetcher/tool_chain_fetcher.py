@@ -690,19 +690,19 @@ def _get_fetcher(name, resource_type):
             except ImportError:
                 raise Exception('"trs" fetcher is not supported in this ya-bin')
         else:
-            from yalibrary.yandex.sandbox import fetcher
+            from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
             return fetcher.SandboxFetcher(), progress_printer
 
 
 def _list_all_resources(**kwargs):
-    from yalibrary.yandex.sandbox import SandboxClient
+    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
 
     return _do_sandbox_method(SandboxClient.list_all_resources, **kwargs)
 
 
 def _list_resources(**kwargs):
-    from yalibrary.yandex.sandbox import SandboxClient
+    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
 
     return _do_sandbox_method(SandboxClient.list_resources, **kwargs)
 
@@ -710,7 +710,7 @@ def _list_resources(**kwargs):
 def _do_sandbox_method(method, **kwargs):
     rest_params = {'total_wait': _SB_REST_API_TIMEOUT, 'check_for_cancel': _get_cancel_checker()}
     guards.update_guard(guards.GuardTypes.FETCH)
-    from yalibrary.yandex.sandbox import SandboxClient
+    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
 
     try:
         return method(SandboxClient(token=get_sandbox_token(), rest_params=rest_params), **kwargs)

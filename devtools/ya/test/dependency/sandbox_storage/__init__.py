@@ -79,7 +79,7 @@ class SandboxStorage(object):
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
         """
         if not self._sandbox_client and app_config.have_sandbox_fetcher:
-            import yalibrary.yandex.sandbox as sandbox
+            import devtools.ya.yalibrary.yandex.sandbox as sandbox
 
             logger.debug("Initializing sandbox client")
             self._sandbox_client = sandbox.SandboxClient(
@@ -269,7 +269,7 @@ class SandboxStorage(object):
                     "Resource {} was not found in local storages and won't be downloaded".format(resource_id)
                 )
 
-            from yalibrary.yandex.sandbox import fetcher
+            from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
             logger.debug("Will download resource %s to %s", resource_id, downloaded_file_path)
             fetcher.download_resource(

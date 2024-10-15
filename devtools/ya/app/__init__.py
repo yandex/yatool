@@ -536,7 +536,7 @@ def configure_fetchers_storage(app_ctx):
         app_state = None  # execute early
 
     if have_sandbox:
-        from yalibrary.yandex.sandbox import fetcher
+        from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
         try:
             custom_fetcher, fetcher_params, oauth_token = app_ctx.fetcher_params

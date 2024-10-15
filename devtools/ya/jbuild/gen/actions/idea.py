@@ -946,7 +946,7 @@ def create_directory_based(by_path, project_root, ctx):
                 logger.warning("Can't detect kotlin compiler resource, be ready to problems with compiler plugins")
             elif not os.path.exists(os.path.join(project_root, plugins_root, kotlin_resource)):
                 try:
-                    import yalibrary.yandex.sandbox as sandbox
+                    import devtools.ya.yalibrary.yandex.sandbox as sandbox
 
                     out_path = os.path.join(project_root, '.plugins_root', kotlin_resource)
                     temp_path = out_path + '_'
