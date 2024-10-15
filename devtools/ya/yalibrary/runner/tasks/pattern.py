@@ -9,7 +9,7 @@ import six
 
 import core.error
 
-from yalibrary.active_state import Cancelled
+from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.runner.tasks.enums import WorkerPoolType
 import yalibrary.worker_threads as worker_threads

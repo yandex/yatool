@@ -6,7 +6,7 @@ import time
 import core.error
 import yalibrary.worker_threads as worker_threads
 
-from yalibrary.active_state import Cancelled
+from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher import common as fetcher_common
 from yalibrary.fetcher.uri_parser import parse_resource_uri
 from yalibrary.runner.tasks.enums import WorkerPoolType

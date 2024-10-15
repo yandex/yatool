@@ -596,9 +596,9 @@ def configure_display(app_ctx):
 
 def configure_active_state(app_ctx):
     import signal
-    import yalibrary.active_state
+    import devtools.ya.yalibrary.active_state
 
-    state = yalibrary.active_state.ActiveState(__name__)
+    state = devtools.ya.yalibrary.active_state.ActiveState(__name__)
     sigint_exit_handler = core.sig_handler.create_sigint_exit_handler()
 
     signal.signal(signal.SIGINT, sigint_exit_handler)
