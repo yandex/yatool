@@ -98,14 +98,19 @@ void TYMake::TransferStartDirs() {
 
 void TYMake::PostInit() {
     IncParserManager.InitManager(Conf.ParserPlugins);
+    LoadPatch();
     Names.FileConf.InitAfterCacheLoading();
     FSCacheMonEvent();
     DepsCacheMonEvent();
 }
 
-void TYMake::PredictChanges() {
+void TYMake::CheckStartDirsChanges() {
     TransferStartDirs();
-    LoadPatch();
+    // Compare order-independently since the order may vary for tool runs
+    if (TSet<ui32>{PrevStartDirs_.begin(), PrevStartDirs_.end()} != TSet<ui32>{CurStartDirs_.begin(), CurStartDirs_.end()}) {
+        HasGraphStructuralChanges_ = true;
+        YDebug() << "Graph has structural changes because start dirs are different" << Endl;
+    }
 }
 
 static void SafeRemove(const TFsPath& path) {

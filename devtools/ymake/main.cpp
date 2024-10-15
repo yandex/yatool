@@ -832,7 +832,8 @@ int main_real(TBuildConfiguration& conf) {
         }
 
         // This should be called after collecting StartDirs
-        yMake->PredictChanges();
+        yMake->CheckStartDirsChanges();
+        yMake->GraphChangesPredictionEvent();
 
         TraceBypassEvent(conf, *yMake);
         if (yMake->CanBypassConfigure()) {

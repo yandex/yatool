@@ -732,12 +732,6 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
         YDebug() << "Graph has structural changes because dep cache isn't loaded" << Endl;
         return;
     }
-    // Compare order-independently since the order may vary for tool runs
-    if (TSet<ui32>{PrevStartDirs_.begin(), PrevStartDirs_.end()} != TSet<ui32>{CurStartDirs_.begin(), CurStartDirs_.end()}) {
-        HasGraphStructuralChanges_ = true;
-        YDebug() << "Graph has structural changes because start dirs are different" << Endl;
-        return;
-    }
 
     TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
     predictor.AnalyzeChanges();
@@ -759,7 +753,6 @@ bool TYMake::LoadPatch() {
     if (changes) {
         AnalyzeGraphChanges(*changes);
         Names.FileConf.UseExternalChanges(std::move(changes));
-        GraphChangesPredictionEvent();
     } else {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because we can't get changes" << Endl;

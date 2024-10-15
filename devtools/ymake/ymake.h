@@ -97,7 +97,6 @@ private:
 public:
     explicit TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
-    void PredictChanges(); // Call this after StartDirs are fully known: this may rely on them
     ~TYMake();
 
     // Returns true if directory loops found
@@ -113,6 +112,7 @@ public:
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();
+    void CheckStartDirsChanges();
     void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false);
     void DumpSrcDeps(IOutputStream& cmsg);
     void PrintTargetDeps(IOutputStream& cmsg);
