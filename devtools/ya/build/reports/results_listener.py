@@ -60,7 +60,7 @@ class BuildResultsListener(object):
         import app_config
 
         if app_config.in_house:
-            from yalibrary.yandex.distbuild import distbs
+            from devtools.ya.yalibrary.yandex.distbuild import distbs
 
             return distbs.extract_stderr(
                 res, self._opts.mds_read_account, download_stderr=self._opts.download_failed_nodes_stderr

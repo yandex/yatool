@@ -1837,7 +1837,7 @@ class YaMake(object):
                 return self._build_local(callback)
 
     def _build_distbs(self, callback):
-        from yalibrary.yandex.distbuild import distbs
+        from devtools.ya.yalibrary.yandex.distbuild import distbs
 
         display = self.app_ctx.display
 
