@@ -278,7 +278,7 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
     }
 }
 
-void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) {
+void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const {
     TVector<TNodeId> loops;
     for (TNodeId loopNum: ValidIds()) {
         loops.push_back(loopNum);
@@ -290,16 +290,16 @@ void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) {
     }
 }
 
-void TGraphLoops::DumpDirLoops(const TDepGraph& graph, IOutputStream& out) {
+void TGraphLoops::DumpDirLoops(const TDepGraph& graph, IOutputStream& out) const {
     DumpLoops(graph, out, DirLoops);
 }
 
-void TGraphLoops::DumpBuildLoops(const TDepGraph& graph, IOutputStream& out) {
+void TGraphLoops::DumpBuildLoops(const TDepGraph& graph, IOutputStream& out) const {
     DumpLoops(graph, out, BuildLoops);
 }
 
 template <typename TContainer>
-void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds) {
+void TGraphLoops::DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds) const {
     const auto& isLoopBad = [this](TNodeId loopId) {
         return DirLoops.contains(loopId) || BuildLoops.contains(loopId);
     };
@@ -404,7 +404,7 @@ public:
     }
 };
 
-void TGraphLoops::RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets) {
+void TGraphLoops::RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets) const {
     auto nodesForRemove = GetNodesToRemove(graph, startTargets);
 
     // 1. Remove bad start targets

@@ -31,17 +31,17 @@ private:
 public:
     bool HasBadLoops() const;
     THashSet<TNodeId> GetNodesToRemove(TDepGraph& graph, TVector<TTarget>& startTargets) const;
-    void RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets);
+    void RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets) const;
     const TNodeId* FindLoopForNode(TNodeId node) const {return Node2Loop.FindPtr(node);}
 
     static TGraphLoops Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
 
     void FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
-    void DumpAllLoops(const TDepGraph& graph, IOutputStream& out);
-    void DumpBuildLoops(const TDepGraph& graph, IOutputStream& out);
-    void DumpDirLoops(const TDepGraph& graph, IOutputStream& out);
+    void DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const;
+    void DumpBuildLoops(const TDepGraph& graph, IOutputStream& out) const;
+    void DumpDirLoops(const TDepGraph& graph, IOutputStream& out) const;
 
 private:
     template <typename TContainer>
-    void DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds);
+    void DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds) const;
 };
