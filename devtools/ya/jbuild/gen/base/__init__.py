@@ -210,7 +210,7 @@ def uniq_last_case(lst, key=None):
 
 
 def remove_prefixes(paths):
-    import yalibrary.checkout as checkout
+    import devtools.ya.yalibrary.checkout as checkout
 
     correct_paths = []
 
