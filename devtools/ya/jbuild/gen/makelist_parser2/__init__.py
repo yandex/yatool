@@ -137,7 +137,6 @@ def obtain_targets_graph2(dart, cpp_graph):
         managed_peers_closure = (
             entry[consts.MANAGED_PEERS_CLOSURE].split() if consts.MANAGED_PEERS_CLOSURE in entry else []
         )
-        test_classpath = entry['TEST_CLASSPATH_MANAGED'].split() if 'TEST_CLASSPATH_MANAGED' in entry else []
         non_manageable_peers = (
             entry[consts.NON_NAMAGEABLE_PEERS].split() if consts.NON_NAMAGEABLE_PEERS in entry else []
         )
@@ -165,11 +164,7 @@ def obtain_targets_graph2(dart, cpp_graph):
                 if td.startswith('arcadia_tests_data/'):
                     arcadia_test_data_resources.append(td[len('arcadia_tests_data/') :])
 
-        all_java_peerdirs |= (
-            set(map(strip_root, non_manageable_peers))
-            | set(map(strip_root, managed_peers_closure))
-            | set(map(strip_root, test_classpath))
-        )
+        all_java_peerdirs |= set(map(strip_root, non_manageable_peers)) | set(map(strip_root, managed_peers_closure))
 
         for words in entry.get(consts.JAVA_SRCS, []):
             try:
@@ -200,7 +195,6 @@ def obtain_targets_graph2(dart, cpp_graph):
         plain.pop('MODULE_ARGS', None)
         plain.pop('UNITTEST_DIR', None)
         plain.pop('TEST_DATA', None)
-        plain.pop('TEST_CLASSPATH_MANAGED', None)
         plain.pop(consts.JDK_RESOURCE_PREFIX, None)
         plain.pop(consts.JDK_FOR_TESTS_RESOURCE_PREFIX, None)
 
