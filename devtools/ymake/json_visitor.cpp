@@ -112,6 +112,8 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     , CmdConf(cmdConf)
     , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
     , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
+    , Loops(TGraphLoops::Find(restoreContext.Graph, startDirs, false))
+    , LoopCnt(Loops.Ids())
     , GlobalVarsCollector(restoreContext)
     , Edge(restoreContext.Graph.GetInvalidEdge())
     , CurrNode(restoreContext.Graph.GetInvalidNode())
@@ -123,9 +125,6 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     }
 
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
-    Loops.FindLoops(RestoreContext.Graph, startDirs, false);
-
-    LoopCnt.SetMaxNodeIdByResize(Loops.MaxNodeId());
 
     for (TTarget target : startDirs) {
         if (target.IsModuleTarget) {

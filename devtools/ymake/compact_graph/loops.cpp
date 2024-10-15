@@ -230,6 +230,12 @@ bool TGraphLoops::HasBadLoops() const {
     return !DirLoops.empty() || !BuildLoops.empty();
 }
 
+TGraphLoops TGraphLoops::Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop) {
+    TGraphLoops res;
+    res.FindLoops(graph, startTargets, outTogetherIsLoop);
+    return res;
+}
+
 void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop) {
     TLoopSearcher ls(outTogetherIsLoop);
     clear();
