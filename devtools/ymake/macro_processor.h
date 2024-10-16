@@ -256,7 +256,7 @@ private:
 
     const TYVar* GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroname, const TStringBuf& args, const TVars& vars);
 
-    THolder<TVector<TStringBuf>> GetDirsFromOpts(const TStringBuf opt, const TVars& vars);
+    void GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst);
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
 
     void CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);

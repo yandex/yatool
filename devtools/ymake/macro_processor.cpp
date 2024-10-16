@@ -653,20 +653,20 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
 
     // Apply .PEERDIR and .ADDINCL from macro
     if (AddPeers) {
-        SBDIAG << "ADDPEERS from " << Get1(&Cmd) << " added to module " << modBuilder.UnitName() << ":";
+        SBDIAG << "ADDPEERS[" << AddPeers->size() << "] from " << Get1(&Cmd) << " added to module " << modBuilder.UnitName() << Endl;
+        size_t i = 0;
         for (const auto& peer : *AddPeers) {
-            SBDIAG << "  " << peer;
+            SBDIAG << "  [" << i++ << "] " << peer << Endl;
         }
-        SBDIAG << Endl;
         modBuilder.DirStatement(NMacro::PEERDIR, *AddPeers);
         AddPeers.Reset();
     }
     if (AddIncls) {
-        SBDIAG << "ADDINCLS from " << Get1(&Cmd) << " added to module " << modBuilder.UnitName() << ":";
+        SBDIAG << "ADDINCLS[" << AddIncls->size() << "] from " << Get1(&Cmd) << " added to module " << modBuilder.UnitName() << Endl;
+        size_t i = 0;
         for (const auto& incl : *AddIncls) {
-            SBDIAG << "  " << incl;
+            SBDIAG << "  [" << i++ << "] " << incl << Endl;
         }
-        SBDIAG << Endl;
         modBuilder.DirStatement(NMacro::ADDINCL, *AddIncls);
         AddIncls.Reset();
     }
@@ -2097,13 +2097,16 @@ void ConvertSpecFiles(const TBuildConfiguration& conf, TSpecFileArr& flist, TYVa
     }
 }
 
-THolder<TVector<TStringBuf>> TCommandInfo::GetDirsFromOpts(const TStringBuf opt, const TVars& vars) {
+void TCommandInfo::GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst) {
     auto dirs = MakeHolder<TVector<TStringBuf>>();
     if (!opt.empty()) {
         TStringBuf optsSubst = StrPool->Append(SubstMacroDeeply(nullptr, opt, vars, false));
         Split(optsSubst, " ", *dirs);
     }
-    return dirs;
+    if (dst)
+        dst->insert(dst->end(), dirs->begin(), dirs->end());
+    else
+        dst = std::move(dirs);
 }
 
 void TCommandInfo::ApplyToolOptions(const TStringBuf macroName, const TVars& vars) {
@@ -2112,13 +2115,11 @@ void TCommandInfo::ApplyToolOptions(const TStringBuf macroName, const TVars& var
     if (toolOptions) {
         if (!toolOptions->AddPeers.empty()) {
             SBDIAG << "ADDPEERS mined from '" << macroName << ": " << toolOptions->AddPeers << Endl;
-            Y_ASSERT(!AddPeers);
-            AddPeers = GetDirsFromOpts(toolOptions->AddPeers, vars);
+            GetDirsFromOpts(toolOptions->AddPeers, vars, AddPeers);
         }
         if (!toolOptions->AddIncl.empty()) {
             SBDIAG << "ADDINCLS mined from '" << macroName << ": " << toolOptions->AddIncl << Endl;
-            Y_ASSERT(!AddIncls);
-            AddIncls = GetDirsFromOpts(toolOptions->AddIncl, vars);
+            GetDirsFromOpts(toolOptions->AddIncl, vars, AddIncls);
         }
     }
 }
