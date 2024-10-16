@@ -78,6 +78,7 @@ namespace {
                     readFlag = &cacheFlags->ReadConfCache;
                     writeFlag = &cacheFlags->WriteConfCache;
                     cacheFlags->ConfCacheWasSetExplicitly = true;
+                    break;
                 case 'd':
                     readFlag = &cacheFlags->ReadDepsCache;
                     writeFlag = &cacheFlags->WriteDepsCache;
