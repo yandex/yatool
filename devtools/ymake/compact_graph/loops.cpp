@@ -279,12 +279,8 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
 }
 
 void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const {
-    TVector<TNodeId> loops;
-    for (TNodeId loopNum: ValidIds()) {
-        loops.push_back(loopNum);
-    }
-    if (loops.size() != 0) {
-        DumpLoops(graph, out, loops);
+    if (ValidIds().size() != 0) {
+        DumpLoops(graph, out, ValidIds());
     } else {
         out << "Loops were not detected" << Endl;
     }
