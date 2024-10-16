@@ -2093,8 +2093,7 @@ void TYMake::PrintTargetDeps(IOutputStream& cmsg) {
     if (HasNonDirTargets) {
         return;
     }
-    TGraphLoops loops;
-    loops.FindLoops(Graph, StartTargets, true);
+    auto loops = TGraphLoops::Find(Graph, StartTargets, true);
     TBuildTargetDepsPrinter proc(loops, cmsg);
     IterateAll(Graph, StartTargets, proc, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 }

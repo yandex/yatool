@@ -36,12 +36,12 @@ public:
 
     static TGraphLoops Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
 
-    void FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
     void DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const;
     void DumpBuildLoops(const TDepGraph& graph, IOutputStream& out) const;
     void DumpDirLoops(const TDepGraph& graph, IOutputStream& out) const;
 
 private:
+    void FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
     template <typename TContainer>
     void DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds) const;
 };
