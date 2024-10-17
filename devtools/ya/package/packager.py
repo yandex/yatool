@@ -371,7 +371,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
                 raise YaPackageTestException()
         else:
             # ... or if build failed on any reason
-            raise YaPackageBuildException(build.exit_code)
+            raise YaPackageBuildException(builder.exit_code)
 
     return builder.exit_code
 
