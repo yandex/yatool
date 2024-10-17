@@ -115,6 +115,10 @@ ui32 TFileConf::Add(TStringBuf name) {
     return TFileId::CreateElemId(context, targetId);
 }
 
+bool TFileConf::IsActualExternalChangesSource(const TFileData& data) const {
+    return UseExternalChangesSource && data.IsStatusUpToDate(TimeStamps.CurStamp() - 1) && !data.CantRead;
+}
+
 //TODO: we want to get rid of WasListed for directories. try to move ListDir into ReadContent
 const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* fileStat) {
     TFileData& data = GetFileDataById(elemId);
@@ -126,7 +130,7 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
     }
 
     if (DebugOptions.CompletelyTrustFSCache) {
-        if (data.LastCheckedStamp != TTimeStamps::Never && !data.CantRead) {
+        if (IsActualExternalChangesSource(data)) {
             // for each file from changelist/patch we call TFileConf::MarkFileAsChanged with data.LastCheckedStamp = TTimeStamps::Never
             // so for this files we not return cached data here except CantRead case which we should re-stat
             //
@@ -195,7 +199,7 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
         // In both cases we treat stat uncacheable. In 2nd case here we reach with successfull `stat()`.
         // But as with other `data` fields below these are OLD values and this ensures CantRead from
         // cache will be converted to `CheckContent` before it is cleared on data update from this session.
-        auto updated = UseExternalChangesSource ? ExternalChanges.contains(elemId) : (data.ModTime != fileStat->MTime || data.Size != fileStat->Size);
+        auto updated = IsActualExternalChangesSource(data) ? ExternalChanges.contains(elemId) : (data.ModTime != fileStat->MTime || data.Size != fileStat->Size);
         data.CheckContent |= updated || data.NotFound || data.LastCheckedStamp == TTimeStamps::Never || data.CantRead;
     }
     data.ModTime = fileStat->MTime;

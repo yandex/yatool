@@ -441,6 +441,8 @@ private:
 
     ui32 CopySourceFileInto(ui32 id, TFileConf& other) const;
 
+    bool IsActualExternalChangesSource(const TFileData& data) const;
+
     using TBase::GetById;
 
 public:
