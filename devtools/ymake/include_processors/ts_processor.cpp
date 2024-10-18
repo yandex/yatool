@@ -8,49 +8,91 @@
 #include <util/folder/path.h>
 
 namespace {
-    std::initializer_list<TString> FileImportExts = {
-        "",
-        ".ts",
-        ".d.ts",
-        ".js",
-        ".tsx",
-        ".jsx",
+    const std::initializer_list<TStringBuf> AllowedImportExts = {
+        "ts",
+        "d.ts",
+        "js",
+        "tsx",
+        "jsx",
     };
 
-    std::initializer_list<TString> DirImportExts = {
-        ".ts",
-        ".d.ts",
-        ".js",
-        ".tsx",
-        ".jsx",
+    const std::vector<std::pair<TString, TString>> AllowedReplacements = {
+        {"js", "ts"},
     };
 
-    bool IsRelativeImport(const TString& import) {
+    const std::string indexName = "index";
+
+    bool IsRelativeImport(const TStringBuf& import) {
         return import.StartsWith("./") || import.StartsWith("../") || import == "." || import == "..";
+    }
+
+    bool FindFile(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath) {
+        Y_ASSERT(searchResultPath.Empty());
+
+        searchResultPath = module.ResolveSourcePath(searchPath, {}, TModuleResolver::Default, false);
+
+        return !searchResultPath.Empty();
+    }
+
+    // If file exists with one of the allowed extensions
+    bool FindFileWithAllowedExt(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath, const std::initializer_list<TStringBuf>& extsToTry = AllowedImportExts) {
+        Y_ASSERT(searchResultPath.Empty());
+
+        for (const auto& ext : extsToTry) {
+            if (FindFile(module, TString::Join(searchPath, ".", ext), searchResultPath)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // If file exists with one of the allowed extension replacements
+    bool FindFileWithAllowedReplacement(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath, const std::vector<std::pair<TString, TString>>& replacements = AllowedReplacements) {
+        Y_ASSERT(searchResultPath.Empty());
+
+        const size_t dotPos = searchPath.rfind(".");
+        if (dotPos == TString::npos || dotPos >= searchPath.size() - 1) {
+            // No dot found or it is in the very end of the filename
+            return false;
+        }
+
+        const size_t filenameStart = searchPath.rfind(NPath::PATH_SEP_S);
+        if (filenameStart != TString::npos && dotPos < filenameStart) {
+            // Last dot is not in the extention - it is in some directory name
+            return false;
+        }
+
+        const TStringBuf ext = TStringBuf(searchPath, dotPos + 1, TStringBuf::npos);
+        for (const auto& [fromExt, toExt] : replacements) {
+            if (ext.equal(fromExt)) {
+                const TStringBuf searchPathBase = TStringBuf(searchPath, 0, dotPos);
+                if (FindFileWithAllowedExt(module, searchPathBase, searchResultPath, {toExt})) {
+                    // File found with the ext replaced to one of the allowed (for esm import cases)
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // TS Modules and CommonJS import resolution order:
     // - parent(importer) / moduleSpecifier,
     // - parent(importer) / moduleSpecifier . with one of the allowed extensions,
     // - parent(importer) / moduleSpecifier / "index" . one of the allowed extensions.
-    TString ResolveRelativeImport(TModuleWrapper& module, const TStringBuf& prefix, const TString& import) {
+    // - parent(importer) / moduleSpecifier   with one of the allowed extension replacements
+    TResolveFile ResolveRelativeImport(TModuleWrapper& module, const TStringBuf& prefix, const TStringBuf& import) {
+        TResolveFile resolvedPath;
+
         const auto searchPath = NPath::Join(prefix, import);
 
-        for (const auto& ext : FileImportExts) {
-            auto resolveFile = module.ResolveSourcePath(TString::Join(searchPath, ext), {}, TModuleResolver::Default, false);
-            if (!resolveFile.Empty()) {
-                return module.GetStr(resolveFile);
-            }
-        }
+        FindFile(module, searchPath, resolvedPath)                                                                   // Path as-is
+            || FindFileWithAllowedExt(module, searchPath, resolvedPath)                                              // Path + one of the allowed extensions
+            || FindFileWithAllowedExt(module, TString::Join(searchPath, NPath::PATH_SEP_S, indexName), resolvedPath) // Path + "/index." + one of the allowed extensions
+            || FindFileWithAllowedReplacement(module, searchPath, resolvedPath);                                     // Path with allowed extension replacement (.js -> .ts)
 
-        for (const auto& ext : DirImportExts) {
-            auto resolveFile = module.ResolveSourcePath(TString::Join(searchPath, NPath::PATH_SEP_S, "index", ext), {}, TModuleResolver::Default, false);
-            if (!resolveFile.Empty()) {
-                return module.GetStr(resolveFile);
-            }
-        }
-
-        return "";
+        return resolvedPath;
     }
 }
 
@@ -115,7 +157,7 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
     const auto importer = TString{incFileName.GetTargetStr()};
     const auto prefix = NPath::Parent(importer);
     auto ignoreNextImport = false;
-    TVector<TString> resolvedImports;
+    TVector<TResolveFile> resolvedImports;
     resolvedImports.reserve(includes.size());
 
     for (const auto& include : includes) {
@@ -136,7 +178,7 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
 
         if (IsRelativeImport(include)) {
             const auto importPath = ResolveRelativeImport(module, prefix, include);
-            if (importPath.empty()) {
+            if (importPath.Empty()) {
                 YConfErr(UserErr) << "Failed to resolve import in " << importer << ": " << include;
                 continue;
             }
@@ -145,9 +187,7 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
         }
     }
 
-    if (!resolvedImports.empty()) {
-        AddIncludesToNode(node, resolvedImports);
-    }
+    AddIncludesToNode(node, resolvedImports, module);
 
     if (module.Get("TS_CONFIG_DEDUCE_OUT") == "no") {
         return;
