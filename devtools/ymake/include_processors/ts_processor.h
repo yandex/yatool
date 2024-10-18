@@ -25,7 +25,7 @@ public:
         }
     };
 
-    static TVector<TString> GenerateOutputPaths(const TString& sourcePath, const TTsConfig& cfg);
+    static TVector<TString> GenerateOutputPaths(TStringBuf sourcePath, const TTsConfig& cfg);
 
     TTsImportProcessor();
 

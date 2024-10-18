@@ -9,24 +9,24 @@
 
 namespace {
     const std::initializer_list<TStringBuf> AllowedImportExts = {
-        "ts",
-        "d.ts",
-        "js",
-        "tsx",
-        "jsx",
+        "ts"sv,
+        "d.ts"sv,
+        "js"sv,
+        "tsx"sv,
+        "jsx"sv,
     };
 
-    const std::vector<std::pair<TString, TString>> AllowedReplacements = {
-        {"js", "ts"},
+    const std::initializer_list<std::pair<TStringBuf, TStringBuf>> AllowedReplacements = {
+        {"js"sv, "ts"sv},
     };
 
-    const std::string indexName = "index";
+    const TStringBuf indexName = "index"sv;
 
-    bool IsRelativeImport(const TStringBuf& import) {
+    bool IsRelativeImport(TStringBuf import) {
         return import.StartsWith("./") || import.StartsWith("../") || import == "." || import == "..";
     }
 
-    bool FindFile(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath) {
+    bool FindFile(TModuleWrapper& module, TStringBuf searchPath, TResolveFile& searchResultPath) {
         Y_ASSERT(searchResultPath.Empty());
 
         searchResultPath = module.ResolveSourcePath(searchPath, {}, TModuleResolver::Default, false);
@@ -35,7 +35,7 @@ namespace {
     }
 
     // If file exists with one of the allowed extensions
-    bool FindFileWithAllowedExt(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath, const std::initializer_list<TStringBuf>& extsToTry = AllowedImportExts) {
+    bool FindFileWithAllowedExt(TModuleWrapper& module, TStringBuf searchPath, TResolveFile& searchResultPath, const std::initializer_list<TStringBuf>& extsToTry = AllowedImportExts) {
         Y_ASSERT(searchResultPath.Empty());
 
         for (const auto& ext : extsToTry) {
@@ -48,7 +48,7 @@ namespace {
     }
 
     // If file exists with one of the allowed extension replacements
-    bool FindFileWithAllowedReplacement(TModuleWrapper& module, const TStringBuf& searchPath, TResolveFile& searchResultPath, const std::vector<std::pair<TString, TString>>& replacements = AllowedReplacements) {
+    bool FindFileWithAllowedReplacement(TModuleWrapper& module, TStringBuf searchPath, TResolveFile& searchResultPath, const std::initializer_list<std::pair<TStringBuf, TStringBuf>>& replacements = AllowedReplacements) {
         Y_ASSERT(searchResultPath.Empty());
 
         const size_t dotPos = searchPath.rfind(".");
@@ -82,7 +82,7 @@ namespace {
     // - parent(importer) / moduleSpecifier . with one of the allowed extensions,
     // - parent(importer) / moduleSpecifier / "index" . one of the allowed extensions.
     // - parent(importer) / moduleSpecifier   with one of the allowed extension replacements
-    TResolveFile ResolveRelativeImport(TModuleWrapper& module, const TStringBuf& prefix, const TStringBuf& import) {
+    TResolveFile ResolveRelativeImport(TModuleWrapper& module, TStringBuf prefix, TStringBuf import) {
         TResolveFile resolvedPath;
 
         const auto searchPath = NPath::Join(prefix, import);
@@ -96,7 +96,7 @@ namespace {
     }
 }
 
-TVector<TString> TTsImportProcessor::GenerateOutputPaths(const TString& sourcePath, const TTsImportProcessor::TTsConfig& cfg) {
+TVector<TString> TTsImportProcessor::GenerateOutputPaths(TStringBuf sourcePath, const TTsImportProcessor::TTsConfig& cfg) {
     Y_ASSERT(NPath::IsPrefixOf(cfg.RootDir, sourcePath));
 
     const auto srcRelPath = sourcePath.substr(cfg.RootDir.size() + 1);
@@ -135,12 +135,10 @@ void TTsImportProcessor::ProcessIncludes(TAddDepAdaptor& node,
                                          TModuleWrapper& module,
                                          TFileView incFileName,
                                          const TVector<TString>& includes) const {
-    if (module.GetModule().GetTag() != "TS") {
-        // Do not process imports of non-_TS_BASE_UNIT modules with js/ts sources.
-        return;
+    if (module.GetModule().GetTag() == "TS") {
+        // Process imports only for _TS_BASE_UNIT modules with js/ts sources.
+        ProcessImports(node, module, incFileName, includes);
     }
-
-    ProcessImports(node, module, incFileName, includes);
 }
 
 void TTsImportProcessor::ProcessOutputIncludes(TAddDepAdaptor& node,
@@ -189,9 +187,7 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
 
     AddIncludesToNode(node, resolvedImports, module);
 
-    if (module.Get("TS_CONFIG_DEDUCE_OUT") == "no") {
-        return;
+    if (module.Get("TS_CONFIG_DEDUCE_OUT") != "no") {
+        node.AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty("Mod.TsDeduceOut", importer));
     }
-
-    node.AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty("Mod.TsDeduceOut", importer));
 }

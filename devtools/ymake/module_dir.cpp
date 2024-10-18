@@ -29,7 +29,7 @@ void TModuleDirBuilder::UseModuleProps(TPropertyType propType, const TPropsNodeL
                 continue;
             }
 
-            auto const outputPaths = TTsImportProcessor::GenerateOutputPaths(TString(sourcePath), cfg);
+            auto const outputPaths = TTsImportProcessor::GenerateOutputPaths(sourcePath, cfg);
             for (auto& outputPath : outputPaths) {
                 auto outputPathElemId = Graph.Names().AddName(EMNT_NonParsedFile, outputPath);
                 TAddDepAdaptor& addCtx = Node.AddOutput(outputPathElemId, EMNT_NonParsedFile);
