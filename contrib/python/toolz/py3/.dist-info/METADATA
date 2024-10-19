@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: toolz
-Version: 0.12.1
+Version: 1.0.0
 Summary: List processing tools and functional utilities
 Home-page: https://github.com/pytoolz/toolz/
 Author: https://raw.github.com/pytoolz/toolz/master/AUTHORS.md
@@ -13,7 +13,6 @@ Classifier: Development Status :: 5 - Production/Stable
 Classifier: License :: OSI Approved :: BSD License
 Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
@@ -21,7 +20,7 @@ Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Programming Language :: Python :: Implementation :: PyPy
-Requires-Python: >=3.7
+Requires-Python: >=3.8
 
 Toolz
 =====
@@ -98,7 +97,7 @@ This builds a standard wordcount function from pieces within ``toolz``:
 Dependencies
 ------------
 
-``toolz`` supports Python 3.7+ with a common codebase.
+``toolz`` supports Python 3.8+ with a common codebase.
 It is pure Python and requires no dependencies beyond the standard
 library.
 
