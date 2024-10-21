@@ -334,7 +334,7 @@ class ClangFormat(BaseStyler):
             style_config = core.resource.try_get_resource("config.clang-format")
             return json.dumps(yaml.safe_load(style_config))
         else:
-            config_file = config_map["clang_format"]
+            config_file = config_map["clang-format"]
             with open(os.path.join(_find_root(), config_file)) as afile:
                 return json.dumps(yaml.safe_load(afile))
 
