@@ -69,7 +69,7 @@ public:
     void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash);
 
     // check DATA|DEPENDS reference to path from makefile not cause usage isolated projects data from another project (use FoldersTree_)
-    void CheckStatementPath(TStringBuf statement, TStringBuf makefile, TStringBuf path) const;
+    void CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path) const;
 
     const TVector<TString>& Projects() const noexcept {
         return Projects_;
@@ -93,15 +93,15 @@ protected:
     virtual void OnIncludedProjectPath(TStringBuf includedPath, const THashSet<TStringBuf>& filesWithIncludedPath, TStringBuf path, const THashSet<TStringBuf>& files) const;
 
     // error handler for detecting usage isolated project from another project
-    virtual void OnDepToIsolatedProject(const TString& project, TStringBuf dependFrom, const TString& dependency) const;
+    virtual void GenerateIsolatedProjectsError(const TString& project, const TFileView& dependencySource, const TString& dependencyDetails) const;
 
     using TProjectPathToSources = TMap<TString, THashSet<TStringBuf>>;
     void LoadFromString(TProjectPathToSources&, TStringBuf content, TStringBuf filename);
     void LoadProjectsIgnoreIncluded(const TProjectPathToSources&);
 
     // walk by folders tree (projects) and call error handler if makefile not in the same project folder
-    void CheckMakefilePlacedInProjects(TStringBuf statement, TStringBuf makefile, const TFoldersTree& folder, TStringBuf dataFile) const;
-    void CheckMakefilePlacedInProject(TStringBuf statement, TStringBuf makefile, const TString& project, TStringBuf dataFile) const;
+    void CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf dataFile) const;
+    void CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf dataFile) const;
 
 private:
     TVector<TString> Projects_;  // (sorted)

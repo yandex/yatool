@@ -41,16 +41,10 @@ namespace {
             using TPathId = ui32;
             static const TPathId EmptyPath = 0;
 
-            TSourceDep(ui32 from, ui32 to)
-                : From(from)
-                , To(to)
-                , PathId(EmptyPath)
-            {
-            }
-
             ui32 From;  // elem id
             ui32 To;  // elem id
-            TPathId PathId; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
+            ui32 ModuleId; // elem id of current module
+            TPathId PathId{EmptyPath}; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
         };
 
         TDepsCollectorVisitor(const TRestoreContext& restoreContext, bool isIsolatedProjectsHashChanged)
@@ -153,7 +147,8 @@ namespace {
             const auto& fileConf = graph.Names().FileConf;
             ui32 fromElemId = fileConf.GetTargetId(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
             Y_ASSERT(fromElemId);
-            Deps_.emplace_back(TSourceDep{fromElemId, toElemId}); // store dep here
+            const auto moduleIt = FindModule(state);
+            Deps_.emplace_back(TSourceDep{fromElemId, toElemId, moduleIt != state.end() ? moduleIt->Node()->ElemId : 0}); // store dep here
             // store dependency path between sources
             size_t pathsSize = Paths_.size();
             for (auto it = state.Stack().rbegin(); it != state.Stack().rend(); ++it) {
@@ -272,7 +267,8 @@ namespace {
             if (parentNode.IsValid() && state.Parent()->CurDep().Value() == EDT_BuildFrom/* DEPENDS */) {
                 auto& fileConf = RestoreContext_.Graph.Names().FileConf;
                 auto path = fileConf.GetTargetName(topNode->ElemId).GetTargetStr();
-                auto makefile = NPath::SmartJoin(fileConf.GetTargetName(parentNode->ElemId).GetTargetStr(), "ya.make");
+                auto dir = fileConf.GetTargetName(parentNode->ElemId).GetTargetStr();
+                auto makefile = RestoreContext_.Graph.Names().FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make"));
                 RestoreContext_.Conf.IsolatedProjects.CheckStatementPath(NProps::DEPENDS, makefile, path);
             }
             return true;
@@ -347,7 +343,7 @@ void TIsolatedProjects::Load(const TFsPath& sourceRoot, const TVector<TStringBuf
 }
 
 // check path not lead inside isolated project (or upper dir), or (if placed) makefile contain this path also placed in same project
-void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TStringBuf makefile, TStringBuf path) const {
+void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path) const {
     const TFoldersTree* folder = &FoldersTree_;
     TStringBuf varPath{path};  // variable consumed with NextTok iteration
     TStringBuf shortFolderName;
@@ -375,7 +371,7 @@ void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TStringBuf make
     CheckMakefilePlacedInProjects(statement, makefile, *folder, path);
 }
 
-void TIsolatedProjects::CheckMakefilePlacedInProjects(TStringBuf statement, TStringBuf makefile, const TFoldersTree& folder, TStringBuf path) const {
+void TIsolatedProjects::CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf path) const {
     if (folder.ExistsProject()) {
         CheckMakefilePlacedInProject(statement, makefile, *folder.GetProject(), path);
         return;
@@ -386,17 +382,19 @@ void TIsolatedProjects::CheckMakefilePlacedInProjects(TStringBuf statement, TStr
     }
 }
 
-void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TStringBuf makefile, const TString& project, TStringBuf path) const {
-    auto makefileStripped = NPath::CutAllTypes(makefile);
+void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf path) const {
+    auto makefileBuf = makefile.GetTargetStr();
+    auto makefileStripped = NPath::CutAllTypes(makefileBuf);
     if (makefileStripped.length() >= project.length()
         && makefileStripped.compare(0, project.length(), project) == 0
         && (project.length() == makefileStripped.length() || makefileStripped[project.length()] == '/')
     ) {
         // has deps from isolated projects to itself, it's ok
     } else {
-        TStringStream ss;
-        ss << makefile << " [[alt1]]"sv << statement << "[[rst]] -> "sv << path;
-        OnDepToIsolatedProject(project, makefile, ss.Str());
+        THolder<TScopedContext> scopedContext(new TScopedContext(makefile));
+        TStringStream dependencyDetails;
+        dependencyDetails << makefileBuf << " [[alt1]]"sv << statement << "[[rst]] -> "sv << path;
+        GenerateIsolatedProjectsError(project, makefile, dependencyDetails.Str());
     }
 }
 
@@ -449,13 +447,20 @@ void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const 
         } else { // res == 0
             if (itProject->length() == toName.length() || toName[itProject->length()] == '/') {
                 // found dependency lead inside isolated project
-                TStringBuf fromName = fileConf.GetName(itDeps->From).CutAllTypes();
+                const auto fromNameView = fileConf.GetTargetName(itDeps->From);
+                TStringBuf fromName = NPath::CutType(fromNameView.GetTargetStr());
                 if (fromName.compare(0, itProject->length(), *itProject) == 0
                     && (itProject->length() == fromName.length() || fromName[itProject->length()] == '/')
                 ) {
                     // has deps from isolated projects to itself, it's ok
                 } else {
-                    OnDepToIsolatedProject(*itProject, fromName, visitor.StringDepWithPath(*itDeps));
+                    THolder<TScopedContext> scopedContext{nullptr};
+                    TFileView moduleView;
+                    if (itDeps->ModuleId) {
+                        moduleView = restoreContext.Graph.Names().FileConf.GetTargetName(itDeps->ModuleId);
+                        scopedContext.Reset(new TScopedContext(itDeps->ModuleId, moduleView.GetTargetStr()));
+                    }
+                    GenerateIsolatedProjectsError(*itProject,  moduleView.IsValid() ? moduleView : fromNameView, visitor.StringDepWithPath(*itDeps));
                 }
             }
             ++itDeps;
@@ -531,8 +536,7 @@ void TIsolatedProjects::OnIncludedProjectPath(TStringBuf includedPath, const THa
     YConfWarn(Syntax) << ss.Str() << Endl;
 }
 
-void TIsolatedProjects::OnDepToIsolatedProject(const TString& project, TStringBuf dependFrom, const TString& dependencyDetails) const {
-    TScopedContext logCtx(0, dependFrom);
+void TIsolatedProjects::GenerateIsolatedProjectsError(const TString& project, const TFileView&, const TString& dependencyDetails) const {
     YConfErr(IslPrjs) << "The project depends on [[alt1]]isolated project[[rst]] [[imp]]" << project << "[[rst]]" << Endl
                       << dependencyDetails << Endl;
 }
