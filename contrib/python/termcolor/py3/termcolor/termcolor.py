@@ -28,7 +28,8 @@ import io
 import os
 import sys
 import warnings
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from ._types import Attribute, Color, Highlight
 
@@ -53,6 +54,7 @@ ATTRIBUTES: dict[Attribute, int] = {
     "blink": 5,
     "reverse": 7,
     "concealed": 8,
+    "strike": 9,
 }
 
 HIGHLIGHTS: dict[Highlight, int] = {
