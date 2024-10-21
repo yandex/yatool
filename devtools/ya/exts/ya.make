@@ -12,6 +12,7 @@ PY_SRCS(
     datetime2.py
     decompress.py
     detect_recursive_dict.py
+    deepget.py
     filelock.py
     flatten.py
     fs.py

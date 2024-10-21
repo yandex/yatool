@@ -83,7 +83,7 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
 
             accepted_schemas = app_ctx.fetchers_storage.accepted_schemas()
         except (ImportError, AttributeError):  # internal tests can have no app_ctx or configured fetchers_storage
-            accepted_schemas = {'sbr', 'http', 'https'}
+            accepted_schemas = {'sbr', 'http', 'https', 'docker'}
     else:
         accepted_schemas = force_accepted_schemas
 

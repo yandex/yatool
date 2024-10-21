@@ -149,8 +149,14 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
 
         # TODO: kuzmich321 (ufetcher) seems like there can be a better way?
         what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
+
         return ufetcher.UFetcherDownloader(
-            ufetcher.get_ufetcher(), what_to_download, progress_callback, state, keep_directory_packed
+            ufetcher.get_ufetcher(),
+            what_to_download,
+            progress_callback,
+            state,
+            keep_directory_packed,
+            resource_info if config.has_mapping() or parsed_uri.resource_type in ('http', 'docker') else None,
         )
 
     try:
