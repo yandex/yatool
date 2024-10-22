@@ -50,6 +50,8 @@ def _register(cls: type[BaseStyler]) -> type[BaseStyler]:
 
 
 def select_styler(target: PurePath, ruff: bool) -> type[BaseStyler] | None:
+    """Find matching spec and return respective styler class"""
+
     if target.suffix in _SUFFIX_MAPPING:
         key = target.suffix
     elif target.name in _SUFFIX_MAPPING:
@@ -57,10 +59,10 @@ def select_styler(target: PurePath, ruff: bool) -> type[BaseStyler] | None:
     else:
         return
 
-    target_spec = Spec(_SUFFIX_MAPPING[key][0].kind, ruff)
+    # find the first full match
     for spec in _SUFFIX_MAPPING[key]:
-        if spec == target_spec:
-            return _REGISTRY[spec]
+        if (s := Spec(spec.kind, ruff)) in _REGISTRY:
+            return _REGISTRY[s]
 
 
 @exts.func.lazy
@@ -92,13 +94,12 @@ def _flush_to_terminal(path: Path, content: str, formatted_content: str, full_ou
 
 
 class BaseStyler(abc.ABC):
-    """Whether a styler should run if not selected explicitly"""
-
-    DEFAULT_ENABLED: bool
-    """Unique description of a styler"""
-    SPEC: Spec
-    """Series of strings upon which the proper styler is selected"""
-    SUFFIXES: tuple[tp.LiteralString, ...]
+    # Whether a styler should run if not selected explicitly
+    DEFAULT_ENABLED: tp.ClassVar[bool]
+    # Unique description of a styler
+    SPEC: tp.ClassVar[Spec]
+    # Series of strings upon which the proper styler is selected
+    SUFFIXES: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
     def __init__(self, args) -> None:
         self.args = args
@@ -124,7 +125,7 @@ class BaseStyler(abc.ABC):
             print(run_format())
         else:
             target = tp.cast(Path, target)
-            if self.args.force or rules.style_required(str(target), content):
+            if self.args.force or not (reason := rules.get_skip_reason(str(target), content)):
                 formatted_content = run_format()
                 if formatted_content != content:
                     if self.args.dry_run:
@@ -133,7 +134,7 @@ class BaseStyler(abc.ABC):
                         _flush_to_file(target, formatted_content)
                     return 1
             else:
-                logger.warning("skip by rules %s", target)
+                logger.warning("skip by rule: %s", reason)
         return 0
 
 

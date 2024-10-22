@@ -47,7 +47,7 @@ def _discover_style_targets(args) -> dict[type[styler.BaseStyler], list[Target]]
         styler_class = styler.select_styler(target=target, ruff=args.use_ruff)
 
         if not styler_class:
-            logger.warning('skip %s (could not sufficient styler)', target)
+            logger.warning('skip %s (sufficient styler not found)', target)
             continue
 
         if file_types and styler_class.SPEC.kind not in file_types:
@@ -65,8 +65,8 @@ def _discover_style_targets(args) -> dict[type[styler.BaseStyler], list[Target]]
 def _setup_logging(quiet: bool = False) -> None:
     console_log = logging.StreamHandler()
 
-    for h in logging.root.handlers:
-        logging.root.removeHandler(h)
+    while logging.root.hasHandlers():
+        logging.root.removeHandler(logging.root.handlers[0])
 
     console_log.setLevel(logging.ERROR if quiet else logging.INFO)
     console_log.setFormatter(coloredlogs.ColoredFormatter('%(levelname).1s | %(message)s'))
