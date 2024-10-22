@@ -161,7 +161,7 @@ void TraceYmakeStart(int argc, char** argv) {
 
     TString output = cmd.GetOutput();
     TString inputTracePath = output.substr(0, output.find_first_of("\r\n"sv));
-    if (!inputTracePath.Empty()) {
+    if (!inputTracePath.empty()) {
         TStdinTrace::Start(inputTracePath);
     }
 }
