@@ -6,8 +6,6 @@
 #include <util/string/split.h>
 #include <util/string/vector.h>
 
-#include <tuple>
-
 namespace {
     class TCacheConfigParserError: public std::exception {
     public:
