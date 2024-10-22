@@ -75,4 +75,4 @@ CLANGD_BG_INDEX_ENABLED = "Index:\n  Background: Build\n"
 DEFAULT_PYTHON_LINTER_CONFIGS = 'build/config/tests/py_style/default_configs.json'
 DEFAULT_CPP_LINTER_CONFIGS = 'build/config/tests/cpp_style/default_configs.json'
 BLACK_LINTER_NAME = 'black'
-CLANG_FORMAT_LINTER_NAME = 'clang_format'
+CLANG_FORMAT_LINTER_NAME = 'clang-format'
