@@ -744,6 +744,7 @@ def configure_report_interceptor(ctx, report_events):
             dict(
                 cwd=os.getcwd(),
                 duration=duration,
+                start_time=start,
                 cmd_args=mine_cmd_args(),
                 success=success,
                 exit_code=exit_code,

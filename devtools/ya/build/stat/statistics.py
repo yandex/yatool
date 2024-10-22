@@ -474,6 +474,7 @@ def print_cache_statistics(graph, filename, display):
         'tests_tasks': tests_task_count,
         'failed_tasks': failed_task_count,
         'ok_tasks': not_tests_task_count,
+        'avoided_tasks': avoided_task_count,
     }
 
     if filename is not None:
