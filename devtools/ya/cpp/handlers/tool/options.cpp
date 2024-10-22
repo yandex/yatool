@@ -105,9 +105,15 @@ namespace NYa::NTool {
         optionDefs.emplace_back("--host-platform", &options.HostPlatform);
 
         options.ProgramName = args[0];
+        bool endOfCommand = false;
         for (size_t i = toolHandlerIndex + 1; i < args.size(); ++i) {
             const TStringBuf arg = args[i];
-            if (arg.StartsWith("-")) {
+            if (!endOfCommand && arg == "--") {
+                endOfCommand = true;
+                continue;
+            } else if (endOfCommand){
+                options.ToolOptions.emplace_back(arg);
+            } else if (arg.StartsWith("-")) {
                 TStringBuf value = arg;
                 const TStringBuf optionName = value.NextTok('=');
                 if (Find(UNSUPPORTED_OPTIONS, optionName) != end(UNSUPPORTED_OPTIONS)) {
