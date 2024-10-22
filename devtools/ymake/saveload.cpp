@@ -740,7 +740,7 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
 
 bool TYMake::LoadPatch() {
     ArcChangesEvent(!Conf.PatchPath.empty());
-    if (!Conf.PatchPath) {
+    if (Conf.PatchPath.Empty()) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because of PatchPath" << Endl;
         return true;
@@ -761,11 +761,11 @@ bool TYMake::LoadPatch() {
     return true;
 }
 
-void TYMake::LoadUids(TUidsCachable* cachable) {
+bool TYMake::LoadUids(TUidsCachable* cachable) {
     if (!Conf.ReadUidsCache) {
-        return;
+        return false;
     }
-    UidsCacheLoaded_ = TryLoadUids(cachable);
+    return UidsCacheLoaded_ = TryLoadUids(cachable);
 }
 
 void TYMake::LoadDMCache() {

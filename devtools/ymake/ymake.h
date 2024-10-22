@@ -147,7 +147,7 @@ public:
     bool LoadImpl(const TFsPath& file);
     bool Load(const TFsPath& file);
     bool LoadPatch();
-    void LoadUids(TUidsCachable* uidsCachable);
+    bool LoadUids(TUidsCachable* uidsCachable);
     void LoadDMCache();
     void Save(const TFsPath& file, bool delayed);
     void SaveStartDirs(TCacheFileWriter& writer);

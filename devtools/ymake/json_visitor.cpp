@@ -106,38 +106,15 @@ namespace {
     }
 }
 
-TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
-    : TBase{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
-    , Commands(commands)
-    , CmdConf(cmdConf)
-    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
-    , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
+TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs)
+    : TBaseVisitor{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Loops(TGraphLoops::Find(restoreContext.Graph, startDirs, false))
     , LoopCnt(Loops.Ids())
-    , GlobalVarsCollector(restoreContext)
-    , Edge(restoreContext.Graph.GetInvalidEdge())
-    , CurrNode(restoreContext.Graph.GetInvalidNode())
-    , Graph(restoreContext.Graph)
-    , ErrorShower(restoreContext.Conf.ExpressionErrorDetails.value_or(TDebugOptions::EShowExpressionErrors::None))
 {
-    if (JsonDepsFromMainOutputEnabled_) {
-        YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;
-    }
-
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
-
-    for (TTarget target : startDirs) {
-        if (target.IsModuleTarget) {
-            StartModules.insert(target);
-        }
-    }
-
-    if (restoreContext.Conf.CheckForIncorrectLoops()) {
-        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
-    }
 }
 
-void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
+void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
 
@@ -148,6 +125,7 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
         }
     }
     output->Write(&nodesCount, sizeof(nodesCount));
+    CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, nodesCount);
 
     for (const auto& [nodeId, nodeData] : Nodes) {
         if (!nodeData.Completed) {
@@ -157,13 +135,12 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
         nodeData.Save(&buffer, graph);
         buffer.SaveNodeDataToStream(output, nodeId, graph);
     }
-    CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, nodesCount);
 
     const TNodeId maxLoopId = Loops.MaxNodeId();
     output->Write(&maxLoopId, sizeof(maxLoopId));
-    ui32 count = 0;
+    ui32 loopsCount = 0;
     for (TNodeId loopId: Loops.ValidIds()) {
-        ++count;
+        ++loopsCount;
         TSaveBuffer buffer{&rawBuffer};
         SaveLoop(&buffer, loopId, graph);
 
@@ -173,13 +150,15 @@ void TJSONVisitor::SaveCache(IOutputStream* output, const TDepGraph& graph) {
         // и мы не будем загружать его данные из кэша.
         buffer.SaveNodeDataToStream(output, Loops[loopId][0], graph);
     }
-
-    CacheStats.Set(NStats::EUidsCacheStats::SavedLoops, count);
+    CacheStats.Set(NStats::EUidsCacheStats::SavedLoops, loopsCount);
 }
 
-void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
+void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
+    ui32 nodesSkipped = 0;
+    ui32 nodesDiscarded = 0;
+    ui32 nodesLoaded = 0;
 
     ui32 nodesCount = LoadFromStream<ui32>(input);
 
@@ -196,33 +175,107 @@ void TJSONVisitor::LoadCache(IInputStream* input, const TDepGraph& graph) {
 
         if (!nodeLoaded) {
             nodeData.LoadStructureUid(&buffer, graph, true);
-            CacheStats.Inc(NStats::EUidsCacheStats::SkippedNodes);
+            ++nodesSkipped;
             continue;
         }
 
         if (!nodeData.Load(&buffer, graph)) {
-            CacheStats.Inc(NStats::EUidsCacheStats::DiscardedNodes);
+            ++nodesDiscarded;
             Nodes.erase(nodeRef.Id());
         }
 
-        CacheStats.Inc(NStats::EUidsCacheStats::LoadedNodes);
+        ++nodesLoaded;
     }
 
+    CacheStats.Inc(NStats::EUidsCacheStats::SkippedNodes, nodesSkipped);
+    CacheStats.Inc(NStats::EUidsCacheStats::DiscardedNodes, nodesDiscarded);
+    CacheStats.Inc(NStats::EUidsCacheStats::LoadedNodes, nodesLoaded);
+
     const auto MaxLoopId = LoadFromStream<TNodeId>(input);
+    ui32 loopsSkipped = 0;
+    ui32 loopsDiscarded = 0;
+    ui32 loopsLoaded = 0;
 
     for (TNodeId i = TNodeId::MinValid; i <= MaxLoopId; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId loopNodeId;
         if (!buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph)) {
-            CacheStats.Inc(NStats::EUidsCacheStats::SkippedLoops);
+            ++loopsSkipped;
             continue;
         }
 
         if (!LoadLoop(&buffer, loopNodeId, graph)) {
-            CacheStats.Inc(NStats::EUidsCacheStats::DiscardedLoops);
+            ++loopsDiscarded;
         } else {
-            CacheStats.Inc(NStats::EUidsCacheStats::LoadedLoops);
+            ++loopsLoaded;
         }
+    }
+
+    CacheStats.Inc(NStats::EUidsCacheStats::SkippedLoops, loopsSkipped);
+    CacheStats.Inc(NStats::EUidsCacheStats::DiscardedLoops, loopsDiscarded);
+    CacheStats.Inc(NStats::EUidsCacheStats::LoadedLoops, loopsLoaded);
+}
+
+void TUidsData::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph) {
+    const TGraphLoop& loop = Loops[loopId];
+
+    buffer->Save(LoopCnt[loopId].SelfSign.GetRawData(), 16);
+    buffer->Save(LoopCnt[loopId].Sign.GetRawData(), 16);
+    buffer->Save<ui32>(loop.Deps.size());
+    for (TNodeId depNode : loop.Deps) {
+        buffer->SaveElemId(depNode, graph);
+    }
+}
+
+bool TUidsData::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph) {
+    const TNodeId* loopId = Loops.FindLoopForNode(nodeFromLoop);
+    if (!loopId)
+        return false;
+
+    buffer->LoadMd5(&LoopCnt[*loopId].SelfSign);
+    buffer->LoadMd5(&LoopCnt[*loopId].Sign);
+
+    ui32 depsCount = buffer->Load<ui32>();
+
+    TGraphLoop& loop = Loops[*loopId];
+    loop.Deps.reserve(depsCount);
+    for (size_t i = 0; i < depsCount; ++i) {
+        TNodeId depNode;
+        if (!buffer->LoadElemId(&depNode, graph)) {
+            loop.Deps.clear();
+            return false;
+        }
+        loop.Deps.push_back(depNode);
+    }
+
+    loop.DepsDone = true;
+    return true;
+}
+
+TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
+    : TUidsData(restoreContext, startDirs)
+    , Commands(commands)
+    , CmdConf(cmdConf)
+    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
+    , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
+    , GlobalVarsCollector(restoreContext)
+    , Edge(restoreContext.Graph.GetInvalidEdge())
+    , CurrNode(restoreContext.Graph.GetInvalidNode())
+    , Graph(restoreContext.Graph)
+    , ErrorShower(restoreContext.Conf.ExpressionErrorDetails.value_or(TDebugOptions::EShowExpressionErrors::None))
+{
+    if (JsonDepsFromMainOutputEnabled_) {
+        YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;
+    }
+
+    for (TTarget target : startDirs) {
+        if (target.IsModuleTarget) {
+            StartModules.insert(target);
+        }
+    }
+
+    if (restoreContext.Conf.CheckForIncorrectLoops()) {
+        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
     }
 }
 
@@ -323,7 +376,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     if (IsTooldirDep(currState.CurDep())) {
         return false;
     }
-    const bool acc = TBase::AcceptDep(state);
+    const bool acc = TBaseVisitor::AcceptDep(state);
 
     if (!acc && currNodeType == EMNT_BuildCommand && *dep == EDT_Include) {
         // Current node is a build command that depends on a macro that depends on this build command.
@@ -346,7 +399,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
 // 2. Do not re-subscan built file nodes.
 // 3. Always re-subscan all other nodes, unless they have no built nodes up ahead.
 bool TJSONVisitor::Enter(TState& state) {
-    bool fresh = TBase::Enter(state);
+    bool fresh = TBaseVisitor::Enter(state);
 
     UpdateReferences(state);
 
@@ -456,12 +509,12 @@ void TJSONVisitor::Leave(TState& state) {
         PassToParent(state);
     }
 
-    TBase::Leave(state);
+    TBaseVisitor::Leave(state);
 }
 
 void TJSONVisitor::Left(TState& state) {
     TJSONEntryStats* chldData = CurEnt;
-    TBase::Left(state);
+    TBaseVisitor::Left(state);
     TJSONEntryStats& currData = *CurEnt;
     TStateItem& currState = state.Top();
     bool currDone = currData.Completed;
@@ -1026,42 +1079,6 @@ void TJSONVisitor::PassToParent(TState& state) {
         }
         PrntState->Hash->ContentMd5Update(CurrData->GetIncludeContentUid(), "Update parent content UID with include content"sv);
     }
-}
-
-void TJSONVisitor::SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph) {
-    const TGraphLoop& loop = Loops[loopId];
-
-    buffer->Save(LoopCnt[loopId].SelfSign.GetRawData(), 16);
-    buffer->Save(LoopCnt[loopId].Sign.GetRawData(), 16);
-    buffer->Save<ui32>(loop.Deps.size());
-    for (TNodeId depNode : loop.Deps) {
-        buffer->SaveElemId(depNode, graph);
-    }
-}
-
-bool TJSONVisitor::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph) {
-    const TNodeId* loopId = Loops.FindLoopForNode(nodeFromLoop);
-    if (!loopId)
-        return false;
-
-    buffer->LoadMd5(&LoopCnt[*loopId].SelfSign);
-    buffer->LoadMd5(&LoopCnt[*loopId].Sign);
-
-    ui32 depsCount = buffer->Load<ui32>();
-
-    TGraphLoop& loop = Loops[*loopId];
-    loop.Deps.reserve(depsCount);
-    for (size_t i = 0; i < depsCount; ++i) {
-        TNodeId depNode;
-        if (!buffer->LoadElemId(&depNode, graph)) {
-            loop.Deps.clear();
-            return false;
-        }
-        loop.Deps.push_back(depNode);
-    }
-
-    loop.DepsDone = true;
-    return true;
 }
 
 bool TJSONVisitor::NeedAddToOuts(const TState& state, const TDepTreeNode& node) const {

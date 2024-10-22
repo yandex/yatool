@@ -34,10 +34,32 @@ class TYMake;
 class TSaveBuffer;
 class TLoadBuffer;
 
+class TUidsData : public TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>, public TUidsCachable {
+protected:
+    using TBaseVisitor = TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>;
 
-class TJSONVisitor final : public TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>, public TUidsCachable {
+    TGraphLoops Loops;
+    TNodesData<TLoopCnt, TVector> LoopCnt;
+    NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
+
+public:
+    using TBaseVisitor::Nodes;
+
+    TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs);
+    virtual ~TUidsData() = default;
+
+    virtual void SaveCache(IOutputStream* output, const TDepGraph& graph) override;
+    virtual void LoadCache(IInputStream* input, const TDepGraph& graph) override;
+
 private:
-    using TBase = TManagedPeerVisitor<TJSONEntryStats, TJsonStateItem>;
+    void SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph);
+    bool LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph);
+};
+
+
+class TJSONVisitor final : public TUidsData {
+private:
+    using TUidsData::TBaseVisitor;
     using TNodeData = TJSONEntryStats;
 
     const TCommands& Commands;
@@ -49,8 +71,6 @@ private:
     ui64 NumModuleNodesForRendering = 0;
     TVector<TNodeId> SortedNodesForRendering;
 
-    TGraphLoops Loops;
-    TNodesData<TLoopCnt, TVector> LoopCnt;
     TVector<TLoopCnt> LoopsHash;
 
     TVector<std::pair<ui32, TMd5Sig>> Inputs;
@@ -61,8 +81,6 @@ private:
     THashMap<TNodeId, TNodeId> Node2Module;
     THashSet<TNodeId> StartModules;
     TGlobalVarsCollector GlobalVarsCollector;
-
-    NStats::TUidsCacheStats CacheStats{"Uids cache stats"};
 
     bool HasParent = false;
     TDepGraph::TConstEdgeRef Edge;
@@ -77,10 +95,7 @@ private:
 public:
     TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
 
-    using TBase::Nodes;
-
-    virtual void SaveCache(IOutputStream* output, const TDepGraph& graph) override;
-    virtual void LoadCache(IInputStream* input, const TDepGraph& graph) override;
+    using TBaseVisitor::Nodes;
 
     // Iteration.
     bool AcceptDep(TState& state);
@@ -110,9 +125,6 @@ private:
     void FinishCurrent(TState& state);
     // Returning from a child node. The child node should be finished, while the parent is not.
     void PassToParent(TState& state);
-
-    void SaveLoop(TSaveBuffer* buffer, TNodeId loopId, const TDepGraph& graph);
-    bool LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGraph& graph);
 
     bool NeedAddToOuts(const TState& state, const TDepTreeNode& node) const;
 
