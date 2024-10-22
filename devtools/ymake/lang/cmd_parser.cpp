@@ -185,7 +185,7 @@ namespace {
 
             auto kwArgCnt = blockData->CmdProps->Keywords.size();
             auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->Keywords.size();
-            auto hasVarArg = !blockData->CmdProps->ArgNames.empty() && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+            auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
                 args[kwArgCnt + i].Script.emplace_back();
