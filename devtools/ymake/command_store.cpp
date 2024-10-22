@@ -983,7 +983,13 @@ NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, con
             break;
     }
     auto reducer = TRefReducer{Mods, Values, vars, result};
-    reducer.ReduceIf(expr);
+    try {
+        reducer.ReduceIf(expr);
+    } catch(const std::exception&) {
+        // note that this is likely to show a partially preevaluated AST
+        YDebug() << "Error while preevaluating " << PrintExpr(expr) << Endl;
+        throw;
+    }
     return result;
 }
 
