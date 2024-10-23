@@ -14,13 +14,15 @@ from yalibrary.runner.tasks.enums import WorkerPoolType
 import exts.yjson as json
 import exts.fs as fs
 
+import yalibrary.fetcher.progress_info as progress_info_lib
+
 from .resource_display import ResourceDisplay
 
 
 class _ExternalResource(object):
     @staticmethod
     def get_sb_id(arc_root, uri):
-        resource_type, address = uri.split(':', 1)
+        _, address = uri.split(':', 1)
 
         with open(os.path.join(arc_root, address), 'r') as f:
             j = json.load(f)
@@ -42,7 +44,7 @@ class PrepareResource(object):
         self._fetchers_storage = fetchers_storage
         self._fetch_resource_if_need = fetch_resource_if_need
 
-        self._percent = None
+        self._progress_info = progress_info_lib.ProgressInfo()
         self._error = None
         self._exit_code = 0
         self._resource_root = resource_root
@@ -74,7 +76,7 @@ class PrepareResource(object):
     @staticmethod
     def dep_resources(ctx, x):
         uri = x['uri']
-        resource_type, address = uri.split(':', 1)
+        resource_type, _ = uri.split(':', 1)
 
         accepted_resource_types = {'ext'} | ctx.fetchers_storage.accepted_schemas()
 
@@ -131,9 +133,11 @@ class PrepareResource(object):
             resource_type, ', '.join(sorted(accepted_resource_types))
         )
 
-        def progress_callback(percent):
+        def progress_callback(downloaded, total_size):
             self._ctx.state.check_cancel_state()
-            self._percent = percent
+
+            self._progress_info.set_total(total_size)
+            self._progress_info.update_downloaded(downloaded)
 
         if resource_type in self._fetchers_storage.accepted_schemas():
             cacheable = not self._ctx.opts.clear_build
@@ -190,10 +194,9 @@ class PrepareResource(object):
 
     def status(self):
         display = self.resource_display.get_short_display(color=True)
-        str = '[[c:yellow]]RESOURCE[[rst]] [[imp]]$(' + display + '[[imp]])[[rst]]'
-        if self._percent is not None:
-            str += ' - %.1f%%' % self._percent
-        return str
+        res = '[[c:yellow]]RESOURCE[[rst]] [[imp]]$(' + display + '[[imp]])[[rst]]'
+        res += ' - %s' % self._progress_info.pretty_progress
+        return res
 
     def res(self):
         return worker_threads.ResInfo()

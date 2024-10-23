@@ -148,7 +148,7 @@ class SandboxStorage(object):
         return resource_info.get("dir_outputs_mode", "") == FILE_MODE
 
     @staticmethod
-    def progress_callback(val):
+    def progress_callback(_, __):
         logger.debug("Downloading")
 
     def is_resource_prepared_for_dir_outputs(self, resource_id):
