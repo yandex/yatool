@@ -967,7 +967,7 @@ def checkout_data(arcadia_root, params):
     (package descriptions, %branch%/arcadia_tests_data, %branch%/data, etc),
     rest data will be obtained during the build.
     """
-    from yalibrary import checkout
+    from devtools.ya.yalibrary import checkout
 
     # obtain specified package json descriptions
     fetcher = checkout.VcsFetcher(arcadia_root)
