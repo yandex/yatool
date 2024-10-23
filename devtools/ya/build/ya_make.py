@@ -235,7 +235,7 @@ def _checkout(opts, display=None):
         logging.warning("--checkout supported only for SVN, option skipped")
         return
 
-    from yalibrary import checkout
+    from devtools.ya.yalibrary import checkout
 
     fetcher = checkout.VcsFetcher(opts.arc_root)
 
