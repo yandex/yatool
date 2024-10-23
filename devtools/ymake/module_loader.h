@@ -73,9 +73,6 @@ private:
     const TModuleConf& ModuleConf;
     TVector<TModuleGlobInfo> ModuleGlobs;
 
-    EMakeNodeType DepModuleType;
-    ui64 DepModuleId;
-
     TVars& Vars;
     TOriginalVars OrigVars;
     const TStringBuf Makefile;              // Reference to Module.Makefile
@@ -188,10 +185,6 @@ public:
         return Module.GetName();
     }
 
-    EMakeNodeType NodeType() const {
-        return Module.GetNodeType();
-    }
-
     const TModuleConf& GetModuleConf() const {
         return ModuleConf;
     }
@@ -232,14 +225,6 @@ public:
 
     const TMakeFileMap& GetMakeFileMap() const {
         return MakeFileMap;
-    }
-
-    EMakeNodeType GetDepModuleType() const {
-        return DepModuleType;
-    }
-
-    ui64 GetDepModuleId() const {
-        return DepModuleId;
     }
 
     bool IsMakelistPeer(const TStringBuf dir) const {
