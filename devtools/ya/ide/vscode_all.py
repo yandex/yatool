@@ -81,6 +81,8 @@ class VSCodeProject(object):
         self.common_args = (
             params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
         )
+        if params.output_root:
+            self.common_args.append("--output=%s" % params.output_root)
         self.params = params
 
     def ensure_dirs(self):
@@ -169,7 +171,8 @@ class VSCodeProject(object):
             build_params.add_result = [ext for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get("CPP", [])]
             build_params.suppress_outputs = [ext for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get("CPP", [])]
             build_params.output_root = self.codegen_cpp_dir
-            build_params.create_symlinks = False
+            if pm.my_platform() == "win32":
+                build_params.create_symlinks = False
 
             ide_common.emit_message("Running codegen for C++")
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
@@ -182,8 +185,9 @@ class VSCodeProject(object):
             build_params.suppress_outputs = [
                 ext for lang in languages for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get(lang, [])
             ]
-            build_params.output_root = self.params.output_root
-            build_params.create_symlinks = True
+
+            if pm.my_platform() == "win32":
+                build_params.create_symlinks = False
             if self.is_go:
                 build_params.flags["CGO_ENABLED"] = "0"
 
@@ -418,6 +422,7 @@ class VSCodeProject(object):
             workspace["launch"]["configurations"] = vscode.configurations.gen_debug_configurations(
                 run_modules,
                 self.params.arc_root,
+                self.params.output_root or self.params.arc_root,
                 self.codegen_cpp_dir,
                 self.params.languages,
                 tool_fetcher,

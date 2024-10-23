@@ -19,7 +19,9 @@ def create_python_wrapper(wrapper_dir, template, arguments):
     return wrapper_path
 
 
-def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool_fetcher, python_wrappers_dir, goroot):
+def gen_debug_configurations(
+    run_modules, arc_root, output_dir, codegen_cpp_dir, languages, tool_fetcher, python_wrappers_dir, goroot
+):
     is_mac = pm.my_platform().startswith("darwin")
     is_win = pm.my_platform().startswith("win")
     cpp_debug_params = None
@@ -33,7 +35,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                         "sourceMap",
                         {
                             "/-S": arc_root,
-                            "/-B": output_root or arc_root,
+                            "/-B": codegen_cpp_dir or output_dir,
                         },
                     ),
                 )
@@ -48,7 +50,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                         "sourceFileMap",
                         {
                             "/-S": arc_root,
-                            "/-B": output_root or arc_root,
+                            "/-B": codegen_cpp_dir or output_dir,
                         },
                     ),
                 )
@@ -86,7 +88,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                                     "ignoreFailures": True,
                                 },
                                 {
-                                    "text": "set substitute-path /-B/ " + (output_root or arc_root),
+                                    "text": "set substitute-path /-B/ " + (codegen_cpp_dir or output_dir),
                                     "description": "Map generated files",
                                     "ignoreFailures": True,
                                 },
@@ -142,7 +144,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                 if isinstance(py_main, dump.PyMain):
                     configuration["module"] = py_main.split(":")[0]
                 elif py_main:
-                    configuration["program"] = os.path.join(arc_root, module["module_path"], py_main)
+                    configuration["program"] = os.path.join(output_dir, module["module_path"], py_main)
                 else:
                     ide_common.emit_message("Cannot create run configuration for module \"%s\"" % name)
                     continue
@@ -172,7 +174,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                     consts.TEST_WRAPPER_TEMPLATE,
                     {
                         "arc_root": arc_root,
-                        "path": os.path.join(arc_root, module["path"]),
+                        "path": os.path.join(output_dir, module["path"]),
                         "test_context": os.path.join(
                             arc_root, module["module_path"], "test-results", "py3test", "test.context"
                         ),
@@ -196,7 +198,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
             configuration = OrderedDict(
                 (
                     ("name", conf_name),
-                    ("program", os.path.join(arc_root, module["path"])),
+                    ("program", os.path.join(output_dir, module["path"])),
                     ("args", []),
                     ("request", "launch"),
                 )
@@ -241,7 +243,7 @@ def gen_debug_configurations(run_modules, arc_root, output_root, languages, tool
                     ("type", "go"),
                     ("request", "launch"),
                     ("mode", "exec"),
-                    ("program", os.path.join(arc_root, module['path'])),
+                    ("program", os.path.join(output_dir, module['path'])),
                     ("args", []),
                     ("env", {}),
                     ("substitutePath", [{'from': arc_root, 'to': '/-S'}]),
