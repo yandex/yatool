@@ -209,6 +209,20 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
 
     target_path = arc_root / ".clang-format"
 
+    if pm.my_platform() == "win32":
+        if target_path.exists(follow_symlinks=False):
+            ide_common.emit_message(
+                "[[warn]]clang-format config exists at '{}' and will be replaced by '{}'[[rst]]".format(
+                    target_path,
+                    config_path,
+                )
+            )
+        try:
+            shutil.copyfile(config_path, target_path, follow_symlinks=False)
+        except OSError as e:
+            ide_common.emit_message("[[warn]]Failed to setup clang-format config[[rst]]: '{}'".format(e.strerror))
+        return
+
     create_symlink = False
     if not target_path.exists(follow_symlinks=False):
         create_symlink = True

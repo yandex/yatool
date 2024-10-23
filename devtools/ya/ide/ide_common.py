@@ -5,6 +5,7 @@ import exts.yjson as json
 import logging
 import os
 import re
+import shutil
 import sys
 import subprocess
 import traceback
@@ -31,6 +32,7 @@ import exts.process
 import yalibrary.display
 import yalibrary.platform_matcher
 from six.moves import filter
+
 
 logger = logging.getLogger(__name__)
 
@@ -1106,6 +1108,20 @@ def setup_tidy_config(source_root):
     target_name = ".clang-tidy"
     target_path = os.path.join(source_root, target_name)
 
+    if yalibrary.platform_matcher.my_platform() == "win32":
+        if os.path.lexists(target_path):
+            emit_message(
+                "[[warn]]Clang_tidy's config exists at '{}' and will be replaced by '{}'[[rst]]".format(
+                    target_path,
+                    config_path,
+                )
+            )
+        try:
+            shutil.copyfile(config_path, target_path, follow_symlinks=False)
+        except OSError as e:
+            emit_message("[[warn]]Failed to setup clang_tidy's config[[rst]]: '{}'".format(e.strerror))
+        return
+
     create_symlink = False
     if not os.path.lexists(target_path):
         create_symlink = True
@@ -1127,4 +1143,7 @@ def setup_tidy_config(source_root):
         )
 
     if create_symlink:
-        os.symlink(config_path, target_path)
+        try:
+            os.symlink(config_path, target_path)
+        except OSError as e:
+            emit_message("[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{}'".format(e.strerror))
