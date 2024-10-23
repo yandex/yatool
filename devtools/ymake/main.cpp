@@ -13,6 +13,7 @@
 #include "transitive_requirements_check.h"
 #include "ymake.h"
 
+#include <devtools/ymake/build_graph_scope.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -133,25 +134,6 @@ static void PrintFlatGraph(const TYMake& ymake) {
     }
     if (ymake.Conf.DumpPretty)
         Cout << Endl;
-}
-
-namespace {
-    class TBuildGraphScope {
-         TUpdIter UpdIter;
-         TGeneralParser Parser;
-    public:
-         explicit TBuildGraphScope(TYMake& yMake)
-             : UpdIter(yMake)
-             , Parser(yMake)
-         {
-             yMake.UpdIter = &UpdIter;
-             yMake.Parser = &Parser;
-         }
-         ~TBuildGraphScope() {
-              UpdIter.YMake.UpdIter = nullptr;
-              UpdIter.YMake.Parser = nullptr;
-         }
-    };
 }
 
 static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
