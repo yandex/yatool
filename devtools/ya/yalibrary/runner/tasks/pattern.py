@@ -14,8 +14,6 @@ from yalibrary.fetcher import resource_fetcher
 from yalibrary.runner.tasks.enums import WorkerPoolType
 import yalibrary.worker_threads as worker_threads
 
-import yalibrary.fetcher.progress_info as progress_info_lib
-
 
 class PreparePattern(object):
     worker_pool_type = WorkerPoolType.SERVICE
@@ -30,7 +28,7 @@ class PreparePattern(object):
         self._fetchers_storage = fetchers_storage
         self._fetch_resource_if_need = fetch_resource_if_need
 
-        self._progress_info = progress_info_lib.ProgressInfo()
+        self._percent = None
         self._error = None
         self._exit_code = 0
         self._build_root = build_root
@@ -80,11 +78,9 @@ class PreparePattern(object):
 
         if resource_type in ({'http'} | self._fetchers_storage.accepted_schemas()):
 
-            def progress_callback(downloaded, total_size):
+            def progress_callback(percent):
                 self._ctx.state.check_cancel_state()
-
-                self._progress_info.set_total(total_size)
-                self._progress_info.update_downloaded(downloaded)
+                self._percent = percent
 
             return os.path.abspath(
                 self._fetch_resource_if_need(
@@ -115,9 +111,10 @@ class PreparePattern(object):
         return self._error
 
     def status(self):
-        res = '[[c:yellow]]PREPARE[[rst]] ' + '[[imp]]$(' + self._pattern + ')[[rst]]'
-        res += ' - %s' % self._progress_info.pretty_progress
-        return res
+        str = '[[c:yellow]]PREPARE[[rst]] ' + '[[imp]]$(' + self._pattern + ')[[rst]]'
+        if self._percent is not None:
+            str += ' - %.1f%%' % self._percent
+        return str
 
     def res(self):
         return worker_threads.ResInfo()

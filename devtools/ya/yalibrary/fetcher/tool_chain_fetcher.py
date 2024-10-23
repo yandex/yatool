@@ -8,7 +8,6 @@ from collections import namedtuple
 from copy import deepcopy
 
 import exts.yjson as json
-import yalibrary.fetcher.progress_info as progress_info_lib
 from exts import fs, func
 from yalibrary import guards
 from yalibrary import platform_matcher
@@ -646,7 +645,7 @@ def _to_list(val):
 
 
 def _get_fetcher(name, resource_type):
-    def default_progress_callback(_, __):
+    def default_progress_callback(_):
         sys.stderr.write('.')
 
     def default_finish_callback():
@@ -660,16 +659,10 @@ def _get_fetcher(name, resource_type):
 
         if getattr(app_ctx, 'state') and getattr(app_ctx, 'display'):
 
-            progress_info = progress_info_lib.ProgressInfo()
-
-            def display_progress(downloaded, total):
+            def display_progress(percent=None):
                 if app_ctx.state.check_cancel_state():
-
-                    progress_info.set_total(total)
-                    progress_info.update_downloaded(downloaded)
-
                     app_ctx.display.emit_status(
-                        'Downloading [[imp]]{}[[rst]] - [[imp]]{:.1f}%[[rst]]'.format(name, progress_info.percent)
+                        'Downloading [[imp]]{}[[rst]] - [[imp]]{:.1f}%[[rst]]'.format(name, percent)
                     )
 
             def display_finish():

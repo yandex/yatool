@@ -110,8 +110,8 @@ class ProgressPrinter(object):
         self._progress = progress_callback
         self._finish = finish_callback
 
-    def __call__(self, downloaded, total):
-        self._progress(downloaded, total)
+    def __call__(self, percent):
+        self._progress(percent)
 
     def finalize(self):
         self._finish()

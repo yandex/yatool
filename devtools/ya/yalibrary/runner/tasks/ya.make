@@ -29,7 +29,6 @@ PEERDIR(
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/fetcher/uri_parser
-    devtools/ya/yalibrary/fetcher/progress_info
     devtools/ya/yalibrary/worker_threads
     devtools/ya/yalibrary/toolscache
     contrib/python/six

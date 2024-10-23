@@ -62,7 +62,7 @@ def fetch_resource_if_need(
     fetcher,
     root_dir,
     resource_uri,
-    progress_callback=lambda _, __: None,
+    progress_callback=lambda _: None,
     state=None,
     install_params=(UNTAR, True),
     binname=None,
