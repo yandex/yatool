@@ -67,6 +67,7 @@ public:
 public:
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
+    void PrepareConfiguration(TMd5Sig& confMd5);
 
     bool IsIncludeOnly(const TStringBuf& name) const;
     bool IsRequiredBuildAndSrcRoots(const TStringBuf& lang) const;

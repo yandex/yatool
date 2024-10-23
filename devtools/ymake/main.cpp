@@ -783,6 +783,7 @@ int main_real(TBuildConfiguration& conf) {
             YDebug() << cacheName << " cache saving is enabled" << Endl;
         }
     };
+    dumpCacheFlags("Conf", conf.ReadConfCache, conf.WriteConfCache);
     dumpCacheFlags("FS", conf.ReadFsCache, conf.WriteFsCache);
     dumpCacheFlags("Deps", conf.ReadDepsCache, conf.WriteDepsCache);
     dumpCacheFlags("DepManagement", conf.ReadDepManagementCache, conf.WriteDepManagementCache);

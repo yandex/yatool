@@ -4,6 +4,7 @@
 #include "licenses_conf.h"
 #include "autoincludes_conf.h"
 
+#include <devtools/ymake/lang/confreader_cache.h>
 #include <devtools/ymake/macro.h>
 #include <devtools/ymake/macro_processor.h>
 #include <devtools/ymake/macro_string.h>
@@ -11,11 +12,14 @@
 #include <devtools/ymake/lang/plugin_facade.h>
 #include <devtools/ymake/yndex/builtin.h>
 #include <devtools/ymake/diag/diag.h>
+#include <devtools/ymake/diag/stats.h>
+#include <devtools/ymake/diag/stats_enums.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/common/memory_pool.h>
 
 #include <util/generic/strbuf.h>
 #include <util/generic/vector.h>
+#include <util/string/cast.h>
 #include <util/string/split.h>
 
 using namespace NYMake;
@@ -32,6 +36,7 @@ namespace {
     constexpr TStringBuf VAR_AUTOINCLUDE_PATHS = "AUTOINCLUDE_PATHS"sv;
 
     void FoldGlobalCommands(TBuildConfiguration* conf) {
+        TTraceStage stage("Fold global commands");
         Y_ASSERT(conf != nullptr);
         auto& vars = conf->CommandConf;
 
@@ -97,6 +102,52 @@ void TBuildConfiguration::CompileAndRecalcAllConditions() {
     Conditions.RecalcAll(CommandConf);
 }
 
+void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
+    using namespace NConfReader;
+
+    auto updateConfCacheFlags = [this]() {
+        if (!NYMake::IsTrue(CommandConf.EvalValue("CONF_CACHE_ENABLED"sv))) {
+            DisableConfCache();
+        }
+        else if (NYMake::IsTrue(CommandConf.EvalValue("DEPS_CACHE_CONTROL_CONF_CACHE"sv))) {
+            MakeDepsCacheControlConfCache();
+        }
+    };
+
+    ClearYmakeConfig();
+    Y_ASSERT(!GetFromCache());
+
+    bool fromCache = false;
+    if (ReadConfCache && LoadCache(*this, confMd5) == ELoadStatus::Success) {
+        updateConfCacheFlags();
+        // call to updateConfCacheFlag() may change the value of ReadConfCache
+        if (ReadConfCache) {
+            fromCache = true;
+        } else {
+            ClearYmakeConfig();
+        }
+    }
+    Y_ASSERT(GetFromCache() == fromCache);
+
+    if (fromCache) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedConfCache), true);
+    } else {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedConfCache), false);
+        MD5 tempConfData;
+        NYMake::TTraceStage stage("Load configuration (no cache)");
+        LoadConfig(YmakeConf.GetPath(), SourceRoot.GetPath(), BuildRoot.GetPath(), tempConfData);
+        tempConfData.Final(confMd5.RawData);
+        updateConfCacheFlags();
+    }
+
+    if (WriteConfCache && !fromCache) {
+        SaveCache(*this, confMd5);
+    } else if (!WriteConfCache) {
+        // FIXME(snermolaev): Shuld we delete previous cache when cache is not saved
+        // confManager.RemoveCache(*this);
+    }
+}
+
 void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DisableHumanReadableOutput) {
         Display()->SetStream(LockedStream());
@@ -156,14 +207,12 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     }
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
-    LoadConfig(YmakeConf.GetPath(), SourceRoot.GetPath(), BuildRoot.GetPath(),  confData);
 
+    TMd5Sig confMd5;
+    PrepareConfiguration(confMd5);
+    confData.Update(&confMd5, sizeof(confMd5));
     CompileAndRecalcAllConditions();
-
-    {
-        TTraceStage stage("Fold global commands");
-        FoldGlobalCommands(this);
-    }
+    FoldGlobalCommands(this);
 
     // this code hangs on win while trying to lock locked non-recursive mutex
     // (after an error that file is not found)

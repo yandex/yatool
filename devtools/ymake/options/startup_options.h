@@ -11,6 +11,7 @@ struct TStartUpOptions: public TRootsOptions {
     TFsPath YmakeConf;
     TFsPath YmakeCache;
     TFsPath YmakeDMCache;
+    TFsPath YmakeConfCache;
     TFsPath YmakeUidsCache;
     TFsPath YmakeJsonCache;
     TFsPath ConfDir;

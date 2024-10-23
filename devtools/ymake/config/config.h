@@ -289,6 +289,18 @@ inline bool HasNamedArgs(const TBlockData* blockData) {
     return blockData && blockData->CmdProps && blockData->CmdProps->IsNonPositional();
 }
 
+struct TImportedFileDescription {
+    TString FileName;
+    TString FileHash;
+    time_t ModificationTime;
+
+    Y_SAVELOAD_DEFINE(
+        FileName,
+        FileHash,
+        ModificationTime
+    );
+};
+
 struct TYmakeConfig {
     TVars CommandConf;     //command patterns, compilers, flags from ymake.conf
     TCondition Conditions; //THashMap: mapping from Var-name to (condition numbers+actions) that have to be recalculated
@@ -306,7 +318,11 @@ struct TYmakeConfig {
 
     NYndex::TDefinitions CommandDefinitions;
 
+    TVector<TImportedFileDescription> ImportedFiles;
+
     bool RenderSemantics = false;
+
+    void ClearYmakeConfig();
 
     void CompleteModules();
     void FillInheritedData(TBlockData& data, const TString& name);
@@ -327,4 +343,14 @@ struct TYmakeConfig {
         BlockData,
         CommandDefinitions
     );
+
+    bool GetFromCache() const {
+        return FromCache_;
+    }
+
+    void SetFromCache(bool fromCache) {
+        FromCache_ = fromCache;
+    }
+private:
+    bool FromCache_ = false;
 };

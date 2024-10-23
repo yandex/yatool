@@ -410,6 +410,22 @@ namespace {
             ::UpdateConfMd5(content, ConfMd5, nullptr);
         }
 
+        void AddToImportedFiles(const TString& fileName, const TString& md5, time_t modTime) {
+            Conf.ImportedFiles.push_back(TImportedFileDescription{fileName, md5, modTime});
+        }
+
+        TString CanonizeImportFileName(TStringBuf fileName) {
+            TFsPath path = fileName;
+            if (path.IsSubpathOf(SourceRoot)) {
+                return ArcPath(path.RelativePath(SourceRoot).GetPath());
+            } else if (path.IsSubpathOf(BuildRoot)) {
+                return BuildPath(path.RelativePath(BuildRoot).GetPath());
+            } else {
+                Y_ASSERT(0);
+                return "";
+            }
+        }
+
         void ProcessImport(TStringBuf fileName) {
             YDIAG(Conf) << "Import: [" << fileName << "]" << Endl;
             bool isFileNameValid = (
@@ -433,10 +449,16 @@ namespace {
 
             TString importContent = TFileInput{importFileName}.ReadAll();
             ValidateUtf8(importContent, importFileName);
+            TString md5 = NConfReader::CalculateConfMd5(importContent);
+            const auto path = TFsPath(importFileName);
+            TFileStat stat;
+            path.Stat(stat);
+            time_t modTime = stat.MTime;
 
             ParseConfig(*this, importFileName, importContent);
 
             ImportsSet.erase(importFileName);
+            AddToImportedFiles(CanonizeImportFileName(importFileName), md5, modTime);
             Y_ASSERT(ImportsStack.back().GetPath() == importFileName);
             ImportsStack.pop_back();
         }
@@ -1630,6 +1652,7 @@ namespace {
             // Postprocessing of resulting configuration should work only for the most-upper
             // conf file (that is all inlcude statements have been already processed)
             if (builder.IsTopLevel()) {
+                builder.AddToImportedFiles("-", CalculateConfMd5(content), 0);
                 builder.Postprocess();
             }
         } catch (TConfigError&) {

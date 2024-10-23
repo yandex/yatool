@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <devtools/ymake/module_confs.h>
+#include <devtools/ymake/lang/confreader_cache.h>
 
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/manager.h>
@@ -679,6 +680,17 @@ void TBlockData::ApplyOwner(const TString& name, TBlockData& owner) {
     }
 
     thisConf.ApplyOwnerConf(ownerConf);
+}
+
+void TYmakeConfig::ClearYmakeConfig() {
+    CommandConf.Clear();
+    Conditions.Clear();
+    BlockData.clear();
+    YmakeConfMD5 = TMd5Sig{};
+    YmakeConfWoRulesMD5 = TMd5Sig{};
+    CommandDefinitions.Clear();
+    ImportedFiles.clear();
+    FromCache_ = false;
 }
 
 void TYmakeConfig::FillInheritedData(TBlockData& data, const TString& name) {

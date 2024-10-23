@@ -140,6 +140,7 @@ namespace NStats {
         RunTime /* "Run time, sec" */,
         ConfigureGraphTime /* "Configure graph time, sec" */,
         ConfigureReadonlyGraphTime /* "Configure readonly graph time, sec" */,
+        UsedConfCache /* "Used Conf cache, bool" */,
         UsedFSCache /* "Used FS cache, bool" */,
         UsedDepsCache /* "Used Deps cache, bool" */,
         UsedJSONCache /* "Used JSON cache, bool" */,

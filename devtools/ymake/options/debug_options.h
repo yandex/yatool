@@ -102,8 +102,8 @@ struct TDebugOptions {
 
     bool UidsCacheWasSetExplicitly = false;
 
-    bool ReadConfCache = true;
-    bool WriteConfCache = true;
+    bool ReadConfCache = false;
+    bool WriteConfCache = false;
     bool ConfCacheWasSetExplicitly = false;
 
     TString PatchPath2;

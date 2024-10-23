@@ -40,6 +40,7 @@ SRCS(
     cmd_parser.cpp
     config_conditions.cpp
     confreader.cpp
+    confreader_cache.cpp
     eval.cpp
     eval_context.cpp
     expansion.rl6
@@ -48,6 +49,8 @@ SRCS(
     makefile_reader.cpp
     resolve_include.cpp
 )
+
+GENERATE_ENUM_SERIALIZATION(confreader_cache.h)
 GENERATE_ENUM_SERIALIZATION(macro_values.h)
 
 END()
