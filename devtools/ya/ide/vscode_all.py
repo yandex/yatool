@@ -134,10 +134,13 @@ class VSCodeProject(object):
 
     def gen_compile_commands(self, tool_fetcher):
         ide_common.emit_message("Generating compilation database")
-        compile_commands_path = os.path.join(self.project_root, "compile_commands.json")
+        compile_commands_path = os.path.join(
+            self.project_root, os.path.expanduser(self.params.target_file or "compile_commands.json")
+        )
         build_params = copy.deepcopy(self.params)
         build_params.cmd_build_root = self.codegen_cpp_dir
         build_params.force_build_depends = self.params.tests_enabled
+        build_params.target_file = compile_commands_path
 
         def gen(prms):
             return bc.gen_compilation_database(prms, self.app_ctx)
@@ -234,7 +237,9 @@ class VSCodeProject(object):
         if self.is_cpp:
             settings["clangd.arguments"] = [
                 "--enable-config",
-                "--compile-commands-dir={}".format(self.project_root),
+                "--compile-commands-dir={}".format(
+                    os.path.dirname(self.params.target_file) if self.params.target_file else self.project_root
+                ),
                 "--header-insertion=never",
                 "--log=info",
                 "--pretty",
