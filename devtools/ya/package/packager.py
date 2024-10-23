@@ -1038,6 +1038,7 @@ def merge_package_with_included(
         result_package[key].update(this_package.get(key, {}))
 
     merged_builds = {}
+    merged_params = {}
     # Clear data and postprocess sections as we merge them later
     result_package["data"] = []
     result_package["postprocess"] = []
@@ -1052,8 +1053,10 @@ def merge_package_with_included(
         build_key = package_path.lstrip(os.sep)
         build_section = package_data.get("build", {})
         builds = [(default_build_key, build_section)] if "targets" in build_section else build_section.items()
+
         for key, value in builds:
             merged_builds["{}::{}".format(build_key, key) if '::' not in key else key] = value
+
         for data in package_data.get("data", []):
             if data.get("source", {}).get("type") == "BUILD_OUTPUT":
                 current = data["source"].get("build_key", default_build_key)
@@ -1065,6 +1068,7 @@ def merge_package_with_included(
                     package_targets_root, data["destination"]["path"].lstrip("/")
                 )
             result_package["data"].append(data)
+
         for pp in package_data.get("postprocess", []):
             if pp.get("source", {}).get("type") == "BUILD_OUTPUT":
                 current = pp["source"].get("build_key", default_build_key)
@@ -1072,7 +1076,14 @@ def merge_package_with_included(
                     pp["source"]["build_key"] = "{}::{}".format(build_key, current)
             result_package["postprocess"].append(pp)
 
+        for key, val in package_data.get("params", {}).items():
+            # param value from base package description wins over included one
+            merged_params.setdefault(key, val)
+
     result_package["build"] = merged_builds
+
+    if merged_params:
+        result_package["params"] = merged_params
 
     return result_package
 
