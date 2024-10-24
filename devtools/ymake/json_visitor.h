@@ -135,6 +135,7 @@ private:
 
     void AddAddincls(TState& state);
     void AddGlobalVars(TState& state);
+    void AddGlobalSrcs();
 
     void ComputeLoopHash(TNodeId loopId);
 

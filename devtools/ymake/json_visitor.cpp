@@ -977,6 +977,8 @@ void TJSONVisitor::FinishCurrent(TState& state) {
 
         AddGlobalVars(state);
 
+        AddGlobalSrcs();
+
         // include main output name to cur entry
         if (IsFileType(CurrNode->NodeType)) {
             TStringBuf nodeName = Graph.ToTargetStringBuf(CurrNode);
@@ -1209,6 +1211,40 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
         for (TNodeId peerNodeId : RestoreContext.Modules.GetNodeListStore().GetList(managedPeersListId)) {
             ui32 peerModuleElemId = RestoreContext.Graph[peerNodeId]->ElemId;
             addVarsFromModule(peerModuleElemId);
+        }
+    }
+}
+
+void TJSONVisitor::AddGlobalSrcs() {
+    if(!CurrData->UsedReservedVars) {
+        return;
+    }
+
+    if (CurrData->UsedReservedVars->contains("SRCS_GLOBAL")) {
+        ui32 moduleElemId = CurrNode->ElemId;
+        const auto& modules = RestoreContext.Modules;
+        const auto& globalSrcsIds = modules.GetModuleNodeIds(moduleElemId).GlobalSrcsIds;
+        for (TNodeId globalSrcNodeId : modules.GetNodeListStore().GetList(globalSrcsIds)) {
+            TNodeData* data = Nodes.FindPtr(globalSrcNodeId);
+            Y_ASSERT(data);
+            if (!data)
+                continue;
+
+            // All generated GLOBAL_SRCS nodes are added to NodeDeps and their changes
+            // are accounted for in Full UID as dependencies
+            if (data->HasBuildCmd)
+                continue;
+
+            CurrState->Hash->ContentMd5Update(data->GetContentUid(), "GlobalSrc content"_sb);
+            CurrState->Hash->ContentMd5Update(data->GetIncludeContentUid(), "GlobalSrc include content"_sb);
+
+            if (RestoreContext.Conf.DumpInputsInJSON) {
+                TConstDepNodeRef srcNode = Graph[globalSrcNodeId];
+                Y_ASSERT(srcNode->NodeType == EMNT_File);
+                if (srcNode->NodeType == EMNT_File) {
+                    AddTo(globalSrcNodeId, GetNodeInputs(CurrNode.Id()));
+                }
+            }
         }
     }
 }
