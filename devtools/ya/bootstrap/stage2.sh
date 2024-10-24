@@ -31,7 +31,7 @@ for platform in $(cat ${SR}/devtools/ya/bootstrap/platform_list); do
         ${SR}/devtools/ya/bin \
         ${SR}/devtools/ymake/bin \
         ${SR}/devtools/local_cache/toolscache/server \
-        ${SR}/devtools/ya/test/programs/test_tool/bin3 \
+        ${SR}/devtools/ya/test/programs/test_tool/bin \
         -I ${RR}/stage2/${platform} \
         --target-platform ${platform} \
         ${FLAGS}

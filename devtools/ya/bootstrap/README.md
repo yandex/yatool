@@ -53,7 +53,6 @@ The last argument is optional and sohuld be used only in debug purposes.
 This stage is optional and uses tooling built in the stage one to build all targets, namely:
 - `devtools/ya/bin`
 - `devtools/local_cache/toolscache/server`
-- `devtools/ya/test/programs/test_tool/bin3`
 - `devtools/ymake/bin`
 - `devtools/yexport/bin`
 
