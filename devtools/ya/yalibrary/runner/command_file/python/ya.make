@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 PEERDIR(
     devtools/ya/yalibrary/runner/command_file

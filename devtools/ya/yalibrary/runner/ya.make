@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 STYLE_PYTHON()
 
@@ -45,7 +45,7 @@ IF (OS_LINUX)
     )
 ENDIF()
 
-IF(NOT YA_OPENSOURCE)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/runner/tasks/distbuild
     )

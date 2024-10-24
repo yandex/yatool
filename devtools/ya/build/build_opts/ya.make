@@ -14,7 +14,6 @@ PEERDIR(
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/opts
-    devtools/ya/yalibrary/runner
     devtools/ya/yalibrary/runner/fs
     devtools/ya/yalibrary/runner/schedule_strategy
     devtools/ya/yalibrary/upload/consts
