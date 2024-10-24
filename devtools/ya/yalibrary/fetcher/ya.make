@@ -8,6 +8,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/core/config
     devtools/ya/yalibrary/fetcher/uri_parser
+    devtools/ya/yalibrary/fetcher/progress_info
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/toolscache
@@ -42,6 +43,7 @@ END()
 
 RECURSE(
     ufetcher
+    progress_info
 )
 
 RECURSE_FOR_TESTS(
