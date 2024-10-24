@@ -784,7 +784,16 @@ def _ymake_wall_time(ymake_stats):
     return wall_time
 
 
-def print_graph_statistics(graph, directory, event_log, display, task_stats=None, ctx_stages=None, ymake_stats=None):
+def print_graph_statistics(
+    graph,
+    directory,
+    event_log,
+    display,
+    task_stats=None,
+    ctx_stages=None,
+    ymake_stats=None,
+    dump_debug=None,
+):
     if directory is not None:
         exts.fs.create_dirs(directory)
 
@@ -812,11 +821,36 @@ def print_graph_statistics(graph, directory, event_log, display, task_stats=None
     if ctx_stages:
         stats['context_stages'] = print_context_stages(ctx_stages, display)
     stats['ymake_wall_time'] = _ymake_wall_time(ymake_stats)
+    stats['changes_in_fs'] = _determine_fs_changes(dump_debug)
     for name, stat in stage_tracer.get_stat('graph').items():
         stats.setdefault('gg_stages', {})[name] = stat.duration
 
     stats['graph_lang_usage'], stats['graph_lang'] = _get_lang_statistics(graph)
     return stats
+
+
+def _determine_fs_changes(dump_debug):
+    """
+    Determines whether there are changes in working copy based on VCS info.
+
+    Returns True if at least one of two conditions below is met:
+    1. ARCADIA_SOURCE_LAST_CHANGE is not the same as ARCADIA_PATCH_NUMBER
+       It means that we are building over non-trunk branch
+    2. DIRTY field is set to 'dirty'
+       It means that we are building over uncommitted changes
+
+    Returns False otherwise.
+    """
+    changes_marker = False
+
+    dump_debug_data = getattr(dump_debug, 'data', {})
+
+    vcs_info = dump_debug_data.get('vcs_info', {})
+
+    changes_marker |= vcs_info.get('ARCADIA_SOURCE_LAST_CHANGE', '') != vcs_info.get('ARCADIA_PATCH_NUMBER', '')
+    changes_marker |= vcs_info.get('DIRTY', '') == 'dirty'
+
+    return changes_marker
 
 
 def _get_lang_statistics(graph):
@@ -873,6 +907,14 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
 
         stat_display = DevNullDisplay()
     stats = {}
+
+    try:
+        import app_ctx
+
+        dump_debug = app_ctx.dump_debug
+    except Exception:
+        dump_debug = None
+
     try:
         stats = print_graph_statistics(
             graph,
@@ -882,6 +924,7 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
             task_stats=task_stats,
             ctx_stages=ctx_stages,
             ymake_stats=ymake_stats,
+            dump_debug=dump_debug,
         )
     except Exception:
         stat_display.emit_message('Unable to calculate statistics because of %s' % traceback.format_exc())

@@ -460,6 +460,8 @@ class YtStore(DistStore):
         stat = {
             "time_to_first_recv_meta": self._time_to_first_recv_meta,
             "time_to_first_call_has": self._time_to_first_call_has,
+            "failed_during_build": self.is_disabled,
+            "failed_during_setup": not self._meta,
         }
 
         report.telemetry.report('{}-{}'.format(self._stats_name, 'additional-info'), stat)
