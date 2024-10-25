@@ -2849,6 +2849,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             graph_kind=_GraphKind.TOOLS,
             debug_id='tools-{ispic}',
             enabled_events=EVENTS_WITH_PROGRESS,
+            extra_conf=opts.extra_conf,
             **kwargs
         )
         graph_tools = tg.pic().graph
