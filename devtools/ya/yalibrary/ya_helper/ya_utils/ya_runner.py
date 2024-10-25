@@ -67,7 +67,7 @@ class Ya(LoggerCounter):
             )
             self.env.update(env)
 
-    def run(self, reraise=True):
+    def run(self, reraise=True, **extra_opts):
         """
         @raise: SubprocessError
         @return: str
@@ -77,7 +77,8 @@ class Ya(LoggerCounter):
             raise RuntimeError("This instance has already been launched")
 
         # XXX: remove after CHANGES_DETECTOR migrate to py3
-        extra_opts = {'process_group': self.process_group} if six.PY3 else {}
+        if six.PY3:
+            extra_opts.update({'process_group': self.process_group})
 
         try:
             result = run_subprocess(self.cmd, self.env, original_env=False, cwd=self.cwd, **extra_opts)
