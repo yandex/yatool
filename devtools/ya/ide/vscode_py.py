@@ -11,7 +11,6 @@ from pathlib import PurePath
 
 import termcolor
 
-import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import core.common_opts
@@ -19,6 +18,8 @@ import core.config
 import core.yarg
 import exts.fs as fs
 import exts.shlex2
+import devtools.ya.app
+import devtools.ya.test.const as const
 import yalibrary.makelists
 import yalibrary.platform_matcher as pm
 import yalibrary.tools
@@ -279,8 +280,8 @@ class PyProject(object):
         arc_root = PurePath(self.params.arc_root)
 
         try:
-            with open(arc_root / vscode.consts.DEFAULT_PYTHON_LINTER_CONFIGS) as afile:
-                black_config_file: str = json.load(afile)[vscode.consts.BLACK_LINTER_NAME]
+            with open(arc_root / const.DefaultLinterConfig.Python) as afile:
+                black_config_file: str = json.load(afile)[const.PythonLinterName.Black]
         except Exception as e:
             ide_common.emit_message("[[warn]]Could not get black config path [[rst]]: %s" % repr(e))
             return {}

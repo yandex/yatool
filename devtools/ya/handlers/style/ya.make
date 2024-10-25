@@ -15,6 +15,7 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/test/const
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/makelists
     devtools/ya/yalibrary/tools

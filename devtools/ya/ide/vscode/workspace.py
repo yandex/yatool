@@ -5,9 +5,9 @@ import shutil
 from collections import OrderedDict
 from pathlib import Path, PurePath
 
+import devtools.ya.test.const as const
 import yalibrary.platform_matcher as pm
 from ide import ide_common
-from . import consts
 from . import excludes
 
 
@@ -158,8 +158,8 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
     arc_root = PurePath(arc_root)
 
     try:
-        with open(arc_root / consts.DEFAULT_PYTHON_LINTER_CONFIGS) as afile:
-            black_config_file: str = json.load(afile)[consts.BLACK_LINTER_NAME]
+        with open(arc_root / const.DefaultLinterConfig.Python) as afile:
+            black_config_file: str = json.load(afile)[const.PythonLinterName.Black]
     except Exception as e:
         ide_common.emit_message(f"[[warn]]Could not get black config path [[rst]]: {e!r}")
         return {}
@@ -195,8 +195,8 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
     arc_root = Path(arc_root)
 
     try:
-        with open(arc_root / consts.DEFAULT_CPP_LINTER_CONFIGS) as afile:
-            config_file: str = json.load(afile)[consts.CLANG_FORMAT_LINTER_NAME]
+        with open(arc_root / const.DefaultLinterConfig.Cpp) as afile:
+            config_file: str = json.load(afile)[const.CppLinterName.ClangFormat]
     except Exception as e:
         ide_common.emit_message(f"[[warn]]Could not get clang-format config path [[rst]]: {e!r}")
         return {}

@@ -16,6 +16,7 @@ from pathlib import Path, PurePath
 
 import core.config
 import core.resource
+import devtools.ya.test.const as const
 import exts.func
 import exts.os2
 import marisa_trie
@@ -144,8 +145,6 @@ class Black(BaseStyler):
     SPEC = Spec(StylerKind.PY)
     SUFFIXES = (".py",)
 
-    _DEFAULT_CONFIGS = "build/config/tests/py_style/default_configs.json"
-
     def __init__(self, args) -> None:
         super().__init__(args)
         self.tool: str = yalibrary.tools.tool("black" if not self.args.py2 else "black_py2")  # type: ignore
@@ -153,7 +152,7 @@ class Black(BaseStyler):
 
     def load_config(self) -> str:
         try:
-            config_map = core.config.config_from_arc_rel_path(self._DEFAULT_CONFIGS)
+            config_map = core.config.config_from_arc_rel_path(const.DefaultLinterConfig.Python)
         except Exception as e:
             logger.warning("Couldn't obtain config from fs due to error %s, reading from memory", repr(e))
             temp = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
@@ -161,7 +160,7 @@ class Black(BaseStyler):
             temp.flush()  # will be read from other subprocesses
             config_file = temp.name
         else:
-            config_file = os.path.join(_find_root(), config_map["black"])
+            config_file = os.path.join(_find_root(), config_map[const.PythonLinterName.Black])
         return config_file
 
     def _run_black(self, content: str, path: PurePath) -> str:
@@ -320,8 +319,6 @@ class ClangFormat(BaseStyler):
     SPEC = Spec(StylerKind.CPP)
     SUFFIXES = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
-    _DEFAULT_CONFIGS = "build/config/tests/cpp_style/default_configs.json"
-
     def __init__(self, args) -> None:
         super().__init__(args)
         self.tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
@@ -329,13 +326,13 @@ class ClangFormat(BaseStyler):
 
     def load_config(self) -> str:
         try:
-            config_map = core.config.config_from_arc_rel_path(self._DEFAULT_CONFIGS)
+            config_map = core.config.config_from_arc_rel_path(const.DefaultLinterConfig.Cpp)
         except Exception as e:
             logger.warning("Couldn't obtain config from fs due to error %s, reading from memory", repr(e))
             style_config = core.resource.try_get_resource("config.clang-format")
             return json.dumps(yaml.safe_load(style_config))
         else:
-            config_file = config_map["clang-format"]
+            config_file = config_map[const.CppLinterName.ClangFormat]
             with open(os.path.join(_find_root(), config_file)) as afile:
                 return json.dumps(yaml.safe_load(afile))
 

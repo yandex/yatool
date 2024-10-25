@@ -15,6 +15,7 @@ PEERDIR(
     devtools/ya/ide/templates
     devtools/ya/jbuild
     devtools/ya/jbuild/idea_templates
+    devtools/ya/test/const
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/find_root
     devtools/ya/yalibrary/graph
