@@ -933,7 +933,7 @@ int main_real(TBuildConfiguration& conf) {
         yMake->DumpDependentDirs(conf.Cmsg());
     }
 
-    if (!hasBadLoops && Diag()->ChkPeers) {
+    if (!hasBadLoops && Diag()->ChkPeers && !yMake->CanBypassConfigure()) {
         yMake->FindMissingPeerdirs();
     }
 

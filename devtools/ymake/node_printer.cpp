@@ -1497,7 +1497,6 @@ private:
 
 private:
     TRestoreContext RestoreContext;
-    THashMap<TNodeId, TUniqVector<TNodeId>> FileToInputs;
 
 public:
     THashMap<TNodeId, TUniqVector<TNodeId>> DirToModules;
