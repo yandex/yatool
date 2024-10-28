@@ -740,7 +740,7 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
 
 bool TYMake::LoadPatch() {
     ArcChangesEvent(!Conf.PatchPath.empty());
-    if (Conf.PatchPath.Empty()) {
+    if (Conf.PatchPath.empty()) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because of PatchPath" << Endl;
         return true;

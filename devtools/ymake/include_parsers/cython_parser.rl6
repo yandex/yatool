@@ -133,7 +133,7 @@ void ParseCythonIncludes(const TString& data, TVector<TString>& includes) {
     TVector<TCythonDep> typedIncludes;
     parser.Parse(incFile, typedIncludes);
     for (auto& incl : typedIncludes) {
-        if (incl.Kind == TCythonDep::EKind::Include && !incl.Path.Empty()) {
+        if (incl.Kind == TCythonDep::EKind::Include && !incl.Path.empty()) {
             includes.push_back(incl.Path);
         }
     }
