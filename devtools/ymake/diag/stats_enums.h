@@ -145,5 +145,6 @@ namespace NStats {
         UsedDepsCache /* "Used Deps cache, bool" */,
         UsedJSONCache /* "Used JSON cache, bool" */,
         UsedUidsCache /* "Used Uids cache, bool" */,
+        BadLoops /* "Bad loops were detected, bool" */,
     };
 }

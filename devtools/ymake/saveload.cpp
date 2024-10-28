@@ -20,6 +20,7 @@
 #include <util/generic/yexception.h>
 #include <util/random/random.h>
 #include <util/system/execpath.h>
+#include <util/system/fs.h>
 #include <util/system/fstat.h>
 
 namespace {
@@ -935,7 +936,7 @@ void TYMake::SaveDepManagementCache() {
 
     DMCacheTempFile = cacheWriter.Flush(true);
 
-    YDebug() << "Dependency management cache has been saved..." << Endl;
+    YDebug() << "DM cache has been saved..." << Endl;
 }
 
 void TYMake::CommitCaches() {
@@ -944,26 +945,40 @@ void TYMake::CommitCaches() {
             Modules.Clear();
             Names.Clear(); // This will unlock any mapped data in graph cache
             DepCacheTempFile.RenameTo(Conf.YmakeCache);
-            DepCacheTempFile = {};
+            if (Conf.WriteFsCache) {
+                YDebug() << "FS cache has been committed..." << Endl;
+            }
+            if (Conf.WriteDepsCache) {
+                YDebug() << "Deps cache has been committed..." << Endl;
+            }
             Conf.OnDepsCacheSaved();
         }
         if (DMCacheTempFile.IsDefined()) {
             DMCacheTempFile.RenameTo(Conf.YmakeDMCache);
-            DMCacheTempFile = {};
+            YDebug() << "DM cache has been committed..." << Endl;
         }
     } else {
-        Y_ASSERT(!DepCacheTempFile.IsDefined());
-        Y_ASSERT(!DMCacheTempFile.IsDefined());
+        if (DepCacheTempFile.IsDefined()) {
+            NFs::Remove(DepCacheTempFile.GetPath());
+        }
+        if (DMCacheTempFile.IsDefined()) {
+            NFs::Remove(DMCacheTempFile.GetPath());
+        }
     }
+    DepCacheTempFile = {};
+    DMCacheTempFile = {};
 
     if (Conf.WriteUidsCache) {
         if (UidsCacheTempFile.IsDefined()) {
             UidsCacheTempFile.RenameTo(Conf.YmakeUidsCache);
-            UidsCacheTempFile = {};
+            YDebug() << "Uids cache has been committed..." << Endl;
         }
     } else {
-        Y_ASSERT(!UidsCacheTempFile.IsDefined());
+        if (UidsCacheTempFile.IsDefined()) {
+            NFs::Remove(UidsCacheTempFile.GetPath());
+        }
     }
+    UidsCacheTempFile = {};
 }
 
 void TYMake::JSONCacheLoaded(bool jsonCacheLoaded) {

@@ -129,6 +129,14 @@ struct TDebugOptions {
         WriteConfCache = false;
     }
 
+    void DoNotWriteAllCaches() {
+        WriteFsCache = false;
+        WriteDepsCache = false;
+        WriteJsonCache = false;
+        WriteDepManagementCache = false;
+        WriteUidsCache = false;
+    }
+
     // The Conf cache can be controlled by the Deps Cache Settings,
     // but this still could be overridden by --xCC=c and --xCR=c.
     void MakeDepsCacheControlConfCache() {

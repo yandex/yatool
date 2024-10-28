@@ -900,6 +900,10 @@ int main_real(TBuildConfiguration& conf) {
     FORCE_TRACE(U, NEvent::TStageFinished("Save and compact"));
 
     bool hasBadLoops = yMake->DumpLoops();
+    if (hasBadLoops) {
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::BadLoops), true);
+        conf.DoNotWriteAllCaches();
+    }
 
     yMake->ApplyDependencyManagement();
 
