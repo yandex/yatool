@@ -200,9 +200,10 @@ def _build(opts, app_ctx, graph):
 def _reduced_ya_make_options():
     import core.yarg.options
     import core.common_opts
-    import devtools.ya.build.build_opts.build_graph_cache
-    import devtools.ya.build.build_opts.checkout
     import devtools.ya.test.opts
+
+    build_graph_cache_opts = build.build_opts.build_graph_cache_config_opts()
+    checkout_opts = build.build_opts.svn_checkout_options()
 
     useless = set(
         [
@@ -233,8 +234,6 @@ def _reduced_ya_make_options():
             core.common_opts.ProfilerOptions,
             core.common_opts.TeamcityOptions,
             core.yarg.options.RawParamsOptions,
-            devtools.ya.build.build_opts.build_graph_cache.BuildGraphCacheConfigOptions,
-            devtools.ya.build.build_opts.checkout.SvnCheckoutOptions,
             devtools.ya.test.opts.ArcadiaTestsDataOptions,
             devtools.ya.test.opts.CanonizationOptions,
             devtools.ya.test.opts.ConsoleReportOptions,
@@ -262,6 +261,10 @@ def _reduced_ya_make_options():
             devtools.ya.test.opts.UidCalculationOptions,
         ]
     )
+
+    # FOR OPENSOURCE
+    useless |= [opt.__class__ for opt in build_graph_cache_opts]
+    useless |= [opt.__class__ for opt in checkout_opts]
 
     useful = []
     for opt in build.build_opts.ya_make_options(free_build_targets=True, build_type="release"):
