@@ -212,13 +212,11 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
         [&](TTermNothing) {
         },
         [&](TString& s) {
-            if (!s.empty())
-                writer->WriteArgument(s);
+            writer->WriteArgument(s);
         },
         [&](TVector<TString>& v) {
             for (auto& s : v)
-                if (!s.empty())
-                    writer->WriteArgument(s);
+                writer->WriteArgument(s);
         },
         [&](TTaggedStrings& v) {
             for (auto& s : v)
@@ -241,8 +239,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoArgument(const NPolexpr::TExpre
     }
     Y_ASSERT(args.Args.size() == 1);
     auto& arg = args.Args.front();
-    if (!arg.empty())
-        writer->WriteArgument(arg);
+    writer->WriteArgument(arg);
     return {termBegin, error};
 }
 

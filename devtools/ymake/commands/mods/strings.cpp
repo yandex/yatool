@@ -186,6 +186,8 @@ namespace {
                     return body;
                 },
                 [&](const TVector<TString>& bodies) -> TTermValue {
+                    if (bodies.empty())
+                        return TTermNothing();
                     return JoinSeq(glue, bodies);
                 },
                 [&](const TTaggedStrings& x) -> TTermValue {

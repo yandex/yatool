@@ -50,6 +50,9 @@ namespace {
             return visitChildren(ctx);
         }
 
+        std::any visitTermsSQ(CmdParser::TermsSQContext *ctx) override { return doVisitTermsQ(ctx); }
+        std::any visitTermsDQ(CmdParser::TermsDQContext *ctx) override { return doVisitTermsQ(ctx); }
+
         // plaintext terms
 
         std::any visitTermO(CmdParser::TermOContext *ctx) override { return doVisitTermR(ctx); }
@@ -116,6 +119,30 @@ namespace {
         }
 
     private:
+
+        std::any doVisitTermsQ(antlr4::RuleContext *ctx) {
+            auto result = visitChildren(ctx);
+            auto& arg = GetCurrentArgument();
+
+            // make sure that:
+            // * enquoted strings stay as command arguments even when they are empty;
+            // * enquoted strings are treated as if being at the term level
+            //   even when they haven't been concatenated with anything;
+            // note that the current argument can have other terms
+            // before and after the string being parsed,
+            // but that should not cause any issues
+            bool hack_the_system = false;
+            if (arg.size() == 0) {
+                hack_the_system = true;
+            } else if (arg.size() == 1) {
+                auto val = std::get_if<NPolexpr::TConstId>(&arg[0]);
+                hack_the_system = !(val && val->GetStorage() == TMacroValues::ST_LITERALS);
+            }
+            if (hack_the_system)
+                arg.emplace_back(Values.InsertStr(""));
+
+            return result;
+        }
 
         std::any doVisitTermR(antlr4::RuleContext *ctx) {
             auto& arg = GetCurrentArgument();
