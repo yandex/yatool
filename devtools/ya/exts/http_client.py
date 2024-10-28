@@ -9,12 +9,13 @@ import time
 
 from six.moves import urllib
 
-import exts.io2
 import exts.fs
 import exts.hashing
-import exts.retry
+import exts.io2
 import exts.process
+import exts.retry
 import library.python.func
+import library.python.unique_id
 import library.python.windows
 
 import typing as tp  # noqa
@@ -91,13 +92,15 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
     if integrity_encoding not in integrity_encoding:
         raise BadIntegrityEncodingException(integrity_encoding)
 
+    temp_path = "{}.{}.part".format(path, library.python.unique_id.gen8())
     exts.fs.ensure_removed(path)
+    exts.fs.ensure_removed(temp_path)
     exts.fs.create_dirs(os.path.dirname(path))
 
     checksum = hasher_map.get(alg)()
     chunks_sizes = []
 
-    logger.debug('Downloading %s to %s, expect %s', url, path, integrity)
+    logger.debug('Downloading %s to %s, expect %s', url, temp_path, integrity)
     start_time = time.time()
     try:
         request = urllib.request.Request(url)
@@ -119,7 +122,7 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
 
     logger.debug('Request to %s has headers %s', url, res.info())
 
-    with open(path, 'wb') as dest_file:
+    with open(temp_path, 'wb') as dest_file:
         exts.io2.copy_stream(res.read, dest_file.write, checksum.update, lambda d: chunks_sizes.append(len(d)))
 
     checksum_str = integrity_encodings.get(integrity_encoding)(checksum)
@@ -127,7 +130,10 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
     if expected_integrity and expected_integrity != checksum_str:
         raise BadMD5Exception('{} sum expected {}, but was {}'.format(alg, expected_integrity, checksum_str))
 
-    os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH | mode)
+    os.chmod(temp_path, stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH | mode)
+
+    # Create finale file only after successful download, checksum verification and installation of all required attributes
+    os.rename(temp_path, path)
 
     logger.debug(
         'Downloading finished %s to %s, %s=%s, size=%s, elapsed=%f',
