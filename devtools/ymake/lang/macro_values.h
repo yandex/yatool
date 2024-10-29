@@ -47,6 +47,8 @@ enum class EMacroFunction: ui32 {
     NoAutoSrc, // output-only, preevaluated
     NoRel, // output-only, preevaluated
     ResolveToBinDir, // output-only, preevaluated
+    // latest additions TODO merge & sort
+    ResourceUri,
     //
     Count
 };

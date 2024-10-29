@@ -99,6 +99,11 @@ void TSubst2Shell::WriteEnv(TStringBuf env) {
     Commands.back().EnvSetDefs.push_back(envStr);
 }
 
+void TSubst2Shell::WriteResource(TStringBuf uri) {
+    auto uriStr = TString(uri);
+    Commands.back().ResourceUris.push_back(uriStr);
+}
+
 void TSubst2Shell::EndCommand() {
     TSingleCmd& cmd = Commands.back();
     TString cmdStr = std::move(std::get<TString>(cmd.CmdStr));

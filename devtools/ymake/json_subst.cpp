@@ -180,6 +180,11 @@ void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     Commands.back().EnvSetDefs.push_back(envStr);
 }
 
+void TJsonCmdAcceptor::WriteResource(TStringBuf uri) {
+    auto uriStr = TString(uri);
+    Commands.back().ResourceUris.push_back(uriStr);
+}
+
 void TJsonCmdAcceptor::EndCommand() {
 }
 
