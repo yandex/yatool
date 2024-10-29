@@ -35,6 +35,7 @@ class ToolResolveException(Exception):
 
 
 class UnsupportedPlatform(Exception):
+    retriable = False
     mute = True
 
 
