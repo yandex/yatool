@@ -402,9 +402,10 @@ class GradleOptions(core.yarg.Options):
 
     def __init__(self):
         self.gradle_name = None
-        self.gradle_project_root = None
+        self.settings_root = None
         self.yexport_bin = None
         self.build_contribs = False
+        self.yexport_debug_mode = None
         self.login = None
         self.bucket_token = None
 
@@ -418,9 +419,9 @@ class GradleOptions(core.yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--project-root', '-P'],
-                help='Root directory for a Gradle project',
-                hook=core.yarg.SetValueHook('gradle_project_root'),
+                ['--settings-root'],
+                help='Directory in Arcadia to place Gradle project settings',
+                hook=core.yarg.SetValueHook('settings_root'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
@@ -434,6 +435,13 @@ class GradleOptions(core.yarg.Options):
                 help='Build all contribs from arcadia to jar files',
                 hook=core.yarg.SetConstValueHook('build_contribs', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--yexport-debug-mode'],
+                help='Debug mode for yexport',
+                hook=core.yarg.SetValueHook('yexport_debug_mode'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
         ]
 

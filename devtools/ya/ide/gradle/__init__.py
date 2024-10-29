@@ -1,279 +1,230 @@
-import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
+import hashlib
+from typing import Callable
+from pathlib import Path
 
 from build.ymake2 import run_ymake
 import build.graph as bg
 import core.yarg
+import core.config
 from core import stage_tracer
 import build.build_opts as bo
 import yalibrary.tools
+from devtools.ya.yalibrary import sjson
 from build import build_facade, ya_make
 import yalibrary.platform_matcher as pm
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("gradle")
-additional_files_ext = ['.config', '.make', '.yaml']
+
+
 requires_props = [
     'bucketUsername',
     'bucketPassword',
     'systemProp.gradle.wrapperUser',
     'systemProp.gradle' '.wrapperPassword',
 ]
-user_root = os.path.expanduser("~")
-gradle_props = os.path.join(user_root, '.gradle', 'gradle.properties')
-build_libs_subdir = '.hic_sunt_dracones'
+gradle_props_file = Path.home() / '.gradle' / 'gradle.properties'
+
+GRADLE_DIR = ".gradle"
+SETTINGS_FILES = ["settings.gradle.kts", "gradlew", "gradlew.bat"]  # Files for symlink to settings root
+SETTINGS_DIRS = [GRADLE_DIR, ".idea", "gradle"]  # Folders for symlink to settings root
+
+YMAKE_DIR = "ymake"
+SKIP_ROOT_DIRS = SETTINGS_DIRS + [YMAKE_DIR]  # Skipped for build directories in export root
+BUILD_FILE = "build.gradle.kts"
+
+NODE_NAME = "Name"  # Build target of node
+NODE_SEMANTICS = "semantics"  # List of node semantics
+NODE_SEMANTIC = "sem"  # One node semantic
 
 
-def in_rel_targets(rel_target, rel_targets_with_slash):
-    for rel_target_with_slash in rel_targets_with_slash:
-        if rel_target[: len(rel_target_with_slash)] == rel_target_with_slash:
-            return True
-    return False
-
-
-class NodeValidator:
-    def __init__(self, rel_targets_with_slash, arcadia_root):
-        self.validate_funcs = [self._bundle_validator, self._proto_files_validator, self._proto_deps_sources_validator]
-        self.additional_targets = []
-        self.outside_targets = []
-        self.rel_targets_with_slash = rel_targets_with_slash
-        self.arcadia_root = arcadia_root
-
-    def validate(self, node):
-        success = False
-        for func in self.validate_funcs:
-            if func(node):
-                success = True
-        return success, self.additional_targets, self.outside_targets
-
-    @staticmethod
-    def _bundle_validator(node):
-        if node.get('NodeType', None) == 'Bundle' and 'semantics' in node:
-            return True
+def _check_bucket_creds() -> bool:
+    """Check exists all required gradle properties"""
+    errors = []
+    if not gradle_props_file.is_file():
+        errors.append(f'file {gradle_props_file} does not exist')
+    else:
+        with gradle_props_file.open() as f:
+            props = f.read()
+        for p in requires_props:
+            if p not in props:
+                errors.append(f'property {p} is not defined in gradle.properties file')
+    if errors:
+        logger.error(
+            'Bucket credentials error: %s\n'
+            'Please, read more about work with Bucket https://docs.yandex-team.ru/bucket/gradle#autentifikaciya\n'
+            'Token can be taken from here '
+            'https://oauth.yandex-team.ru/authorize?response_type=token&client_id=bf8b6a8a109242daaf62bce9d6609b3b',
+            ', '.join(errors),
+        )
         return False
-
-    def _proto_files_validator(self, node):
-        if node.get('NodeType', None) == 'NonParsedFile' and 'semantics' in node:
-            for semantic in node['semantics']:
-                if 'sem' in semantic and len(semantic['sem']) == 2 and semantic['sem'][0] == 'proto_files':
-                    proto_sem = semantic['sem'][1]
-                    if in_rel_targets(proto_sem, self.rel_targets_with_slash):
-                        self.additional_targets.append(semantic['sem'][1])
-                        return True
-
-        return False
-
-    def _proto_deps_sources_validator(self, node):
-        if node.get('NodeType', None) == 'Bundle' and 'semantics' in node:
-            for semantic in node['semantics']:
-                if 'sem' in semantic and len(semantic['sem']) == 3 and semantic['sem'][0] == 'jar_proto':
-                    self.outside_targets.extend(
-                        find_files_by_extension(self.arcadia_root, semantic['sem'][1], [".proto"])
-                    )
-                    return True
-        return False
-
-
-def find_files_by_extension(arcadia_root, start_dir, extensions):
-    result = []
-    for root, dirs, files in os.walk(os.path.join(arcadia_root, start_dir)):
-        for file in files:
-            if any(file.endswith(ext) for ext in extensions):
-                result.append(os.path.join(start_dir, file))
-    return result
-
-
-def save_bucket_creds(login, token):
-    props = {}
-    if os.path.isfile(gradle_props):
-        with open(gradle_props) as f:
-            lines = f.readlines()
-        for line in lines:
-            line = line.strip()
-            if line and not line.startswith('#'):
-                key, value = line.split('=')
-                props[key.strip()] = value.strip()
-    for idx, prop in enumerate(requires_props):
-        if idx % 2 == 0 and login is not None:
-            props[prop] = login
-        elif token is not None:
-            props[prop] = token
-        if prop not in props:
-            return False
-    with open(gradle_props, 'w') as f:
-        for k, v in props.items():
-            f.write('{}={}\n'.format(k, v))
     return True
 
 
-def check_bucket_creds():
-    if not os.path.isfile(gradle_props):
-        return False, 'file gradle.properties does not exist'
-    with open(gradle_props) as f:
-        props = f.read()
-    for p in requires_props:
-        if p not in props:
-            return False, 'property {} is not defined in gradle.properties file'.format(p)
-    return True, ''
+def _prepare_input_targets(params, arcadia_root: Path) -> None:
+    """Add current directory to input targets, if targets empty"""
+    if not params.abs_targets:
+        abs_target = Path.cwd().resolve()
+        params.abs_targets.append(str(abs_target))
+        params.rel_targets.append(os.path.relpath(abs_target, arcadia_root))
+    logger.info("Input targets: %s", ', '.join(params.rel_targets))
 
 
-def is_subpath_of(path, root_path):
-    return os.path.realpath(path).startswith(os.path.realpath(root_path) + os.sep)
+def _get_export_root(params) -> Path:
+    """Create export_root path by hash of targets"""
+    targets_hash = hashlib.sha1(':'.join(sorted(params.abs_targets)).encode("utf-8")).hexdigest()
+    export_root = Path.home() / ".ya" / "gradle" / targets_hash
+    logger.info("Export root: %s", export_root)
+    return export_root
 
 
-def recursive_symlinks(arcadia_root, gradle_project_root, target):
-    arc_target_src = os.path.join(arcadia_root, target)
-    exp_target_src = os.path.join(gradle_project_root, target)
-    if not os.path.exists(arc_target_src):
+def _get_settings_root(params, arcadia_root: Path) -> Path:
+    """Create settings_root path by options and targets"""
+    if params.settings_root is None:
+        settings_root = Path(params.abs_targets[0])
+    else:
+        settings_root = arcadia_root / params.settings_root
+    if not settings_root.exists() or not settings_root.is_dir():
+        logger.error('Not found settings directory %s', settings_root)
         return
-    # pay attention to it
-    if not os.path.exists(exp_target_src):
-        os.makedirs(os.path.dirname(exp_target_src), exist_ok=True)
-        os.symlink(os.path.relpath(arc_target_src, os.path.dirname(exp_target_src)), exp_target_src)
-    elif os.path.isdir(arc_target_src):
-        for path in os.listdir(arc_target_src):
-            if os.path.isdir(os.path.join(arc_target_src, path)):
-                recursive_symlinks(arcadia_root, gradle_project_root, os.path.join(target, path))
+    logger.info("Settings root: %s", settings_root)
+    return settings_root
 
 
-def apply_graph(params, sem_graph, gradle_project_root, additional_run_java_targets):
-    with open(sem_graph) as f:
-        graph = json.load(f)
-        f.close()
-
-    # Нормализуем пути
-    rel_targets_with_slash = []  # Relative targets for export as source to gradle project with slash at end
-    for rel_target in params.rel_targets:
-        if '/' == rel_target[-1:]:
-            rel_targets_with_slash.append(rel_target)
-        else:
-            rel_targets_with_slash.append(rel_target + '/')
-
-    arcadia_root = params.arc_root
-    project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
-    # Пути для сборки yamake'ом
-    build_rel_targets = []  # Relative paths to targets for build
-    build_rel_targets.extend(additional_run_java_targets)
-    for node in graph['data']:
-        # additional - пути для симлинков внутри проекта, outside - пути для симлинков вне проекта
-        validated, additional_targets, outside_targets = NodeValidator(rel_targets_with_slash, arcadia_root).validate(
-            node
-        )
-        if not validated:
-            continue
-
-        for outside_target in outside_targets:
-            if not in_rel_targets(outside_target, rel_targets_with_slash):
-                recursive_symlinks(arcadia_root, gradle_project_root, outside_target)
-
-        rel_target = node['Name'].replace('$B/', '').replace('$S/', '')  # Relative target - some *.jar
-        # если путь проекта является префиксом для таргета
-        if in_rel_targets(rel_target, rel_targets_with_slash):
-            # если генерим проект в отдельную директорию - вне Аркадии
-            if project_outside_arcadia:
-                # Target for export as sources, make symlinks to all sources in export folder
-                rel_target_srcs = [os.path.join(os.path.dirname(rel_target), 'src')]
-                rel_target_srcs.extend(additional_targets)
-                # TODO Add other non-standard sources from jar_source_set semantic to rel_target_srcs
-                for rel_target_src in rel_target_srcs:
-                    recursive_symlinks(arcadia_root, gradle_project_root, rel_target_src)
-        # если в режиме сборки контрибов
-        elif params.build_contribs:
-            build_rel_targets.append(rel_target)
-        else:
-            # если не в режиме сборки контриба и не нашли семантику контриба, то собираем
-            contrib = False
-            for semantic in node['semantics']:
-                if (
-                    'sem' in semantic
-                    and len(semantic['sem']) >= 2
-                    and semantic['sem'][0] == 'consumer-type'
-                    and semantic['sem'][1] == 'contrib'
-                ):
-                    contrib = True
-                    break
-            if not contrib:
-                build_rel_targets.append(rel_target)
-
-    # .config, .make, .yaml etc files symlinks addition
-    add_files_targets = find_files_by_extension(arcadia_root, params.rel_targets[0], additional_files_ext)
-    for target in add_files_targets:
-        recursive_symlinks(arcadia_root, gradle_project_root, target)
-
-    if len(build_rel_targets):  # Has something to build
-        import app_ctx
-
-        ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
-        opts = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra))
-
-        opts.bld_dir = params.bld_dir
-        opts.arc_root = arcadia_root
-        opts.bld_root = params.bld_root
-
-        opts.rel_targets = list()
-        opts.abs_targets = list()
-        for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
-            rel_dir = os.path.dirname(build_rel_target)
-            opts.rel_targets.append(rel_dir)
-            opts.abs_targets.append(os.path.join(arcadia_root, rel_dir))
-
-        # получаем сборочный граф
-        logger.info("Making building graph with opts\n")
-        with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
-            graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, display=app_ctx.display)
-        # собираем, что есть в сборочном графе
-        builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
-        exit_code = builder.go()
-        if exit_code != 0:
-            sys.exit(exit_code)
-
-        # если генерим не в Аркадию, то переносим все собранные модули в одну директорию
-        if project_outside_arcadia:
-            # Make symlinks to all built targets
-            for build_rel_target in build_rel_targets:
-                dst = os.path.join(os.path.join(gradle_project_root, build_libs_subdir), build_rel_target)
-                if os.path.exists(dst):
-                    os.unlink(dst)
-                src = os.path.join(arcadia_root, build_rel_target)
-                if os.path.exists(src):
-                    os.makedirs(os.path.dirname(dst), exist_ok=True)
-                    os.symlink(src, dst)
+def _remove_symlink(export_file: Path, arcadia_file: Path) -> None:
+    """Remove symlink from arcadia_file to export_file"""
+    if arcadia_file.is_symlink() and arcadia_file.resolve() == export_file:
+        try:
+            arcadia_file.unlink()
+        except Exception as e:
+            logger.warning("Can't remove symlink '%s' -> '%s': %s", arcadia_file, export_file, str(e))
 
 
-def find_run_java_program(sem_graph, gradle_project_root, arcadia_root):
-    with open(sem_graph) as f:
-        graph = json.load(f)
-        f.close()
+def _make_symlink(export_file: Path, arcadia_file: Path) -> None:
+    """Make symlink from arcadia_file to export_file"""
+    try:
+        _remove_symlink(export_file, arcadia_file)
+        arcadia_file.symlink_to(export_file, export_file.is_dir())
+    except Exception as e:
+        logger.warning("Can't create symlink '%s' -> '%s': %s", arcadia_file, export_file, str(e))
 
-    additional_targets = list()
-    for node in graph['data']:
-        if node.get('NodeType', None) != 'NonParsedFile' or 'semantics' not in node:
-            continue
-        semantics = node['semantics']
-        if (
-            'sem' in semantics[0]
-            and len(semantics[0]['sem']) == 1
-            and semantics[0]['sem'][0] == 'runs-ITEM'
-            and semantics[2]['sem'][1] != '@.cplst'
+
+def _apply_settings_symlinks(export_root: Path, settings_root: Path, on_symlink: Callable[[Path, Path], None]) -> None:
+    """Apply on_symlink function for each settings files/dirs"""
+    (export_root / GRADLE_DIR).mkdir(0o755, parents=True, exist_ok=True)
+    for export_file in export_root.iterdir():
+        basename = export_file.name
+        if (basename in SETTINGS_FILES and export_file.is_file()) or (
+            basename in SETTINGS_DIRS and export_file.is_dir()
         ):
-            additional_target = semantics[2]['sem'][1]
-            additional_target = additional_target.replace('@', '')
-            additional_target = os.path.dirname(additional_target)
-            additional_target = os.path.relpath(additional_target, gradle_project_root)
-            additional_target = os.path.join(arcadia_root, additional_target)
-            additional_targets.append(additional_target)
+            arcadia_file = settings_root / basename
+            on_symlink(export_file, arcadia_file)
+
+
+def _apply_build_symlinks_recursive(
+    export_root: Path, arcadia_root: Path, rel_dir: Path, on_symlink: Callable[[Path, Path], None]
+) -> None:
+    """Recursive apply on_symlink function for each build files/dirs from arcadia to export"""
+    export_dir = export_root / rel_dir
+    for export_file in export_dir.iterdir():
+        if export_file.name == BUILD_FILE and export_file.is_file():
+            arcadia_file = arcadia_root / rel_dir / Path(export_file.name)
+            on_symlink(export_file, arcadia_file)
+        elif export_file.is_dir():
+            _apply_build_symlinks_recursive(export_root, arcadia_root, Path(rel_dir, export_file.name), on_symlink)
+
+
+def _apply_build_symlinks(export_root: Path, arcadia_root: Path, on_symlink: Callable[[Path, Path], None]) -> None:
+    """Apply on_symlink function for each build files/dirs from arcadia to export"""
+    for export_file in export_root.iterdir():
+        basename = export_file.name
+        if basename not in SKIP_ROOT_DIRS and export_file.is_dir():
+            _apply_build_symlinks_recursive(export_root, arcadia_root, Path(export_file.name), on_symlink)
+        elif basename == BUILD_FILE and export_file.is_file():
+            on_symlink(export_file, arcadia_root / basename)
+
+
+def _clear_export(export_root: Path, arcadia_root: Path, settings_root: Path) -> None:
+    """Clear export_root and arcadia symlinks before rebuild export"""
+    if not export_root.exists():
+        return
+    _apply_settings_symlinks(
+        export_root, settings_root, _remove_symlink
+    )  # Remove settings symlinks from arcadia to export
+    _apply_build_symlinks(export_root, arcadia_root, _remove_symlink)  # Remove build symlinks from arcadia to export
+    shutil.rmtree(export_root)
+
+
+def _read_sem_graph(sem_graph: Path) -> dict:
+    try:
+        with sem_graph.open('rb') as f:
+            graph = sjson.load(f)
+        return graph
+    except Exception as e:
+        logger.error("Fail read sem-graph from `%s`: %s", str(sem_graph), str(e))
+        return None
+
+
+def _node_with_semantics(node: dict) -> bool:
+    return NODE_SEMANTICS in node
+
+
+def _is_valid_semgraph_node(node: dict) -> bool:
+    valid = True
+    if NODE_NAME not in node or not isinstance(node[NODE_SEMANTICS], list) or not node[NODE_SEMANTICS]:
+        valid = False
+    for semantic in node[NODE_SEMANTICS]:
+        if (
+            NODE_SEMANTIC not in semantic
+            or not isinstance(semantic[NODE_SEMANTIC], list)
+            or not semantic[NODE_SEMANTIC]
+        ):
+            valid = False
+            break
+    if not valid:
+        logger.error('Skip invalid sem-graph node %s', str(sjson.dumps(node)))
+    return valid
+
+
+def _find_run_java_program(sem_graph: Path, export_root: Path, arcadia_root: Path) -> list[Path]:
+    """Find RUN_JAVA_PROGRAMs in sem-graph and extract additional targets for they"""
+    graph = _read_sem_graph(sem_graph)
+    if graph is None:
+        return []
+
+    try:
+        additional_targets = []
+        for node in graph['data']:
+            if not _node_with_semantics(node) or not _is_valid_semgraph_node(node):
+                continue
+            semantics = node[NODE_SEMANTICS]
+            if (
+                len(semantics) >= 3
+                and semantics[0][NODE_SEMANTIC][0] == 'runs-ITEM'
+                and len(semantics[2][NODE_SEMANTIC]) >= 2
+                and semantics[2][NODE_SEMANTIC][1] != '@.cplst'
+            ):
+                additional_target = semantics[2][NODE_SEMANTIC][1]
+                additional_target = additional_target.replace('@', '')
+                additional_target = Path(additional_target).parent
+                additional_target = os.path.relpath(additional_target, export_root)
+                additional_target = arcadia_root / additional_target
+                additional_targets.append(additional_target)
+    except Exception as e:
+        logger.error("Fail extract additional targets from sem-graph: %s", str(e))
 
     return additional_targets
 
 
-def make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener):
+def _make_sem_graph(ymake, params, arcadia_root: Path, ymake_root: Path, listener: Callable) -> Path:
+    """Make sem-graph to ymake_root"""
     conf = build_facade.gen_conf(
-        build_root=handler_root,
+        build_root=core.config.build_root(),
         build_type='nobuild',
         build_targets=params.abs_targets,
         flags=params.flags,
@@ -283,84 +234,42 @@ def make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_roo
         arc_root=arcadia_root,
     )
 
+    ymake_root.mkdir(0o755, parents=True, exist_ok=True)
+    ymake_conf = ymake_root / 'ymake.conf'
+    shutil.copy(conf, ymake_conf)
+
     ymake_args = [
         '-k',
         '--build-root',
-        gradle_project_root,
+        str(ymake_root),
         '--config',
-        conf,
+        str(ymake_conf),
         '--plugins-root',
-        os.path.join(arcadia_root, 'build/plugins'),
+        str(arcadia_root / 'build' / 'plugins'),
         '--xs',
         '--sem-graph',
     ] + params.abs_targets
 
-    logger.info("Generate sem-graph command:\n" + ' '.join([ymake] + ymake_args) + "\n")
+    logger.info("Generate sem-graph command:\n%s", ' '.join([ymake] + ymake_args))
 
-    _, stdout, _ = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
+    exit_code, stdout, stderr = run_ymake.run(ymake, ymake_args, {}, listener, raw_cpp_stdout=False)
 
-    shutil.copy(
-        conf, os.path.join(handler_root, 'ymake.conf')
-    )  # TODO Remove For debugonly, required for retry to make sem.json
-    sem_graph = os.path.join(handler_root, 'sem.json')
-    with open(sem_graph, 'w') as f:
+    if exit_code != 0:
+        logger.error("Fail generate sem-graph:\n%s", stderr)
+        return None
+
+    sem_graph = ymake_root / 'sem.json'
+    with sem_graph.open('w') as f:
         f.write(stdout)
-        f.close()
 
     return sem_graph
 
 
-def do_gradle(params):
-    do_gradle_stage = stager.start('do_gradle')
-
-    if pm.my_platform() == 'win32':
-        logger.error("Win is not supported in ya ide gradle")
-        return
-
-    check, err = check_bucket_creds()
-    if not check:
-        logger.error(
-            'Bucket credentials error: {}\n'
-            'Please, read more about work with Bucket https://docs.yandex-team.ru/bucket/gradle#autentifikaciya\n'
-            'Token can be taken from here '
-            'https://oauth.yandex-team.ru/authorize?response_type=token&client_id=bf8b6a8a109242daaf62bce9d6609b3b'.format(
-                err
-            )
-        )
-        return
-
-    arcadia_root = params.arc_root
-
-    # If not defined any target use current directory as target
-    if len(params.abs_targets) == 0:
-        abs_target = os.path.realpath(os.getcwd())
-        params.abs_targets.append(abs_target)
-        params.rel_targets.append(os.path.relpath(abs_target, arcadia_root))
-
-    gradle_project_root = params.gradle_project_root
-    if gradle_project_root is None:
-        if len(params.abs_targets) > 1:
-            logger.error("Must be defined --project-root when used few targets")
-            return
-        # For single target use it as project_root, when not defined
-        gradle_project_root = os.path.realpath(params.abs_targets[0])
-
-    logger.info("Project root: " + gradle_project_root)
-
-    project_outside_arcadia = not is_subpath_of(gradle_project_root, arcadia_root)
-    tmp = None
-    if project_outside_arcadia:
-        # Save handler files to project root
-        handler_root = gradle_project_root
-    else:
-        # Save handler files to tmp
-        tmp = tempfile.mkdtemp()
-        handler_root = tmp
-        logger.info("Handler root: " + handler_root)
-
+def _generate_sem_graph(params, export_root: Path, arcadia_root: Path, ymake_root: Path) -> list[Path, list[Path]]:
     flags = {
-        'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': arcadia_root,
-        'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': gradle_project_root,
+        'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': str(arcadia_root),
+        'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': str(export_root),
+        'YA_IDE_GRADLE': 'yes',
         'EXPORT_GRADLE': 'yes',
         'TRAVERSE_RECURSE': 'yes',
         'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
@@ -368,35 +277,43 @@ def do_gradle(params):
         'USE_PREBUILT_TOOLS': 'no',
     }
     params.flags.update(flags)
-    # to avoid problems with proto
-    params.ya_make_extra.append('-DBUILD_LANGUAGES=JAVA')
+    params.ya_make_extra.append('-DBUILD_LANGUAGES=JAVA')  # to avoid problems with proto
 
-    yexport = yalibrary.tools.tool('yexport') if params.yexport_bin is None else params.yexport_bin
     ymake = yalibrary.tools.tool('ymake') if params.ymake_bin is None else params.ymake_bin
 
     def listener(event):
         logger.info(event)
 
-    sem_graph = make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener)
-    additional_run_java_program_targets = find_run_java_program(sem_graph, gradle_project_root, arcadia_root)
-    additional_run_java_program_rel_targets = list()
-    if len(additional_run_java_program_targets) > 0:
-        for additional_run_java_program_target in additional_run_java_program_targets:
-            params.abs_targets.append(additional_run_java_program_target)
-            rel_target = os.path.relpath(additional_run_java_program_target, arcadia_root)
-            params.rel_targets.append(rel_target)
-            additional_run_java_program_rel_targets.append(rel_target)
-        sem_graph = make_sem_graph(ymake, params, arcadia_root, handler_root, gradle_project_root, listener)
+    sem_graph = _make_sem_graph(ymake, params, arcadia_root, ymake_root, listener)
+    if sem_graph is None:
+        return None, None
 
+    additional_run_java_program_targets = _find_run_java_program(sem_graph, export_root, arcadia_root)
+    additional_run_java_program_rel_targets = list()
+    if additional_run_java_program_targets:
+        for additional_run_java_program_target in additional_run_java_program_targets:
+            params.abs_targets.append(str(additional_run_java_program_target))
+            rel_target = os.path.relpath(additional_run_java_program_target, arcadia_root)
+            params.rel_targets.append(str(rel_target))
+            additional_run_java_program_rel_targets.append(rel_target)
+        sem_graph = _make_sem_graph(ymake, params, arcadia_root, ymake_root, listener)
+        if sem_graph is None:
+            return None, None
+        logger.info("Updated by targets: %s", ', '.join(params.rel_targets))
+
+    return sem_graph, additional_run_java_program_rel_targets
+
+
+def _generate_by_yexport(params, export_root: Path, arcadia_root: Path, ymake_root: Path, sem_graph: Path) -> bool:
     if params.gradle_name:
         project_name = params.gradle_name
     else:
         project_name = params.abs_targets[0].split(os.sep)[-1]
 
-    logger.info("Path prefixes for skip in yexport:\n" + ' '.join(params.rel_targets) + "\n")
+    logger.info("Path prefixes for skip in yexport:\n%s", ' '.join(params.rel_targets))
 
-    yexport_toml = os.path.join(handler_root, 'yexport.toml')
-    with open(yexport_toml, 'w') as f:
+    yexport_toml = ymake_root / 'yexport.toml'
+    with yexport_toml.open('w') as f:
         f.write(
             '[add_attrs.dir]\n'
             + 'build_contribs = '
@@ -414,35 +331,155 @@ def do_gradle(params):
             + 'name = "IGNORED"\n'
             + 'args = []\n'
         )
-        f.close()
+
+    yexport = yalibrary.tools.tool('yexport') if params.yexport_bin is None else params.yexport_bin
 
     yexport_args = [
         yexport,
         '--arcadia-root',
-        arcadia_root,
+        str(arcadia_root),
         '--export-root',
-        gradle_project_root,
+        str(export_root),
         '--configuration',
-        handler_root,
+        str(ymake_root),
         '--semantic-graph',
-        sem_graph,
-        '--debug-mode',
-        'attrs',
+        str(sem_graph),
+    ]
+    if params.yexport_debug_mode is not None:
+        yexport_args += ["--debug-mode", str(params.yexport_debug_mode)]
+    yexport_args += [
         '--generator',
         'ide-gradle',
         '--target',
         project_name,
     ]
 
-    logger.info("Generate by yexport command:\n" + ' '.join(yexport_args) + "\n")
+    logger.info("Generate by yexport command:\n%s", ' '.join(yexport_args))
+    r = subprocess.run(yexport_args, capture_output=True, text=True)
+    if r.returncode != 0:
+        logger.error("Fail yexport command:\n%s", r.stderr)
+        return False
+    return True
 
-    subprocess.call(yexport_args)
 
-    apply_graph(params, sem_graph, gradle_project_root, additional_run_java_program_rel_targets)
+def _build_targets(params, sem_graph: Path, additional_run_java_program_rel_targets: list[Path]) -> bool:
+    """Extract build targets from sem-graph and build they"""
+    graph = _read_sem_graph(sem_graph)
+    if graph is None:
+        return False
 
-    # TODO remove ymake.conf, sem.json, yexport.toml
+    try:
+        build_rel_targets = additional_run_java_program_rel_targets
+        for node in graph['data']:
+            if not _node_with_semantics(node) or not _is_valid_semgraph_node(node):
+                continue
+
+            name = node['Name']
+            if not name.startswith('$B/') or not name.endswith('.jar'):  # Search only *.jar with semantics
+                continue
+
+            rel_target = Path(name.replace('$B/', '')).parent  # Relative target - directory of *.jar
+            in_rel_targets = False
+            for input_rel_target in params.rel_targets:
+                if rel_target.is_relative_to(Path(input_rel_target)):
+                    in_rel_targets = True
+                    break
+
+            if in_rel_targets:
+                # Skip target, already in input targets
+                continue
+            elif params.build_contribs:
+                # Build all non-input targets
+                build_rel_targets.append(rel_target)
+            else:
+                # else build all non-contrib targets
+                contrib = False
+                for semantic in node[NODE_SEMANTICS]:
+                    sem = semantic[NODE_SEMANTIC]
+                    if len(sem) == 2 and sem[0] == 'consumer-type' and sem[1] == 'contrib':
+                        contrib = True
+                        break
+                if not contrib:
+                    build_rel_targets.append(rel_target)
+    except Exception as e:
+        logger.error("Fail extract build targets from sem-graph `%s`: %s", str(sem_graph), str(e))
+        return False
+
+    if build_rel_targets:  # Has something for build
+        import app_ctx
+
+        try:
+            ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
+            opts = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra))
+
+            arcadia_root = Path(params.arc_root)
+
+            opts.bld_dir = params.bld_dir
+            opts.arc_root = str(arcadia_root)
+            opts.bld_root = params.bld_root
+
+            opts.rel_targets = list()
+            opts.abs_targets = list()
+            for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
+                opts.rel_targets.append(str(build_rel_target))
+                opts.abs_targets.append(str(arcadia_root / build_rel_target))
+
+            logger.info("Making building graph")
+            with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
+                graph, _, _, _, _ = bg.build_graph_and_tests(opts, check=True, display=app_ctx.display)
+            logger.info("Build all by graph")
+            builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
+            return_code = builder.go()
+            if return_code != 0:
+                logger.error("Some builds failed")
+                return False
+        except Exception as e:
+            logger.error("Failed in build process: %s", str(e))
+            return False
+    return True
+
+
+def do_gradle(params):
+    """Real handler of `ya ide gradle`"""
+    return_code = 1  # By default some failed
+    do_gradle_stage = stager.start('do_gradle')
+
+    while True:
+
+        if pm.my_platform() == 'win32':
+            logger.error("Windows is not supported in ya ide gradle")
+            break
+
+        if not _check_bucket_creds():
+            break
+
+        arcadia_root = Path(params.arc_root)
+        _prepare_input_targets(params, arcadia_root)
+        export_root = _get_export_root(params)
+        settings_root = _get_settings_root(params, arcadia_root)
+        _clear_export(export_root, arcadia_root, settings_root)
+
+        ymake_root = export_root / YMAKE_DIR
+        sem_graph, additional_run_java_program_rel_targets = _generate_sem_graph(
+            params, export_root, arcadia_root, ymake_root
+        )
+        if sem_graph is None:
+            break
+
+        if not _generate_by_yexport(params, export_root, arcadia_root, ymake_root, sem_graph):
+            break
+
+        _apply_settings_symlinks(
+            export_root, settings_root, _make_symlink
+        )  # Make settings symlinks from arcadia to export
+        _apply_build_symlinks(export_root, arcadia_root, _make_symlink)  # Make build symlinks from arcadia to export
+
+        if not _build_targets(params, sem_graph, additional_run_java_program_rel_targets):
+            break
+
+        return_code = 0  # All executed success
+        break
 
     do_gradle_stage.finish()
 
-    if tmp:
-        shutil.rmtree(tmp)
+    sys.exit(return_code)
