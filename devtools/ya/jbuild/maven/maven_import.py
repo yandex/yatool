@@ -140,15 +140,18 @@ class Artifact(object):
 
 
 def contrib_location(artifact):
+    path = [get_contrib_path()] + artifact.group_id.split('.')
+
     if not artifact.classifier or artifact.classifier == 'sources':
         suffix = ''
-
     else:
         suffix = '-' + artifact.classifier
+    path.append(artifact.artifactId + suffix)
 
-    return graph_base.hacked_path_join(
-        *([get_contrib_path()] + artifact.group_id.split('.') + [artifact.artifactId + suffix, artifact.version])
-    )
+    if artifact.version:
+        path.append(artifact.version)
+
+    return graph_base.hacked_path_join(*path)
 
 
 def contrib_location_bom(artifact):
@@ -730,6 +733,13 @@ def populate_contrib_unified(
             for peerdir in peerdirs:
                 macro.add_value(get_peerdir(peerdir, forced_deps))
 
+        # EXCLUDE
+        excludes = [contrib_location(d) for d in p.get('excludes', [])]
+        if excludes:
+            macro = find_or_create(project, 'EXCLUDE')
+            for exclude in excludes:
+                macro.add_value(exclude)
+
         if p.get('jar_file_id'):
             macro = (
                 find_or_create(project, 'LOCAL_JAR') if local_jar_resources else find_or_create(project, 'JAR_RESOURCE')
@@ -1291,6 +1301,7 @@ def import_unified(
                 'source_file': data.get('source_file'),
                 'includes': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_imports', [])],
                 'peerdirs': [extract_artefact(i['artifact'], replace_version) for i in data.get('dependencies', [])],
+                "excludes": [Artifact.from_unified_dict(i['artifact']) for i in data.get("exclusions", [])],
                 'dm': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_dependencies', [])],
                 'licenses': my_licenses,
                 'repository': data.get('repository'),
