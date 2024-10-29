@@ -257,7 +257,7 @@ def gen_compilation_database(params, app_ctx):
 def dump_compilation_database(params):
     import app_ctx  # XXX
 
-    params.flags['BUILD_LANGUAGES'] = 'CPP'
+    params.flags.setdefault('BUILD_LANGUAGES', 'CPP')
     cdb = gen_compilation_database(params, app_ctx)
     if params.target_file:
         with open(params.target_file, "w") as f:
