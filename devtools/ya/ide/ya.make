@@ -29,7 +29,6 @@ PEERDIR(
 IF (PYTHON3)
     PEERDIR(
         devtools/ya/ide/gradle
-        devtools/ya/ide/yegradle
     )
 ENDIF()
 

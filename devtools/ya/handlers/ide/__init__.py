@@ -37,7 +37,6 @@ from core.yarg.help_level import HelpLevel
 
 if six.PY3:
     import ide.gradle
-    import ide.yegradle
 
 
 class TidyOptions(core.yarg.Options):
@@ -558,24 +557,6 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['gradle'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(ide.gradle.do_gradle),
             description='Generate gradle for project with yexport',
-            opts=ide.ide_common.ide_minimal_opts(targets_free=True)
-            + [
-                ide.ide_common.YaExtraArgsOptions(),
-                GradleOptions(),
-                build.build_opts.YMakeBinOptions(),
-                build.build_opts.FlagsOptions(),
-                build.build_opts.CustomFetcherOptions(),
-                build.build_opts.SandboxAuthOptions(),
-                core.common_opts.CrossCompilationOptions(),
-                build.build_opts.ToolsOptions(),
-                build.build_opts.BuildTypeOptions('release'),
-                build.build_opts.JavaSpecificOptions(),
-            ],
-            visible=False,
-        )
-        self['yegradle'] = core.yarg.OptsHandler(
-            action=devtools.ya.app.execute(ide.yegradle.do_yegradle),
-            description='Generate gradle for project by yexport',
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.ide_common.YaExtraArgsOptions(),
