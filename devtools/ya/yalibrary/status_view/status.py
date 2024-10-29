@@ -25,6 +25,47 @@ class DummyListener(object):
 
 
 class Status(object):
+    class _Listener(object):
+        def __init__(self, status):
+            self._status = status
+
+        def add(self, task):
+            with self._status._lock:
+                self._status._qty += 1
+                self._status._progress = len(self._status._finished) * 1.0 / self._status._qty
+
+        def ready(self, task):
+            pass
+
+        def started(self, task):
+            with self._status._lock:
+                self._status._active[task] = time.time()
+
+        def finished(self, task):
+            with self._status._lock:
+                del self._status._active[task]
+                self._status._finished.append(task)
+                self._status._progress = len(self._status._finished) * 1.0 / self._status._qty
+
+    class _BulkListener(object):
+        def __init__(self, status):
+            self._status = status
+
+        def add_finished(self, tasks):
+            with self._status._lock:
+                self._status._finished.extend(tasks)
+
+        def set_active(self, tasks):
+            tasks = sorted(tasks, key=operator.itemgetter(1))
+            with self._status._lock:
+                self._status._active = tasks
+
+        def set_count(self, count):
+            self._status._qty = count
+
+        def set_progress(self, progress):
+            self._status._progress = progress
+
     def __init__(self):
         self._active = collections.OrderedDict()
         self._finished = []
@@ -33,54 +74,10 @@ class Status(object):
         self._progress = 0.0
 
     def listener(self):
-        class Listener(object):
-            @staticmethod
-            def add(task):
-                with self._lock:
-                    self._qty += 1
-                    self._progress = len(self._finished) * 1.0 / self._qty
-
-            def ready(self, task):
-                pass
-
-            @staticmethod
-            def started(task):
-                with self._lock:
-                    self._active[task] = time.time()
-
-            @staticmethod
-            def finished(task):
-                with self._lock:
-                    del self._active[task]
-                    self._finished.append(task)
-                    self._progress = len(self._finished) * 1.0 / self._qty
-
-        return Listener()
+        return Status._Listener(self)
 
     def bulk_listener(self):
-        class BulkListener(object):
-            @staticmethod
-            def add_finished(tasks):
-                with self._lock:
-                    self._finished.extend(tasks)
-
-            @staticmethod
-            def set_active(tasks):
-                tasks = tasks[:]
-                tasks.sort(key=operator.itemgetter(1))
-
-                with self._lock:
-                    self._active = tasks
-
-            @staticmethod
-            def set_count(count):
-                self._qty = count
-
-            @staticmethod
-            def set_progress(progress):
-                self._progress = progress
-
-        return BulkListener()
+        return Status._BulkListener(self)
 
     def finished(self, since):
         with self._lock:

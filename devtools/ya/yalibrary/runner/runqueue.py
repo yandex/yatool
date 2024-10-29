@@ -11,7 +11,46 @@ from yalibrary import status_view
 logger = logging.getLogger(__name__)
 
 
-class RunQueue(object):
+class RunQueue:
+    class _Wrapper:
+        __slots__ = ("_run_queue", "_task", "_deps")
+
+        def __init__(self, run_queue, task, deps):
+            self._run_queue = run_queue
+            self._task = task
+            self._deps = deps
+
+        def __call__(self, *args, **kwargs):
+            start_time = time.time()
+            self._run_queue._listener.started(self)
+            notify_dependants = True
+            try:
+                return self._task(self._deps)
+            except Exception:
+                notify_dependants = False
+                raise
+            finally:
+                end_time = time.time()
+                self._run_queue._timing[self._task] = (start_time, end_time)
+                self._run_queue._listener.finished(self)
+                # Report first error, avoid race in exception reporting.
+                if notify_dependants:
+                    self._run_queue._topo.notify_dependants(self._task)
+
+        def __lt__(self, other):
+            # For https://a.yandex-team.ru/arc_vcs/devtools/ya/yalibrary/worker_threads/__init__.py?rev=7d8373415fa6f1d334941c0f126c53fac9564e67#L144 in python3
+            # Copied from https://a.yandex-team.ru/arc_vcs/contrib/tools/python/src/Lib/heapq.py?rev=c4f8f494816a77f4455bb920e42336b158368695#L138
+            return True  # Default option in py2 when non-comparable types x <= y
+
+        def timing(self):
+            return self._run_queue._timing[self._task]
+
+        def __getattr__(self, name):
+            return getattr(self._task, name)
+
+        def __str__(self):
+            return str(self._task)
+
     def __init__(self, out, listener=None):
         self._out = out
         self._listener = listener or status_view.DummyListener()
@@ -23,43 +62,7 @@ class RunQueue(object):
         self._timing = {}
 
     def _wrap(self, task, deps):
-        class Wrapper(object):
-            __slots__ = []
-
-            def __call__(self2, *args, **kwargs):
-                start_time = time.time()
-                self._listener.started(self2)
-                notify_dependants = True
-                try:
-                    return task(deps)
-                except Exception:
-                    notify_dependants = False
-                    raise
-                finally:
-                    end_time = time.time()
-                    self._timing[task] = (start_time, end_time)
-                    self._listener.finished(self2)
-                    # Report first error, avoid race in exception reporting.
-                    if notify_dependants:
-                        self._topo.notify_dependants(task)
-
-            def __lt__(self, other):
-                # For https://a.yandex-team.ru/arc_vcs/devtools/ya/yalibrary/worker_threads/__init__.py?rev=7d8373415fa6f1d334941c0f126c53fac9564e67#L144 in python3
-                # Copied from https://a.yandex-team.ru/arc_vcs/contrib/tools/python/src/Lib/heapq.py?rev=c4f8f494816a77f4455bb920e42336b158368695#L138
-                return True  # Default option in py2 when non-comparable types x <= y
-
-            @staticmethod
-            def timing():
-                return self._timing[task]
-
-            @staticmethod
-            def __getattr__(name):
-                return getattr(task, name)
-
-            def __str__(self):
-                return str(task)
-
-        return Wrapper()
+        return RunQueue._Wrapper(self, task, deps)
 
     def _when_ready(self, task, deps, inplace_execution=False):
         self._listener.ready(task)
