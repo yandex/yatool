@@ -18,6 +18,7 @@ PEERDIR(
     devtools/ya/core/stage_tracer
     devtools/ya/test/const
     devtools/ya/build/node_checks
+    devtools/ya/build/graph_description
 )
 
 STYLE_PYTHON()

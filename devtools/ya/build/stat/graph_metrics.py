@@ -1,11 +1,12 @@
 # cython: profile=True
 
+import typing
 import logging
 from collections import defaultdict
 import six
 
 from build.node_checks import is_module, is_binary
-
+from build.graph_description import GraphNodeUid, GraphNode
 
 try:
     RecursionError
@@ -16,7 +17,31 @@ except NameError:
 logger = logging.getLogger(__name__)
 
 
-def make_dependencies_lists(graph):
+def _traverse_deps(
+    start_node: GraphNodeUid,
+    v: GraphNodeUid,
+    modules: typing.Set[GraphNodeUid],
+    not_modules: typing.Set[GraphNodeUid],
+    nodes: typing.Dict[GraphNodeUid, GraphNode],
+    deps: typing.Dict[GraphNodeUid, typing.Set[GraphNodeUid]],
+) -> None:
+    if v in modules or v in not_modules:
+        return
+
+    if is_module(nodes[v]) and v != start_node:
+        modules.add(v)
+    else:
+        if v != start_node:
+            not_modules.add(v)
+        for d in deps[v]:
+            if d == start_node:
+                logger.warning("Detect circular dependency for `%s` in deps for `%s`", d, v)
+                logger.debug("Node: %s", nodes[v])
+            else:
+                _traverse_deps(start_node, d, modules, not_modules, nodes, deps)
+
+
+def make_dependencies_lists(graph: typing.List[GraphNode]) -> typing.Dict:
     nodes = {}
     deps = defaultdict(set)
     for node in graph:
@@ -25,29 +50,13 @@ def make_dependencies_lists(graph):
         for dep in node['deps']:
             deps[uid].add(dep)
 
-    def traverse(start_node, v, modules, not_modules):
-        if v in modules or v in not_modules:
-            return
-
-        if is_module(nodes[v]) and v != start_node:
-            modules.add(v)
-        else:
-            if v != start_node:
-                not_modules.add(v)
-            for d in deps[v]:
-                if d == start_node:
-                    logger.warning("Detect circular dependency for `%s` in deps for `%s`", d, v)
-                    logger.debug("Node: %s", nodes[v])
-                else:
-                    traverse(start_node, d, modules, not_modules)
-
     result = {}
     for uid, node in six.iteritems(nodes):
         if is_module(node):
             modules = set()
             not_modules = set()
             try:
-                traverse(uid, uid, modules, not_modules)
+                _traverse_deps(uid, uid, modules, not_modules, nodes, deps)
             except RecursionError:
                 logger.exception("While traversing uid `%s`", uid)
                 logger.debug("Node: %s", nodes[uid])
@@ -57,35 +66,39 @@ def make_dependencies_lists(graph):
     return result
 
 
-def make_targets_metrics(graph, tasks_metrics):
+def _calculate_elapsed_time_by_deps(
+    deps: typing.List[GraphNodeUid], tasks_metrics: typing.Dict
+) -> typing.Union[int, float]:
+    res = 0
+    for dep in deps:
+        if tasks_metrics.get(dep, {}).get('elapsed') is None:
+            return None
+        res += tasks_metrics[dep]['elapsed']
+    return res
+
+
+def _add_metric(n: GraphNode, name: str, value: typing.Any, metrics: typing.Dict[GraphNodeUid, typing.Any]) -> None:
+    metrics[n['uid']].update({name: value})
+
+
+def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Dict) -> typing.Dict:
     metrics = defaultdict(dict)
     deps = make_dependencies_lists(graph)
-
-    def add(n, name, value):
-        metrics[n['uid']].update({name: value})
-
-    def calculate_elapsed(deps):
-        res = 0
-        for dep in deps:
-            if tasks_metrics.get(dep, {}).get('elapsed') is None:
-                return None
-            res += tasks_metrics[dep]['elapsed']
-        return res
 
     for node in graph:
         if is_module(node):
             uid = node['uid']
             task_metrics = tasks_metrics.get(uid, {})
             if 'size' in task_metrics:
-                add(node, 'artifacts-size', task_metrics['size'])
+                _add_metric(node, 'artifacts-size', task_metrics['size'], metrics)
 
             if uid in deps:
                 modules, not_modules = deps[uid]
                 if is_binary(node):
-                    add(node, 'dependencies-count', len(modules))
+                    _add_metric(node, 'dependencies-count', len(modules), metrics)
 
-                elapsed = calculate_elapsed(list(not_modules) + [uid])
+                elapsed = _calculate_elapsed_time_by_deps(list(not_modules) + [uid], tasks_metrics)
                 if elapsed is not None:
-                    add(node, 'build-time', elapsed)
+                    _add_metric(node, 'build-time', elapsed, metrics)
 
     return metrics
