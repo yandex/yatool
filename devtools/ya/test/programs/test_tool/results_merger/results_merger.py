@@ -67,17 +67,16 @@ def merge_meta_files(files, dst):
         assert len(set(meta[field] for meta in all_metas)) == 1, (all_metas, field)
 
     def max_from_metas(field):
-        return max([meta[field] for meta in all_metas])
+        return max(meta[field] for meta in all_metas)
 
     def min_from_metas(field):
-        return min([meta[field] for meta in all_metas])
+        return min(meta[field] for meta in all_metas)
 
     start_time = min_from_metas("start_time")
     end_time = max_from_metas("end_time")
     # meta with most actual info
     latest_meta = sorted(all_metas, key=lambda x: x.get("start_time", ""))[-1]
     merged = {
-        "uid": latest_meta["uid"],
         "project": latest_meta["project"],
         "cwd": os.getcwd(),
         "end_time": end_time,

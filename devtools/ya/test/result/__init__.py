@@ -129,10 +129,6 @@ class TestPackedResultView(BaseTestSuiteRunResult):
     def suite_ci_type(self):
         return self._meta['test_ci_type']
 
-    @exts.func.lazy_property
-    def uid(self):
-        return self._meta['uid']
-
     def _output_path(self, name):
         return os.path.join(self._output_dir, name)
 
@@ -161,7 +157,6 @@ def load_suite_from_result(result, output, resolver):
         suite_type=result.suite_type,
         suite_ci_type=result.suite_ci_type,
         multi_target_platform_run=result.multi_target_platform_run,
-        uid=result.uid,
     )
     suite.set_work_dir(output)
     suite.load_run_results(result.trace_report_path, resolver)

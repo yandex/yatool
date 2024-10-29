@@ -549,8 +549,6 @@ def parse_args(args=None):
         if limit is not None:
             args.truncate_files_limit = int(limit)
 
-    args.uid = os.environ.get('TEST_NODE_SUITE_UID')
-
     return args
 
 
@@ -1227,8 +1225,7 @@ def main():
     devtools.ya.test.util.shared.setup_logging(options.log_level, options.log_path)
     logger.debug('Host %s, cwd %s, subreaper_set_error: %s', socket.gethostname(), cwd, subreaper_set_error)
     logger.debug(
-        'Uid: %s; Retry: %s; chunk %s (of %s); split file: %s',
-        options.uid,
+        'Retry: %s; chunk %s (of %s); split file: %s',
         options.retry,
         options.split_index,
         options.split_count,
@@ -2177,7 +2174,6 @@ def validate_java_coverage(dirname):
 
 def dump_meta(params, test_rc, start_time, end_time):
     meta = {
-        'uid': params.uid,
         'exit_code': test_rc,
         'elapsed': end_time - start_time,
         'start_time': datetime.datetime.fromtimestamp(start_time).strftime(const.TIMESTAMP_FORMAT),

@@ -72,6 +72,8 @@ def parse_args():
 
     args.output_dir = os.path.splitext(args.output_tar)[0]
 
+    args.description = f'[TS-{os.environ["TEST_NODE_SUITE_UID"]}] {args.description}'
+
     # Steal args from run_test (skipping test_tool binary path and first argument - run_test handler)
     test_args = run_test.parse_args(args.run_test_command[2:])
 

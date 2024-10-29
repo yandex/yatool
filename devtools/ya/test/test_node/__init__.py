@@ -696,9 +696,6 @@ def create_test_node(
     if not is_for_distbuild:
         env["TESTING_SAVE_OUTPUT"] = "yes"
 
-    # pass it as env variable because we hash command in static_uid
-    env["TEST_NODE_SUITE_UID"] = str(suite.uid)
-
     def add_docker_image_dep(image):
         image_node_uid = inject_download_docker_image_node(graph, image, opts)
         deps.append(image_node_uid)
@@ -1007,9 +1004,9 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
         output_tar = os.path.join(test_out_dir, devtools.ya.test.const.YT_RUN_TEST_TAR_NAME)
         ytexec_tool = opts.ytexec_bin or "$(YTEXEC)/ytexec/ytexec"
         # yt_run_test steals args from run_test, no need to duplicate args
-        ytexec_desc = "[TS-{uid}] {project_path}({test_type}) - chunk{split_index}"
+        ytexec_desc = "{project_path}({test_type}) - chunk{split_index}"
         description = ytexec_desc.format(
-            project_path=suite.project_path, test_type=suite.get_type(), split_index=split_index, uid=node["uid"]
+            project_path=suite.project_path, test_type=suite.get_type(), split_index=split_index
         )
         if opts.ytexec_title_suffix:
             description += " - {}".format(opts.ytexec_title_suffix)
@@ -1029,6 +1026,9 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
             '--ram',
             str(node['requirements']['ram']),
         ]
+
+        # pass it as env variable because we hash command in static_uid
+        node['env']['TEST_NODE_SUITE_UID'] = node['uid']
 
         for o in testdeps.unique(node["outputs"] + [output_tar]):
             wrapper_cmd += ["--ytexec-outputs", o]

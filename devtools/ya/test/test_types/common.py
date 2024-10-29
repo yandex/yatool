@@ -1026,6 +1026,8 @@ class PerformedTestSuite(AbstractTestSuite):
         suite_type=None,
         suite_ci_type=None,
         multi_target_platform_run=False,
+        # kept for backward compatibility with devtools/common/reports which is used in SB tasks
+        # TODO delete once devtools/common/reports is deployed
         uid=None,
     ):  # noqa
         dart = {'TAG': tags or []}
@@ -1043,7 +1045,6 @@ class PerformedTestSuite(AbstractTestSuite):
         self._target_platform_descriptor = target_platform_descriptor
         self._multi_target_platform_run = multi_target_platform_run
         self._test_size = size
-        self.uid = uid
 
     @property
     def name(self):

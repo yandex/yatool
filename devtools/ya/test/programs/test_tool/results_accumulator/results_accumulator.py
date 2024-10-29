@@ -233,7 +233,6 @@ def merge_meta_jsons(args, files, dst):
         "test_type",
         "test_ci_type",
         "multi_target_platform_run",
-        "uid",
     ]
     start_time = datetime.max
     end_time = datetime.min
@@ -257,7 +256,6 @@ def merge_meta_jsons(args, files, dst):
                 "Cannot merge meta.json correctly - it contains unknown fields '{}'".format(", ".join(unknown_fields))
             )
 
-        result["uid"] = data["uid"]
         result["project"] = data["project"]
         result["test_timeout"] = data["test_timeout"]
         result["name"] = data["name"]
