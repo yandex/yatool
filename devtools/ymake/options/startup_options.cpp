@@ -98,6 +98,11 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
             throw TConfigurationError() << "explicit --source-root is required for --targets-from-evlog";
         }
 
+        // This is a dirty workaround. Some sandbox tasks use arcadia symlink as a source root
+        // (https://a.yandex-team.ru/arcadia/sandbox/projects/common/build/YaMake/__init__.py?rev=r15185065#L657).
+        // Here we follow these symlinks instead of disabling servermode in all current and future cases that use this technique.
+        // TODO(YMAKE-1505): remove this when ymake could work with symlinked source tree w/o issues.
+        SourceRoot = SourceRoot.RealLocation();
         // TODO: check SourceRoot.Exists() && SourceRoot.IsDirectory() && SourceRoot.IsAbsolute()
 
         return;
