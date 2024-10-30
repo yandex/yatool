@@ -20,6 +20,7 @@ import zstandard as zstd
 DOWNLOAD_CHUNK_SIZE = 1 << 15
 META_VERSION = '1'
 SHA256_LENGTH = 64
+DEFAULT_TIMEOUT = 30
 
 EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL'])
 
@@ -48,6 +49,19 @@ class BazelStoreBrokenException(BazelStoreException):
     """
 
     pass
+
+
+class TimeoutHTTPAdapter(requests.adapters.HTTPAdapter):
+    def send(
+        self,
+        request,
+        stream,
+        timeout=DEFAULT_TIMEOUT,
+        verify=True,
+        cert=None,
+        proxies=None,
+    ):
+        return super().send(request=request, stream=stream, timeout=timeout, verify=verify, cert=cert, proxies=proxies)
 
 
 class _RetryPolicy:
@@ -143,7 +157,7 @@ class BazelStoreClient(object):
     def __init__(self, base_uri, username=None, password=None, max_connections=48, retry_policy=None):
         self.base_uri = base_uri
         self.session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
+        adapter = TimeoutHTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
         if username and password:
