@@ -821,11 +821,7 @@ int main_real(TBuildConfiguration& conf) {
         if (yMake->CanBypassConfigure()) {
             // FIXME: Currently we are implementing plan "B" for Grand Bypass,
             // that is we do not want to save caches when Grand Bypass occurs
-            conf.WriteFsCache = false;
-            conf.WriteDepsCache = false;
-            conf.WriteJsonCache = false;
-            conf.WriteDepManagementCache = false;
-            conf.WriteUidsCache = false;
+            conf.DoNotWriteAllCaches();
         }
 
         TMaybe<EBuildResult> configureBuildRes;
