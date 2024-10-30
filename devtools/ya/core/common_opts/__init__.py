@@ -999,6 +999,8 @@ class AuthOptions(Options):
         # Fall-back option, remove
         self.oauth_exchange_ssh_keys = True
 
+        self.store_oauth_token = True
+
     def consumer(self):
         res = [
             EnvConsumer(
@@ -1027,6 +1029,10 @@ class AuthOptions(Options):
             ),
             ConfigConsumer('docker_config_path'),
             EnvConsumer('YA_DOCKER_CONFIG_PATH', hook=SetValueHook('docker_config_path')),
+            EnvConsumer(
+                'YA_STORE_TOKEN',
+                hook=SetValueHook('store_oauth_token', return_true_if_enabled),
+            ),
         ]
         if self._extra_env_vars:
             res.extend(EnvConsumer(var, hook=SetValueHook('oauth_token')) for var in self._extra_env_vars)

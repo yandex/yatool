@@ -219,7 +219,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
     if ctx.opts.oauth_token_path:
         patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(ctx.opts.oauth_token_path)
-    elif ctx.opts.oauth_token:
+    elif ctx.opts.oauth_token and ctx.opts.store_oauth_token:
 
         class TokenContext(object):
             def __init__(self, transient_resource_dir):
