@@ -41,6 +41,22 @@ namespace {
         return {};
     }
 
+    TResolveFile MakeInduced(TModuleResolver& module, const TResolveFile& resolvedInclude) {
+        TStringBuf resolvedPath = NPath::CutAllTypes(module.GetTargetBuf(resolvedInclude));
+
+        TStringBuf dir = NPath::Parent(resolvedPath);
+        TStringBuf name = NPath::BasenameWithoutExtension(resolvedPath);
+
+        TStringBuf dirname = NPath::Basename(dir);
+        if (dirname == "msg" || dirname == "srv") {
+            dir = NPath::Parent(dir);
+        }
+
+        TString inducedPath = NPath::Join(dir, TString::Join(name, ".h"));
+
+        return module.MakeUnresolved(inducedPath);
+    }
+
 } // namespace
 
 void TRosIncludeProcessor::ProcessIncludes(
@@ -57,17 +73,18 @@ void TRosIncludeProcessor::ProcessIncludes(
     TVector<TResolveFile> inducedIncludes;
 
     for (const auto& include : includes) {
-        auto resolveFile = ResolveInclude(module, packages, include);
+        auto resolvedInclude = ResolveInclude(module, packages, include);
 
-        if (resolveFile.Empty()) {
+        if (resolvedInclude.Empty()) {
             TString typeName = include.PackageName.empty() ? include.MessageName : TString::Join(include.PackageName, "/", include.MessageName);
             YConfErr(BadIncl) << "Failed to resolve ROS type " << typeName << Endl;
             continue;
-        } else {
-            resolvedIncludes.push_back(std::move(resolveFile));
         }
 
-        inducedIncludes.emplace_back(module.MakeUnresolved(TString::Join(include.MessageName, ".h")));
+        auto inducedInclude = MakeInduced(module, resolvedInclude);
+
+        resolvedIncludes.push_back(std::move(resolvedInclude));
+        inducedIncludes.push_back(std::move(inducedInclude));
     }
 
     if (!resolvedIncludes.empty()) {
