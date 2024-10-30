@@ -1236,6 +1236,7 @@ class PackageContext:
                 "package_path": self._package_path,
                 "package_version": self._version,
                 "revision": str(package.vcs.Revision(self._arcadia_root)),
+                "revision_date": package.vcs.RevisionDate(self._arcadia_root),
                 "sandbox_task_id": self._params.sandbox_task_id,
                 "svn_revision": str(package.vcs.SvnRevision(self._arcadia_root)),
             }

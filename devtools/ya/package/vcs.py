@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import traceback
@@ -9,6 +10,8 @@ import exts.tmp
 from yalibrary.vcs import vcsversion
 
 logger = logging.getLogger(__name__)
+
+UNDEFINED = 'undefined'
 
 
 @exts.func.memoize()
@@ -36,12 +39,24 @@ class VcsInfo(object):
 
 class Revision(VcsInfo):
     def calc(self, info):
-        return info.get('hash', info.get('revision', 'undefined'))
+        return info.get('hash', info.get('revision', UNDEFINED))
+
+
+class RevisionDate(VcsInfo):
+    def calc(self, info):
+        try:
+            tstamp = info['date']
+            tstamp = datetime.datetime.fromisoformat(tstamp)
+            tstamp = tstamp.date().isoformat()
+            return tstamp
+        except Exception:
+            logger.exception("Failed to obtain date from arc. arc info: %s", info)
+            raise
 
 
 class SvnRevision(VcsInfo):
     def calc(self, info):
-        return info.get('revision') or self.get_last_change_revision(default='undefined')
+        return info.get('revision') or self.get_last_change_revision(default=UNDEFINED)
 
     def get_last_change_revision(self, default):
         with exts.tmp.temp_dir() as tmpdir:
