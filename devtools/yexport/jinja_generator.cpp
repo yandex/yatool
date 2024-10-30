@@ -460,12 +460,12 @@ void TJinjaGenerator::RenderRoot() {
 }
 
 void TJinjaGenerator::RenderSubdir(TPlatformPtr platform, TProjectSubdirPtr subdir) {
-    const auto& mainTargetMacro = subdir->MainTargetMacro.empty() ? EMPTY_TARGET : subdir->MainTargetMacro;
+    const auto& macroForTemplate = GetMacroForTemplate(*subdir);
     SetCurrentDirectory(ArcadiaRoot / subdir->Path);
-    if (TargetTemplates.contains(mainTargetMacro)) {
-        RenderJinjaTemplates(subdir->Attrs, TargetTemplates[mainTargetMacro], subdir->Path, platform->Name);
-    } else if (mainTargetMacro != EMPTY_TARGET) {
-        spdlog::error("Skip render directory {}, has no templates for main target {}", subdir->Path.string(), mainTargetMacro);
+    if (TargetTemplates.contains(macroForTemplate)) {
+        RenderJinjaTemplates(subdir->Attrs, TargetTemplates[macroForTemplate], subdir->Path, platform->Name);
+    } else if (macroForTemplate != EMPTY_TARGET and macroForTemplate != EXTRA_ONLY_TARGET) {
+        spdlog::error("Skip render directory {}, has no templates for main target {}", subdir->Path.string(), macroForTemplate);
     }
 }
 

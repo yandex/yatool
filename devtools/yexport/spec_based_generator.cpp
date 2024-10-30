@@ -433,8 +433,8 @@ void TSpecBasedGenerator::MergePlatforms() {
     THashMap<fs::path, std::vector<TPlatformPtr>> dir2platforms;// list of platforms for each dir
     for (const auto& platform : Platforms) {
         for (const auto& dir : platform->Project->GetSubdirs()) {
-            const auto& mainTargetMacro = dir->MainTargetMacro.empty() ? EMPTY_TARGET : dir->MainTargetMacro;
-            if (!MergePlatformTargetTemplates.contains(mainTargetMacro)) {
+            const auto& macroForTemplate = GetMacroForTemplate(*dir);
+            if (!MergePlatformTargetTemplates.contains(macroForTemplate)) {
                 continue; // ignore directories without merge platform templates
             }
             dir2platforms[dir->Path].emplace_back(platform);// collect platforms for every dir
@@ -443,9 +443,9 @@ void TSpecBasedGenerator::MergePlatforms() {
     }
     for (const auto* dir : dirs) {
         const auto& path = dir->Path;
-        const auto& mainTargetMacro = dir->MainTargetMacro.empty() ? EMPTY_TARGET : dir->MainTargetMacro;
-        const auto& dirTemplates = TargetTemplates.at(mainTargetMacro);
-        auto& mergePlatformTemplates = MergePlatformTargetTemplates.at(mainTargetMacro);
+        const auto& macroForTemplate = GetMacroForTemplate(*dir);
+        const auto& dirTemplates = TargetTemplates.at(macroForTemplate);
+        auto& mergePlatformTemplates = MergePlatformTargetTemplates.at(macroForTemplate);
         Y_ASSERT(dirTemplates.size() == mergePlatformTemplates.size());
         const auto& dirPlatforms = dir2platforms[path];
         auto templatesCount = dirTemplates.size();
@@ -566,6 +566,20 @@ void TSpecBasedGenerator::InitReplacer() {
             return RootReplacer(s);
         });
         Replacer_ = &REPLACER;
+    }
+}
+
+const std::string TSpecBasedGenerator::EMPTY_TARGET = "EMPTY";///< Magic target for use in directory without any targets
+const std::string TSpecBasedGenerator::EXTRA_ONLY_TARGET ="EXTRA_ONLY";///< Magic target for use in directory with only extra targets without main target
+
+const std::string& TSpecBasedGenerator::GetMacroForTemplate(const NYexport::TProjectSubdir& dir) {
+    if (!dir.MainTargetMacro.empty()) {
+        return dir.MainTargetMacro;
+    }
+    if (dir.Targets.empty()) {
+        return EMPTY_TARGET;
+    } else {
+        return EXTRA_ONLY_TARGET;
     }
 }
 

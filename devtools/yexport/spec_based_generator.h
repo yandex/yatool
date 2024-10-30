@@ -40,8 +40,9 @@ public:
     static constexpr const char* GENERATOR_FILE = "generator.toml";
     static constexpr const char* GENERATORS_ROOT = "build/export_generators";
     static constexpr const char* GENERATOR_TEMPLATES_PREFIX = "[generator]/";
-    static constexpr const char* YEXPORT_FILE = "yexport.toml";
-    static constexpr const char* EMPTY_TARGET = "EMPTY";///< Magic target for use in directory without any targets
+    static constexpr const char* YEXPORT_FILE = "yexport.toml";///< Additional configure for yexport
+    static const std::string EMPTY_TARGET;///< Magic target for use in directory without any targets
+    static const std::string EXTRA_ONLY_TARGET;///< Magic target for use in directory with only extra targets without main target
 
     TSpecBasedGenerator() noexcept = default;
     virtual ~TSpecBasedGenerator() = default;
@@ -108,6 +109,7 @@ protected:
     mutable std::string ReplacerBuffer_;
     const std::string& RootReplacer(const std::string& s) const;
     void InitReplacer();
+    const std::string& GetMacroForTemplate(const NYexport::TProjectSubdir& dir);
 
 private:
     TJinjaFileSystemPtr SourceTemplateFs;
