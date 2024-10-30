@@ -52,10 +52,6 @@
                     "description": "Build with MUSL",
                     "type": "boolean"
                 },
-                "pch": {
-                    "description": "Build with PCH",
-                    "type": "boolean"
-                },
                 "maven-export": {
                     "description": "Create pom.xml file (java build)",
                     "type": "boolean"
@@ -79,6 +75,22 @@
                         "type": "string",
                         "uniqueItems": true
                     }
+                },
+                "force_build_depends": {
+                    "description": "Build targets reachable by RECURSE_FOR_TESTS and DEPENDS macros",
+                    "type": "boolean"
+                },
+                "ignore_recurses": {
+                    "description": "Do not build by RECURSES",
+                    "type": "boolean"
+                },
+                "sanitize_coverage": {
+                    "description": "Enable sanitize coverage",
+                    "type": "string"
+                },
+                "use_afl": {
+                    "description": "Use AFL instead of libFuzzer",
+                    "type": "boolean"
                 },
                 "flags": {
                     "description": "Build flags",

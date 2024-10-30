@@ -185,7 +185,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.musl = build_info.get("musl", params.musl)
     build_options.sanitize_coverage = build_info.get("sanitize_coverage", params.sanitize_coverage)
     build_options.use_afl = build_info.get("use_afl", params.use_afl)
-    build_options.sanitize = build_info.get("sanitize", params.sanitize)
     build_options.race = build_info.get("race", params.race)
 
     build_options.pgo_user_path = build_info.get("pgo_use", params.pgo_user_path)
