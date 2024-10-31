@@ -127,9 +127,16 @@ private:
     }
 
 public:
+    enum ELoadResult {
+        InvalidResult,
+        NodeLoaded,
+        NodeChangedAndHeaderLoaded,
+        NodeNotValid,
+    };
+
     TLoadBuffer(TVector<ui8>* rawBuffer) : RawBuffer(rawBuffer) {}
 
-    bool LoadUnchangedNodeDataFromStream(IInputStream* input, TNodeId& nodeId, const TDepGraph& graph, size_t onSkipHeaderSize = 0) {
+    ELoadResult LoadUnchangedNodeDataFromStream(IInputStream* input, TNodeId& nodeId, const TDepGraph& graph, size_t onSkipHeaderSize = 0) {
         ui8 useFileId = LoadFromStream<ui8>(input);
         ui32 elemId = LoadFromStream<ui32>(input);
         ui32 size = LoadFromStream<ui32>(input);
@@ -137,19 +144,44 @@ public:
         auto nodeRef = graph.GetNodeById(useFileId ? EMNT_File : EMNT_BuildCommand, elemId);
         nodeId = nodeRef.Id();
 
-        // TODO: Make separate usage of content and structure changes flag.
-        if (!nodeRef.IsValid() || !nodeRef.Value().State.HasNoChanges()) {
-            if (onSkipHeaderSize) {
+        bool skipNode{};
+        bool loadHeaderWhenSkipping{};
+        ELoadResult loadResult = InvalidResult;
+
+        if (nodeRef.IsValid()) {
+            // TODO: Make separate usage of content and structure changes flag.
+            if (nodeRef.Value().State.HasNoChanges()) {
+                skipNode = false;
+                loadResult = NodeLoaded;
+            } else {
+                skipNode = true;
+                loadHeaderWhenSkipping = true;
+                loadResult = NodeChangedAndHeaderLoaded;
+            }
+        } else {
+            skipNode = true;
+            loadHeaderWhenSkipping = false;
+            loadResult = NodeNotValid;
+        }
+
+        if (onSkipHeaderSize == 0) {
+            loadHeaderWhenSkipping = false;
+        }
+
+        if (skipNode) {
+            if (loadHeaderWhenSkipping) {
                 Y_ASSERT(size >= onSkipHeaderSize);
                 LoadRawBufferFromStream(input, onSkipHeaderSize);
                 input->Skip(size - onSkipHeaderSize);
             } else {
                 input->Skip(size);
             }
-            return false;
+        } else {
+            LoadRawBufferFromStream(input, size);
         }
-        LoadRawBufferFromStream(input, size);
-        return true;
+
+        Y_ASSERT(loadResult != InvalidResult);
+        return loadResult;
     }
 
     template<typename T>
@@ -159,7 +191,6 @@ public:
             ythrow TFileFormatError{};
         return value;
     }
-
 
     bool LoadBuffer(void* ptr, size_t size) noexcept {
         const ui8* nextIterator = Iterator + size;

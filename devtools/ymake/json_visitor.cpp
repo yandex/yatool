@@ -165,23 +165,33 @@ void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
     for (size_t i = 0; i < nodesCount; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId nodeId;
-        auto nodeLoaded = buffer.LoadUnchangedNodeDataFromStream(input, nodeId, graph, sizeof(TMd5Sig));
+        auto loadResult = buffer.LoadUnchangedNodeDataFromStream(input, nodeId, graph, sizeof(TMd5Sig));
+
+        if (loadResult == TLoadBuffer::NodeNotValid) {
+            ++nodesSkipped;
+            continue;
+        }
 
         auto nodeRef = graph.Get(nodeId);
+        Y_ASSERT(nodeRef.IsValid());
+
         auto [it, added] = Nodes.try_emplace(nodeRef.Id(), TJSONEntryStats::TItemDebug{graph, nodeRef.Id()});
         auto& [_, nodeData] = *it;
         nodeData.InStack = false;
         Y_ASSERT(added);
 
-        if (!nodeLoaded) {
-            nodeData.LoadStructureUid(&buffer, graph, true);
+        if (loadResult == TLoadBuffer::NodeChangedAndHeaderLoaded) {
+            nodeData.LoadStructureUid(&buffer, true);
             ++nodesSkipped;
             continue;
         }
 
+        Y_ASSERT(loadResult == TLoadBuffer::NodeLoaded);
+
         if (!nodeData.Load(&buffer, graph)) {
             ++nodesDiscarded;
             Nodes.erase(nodeRef.Id());
+            continue;
         }
 
         ++nodesLoaded;
@@ -199,7 +209,7 @@ void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
     for (TNodeId i = TNodeId::MinValid; i <= MaxLoopId; ++i) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId loopNodeId;
-        if (!buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph)) {
+        if (buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph) != TLoadBuffer::NodeLoaded) {
             ++loopsSkipped;
             continue;
         }

@@ -104,7 +104,7 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const no
     buffer->Save(SelfUID.GetRawSig());
 }
 
-void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& /* graph */, bool asPre) noexcept {
+void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, bool asPre) noexcept {
     if (asPre) {
         buffer->LoadMd5(&PreStructureUID);
     } else {
@@ -114,7 +114,7 @@ void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& /* 
 }
 
 bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept {
-    LoadStructureUid(buffer, graph);
+    LoadStructureUid(buffer);
     static_cast<TEntryStatsData*>(this)->AllFlags = buffer->Load<ui8>();
     AllFlags = buffer->Load<ui8>();
     if (!buffer->LoadElemId(&OutTogetherDependency, graph))

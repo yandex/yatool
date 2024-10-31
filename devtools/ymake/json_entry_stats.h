@@ -98,7 +98,7 @@ public:
     using TItemDebug = TNodeDebugOnly;
 
     void Save(TSaveBuffer* buffer, const TDepGraph& graph) const noexcept;
-    void LoadStructureUid(TLoadBuffer* buffer, const TDepGraph& graph, bool asPre = false) noexcept;
+    void LoadStructureUid(TLoadBuffer* buffer, bool asPre = false) noexcept;
     bool Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept;
 
     void SetStructureUid(const TMd5SigValue& md5);
