@@ -71,15 +71,16 @@ def _find_root() -> str:
     return core.config.find_root()
 
 
-def _flush_to_file(path: Path, content: str) -> None:
+def _flush_to_file(path: str, content: str) -> None:
     display.emit_message(f'[[good]]fix {path}')
 
-    tmp = path.with_suffix(".tmp")
-    tmp.write_bytes(content.encode())
+    tmp = path + ".tmp"
+    with open(tmp, 'wb') as f:
+        f.write(content.encode())
 
     # never break original file
     path_st_mode = os.stat(path).st_mode
-    replace_file(str(tmp), str(path))
+    replace_file(tmp, path)
     os.chmod(path, path_st_mode)
 
 
@@ -132,7 +133,7 @@ class BaseStyler(abc.ABC):
                     if self.args.dry_run:
                         _flush_to_terminal(target, content, formatted_content, self.args.full_output)
                     elif not self.args.check:
-                        _flush_to_file(target, formatted_content)
+                        _flush_to_file(str(target), formatted_content)
                     return 1
             else:
                 logger.warning("skip by rule: %s", reason)
