@@ -898,7 +898,9 @@ int main_real(TBuildConfiguration& conf) {
     bool hasBadLoops = yMake->DumpLoops();
     if (hasBadLoops) {
         NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::BadLoops), true);
-        conf.DoNotWriteAllCaches();
+        if (!conf.IsYmakeSaveAllCachesWhenBadLoops()) {
+            conf.DoNotWriteAllCaches();
+        }
     }
 
     yMake->ApplyDependencyManagement();

@@ -180,6 +180,10 @@ public:
         return IsolatedProjectsHashChanged_;
     }
 
+    bool IsYmakeSaveAllCachesWhenBadLoops() const noexcept {
+        return YmakeSaveAllCachesWhenBadLoops_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
 
@@ -214,6 +218,7 @@ private:
     bool UseGrandBypass = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
+    bool YmakeSaveAllCachesWhenBadLoops_ = false;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
