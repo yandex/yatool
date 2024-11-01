@@ -5,16 +5,39 @@
 #include <devtools/ymake/compact_graph/query.h>
 
 namespace NComputeReachability {
-    using TStateItem = TGraphIteratorStateItemBase<false>;
+    struct TStackData {
+        bool IsIndirectPeerdir = false;
+    };
+    using TStateItem = TGraphIteratorStateItem<TStackData, false>;
 
-    class TVisitor: public TDirectPeerdirsVisitor<TEntryStats, TStateItem> {
+    class TVisitor: public TFilteredNoReentryStatsVisitor<TEntryStats, TStateItem> {
     public:
-        using TBase = TDirectPeerdirsVisitor<TEntryStats, TStateItem>;
+        using TBase = TFilteredNoReentryStatsVisitor<TEntryStats, TStateItem>;
+
+        TVisitor()
+            : TBase{TDependencyFilter{TDependencyFilter::SkipRecurses | TDependencyFilter::SkipAddincls}}
+        {
+        }
+
+        bool AcceptDep(TState& state) {
+            if (state.Top().IsIndirectPeerdir) {
+                const auto& dep = state.NextDep();
+                if (EDT_Include == *dep && IsMakeFileType(dep.To()->NodeType)) {
+                    // Do nothing
+                } else {
+                     return false;
+                }
+            }
+            return TBase::AcceptDep(state);
+        }
 
         bool Enter(TState& state) {
             bool fresh  = TBase::Enter(state);
 
             if (fresh) {
+                if (state.HasIncomingDep() && IsPeerdirDep(state.IncomingDep())) {
+                    state.Top().IsIndirectPeerdir = true;
+                }
                 state.TopNode()->State.SetReachable(true);
             }
 
