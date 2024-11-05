@@ -263,8 +263,8 @@ def _reduced_ya_make_options():
     )
 
     # FOR OPENSOURCE
-    useless |= [opt.__class__ for opt in build_graph_cache_opts]
-    useless |= [opt.__class__ for opt in checkout_opts]
+    useless |= {opt.__class__ for opt in build_graph_cache_opts}
+    useless |= {opt.__class__ for opt in checkout_opts}
 
     useful = []
     for opt in build.build_opts.ya_make_options(free_build_targets=True, build_type="release"):
