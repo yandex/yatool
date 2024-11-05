@@ -791,7 +791,7 @@ class MavenImportOptions(SandboxUploadOptions):
             ),
             ArgConsumer(
                 ['-r', '--remote-repository'],
-                help='Specify remote repository manually to improve performance.',
+                help='Specify remote repository manually to improve performance. Example: file://localhost/Users/me/repo',
                 hook=SetAppendHook('remote_repos'),
                 group=MAVEN_OPT_GROUP,
             ),
