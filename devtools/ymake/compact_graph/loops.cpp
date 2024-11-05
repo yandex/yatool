@@ -242,7 +242,7 @@ bool TGraphLoops::HasBadLoops() const {
 TGraphLoops TGraphLoops::Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop) {
     TLoopSearcher ls(outTogetherIsLoop);
     IterateAll(graph, startTargets, ls, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
-    const auto collected = ls.CollectLoops();
+    auto collected = ls.CollectLoops();
 
     THashSet<TNodeId> dirLoops;
     THashSet<TNodeId> buildLoops;
