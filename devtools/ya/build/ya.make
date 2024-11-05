@@ -80,6 +80,7 @@ PEERDIR(
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
+        devtools/ya/build/distbuild_mock
         devtools/ya/build/remote
         devtools/ya/build/source_package
         devtools/ya/yalibrary/build_graph_cache
@@ -115,6 +116,7 @@ RECURSE(
 
 IF (NOT YA_OPENSOURCE)
     RECURSE(
+        distbuild_mock
         remote
         source_package
     )

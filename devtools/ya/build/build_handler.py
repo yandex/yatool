@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 from core import stage_tracer
@@ -13,6 +14,7 @@ from yalibrary.monitoring import YaMonEvent
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("build_handler")
 stage_begin_time = {}
+distbuild_mock_data_dir_env = "__DISTBUILD_MOCK_DIR"
 
 
 def _dump_results(builder, owners):
@@ -53,6 +55,12 @@ def do_ya_make(params):
     from build import ya_make
 
     import app_ctx  # XXX
+
+    distbuild_mock = None
+    if distbuild_mock_data_dir := os.environ.get(distbuild_mock_data_dir_env):
+        from devtools.ya.build.distbuild_mock import DistbuildMock
+
+        distbuild_mock = DistbuildMock(distbuild_mock_data_dir)
 
     monitoring_stage_started('ya_make_handler')
     context_generating_stage = stager.start('context_generating')
@@ -124,5 +132,8 @@ def do_ya_make(params):
         stager.finish('save_context')
 
     monitoring_stage_finished('ya_make_handler')
+
+    if distbuild_mock:
+        distbuild_mock.close()
 
     return 0 if params.ignore_nodes_exit_code else exit_code
