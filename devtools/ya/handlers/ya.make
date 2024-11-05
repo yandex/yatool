@@ -33,7 +33,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/fix_includes
         devtools/ya/handlers/notify
         devtools/ya/handlers/paste
-        devtools/ya/handlers/pr
         devtools/ya/handlers/profile
         devtools/ya/handlers/project
         devtools/ya/handlers/svn
@@ -90,7 +89,6 @@ RECURSE(
     notify
     package
     paste
-    pr
     profile
     project
     py
