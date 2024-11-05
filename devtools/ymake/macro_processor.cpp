@@ -2089,6 +2089,18 @@ TString TCommandInfo::SubstVarDeeply(const TStringBuf& varName, const TVars& var
     return SubstMacroDeeply(var, Get1(var), vars, true, cmdFormat);
 }
 
+void TCommandInfo::WriteRequirements(TStringBuf reqs) {
+    // see TCommandInfo::ApplyMods / EMF_Requirements
+    if (!Requirements) {
+        if (Conf) {
+            Requirements = MakeHolder<THashMap<TString, TString>>(Conf->GetDefaultRequirements());
+        } else {
+            Requirements = MakeHolder<THashMap<TString, TString>>();
+        }
+    }
+    ParseRequirements(reqs, *Requirements);
+}
+
 void ConvertSpecFiles(const TBuildConfiguration& conf, TSpecFileArr& flist, TYVar& dst) {
     for (auto& f : flist) {
         f.Name = conf.RealPath(ArcPath(f.Name));

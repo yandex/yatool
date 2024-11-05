@@ -49,6 +49,7 @@ enum class EMacroFunction: ui32 {
     ResolveToBinDir, // output-only, preevaluated
     // latest additions TODO merge & sort
     ResourceUri,
+    Requirements,
     //
     Count
 };

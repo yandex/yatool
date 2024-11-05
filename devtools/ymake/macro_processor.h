@@ -205,6 +205,8 @@ public:
     void SetCmdType(ECmdType type) { CmdType = type; }
     void SetAllVarsNeedSubst(bool need) { AllVarsNeedSubst = need; }
 
+    void WriteRequirements(TStringBuf reqs);
+
 private:
     template<typename T>
     void ApplyToOutputIncludes(T&& action) const {

@@ -226,6 +226,46 @@ namespace {
     //
     //
 
+    class TRequirements: public TBasicModImpl {
+    public:
+        TRequirements(): TBasicModImpl({.Id = EMacroFunction::Requirements, .Name = "requirements", .Arity = 1, .CanEvaluate = true}) {
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            std::visit(TOverloaded{
+                [](TTermError) {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) {
+                    throw TBadArgType(Name, x);
+                },
+                [&](const TString& s) {
+                    ctx.CmdInfo.WriteRequirements(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
+                },
+                [&](const TVector<TString>& v) {
+                    if (v.empty())
+                        return;
+                    else if (v.size() == 1)
+                        ctx.CmdInfo.WriteRequirements(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
+                    else
+                        throw TNotImplemented() << "Requirements do not support arrays";
+                },
+                [&](const TTaggedStrings& x) {
+                    throw TBadArgType(Name, x);
+                }
+            }, args[0]);
+            return TTermNothing();
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TKeyValue: public TBasicModImpl {
     public:
         TKeyValue(): TBasicModImpl({.Id = EMacroFunction::KeyValue, .Name = "kv", .Arity = 1, .CanEvaluate = true}) {
