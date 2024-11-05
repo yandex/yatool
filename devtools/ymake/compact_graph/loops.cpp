@@ -17,6 +17,11 @@ struct TLoopId {
     bool IsFile = false;
 };
 
+struct TCollectedLoops {
+    THashMap<TNodeId, TNodeId> Node2Loop;
+    TNodesData<TGraphLoop, TVector> Loop2Nodes;
+};
+
 using TLoopData = TVisitorStateItem<TLoopId>;
 
 class TLoopSearcher: public TNoReentryStatsVisitor<TLoopData, TGraphConstIteratorStateItemBase> {
@@ -183,7 +188,7 @@ public:
         return acc;
     }
 
-    void CollectLoops(THashMap<TNodeId, TNodeId>& node2Loop, TNodesData<TGraphLoop, TVector>& loop2Nodes) {
+    TCollectedLoops CollectLoops() {
         TVector<std::pair<TNodeId, TNodeId>> loopSrt;
         for (const auto& node : Nodes) {
             TNodeId loopId = node.second.LoopId;
@@ -193,7 +198,7 @@ public:
             }
         }
         if (loopSrt.empty()) {
-            return;
+            return {};
         }
         std::sort(loopSrt.begin(), loopSrt.end());
         // continuous loop enumeration makes other code simpler
@@ -207,20 +212,24 @@ public:
             }
             loopSz.back()++;
         }
-        loop2Nodes.SetMaxNodeIdByResize(loopSz.MaxNodeId());
+        TCollectedLoops res{
+            .Node2Loop{},
+            .Loop2Nodes{loopSz.Ids()}
+        };
         // loop id 0 is reserved for 'no loop' flag
         newId = TNodeId::MinValid, curId = loopSrt[0].first;
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
                 newId++;
-                loop2Nodes[newId].reserve(loopSz[newId]);
+                res.Loop2Nodes[newId].reserve(loopSz[newId]);
                 curId = loopSrt[n].first;
             }
-            node2Loop[loopSrt[n].second] = newId;
-            loop2Nodes[newId].push_back(loopSrt[n].second);
+            res.Node2Loop[loopSrt[n].second] = newId;
+            res.Loop2Nodes[newId].push_back(loopSrt[n].second);
         }
         Y_ASSERT(newId == loopSz.MaxNodeId());
         YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
+        return res;
     }
 };
 
@@ -231,22 +240,14 @@ bool TGraphLoops::HasBadLoops() const {
 }
 
 TGraphLoops TGraphLoops::Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop) {
-    TGraphLoops res;
-    res.FindLoops(graph, startTargets, outTogetherIsLoop);
-    return res;
-}
-
-void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop) {
     TLoopSearcher ls(outTogetherIsLoop);
-    clear();
-    Node2Loop.clear();
-    DirLoops.clear();
-    BuildLoops.clear();
     IterateAll(graph, startTargets, ls, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
-    ls.CollectLoops(Node2Loop, *this);
+    const auto collected = ls.CollectLoops();
 
-    for (TNodeId loopNum: ValidIds()) {
-        TGraphLoop curLoop = (*this)[loopNum];
+    THashSet<TNodeId> dirLoops;
+    THashSet<TNodeId> buildLoops;
+    for (TNodeId loopNum: collected.Loop2Nodes.ValidIds()) {
+        const TGraphLoop& curLoop = collected.Loop2Nodes[loopNum];
 
         bool isDirLoop = false;
         bool isBuildLoop = false;
@@ -257,14 +258,14 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
             const auto& node = graph.Get(curNode);
 
             if (!isDirLoop && node->NodeType == EMNT_Directory) {
-                DirLoops.insert(loopNum);
+                dirLoops.insert(loopNum);
                 isDirLoop = true;
             }
 
             if (!isBuildLoop) {
                 for (const auto& edge : node.Edges()) {
                     if (*edge == EDT_BuildFrom && nodesInLoop.contains(edge.To().Id())) {
-                        BuildLoops.insert(loopNum);
+                        buildLoops.insert(loopNum);
                         isBuildLoop = true;
                         break;
                     }
@@ -276,6 +277,8 @@ void TGraphLoops::FindLoops(const TDepGraph& graph, const TVector<TTarget>& star
             }
         }
     }
+
+    return TGraphLoops{std::move(collected.Loop2Nodes), std::move(dirLoops), std::move(buildLoops), std::move(collected.Node2Loop)};
 }
 
 void TGraphLoops::DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const {

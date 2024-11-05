@@ -41,7 +41,17 @@ public:
     void DumpDirLoops(const TDepGraph& graph, IOutputStream& out) const;
 
 private:
-    void FindLoops(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
+    TGraphLoops(
+        TNodesData<TGraphLoop, TVector> loop2nodes,
+        THashSet<TNodeId> dirLoops,
+        THashSet<TNodeId> buildLoops,
+        THashMap<TNodeId, TNodeId> node2loop) noexcept
+        : TNodesData<TGraphLoop, TVector>{std::move(loop2nodes)}
+        , DirLoops{std::move(dirLoops)}
+        , BuildLoops{std::move(buildLoops)}
+        , Node2Loop{std::move(node2loop)}
+    {}
+
     template <typename TContainer>
     void DumpLoops(const TDepGraph& graph, IOutputStream& out, const TContainer& loopIds) const;
 };
