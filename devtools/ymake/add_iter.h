@@ -834,6 +834,9 @@ struct TUpdReIterSt: public TUpdIterStBase {
         } else {
             Node = it.DepNode;
         }
+#if defined(YMAKE_DEBUG)
+        DebugNode = MakeDepsCacheId(Node.NodeType, Node.ElemId);
+#endif
         YDIAG(GUpd) << "new IterAddable " << graph.ToString(Node) << Endl;
     }
 
