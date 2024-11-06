@@ -93,7 +93,7 @@ class WorkerThreads(object):
         self._active_set = collections.defaultdict(list)
         self._active_res_usage = [zero]
         self._condition = threading.Condition(threading.Lock())
-        self._evlog_writer = evlog.get_writer(__name__) if evlog else lambda *a, **kw: None
+        self._evlog_writer = evlog.get_writer('worker_threads') if evlog else lambda *a, **kw: None
         self._schedule_strategy = schedule_strategy
 
         def exec_target(worker_pool_type):
