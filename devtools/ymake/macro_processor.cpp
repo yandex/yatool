@@ -387,12 +387,25 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
     //     or a "0:VARNAME=S:123" context variable node
     //
 
+    auto compilationFallback = [&](const std::exception& e, TStringBuf varName, TStringBuf varValue) {
+        YConfErr(Details)
+            << "Expression error (module " << Module->GetUserType() << "), "
+            << varName << "=" << varValue << ": "
+            << e.what() << Endl;
+        return commands.Compile("$FAIL_EXPR", Conf, Module->Vars, Module->Vars, false);
+    };
+
     auto mkCmd = [&](TStringBuf exprVarName) {
         ui64 id;
         TStringBuf cmdName;
         TStringBuf cmdValue;
         ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
-        auto compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
+        auto compiled = NCommands::TCompiledCommand();
+        try {
+            compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
+        } catch (const std::exception& e) {
+            compiled = compilationFallback(e, exprVarName, cmdValue);
+        }
         // TODO: there's no point in allocating cmdElemId for expressions
         // that do _not_ have directly corresponding nodes
         // (and are linked as "0:VARNAME=S:123" instead)
@@ -441,7 +454,12 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         auto& subBinding = it->second;
 
         auto val = EvalAll(var);
-        auto compiled = commands.Compile(val, Conf, Module->Vars, varDefinitionSources, false);
+        auto compiled = NCommands::TCompiledCommand();
+        try {
+            compiled = commands.Compile(val, Conf, Module->Vars, varDefinitionSources, false);
+        } catch (const std::exception& e) {
+            compiled = compilationFallback(e, exprVarName, val);
+        }
         const ui32 subExpr = commands.Add(*Graph, std::move(compiled.Expression));
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
 

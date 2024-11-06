@@ -165,7 +165,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
                     continue;
                 }
                 auto subExpr = AsSubexpression(val);
-                if (!subExpr)
+                if (!subExpr || subExpr->GetNodes().empty())
                     continue; // TODO?
                 auto [cmdBegin, cmdCnt] = GetFnArgs(*subExpr, 0, EMacroFunction::Cmds);
                 if (cmdCnt == 0)
@@ -351,7 +351,7 @@ TTermValue TScriptEvaluator::EvalFn(
         throw yexception()
             << "Don't know how to render configure time modifier "
             << fn;
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         ++ErrorShower->Count;
         return TTermError(e.what(), true);
     }
