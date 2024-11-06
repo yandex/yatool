@@ -9,4 +9,4 @@ class MD5;
 const TString YA_COMMON = TString("ya.common");
 
 /// @brief loads autoinclude paths for current build
-TCompactTrieBuilder<char, TString> LoadAutoincludes(const TFsPath& config, MD5& confData);
+TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& configs, MD5& confData);
