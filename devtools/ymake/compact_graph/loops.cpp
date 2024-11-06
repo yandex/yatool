@@ -17,7 +17,7 @@ struct TLoopId {
     bool IsFile = false;
 };
 
-struct TCollectedLoops {
+struct TCollectedLoops: TMoveOnly {
     THashMap<TNodeId, TNodeId> Node2Loop;
     TNodesData<TGraphLoop, TVector> Loop2Nodes;
 };

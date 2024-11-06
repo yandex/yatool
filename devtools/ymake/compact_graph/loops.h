@@ -22,7 +22,7 @@ struct TGraphLoop: public TVector<TNodeId> {
     bool DepsDone = false;
 };
 
-class TGraphLoops: public TNodesData<TGraphLoop, TVector> {
+class TGraphLoops: public TNodesData<TGraphLoop, TVector>, public TMoveOnly {
 private:
     THashSet<TNodeId> DirLoops;
     THashSet<TNodeId> BuildLoops;
@@ -42,10 +42,10 @@ public:
 
 private:
     TGraphLoops(
-        TNodesData<TGraphLoop, TVector> loop2nodes,
-        THashSet<TNodeId> dirLoops,
-        THashSet<TNodeId> buildLoops,
-        THashMap<TNodeId, TNodeId> node2loop) noexcept
+        TNodesData<TGraphLoop, TVector>&& loop2nodes,
+        THashSet<TNodeId>&& dirLoops,
+        THashSet<TNodeId>&& buildLoops,
+        THashMap<TNodeId, TNodeId>&& node2loop) noexcept
         : TNodesData<TGraphLoop, TVector>{std::move(loop2nodes)}
         , DirLoops{std::move(dirLoops)}
         , BuildLoops{std::move(buildLoops)}
