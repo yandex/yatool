@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nodes_data.h"
+#include "nodeids_range.h"
 
 #include <util/generic/vector.h>
 #include <util/generic/deque.h>
@@ -708,11 +709,11 @@ private:
     using TNRef = TAddRef<TN, IsConst>;
 
     TGraphRef Graph_;
-    TNodeId Id_;
+    NDetail::TNodeIdsIterator Id_;
 
 private:
     bool IsValid() const {
-        return !Graph_.Nodes_.contains(Id_) || Cur().IsValid();
+        return !Graph_.Nodes_.contains(*Id_) || Cur().IsValid();
     }
 
     void Advance() {
@@ -740,21 +741,21 @@ public:
     }
 
     TNodeIterator& operator++() {
-        Y_ASSERT(Graph_.Nodes_.contains(Id_));
+        Y_ASSERT(Graph_.Nodes_.contains(*Id_));
         Advance();
         return *this;
     }
 
     TRef operator*() const {
-        return TRef(Cur(), Id_, Graph_);
+        return TRef(Cur(), *Id_, Graph_);
     }
 
 private:
     TNRef Cur() {
-        return Graph_.Nodes_[Id_];
+        return Graph_.Nodes_[*Id_];
     }
     const TNRef Cur() const {
-        return Graph_.Nodes_[Id_];
+        return Graph_.Nodes_[*Id_];
     }
 };
 

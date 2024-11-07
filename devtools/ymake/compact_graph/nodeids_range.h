@@ -11,6 +11,7 @@ public:
 
     constexpr TNodeIdsIterator() noexcept = default;
     constexpr TNodeIdsIterator(std::underlying_type_t<TNodeId> state) noexcept: State_{state} {}
+    constexpr TNodeIdsIterator(TNodeId val) noexcept: State_{ToUnderlying(val)} {}
 
     constexpr std::strong_ordering operator<=> (const TNodeIdsIterator&) const noexcept = default;
 
