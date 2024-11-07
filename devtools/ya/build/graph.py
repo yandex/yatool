@@ -1995,9 +1995,6 @@ def _build_graph_and_tests(
     res_dir = core.config.tool_root(toolscache_version(opts))
     src_dir = opts.arc_root
 
-    host = opts.host_platform
-    target_platforms = opts.target_platforms
-
     vcs_info = exit_stack.enter_context(
         _AsyncContext(
             core_async.future(
@@ -2012,6 +2009,9 @@ def _build_graph_and_tests(
             )
         )
     )
+
+    host = opts.host_platform
+    target_platforms = opts.target_platforms
 
     if host:
         host = bg.mine_platform_name(host)
