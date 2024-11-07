@@ -679,7 +679,12 @@ def _calculate_stats_uid(node):
 
 
 def _calculate_static_uid(node):
-    return hashing.md5_value(str(node['outputs'] + [cmd['cmd_args'] for cmd in node['cmds']]))
+    sep = ':'
+    return hashing.md5_value(
+        sep.join(sep.join(cmd['cmd_args']) for cmd in node['cmds'])
+        + sep
+        + (sep.join(sorted(node['outputs'])) if 'outputs' in node else '')
+    )
 
 
 def inject_stats_and_static_uids(graph):
