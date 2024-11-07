@@ -51,6 +51,13 @@ public:
         return TString(Module.UnitPath());
     }
 
+    TString UnitAutoincludePath() const override {
+        size_t prefixLen;
+        TString YaCommon {};
+        Conf.AutoincludePathsTrie.FindLongestPrefix(UnitPath() + NPath::PATH_SEP_S, &prefixLen, &YaCommon);
+        return TString{NPath::Parent(YaCommon)};
+    }
+
     void SetProperty(TStringBuf propName, TStringBuf value) override {
         ythrow TError() << "SetProperty (" << propName << "=" << value << "): Graph modification is no allowed in a simple wrapper";
     }
