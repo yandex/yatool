@@ -44,8 +44,6 @@ namespace NYMake {
                 return NPyBind::BuildPyObject(cmdContext->Unit->UnitFileName());
             } else if (cmdContext->Name == TStringBuf("global_filename")) {
                 return NPyBind::BuildPyObject(cmdContext->Unit->GetGlobalFileName());
-            } else if (cmdContext->Name == TStringBuf("autoinclude_path")) {
-                return NPyBind::BuildPyObject(cmdContext->Unit->UnitAutoincludePath());
             } else if (cmdContext->Name == TStringBuf("path")) {
                 return NPyBind::BuildPyObject(cmdContext->Unit->UnitPath());
             } else if (cmdContext->Name == TStringBuf("resolve")) { //TODO: rename resolve here to smth else like get_abs_path

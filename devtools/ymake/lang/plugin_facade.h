@@ -64,8 +64,6 @@ public:
 
     virtual TString UnitPath() const = 0;
 
-    virtual TString UnitAutoincludePath() const = 0;
-
     virtual void ResolveInclude(TStringBuf src, const TVector<TStringBuf>& includes, TVector<TString>& result) = 0;
 
     virtual void SetProperty(TStringBuf propName, TStringBuf value) = 0;
