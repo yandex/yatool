@@ -31,6 +31,7 @@ struct TModuleConf;
 
 constexpr TStringBuf VAR_PEERDIR_TAGS = "PEERDIR_TAGS";
 constexpr TStringBuf MANGLED_MODULE_TYPE = "MANGLED_MODULE_TYPE";
+constexpr TStringBuf VAR_MODULE_COMMON_CONFIGS_DIR = "MODULE_COMMON_CONFIGS_DIR";
 constexpr TStringBuf VAR_MODULE_LANG = "MODULE_LANG";
 constexpr TStringBuf VAR_MODULE_TYPE = "MODULE_TYPE";
 

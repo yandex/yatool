@@ -216,6 +216,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                     } else {
                         auto includeCtr = OnInclude(YaCommon, Makefile);
                         Y_ASSERT(!includeCtr.Ignored());
+                        Vars().SetStoreOriginals(VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(YaCommon)), OrigVars());
                         ReadMakeFile(YaCommon);
                     }
                 }
