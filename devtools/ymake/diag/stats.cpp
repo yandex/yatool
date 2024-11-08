@@ -23,30 +23,6 @@ namespace NStats {
         FORCE_TRACE(U, msg);
     }
 
-    ui64 TStatsBase::Get(size_t index) const {
-        return Data[index];
-    }
-
-    void TStatsBase::Set(size_t index, ui64 value) {
-        Data[index] = value;
-    }
-
-    void TStatsBase::SetMin(size_t index, ui64 value) {
-        Data[index] = Min(Data[index], value);
-    }
-
-    void TStatsBase::SetMax(size_t index, ui64 value) {
-        Data[index] = Max(Data[index], value);
-    }
-
-    void TStatsBase::Inc(size_t index, ui64 value) {
-        Data[index] += value;
-    }
-
-    size_t TStatsBase::Size() const {
-        return Data.size();
-    }
-
     void TStatsBase::MonEvent(const TString& indexName, ui64 value) {
         NEvent::TMonitoringStat event;
         event.SetName(indexName);

@@ -27,12 +27,32 @@ namespace NStats {
         TStatsBase& operator=(TStatsBase&&) = default;
         virtual ~TStatsBase() = default;
 
-        ui64 Get(size_t index) const;
-        void Set(size_t index, ui64 value);
-        void SetMin(size_t index, ui64 value);
-        void SetMax(size_t index, ui64 value);
-        void Inc(size_t index, ui64 value = 1);
-        size_t Size() const;
+        ui64 Get(size_t index) const {
+            return Data[index];
+        }
+
+        void Set(size_t index, ui64 value) {
+            Data[index] = value;
+        }
+
+        void SetMin(size_t index, ui64 value) {
+            if (Data[index] > value)
+                Data[index] = value;
+        }
+
+        void SetMax(size_t index, ui64 value) {
+            if (Data[index] < value)
+                Data[index] = value;
+        }
+
+        void Inc(size_t index, ui64 value) {
+            Data[index] += value;
+        }
+
+        size_t Size() const {
+            return Data.size();
+        }
+
         virtual TString NameByIndex(size_t index) const = 0;
 
     private:
