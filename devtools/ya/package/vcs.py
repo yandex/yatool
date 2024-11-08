@@ -12,6 +12,7 @@ from yalibrary.vcs import vcsversion
 logger = logging.getLogger(__name__)
 
 UNDEFINED = 'undefined'
+DEFAULT_DATE = '1970-01-01T00:00:00'
 
 
 @exts.func.memoize()
@@ -45,12 +46,13 @@ class Revision(VcsInfo):
 class RevisionDate(VcsInfo):
     def calc(self, info):
         try:
-            tstamp = info['date']
+            tstamp = info.get('date', DEFAULT_DATE)
+            if tstamp == DEFAULT_DATE:
+                logger.debug("Failed to obtain date from vcs. vcs info: %s", info)
             tstamp = datetime.datetime.fromisoformat(tstamp)
             tstamp = tstamp.date().isoformat()
             return tstamp
         except Exception:
-            logger.exception("Failed to obtain date from arc. arc info: %s", info)
             raise
 
 
