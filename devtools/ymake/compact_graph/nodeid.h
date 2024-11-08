@@ -7,20 +7,6 @@ enum class TNodeId: ui32 {
     Invalid = 0,
     MinValid = 1
 };
-constexpr TNodeId& operator++ (TNodeId& id) noexcept {
-    id = TNodeId{ToUnderlying(id) + 1};
-    return id;
-}
-constexpr TNodeId operator++ (TNodeId& id, int) noexcept {
-    return std::exchange(id, TNodeId{ToUnderlying(id) + 1});
-}
-constexpr TNodeId& operator-- (TNodeId& id) noexcept {
-    id = TNodeId{ToUnderlying(id) - 1};
-    return id;
-}
-constexpr TNodeId operator-- (TNodeId& id, int) noexcept {
-    return std::exchange(id, TNodeId{ToUnderlying(id) - 1});
-}
 
 // TODO: Investigate if using default hash for enum affects performance. Switching
 // node id hash function from default for ui32 to default for enum breaks at least one

@@ -203,7 +203,7 @@ public:
         std::sort(loopSrt.begin(), loopSrt.end());
         // continuous loop enumeration makes other code simpler
         TNodesData<size_t, TVector> loopSz;
-        TNodeId newId, curId = loopSrt[0].first;
+        TNodeId curId = loopSrt[0].first;
         loopSz.push_back(0);
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
@@ -217,18 +217,19 @@ public:
             .Loop2Nodes{loopSz.Ids()}
         };
         // loop id 0 is reserved for 'no loop' flag
-        newId = TNodeId::MinValid, curId = loopSrt[0].first;
+        auto newId = res.Loop2Nodes.ValidIds().begin();
+        curId = loopSrt[0].first;
         for (size_t n = 0; n < loopSrt.size(); n++) {
             if (curId != loopSrt[n].first) {
-                newId++;
-                res.Loop2Nodes[newId].reserve(loopSz[newId]);
+                ++newId;
+                res.Loop2Nodes[*newId].reserve(loopSz[*newId]);
                 curId = loopSrt[n].first;
             }
-            res.Node2Loop[loopSrt[n].second] = newId;
-            res.Loop2Nodes[newId].push_back(loopSrt[n].second);
+            res.Node2Loop[loopSrt[n].second] = *newId;
+            res.Loop2Nodes[*newId].push_back(loopSrt[n].second);
         }
         Y_ASSERT(newId == loopSz.MaxNodeId());
-        YDIAG(Loop) << "Found " << newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
+        YDIAG(Loop) << "Found " << *newId << " loops, with " << loopSrt.size() << " elements (of " << Nodes.size() << " total nodes)" << Endl;
         return res;
     }
 };

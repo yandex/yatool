@@ -206,7 +206,7 @@ void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
     ui32 loopsDiscarded = 0;
     ui32 loopsLoaded = 0;
 
-    for (TNodeId i = TNodeId::MinValid; i <= MaxLoopId; ++i) {
+    for (TNodeId _ [[maybe_unused]]: TValidNodeIds{MaxLoopId}) {
         TLoadBuffer buffer{&rawBuffer};
         TNodeId loopNodeId;
         if (buffer.LoadUnchangedNodeDataFromStream(input, loopNodeId, graph) != TLoadBuffer::NodeLoaded) {
