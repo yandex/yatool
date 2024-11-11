@@ -84,20 +84,38 @@ namespace NYMake {
             dontCompress = dontCompress || unit.Enabled("ARCH_AARCH64"sv) || unit.Enabled("ARCH_ARM"sv) || unit.Enabled("ARCH_PPC64LE"sv);
 
             if (IsSemanticsRendering) {
+                TVector<TStringBuf> inputs;
                 TVector<TStringBuf> keys;
-                outs.push_back("INPUTS");
+                TVector<TStringBuf> opts;
+                TVector<TStringBuf> args;
                 for (auto name = bucketStart; name != params.cend(); name++) {
                     if (path == params.end()) {
                         path = name;
                         continue;
                     }
-                    outs.emplace_back(*path);
-                    keys.push_back(*name);
+                    if (*path == "-") {
+                        opts.emplace_back(*path);
+                        opts.emplace_back(*name);
+                    } else {
+                        inputs.emplace_back(*path);
+                        keys.emplace_back(*name);
+                    }
                     path = params.end();
                 }
-                outs.emplace_back("KEYS");
-                outs.insert(outs.end(), keys.begin(), keys.end());
-                unit.CallMacro("_RESOURCE_SEM", TVector<TStringBuf>(outs.begin(), outs.end()));
+
+                if (!inputs.empty()) {
+                    args.emplace_back("INPUTS");
+                    args.insert(args.end(), inputs.begin(), inputs.end());
+                    args.emplace_back("KEYS");
+                    args.insert(args.end(), keys.begin(), keys.end());
+                }
+                if (!opts.empty()) {
+                    args.emplace_back("OPTS");
+                    args.insert(args.end(), opts.begin(), opts.end());
+                }
+                if (!args.empty()) {
+                    unit.CallMacro("_RESOURCE_SEM", args);
+                }
                 return;
             }
 
