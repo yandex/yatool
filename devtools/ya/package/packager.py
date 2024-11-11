@@ -305,6 +305,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "new_store",
         "new_store_ttl",
         "pytest_args",
+        "release_version",
         "strip_cache",
         "strip_symlinks",
         "symlinks_ttl",

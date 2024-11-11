@@ -103,10 +103,12 @@ def _dump_json(
     build_date=None,
     build_timestamp=0,
     custom_version='',
+    release_version='',
 ):
     j = {}
     j['PROGRAM_VERSION'] = info['scm_text'] + "\n" + _SystemInfo._to_text(other_data)
     j['CUSTOM_VERSION'] = str(_SystemInfo._to_text(custom_version)) if custom_version else ''
+    j['RELEASE_VERSION'] = str(_SystemInfo._to_text(release_version)) if release_version else ''
     j['SCM_DATA'] = info['scm_text']
     j['ARCADIA_SOURCE_PATH'] = _SystemInfo._to_text(arc_root)
     j['ARCADIA_SOURCE_URL'] = info.get('url', info.get('svn_url', ''))
@@ -768,7 +770,7 @@ def get_raw_version_info(arc_root, bld_root=None):
     return info
 
 
-def get_version_info(arc_root, bld_root, fake_data=False, fake_build_info=False, custom_version=""):
+def get_version_info(arc_root, bld_root, fake_data=False, fake_build_info=False, custom_version="", release_version=""):
     info, vcs_root = _get_default_json() if fake_data else _get_json(arc_root)
     return _dump_json(
         vcs_root,
@@ -783,6 +785,7 @@ def get_version_info(arc_root, bld_root, fake_data=False, fake_build_info=False,
         build_date=_SystemInfo.get_date(0 if fake_build_info else None),
         build_timestamp=_SystemInfo.get_timestamp(fake_build_info=fake_build_info),
         custom_version=custom_version,
+        release_version=release_version,
     )
 
 

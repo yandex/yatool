@@ -46,6 +46,7 @@ class PackageOperationalOptions(core.yarg.Options):
         self.packages = []
         self.publish_to = {}
         self.raw_package_path = None
+        self.release_version = None
         self.run_long_tests = False
         self.sandbox_download_protocols = []
         self.sandbox_task_id = 0
@@ -584,6 +585,13 @@ class PackageCustomizableOptions(core.yarg.Options):
                 names=['--custom-version'],
                 help='Custom package version',
                 hook=core.yarg.SetValueHook('custom_version'),
+                group=core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            core.yarg.ArgConsumer(
+                names=['--release-version'],
+                help='Custom release version',
+                hook=core.yarg.SetValueHook('release_version'),
                 group=core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),

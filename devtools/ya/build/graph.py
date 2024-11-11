@@ -2004,6 +2004,7 @@ def _build_graph_and_tests(
                     opts.vcs_file,
                     opts.flags,
                     custom_version=getattr(opts, 'custom_version', ''),
+                    release_version=getattr(opts, 'release_version', ''),
                 ),
                 daemon=False,
             )
@@ -3340,7 +3341,7 @@ def build_lite_graph(graph):
     return lite_graph
 
 
-def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_version=''):
+def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_version='', release_version=''):
     flags = flags or {}
     logger.debug('Collect vcs info')
     timer = exts.timer.Timer('get_version_info')
@@ -3351,7 +3352,12 @@ def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_ver
             json_str = f.read()
     else:
         json_str = vcsversion.get_version_info(
-            arc_root, bld_root, fake_data, fake_build_info, custom_version=custom_version
+            arc_root,
+            bld_root,
+            fake_data,
+            fake_build_info,
+            custom_version=custom_version,
+            release_version=release_version,
         )
     logger.debug("Got version json  %s", json.dumps(json_str, sort_keys=True))
 
