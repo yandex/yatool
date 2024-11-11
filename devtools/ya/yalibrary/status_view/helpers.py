@@ -10,6 +10,8 @@ import library.python.func as func
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_PRINT_COLOR = 'white'
+
 
 class NodeView(object):
     def __init__(self):
@@ -177,7 +179,7 @@ def fmt_node(inputs, outputs, kv, tags=None, status=None):
     view.primary.append(color_path(patch_path(format_paths(inputs, outputs, kv))))
     if status:
         view.secondary.append(status)
-    if 'p' in kv and 'pc' in kv:
-        view.type = '[[[c:' + kv['pc'] + ']]' + kv['p'] + '[[rst]]]'
+    if 'p' in kv:
+        view.type = '[[[c:' + kv.get('pc', DEFAULT_PRINT_COLOR) + ']]' + kv['p'] + '[[rst]]]'
     view.tags = tags
     return view
