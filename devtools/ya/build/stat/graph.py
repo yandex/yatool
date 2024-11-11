@@ -1,14 +1,15 @@
 # cython: profile=True
 
+import contextlib
+import io
 import logging
-import re
+import os
 import sys
+import tempfile
 from collections import defaultdict
 
 from exts import http_client
 from yalibrary.status_view.helpers import format_paths
-
-import six
 
 logger = logging.getLogger(__name__)
 
@@ -390,16 +391,27 @@ class Graph:
         return self.fake_resource_node.get_time_elapsed()
 
 
-def _fetch_or_return(stderr):
-    if stderr and stderr.startswith('http://'):
-        stderr = http_client.http_get(stderr)
-    return six.ensure_str(stderr)
+@contextlib.contextmanager
+def _get_log(log):
+    if log and log.startswith('http://'):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_name = os.path.join(tmpdir, "log.txt")
+            http_client.download_file(log, file_name)
+            with open(file_name) as flog:
+                yield flog
+    else:
+        with io.StringIO(log) as flog:
+            yield flog
 
 
 def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
+    with _get_log(distbuild_log_json['log']) as flog:
+        return _create_graph_with_distbuild_log(graph_json, distbuild_log_json, flog)
+
+
+def _create_graph_with_distbuild_log(graph_json, distbuild_log_json, flog):
     graph = Graph(graph_json)
     graph.log_json = distbuild_log_json
-    log = _fetch_or_return(distbuild_log_json['log'])
 
     failed_results = distbuild_log_json.get('failed_results', {})
     failed_tasks_uids = failed_results.get('results', [])
@@ -420,8 +432,8 @@ def create_graph_with_distbuild_log(graph_json, distbuild_log_json):
     prepare_types = list(map(get_prepare_type, prepare_finish_ev_types))
 
     start_time = 0
-    for match in re.finditer(r'[^\n]+', log):
-        i = match[0]
+    for i in flog:
+        i.rstrip()
         lines = i.split(' ')
         if len(lines) < 3:
             continue
@@ -569,7 +581,7 @@ def create_graph_with_local_log(graph, execution_log, failed_uids=None):
         graph.log_json = execution_log
         graph.failed_uids = failed_uids if failed_uids else set()
 
-    for uid, info in six.iteritems(execution_log):
+    for uid, info in execution_log.items():
         task = None
         if info and info.get('prepare') is not None:
             prepare_type = "{}:{}".format(info['prepare'], uid) if info['prepare'] else uid
