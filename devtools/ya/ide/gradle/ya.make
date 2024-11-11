@@ -7,27 +7,15 @@ PY_SRCS(
     __init__.py
 )
 
-# TODO: Cleanup
 PEERDIR(
-    contrib/python/six
-    contrib/python/termcolor
-    contrib/python/pygtrie
-    devtools/msvs
     devtools/ya/build
+    devtools/ya/build/build_opts
+    devtools/ya/build/sem_graph
+    devtools/ya/core/config
     devtools/ya/core/stage_tracer
     devtools/ya/core/yarg
     devtools/ya/exts
-    devtools/ya/ide/templates
-    devtools/ya/jbuild
-    devtools/ya/jbuild/idea_templates
-    devtools/ya/yalibrary/display
-    devtools/ya/yalibrary/find_root
-    devtools/ya/yalibrary/graph
-    devtools/ya/yalibrary/makelists
     devtools/ya/yalibrary/platform_matcher
-    devtools/ya/yalibrary/qxml
-    devtools/ya/yalibrary/tools
-    devtools/ya/yalibrary/vcs
 )
 
 END()

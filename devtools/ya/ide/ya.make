@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/ide/gradle
     devtools/ya/ide/templates
     devtools/ya/jbuild
     devtools/ya/jbuild/idea_templates
@@ -25,12 +26,6 @@ PEERDIR(
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
 )
-
-IF (PYTHON3)
-    PEERDIR(
-        devtools/ya/ide/gradle
-    )
-ENDIF()
 
 STYLE_PYTHON()
 
@@ -71,4 +66,8 @@ END()
 
 RECURSE(
     fsnotifier
+)
+
+RECURSE_FOR_TESTS(
+    tests_gradle
 )

@@ -71,6 +71,7 @@ namespace NYa {
     TString CurrentOs();
     TString CurrentArchitecture();
     TLegacyPlatform CurrentPlatform();
+    bool IsWindows();
     bool IsDarwinArm64();
     TCanonizedPlatform MyPlatform();
 

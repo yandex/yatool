@@ -1,0 +1,245 @@
+import copy
+import os
+import logging
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Iterable
+
+from build.ymake2 import ymake_sem_graph
+from yalibrary import tools
+from devtools.ya.yalibrary import sjson
+from build import build_facade
+from core import config as core_config
+
+
+class SemException(Exception):
+    pass
+
+
+class SemLang:
+    """Languages supported by sem-graph"""
+
+    def __init__(self, lang: str, flags: dict[str, str], extra: list[str]):
+        self.lang: str = lang
+        self.flags: dict[str, str] = flags
+        self.extra: list[str] = extra
+
+    @classmethod
+    def JAVA(cls) -> "SemLang":
+        return cls(
+            lang="java",
+            flags={
+                'YA_IDE_GRADLE': 'yes',
+                'EXPORT_GRADLE': 'yes',
+                'BUILD_LANGUAGES': 'JAVA',  # KOTLIN == JAVA
+            },
+            extra=['-DBUILD_LANGUAGES=JAVA'],
+        )
+
+    @classmethod
+    def CPP(cls) -> "SemLang":
+        return cls(
+            lang="cpp",
+            flags={
+                'EXPORT_CMAKE': 'yes',
+                'BUILD_LANGUAGES': 'CPP',  # C == CPP
+            },
+            extra=['-DBUILD_LANGUAGES=CPP'],
+        )
+
+
+class SemConfig:
+    """Configure making sem-graph and exporting with it"""
+
+    YMAKE_DIR = "ymake"  # Subfolder of export root for ymake files
+
+    def __init__(self, lang: SemLang, params):
+        self.logger = logging.getLogger(type(self).__name__)
+        self.lang = lang
+        self.params = copy.copy(params)
+        self.arcadia_root = Path(self.params.arc_root)
+        self._prepare_targets()
+        self.export_root = self._get_export_root()
+        self.ymake_root = self.export_root / SemConfig.YMAKE_DIR
+        self._ymake_bin_cache = None
+        if hasattr(self.params, 'ymake_bin'):
+            self._ymake_bin_cache = self.params.ymake_bin
+        self._yexport_bin_cache = None
+        if hasattr(self.params, 'yexport_bin'):
+            self._yexport_bin_cache = self.params.yexport_bin
+
+        self.params.flags.update(
+            {  # Common flags for all languages
+                'EXPORTED_BUILD_SYSTEM_SOURCE_ROOT': str(self.arcadia_root),
+                'EXPORTED_BUILD_SYSTEM_BUILD_ROOT': str(self.export_root),
+                'TRAVERSE_RECURSE': 'yes',
+                'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
+                'USE_PREBUILT_TOOLS': 'no',
+            }
+        )
+
+        if self.lang.flags:
+            self.params.flags.update(self.lang.flags)
+
+        if self.lang.extra and hasattr(self.params, 'ya_make_extra'):
+            self.params.ya_make_extra += self.lang.extra
+
+    def _prepare_targets(self) -> None:
+        """Add current directory to input targets, if targets empty"""
+        if not self.params.abs_targets:
+            abs_target = Path.cwd().resolve()
+            self.params.abs_targets.append(str(abs_target))
+            self.params.rel_targets.append(os.path.relpath(abs_target, self.arcadia_root))
+        self.logger.info("Targets: %s", self.params.rel_targets)
+
+    def _get_export_root(self) -> Path:
+        """As a rule must overwrite by child class"""
+        export_root = Path(tempfile.mkdtemp('sem'))
+        self.logger.info("Export root: %s", export_root)
+        return export_root
+
+    @property
+    def ymake_bin(self) -> str:
+        """Lazy get ymake_bin path"""
+        if not self._ymake_bin_cache:
+            self._ymake_bin_cache = tools.tool('ymake')
+        return self._ymake_bin_cache
+
+    @property
+    def yexport_bin(self) -> str:
+        """Lazy get yexport_bin path"""
+        if not self._yexport_bin_cache:
+            self._yexport_bin_cache = tools.tool('yexport')
+        return self._yexport_bin_cache
+
+
+class Semantic:
+    """One semantic in sem-graph node"""
+
+    SEM = 'sem'
+
+    def __init__(self, data: dict):
+        if Semantic.SEM not in data:
+            raise SemException(f"Not found '{Semantic.SEM}' in semantic")
+        data_sem = data[Semantic.SEM]
+        if not isinstance(data_sem, list):
+            raise SemException(f"Field '{Semantic.SEM}' in semantic is not list")
+        if not data_sem:
+            raise SemException(f"Field '{Semantic.SEM}' in semantic is empty list")
+        if not data_sem[0]:
+            raise SemException(f"Empty first item in '{Semantic.SEM}' in semantic")
+        self.sems: list[str] = [str(s) for s in data_sem]
+
+
+class SemNode:
+    """Node of sem-graph"""
+
+    ID = 'Id'
+    NAME = 'Name'
+    SEMANTICS = 'semantics'
+
+    def __init__(self, data: dict, skip_invalid: bool = False, logger: logging.Logger = None):
+        if SemNode.ID not in data:
+            raise SemException(f"Not found '{SemNode.ID}' in node")
+        self.id: int = int(data[SemNode.ID])
+        if SemNode.NAME not in data:
+            raise SemException(f"Not found '{SemNode.NAME}' in node")
+        self.name: str = str(data[SemNode.NAME])
+        self.semantics = None
+        if SemNode.SEMANTICS in data:
+            data_semantics = data[SemNode.SEMANTICS]
+            if not isinstance(data_semantics, list):
+                raise SemException(f"Field '{SemNode.SEMANTICS}' is not list")
+            if not data_semantics:
+                raise SemException(f"Field '{SemNode.SEMANTICS}' is empty list")
+            try:
+                self.semantics: list[Semantic] = []
+                for data_semantic in data_semantics:
+                    self.semantics.append(Semantic(data_semantic))
+            except SemException as e:
+                if skip_invalid:
+                    if logger is not None:
+                        logger.warning("Skip invalid semantic %s: %s", data_semantic, e)
+                else:
+                    raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
+
+    def has_semantics(self) -> bool:
+        return self.semantics is not None
+
+
+class SemGraph:
+    """Creating and reading sem-graph"""
+
+    DATA = 'data'
+    DATATYPE = 'DataType'
+    DATATYPE_NODE = 'Node'
+
+    def __init__(self, config: SemConfig, skip_invalid: bool = False):
+        self.logger = logging.getLogger(type(self).__name__)
+        self.config: SemConfig = config
+        self.skip_invalid: bool = skip_invalid
+        self.sem_graph_file: Path = None
+
+    def make(self) -> None:
+        """Make sem-graph file with current config params to ymake_root"""
+
+        conf = build_facade.gen_conf(
+            build_root=core_config.build_root(),
+            build_type='nobuild',
+            build_targets=self.config.params.abs_targets,
+            flags=self.config.params.flags,
+            ymake_bin=self.config.ymake_bin,
+            host_platform=self.config.params.host_platform,
+            target_platforms=self.config.params.target_platforms,
+            arc_root=self.config.arcadia_root,
+        )
+
+        self.config.ymake_root.mkdir(0o755, parents=True, exist_ok=True)
+        ymake_conf = self.config.ymake_root / 'ymake.conf'
+        shutil.copy(conf, ymake_conf)
+
+        r, _ = ymake_sem_graph(
+            source_root=self.config.arcadia_root,
+            custom_build_directory=self.config.ymake_root,
+            custom_conf=ymake_conf,
+            continue_on_fail=True,
+            dump_sem_graph=True,
+            ymake_bin=self.config.ymake_bin,
+            abs_targets=self.config.params.abs_targets,
+        )
+        if r.exit_code != 0:
+            self.logger.error('Fail generate sem-graph by ymake with exit_code=%d:\n%s', r.exit_code, r.stderr)
+            raise SemException(f'Fail generate sem-graph by ymake with exit_code={r.exit_code}')
+
+        try:
+            self.sem_graph_file: Path = self.config.ymake_root / 'sem.json'
+            with self.sem_graph_file.open('w') as f:
+                f.write(r.stdout)
+        except Exception as e:
+            raise SemException(f'Fail write sem-graph to {self.sem_graph_file}: {e}')
+
+    def read(self) -> Iterable[SemNode]:
+        """Read sem-graph from file"""
+        try:
+            with self.sem_graph_file.open('rb') as f:
+                graph = sjson.load(f)
+            if SemGraph.DATA not in graph:
+                raise SemException(f"Not found '{SemGraph.DATA}' in sem-graph")
+            for data_node in graph[SemGraph.DATA]:
+                try:
+                    if SemGraph.DATATYPE not in data_node:
+                        raise SemException(f"Not found '{SemGraph.DATATYPE}' in item {data_node}")
+                    if data_node[SemGraph.DATATYPE] != SemGraph.DATATYPE_NODE:
+                        continue  # non-node item valid, but not interest
+                    sem_node = SemNode(data_node, self.skip_invalid, self.logger if self.skip_invalid else None)
+                    if not sem_node.has_semantics():
+                        continue  # node without semantics valid, but not interest
+                    yield sem_node
+                except SemException as e:
+                    if self.skip_invalid:
+                        self.logger.warning("Skip invalid node %s: %s", data_node, e)
+                    else:
+                        raise SemException(f"Fail parse node {data_node}: {e}") from e
+        except Exception as e:
+            raise SemException(f'Fail read sem-graph from {self.sem_graph_file}: {e}') from e

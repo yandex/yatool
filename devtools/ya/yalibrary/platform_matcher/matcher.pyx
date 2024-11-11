@@ -73,6 +73,7 @@ cdef extern from "devtools/libs/yaplatform/platform.h" namespace "NYa":
     TString CurrentOs()
     TString CurrentArchitecture()
     TLegacyPlatform CurrentPlatform()
+    bool IsWindows()
     bool IsDarwinArm64()
     TCanonizedPlatform MyPlatform()
 
@@ -110,6 +111,9 @@ def canonize_full_platform(full_platform):
 
     return canonize_platform(platform_ + platform_suffix)
 
+@exts.func.lazy
+def is_windows():
+    return IsWindows()
 
 @exts.func.lazy
 def is_darwin_arm64():

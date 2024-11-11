@@ -36,6 +36,7 @@ PEERDIR(
     devtools/ya/build/owners
     devtools/ya/build/prefetch
     devtools/ya/build/reports
+    devtools/ya/build/sem_graph
     devtools/ya/build/stat
     devtools/ya/build/targets
     devtools/ya/build/ymake2

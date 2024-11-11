@@ -134,6 +134,7 @@ def _build_params():
     return _configure_params(buildable=True, check=False) + [
         core.yarg.Param('clear_build', default_value=False),
         core.yarg.Param('no_caches_on_retry', default_value=False),
+        core.yarg.Param('dump_sem_graph', default_value=None),
     ]
 
 
@@ -169,12 +170,17 @@ def _gen_graph_params():
 
 
 def _ymake_build(**kwargs):
-    logger.debug('Run build with {0}'.format(kwargs))
+    logger.debug('Run build with %s', kwargs)
+    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
+
+
+def ymake_sem_graph(**kwargs):
+    logger.debug('Run sem-graph with %s', kwargs)
     return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
 
 
 def ymake_dump(**kwargs):
-    logger.debug('Run dump with {0}'.format(kwargs))
+    logger.debug('Run dump with %s', kwargs)
     return core.yarg.behave(
         kwargs,
         core.yarg.Behaviour(
@@ -185,7 +191,7 @@ def ymake_dump(**kwargs):
 
 
 def ymake_gen_graph(**kwargs):
-    logger.debug('Run gen graph with {0}'.format(kwargs))
+    logger.debug('Run gen graph with %s', kwargs)
 
     res, evlog = core.yarg.behave(
         kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_graph_params())
@@ -309,6 +315,10 @@ def _cons_ymake_args(**kwargs):
     dump_yndex = kwargs.pop('yndex_file', None)
     if dump_yndex:
         ret += ['-Y', dump_yndex]
+
+    dump_sem_graph = kwargs.pop('dump_sem_graph', None)
+    if dump_sem_graph:
+        ret += ['--sem-graph']
 
     # GENGRAPH PARAMS
     # XXX

@@ -399,6 +399,12 @@ class IdeaOptions(core.yarg.Options):
 class GradleOptions(core.yarg.Options):
     YGRADLE_OPT_GROUP = core.yarg.Group('Yexport gradle project options', 0)
 
+    OPT_GRADLE_NAME = '--gradle-name'
+    OPT_SETTINGS_ROOT = '--settings-root'
+    OPT_YEXPORT_BIN = '--yexport-bin'
+    OPT_BUILD_CONTRIBS = '--build-contribs'
+    OPT_REMOVE = '--remove'
+
     def __init__(self):
         self.gradle_name = None
         self.settings_root = None
@@ -407,32 +413,39 @@ class GradleOptions(core.yarg.Options):
         self.yexport_debug_mode = None
         self.login = None
         self.bucket_token = None
+        self.remove = None
 
     @staticmethod
     def consumer():
         return [
             core.yarg.ArgConsumer(
-                ['--gradle-name'],
+                [GradleOptions.OPT_GRADLE_NAME],
                 help='Set project name manually',
                 hook=core.yarg.SetValueHook('gradle_name'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--settings-root'],
+                [GradleOptions.OPT_SETTINGS_ROOT],
                 help='Directory in Arcadia to place Gradle project settings',
                 hook=core.yarg.SetValueHook('settings_root'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--yexport-bin'],
+                [GradleOptions.OPT_YEXPORT_BIN],
                 help='Full path to yexport binary',
                 hook=core.yarg.SetValueHook('yexport_bin'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
-                ['--build-contribs'],
+                [GradleOptions.OPT_BUILD_CONTRIBS],
                 help='Build all contribs from arcadia to jar files',
                 hook=core.yarg.SetConstValueHook('build_contribs', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                [GradleOptions.OPT_REMOVE],
+                help='Remove gradle project files and all symlinks',
+                hook=core.yarg.SetConstValueHook('remove', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
@@ -447,7 +460,13 @@ class GradleOptions(core.yarg.Options):
     def postprocess(self):
         if self.yexport_bin is not None and not os.path.exists(self.yexport_bin):
             raise core.yarg.ArgsValidatingException(
-                'Not found yexport binary(--yexport-bin) {}.'.format(self.yexport_bin)
+                'Not found yexport binary({}) {}.'.format(GradleOptions.OPT_YEXPORT_BIN, self.yexport_bin)
+            )
+        if self.remove and (self.gradle_name or self.build_contribs):
+            raise core.yarg.ArgsValidatingException(
+                '{} and {} not applicable with {}'.format(
+                    GradleOptions.OPT_GRADLE_NAME, GradleOptions.OPT_BUILD_CONTRIBS, GradleOptions.OPT_REMOVE
+                )
             )
 
 

@@ -123,6 +123,14 @@ namespace NYa {
         return {CurrentOs(), CurrentArchitecture()};
     }
 
+    bool IsWindows() {
+#if defined(_win_)
+        return true;
+#else
+        return false;
+#endif
+    }
+
     bool IsDarwinArm64() {
 #if defined(_darwin_)
         auto s_uname = Uname();
