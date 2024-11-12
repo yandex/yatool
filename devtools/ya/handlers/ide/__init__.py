@@ -521,10 +521,7 @@ class PycharmOptions(core.yarg.Options):
 def get_description(text, ref_name):
     if app_config.in_house:
         ref = {
-            "c": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#c",
-            "golang": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#golang",
-            "multi": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#multi",
-            "python": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#python",
+            "multi": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode",
             "typescript": "https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#typescript",
         }[ref_name]
         return "{}\nDocs: [[c:dark-cyan]]{}[[rst]]".format(text, ref)
@@ -620,7 +617,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-clangd'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(ide.vscode_clangd.gen_vscode_workspace),
-            description=get_description('Generate VSCode clangd C++ project.', ref_name='c'),
+            description="[[bad]]ya ide vscode-clangd[[rst]] is deprecated, please use [[good]]ya ide vscode --cpp[[rst]] instead",
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_clangd.VSCodeClangdOptions(),
@@ -637,7 +634,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-go'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(ide.vscode_go.gen_vscode_workspace),
-            description=get_description('Generate VSCode Go project.', ref_name='golang'),
+            description="[[bad]]ya ide vscode-go[[rst]] is deprecated, please use [[good]]ya ide vscode --go[[rst]] instead",
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_go.VSCodeGoOptions(),
@@ -651,7 +648,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         )
         self['vscode-py'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(ide.vscode_py.gen_vscode_workspace),
-            description=get_description('Generate VSCode Python project.', ref_name='python'),
+            description="[[bad]]ya ide vscode-py[[rst]] is deprecated, please use [[good]]ya ide vscode --py3[[rst]] instead",
             opts=ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 ide.vscode_py.VSCodePyOptions(),

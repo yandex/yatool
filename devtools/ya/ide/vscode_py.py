@@ -274,7 +274,7 @@ class PyProject(object):
         try:
             black_binary_path = yalibrary.tools.tool('black')
         except Exception as e:
-            ide_common.emit_message(termcolor.colored("Could not get 'ya tool black': %s" % repr(e), 'yellow'))
+            ide_common.emit_message("[[warn]]Could not get 'ya tool black': %s[[rst]]" % repr(e))
             return {}
 
         arc_root = PurePath(self.params.arc_root)
@@ -408,7 +408,7 @@ class PyProject(object):
             try:
                 makelist = yalibrary.makelists.ArcProject(self.params.arc_root, module_dir).makelist()
             except Exception as e:
-                ide_common.emit_message(termcolor.colored('Error in module "%s": %s' % (module_dir, repr(e)), 'yellow'))
+                ide_common.emit_message('[[warn]]Error in module "%s": %s[[rst]]' % (module_dir, repr(e)))
                 continue
             if not makelist:
                 continue
@@ -466,9 +466,7 @@ class PyProject(object):
             try:
                 makelist = yalibrary.makelists.ArcProject(self.params.arc_root, module['module_path']).makelist()
             except Exception as e:
-                ide_common.emit_message(
-                    termcolor.colored('Error in module "%s": %s' % (module['module_path'], repr(e)), 'yellow')
-                )
+                ide_common.emit_message('[[warn]]Error in module "%s": %s[[rst]]' % (module['module_path'], repr(e)))
                 continue
 
             if not makelist:
@@ -811,8 +809,12 @@ class PyProject(object):
 
 
 def gen_vscode_workspace(params):
+    ide_common.emit_message(
+        "[[warn]]DEPRECATED: 'ya ide vscode-py' [[rst]]is not supported anymore. Use [[good]]'ya ide vscode --py3'[[rst]] instead.\n"
+        "[[c:dark-cyan]]https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode[[rst]]"
+    )
     if pm.my_platform() == 'win32':
-        ide_common.emit_message(termcolor.colored("Handler 'vscode-py' doesn't work on Windows", "red"))
+        ide_common.emit_message("[[bad]]Handler 'vscode-py' doesn't work on Windows[[rst]]")
         return
 
     orig_flags = copy.copy(params.flags)

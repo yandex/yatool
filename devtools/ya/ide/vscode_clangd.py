@@ -208,7 +208,9 @@ def gen_run_configurations(params, modules, args, YA_PATH):
         try:
             gdb_path = yalibrary.tools.tool('gdbnew')
         except Exception as e:
-            ide_common.emit_message("Unable to get 'gdb' tool: %s.\nSkipping debug configurations." % repr(e))
+            ide_common.emit_message(
+                "[[warn]]Unable to get 'gdb' tool: %s.\nSkipping debug configurations.[[rst]]" % repr(e)
+            )
     debug_enabled = params.debug_enabled and (gdb_path or is_mac)
 
     for name, module in sorted(modules.items(), key=lambda item: item[0]):
@@ -391,6 +393,10 @@ def gen_run_configurations(params, modules, args, YA_PATH):
 
 
 def gen_vscode_workspace(params):
+    ide_common.emit_message(
+        "[[warn]]DEPRECATED: 'ya ide vscode-clangd' [[rst]]is not supported anymore. Use [[good]]'ya ide vscode --cpp'[[rst]] instead.\n"
+        "[[c:dark-cyan]]https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode[[rst]]"
+    )
     orig_flags = copy.copy(params.flags)
     ya_make_opts = core.yarg.merge_opts(
         build_opts.ya_make_options(free_build_targets=True) + [bc.CompilationDatabaseOptions()],

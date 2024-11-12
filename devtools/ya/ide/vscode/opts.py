@@ -24,6 +24,7 @@ class VSCodeAllOptions(core.yarg.Options):
         self.files_visibility = None
         self.goroot = None
         self.patch_gopls = True
+        self.gopls_index_targets = True
         self.dlv_enabled = True
         self.compile_commands_fix = True
         self.allow_project_inside_arc = False
@@ -149,6 +150,12 @@ class VSCodeAllOptions(core.yarg.Options):
                 ["--no-gopls-fix"],
                 help="Do not use patched gopls",
                 hook=core.yarg.SetConstValueHook("patch_gopls", False),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ['--no-gopls-index-targets'],
+                help='Do not index targets with gopls',
+                hook=core.yarg.SetConstValueHook('gopls_index_targets', False),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(

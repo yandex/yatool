@@ -226,6 +226,10 @@ def gen_run_configurations(params, modules, args, YA_PATH):
 
 
 def gen_vscode_workspace(params):
+    ide_common.emit_message(
+        "[[warn]]DEPRECATED: 'ya ide vscode-go' [[rst]]is not supported anymore. Use [[good]]'ya ide vscode --go'[[rst]] instead.\n"
+        "[[c:dark-cyan]]https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode[[rst]]"
+    )
     orig_flags = copy.copy(params.flags)
     ya_make_opts = core.yarg.merge_opts(
         build_opts.ya_make_options(free_build_targets=True),
@@ -241,7 +245,7 @@ def gen_vscode_workspace(params):
     params.hide_arm64_host_warning = True
 
     if params.darwin_arm64_platform:
-        ide_common.emit_message(termcolor.colored("Option '--apple-arm-platform' in no longer needed", 'yellow'))
+        ide_common.emit_message("[[warn]]Option '--apple-arm-platform' in no longer needed[[rst]]")
 
     tool_platform = None
     if params.host_platform:
@@ -255,16 +259,14 @@ def gen_vscode_workspace(params):
 
     gobin_path = os.path.join(goroot, 'bin', 'go.exe' if pm.my_platform() == 'win32' else 'go')
     if not os.path.exists(gobin_path):
-        ide_common.emit_message(termcolor.colored("ERR: Go binary not found in %s" % gobin_path, 'red'))
+        ide_common.emit_message("[[bad]]ERR: Go binary not found in %s[[rst]]" % gobin_path)
         return
 
     if pm.is_darwin_arm64():
         try:
             result = subprocess.check_output(['/usr/bin/file', gobin_path])
             if result.strip().rsplit(' ', 1)[1] != 'arm64':
-                ide_common.emit_message(
-                    termcolor.colored("Using X86-64 Go toolchain. Debug will not work under Rosetta.", 'yellow')
-                )
+                ide_common.emit_message("[[warn]]Using X86-64 Go toolchain. Debug will not work under Rosetta.[[rst]]")
         except Exception:
             pass
 

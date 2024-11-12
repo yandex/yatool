@@ -68,7 +68,7 @@ class VSCodeProject(object):
             params.flags["CGO_ENABLED"] = "0"
 
         if params.darwin_arm64_platform:
-            ide_common.emit_message("[[warn]]Option '--apple-arm-platform' in no longer needed[[rst]]")
+            ide_common.emit_message("[[warn]]Option '--apple-arm-platform' is no longer needed[[rst]]")
 
         self.tool_platform = None
         if params.host_platform:
@@ -268,10 +268,6 @@ class VSCodeProject(object):
                         OrderedDict(
                             (
                                 (
-                                    "build.arcadiaIndexDirs",
-                                    self.params.abs_targets,
-                                ),
-                                (
                                     "build.env",
                                     {
                                         "CGO_ENABLED": "0",
@@ -295,6 +291,9 @@ class VSCodeProject(object):
                     ),
                 )
             )
+            if self.params.patch_gopls and self.params.gopls_index_targets:
+                settings["gopls"]["build.arcadiaIndexDirs"] = self.params.rel_targets
+
         else:
             settings["go.useLanguageServer"] = False
 
