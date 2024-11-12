@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import itertools
 import re
 import math
 
@@ -186,21 +187,21 @@ class _TaggedFragment(object):
 
     @classmethod
     def split(cls, text):
-        fragments = []
-        tags = list(MARKUP_RE_BIN.finditer(text))
-        if tags:
-            if tags[0].start():
-                fragments.append(_TaggedFragment(b"", 0, tags[0].start()))
+        tags = MARKUP_RE_BIN.finditer(text)
+        first_tag = next(tags, None)
+        if first_tag is None:
+            yield _TaggedFragment(b"", 0, len(text))
+            return
 
-            for tag, next_tag in _pairwise(tags):
-                if next_tag:
-                    tag_end = next_tag.start()
-                else:
-                    tag_end = len(text)
-                fragments.append(_TaggedFragment(tag.group(1), tag.start(), tag_end))
-        else:
-            fragments.append(_TaggedFragment(b"", 0, len(text)))
-        return fragments
+        if first_tag.start() > 0:
+            yield _TaggedFragment(b"", 0, first_tag.start())
+
+        for tag, next_tag in _pairwise(itertools.chain([first_tag], tags)):
+            if next_tag:
+                tag_end = next_tag.start()
+            else:
+                tag_end = len(text)
+            yield _TaggedFragment(tag.group(1), tag.start(), tag_end)
 
 
 def truncate_middle(data, limit, ellipsis="...", message=""):

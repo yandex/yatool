@@ -12,6 +12,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/multidict
     devtools/ya/build/owners
     devtools/ya/build/stat
     devtools/ya/exts
@@ -21,6 +22,7 @@ PEERDIR(
     devtools/ya/test/util
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/platform_matcher
+    devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/term
     library/python/testing/yatest_lib
 )

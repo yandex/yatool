@@ -6,6 +6,7 @@ import os
 import threading
 import time
 import traceback
+from multidict import MultiDict
 
 import exts.fs
 
@@ -29,7 +30,7 @@ class BuildResultsListener(object):
         self._build_root = build_root
         self._notified = set()
         self._processed = set()
-        self._reversed_deps = defaultdict(set)
+        self._reversed_deps = MultiDict()
         self._nodes = {}
         self._tests = {}
         self._mergers = {}
@@ -37,8 +38,8 @@ class BuildResultsListener(object):
 
         for node in graph['graph']:
             self._nodes[node['uid']] = node
-            for dep in node['deps']:
-                self._reversed_deps[dep].add(node['uid'])
+            for dep in set(node['deps']):
+                self._reversed_deps.add(dep, node['uid'])
         for tst in tests:
             self._tests[tst.uid] = tst
         for merger in mergers:
@@ -132,7 +133,7 @@ class BuildResultsListener(object):
                 notify(u, msg, links)
                 broken_dep = broken_dep or u
 
-            for reversed_dep in sorted(self._reversed_deps.get(u, tuple())):
+            for reversed_dep in sorted(self._reversed_deps.getall(u, tuple())):
                 mark_failed(reversed_dep, broken_dep)
 
         with self._lock:

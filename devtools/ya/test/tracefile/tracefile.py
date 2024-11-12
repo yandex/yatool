@@ -2,13 +2,13 @@
 
 import base64
 import collections
-import json
 import logging
 import os
 import io
 
 import six
 
+from exts import yjson
 from library.python import strings
 from devtools.ya.test import const
 from devtools.ya.test import facility
@@ -277,7 +277,10 @@ class TestTraceParser(object):
                 logger.debug("%d trash bytes found in tracefile", len(line) - len(line_striped))
 
             try:
-                event = strings.ensure_str_deep(json.loads(line_striped))
+                if six.PY2:
+                    event = strings.ensure_str_deep(yjson.loads(line_striped))
+                else:
+                    event = yjson.loads(line_striped)
             except ValueError:
                 b64data = base64.b64encode(six.ensure_binary(line))
                 if relaxed:

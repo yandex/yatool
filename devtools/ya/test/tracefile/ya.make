@@ -7,6 +7,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/exts
     devtools/ya/test/facility
     devtools/ya/yalibrary/formatter
     library/python/strings

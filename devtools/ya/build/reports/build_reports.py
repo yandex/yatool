@@ -104,14 +104,15 @@ def generate_results_report(builder):
 
         report_file_path = os.path.join(output_dir, builder.opts.build_results_report_file)
         logger.info('Dump results report to %s', report_file_path)
-        with open(report_file_path, 'w') as rep_file:
-            if report_type == CANONICAL_REPORT_TYPE:
-                import ujson
+        if report_type == CANONICAL_REPORT_TYPE:
+            from devtools.ya.yalibrary import sjson
 
-                ujson.dump(results, rep_file)
-            else:
-                import exts.yjson as json
+            with open(report_file_path, 'wb') as rep_file:
+                sjson.dump(results, rep_file)
+        else:
+            import exts.yjson as json
 
+            with open(report_file_path, 'w') as rep_file:
                 json.dump(results, rep_file, indent=4, sort_keys=True)
 
 

@@ -251,34 +251,97 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
     ninja = opts.output_style == 'ninja'
 
-    class Noda(object):
+    class Noda:
+        __slots__ = (
+            'args',
+            'is_result_node',
+            'uid',
+            'max_dist',
+            'refcount',
+            'content_uid',
+            'output_digests',
+            'custom_commands',
+            '__dep_nodes',
+        )
+
         def __init__(self, kwargs, is_result_node=False):
             self.args = kwargs
             self.is_result_node = is_result_node
             self.uid = kwargs.get('uid')
-            self.self_uid = kwargs.get('self_uid', None)
-            self.static_uid = kwargs.get('static_uid', None)
-            # FIXME: we need separate property in the node for this
-            self.hashable = True if self.self_uid else False
+            self.max_dist = 0
+            self.refcount = 0
             self.content_uid = None
             self.output_digests = None
-            self.inputs = kwargs.get('inputs')
-            self.outputs = kwargs.get('outputs')
-            self.resources = kwargs.get('resources', [])
-            self.tared_outputs = kwargs.get('tared_outputs', [])
-            self.dir_outputs = kwargs.get('dir_outputs', [])
-            self.tags = kwargs.get('tags', [])
-            self.deps = kwargs.get('deps')
-            self.kv = kwargs.get('kv')
-            self.requirements = kwargs.get('requirements', {})
-            self.cacheable = kwargs.get('cache', True)
-            self.priority = kwargs.get('priority')
-            self.target_properties = kwargs.get('target_properties', {})
-            self.max_dist = 0
-            self.ignore_broken_dependencies = kwargs.get('ignore_broken_dependencies', False)
-            self.refcount = 0
-            self.stable_dir_outputs = kwargs.get('stable_dir_outputs', False)
+            self.custom_commands = None
             self.__dep_nodes = None
+
+        @property
+        def self_uid(self):
+            return self.args.get('self_uid', None)
+
+        @property
+        def static_uid(self):
+            return self.args.get('static_uid', None)
+
+        @property
+        def hashable(self):
+            return True if self.self_uid else False
+
+        @property
+        def inputs(self):
+            return self.args.get('inputs')
+
+        @property
+        def outputs(self):
+            return self.args.get('outputs')
+
+        @property
+        def resources(self):
+            return self.args.get('resources', [])
+
+        @property
+        def tared_outputs(self):
+            return self.args.get('tared_outputs', [])
+
+        @property
+        def dir_outputs(self):
+            return self.args.get('dir_outputs', [])
+
+        @property
+        def tags(self):
+            return self.args.get('tags', [])
+
+        @property
+        def deps(self):
+            return self.args.get('deps')
+
+        @property
+        def kv(self):
+            return self.args.get('kv')
+
+        @property
+        def requirements(self):
+            return self.args.get('requirements', {})
+
+        @property
+        def cacheable(self):
+            return self.args.get('cache', True)
+
+        @property
+        def priority(self):
+            return self.args.get('priority')
+
+        @property
+        def target_properties(self):
+            return self.args.get('target_properties', {})
+
+        @property
+        def ignore_broken_dependencies(self):
+            return self.args.get('ignore_broken_dependencies', False)
+
+        @property
+        def stable_dir_outputs(self):
+            return self.args.get('stable_dir_outputs', False)
 
         @property
         def has_self_uid_support(self):
@@ -305,6 +368,8 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
             return args
 
         def commands(self, build_root):
+            if self.custom_commands:
+                return self.custom_commands(build_root)
             p = patterns.sub()
             p['BUILD_ROOT'] = exts.windows.win_path_fix(build_root)
             return self._command_args(build_root, p)
