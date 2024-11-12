@@ -298,7 +298,7 @@ namespace NYa::NGraph {
         TGraphPtr merged = CreateGraph();
         InsertTo(merged->Conf.Resources, tools->Conf.Resources, target->Conf.Resources);
         InsertTo(merged->Graph, extraNodes, target->Graph, tools->Graph);
-        merged->Inputs = target->Inputs;
+        InsertTo(merged->Inputs, target->Inputs, tools->Inputs);
         merged->Result = target->Result;
 
         return {.Merged = merged, .UnmatchedTargetToolDirs = std::move(discoveringResult.UnmatchedTargetToolDirs)};
@@ -373,7 +373,7 @@ namespace NYa::NGraph {
         TGraphPtr merged = CreateGraph();
         InsertTo(merged->Conf.Resources, tools->Conf.Resources, pic->Conf.Resources, noPic->Conf.Resources);
         InsertTo(merged->Graph, noPic->Graph, extraNodes, pic->Graph, tools->Graph);
-        InsertTo(merged->Inputs, pic->Inputs, noPic->Inputs);
+        InsertTo(merged->Inputs, pic->Inputs, noPic->Inputs, tools->Inputs);
         InsertTo(merged->Result, newResult);
         Sort(merged->Result);
 
