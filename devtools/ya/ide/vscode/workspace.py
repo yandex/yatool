@@ -221,27 +221,33 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
             shutil.copyfile(config_path, target_path, follow_symlinks=False)
         except OSError as e:
             ide_common.emit_message("[[warn]]Failed to setup clang-format config[[rst]]: '{}'".format(e.strerror))
-        return
-
-    create_symlink = False
-    if not target_path.exists(follow_symlinks=False):
-        create_symlink = True
-    elif target_path.is_symlink():
-        link_path = target_path.readlink()
-        if link_path != config_path:
-            ide_common.emit_message(
-                f"[[warn]]clang-format config was updated[[rst]]: '{target_path}' "
-                f"was linked to the '{link_path}', new path: '{config_path}'",
-            )
-            target_path.unlink()
-            create_symlink = True
+            return {}
     else:
-        ide_common.emit_message(
-            f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{target_path}' is not a link"
-        )
+        create_symlink = False
+        if not target_path.exists(follow_symlinks=False):
+            create_symlink = True
+        elif target_path.is_symlink():
+            link_path = target_path.readlink()
+            if link_path != config_path:
+                ide_common.emit_message(
+                    f"[[warn]]clang-format config was updated[[rst]]: '{target_path}' "
+                    f"was linked to the '{link_path}', new path: '{config_path}'",
+                )
+                target_path.unlink()
+                create_symlink = True
+        else:
+            ide_common.emit_message(
+                f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{target_path}' is not a link"
+            )
 
-    if create_symlink:
-        target_path.symlink_to(config_path)
+        if create_symlink:
+            try:
+                target_path.symlink_to(config_path)
+            except OSError as e:
+                ide_common.emit_message(
+                    "[[warn]]Failed to create link to the clang-format config[[rst]]: '{}'".format(e.strerror)
+                )
+                return {}
 
     return OrderedDict(
         (
