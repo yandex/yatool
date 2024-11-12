@@ -1586,7 +1586,7 @@ namespace {
             const auto& values = stringArray->string();
             Y_ASSERT(!values.empty());
             std::string result("(");
-            std::string var = logicVarRef->varRef()->getText();
+            std::string var = visitAs<std::string>(logicVarRef);
             bool firstTime = true;
             for (auto& value : values) {
                 if (firstTime) {
