@@ -12,6 +12,7 @@ SRCS(
     lib/encoder.cpp
     lib/dump.cpp
     lib/load.cpp
+    lib/filter.cpp
 )
 
 PEERDIR(

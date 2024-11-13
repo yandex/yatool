@@ -1,5 +1,6 @@
 #include "load.h"
 #include "common.h"
+#include "filter.h"
 
 #include <Python.h>
 
@@ -455,12 +456,18 @@ namespace NSJson {
         };
     }
 
-    PyObject* LoadFromStream(PyObject* stream, bool internKeys, bool internVals) {
+    PyObject* LoadFromStream(PyObject* stream, const TLoaderOptions& options) {
         try {
             TPythonInputStreamWrapper input{stream};
-            TParserCallbacks callbacks{internKeys, internVals};
-            NYa::NJson::ReadJson(input, &callbacks);
-            return callbacks.GetResult();
+            TParserCallbacks parserCallbacks{options.InternKeys, options.InternValues};
+            ::NJson::TJsonCallbacks* callbacksPtr = &parserCallbacks;
+            THolder<TRootKeyFilter> rootKeyFilter{};
+            if (options.RootKeyWhiteList || options.RootKeyBlackList) {
+                rootKeyFilter.Reset(new TRootKeyFilter(parserCallbacks, options.RootKeyWhiteList, options.RootKeyBlackList));
+                callbacksPtr = rootKeyFilter.get();
+            }
+            NYa::NJson::ReadJson(input, callbacksPtr);
+            return parserCallbacks.GetResult();
         } catch (TValueError& e) {
             PyErr_SetString(PyExc_ValueError, e.what());
         } catch (yexception& e) {

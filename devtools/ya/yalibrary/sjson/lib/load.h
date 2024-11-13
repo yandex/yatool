@@ -2,6 +2,16 @@
 
 #include <Python.h>
 
+#include <util/generic/hash_set.h>
+
 namespace NSJson {
-    PyObject* LoadFromStream(PyObject* stream, bool internKeys=false, bool internVals=false);
+    struct TLoaderOptions {
+        TLoaderOptions() = default;
+        bool InternKeys{};
+        bool InternValues{};
+        THashSet<TString> RootKeyBlackList{};
+        THashSet<TString> RootKeyWhiteList{};
+    };
+
+    PyObject* LoadFromStream(PyObject* stream, const TLoaderOptions& options = {});
 }
