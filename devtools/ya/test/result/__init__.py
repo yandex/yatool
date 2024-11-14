@@ -187,18 +187,32 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         return
 
     def get_errors(target):
+        TARGET_LIMIT = 2
+        BUILD_ERROR_LIMIT = 5
         errs = []
 
         # search for errors in broken dependencies
         if target in builder.build_result.failed_deps:
             failed_deps = builder.build_result.failed_deps[target]
 
-            for failed_dep in failed_deps:
-                if failed_dep in builder.build_result.build_errors:
-                    project_path, platform, uid = failed_dep
+            target_failed_deps = [
+                failed_dep for failed_dep in failed_deps if failed_dep in builder.build_result.build_errors
+            ]
+            for failed_dep in target_failed_deps[:TARGET_LIMIT]:
+                project_path, platform, uid = failed_dep
+                errs.append("Broken target [[imp]]{}[[rst]]:".format(project_path))
 
-                    errs.append("Broken target [[imp]]{}[[rst]]:".format(project_path))
-                    errs.append("\n".join(builder.build_result.build_errors[failed_dep]))
+                build_errs = builder.build_result.build_errors[failed_dep]
+                build_errs = sum((s.split("\n") for s in build_errs), start=[])
+                if len(build_errs) > BUILD_ERROR_LIMIT:
+                    build_errs = build_errs[:BUILD_ERROR_LIMIT] + [
+                        "... +{} more lines\n".format(len(build_errs) - BUILD_ERROR_LIMIT)
+                    ]
+                errs.append("\n".join(build_errs))
+
+            if len(target_failed_deps) > TARGET_LIMIT:
+                errs.append("... +{} more broken targets\n".format(len(target_failed_deps) - TARGET_LIMIT))
+
         # specified target is broken directly, there are no broken deps
         else:
             errs.append("\n".join(builder.build_result.build_errors[target]))
@@ -207,14 +221,17 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
     build_errors_map = {uid: (path, platform, uid) for path, platform, uid in builder.build_result.build_errors}
 
     def collect_errors_for_suite(suite):
+        DEP_LIMIT = 2
         errs = []
 
-        for dep_uid in suite.get_build_dep_uids():
-            if dep_uid in build_errors_map:
-                suite_key = build_errors_map[dep_uid]
-                project_path, _, _ = suite_key
-                errs.append("[[imp]]{}[[rst]]".format(project_path))
-                errs += get_errors(suite_key)
+        suite_failed_dep_uids = [dep_uid for dep_uid in suite.get_build_dep_uids() if dep_uid in build_errors_map]
+        for dep_uid in suite_failed_dep_uids[:DEP_LIMIT]:
+            suite_key = build_errors_map[dep_uid]
+            project_path, _, _ = suite_key
+            errs.append("[[imp]]{}[[rst]]".format(project_path))
+            errs += get_errors(suite_key)
+        if len(suite_failed_dep_uids) > DEP_LIMIT:
+            errs.append("... +{} more suite failed depends\n".format(len(suite_failed_dep_uids) - DEP_LIMIT))
 
         return errs
 
