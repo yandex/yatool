@@ -70,6 +70,7 @@ def get_file_stats(llvm_cov_bin, indexed_profile, binaries, source_root, prefix_
             "instantiations": {"covered": 0, "count": 0, "percent": 0},
             "lines": {"covered": 0, "count": 0, "percent": 0},
             "regions": {"covered": 0, "count": 0, "percent": 0},
+            "mcdc": {"covered": 0, "count": 0, "percent": 0},
         }
     }
 
