@@ -144,7 +144,7 @@ def iter_export_nodes(path, ctx):
         pom_file_path,
     ]
 
-    if not from_contrib(path) or ctx.by_path[path].is_dart_target() and base.path_provides_external_jar(path, ctx)[0]:
+    if not from_contrib(path):
         ctx.maven_export_modules_list.add(path)
 
     if target.is_dart_target():  # Has <plain> field
@@ -177,82 +177,72 @@ def iter_export_nodes(path, ctx):
                         graph_base.hacked_normpath(os.path.relpath(base.relativize(td, ('arcadia',)), path)),
                     ]
 
-        # EXTERNAL_JAR
-        _, external_jars = base.path_provides_external_jar(path, ctx)
-        # if external_jars:
-        #     script += ['--packaging', 'pom']
-        #     for jar in external_jars:
-        #         script += ['--external-jars', jar]
-
         # PEERDIR & EXCLUDE
         cp = ctx.classpath(path, direct=ctx.opts.maven_no_recursive_deps)
-        if not external_jars:
-            excludes = base.extract_excludes([path], ctx)
-            for x in cp:
-                if x == cls_jar:
+        excludes = base.extract_excludes([path], ctx)
+        for x in cp:
+            if x == cls_jar:
+                continue
+            jar_path = graph_base.hacked_normpath(base.relativize(os.path.dirname(x)))
+            g, a, v, c = get_artifact_coords(base.relativize(x), ctx)
+            script += ['--target-dependencies', ':'.join([g, a, v, c])]
+            dep_cp = ctx.classpath(jar_path)
+            exclude_list = []
+            for dep_cls in (graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != jar_path):
+                if ctx.opts.maven_exclude_transitive_deps:
+                    for i in ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls))))[1:]:
+                        candidate = graph_base.hacked_normpath(base.relativize(i))
+                        if candidate not in exclude_list:
+                            exclude_list.append(candidate)
+                else:
+                    for exclude in excludes:
+                        if base.is_excluded(dep_cls, exclude):
+                            exclude_list.append(dep_cls)
+                            continue
+            for i in exclude_list:
+                dg, da, _1, _2 = get_artifact_coords(i, ctx)
+                script[-1] += '::%s:%s' % (dg, da)
+
+        cp_set = frozenset(cp)
+
+        for test_path in test_paths:
+            test_jar_path = ctx.by_path[test_path].output_jar_path()
+            test_cp = ctx.classpath(test_path)
+            exclude_list = []
+            test_excludes = base.extract_excludes([test_path], ctx)
+            for x in test_cp:
+                if x == test_jar_path or x in cp_set:
                     continue
-                jar_path = graph_base.hacked_normpath(base.relativize(os.path.dirname(x)))
                 g, a, v, c = get_artifact_coords(base.relativize(x), ctx)
-                script += ['--target-dependencies', ':'.join([g, a, v, c])]
-                dep_cp = ctx.classpath(jar_path)
-                exclude_list = []
-                for dep_cls in (graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != jar_path):
-                    if ctx.opts.maven_exclude_transitive_deps:
+                script += ['--test-target-dependencies', ':'.join([g, a, v, c])]
+                if ctx.opts.maven_exclude_transitive_deps:
+                    dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
+                    exclude_list = []
+                    for dep_cls in (
+                        graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_path
+                    ):
                         for i in ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls))))[
                             1:
                         ]:
                             candidate = graph_base.hacked_normpath(base.relativize(i))
                             if candidate not in exclude_list:
                                 exclude_list.append(candidate)
-                    else:
-                        for exclude in excludes:
-                            if base.is_excluded(dep_cls, exclude):
-                                exclude_list.append(dep_cls)
-                                continue
-                for i in exclude_list:
-                    dg, da, _1, _2 = get_artifact_coords(i, ctx)
-                    script[-1] += '::%s:%s' % (dg, da)
-
-            cp_set = frozenset(cp)
-
-            for test_path in test_paths:
-                test_jar_path = ctx.by_path[test_path].output_jar_path()
-                test_cp = ctx.classpath(test_path)
-                exclude_list = []
-                test_excludes = base.extract_excludes([test_path], ctx)
-                for x in test_cp:
-                    if x == test_jar_path or x in cp_set:
-                        continue
-                    g, a, v, c = get_artifact_coords(base.relativize(x), ctx)
-                    script += ['--test-target-dependencies', ':'.join([g, a, v, c])]
-                    if ctx.opts.maven_exclude_transitive_deps:
-                        dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
-                        exclude_list = []
-                        for dep_cls in (
-                            graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_path
-                        ):
-                            for i in ctx.classpath(
-                                graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls)))
-                            )[1:]:
-                                candidate = graph_base.hacked_normpath(base.relativize(i))
-                                if candidate not in exclude_list:
-                                    exclude_list.append(candidate)
-                        for exc in exclude_list:
-                            dg, da, _1, _2 = get_artifact_coords(exc, ctx)
-                            script[-1] += '::%s:%s' % (dg, da)
-                    dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
-                    for dep_cls in (
-                        graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_jar_path
-                    ):
-                        for exclude in test_excludes:
-                            if base.is_excluded(dep_cls, exclude):
-                                candidate = graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls)))
-                                if candidate not in exclude_list:
-                                    exclude_list.append(candidate)
-                for exclude in exclude_list:
-                    print(ctx.by_path.keys())
-                    g, a, v, _ = get_artifact_coords(base.relativize(ctx.by_path[exclude].output_jar_path()), ctx)
-                    script += ['--test-target-dependencies-exclude', ':'.join([g, a])]
+                    for exc in exclude_list:
+                        dg, da, _1, _2 = get_artifact_coords(exc, ctx)
+                        script[-1] += '::%s:%s' % (dg, da)
+                dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
+                for dep_cls in (
+                    graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_jar_path
+                ):
+                    for exclude in test_excludes:
+                        if base.is_excluded(dep_cls, exclude):
+                            candidate = graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls)))
+                            if candidate not in exclude_list:
+                                exclude_list.append(candidate)
+            for exclude in exclude_list:
+                print(ctx.by_path.keys())
+                g, a, v, _ = get_artifact_coords(base.relativize(ctx.by_path[exclude].output_jar_path()), ctx)
+                script += ['--test-target-dependencies-exclude', ':'.join([g, a])]
 
         if ctx.opts.maven_output:
             script += ['--output-dir', ctx.opts.maven_output]

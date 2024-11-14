@@ -242,25 +242,6 @@ def relativize(path, root=(consts.BUILD_ROOT, consts.SOURCE_ROOT)):
     return path
 
 
-def path_provides_external_jar(path, ctx):
-    import jbuild.gen.actions.externals as ext
-
-    if path in ctx.by_path and consts.EXTERNAL_JAR in ctx.by_path[path].plain:
-        _candidates, _, _, _ = ext.extract_ej(ctx.by_path[path].plain)
-        candidates = []
-        for candidate in _candidates:
-            if os.path.exists(os.path.join(ctx.arc_root, path, candidate)):
-                candidates.append(candidate)
-            if os.path.exists(os.path.join(ctx.arc_root, candidate)):
-                candidates.append(
-                    base.hacked_path_join(
-                        *(['..'] * (base.hacked_normpath(path).count('/') + int(bool(path))) + [candidate])
-                    )
-                )
-        return bool(candidates), candidates or None
-    return False, None
-
-
 def resolve_java_srcs(
     srcdir, include_patterns, exclude_patterns=None, all_resources=False, resolve_kotlin=False, resolve_groovy=False
 ):

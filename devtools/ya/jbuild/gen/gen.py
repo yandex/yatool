@@ -6,7 +6,6 @@ import fnmatch
 
 from . import node
 from . import base
-import jbuild.gen.actions.externals as externals
 import jbuild.gen.actions.compile as compile
 import jbuild.gen.actions.generate_scripts as generate_scripts
 from .actions import fetch_test_data as fetch_test_data
@@ -144,7 +143,6 @@ def iter_path_nodes(path, ctx):
         return
 
     it = [
-        externals.externals(path, t, ctx),
         compile.compile(path, t, ctx),
         generate_scripts.generate_scripts(path, t, ctx),
         fetch_test_data.fetch_test_data(path, t, ctx),

@@ -7,7 +7,6 @@ PY_SRCS(
     codenav_gen.py
     compile.py
     export_to_maven.py
-    externals.py
     fetch_test_data.py
     funcs.py
     generate_scripts.py
