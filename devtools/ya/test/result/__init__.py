@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 import traceback
 
 import core.error
@@ -13,6 +14,7 @@ import exts.windows
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const
 from yalibrary import platform_matcher
+from exts.limiter import Limiter
 from library.python import strings
 
 import app_config
@@ -195,23 +197,24 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         if target in builder.build_result.failed_deps:
             failed_deps = builder.build_result.failed_deps[target]
 
-            target_failed_deps = [
+            target_failed_deps = (
                 failed_dep for failed_dep in failed_deps if failed_dep in builder.build_result.build_errors
-            ]
-            for failed_dep in target_failed_deps[:TARGET_LIMIT]:
+            )
+            target_failed_deps_limiter = Limiter(target_failed_deps, TARGET_LIMIT)
+            for failed_dep in target_failed_deps_limiter:
                 project_path, platform, uid = failed_dep
                 errs.append("Broken target [[imp]]{}[[rst]]:".format(project_path))
 
                 build_errs = builder.build_result.build_errors[failed_dep]
-                build_errs = sum((s.split("\n") for s in build_errs), start=[])
-                if len(build_errs) > BUILD_ERROR_LIMIT:
-                    build_errs = build_errs[:BUILD_ERROR_LIMIT] + [
-                        "... +{} more lines\n".format(len(build_errs) - BUILD_ERROR_LIMIT)
-                    ]
-                errs.append("\n".join(build_errs))
+                error_lines = (x.group() for s in build_errs for x in re.finditer(r"[^\n]+", s))
+                error_lines_limiter = Limiter(error_lines, BUILD_ERROR_LIMIT)
+                limited_errs = list(error_lines_limiter)
+                if rest := error_lines_limiter.rest_count():
+                    limited_errs.append(f"... +{rest} more lines\n")
+                errs.append("\n".join(limited_errs))
 
-            if len(target_failed_deps) > TARGET_LIMIT:
-                errs.append("... +{} more broken targets\n".format(len(target_failed_deps) - TARGET_LIMIT))
+            if rest := target_failed_deps_limiter.rest_count():
+                errs.append(f"... +{rest} more broken targets\n")
 
         # specified target is broken directly, there are no broken deps
         else:
@@ -224,14 +227,15 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         DEP_LIMIT = 2
         errs = []
 
-        suite_failed_dep_uids = [dep_uid for dep_uid in suite.get_build_dep_uids() if dep_uid in build_errors_map]
-        for dep_uid in suite_failed_dep_uids[:DEP_LIMIT]:
+        dep_uids = (dep_uid for dep_uid in suite.get_build_dep_uids() if dep_uid in build_errors_map)
+        dep_uids_limiter = Limiter(dep_uids, DEP_LIMIT)
+        for dep_uid in dep_uids_limiter:
             suite_key = build_errors_map[dep_uid]
             project_path, _, _ = suite_key
             errs.append("[[imp]]{}[[rst]]".format(project_path))
             errs += get_errors(suite_key)
-        if len(suite_failed_dep_uids) > DEP_LIMIT:
-            errs.append("... +{} more suite failed depends\n".format(len(suite_failed_dep_uids) - DEP_LIMIT))
+        if rest := dep_uids_limiter.rest_count():
+            errs.append(f"... +{rest} more suite failed depends\n")
 
         return errs
 
@@ -274,13 +278,13 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         ]
 
         if derived_status is not None:
-            lines += [
+            lines.append(
                 "Node's derived status: {}. {}".format(
                     derived_status, node_status.get_human_readable_message(derived_status)
                 ),
-            ]
+            )
         elif exit_code is not None:
-            lines += ["Node's derived exit code: {}".format(exit_code)]
+            lines.append(f"Node's derived exit code: {exit_code}")
 
         # XXX
         header_approximate_size = 300
@@ -288,23 +292,24 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
             devtools.ya.test.const.CONSOLE_SNIPPET_LIMIT // min(len(node_errors), limit)
         ) - header_approximate_size
 
-        for uid, err_msg in node_errors[:limit]:
+        node_errors_limiter = Limiter(node_errors, limit)
+        for uid, err_msg in node_errors_limiter:
             st = builder.build_result.node_status_map.get(uid)
             if app_config.in_house and st:
                 error_reason = node_status.get_human_readable_message(st)
             else:
                 error_reason = "failed"
-            lines += ["[[imp]]* {}[[rst]]: {}".format(uid, error_reason)]
+            lines.append(f"[[imp]]* {uid}[[rst]]: {error_reason}")
 
             if uid in builder.build_result.node_build_errors_links:
                 logs = [x for u, urls in builder.build_result.node_build_errors_links[uid] for x in urls]
                 ellipsis_text = "\n..[truncated] Full logs: [[warn]]{}[[rst]]".format(logs)
             else:
                 ellipsis_text = "\n..[truncated]"
-            lines += [strings.truncate(err_msg, node_snippet_limit, msg=ellipsis_text)]
+            lines.append(strings.truncate(err_msg, node_snippet_limit, msg=ellipsis_text))
 
-        if len(node_errors) > limit:
-            lines += ["{} more node errors are omitted.".format(len(node_errors) - limit)]
+        if rest := node_errors_limiter.rest_count():
+            lines.append(f"{rest} more node errors are omitted.")
 
         return test_status, "\n".join(x.strip() for x in lines)
 

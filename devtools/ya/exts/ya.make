@@ -39,6 +39,13 @@ PY_SRCS(
     yjson.py
 )
 
+IF (PYTHON3)
+    PY_SRCS(
+        NAMESPACE exts
+        limiter.py
+    )
+ENDIF()
+
 IF (PYTHON2)
     PEERDIR(
         contrib/deprecated/python/scandir
