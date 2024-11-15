@@ -7,7 +7,7 @@ from pathlib import Path
 
 from core import config as core_config, yarg, stage_tracer
 from build import build_opts, graph as build_graph, ya_make
-from build.sem_graph import SemLang, SemConfig, SemGraph
+from build.sem_graph import SemLang, SemConfig, SemNode, SemGraph
 from yalibrary import platform_matcher
 from exts import hashing
 
@@ -19,15 +19,15 @@ class YaIdeGradleException(Exception):
 class _JavaSemConfig(SemConfig):
     """Check and use command line options for configure roots and flags"""
 
-    GRADLE_PROPS_FILE = Path.home() / '.gradle' / 'gradle.properties'
-    GRADLE_REQUIRED_PROPS = [
+    GRADLE_PROPS_FILE: Path = Path.home() / '.gradle' / 'gradle.properties'
+    GRADLE_REQUIRED_PROPS: list[str] = [
         'bucketUsername',
         'bucketPassword',
         'systemProp.gradle.wrapperUser',
         'systemProp.gradle.wrapperPassword',
     ]
 
-    EXPORT_ROOT_BASE = Path(core_config.misc_root()) / 'gradle'  # Base folder of all export roots
+    EXPORT_ROOT_BASE: Path = Path(core_config.misc_root()) / 'gradle'  # Base folder of all export roots
 
     def __init__(self, params):
         if platform_matcher.is_windows():
@@ -96,15 +96,17 @@ class _JavaSemConfig(SemConfig):
 class _SymlinkCollector:
     """Iterate on settings and build root and call collect function for every place, where symlinks waited"""
 
-    SETTINGS_FILES = ["settings.gradle.kts", "gradlew", "gradlew.bat"]  # Files for symlink to settings root
-    SETTINGS_MKDIRS = [".gradle", ".idea"]  # Folders for creating at settings root
-    SETTINGS_DIRS = SETTINGS_MKDIRS + ["gradle"]  # Folders for symlink to settings root
+    SETTINGS_FILES: list[str] = ["settings.gradle.kts", "gradlew", "gradlew.bat"]  # Files for symlink to settings root
+    SETTINGS_MKDIRS: list[str] = [".gradle", ".idea"]  # Folders for creating at settings root
+    SETTINGS_DIRS: list[str] = SETTINGS_MKDIRS + ["gradle"]  # Folders for symlink to settings root
 
-    BUILD_SKIP_ROOT_DIRS = SETTINGS_DIRS + [_JavaSemConfig.YMAKE_DIR]  # Skipped for build directories in export root
-    BUILD_FILE = "build.gradle.kts"  # Filename for create build symlinks
+    BUILD_SKIP_ROOT_DIRS: list[str] = SETTINGS_DIRS + [
+        _JavaSemConfig.YMAKE_DIR
+    ]  # Skipped for build directories in export root
+    BUILD_FILE: str = "build.gradle.kts"  # Filename for create build symlinks
 
-    def __init__(self, config: _JavaSemConfig):
-        self.config = config
+    def __init__(self, java_sem_config: _JavaSemConfig):
+        self.config: _JavaSemConfig = java_sem_config
 
     def collect_symlinks(self) -> Iterable[tuple[Path]]:
         yield from self._collect_settings_symlinks()
@@ -142,10 +144,10 @@ class _SymlinkCollector:
 class _ExistsSymlinkCollector(_SymlinkCollector):
     """Collect exists symlinks for remove later"""
 
-    def __init__(self, config: _JavaSemConfig):
-        super().__init__(config)
+    def __init__(self, java_sem_config: _JavaSemConfig):
+        super().__init__(java_sem_config)
         self.logger = logging.getLogger(type(self).__name__)
-        self.symlinks = {}
+        self.symlinks: dict[Path, Path] = {}
 
     def collect(self):
         """Collect already exists symlinks"""
@@ -172,9 +174,9 @@ class _NewSymlinkCollector(_SymlinkCollector):
     def __init__(self, exists_symlinks: _ExistsSymlinkCollector):
         super().__init__(exists_symlinks.config)
         self.logger = logging.getLogger(type(self).__name__)
-        self.exists_symlinks = exists_symlinks
-        self.symlinks = {}
-        self.has_errors = False
+        self.exists_symlinks: _ExistsSymlinkCollector = exists_symlinks
+        self.symlinks: dict[Path, Path] = {}
+        self.has_errors: bool = False
 
     def collect(self):
         """Collect new symlinks for creating, skip already exists symlinks"""
@@ -218,6 +220,8 @@ class _JavaSemGraph(SemGraph):
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
         rel_targets = []
         for node in self.read():
+            if not isinstance(node, SemNode):
+                continue  # interest only nodes
             if not node.name.startswith('$B/') or not node.name.endswith('.jar'):  # Search only *.jar with semantics
                 continue
             rel_target = Path(node.name.replace('$B/', '')).parent  # Relative target - directory of *.jar
@@ -234,6 +238,8 @@ class _JavaSemGraph(SemGraph):
         try:
             run_java_program_rel_targets = []
             for node in self.read():
+                if not isinstance(node, SemNode):
+                    continue  # interest only nodes
                 for semantic in node.semantics:
                     if (
                         len(semantic.sems) == 2
@@ -256,10 +262,10 @@ class _JavaSemGraph(SemGraph):
 class _Exporter:
     """Generating files to export root"""
 
-    def __init__(self, config: _JavaSemConfig, sem_graph: SemGraph):
+    def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
-        self.config = config
-        self.sem_graph = sem_graph
+        self.config: _JavaSemConfig = java_sem_config
+        self.sem_graph: _JavaSemGraph = java_sem_graph
 
     def export(self) -> None:
         """Generate files from sem-graph by yexport"""
@@ -318,10 +324,10 @@ class _Exporter:
 class _Builder:
     """Build required targets"""
 
-    def __init__(self, config: _JavaSemConfig, sem_graph: _JavaSemGraph):
+    def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
-        self.config = config
-        self.sem_graph = sem_graph
+        self.config: _JavaSemConfig = java_sem_config
+        self.sem_graph: _JavaSemGraph = java_sem_graph
 
     def build(self) -> None:
         """Extract build targets from sem-graph and build they"""
@@ -382,10 +388,10 @@ class _Builder:
 class _Remover:
     """Remove all symlinks and export root"""
 
-    def __init__(self, config: _JavaSemConfig, exists_symlinks: _ExistsSymlinkCollector):
+    def __init__(self, java_sem_config: _JavaSemConfig, exists_symlinks: _ExistsSymlinkCollector):
         self.logger = logging.getLogger(type(self).__name__)
-        self.config = config
-        self.exists_symlinks = exists_symlinks
+        self.config: _JavaSemConfig = java_sem_config
+        self.exists_symlinks: _ExistsSymlinkCollector = exists_symlinks
 
     def remove(self) -> None:
         """Remove all exists symlinks and then remove export root"""

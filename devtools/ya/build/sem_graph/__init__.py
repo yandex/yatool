@@ -131,21 +131,34 @@ class Semantic:
             raise SemException(f"Empty first item in '{Semantic.SEM}' in semantic")
         self.sems: list[str] = [str(s) for s in data_sem]
 
+    def as_dict(self) -> dict:
+        return {
+            Semantic.SEM: self.sems,
+        }
+
 
 class SemNode:
     """Node of sem-graph"""
 
     ID = 'Id'
     NAME = 'Name'
+    NODE_TYPE = 'NodeType'
+    TAG = 'Tag'
+    TOOLS = 'Tools'
     SEMANTICS = 'semantics'
 
     def __init__(self, data: dict, skip_invalid: bool = False, logger: logging.Logger = None):
         if SemNode.ID not in data:
             raise SemException(f"Not found '{SemNode.ID}' in node")
-        self.id: int = int(data[SemNode.ID])
+        self.id: int = SemNode.take_id(data)
         if SemNode.NAME not in data:
             raise SemException(f"Not found '{SemNode.NAME}' in node")
-        self.name: str = str(data[SemNode.NAME])
+        self.name: str = SemNode.take_name(data)
+        if SemNode.NODE_TYPE not in data:
+            raise SemException(f"Not found '{SemNode.NODE_TYPE}' in node")
+        self.type: str = str(data[SemNode.NODE_TYPE])
+        self.tag: str = str(data[SemNode.TAG]) if SemNode.TAG in data else None
+        self.tools: list[int] = [int(node_id) for node_id in data[SemNode.TOOLS]] if SemNode.TOOLS in data else None
         self.semantics = None
         if SemNode.SEMANTICS in data:
             data_semantics = data[SemNode.SEMANTICS]
@@ -160,12 +173,76 @@ class SemNode:
             except SemException as e:
                 if skip_invalid:
                     if logger is not None:
-                        logger.warning("Skip invalid semantic %s: %s", data_semantic, e)
+                        logger.warning("Skip invalid semantic %s of node %s: %s", data_semantic, data, e)
                 else:
                     raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
 
     def has_semantics(self) -> bool:
         return self.semantics is not None
+
+    @staticmethod
+    def take_id(data: dict) -> int:
+        return int(data[SemNode.ID])
+
+    @staticmethod
+    def take_name(data: dict) -> str:
+        return str(data[SemNode.NAME])
+
+    def as_dict(self) -> dict:
+        r = {
+            SemGraph.DATATYPE: SemGraph.DATATYPE_NODE,
+            SemNode.ID: self.id,
+            SemNode.NAME: self.name,
+            SemNode.NODE_TYPE: self.type,
+        }
+        if self.tag:
+            r[SemNode.TAG] = self.tag
+        if self.tools:
+            r[SemNode.TOOLS] = self.tools
+        if self.semantics:
+            r[SemNode.SEMANTICS] = [semantic.as_dict() for semantic in self.semantics]
+        return r
+
+
+class SemDep:
+    """Dependence of sem-graph"""
+
+    FROM_ID = 'FromId'
+    TO_ID = 'ToId'
+    DEP_TYPE = 'DepType'
+    IS_CLOSURE = 'IsClosure:bool'
+    EXCLUDES = 'Excludes:[NodeId]'
+
+    def __init__(self, data: dict, skip_invalid: bool = False, logger: logging.Logger = None):
+        if SemDep.FROM_ID not in data:
+            raise SemException(f"Not found '{SemDep.FROM_ID}' in dependence")
+        self.from_id: int = int(data[SemDep.FROM_ID])
+        if SemDep.TO_ID not in data:
+            raise SemException(f"Not found '{SemDep.TO_ID}' in dependence")
+        self.to_id: int = int(data[SemDep.TO_ID])
+        if SemDep.DEP_TYPE not in data:
+            raise SemException(f"Not found '{SemDep.DEP_TYPE}' in dependence")
+        self.type: str = str(data[SemDep.DEP_TYPE])
+        self.is_closure: bool = bool(data[SemDep.IS_CLOSURE]) if SemDep.IS_CLOSURE in data else False
+        self.excludes = None
+        if SemDep.EXCLUDES in data:
+            data_excludes = data[SemDep.EXCLUDES]
+            if not isinstance(data_excludes, list):
+                raise SemException(f"Field '{SemDep.EXCLUDES}' is not list")
+            self.excludes: list[int] = [int(node_id) for node_id in data_excludes]
+
+    def as_dict(self) -> dict:
+        r = {
+            SemGraph.DATATYPE: SemGraph.DATATYPE_DEP,
+            SemDep.FROM_ID: self.from_id,
+            SemDep.TO_ID: self.to_id,
+            SemDep.DEP_TYPE: self.type,
+        }
+        if self.is_closure:
+            r[SemDep.IS_CLOSURE] = True
+        if self.excludes:
+            r[SemDep.EXCLUDES] = self.excludes
+        return r
 
 
 class SemGraph:
@@ -174,6 +251,7 @@ class SemGraph:
     DATA = 'data'
     DATATYPE = 'DataType'
     DATATYPE_NODE = 'Node'
+    DATATYPE_DEP = 'Dep'
 
     def __init__(self, config: SemConfig, skip_invalid: bool = False):
         self.logger = logging.getLogger(type(self).__name__)
@@ -219,27 +297,43 @@ class SemGraph:
         except Exception as e:
             raise SemException(f'Fail write sem-graph to {self.sem_graph_file}: {e}')
 
-    def read(self) -> Iterable[SemNode]:
+    @staticmethod
+    def is_node(item: dict) -> bool:
+        return item[SemGraph.DATATYPE] == SemGraph.DATATYPE_NODE
+
+    @staticmethod
+    def is_dep(item: dict) -> bool:
+        return item[SemGraph.DATATYPE] == SemGraph.DATATYPE_DEP
+
+    def read(self, all_nodes: bool = False) -> Iterable[SemNode | SemDep]:
         """Read sem-graph from file"""
         try:
             with self.sem_graph_file.open('rb') as f:
                 graph = sjson.load(f)
             if SemGraph.DATA not in graph:
                 raise SemException(f"Not found '{SemGraph.DATA}' in sem-graph")
-            for data_node in graph[SemGraph.DATA]:
+            for data_item in graph[SemGraph.DATA]:
                 try:
-                    if SemGraph.DATATYPE not in data_node:
-                        raise SemException(f"Not found '{SemGraph.DATATYPE}' in item {data_node}")
-                    if data_node[SemGraph.DATATYPE] != SemGraph.DATATYPE_NODE:
-                        continue  # non-node item valid, but not interest
-                    sem_node = SemNode(data_node, self.skip_invalid, self.logger if self.skip_invalid else None)
-                    if not sem_node.has_semantics():
-                        continue  # node without semantics valid, but not interest
-                    yield sem_node
-                except SemException as e:
-                    if self.skip_invalid:
-                        self.logger.warning("Skip invalid node %s: %s", data_node, e)
+                    if SemGraph.DATATYPE not in data_item:
+                        raise SemException(f"Not found '{SemGraph.DATATYPE}' in item {data_item}")
+                    if self.is_node(data_item):
+                        sem_node = SemNode(data_item, self.skip_invalid, self.logger if self.skip_invalid else None)
+                        if not all_nodes and not sem_node.has_semantics():
+                            continue  # node without semantics valid, but not interest
+                        yield sem_node
+                    elif self.is_dep(data_item):
+                        yield SemDep(data_item)
                     else:
-                        raise SemException(f"Fail parse node {data_node}: {e}") from e
+                        raise SemException(f"Unknown DataType '{data_item[SemGraph.DATATYPE]}'")
+                except SemException as e:
+                    item_type = 'item'
+                    if self.is_node(data_item):
+                        item_type = 'node'
+                    elif self.is_dep(data_item):
+                        item_type = 'dep'
+                    if self.skip_invalid:
+                        self.logger.warning("Skip invalid %s %s: %s", item_type, data_item, e)
+                    else:
+                        raise SemException(f"Fail parse {item_type} {data_item}: {e}") from e
         except Exception as e:
             raise SemException(f'Fail read sem-graph from {self.sem_graph_file}: {e}') from e
