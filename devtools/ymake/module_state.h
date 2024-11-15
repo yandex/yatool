@@ -425,10 +425,6 @@ public:
         return Attrs.FinalTarget;
     }
 
-    bool IsProxyLibrary() const {
-        return Attrs.ProxyLibrary;
-    }
-
     bool IsFakeModule() const {
         return Attrs.Fake;
     }

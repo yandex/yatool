@@ -462,9 +462,9 @@ void TModule::ImportPeerdirRules() {
 void TModule::ImportPeerdirPolicy() {
     Attrs.UsePeers = PeerdirType == EPT_BuildFrom;
 
-    if (NodeType != EMNT_Bundle && !IsProxyLibrary()) {
+    if (NodeType != EMNT_Bundle && !Attrs.ProxyLibrary) {
         auto match = [](const TModule& peer) {
-            return !(peer.IsStaticLib() || peer.IsProxyLibrary());
+            return !(peer.IsStaticLib() || peer.Attrs.ProxyLibrary);
         };
 
         PeersRestrictions.Add({EPeerSearchStatus::DeprecatedByFilter, std::move(match)});
