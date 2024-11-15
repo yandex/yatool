@@ -66,7 +66,7 @@
 
     import_simple = ( ws ( [a-zA-Z0-9_.]+ wsc+ )? ( '"' ^'\n'* $AddChar :> '"' ) ) >ClearImport @AddImport;
 
-    cpp_comment_content = ^'\n'*;
+    cpp_comment_content = ^'\n'* >*ClearComment %^ProcessComment $err(Skip);
 
     cpp_comment = "//" cpp_comment_content;
 
@@ -78,11 +78,9 @@
 
     import_stmt = ( import_simple | import_compound );
 
-    main := ( ws ( "import" @Import | "//" @CppComment ) ) @err(Skip);
+    main := ( ws ( "import" @Import | cpp_comment ) ) @err(Skip);
 
     Import := import_stmt $err(Skip);
-
-    CppComment := cpp_comment_content >*ClearComment %^ProcessComment $err(Skip);
 }%%
 
 %% write data;
