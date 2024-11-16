@@ -750,7 +750,6 @@ def get_recipes_env(env_file):
 
             for k, v in data.items():
                 env[test_common.to_utf8(k)] = test_common.to_utf8(v)
-
     return env
 
 
