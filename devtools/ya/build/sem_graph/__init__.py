@@ -337,3 +337,8 @@ class SemGraph:
                         raise SemException(f"Fail parse {item_type} {data_item}: {e}") from e
         except Exception as e:
             raise SemException(f'Fail read sem-graph from {self.sem_graph_file}: {e}') from e
+
+    def update(self, data: list[dict]) -> None:
+        """Rewrite sem-graph file by updated data"""
+        with self.sem_graph_file.open('wb') as f:  # Update sem-graph in file
+            sjson.dump({SemGraph.DATA: data}, f)

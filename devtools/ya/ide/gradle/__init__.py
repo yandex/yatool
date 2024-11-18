@@ -2,14 +2,16 @@ import os
 import logging
 import shutil
 import subprocess
+import re
 from typing import Iterable
 from pathlib import Path
 
 from core import config as core_config, yarg, stage_tracer
 from build import build_opts, graph as build_graph, ya_make
-from build.sem_graph import SemLang, SemConfig, SemNode, SemGraph
+from build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
 from yalibrary import platform_matcher
 from exts import hashing
+from devtools.ya.yalibrary import sjson
 
 
 class YaIdeGradleException(Exception):
@@ -34,20 +36,9 @@ class _JavaSemConfig(SemConfig):
             raise YaIdeGradleException("Windows is not supported in ya ide gradle")
         super().__init__(SemLang.JAVA(), params)
         self.logger = logging.getLogger(type(self).__name__)
-        self.settings_root = self._get_settings_root()
-        self.appended_abs_targets = []
-        self.appended_rel_targets = []
-
+        self.settings_root: Path = self._get_settings_root()
         if not self.params.remove:
             self._check_gradle_props()
-
-    def append_rel_targets(self, rel_targets: list[Path]) -> None:
-        for rel_target in rel_targets:
-            self.params.rel_targets.append(rel_target)
-            self.appended_rel_targets.append(rel_target)
-            abs_target = str(self.arcadia_root / rel_target)
-            self.params.abs_targets.append(abs_target)
-            self.appended_abs_targets.append(abs_target)
 
     def _check_gradle_props(self) -> None:
         """Check exists all required gradle properties"""
@@ -203,6 +194,9 @@ class _NewSymlinkCollector(_SymlinkCollector):
 class _JavaSemGraph(SemGraph):
     """Creating and reading sem-graph"""
 
+    OLD_AP_SEM = 'annotation_processors'
+    NEW_AP_SEM = 'use_annotation_processor'
+
     def __init__(self, config: _JavaSemConfig):
         super().__init__(config, skip_invalid=True)
         self.logger = logging.getLogger(type(self).__name__)
@@ -210,11 +204,7 @@ class _JavaSemGraph(SemGraph):
     def make(self) -> None:
         """Make sem-graph file by ymake"""
         super().make()
-        run_java_program_rel_targets = self._get_run_java_program_rel_targets()
-        if run_java_program_rel_targets:
-            self.config.append_rel_targets(run_java_program_rel_targets)
-            self.logger.info("Updated targets: %s", self.config.params.rel_targets)
-            super().make()  # Remake sem-graph with appended RUN_JAVA_PROGRAM targets
+        self._patch_annotation_processors()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
@@ -227,14 +217,14 @@ class _JavaSemGraph(SemGraph):
             rel_target = Path(node.name.replace('$B/', '')).parent  # Relative target - directory of *.jar
             is_contrib = False
             for semantic in node.semantics:
-                if len(semantic.sems) == 2 and semantic.sems[0] == 'consumer-type' and semantic.sems[1] == 'contrib':
+                if semantic.sems == ['consumer-type', 'contrib']:
                     is_contrib = True
                     break
             rel_targets.append((rel_target, is_contrib))
         return rel_targets
 
-    def _get_run_java_program_rel_targets(self) -> list[Path]:
-        """Find RUN_JAVA_PROGRAMs in sem-graph and extract additional targets for they"""
+    def get_run_java_program_rel_targets(self) -> list[Path]:
+        """Search RUN_JAVA_PROGRAMs in sem-graph and return relative targets for build"""
         try:
             run_java_program_rel_targets = []
             for node in self.read():
@@ -247,9 +237,9 @@ class _JavaSemGraph(SemGraph):
                         and semantic.sems[1].startswith('@')
                         and semantic.sems[1].endswith('.cplst')
                     ):
-                        cplst = semantic.sems[1][1:]
-                        if not cplst:
-                            raise YaIdeGradleException(f'Empty classpath list in node {node}')
+                        cplst = semantic.sems[1][len('@') : -len('.cplst')]
+                        if not cplst:  # Ignore java runners without classpath
+                            continue
                         # target is directory of cplst
                         run_java_program_rel_targets.append(
                             os.path.relpath(Path(cplst).parent, self.config.export_root)
@@ -257,6 +247,156 @@ class _JavaSemGraph(SemGraph):
             return run_java_program_rel_targets
         except Exception as e:
             raise YaIdeGradleException(f'Fail extract additional RUN_JAVA_PROGRAM targets from sem-graph: {e}') from e
+
+    def _patch_annotation_processors(self) -> None:
+        """Patch AP semantics in graph"""
+        self._configure_patch_annotation_processors()
+        data = self._find_annotation_processors()
+        self.used_ap_class2path: dict[str, str | list[str]] = {}
+        data = self._do_patch_annotation_processors(data)
+        if self.used_ap_class2path:  # Some patched
+            self.logger.info(
+                "Annotation processors patched in graph:\n%s",
+                '\n'.join([f'{k} --> {v}' for k, v in self.used_ap_class2path.items()]),
+            )
+            self.update(data)
+
+    def _configure_patch_annotation_processors(self) -> None:
+        """Read mapping AP class -> path from configure"""
+        annotation_processors_file = (
+            self.config.arcadia_root / "build" / "yandex_specific" / "gradle" / "annotation_processors.json"
+        )
+        if not annotation_processors_file.exists():
+            raise YaIdeGradleException(f"Not found {annotation_processors_file}")
+        with annotation_processors_file.open('rb') as f:
+            self.ap_class2path = sjson.load(f)
+
+    def _find_annotation_processors(self) -> list[dict]:
+        """Find nodes with AP semantics (old or new), collect dep ids for old AP semantics"""
+        self.use_ap_node_ids: list[int] = []
+        self.node2dep_ids: dict[int, list[int]] = {}
+        data: list[dict] = []
+        for item in self.read(all_nodes=True):
+            if isinstance(item, SemDep):
+                if item.from_id in self.node2dep_ids:  # collect dep ids for patching AP
+                    self.node2dep_ids[item.from_id].append(item.to_id)
+            if not isinstance(item, SemNode):
+                data.append(item.as_dict())  # non-node direct append to patched graph as is
+                continue
+            node = item
+            if node.has_semantics():
+                for semantic in node.semantics:
+                    sem0 = semantic.sems[0]
+                    if sem0 == _JavaSemGraph.OLD_AP_SEM:
+                        self.node2dep_ids[node.id] = []  # require collect deps for patch AP classes to AP paths
+                    elif sem0 == _JavaSemGraph.NEW_AP_SEM:
+                        self.use_ap_node_ids.append(node.id)  # collect node ids to check for versions of all AP
+            data.append(node.as_dict())
+        return data
+
+    def _do_patch_annotation_processors(self, data: list[dict]) -> list[dict]:
+        """Patch AP semantics in graph and check all AP with versions"""
+        if not self.use_ap_node_ids and not self.node2dep_ids:
+            return data, {}
+
+        self._fill_dep_paths(data)
+
+        # patch AP paths by deps paths and check AP has version
+        for item in data:
+            if not SemGraph.is_node(item):
+                continue
+            node_id = SemNode.take_id(item)
+            # Interest only nodes with old or new semantics with AP
+            if node_id not in self.node2dep_ids and node_id not in self.use_ap_node_ids:
+                continue
+            node = SemNode(item, skip_invalid=True)
+            if node_id in self.node2dep_ids:  # require patch old to new semantic
+                node = self._patch_node_annotation_processors(node)
+                item.update(node.as_dict())  # update current graph by patched node
+            self._check_annotation_processors_has_version(node)
+        return data
+
+    def _fill_dep_paths(self, data) -> None:
+        """Collect all used with AP deps as id -> path"""
+        if not self.node2dep_ids:
+            return
+
+        # collect all unique dep ids
+        dep_ids = []
+        for node_dep_ids in self.node2dep_ids.values():
+            dep_ids += node_dep_ids
+        dep_ids = list(set(dep_ids))
+
+        # collect all deps paths
+        self.dep_paths: dict[int, Path] = {}
+        for item in data:
+            if not SemGraph.is_node(item):
+                continue
+            node_id = SemNode.take_id(item)
+            if node_id not in dep_ids:
+                continue
+            self.dep_paths[node_id] = Path(SemNode.take_name(item).replace('$B/', ''))
+
+    def _patch_node_annotation_processors(self, node: SemNode) -> SemNode:
+        """Path old AP semantics in one node"""
+        for semantic in node.semantics:
+            if semantic.sems[0] == _JavaSemGraph.OLD_AP_SEM:
+                ap_paths = []
+                ap_classes = semantic.sems[1:]
+                for ap_class in ap_classes:
+                    if ap_class in self.ap_class2path:
+                        ap_path = self.ap_class2path[ap_class]
+                        if ap_class not in self.used_ap_class2path:
+                            self.used_ap_class2path[ap_class] = ap_path
+                        found_in_deps = False
+                        for dep_id in self.node2dep_ids[node.id]:
+                            dep_path = self.dep_paths[dep_id]
+                            if dep_path.is_relative_to(Path(ap_path)):  # found dep with same base path
+                                ap_path_by_dep = str(dep_path)
+                                ap_paths.append(ap_path_by_dep)  # patch class by path
+                                found_in_deps = True
+                                self._on_patch(ap_class, ap_path, ap_path_by_dep)
+                                break
+                        if not found_in_deps:
+                            self.logger.error(
+                                "Not found AP %s --> %s in dependencies of node %s[%d], skip it, all node dependencies:\n%s",
+                                ap_class,
+                                ap_path,
+                                node.name,
+                                node.id,
+                                [self.dep_paths[dep_id] for dep_id in self.node2dep_ids[node.id]],
+                            )
+                    else:
+                        self.logger.error("Not found path for AP class %s, skip it", ap_class)
+                # Replace old semantic with classes by new semantic with paths
+                semantic.sems = [_JavaSemGraph.NEW_AP_SEM] + ap_paths
+        return node
+
+    def _on_patch(self, ap_class: str, ap_path: str, ap_path_by_dep: str) -> None:
+        """Collect AP patching class -> path | paths"""
+        if self.used_ap_class2path[ap_class] == ap_path:  # in used base path
+            self.used_ap_class2path[ap_class] = ap_path_by_dep  # overwrite by full path
+        elif isinstance(self.used_ap_class2path[ap_class], list):  # in used list of paths
+            if ap_path_by_dep not in self.used_ap_class2path[ap_class]:
+                self.used_ap_class2path[ap_class].append(ap_path_by_dep)  # append found to list
+        elif self.used_ap_class2path[ap_class] != ap_path_by_dep:  # some other path
+            self.used_ap_class2path[ap_class] = [  # make list with 2 paths
+                self.used_ap_class2path[ap_class],
+                ap_path_by_dep,
+            ]
+
+    def _check_annotation_processors_has_version(self, node: SemNode) -> None:
+        for semantic in node.semantics:
+            if semantic.sems[0] == _JavaSemGraph.NEW_AP_SEM:
+                for ap_path in semantic.sems[1:]:
+                    if not _JavaSemGraph._is_path_has_version(ap_path):
+                        self.logger.error(
+                            "Using annotation processor without version %s in node %s", ap_path, node.as_dict()
+                        )
+
+    @staticmethod
+    def _is_path_has_version(path: str) -> bool:
+        return bool(re.fullmatch('^\\d+[.\\d]+.*$', Path(Path(path).parent).name))
 
 
 class _Exporter:
@@ -276,7 +416,7 @@ class _Exporter:
         )
         self.logger.info("Project name: %s", project_name)
 
-        self.logger.info("Path prefixes for skip in yexport:\n%s", self.config.params.rel_targets)
+        self.logger.info("Path prefixes for skip in yexport: %s", self.config.params.rel_targets)
 
         yexport_toml = self.config.ymake_root / 'yexport.toml'
         with yexport_toml.open('w') as f:
@@ -332,7 +472,7 @@ class _Builder:
     def build(self) -> None:
         """Extract build targets from sem-graph and build they"""
         try:
-            build_rel_targets = self.config.appended_rel_targets
+            build_rel_targets = self.sem_graph.get_run_java_program_rel_targets()
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, is_contrib in rel_targets:
                 in_rel_targets = False
@@ -367,16 +507,16 @@ class _Builder:
             opts.arc_root = str(arcadia_root)
             opts.bld_root = self.config.params.bld_root
 
-            opts.rel_targets = list()
-            opts.abs_targets = list()
+            opts.rel_targets = []
+            opts.abs_targets = []
             for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
                 opts.rel_targets.append(str(build_rel_target))
                 opts.abs_targets.append(str(arcadia_root / build_rel_target))
 
-            self.logger.info("Making building graph")
+            self.logger.info("Making building graph...")
             with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
                 graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
-            self.logger.info("Build all by graph")
+            self.logger.info("Building all by graph...")
             builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
             return_code = builder.go()
             if return_code != 0:
