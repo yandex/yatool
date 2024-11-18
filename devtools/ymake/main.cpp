@@ -929,7 +929,9 @@ int main_real(TBuildConfiguration& conf) {
 
     MakeUnique(yMake->StartTargets);
 
-    CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
+    if (!yMake->CanBypassConfigure()) {
+        CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
+    }
 
     if (conf.DumpRecurses || conf.DumpPeers) {
         yMake->DumpDependentDirs(conf.Cmsg());

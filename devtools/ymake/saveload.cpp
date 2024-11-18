@@ -734,9 +734,11 @@ void TYMake::AnalyzeGraphChanges(IChanges& changes) {
         return;
     }
 
-    TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
-    predictor.AnalyzeChanges();
-    HasGraphStructuralChanges_ = predictor.HasChanges();
+    if (!HasGraphStructuralChanges_) {
+        TGraphChangesPredictor predictor(IncParserManager, Names.FileConf, changes);
+        predictor.AnalyzeChanges();
+        HasGraphStructuralChanges_ = predictor.HasChanges();
+    }
 }
 
 bool TYMake::LoadPatch() {
