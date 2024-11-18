@@ -761,6 +761,8 @@ public:
 
     TUsingRules GetPropsToUse(TDepTreeNode node) const;
 
+    NGraphUpdater::ENodeStatus CheckNodeStatus(const TUpdEntryStats& stats) const;
+
     NGraphUpdater::ENodeStatus CheckNodeStatus(const TDepTreeNode& node) const;
 
     ~TUpdIter() override {

@@ -441,7 +441,7 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     if (entries) {
         for (auto fileId: *entries) {
             auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(fileId));
-            if (it != YMake.UpdIter->Nodes.end()) {
+            if (it != YMake.UpdIter->Nodes.end() && YMake.UpdIter->CheckNodeStatus(it->second) != NGraphUpdater::ENodeStatus::Ready) {
                 it->second.MarkedAsUnknown = true;
                 YDIAG(Dev) << fileConf.GetName(fileId) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
             }

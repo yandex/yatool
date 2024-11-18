@@ -3,6 +3,7 @@
 #include "dependency_management.h"
 #include "json_saveload.h"
 
+#include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/progress_manager.h>
 
 #include <util/stream/format.h>
@@ -70,6 +71,7 @@ void TModules::Commit(TModule& module) {
             AssertEx(!module.IsLoaded(), "Attempt to commit new cached module " + ToString(id));
             ModulesStore.erase(oldMod);
             ModuleIncludesById.erase(id);
+            ConfMsgManager()->EraseDupSrcForModule(id);
             delete oldMod;
         } else {
             AssertEx(false, "Attempt to commit module with duplicate id " + ToString(id));

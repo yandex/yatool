@@ -37,10 +37,13 @@ TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStrin
 
 void TConfMsgManager::AddDupSrcLink(ui32 id, ui32 modid, bool force) {
     if (force) {
-        DupSrcMap[id].insert(modid);
-    } else if (auto iter = DupSrcMap.find(id); iter != DupSrcMap.end()) {
-        iter->second.insert(modid);
+        DupSrcOutsMap[id].insert(modid);
+    } else if (auto* pModIds = DupSrcOutsMap.FindPtr(id)) {
+        pModIds->insert(modid);
+    } else {
+        return;
     }
+    DupSrcModsMap[modid].insert(id);
 }
 
 void TConfMsgManager::AddVisitedModule(ui32 modId) {
@@ -49,7 +52,7 @@ void TConfMsgManager::AddVisitedModule(ui32 modId) {
 
 void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32)> toString) {
     TVector<ui32> ids;
-    for (const auto& [fid, modids] : DupSrcMap) {
+    for (const auto& [fid, modids] : DupSrcOutsMap) {
         ids.clear();
         CopyIf(begin(modids), end(modids), std::back_inserter(ids), [this](auto id) { return VisitedModules.contains(id); });
         if (ids.size() > 1) {
@@ -63,7 +66,7 @@ void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32
                     << MakeRangeJoiner(", "sv, MakeIteratorRange(begin(moduleNames), end(moduleNames)));
                 output.Finish();
             }
-            *Display()->NewConfMsg(EConfMsgType::Error, "-WDupSrc", TDiagCtrl::TWhere::TOP_LEVEL, 0, 0) << message;
+            *Display()->NewConfMsg(EConfMsgType::Error, "-WDupSrc", TDiagCtrl::TWhere::TOP_LEVEL, 0, 0) << message << Endl;
             Diag()->HasConfigurationErrors = true;
         }
     }
@@ -120,8 +123,23 @@ void TConfMsgManager::DisableDelay() {
 
 void TConfMsgManager::Erase(ui32 owner) {
     Messages.erase(owner);
-    DupSrcMap.erase(owner);
     Events.erase(owner);
+}
+
+void TConfMsgManager::EraseDupSrcForModule(ui32 modId) {
+    if (auto* pOutIds = DupSrcModsMap.FindPtr(modId)) {
+        for (auto elemId: *pOutIds) {
+            if (auto* pModIds = DupSrcOutsMap.FindPtr(elemId)) {
+                pModIds->erase(modId);
+                if (pModIds->empty()) {
+                    DupSrcOutsMap.erase(elemId);
+                }
+            } else {
+                Y_ASSERT(0);
+            }
+        }
+        DupSrcModsMap.erase(modId);
+    }
 }
 
 bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, ui32 owner) {
@@ -171,7 +189,7 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
     TString dupSrcData;
     {
         TStringOutput output(dupSrcData);
-        Save(&output, DupSrcMap);
+        Save(&output, DupSrcOutsMap);
         output.Finish();
     }
     builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(dupSrcData.data(), dupSrcData.size())));
@@ -210,7 +228,12 @@ void TConfMsgManager::Load(const TBlob& multi) {
     }
     {
         TMemoryInput input(blobs[1].Data(), blobs[1].Length());
-        Load(&input, DupSrcMap);
+        Load(&input, DupSrcOutsMap);
+        for (const auto& [elemId, modIds]: DupSrcOutsMap) {
+            for (auto modId: modIds) {
+                DupSrcModsMap[modId].insert(elemId);
+            }
+        }
     }
     {
         TMemoryInput input(blobs[2].Data(), blobs[2].Length());

@@ -850,8 +850,8 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
 
             // We do not consider outputs of module command that macth main module output as a DupSrc issue
-            if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
-                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(fid)) {
+            if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId()) && !mod.GetSharedEntries().has(fid)) {
+                if (UpdIter->CheckNodeStatus(TDepTreeNode{EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready) {
                     ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
                 }
             }
