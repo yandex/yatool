@@ -390,6 +390,7 @@ def gen_conf(
         cmd = (
             [
                 sys.executable,
+                '-B',
                 script,
                 arc_dir,
                 build_type,
