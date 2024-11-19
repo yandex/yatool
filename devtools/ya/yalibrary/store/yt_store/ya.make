@@ -5,11 +5,10 @@ STYLE_PYTHON()
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store
     yt_store.py
-    proxy.py
     client.py
-    configuration.py
     consts.py
     utils.py
+    retries.py
 )
 
 PEERDIR(

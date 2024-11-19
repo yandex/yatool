@@ -13,9 +13,8 @@ from yt.wrapper.format import YsonFormat
 from yt.yson import YsonList, get_bytes
 
 import core.gsid  # XXX
-import yalibrary.store.yt_store.configuration as yt_configuration
 import yalibrary.store.yt_store.consts as consts
-import yalibrary.store.yt_store.proxy as proxy
+import yalibrary.store.yt_store.retries as retries
 import yalibrary.store.yt_store.utils as utils
 from exts import hashing
 from exts.func import memoize
@@ -71,7 +70,7 @@ class YtStoreClient(object):
 
     @property
     def is_disabled(self):
-        return hasattr(self._tls, "yt_client") and self._tls.yt_client.total_retries_exceeded
+        return hasattr(self._tls, "yt_client") and self._tls.yt_client.is_disabled
 
     def exists(self, path):
         return self._client.exists(path)
@@ -117,9 +116,9 @@ class YtStoreClient(object):
     @property
     def _client(self):
         if not hasattr(self._tls, 'yt_client'):
-            client = proxy.get_default_client(self._proxy, self._token)
-            retryer = yt_configuration.DefaultYtClientRetryerHandler()
-            self._tls.yt_client = proxy.InterruptableYtClientProxy(client, retryer)
+            client = retries.get_default_client(self._proxy, self._token)
+            retry_policy = retries.RetryPolicy()
+            self._tls.yt_client = retries.YtClientProxy(client, retry_policy)
         return self._tls.yt_client
 
     def _create_table(self, table, attrs):
