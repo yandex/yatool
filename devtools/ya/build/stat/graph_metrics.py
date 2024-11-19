@@ -3,7 +3,6 @@
 import typing
 import logging
 from collections import defaultdict
-import six
 
 from build.node_checks import is_module, is_binary
 from build.graph_description import GraphNodeUid, GraphNode
@@ -23,7 +22,7 @@ def _traverse_deps(
     modules: typing.Set[GraphNodeUid],
     not_modules: typing.Set[GraphNodeUid],
     nodes: typing.Dict[GraphNodeUid, GraphNode],
-    deps: typing.Dict[GraphNodeUid, typing.Set[GraphNodeUid]],
+    deps: typing.Dict[GraphNodeUid, typing.List[GraphNodeUid]],
 ) -> None:
     if v in modules or v in not_modules:
         return
@@ -33,6 +32,8 @@ def _traverse_deps(
     else:
         if v != start_node:
             not_modules.add(v)
+        if v not in deps:
+            return
         for d in deps[v]:
             if d == start_node:
                 logger.warning("Detect circular dependency for `%s` in deps for `%s`", d, v)
@@ -41,17 +42,17 @@ def _traverse_deps(
                 _traverse_deps(start_node, d, modules, not_modules, nodes, deps)
 
 
-def make_dependencies_lists(graph: typing.List[GraphNode]) -> typing.Dict:
+def _make_dependencies_lists(graph: typing.List[GraphNode]) -> typing.Dict:
     nodes = {}
-    deps = defaultdict(set)
+    deps = defaultdict(list)
     for node in graph:
         uid = node['uid']
         nodes[uid] = node
-        for dep in node['deps']:
-            deps[uid].add(dep)
+        for dep in set(node['deps']):
+            deps[uid].append(dep)
 
     result = {}
-    for uid, node in six.iteritems(nodes):
+    for uid, node in nodes.items():
         if is_module(node):
             modules = set()
             not_modules = set()
@@ -59,10 +60,10 @@ def make_dependencies_lists(graph: typing.List[GraphNode]) -> typing.Dict:
                 _traverse_deps(uid, uid, modules, not_modules, nodes, deps)
             except RecursionError:
                 logger.exception("While traversing uid `%s`", uid)
-                logger.debug("Node: %s", nodes[uid])
+                logger.debug("Node: %s", node)
                 logger.debug("Deps for uid `%s`: %s", uid, deps[uid])
                 raise
-            result[uid] = (modules, not_modules)
+            result[uid] = (len(modules), not_modules)
     return result
 
 
@@ -83,7 +84,7 @@ def _add_metric(n: GraphNode, name: str, value: typing.Any, metrics: typing.Dict
 
 def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Dict) -> typing.Dict:
     metrics = defaultdict(dict)
-    deps = make_dependencies_lists(graph)
+    deps = _make_dependencies_lists(graph)
 
     for node in graph:
         if is_module(node):
@@ -93,9 +94,9 @@ def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Di
                 _add_metric(node, 'artifacts-size', task_metrics['size'], metrics)
 
             if uid in deps:
-                modules, not_modules = deps[uid]
+                module_count, not_modules = deps[uid]
                 if is_binary(node):
-                    _add_metric(node, 'dependencies-count', len(modules), metrics)
+                    _add_metric(node, 'dependencies-count', module_count, metrics)
 
                 elapsed = _calculate_elapsed_time_by_deps(list(not_modules) + [uid], tasks_metrics)
                 if elapsed is not None:
