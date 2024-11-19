@@ -88,7 +88,7 @@ class Target(object):
 
     # Common
     def is_dart_target(self):
-        return True
+        return False
 
     def is_idea_target(self):
         return self.is_dart_target()
