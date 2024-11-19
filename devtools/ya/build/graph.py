@@ -1,5 +1,6 @@
 import base64
 import collections
+from concurrent.futures import ThreadPoolExecutor
 import contextlib2
 import copy
 from enum import Enum
@@ -11,7 +12,6 @@ from six.moves import queue
 import sys
 import tempfile
 import devtools.ya.test.const as test_consts
-import threading
 import traceback
 
 import typing as tp  # noqa
@@ -1311,7 +1311,6 @@ class _GraphMaker(object):
     def __init__(
         self,
         opts,
-        ya_sem,
         ymake_bin,
         real_ymake_bin,
         src_dir,
@@ -1325,7 +1324,7 @@ class _GraphMaker(object):
         cl_generator,
     ):
         self._opts = opts
-        self._ya_sem = ya_sem
+        self._platform_threadpool = ThreadPoolExecutor(max_workers=getattr(opts, 'ya_threads'))
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
         self._src_dir = src_dir
@@ -1423,7 +1422,7 @@ class _GraphMaker(object):
                     ymake_opts=ymake_opts,
                 )
 
-            pic = self._exit_stack.enter_context(_AsyncContext(core_async.future(gen_pic, daemon=False)))
+            pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
 
         if to_build_no_pic:
             no_pic_func = self._build_no_pic
@@ -1449,7 +1448,7 @@ class _GraphMaker(object):
                     ymake_opts=ymake_opts,
                 )
 
-            no_pic = self._exit_stack.enter_context(_AsyncContext(core_async.future(gen_no_pic, daemon=False)))
+            no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
 
         # For compatibility with merge_graph() and all other similar code
         # Will be removed somewhen
@@ -1592,7 +1591,7 @@ class _GraphMaker(object):
             cache_subdir = cache_dir if extra_tag is None else os.path.join(cache_dir, extra_tag)
             exts.fs.ensure_dir(cache_subdir)
         tags, platform = gen_plan.prepare_tags(target_tc, flags, self._opts)
-        with self._ya_sem, stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
+        with stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
             result = self._gen_graph(
                 flags,
                 target_tc,
@@ -2140,13 +2139,10 @@ def _build_graph_and_tests(
         real_ymake_bin = tools.tool('ymake')
         timer.show_step('fetch ymake')
 
-    ya_sem = threading.Semaphore(opts.ya_threads) if getattr(opts, 'ya_threads', None) else contextlib2.nullcontext()
-
     _enable_imprint_fs_cache(opts)
 
     graph_maker = _GraphMaker(
         opts,
-        ya_sem,
         ymake_bin,
         real_ymake_bin,
         src_dir,
