@@ -53,6 +53,7 @@ class PrepareResource(object):
 
         self._parsed_uri = None
         self._resource_display = None
+        self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
 
     @property
     def parsed_uri(self):
@@ -134,7 +135,8 @@ class PrepareResource(object):
         )
 
         def progress_callback(downloaded, total_size):
-            self._ctx.state.check_cancel_state()
+            if not self._shloud_use_universal_fetcher:
+                self._ctx.state.check_cancel_state()
 
             self._progress_info.set_total(total_size)
             self._progress_info.update_downloaded(downloaded)

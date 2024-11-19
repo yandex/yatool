@@ -669,7 +669,7 @@ def _get_fetcher(name, resource_type):
                     progress_info.update_downloaded(downloaded)
 
                     app_ctx.display.emit_status(
-                        'Downloading [[imp]]{}[[rst]] - [[imp]]{:.1f}%[[rst]]'.format(name, progress_info.percent or 0)
+                        'Downloading [[imp]]{}[[rst]] - [[imp]]{}[[rst]]'.format(name, progress_info.pretty_progress)
                     )
 
             def display_finish():

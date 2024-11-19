@@ -35,6 +35,7 @@ class PreparePattern(object):
         self._exit_code = 0
         self._build_root = build_root
         self._execution_log = execution_log
+        self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
 
     @property
     def exit_code(self):
@@ -81,7 +82,8 @@ class PreparePattern(object):
         if resource_type in ({'http'} | self._fetchers_storage.accepted_schemas()):
 
             def progress_callback(downloaded, total_size):
-                self._ctx.state.check_cancel_state()
+                if not self._shloud_use_universal_fetcher:
+                    self._ctx.state.check_cancel_state()
 
                 self._progress_info.set_total(total_size)
                 self._progress_info.update_downloaded(downloaded)
