@@ -7,10 +7,8 @@ import copy
 import logging
 import tempfile
 import base64
-import subprocess
 import re
 import jinja2
-import sys
 
 import library.python.filelock
 import library.python.resource as rs
@@ -32,10 +30,10 @@ import jbuild.gen.consts as consts
 import jbuild.gen.node as jnode
 import jbuild.execute as execute
 import jbuild.commands as commands
+import jbuild.maven.license as license
 import jbuild.maven.version_filter as vf
 
 import yalibrary.graph.base as graph_base
-import yalibrary.tools as tools
 
 from handlers.dump import FullForcedDepsOptions, do_forced_deps
 
@@ -1084,7 +1082,7 @@ def import_artifacts(
                     for lic in n.licenses:
                         all_licenses.add(lic)
             all_licenses = {i for i in all_licenses if i not in license_aliases}
-            licenses_map = collect_licenses_spdx_map(list(all_licenses))
+            licenses_map = license.collect_licenses_spdx_map(list(all_licenses))
         else:
             licenses_map = {}
 
@@ -1229,16 +1227,6 @@ def import_unified(
     elif write_licenses:
         logger.error("Licenses will not be written: trusted repos file {} not found".format(trusted_repos_file))
 
-    license_aliases = {}
-    if license_aliases_file and os.path.exists(license_aliases_file):
-        with open(license_aliases_file) as f:
-            try:
-                license_aliases = json.loads(f.read())
-            except Exception as e:
-                logger.error("Can't load license aliases file: {} {}".format(license_aliases_file, e))
-    else:
-        logger.error("License aliases is not available: file {} not found".format(license_aliases_file))
-
     if not artifacts_to_import:
         logger.info('Requested artifact(s) exist:\n%s', '\n'.join(contrib_location(a) for a in request_artifacts))
         return
@@ -1255,43 +1243,24 @@ def import_unified(
         meta = resolve_transitively(list(map(str, request_artifacts)), local_repo, repos, opts, app_ctx, 'unified')
         nodes = {}
         empty_ya_makes, empty_incs = set(), set()
-        if canonize_licenses:
-            all_licenses = set()
-            for data in meta:
-                all_licenses |= {license_aliases.get(i, i) for i in data.get('licenses', [])}
-            all_licenses = {i for i in all_licenses if i not in license_aliases}
-            licenses_map = collect_licenses_spdx_map(list(all_licenses))
-        else:
-            licenses_map = {}
-        if os.path.exists(license_aliases_file):
-            try:
-                updated = False
-                with open(license_aliases_file) as f:
-                    aliases = json.loads(f.read())
-                for k, v in licenses_map.items():
-                    if k not in aliases:
-                        aliases[k] = v
-                        updated = True
-                if updated:
-                    with open(license_aliases_file, 'w') as f:
-                        f.write(json.dumps(aliases, sort_keys=True, indent=2))
-                    logger.info("License aliases file {} are updated".format(license_aliases_file))
-            except Exception as e:
-                logger.warning("Can't update license aliases: {}".format(e))
+
+        meta = license.enrich_with_licenses(meta)
+        license_aliases = license.build_licenses_aliases(license_aliases_file, meta, canonize_licenses)
 
         replace_version = opts.replace_version
         for data in meta:
             key = extract_artefact(data['artifact'], replace_version)
-            my_licenses = [
-                licenses_map.get(license_aliases.get(i, i), license_aliases.get(i, i)) for i in data.get('licenses', [])
-            ]
+
+            my_licenses = []
             if write_licenses and data.get('repository') and data.get('repository') not in trusted_repos:
                 logger.warning(
                     "Repository {} (for artifact {}) not included in the list of trusted. Licenses will not be writen automatically".format(
                         data.get('repository'), key
                     )
                 )
-                my_licenses = []
+            else:
+                my_licenses = [license_aliases.get(i, i) for i in data.get('licenses', [])]
+
             nodes[str(key)] = {
                 'artifact': key,
                 'generate_ya_make': data.get('generate_ya_make', False),
@@ -1361,28 +1330,6 @@ def extract_artefact(raw_artefact, replace_versions: dict):
         raise NoArtefactVersionError("No version specified for artifact '{}'".format(package_name))
 
     return artefact
-
-
-def collect_licenses_spdx_map(licenses):
-    if not sys.platform.startswith('linux') and sys.platform.startswith('darwin'):
-        return {}
-    if not licenses:
-        return {}
-    with tmp.temp_dir() as td:
-        input_file = os.path.join(td, 'licenses.list')
-        output_file = os.path.join(td, 'aliases')
-        with open(input_file, 'w') as lics_file:
-            lics_file.write('\n'.join(licenses))
-        license_analyzer = tools.tool('license_analyzer')
-        subprocess.call([license_analyzer, 'canonize', '--input-file', input_file, '--output-file', output_file])
-        if not os.path.exists(output_file):
-            return {}
-        try:
-            with open(output_file) as out:
-                return json.loads(out.read())
-        except Exception as e:
-            logger.warning("Can't get licenses spdx ids: {}".format(e))
-    return {}
 
 
 def get_peerdir(peerdir, forced_deps):

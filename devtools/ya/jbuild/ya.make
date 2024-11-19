@@ -8,6 +8,7 @@ PY_SRCS(
     jbuild_opts.py
     java_build2.py
     maven/fetcher.py
+    maven/license.py
     maven/pom_parser.py
     maven/version_filter.py
     maven/maven_import.py
