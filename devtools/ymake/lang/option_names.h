@@ -30,6 +30,7 @@ constexpr TStringBuf PEERDIR = "PEERDIR";
 constexpr TStringBuf PEERDIR_POLICY = "PEERDIR_POLICY";
 constexpr TStringBuf PEERDIRSELF = "PEERDIRSELF";
 constexpr TStringBuf PROXY = "PROXY";
+constexpr TStringBuf VERSION_PROXY = "VERSION_PROXY";
 constexpr TStringBuf RESTRICTED = "RESTRICTED";
 constexpr TStringBuf SEM = "SEM";
 constexpr TStringBuf SEM_IGNORE = "SEM_IGNORE";

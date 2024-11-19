@@ -298,6 +298,7 @@ void TModule::Init(TString fileName, TString globalFileName, TString baseName, c
     Attrs.UsePeersLateOuts = conf.UsePeersLateOuts;
     Attrs.FinalTarget = conf.FinalTarget;
     Attrs.ProxyLibrary = conf.ProxyLibrary;
+    Attrs.DepManagementVersionProxy = conf.DepManagementVersionProxy;
     Attrs.RenderModuleType = static_cast<ui32>(ComputeRenderModuleType(this, NodeType, conf.SymlinkType));
 }
 

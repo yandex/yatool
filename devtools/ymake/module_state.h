@@ -79,6 +79,7 @@ union TModuleAttrs {
         ui32 CheckProvides       : 1;  // Require to check PEER feature conflicts
         ui32 RequireDepManagement : 1;  // Require to to to run dependendy management on module peers
         ui32 ConsumeNonManageablePeers: 1; // Module with RequireDepManagement adds peers without PropagateDepManagement to MANAGED_PEERS_CLOSURE
+        ui32 DepManagementVersionProxy: 1; // Module is used as proxy without version which must be replaced by real module with exact version during dependency management
         ui32 DynamicLink         : 1; // PEERDIR to this module is interpreted as dynamically linked dependency (used by license checks)
         ui32 UseGlobalCmd        : 1; // Use GLOBAL_CMD
         ui32 NeedGoDepsCheck     : 1; // Go internal test
@@ -88,7 +89,6 @@ union TModuleAttrs {
         ui32 SemIgnore           : 1; // module is ignored in sem graph
         ui32 IgnoreDupSrc        : 1; // ignore DupSrc errors for REPORT_ALL_DUPSRC
         ui32 UseAllSrcs          : 1; // module uses ALL_SRCS variable
-
     };
 };
 

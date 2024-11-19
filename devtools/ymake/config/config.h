@@ -103,6 +103,7 @@ struct TModuleConf {
     bool IncludeTag = true;
     TDefaultValue<bool> FinalTarget = TDefaultValue<bool>(false);
     TDefaultValue<bool> ProxyLibrary = TDefaultValue<bool>(false);
+    TDefaultValue<bool> DepManagementVersionProxy = TDefaultValue<bool>(false);
     EMakeNodeType NodeType;
     ESymlinkType SymlinkType;
     EPeerdirType PeerdirType;

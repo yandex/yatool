@@ -969,6 +969,7 @@ namespace {
             } else if (name == NOptions::FINAL_TARGET ||
                        name == NOptions::INCLUDE_TAG ||
                        name == NOptions::PROXY ||
+                       name == NOptions::VERSION_PROXY ||
                        name == NOptions::STRUCT_CMD ||
                        name == NOptions::STRUCT_SEM ||
                        name == NOptions::USE_INJECTED_DATA ||

@@ -332,6 +332,9 @@ void TModuleConf::Inherit(const TModuleConf& parent) {
     if (ProxyLibrary.IsDefaultValue()) {
         ProxyLibrary = parent.ProxyLibrary;
     }
+    if (DepManagementVersionProxy.IsDefaultValue()) {
+        DepManagementVersionProxy = parent.DepManagementVersionProxy;
+    }
     if (!ParseModuleArgs && parent.ParseModuleArgs) {
         ParseModuleArgs = parent.ParseModuleArgs;
     }
@@ -549,6 +552,8 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         ApplyBoolProperty(FinalTarget, key, name, value);
     } else if (name == NOptions::PROXY) {
         ApplyBoolProperty(ProxyLibrary, key, name, value);
+    } else if (name == NOptions::VERSION_PROXY) {
+        ApplyBoolProperty(DepManagementVersionProxy, key, name, value);
     } else if (name == NOptions::PEERDIRSELF) {
         TUniqVector<TString> tags;
         for (const auto tag : StringSplitter(value).Split(' ').SkipEmpty()) {
@@ -580,6 +585,7 @@ void TModuleConf::Load(IInputStream* input) {
     ::Load(input, IncludeTag);
     ::Load(input, FinalTarget);
     ::Load(input, ProxyLibrary);
+    ::Load(input, DepManagementVersionProxy);
     ::Load(input, NodeType);
     ::Load(input, SymlinkType);
     ::Load(input, PeerdirType);
@@ -632,6 +638,7 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, IncludeTag);
     ::Save(output, FinalTarget);
     ::Save(output, ProxyLibrary);
+    ::Save(output, DepManagementVersionProxy);
     ::Save(output, NodeType);
     ::Save(output, SymlinkType);
     ::Save(output, PeerdirType);
