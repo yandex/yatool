@@ -1086,24 +1086,18 @@ TUsingRules TUpdIter::GetPropsToUse(TDepTreeNode node) const {
     return {propsToUseIt->second};
 }
 
-NGraphUpdater::ENodeStatus TUpdIter::CheckNodeStatus(const TUpdEntryStats& stats) const {
-    if (stats.MarkedAsUnknown) {
+NGraphUpdater::ENodeStatus TUpdIter::CheckNodeStatus(const TDepTreeNode& node) const {
+    const auto iter = Nodes.find(MakeDepsCacheId(node.NodeType, node.ElemId));
+    if (iter == Nodes.end() || iter->second.MarkedAsUnknown) {
         return NGraphUpdater::ENodeStatus::Unknown;
     }
-    if (!stats.OnceEntered) {
+    if (!iter->second.OnceEntered) {
         return NGraphUpdater::ENodeStatus::Waiting;
     }
-    if (stats.InStack) {
+    if (iter->second.InStack) {
         return NGraphUpdater::ENodeStatus::Processing;
     }
     return NGraphUpdater::ENodeStatus::Ready;
-}
-
-NGraphUpdater::ENodeStatus TUpdIter::CheckNodeStatus(const TDepTreeNode& node) const {
-    if (const auto iter = Nodes.find(MakeDepsCacheId(node.NodeType, node.ElemId)); iter != Nodes.end()) {
-        return CheckNodeStatus(iter->second);
-    }
-    return NGraphUpdater::ENodeStatus::Unknown;
 }
 
 inline bool TUpdIter::Enter(TState& state) {

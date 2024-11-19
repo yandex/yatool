@@ -97,7 +97,6 @@ public:
     bool IsDelayed() const;
 
     void Erase(ui32 owner);
-    void EraseDupSrcForModule(ui32 modId);
     bool EraseMessagesByKind(const TStringBuf var, ui32 owner = 0); // If owner == 0 erase for all owners
     bool HasMessagesByKind(const TStringBuf var, ui32 owner) const;
 
@@ -124,8 +123,7 @@ private:
     bool Delayed;
     TConfValuesMap<TConfigureMessage> Messages;
     TConfValuesMap<TConfigureEvent> Events;
-    THashMap<ui32, TSet<ui32>> DupSrcOutsMap;
-    THashMap<ui32, TSet<ui32>> DupSrcModsMap;
+    THashMap<ui32, TSet<ui32>> DupSrcMap;
     THashSet<ui32> VisitedModules;
     NDetail::TConfigureTraceDecuplicator TracesDeduplicator;
 };

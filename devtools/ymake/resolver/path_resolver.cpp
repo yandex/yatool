@@ -204,7 +204,7 @@ TResolveFile TPathResolver::CheckBuilt(TStringBuf path) {
     }
 
     // File was restored from cache but wasn't flushed this time: check if it was processed
-    auto status = Context_.CheckNodeStatus(TDepTreeNode{EMNT_NonParsedFile, fileId});
+    auto status = Context_.CheckNodeStatus({EMNT_NonParsedFile, fileId});
 
     if (status == NGraphUpdater::ENodeStatus::Ready) {
         // File was already processed and flushed into graph
