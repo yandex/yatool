@@ -69,27 +69,25 @@ def _gen_node(items, logins, groups):
     return {'items': items, 'owners': {'logins': logins, 'groups': groups}}
 
 
-def add_owner(owners, path, logins, groups):
-    if not logins and not groups:
+def _inject_owner(node: dict, parts: tuple[str], logins: list[str], groups: list[str]):
+    if len(parts) == 0:
+        node['owners'] = {'logins': logins, 'groups': groups}
         return
 
-    def inject_owner(node, parts):
-        if len(parts) == 0:
-            node['owners'] = {'logins': logins, 'groups': groups}
-            return
+    head, tail = parts[0], parts[1:]
+    if 'items' not in node:
+        node['items'] = {}
 
-        head, tail = parts[0], parts[1:]
-        if 'items' not in node:
-            node['items'] = {}
+    if head not in node['items']:
+        node['items'][head] = {'items': {}, 'owners': EMPTY_OWNERS.copy()}
 
-        if head not in node['items']:
-            node['items'][head] = {'items': {}, 'owners': EMPTY_OWNERS.copy()}
+    _inject_owner(node['items'][head], tail, logins, groups)
 
-        inject_owner(node['items'][head], tail)
 
-    parts = tuple(filter(len, exts.path2.path_explode(path)))
-
-    inject_owner(owners, parts)
+def add_owner(owners: dict, path: str, logins: list[str], groups: list[str]):
+    if logins or groups:
+        parts = tuple(filter(len, exts.path2.path_explode(path)))
+        _inject_owner(owners, parts, logins, groups)
 
 
 def find_path_owners(owners_list, source_path):
