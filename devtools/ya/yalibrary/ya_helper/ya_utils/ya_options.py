@@ -195,6 +195,7 @@ class YaMakeOptions(YaBaseOptions):
         self.source_root = self._pop('source_root')
         self.build_type = self._pop('build_type')
         self.keep_build = self._pop('keep_build')
+        self.keep_temps = self._pop('keep_temps')
         self.build_root = self._pop('build_root')
         self.output_dir = self._pop('output_dir')
         self.build_results_report = self._pop('build_results_report')
@@ -477,6 +478,8 @@ class YaMakeOptions(YaBaseOptions):
             result += ['-T']
         if self.keep_build:
             result += ['-k']
+        if self.keep_temps:
+            result += ['--keep-temps']
         if self.profile_to:
             result += ['--profile-to', 'ya.prof']
         if self.do_not_download_tests_results:
