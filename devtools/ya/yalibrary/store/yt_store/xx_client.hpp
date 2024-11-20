@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mapreduce/yt/interface/client.h>
+#include <yt/cpp/mapreduce/interface/client.h>
 
 struct YtStoreClientResponse {
     bool Success;
