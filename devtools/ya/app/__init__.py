@@ -2,6 +2,7 @@ import enum
 import copy
 import logging
 import os
+import re
 import six
 import sys
 import time
@@ -660,19 +661,44 @@ def _ya_downloads_report():
     return aggregator.aggregate(stages)
 
 
+def _vmhwm():
+    if not sys.platform.startswith("linux"):
+        return
+
+    line = None
+    status_file = "/proc/self/status"
+    with open(status_file) as f:
+        for s in f:
+            if s.startswith("VmHWM:"):
+                line = s
+                break
+    if not line:
+        logger.debug("VmHWM not found in %s", status_file)
+        return
+
+    # JFI: 'kB' suffix is hardcoded in the Linux kernel source file fs/proc/task_mmu.c
+    if m := re.match(r"VmHWM:\s*(\d+)\s*kB", line):
+        return int(m.group(1)) * 1024
+    else:
+        logger.debug("Unexpected VmHWM status string: '%s'", line)
+
+
 def _resources_report():
     try:
         import resource
     except ImportError:
         return {}
 
-    return {
+    stat = {
         'max_rss': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         'utime': resource.getrusage(resource.RUSAGE_SELF).ru_utime,
         'stime': resource.getrusage(resource.RUSAGE_SELF).ru_stime,
         'inblock': resource.getrusage(resource.RUSAGE_SELF).ru_inblock,
         'oublock': resource.getrusage(resource.RUSAGE_SELF).ru_oublock,
     }
+    if vmhwm := _vmhwm():
+        stat["vmhwm_bytes"] = vmhwm
+    return stat
 
 
 def configure_report_interceptor(ctx, report_events):
