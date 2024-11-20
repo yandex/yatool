@@ -4,12 +4,14 @@ Order is preserved with the help of priority queue, see WorkerThreads.
 """
 
 __all__ = (
+    'BuildTimeCacheAvailability',
     'Strategies',
     'strategy_name',
     'strategy_names',
 )
 
 
+import enum
 import logging
 from collections.abc import Callable
 
@@ -62,6 +64,16 @@ def _spt_with_deps(action: Action) -> float:
     return -_lpt_with_deps(action)
 
 
+class BuildTimeCacheAvailability(enum.Enum):
+    YES = enum.auto()
+    NO = enum.auto()
+    NEVER = enum.auto()
+
+    @enum.property
+    def available(self):
+        return self is self.__class__.YES
+
+
 class Strategies:
     """
     Schedule strategy name is combined from function names of different strategies like this
@@ -74,16 +86,17 @@ class Strategies:
     default_wo_cache = (_deeper_first,)
 
     @classmethod
-    def pick(cls, name: str, build_time_cache_available: bool) -> ScheduleStrategy:
-        default = cls.default_w_cache if build_time_cache_available else cls.default_wo_cache
+    def pick(cls, name: str, build_time_cache_availability: BuildTimeCacheAvailability) -> ScheduleStrategy:
+        default = cls.default_w_cache if build_time_cache_availability.available else cls.default_wo_cache
 
         if name and hasattr(cls, name):
             requires_cache = any(component in name for component in cls._build_time_components)
-            if requires_cache and not build_time_cache_available:
-                logger.warning(
-                    "Build time based schedule strategies are not available because build time cache is not set up. Falling back to '%s'",
-                    strategy_name(cls.default_wo_cache),
-                )
+            if requires_cache and not build_time_cache_availability.available:
+                if build_time_cache_availability is not BuildTimeCacheAvailability.NEVER:
+                    logger.warning(
+                        "Build time based schedule strategies are not available because build time cache is not set up. Falling back to '%s'",
+                        strategy_name(cls.default_wo_cache),
+                    )
                 return cls.default_wo_cache
             else:
                 return getattr(cls, name)

@@ -135,10 +135,14 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
     build_time_cache = None
     if not opts.use_distbuild:
+        build_time_cache_availability = schedule_strategy.BuildTimeCacheAvailability.YES
         try:
             build_time_cache = UsageMap(os.path.join(ctx.garbage_dir, 'cache', 'runner_build_time', 'rbt'))
         except Exception as e:
+            build_time_cache_availability = schedule_strategy.BuildTimeCacheAvailability.NO
             logger.warning('Could not create build time cache due to error {!r}'.format(e))
+    else:
+        build_time_cache_availability = schedule_strategy.BuildTimeCacheAvailability.NEVER
 
     ienv = sandboxing.FuseSandboxing(opts, ctx.src_dir)
 
@@ -160,7 +164,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         io=io_limit, cpu=threads, test=test_threads, download=threads + net_threads, upload=net_threads
     )
     worker_pools = {WorkerPoolType.BASE: threads, WorkerPoolType.SERVICE: net_threads + 1}
-    strategy = schedule_strategy.Strategies.pick(opts.schedule_strategy, build_time_cache is not None)
+    strategy = schedule_strategy.Strategies.pick(opts.schedule_strategy, build_time_cache_availability)
 
     workers = worker_threads.WorkerThreads(
         state=state,
