@@ -103,7 +103,7 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
         self['dist_cache'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=do_strip_yt_cache, respawn=devtools.ya.app.RespawnType.NONE),
             description='Strip distributed (YT) cache',
-            opts=[core.common_opts.ShowHelpOptions(), DistCacheSetupOptions()],
+            opts=[core.common_opts.ShowHelpOptions(), DistCacheSetupOptions(), core.common_opts.AuthOptions()],
             visible=False,
         )
 

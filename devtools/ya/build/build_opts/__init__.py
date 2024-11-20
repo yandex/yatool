@@ -2464,7 +2464,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             self.yt_dir = ''
 
         self.yt_token = None
-        self.yt_token_path = os.path.expanduser('~/.yt/token')
+        self.yt_token_path = '~/.yt/token'
         self.yt_readonly = True
         self.yt_max_cache_size = None
         self.yt_store_ttl = 24
@@ -2567,6 +2567,8 @@ class DistCacheSetupOptions(LocalCacheOptions):
 
     def postprocess(self):
         super(DistCacheSetupOptions, self).postprocess()
+        if self.yt_token_path:
+            self.yt_token_path = os.path.expanduser(self.yt_token_path)
         self._read_token_file()
 
     def _read_token_file(self):
@@ -2583,6 +2585,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
                     return
 
                 self.yt_token = token
+                logger.debug("Load yt token from %s", self.yt_token_path)
         except UnicodeDecodeError:
             logger.warning('Incorrect file "{}" encoding. Utf8 is expected'.format(self.yt_token_path))
             self.yt_token_path = None
