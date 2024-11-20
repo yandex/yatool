@@ -24,7 +24,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 45;
+    const ui64 ImageVersion = 46;
     const ui64 DMCacheVersion = 0;
 
     template <size_t HashSize>
