@@ -571,10 +571,12 @@ def do_gradle(params):
 
         new_symlinks = _NewSymlinkCollector(exists_symlinks)
         new_symlinks.collect()
-        exists_symlinks.remove_symlinks()
-        new_symlinks.create_symlinks()
+
         if new_symlinks.has_errors:
             raise YaIdeGradleException('Some errors during creating symlinks, read the logs for more information')
+
+        exists_symlinks.remove_symlinks()
+        new_symlinks.create_symlinks()
 
         builder = _Builder(config, sem_graph)
         builder.build()
