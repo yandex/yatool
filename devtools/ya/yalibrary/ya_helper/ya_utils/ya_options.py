@@ -373,6 +373,8 @@ class YaMakeOptions(YaBaseOptions):
 
         self.no_prefetch = self._pop('no_prefetch')
 
+        self._ymake_tool_servermode = self._pop('ymake_tool_servermode')
+
     def _generate_post_handler(self):
         result = []
         if self.use_distbuild:
@@ -785,6 +787,9 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.no_prefetch:
             env['YA_PREFETCH'] = '0'
+
+        if self._ymake_tool_servermode is not None:
+            env['YA_YMAKE_TOOL_SERVERMODE'] = self._bool_to_env(self._ymake_tool_servermode)
 
         return env
 
