@@ -82,6 +82,18 @@ class YtStore(DistStore):
             )
 
         self._stager = kwargs.get("stager", utils.DummyStager())
+        self._xx_client = None
+        if kwargs.get('new_client'):
+            try:
+                import yalibrary.store.yt_store.xx_client as xx_client
+
+                self._xx_client = xx_client.YtStoreWrapper(
+                    proxy,
+                    data_dir,
+                )
+                logger.debug('Will use new YT store client')
+            except Exception:  # ModuleNotFoundError is py3-only :(
+                logger.warning('Failed to init new yt store client', exc_info=True)
 
     @property
     def is_disabled(self):
@@ -268,25 +280,35 @@ class YtStore(DistStore):
             return False
 
         try:
-            with ExitStack() as stack:
-                data_path = stack.enter_context(tmp.temp_file())
+            if self._xx_client is None or meta.get('data_size', None) is None:
+                # data_size is required for c++ version but not for py (should never happend tho)
+                with ExitStack() as stack:
+                    data_path = stack.enter_context(tmp.temp_file())
 
-                self._client.get_data(meta['hash'], data_path, meta['chunks_count'])
-                stored_data_size = fs.get_file_size(data_path)
-                self._inc_data_size(stored_data_size, 'get')
+                    self._client.get_data(meta['hash'], data_path, meta['chunks_count'])
+                    stored_data_size = fs.get_file_size(data_path)
+                    self._inc_data_size(stored_data_size, 'get')
 
-                if meta['codec']:
+                    if meta['codec']:
+                        utils.check_cancel_state()
+                        tar_path = stack.enter_context(tmp.temp_file())
+                        compress.decompress(data_path, tar_path, codec=meta['codec'])
+                        self._update_compression_ratio(stored_data_size, fs.get_file_size(tar_path))
+                    else:
+                        tar_path = data_path
+
                     utils.check_cancel_state()
-                    tar_path = stack.enter_context(tmp.temp_file())
-                    compress.decompress(data_path, tar_path, codec=meta['codec'])
-                    self._update_compression_ratio(stored_data_size, fs.get_file_size(tar_path))
-                else:
-                    tar_path = data_path
-
-                utils.check_cancel_state()
-                archive.extract_from_tar(tar_path, into_dir)
-        except Exception as e:
-            logger.debug('Try restore %s from YT failed: %s', uid, e)
+                    archive.extract_from_tar(tar_path, into_dir)
+            else:
+                sz_decoded = self._xx_client.do_try_restore(
+                    meta['hash'], into_dir, meta['codec'], meta['chunks_count'], meta['data_size']
+                )
+                # XXX now data_size is required field
+                self._inc_data_size(meta['data_size'], 'get')
+                if sz_decoded:
+                    self._update_compression_ratio(sz_decoded, meta['data_size'])
+        except Exception:
+            logger.debug('Try restore %s from YT failed', uid, exc_info=True)
             self._count_failure('get')
             return False
 

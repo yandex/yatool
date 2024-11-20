@@ -2,13 +2,24 @@ PY23_LIBRARY()
 
 STYLE_PYTHON()
 
+IF(PYTHON3)
+    SET(XXCLIENT_SRC xx_client.pyx)
+    SRCS(xx_client.cpp)
+    PEERDIR(
+        library/cpp/ucompress
+        yt/cpp/mapreduce/client
+    )
+ENDIF()
+
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store
+    CYTHON_CPP
     yt_store.py
     client.py
     consts.py
     utils.py
     retries.py
+    ${XXCLIENT_SRC}
 )
 
 PEERDIR(
@@ -43,6 +54,7 @@ CHECK_DEPENDENT_DIRS(
     yt/yt/library
     yt/yt/python
     yt/yt_proto
+    yt/cpp
 )
 
 IF (NOT OPENSOURCE)

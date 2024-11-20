@@ -2612,6 +2612,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_threads = max(get_cpu_count() // 2, 1)
         self.yt_store_wt = True
         self.yt_store_refresh_on_read = False
+        self.yt_store_cpp_client = False
         self.bazel_remote_store = False
         self.bazel_remote_baseuri = 'http://[::1]:8080/'
         self.bazel_remote_username = None
@@ -2815,6 +2816,8 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.INTERNAL,
                 ),
                 ConfigConsumer('yt_store_refresh_on_read'),
+                EnvConsumer('YA_YT_STORE_CPP_CLIENT', hook=SetValueHook('yt_store_cpp_client')),
+                ConfigConsumer('yt_store_cpp_client'),
                 EnvConsumer('YA_YT_STORE_REFRESH_ON_READ', hook=SetValueHook('yt_store_refresh_on_read')),
             ]
             + make_opt_consumers(

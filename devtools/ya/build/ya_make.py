@@ -442,6 +442,7 @@ class CacheFactory(object):
             heater_mode=not self._opts.yt_store_wt,
             stager=stager,
             with_self_uid=self._opts.yt_self_uid,
+            new_client=self._opts.yt_store_cpp_client,
         )
 
     def _can_use_bazel_remote_cache(self):
