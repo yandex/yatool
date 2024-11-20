@@ -63,7 +63,7 @@ def execute_early(action):
         no_logs=False,
         no_tmp_dir=False,
         precise=False,
-        **kwargs
+        **kwargs,
     ):
         modules_initialization_early_stage = stager.start("modules-initialization-early")
         ctx = devtools.ya.yalibrary.app_ctx.get_app_ctx()
@@ -777,7 +777,7 @@ def configure_report_interceptor(ctx, report_events):
                 prefix=core.yarg.OptsHandler.latest_handled_prefix(),
                 version=ctx.revision,
                 total_walltimes=aggregate_stages(),
-                **additional_fields
+                **additional_fields,
             ),
         )
         telemetry.stop_reporter()  # flush urgent reports
