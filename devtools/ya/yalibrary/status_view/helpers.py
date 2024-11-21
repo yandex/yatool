@@ -108,7 +108,7 @@ def patch_path(path):
     return path.replace('$(SOURCE_ROOT)', '$(S)').replace('$(BUILD_ROOT)', '$(B)')
 
 
-srcs_exts = frozenset(['c', 'C', 'cc', 'cxx', 'cpp', 'cu', 'yasm', 'asm'])
+srcs_exts = frozenset(['auxcpp', 'c', 'C', 'cc', 'cxx', 'cpp', 'cu', 'yasm', 'asm'])
 
 
 def iter_input_sources(inputs):
