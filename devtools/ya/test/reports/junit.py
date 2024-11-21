@@ -93,12 +93,11 @@ class JUnitReportGenerator(object):
         if suite.get_comment():
             add_test(facility.TestCase(suite.get_type(), suite.get_status(), suite.get_comment(), logs=suite.logs))
         for chunk in suite.chunks:
-            if chunk.get_comment():
-                add_test(
-                    facility.TestCase(
-                        "{} chunk".format(chunk.get_name()), chunk.get_status(), chunk.get_comment(), logs=chunk.logs
-                    )
+            add_test(
+                facility.TestCase(
+                    "{} chunk".format(chunk.get_name()), chunk.get_status(), chunk.get_comment(), logs=chunk.logs
                 )
+            )
             for test_case in chunk.tests:
                 add_test(test_case)
 
