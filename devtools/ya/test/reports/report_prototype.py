@@ -11,6 +11,12 @@ from devtools.ya.test.const import Status
 from exts.hashing import md5_value
 import exts.yjson as json
 
+import typing as tp
+
+if tp.TYPE_CHECKING:
+    import devtools.ya.test.test_types.common as tt_common  # noqa
+
+
 logger = logging.getLogger(__name__)
 
 MAX_TEST_LEN = 1000
@@ -201,6 +207,7 @@ def truncate_test_name(class_name, subtest_name):
 
 
 def make_suites_results_prototype(suites, merger_out_dir=None):
+    # type: (list[tt_common.AbstractTestSuite], tp.Any) -> list[dict]
     # XXX: move from global scope, just to fix checks
     from yatest_lib import external
 

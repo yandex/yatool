@@ -142,6 +142,8 @@ class AbstractTestSuite(facility.Suite):
         elif devtools.ya.test.const.YaTestTags.ForceSandbox in self.tags:
             self.special_runner = 'sandbox'
 
+        self._links_map = {}
+
     def need_wine(self):
         return self.wine_path is not None
 
@@ -446,6 +448,14 @@ class AbstractTestSuite(facility.Suite):
             if cwd:
                 cwd = "$(SOURCE_ROOT)/" + cwd
             return cwd
+
+    @property
+    def links_map(self):
+        return self._links_map
+
+    def update_links_map(self, kwargs):
+        # type: (dict[str, str]) -> None
+        self._links_map.update(kwargs)
 
     def get_sandbox_resources(self):
         return self._get_all_test_data(data_type='sbr')

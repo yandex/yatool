@@ -19,6 +19,11 @@ import devtools.ya.test.common as test_common
 import devtools.ya.test.result as test_result
 import devtools.ya.test.reports as test_reports
 
+import typing as tp
+
+if tp.TYPE_CHECKING:
+    import devtools.ya.test.test_types.common as tt_common  # noqa
+
 
 class BuildResultsListener(object):
     _logger = logging.getLogger('BuildResultsListener')
@@ -185,7 +190,7 @@ class TestNodeListener(object):
     def __init__(self, tests, output_root, report_generator):
         self._lock = threading.Lock()
         self._output_root = output_root
-        self._tests = {}
+        self._tests = {}  # type: dict[str, tt_common.AbstractTestSuite]
         self._seen = set()
         self._report_generator = report_generator
 
@@ -226,6 +231,9 @@ class TestNodeListener(object):
             multi_target_platform_run=suite.multi_target_platform_run,
         )
         suite.set_work_dir(work_dir)
+        if 'links_map' in res:
+            suite.update_links_map(res['links_map'])
+
         resolver = test_reports.TextTransformer(
             [("$(BUILD_ROOT)", self._output_root or build_root), ("$(SOURCE_ROOT)/", "")]
         )

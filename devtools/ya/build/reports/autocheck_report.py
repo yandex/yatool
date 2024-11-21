@@ -121,7 +121,7 @@ def log_restrained_investigation(entry, logsdir, output_dir, work_dir, tar_dirs)
             logger.debug("Target dir %s content: %s", path, os.listdir(path) if os.path.exists(path) else 'None')
 
 
-def _replace_logs_with_links(entry, output_dir, work_dir):
+def _replace_logs_with_links(entry, output_dir, work_dir, links_map=None):
     def _any_path():
         for log_type, paths in entry.get("links", {}).items():
             for path in paths:
@@ -146,30 +146,63 @@ def _replace_logs_with_links(entry, output_dir, work_dir):
     if os.path.exists(work_dir) and os.path.isdir(work_dir):
         search_dir = _build_root()
 
+    if links_map is None:
+        links_map = {}
+
     path_to_link = dict()
     links = set()
+
     for log_type, paths in entry.get("links", {}).items():
-        for path in paths:
-            link_path = path.replace("build-release", search_dir) + '.link'
-            link_tar_path = path.replace("build-release", search_dir) + '.tar.link'
-            link_tar_zstd_path = path.replace("build-release", search_dir) + '.tar.zstd.link'
-            if os.path.exists(link_path) and os.path.isfile(link_path):
-                with open(link_path) as fp:
-                    link = fp.read().strip()
+        read_files = True
+
+        if links_map:
+            for path in paths:
+                link_path = path + '.link'
+                link_tar_path = path + '.tar.link'
+                link_tar_zstd_path = path + '.tar.zstd.link'
+
+                if link := links_map.get(link_path):
                     links.add(link)
                     _fix_links_entry(entry, log_type, path, link)
-                break
-            else:
-                link_filename = None
-                if os.path.exists(link_tar_path) and os.path.isfile(link_tar_path):
-                    link_filename = link_tar_path
-                elif os.path.exists(link_tar_zstd_path) and os.path.isfile(link_tar_zstd_path):
-                    link_filename = link_tar_zstd_path
-                if link_filename:
-                    with open(link_filename) as fp:
-                        link = fp.read().strip()
-                        path_to_link[path] = link
+                    read_files = False
                     break
+
+                link_key = None
+
+                if link_tar_path in links_map:
+                    link_key = link_tar_path
+                elif link_tar_zstd_path in links_map:
+                    link_key = link_tar_zstd_path
+                if link_key:
+                    path_to_link[path] = links_map[link_key]
+                    read_files = False
+                    break
+
+        if read_files:
+            # XXX
+            # Fallback to reading from FS
+            for path in paths:
+                link_path = path.replace("build-release", search_dir) + '.link'
+                link_tar_path = path.replace("build-release", search_dir) + '.tar.link'
+                link_tar_zstd_path = path.replace("build-release", search_dir) + '.tar.zstd.link'
+
+                if os.path.exists(link_path) and os.path.isfile(link_path):
+                    with open(link_path) as fp:
+                        link = fp.read().strip()
+                        links.add(link)
+                        _fix_links_entry(entry, log_type, path, link)
+                    break
+                else:
+                    link_filename = None
+                    if os.path.exists(link_tar_path) and os.path.isfile(link_tar_path):
+                        link_filename = link_tar_path
+                    elif os.path.exists(link_tar_zstd_path) and os.path.isfile(link_tar_zstd_path):
+                        link_filename = link_tar_zstd_path
+                    if link_filename:
+                        with open(link_filename) as fp:
+                            link = fp.read().strip()
+                            path_to_link[path] = link
+                        break
 
     for log_type, paths in entry.get("links", {}).items():
         for path in paths:
@@ -403,6 +436,7 @@ class ReportGenerator(object):
                 self.finish_tests_report_by_size(size)
                 self._tests_by_size[size] = set()
         self.setup_ya_make_progress(style_tests_count, tests_count)
+        self._links_map = {}
 
     def setup_ya_make_progress(self, style_tests_count, tests_count):
         totals_build = defaultdict(int)
@@ -687,6 +721,9 @@ class ReportGenerator(object):
 
         resolver = test_reports.TextTransformer(replacements)
 
+        for k, v in suite.links_map.items():
+            self._links_map[resolver.substitute(k)] = v
+
         if not suite_prototype["is_skipped"]:
             suite.set_work_dir(resolver.substitute(suite.work_dir()))
 
@@ -737,7 +774,7 @@ class ReportGenerator(object):
                 and (entry != suite_prototype or suite_prototype["links"])
                 and not entry_prototype["is_skipped"]
             ):
-                _replace_logs_with_links(entry, self._build_root, suite.work_dir())
+                _replace_logs_with_links(entry, self._build_root, suite.work_dir(), self._links_map)
             if links:
                 if "links" not in entry:
                     entry["links"] = {}

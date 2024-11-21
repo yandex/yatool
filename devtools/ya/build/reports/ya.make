@@ -19,6 +19,7 @@ PEERDIR(
     devtools/ya/test/reports
     devtools/ya/test/result
     devtools/ya/test/test_node
+    devtools/ya/test/test_types
     devtools/ya/test/util
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/platform_matcher

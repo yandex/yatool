@@ -725,6 +725,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                 self.opts.mds_read_account,
                 execution_log,
                 dump_evlog_stat=self.opts.evlog_dump_node_stat,
+                store_links_in_memory=self.opts.store_links_in_memory,
             )
 
         def dispatch_uid(self, uid, *args, **kwargs):
