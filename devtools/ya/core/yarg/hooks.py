@@ -323,3 +323,13 @@ class DictUpdateHook(BaseHook):
             raise NotImplementedError(
                 "Unknown type to update attribute `{}`: {}, expect dict".format(self.name, type(value))
             )
+
+
+class NoValueDummyHook(BaseHook):
+    def __call__(self, to, *args):
+        # type: ("Options", tp.Optional[tp.Any]) -> None
+        pass
+
+    @staticmethod
+    def need_value():
+        return False

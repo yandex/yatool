@@ -18,7 +18,7 @@ from core.yarg import (
     ExtendHook,
     ShowHelpException,
     SetAppendHook,
-    BaseHook,
+    NoValueDummyHook,
 )
 
 import devtools.ya.app
@@ -65,16 +65,6 @@ class ToolYaHandler(CompositeHandler):
                 opts=[ToolOptions(x.name)] + self.common_download_options(),
                 unknown_args_as_free=True,
             )
-
-
-class DummyHook(BaseHook):
-    def __call__(self, to, *args):
-        # type: ("Options", tp.Optional[tp.Any]) -> None
-        pass
-
-    @staticmethod
-    def need_value():
-        return False
 
 
 class ToolOptions(Options):
@@ -145,7 +135,7 @@ class ToolOptions(Options):
                 hook=SetConstValueHook('force_update', True),
             ),
             ArgConsumer(['--force-refetch'], help='Refetch toolchain', hook=SetConstValueHook('force_refetch', True)),
-            ArgConsumer(['--print-fastpath-error'], help='Print fast path failure error', hook=DummyHook()),
+            ArgConsumer(['--print-fastpath-error'], help='Print fast path failure error', hook=NoValueDummyHook()),
             FreeArgConsumer(help='arg', hook=ExtendHook(name='tail_args')),
         ]
 
