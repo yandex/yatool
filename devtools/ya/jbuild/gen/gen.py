@@ -1,13 +1,9 @@
 import os
-import itertools
 import six
 import logging
-import fnmatch
 
 from . import node
 from . import base
-import jbuild.gen.actions.compile as compile
-import jbuild.gen.actions.generate_scripts as generate_scripts
 from .actions import fetch_test_data as fetch_test_data
 from . import makelist_parser2 as mp
 from . import configure
@@ -22,10 +18,6 @@ from six.moves import map
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("jbuild")
-
-
-def with_tests(opts):
-    return opts.run_tests or opts.list_tests or opts.canonize_tests
 
 
 def gen_ctx(
@@ -68,38 +60,7 @@ def gen_ctx(
 
     rsrcs = base.resolve_possible_srcdirs(arc_root, by_path.values())
 
-    if getattr(opts, 'sonar', False):
-        sonar_paths = set()
-
-        for p in rc:
-            assert p in by_path
-
-            if not by_path[p].is_dart_target():
-                continue
-
-            plain = by_path[p].plain
-
-            if (
-                mp.is_java(plain)
-                and not mp.is_jtest(plain)
-                and not mp.is_jtest_for(plain)
-                and consts.JAVA_SRCS in plain
-            ):
-                if opts.sonar_project_filters:
-                    for f in opts.sonar_project_filters:
-                        if fnmatch.fnmatch(p, f):
-                            sonar_paths.add(p)
-                            break
-                elif opts.sonar_default_project_filter:
-                    if not p.startswith('devtools'):
-                        sonar_paths.add(p)
-                else:
-                    sonar_paths.add(p)
-
-        logger.debug('Run sonar analysis for %s module(s): %s', str(len(sonar_paths)), ', '.join(sorted(sonar_paths)))
-
-    else:
-        sonar_paths = set()
+    sonar_paths = set()
 
     target_platform = None
     if target_tc and 'platform_name' in target_tc:
@@ -131,66 +92,16 @@ def iter_path_nodes(path, ctx):
     def fix_io(n):
         node.resolve_ins(ctx.arc_root, n)
         node.resolve_outs(n)
-
         return n
 
     t = ctx.by_path[path]
-    if not t.is_dart_target():
-        yield graph_node.YmakeGrapNodeWrap(path, t.node, t.graph)
-        if t.plain is not None:
-            for nod in fetch_test_data.fetch_test_data(path, t, ctx):
-                yield fix_io(nod)
-        return
-
-    it = [
-        compile.compile(path, t, ctx),
-        generate_scripts.generate_scripts(path, t, ctx),
-        fetch_test_data.fetch_test_data(path, t, ctx),
-    ]
-
-    if ctx.opts.export_to_maven and (consts.JAVA_LIBRARY in t.plain or consts.JAVA_PROGRAM in t.plain):
-        import jbuild.gen.actions.export_to_maven as mvn_export
-
-        it.append(mvn_export.export_to_maven(path, t, ctx))
-
-    if ctx.opts.get_deps and path in ctx.paths:
-        import jbuild.gen.actions.get_deps as get_deps
-
-        it.append(get_deps.get_deps(path, t, ctx))
-
-    if ctx.opts.java_yndexing:
-        import jbuild.gen.actions.codenav_gen as codenav_gen
-
-        it.append(codenav_gen.gen_codenav(path, ctx, ctx.opts.kythe_to_proto_tool))
-
-    outs = set()
-
-    for n in map(fix_io, itertools.chain(*it)):
-        for o in n.outs:
-            outs.add(o)
-
-        yield n
-
-    def iter_fake(type_):
-        p = ctx.by_path[path].output_jar_of_type_path(type_)
-
-        if (p, node.FILE) not in outs and mp.is_java(t.plain):
-            yield fix_io(compile.empty_jar(path, t, ctx, type_))
-
-    for n in iter_fake(consts.CLS):
-        yield n
-
-    for n in iter_fake(consts.SRC):
-        yield n
+    yield graph_node.YmakeGrapNodeWrap(path, t.node, t.graph)
+    if t.plain is not None:
+        for nod in fetch_test_data.fetch_test_data(path, t, ctx):
+            yield fix_io(nod)
 
 
 def iter_nodes(ctx):
-    if ctx.opts.export_to_maven:
-        for p in ctx.by_path:
-            try:
-                fill_test_map(p, ctx)
-            except mp.ParseError as e:
-                raise mp.ParseError('{}: {}'.format(p, str(e)))
     for p in ctx.by_path:
         try:
             for n in iter_path_nodes(p, ctx):
@@ -211,44 +122,6 @@ def iter_nodes(ctx):
         import jbuild.gen.actions.export_to_maven as mvn_export
 
         yield mvn_export.export_root(ctx)
-
-
-def fill_test_map(path, ctx):
-    assert path in ctx.by_path
-    target = ctx.by_path[path]
-
-    if not target.is_dart_target() or (
-        consts.JAVA_TEST not in target.plain
-        and consts.JAVA_TEST_FOR not in target.plain
-        and consts.TESTNG not in target.plain
-        and consts.JUNIT5 not in target.plain
-    ):
-        return
-    parent = None
-    if consts.JAVA_TEST_FOR in target.plain:
-        try:
-            parent = target.plain[consts.JAVA_TEST_FOR][0][0]
-        except IndexError:  # Ymake had to warn, ignore
-            return
-
-        if parent not in ctx.by_path:  # JTEST_FOR for missing module - ymake warns it, ignore
-            return
-
-        if not ctx.by_path[parent].is_dart_target():
-            return
-    else:
-        parent_path = '/'.join(graph_base.hacked_normpath(path).split('/')[:-1])
-        while not parent and parent_path:
-            if parent_path in ctx.by_path and ctx.by_path[parent_path].is_dart_target():
-                for key in (consts.JAVA_PROGRAM, consts.JAVA_LIBRARY):
-                    if key in ctx.by_path[parent_path].plain:
-                        parent = parent_path
-            parent_path = '/'.join(parent_path.split('/')[:-1])
-
-        if not parent:
-            return
-
-    ctx.maven_test_map[parent].add(path)
 
 
 def iter_result(ctx, nodes):
@@ -303,15 +176,6 @@ def default_opts():
     import core.yarg
 
     return core.yarg.merge_opts(jbuild_opts.jbuild_opts()).params()
-
-
-def conf_warning(conf_errs):
-    s = []
-
-    for path, err in six.iteritems(conf_errs):
-        s.extend(path + ': ' + x for x in str(err).split('\n'))
-
-    return '\n'.join(s)
 
 
 def gen(
@@ -400,15 +264,8 @@ def gen(
                     )
 
     if ctx.errs:
-        # s = conf_warning(ctx.errs)
         if not opts.continue_on_fail:
             raise configure.ConfigureError('Configure error (use -k to proceed)')
-
-        # if opts.continue_on_fail:
-        #     logger.error(s)
-        #
-        # else:
-        #     raise configure.ConfigureError(s)
 
     ctx.nodes = nodes
     return task, ctx, ctx.errs
