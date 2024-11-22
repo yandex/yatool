@@ -705,6 +705,11 @@ def populate_contrib_unified(
         if not macro.find_nodes(owner):
             macro.add_value(owner)
 
+        # VERSION
+        artifact = p.get('artifact')
+        version_macro = find_or_create(project, 'VERSION')
+        version_macro.add_value(artifact.version)
+
         # LICENSE
         if write_licenses and p.get('licenses', []):
             license_macro = find_or_create(project, md.LicenseMacro)
