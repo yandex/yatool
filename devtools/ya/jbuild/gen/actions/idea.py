@@ -196,7 +196,7 @@ def idea_results(ctx, nodes):
 
             return
 
-        if target.is_idea_target() and not target.is_dart_target():
+        if target.is_idea_target():
             for peer in target.plain[consts.MANAGED_PEERS_CLOSURE][0]:
                 peer = ctx.by_path[strip_root(peer)]
                 if peer.provides_jar():
@@ -1343,7 +1343,7 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
 
             proj = srcdir.replace(consts.BUILD_ROOT, project_root)
 
-            if target.is_idea_target() and not target.is_dart_target():
+            if target.is_idea_target():
                 funcz.append(funcs.rm(proj))
                 funcz.append(funcs.cp(srcdir.replace(consts.BUILD_ROOT, results_root), proj))
             else:
@@ -1379,7 +1379,7 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         funcz.append(funcs.mkdirp(proj))
 
         dll_deps = ctx.dlls(path)
-        if target.is_idea_target() and not target.is_dart_target():
+        if target.is_idea_target():
             dll_deps = set()
             for peer in target.plain[consts.NON_NAMAGEABLE_PEERS][0]:
                 peer = ctx.by_path.get(strip_root(peer))
@@ -1450,7 +1450,7 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         conts = [Cotent(op.join(ctx.arc_root, path), in_roots)] + [Cotent(r.path, [r]) for r in out_roots]
 
         cp = ctx.classpath(target.path, consts.CLS)
-        if not target.is_dart_target() and target.is_idea_target():
+        if target.is_idea_target():
             cp = [
                 ctx.by_path[strip_root(p)].output_jar_path() for p in target.plain.get('MANAGED_PEERS_CLOSURE', [[]])[0]
             ]
@@ -1751,8 +1751,6 @@ def collect_dlls(ctx, result_nodes, results_root, project_root):
         target = ctx.by_path[n.path]
 
         if target.provides_dll():
-            assert not target.is_dart_target()
-
             for dll in target.output_dll_paths():
                 all_dll_results.add(dll)
 
