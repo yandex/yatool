@@ -27,15 +27,7 @@ def is_proxy_library(path, ctx):
 
 
 def extract_excludes(paths, ctx):
-    excludes = []
-
-    for path in paths:
-        target = ctx.by_path[path]
-
-        if target.is_dart_target():
-            excludes.extend(sum(target.plain.get(consts.EXCLUDE, []), []))
-
-    return sorted(set(excludes))
+    return []
 
 
 def is_excluded(path, exclude):
@@ -93,40 +85,10 @@ class Context(object):
 
     def choose_in_classpath(self, path, accept_target, extract_artifact, direct=False):
         chosen = []
-        checked = set()
 
-        def collect(target):
-            if not is_proxy_library(target.path, self) and accept_target(target):
-                chosen.append(extract_artifact(target))
-
-        def collect_non_java_deps(target):
-            for dep in target.deps:
-                if dep.provides_jar() or dep in checked:
-                    continue
-                checked.add(dep)
-                collect(dep)
-
-        checked.add(path)
         target = self.by_path[path]
-        collect(target)
-        if not target.is_dart_target():
-            return chosen
-
-        # collect direct non java deps
-        collect_non_java_deps(target)
-
-        # collect managed java deps
-        classpath = target.plain[consts.MANAGED_PEERS][0] if direct else target.plain[consts.MANAGED_PEERS_CLOSURE][0]
-        for classpath_dir in classpath:
-            classpath_target = self.by_path[strip_root(classpath_dir)]
-            if classpath_target.path in checked:
-                continue
-            checked.add(classpath_target.path)
-
-            collect(classpath_target)
-            if not direct:
-                collect_non_java_deps(classpath_target)
-
+        if not is_proxy_library(target.path, self) and accept_target(target):
+            chosen.append(extract_artifact(target))
         return chosen
 
     def _filter_classpath(self, classpath, accept_target, extract_artifact):
@@ -253,45 +215,7 @@ def resolve_java_srcs(
 
 
 def resolve_possible_srcdirs(arc_root, targets):
-    from jbuild.gen import node
-    import jbuild.gen.actions.compile as comp
-
-    srcs = collections.defaultdict(lambda: collections.defaultdict(lambda: ([], [], [], [])))
-
-    for t in targets:
-        if not t.is_dart_target():
-            continue
-
-        resolve_kotlin = consts.WITH_KOTLIN in t.plain
-        resolve_groovy = consts.WITH_GROOVY in t.plain
-
-        for words in t.plain.get(consts.JAVA_SRCS, []):
-            is_resource, srcdir, pp, ex, ws, exc = comp.parse_words(words)
-
-            if ex:
-                continue
-
-            if not srcdir:
-                srcdir = base.hacked_path_join(consts.SOURCE_ROOT, t.path)
-
-            res = node.try_resolve_inp(arc_root, t.path, srcdir)
-
-            if base.in_source(res):
-                s, r, k, g = resolve_java_srcs(
-                    res.replace(consts.SOURCE_ROOT, arc_root),
-                    ws,
-                    exclude_patterns=exc,
-                    all_resources=is_resource,
-                    resolve_kotlin=resolve_kotlin,
-                    resolve_groovy=resolve_groovy,
-                )
-
-                srcs[t.path][(res, pp)][0].extend(s)
-                srcs[t.path][(res, pp)][1].extend(r)
-                srcs[t.path][(res, pp)][2].extend(k)
-                srcs[t.path][(res, pp)][3].extend(g)
-
-    return srcs
+    return collections.defaultdict(lambda: collections.defaultdict(lambda: ([], [], [], [])))
 
 
 def resolve_jdk(
