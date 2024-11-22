@@ -50,10 +50,7 @@ def get_artifact_id(jar_path, ctx):
     target = ctx.by_path[dn]
     assert target.provides_jar()
     candidate_name = target.output_jar_name()[:-4]
-    if not target.is_dart_target():
-        return consts.MAVEN_DEFAULT_GROUP, candidate_name
-    else:
-        return target.plain.get(consts.MAVEN_GROUP_ID, [[consts.MAVEN_DEFAULT_GROUP]])[0][0], candidate_name
+    return consts.MAVEN_DEFAULT_GROUP, candidate_name
 
 
 def get_artifact_coords(jar_path, ctx):
@@ -147,106 +144,6 @@ def iter_export_nodes(path, ctx):
     if not from_contrib(path):
         ctx.maven_export_modules_list.add(path)
 
-    if target.is_dart_target():  # Has <plain> field
-        test_paths = ctx.maven_test_map.get(path, set())
-
-        for test_path in test_paths:
-            assert test_path in ctx.by_path and ctx.by_path[test_path].is_dart_target()
-
-        # JAVA_SRCS
-        added_srcs = set()
-        added_test_srcs = set()
-        for src_dir in iter_srcs(path, ctx):
-            if src_dir not in added_srcs:
-                script += ['--source-dirs', src_dir]
-                for test_path in test_paths:
-                    if consts.JAVA_TEST_FOR in ctx.by_path[test_path].plain:
-                        script += ['--test-source-dirs', src_dir]
-                        added_test_srcs.add(src_dir)
-                added_srcs.add(src_dir)
-        for test_path in test_paths:
-            for src_dir in iter_srcs(test_path, ctx):
-                src_dir = graph_base.hacked_normpath(os.path.relpath(os.path.join(test_path, src_dir), path))
-                if src_dir not in added_test_srcs:
-                    script += ['--test-source-dirs', src_dir]
-                    added_test_srcs.add(src_dir)
-            for td in path_test_data(test_path, ctx):
-                if td.startswith('arcadia/'):
-                    script += [
-                        '--test-resource-dirs',
-                        graph_base.hacked_normpath(os.path.relpath(base.relativize(td, ('arcadia',)), path)),
-                    ]
-
-        # PEERDIR & EXCLUDE
-        cp = ctx.classpath(path, direct=ctx.opts.maven_no_recursive_deps)
-        excludes = base.extract_excludes([path], ctx)
-        for x in cp:
-            if x == cls_jar:
-                continue
-            jar_path = graph_base.hacked_normpath(base.relativize(os.path.dirname(x)))
-            g, a, v, c = get_artifact_coords(base.relativize(x), ctx)
-            script += ['--target-dependencies', ':'.join([g, a, v, c])]
-            dep_cp = ctx.classpath(jar_path)
-            exclude_list = []
-            for dep_cls in (graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != jar_path):
-                if ctx.opts.maven_exclude_transitive_deps:
-                    for i in ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls))))[1:]:
-                        candidate = graph_base.hacked_normpath(base.relativize(i))
-                        if candidate not in exclude_list:
-                            exclude_list.append(candidate)
-                else:
-                    for exclude in excludes:
-                        if base.is_excluded(dep_cls, exclude):
-                            exclude_list.append(dep_cls)
-                            continue
-            for i in exclude_list:
-                dg, da, _1, _2 = get_artifact_coords(i, ctx)
-                script[-1] += '::%s:%s' % (dg, da)
-
-        cp_set = frozenset(cp)
-
-        for test_path in test_paths:
-            test_jar_path = ctx.by_path[test_path].output_jar_path()
-            test_cp = ctx.classpath(test_path)
-            exclude_list = []
-            test_excludes = base.extract_excludes([test_path], ctx)
-            for x in test_cp:
-                if x == test_jar_path or x in cp_set:
-                    continue
-                g, a, v, c = get_artifact_coords(base.relativize(x), ctx)
-                script += ['--test-target-dependencies', ':'.join([g, a, v, c])]
-                if ctx.opts.maven_exclude_transitive_deps:
-                    dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
-                    exclude_list = []
-                    for dep_cls in (
-                        graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_path
-                    ):
-                        for i in ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls))))[
-                            1:
-                        ]:
-                            candidate = graph_base.hacked_normpath(base.relativize(i))
-                            if candidate not in exclude_list:
-                                exclude_list.append(candidate)
-                    for exc in exclude_list:
-                        dg, da, _1, _2 = get_artifact_coords(exc, ctx)
-                        script[-1] += '::%s:%s' % (dg, da)
-                dep_cp = ctx.classpath(graph_base.hacked_normpath(base.relativize(os.path.dirname(x))))
-                for dep_cls in (
-                    graph_base.hacked_normpath(base.relativize(_x)) for _x in dep_cp if _x != test_jar_path
-                ):
-                    for exclude in test_excludes:
-                        if base.is_excluded(dep_cls, exclude):
-                            candidate = graph_base.hacked_normpath(base.relativize(os.path.dirname(dep_cls)))
-                            if candidate not in exclude_list:
-                                exclude_list.append(candidate)
-            for exclude in exclude_list:
-                print(ctx.by_path.keys())
-                g, a, v, _ = get_artifact_coords(base.relativize(ctx.by_path[exclude].output_jar_path()), ctx)
-                script += ['--test-target-dependencies-exclude', ':'.join([g, a])]
-
-        if ctx.opts.maven_output:
-            script += ['--output-dir', ctx.opts.maven_output]
-
     ins = [(cls_jar, node.FILE)]
     if ctx.opts.dump_sources and src_jar:
         ins.append((src_jar, node.FILE))
@@ -291,8 +188,7 @@ def iter_export_nodes(path, ctx):
     for dep in ctx.classpath(path):
         dep_target_path = graph_base.hacked_normpath(base.relativize(os.path.dirname(dep)))
         assert dep_target_path in ctx.by_path
-        if not ctx.by_path[dep_target_path].is_dart_target():
-            ext_paths.append(dep_target_path)
+        ext_paths.append(dep_target_path)
 
     if not from_contrib(path) or not pom_exists:
         yield node.JNode(
