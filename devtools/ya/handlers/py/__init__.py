@@ -241,7 +241,17 @@ def _parse_target(target, root):
     except yalibrary.makelists.mk_common.MkLibException:
         logger.warning('Can not get project for: %s', target)
         return None
-    if project.name in ('LIBRARY', 'PROTO_LIBRARY', 'PY2_LIBRARY', 'PY23_LIBRARY', 'PY3_LIBRARY', 'SANDBOX_TASK', 'SANDBOX_PY3_TASK'):
+    if project.name in (
+        'LIBRARY',
+        'PROTO_LIBRARY',
+        'PY2_LIBRARY',
+        'PY23_LIBRARY',
+        'PY3_LIBRARY',
+        'SANDBOX_TASK',
+        'SANDBOX_PY3_TASK',
+        'SANDBOX_PY23_TASK',
+        'SANDBOX_PY23_3_TASK',
+    ):
         return _Target(target, makefile)
     elif project.name in ('PROGRAM', 'PY2_PROGRAM', 'PY3_PROGRAM', 'PY2TEST', 'PY3TEST', 'PY23_TEST'):
         return _Target(target, makefile, program=True)
