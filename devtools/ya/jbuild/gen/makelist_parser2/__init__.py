@@ -256,18 +256,7 @@ def obtain_targets_graph2(dart, cpp_graph):
 
     # Make dependencies
     for path, target in six.iteritems(by_path):
-        if target.is_dart_target():  # Java module from dart
-
-            def add_deps_by_ymake_paths(paths):
-                for ypath in paths:
-                    path = strip_root(ypath)
-                    if path in by_path:  # Otherwise there is no module in <peerdir> path and ymake had to report this
-                        target.deps.append(by_path[path])
-
-            add_deps_by_ymake_paths(target.plain[consts.MANAGED_PEERS][0])
-            add_deps_by_ymake_paths(target.plain[consts.NON_NAMAGEABLE_PEERS][0])
-
-        elif target.provides_jar():  # Java module from ymake graph
+        if target.provides_jar():
             for dep_uid in target.node['deps']:
                 dep_node = cpp_node_by_uid[dep_uid]
 
