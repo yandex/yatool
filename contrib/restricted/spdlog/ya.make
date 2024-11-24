@@ -6,9 +6,9 @@ LICENSE(MIT)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(1.14.1)
+VERSION(1.15.0)
 
-ORIGINAL_SOURCE(https://github.com/gabime/spdlog/archive/v1.14.1.tar.gz)
+ORIGINAL_SOURCE(https://github.com/gabime/spdlog/archive/v1.15.0.tar.gz)
 
 PEERDIR(
     contrib/libs/fmt
