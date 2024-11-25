@@ -2058,7 +2058,7 @@ class YaMake(object):
 
         return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer
 
-    @func.lazy_property
+    @property
     def targets(self):
         return self.distbuild_graph.get_targets()
 

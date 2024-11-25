@@ -169,7 +169,6 @@ class BuildPlan(object):
 class DistbuildGraph(object):
     def __init__(self, graph):
         self._graph = graph
-        self._store = set(self._graph['result'])
         self._projects_by_uids = {}  # TODO
         self._not_add_to_report = set()
 
