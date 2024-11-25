@@ -1,5 +1,7 @@
 JAVA_CONTRIB(junit-platform-engine-1.5.2)
 
+VERSION(1.5.2)
+
 LICENSE(EPL-1.0)
 
 PEERDIR(

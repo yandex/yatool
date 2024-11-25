@@ -1,5 +1,7 @@
 JAVA_CONTRIB(junit-jupiter-engine-5.5.2)
 
+VERSION(5.5.2)
+
 LICENSE(EPL-1.0)
 
 PEERDIR(

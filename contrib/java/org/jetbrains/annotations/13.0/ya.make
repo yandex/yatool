@@ -1,6 +1,8 @@
 
 JAVA_CONTRIB(annotations-13.0)
 
+VERSION(13.0)
+
 LICENSE(Apache-2.0)
 
 JAR_RESOURCE(65627451)
