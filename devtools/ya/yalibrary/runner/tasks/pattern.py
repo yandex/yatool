@@ -118,7 +118,8 @@ class PreparePattern(object):
 
     def status(self):
         res = '[[c:yellow]]PREPARE[[rst]] ' + '[[imp]]$(' + self._pattern + ')[[rst]]'
-        res += ' - %s' % self._progress_info.pretty_progress
+        if self._progress_info.downloaded > 0:
+            res += ' - %s' % self._progress_info.pretty_progress
         return res
 
     def res(self):

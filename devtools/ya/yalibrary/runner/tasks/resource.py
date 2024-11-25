@@ -197,7 +197,8 @@ class PrepareResource(object):
     def status(self):
         display = self.resource_display.get_short_display(color=True)
         res = '[[c:yellow]]RESOURCE[[rst]] [[imp]]$(' + display + '[[imp]])[[rst]]'
-        res += ' - %s' % self._progress_info.pretty_progress
+        if self._progress_info.downloaded > 0:
+            res += ' - %s' % self._progress_info.pretty_progress
         return res
 
     def res(self):
