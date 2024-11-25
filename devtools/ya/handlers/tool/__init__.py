@@ -239,9 +239,11 @@ def do_tool(params):
                     except ValueError as e:
                         logger.error("Failure while setting RLIMIT_STACK ({}, {}), {}".format(new, hard, e))
                         logger.exception("While setting RLIMIT_STACK")
-            arc_root = core.config.find_root(fail_on_error=False)
-            if arc_root is not None:
-                logger.debug('Arcadia root found: %s', arc_root)
+            arc_root = os.environ.get('YA_TOOL_GDB_ARCADIA_ROOT', None)
+            if arc_root is None:
+                arc_root = core.config.find_root(fail_on_error=False)
+            if arc_root:
+                logger.debug('Arcadia root: [%s]', arc_root)
                 extra_args = ['-ex', 'set substitute-path /-S/ {}/'.format(arc_root)] + extra_args
                 extra_args = ['-ex', 'set filename-display absolute'] + extra_args
         if (

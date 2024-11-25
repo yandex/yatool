@@ -10,6 +10,8 @@
 #include <util/string/join.h>
 
 #ifndef _win_
+    #include <util/system/env.h>
+
     #include <sys/resource.h>
 #endif
 
@@ -75,7 +77,8 @@ namespace NYa::NTool {
                 limits.rlim_cur = newLimit;
             }
             setrlimit(RLIMIT_STACK, &limits);
-            if (const auto& root = config.ArcadiaRoot()) {
+            const auto arcadia_root = TryGetEnv("YA_TOOL_GDB_ARCADIA_ROOT");
+            if (const auto& root = arcadia_root ? TFsPath(*arcadia_root) : config.ArcadiaRoot()) {
                 toolOptions.insert(toolOptions.begin(), {"-ex", "set substitute-path /-S/ " + root.GetPath() + "/"});
                 toolOptions.insert(toolOptions.begin(), {"-ex", "set filename-display absolute"});
             }
