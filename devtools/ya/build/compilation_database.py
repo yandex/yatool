@@ -199,6 +199,13 @@ def gen_compilation_database(params, app_ctx):
         if len(files) != 1:
             return
 
+        # Remove args related to python wrapper
+        WRAPCC_ARGS_END = '--wrapcc-end'
+        for i, arg in enumerate(cmd_args):
+            if arg == WRAPCC_ARGS_END:
+                cmd_args = cmd_args[i + 1 :]
+                break
+
         cmd_args[0] = os.path.basename(cmd_args[0])
         _log_compiler(app_ctx, compilers, cmd_args[0])
         cmd_args = [_fix_macros(x, **patterns) for x in cmd_args]
