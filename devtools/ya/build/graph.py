@@ -901,12 +901,6 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
         if opts.replace_result:
             graph = strip_graph(graph)
 
-    if opts.download_artifacts and 'result' in graph:
-        graph_result = set(graph['result'])
-        for node in graph['graph']:
-            if node.get('uid') in graph_result:
-                node['backup'] = True
-
 
 def _load_stat(graph_stat_path):
     load_graph_stat_stage = stager.start("load_graph_stat")
@@ -2258,15 +2252,17 @@ def _build_graph_and_tests(
 
     graph['conf']['resources'].append(vcs_info())
 
-    graph['conf'] |= {
-        'keepon': opts.continue_on_fail,
-        'cache': not opts.clear_build,
-        'platform': host_platform.lower(),
-        'graph_size': len(graph['graph']),
-        'execution_cost': {'cpu': 0, 'evaluation_errors': 0},
-        'min_reqs_errors': 0,
-        'backup_only_requested': True,
-    }
+    graph['conf']['keepon'] = opts.continue_on_fail
+
+    graph['conf']['cache'] = not opts.clear_build
+    # hell, yeah
+    graph['conf']['platform'] = host_platform.lower()
+
+    graph['conf']['graph_size'] = len(graph['graph'])
+
+    graph['conf']['execution_cost'] = {'cpu': 0, 'evaluation_errors': 0}
+
+    graph['conf']['min_reqs_errors'] = 0
 
     if 0:
         graph['graph'] = list(_split_gcc(graph['graph']))

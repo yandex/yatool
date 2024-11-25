@@ -30,7 +30,6 @@ class GraphConfSection(TypedDict):
     min_reqs_errors: int
     platform: str
     resources: list[GraphConfResourceInfo]
-    backup_only_requested: NotRequired[bool]
 
 
 GraphNodeUid = NewType('GraphNodeUid', str)
@@ -62,7 +61,6 @@ GraphNode = TypedDict(
         'cache': bool,
         'type': int,
         'target_properties': NotRequired[GraphNodeTargetProperties],
-        'backup': NotRequired[bool],
     },
 )
 

@@ -378,6 +378,7 @@ def create_test_node(
     split_file=None,
 ):
     inline_diff = getattr(opts, 'inline_diff', False)
+    backup = getattr(opts, 'backup_test_results', False)
 
     work_dir = test_common.get_test_suite_work_dir(
         '$(BUILD_ROOT)',
@@ -891,6 +892,7 @@ def create_test_node(
         uid = suite.uid
 
     node = {
+        "backup": backup,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
@@ -1151,6 +1153,7 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
     env['TEST_NODE_SUITE_UID'] = str(suite.uid)
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST,
+        "backup": False,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
@@ -1320,7 +1323,7 @@ def intermediate_test_nodes(test_nodes):
         node['tared_outputs'] = []
 
 
-def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None):
+def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, backup=False):
     test_uids = [node["uid"] for node in test_nodes]
     if retry is not None:
         uid = suite.uid + "-run{}".format(retry)
@@ -1488,6 +1491,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None):
             "module_lang": suite.meta.module_lang,
         },
         "cache": _should_cache_suite(suite, opts),
+        "backup": backup,
         "broadcast": False,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
@@ -1526,7 +1530,7 @@ def get_merger_root_path(suites):
     return os.path.join(suites[0].project_path, "tests_merger")
 
 
-def create_merge_test_runs_node(graph, test_nodes, suite, opts):
+def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
     test_uids = [node["uid"] for node in test_nodes]
     uid = suite.uid
     out_dir = suite.work_dir()
@@ -1592,8 +1596,8 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts):
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
+        "backup": backup,
         "broadcast": False,
-        "backup": True,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -1641,9 +1645,8 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
             opts=opts,
             retry=retry,
         )
-        add_to_result = tests_retries < 2
-        node['backup'] = add_to_result
-        graph.append_node(node, add_to_result=add_to_result)
+
+        graph.append_node(node, add_to_result=(tests_retries < 2))
         test_nodes.append(node)
     return test_nodes
 
@@ -1684,13 +1687,11 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
 
         for test_node in test_nodes:
             graph.append_node(test_node, add_to_result=False)
-        acc_node = create_results_accumulator_node(test_nodes, suite, graph, retry, opts=opts)
-
-        add_to_result = tests_retries < 2
-        acc_node["backup"] = add_to_result
-
+        acc_node = create_results_accumulator_node(
+            test_nodes, suite, graph, retry, opts=opts, backup=getattr(opts, 'backup_test_results', False)
+        )
         acc_nodes.append(acc_node)
-        graph.append_node(acc_node, add_to_result=add_to_result)
+        graph.append_node(acc_node, add_to_result=(tests_retries < 2))
 
     return acc_nodes
 
@@ -1818,7 +1819,8 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
 
         assert test_nodes
         if len(test_nodes) > 1:
-            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts)
+            backup = opts is not None and getattr(opts, 'backup_test_results', False)
+            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts, backup)
         else:
             suite_run_node = test_nodes[0]
 
