@@ -1,7 +1,9 @@
 import errno
 import json
-import os
 import logging
+import os
+import pathlib
+import stat
 import subprocess
 import sys
 import threading
@@ -148,9 +150,59 @@ class BuildRoot(object):
         self._original_outputs.append(new_output)
 
     def validate(self):
+        outset = None
+        brpath = None
+
         for x in self.output:
-            if not os.path.exists(x):
-                raise BuildRootIntegrityError('Cannot find {} in build root'.format(x))
+            # XXX will be removed soon
+            try:
+                import app_ctx
+
+                strict_checks = getattr(app_ctx.params, 'strict_output_checks', False)
+            except (ImportError, AttributeError):
+                strict_checks = True
+
+            if strict_checks:
+                try:
+                    lst = os.lstat(x)
+                except FileNotFoundError as e:
+                    raise BuildRootIntegrityError(f'Cannot find {x} in build root') from e
+
+                if stat.S_ISLNK(lst.st_mode):
+                    brpath = brpath or pathlib.Path(self.path)
+                    xpath = pathlib.Path(x)
+                    lpath = xpath.readlink()
+
+                    if lpath.is_absolute():
+                        # We can't cache such symlink output in the dist and local caches
+                        # because the caching subsystem does not control the life cycle of the linkpath file.
+                        # Even if symlink points to a file inside the buildroot,
+                        # since the buildroot is an ephemeral entity that can be disposed of at any time.
+                        raise BuildRootIntegrityError(
+                            f'{x} (linkpath: {lpath}) is a symlink with an absolute path, which is why it cannot be cached correctly'
+                        )
+                    elif not xpath.resolve().is_relative_to(brpath.resolve()):
+                        raise BuildRootIntegrityError(
+                            f'{x} (real: {xpath.resolve()} linkpath: {lpath}) is a symlink output which points to a file outside the buildroot {self.path} (real: {brpath.resolve()})'
+                        )
+                    else:
+                        # lazy init - realpath is quite an expensive operation
+                        outset = outset or set(os.path.realpath(o) for o in self.output if o != x)
+
+                        if str(xpath.resolve()) in outset:
+                            # This particular symlink is valid because it's
+                            # relative and poining to a file that is part of the node's output
+                            pass
+                        else:
+                            raise BuildRootIntegrityError(
+                                f'{x} (real: {xpath.resolve()} linkpath: {lpath}) is a symlink output pointing to a file that is not part of the output: {outset}'
+                            )
+                elif not stat.S_ISREG(lst.st_mode):
+                    raise BuildRootIntegrityError(f'Invalid file type {x} ({lst.st_mode:o}) in build root')
+            # XXX will be removed soon
+            else:
+                if not os.path.exists(x):
+                    raise BuildRootIntegrityError('Cannot find {} in build root'.format(x))
 
         if self._validate_content:
             if self._compute_hash and os.path.exists(self._output_digests_file()):
