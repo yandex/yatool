@@ -191,7 +191,7 @@ class BuildRoot(object):
 
                         if str(xpath.resolve()) in outset:
                             # This particular symlink is valid because it's
-                            # relative and poining to a file that is part of the node's output
+                            # relative and pointing to a file that is part of the node's output
                             pass
                         else:
                             raise BuildRootIntegrityError(
