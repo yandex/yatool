@@ -304,6 +304,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "local_executor",
         "new_store",
         "new_store_ttl",
+        "output_style",
         "pytest_args",
         "release_version",
         "strip_cache",
@@ -338,6 +339,13 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
+
+    build_options.bazel_remote_store = params.bazel_remote_store
+    build_options.bazel_remote_baseuri = params.bazel_remote_baseuri
+    build_options.bazel_remote_username = params.bazel_remote_username
+    build_options.bazel_remote_password = params.bazel_remote_password
+    build_options.bazel_remote_password_file = params.bazel_remote_password_file
+    build_options.bazel_remote_readonly = params.bazel_remote_readonly
 
     build_options.oauth_token = params.oauth_token
     if app_config.in_house:
