@@ -1,0 +1,39 @@
+#!/usr/bin/env sh
+
+cd $source_root
+
+./ya make \
+    -DUSE_ICONV=static \
+    --host-platform-flag=USE_ICONV=static \
+    --musl --host-platform-flag=MUSL \
+    --host-platform-flag=USE_PREBUILT_TOOLS=no -DUSE_PREBUILT_TOOLS=no \
+    --host-platform-flag=OPENSOURCE=yes -DOPENSOURCE=yes \
+    --host-platform-flag=OPENSOURCE_PROJECT="ya" -DOPENSOURCE_PROJECT="ya" \
+    -DDISABLE_YMAKE_CONF_CUSTOMIZATION=yes \
+    --host-platform-flag=DISABLE_YMAKE_CONF_CUSTOMIZATION=yes \
+    -DOS_SDK=local --host-platform-flag=OS_SDK=local \
+    -DBUILD_PYTHON3_BIN=python3 \
+    -DBUILD_PYTHON_BIN=python3 \
+    -DUSE_SYSTEM_JDK=/usr \
+    -DYA_OPENSOURCE=yes \
+    -DYMAKE_EXCLUDE_IDL_TOOL=yes \
+    -DHAVE_CUDA=no \
+    -DEMBED_SBOM=no \
+    --host-platform-flag=EMBED_SBOM=no \
+    --host-platform-flag=USE_PREBUILT_TOOLS=no \
+    -DUSE_PREBUILT_TOOLS=no \
+    --sandboxing \
+    --host-platform-flag=HAVE_CUDA=no \
+    --no-ya-bin-resource \
+    --cxx-compiler clang++ \
+    --c-compiler clang \
+    --ymake-bin $(ya tool ymake --print-path) \
+    --no-yt-store \
+    -G -j 0 \
+    devtools/ymake/bin \
+    devtools/ya/bin \
+    | sed \
+    -e 's|"/.*python|"python|' \
+    -e 's|"/.*clang|"clang|' \
+    -e 's|-B.*/usr/bin|-DXXXX|' \
+    -e 's|/usr/bin/java|java|'
