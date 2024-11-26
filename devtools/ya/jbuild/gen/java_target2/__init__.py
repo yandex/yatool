@@ -87,11 +87,8 @@ class Target(object):
         return None
 
     # Common
-    def is_dart_target(self):
-        return False
-
     def is_idea_target(self):
-        return self.is_dart_target()
+        return False
 
     def provides_jar_of_type(self, type):
         if type == consts.CLS:
@@ -253,9 +250,6 @@ class YmakeGraphTarget(Target):  # TODO: memoize
 
     def provides_aar(self):
         return self.output_aar_name() is not None
-
-    def is_dart_target(self):
-        return False
 
     def is_idea_target(self):
         return self.plain is not None
