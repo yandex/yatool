@@ -67,7 +67,9 @@ class ArcPrefetchSubscriber(
 
         if prefetch_subscriber._arc_root != arc_root:
             logger.warning(
-                "Arc root mismatch at subscriber creation. Requested: %s, Actual: %s", arc_root, prefetch_subscriber._arc_root
+                "Arc root mismatch at subscriber creation. Requested: %s, Actual: %s",
+                arc_root,
+                prefetch_subscriber._arc_root,
             )
 
         return prefetch_subscriber
@@ -146,7 +148,9 @@ class ArcStreamingPrefetcher:
             cwd=self._arc_root,
             **({'text': True} if six.PY3 else {})
         )
-        logger.debug('arc prefetch-files started with pid %d, cmd: %s, cwd: %s', self._arc_process.pid, cmd, self._arc_root)
+        logger.debug(
+            'arc prefetch-files started with pid %d, cmd: %s, cwd: %s', self._arc_process.pid, cmd, self._arc_root
+        )
 
         logger.debug('Starting writer and reader threads')
         self._writer_thread = exts.asyncthread.asyncthread(self._run_write_loop)

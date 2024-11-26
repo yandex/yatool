@@ -86,7 +86,9 @@ def do_ya_make(params):
         builder = context.builder
     elif params.custom_context:
         with udopen(params.custom_context, 'rb') as custom_context_file:
-            custom_context_json = sjson.load(custom_context_file, intern_keys=True, intern_vals=True)
+            custom_context_json = sjson.load(
+                custom_context_file, intern_keys=True, intern_vals=True, root_key_black_list=['lite_graph']
+            )
         if params.dist_priority:
             custom_context_json['graph']['conf']['priority'] = params.dist_priority
         if params.distbuild_cluster:
@@ -96,9 +98,7 @@ def do_ya_make(params):
         if params.distbuild_pool:
             custom_context_json['graph']['conf']['pool'] = params.distbuild_pool
         if params.cache_namespace:
-            for graph_section in ('graph', 'lite_graph'):
-                if graph_section in custom_context_json:
-                    custom_context_json[graph_section]['conf']['namespace'] = params.cache_namespace
+            custom_context_json['graph']['conf']['namespace'] = params.cache_namespace
         context = ya_make.BuildContext.load(params, app_ctx, custom_context_json)
         builder = context.builder
     else:
@@ -116,11 +116,15 @@ def do_ya_make(params):
                 context = context or ya_make.BuildContext(builder)
                 _dump_results(builder, context.owners)
     else:
+        import build.graph as lg
+
         stager.start('save_context')
         with stager.scope('create_build_context'):
             context = context or ya_make.BuildContext(builder)
 
         context_json = context.save()
+        # TODO Remove in step 3 of YA-2271
+        context_json['lite_graph'] = lg.build_lite_graph(context_json['graph'])
         graph_json = context_json.pop('graph')
 
         with ucopen(params.save_context_to, mode="wb") as context_file:

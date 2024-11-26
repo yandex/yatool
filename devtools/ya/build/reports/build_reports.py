@@ -1,7 +1,6 @@
 import collections
 import os
 import logging
-import devtools.ya.test.reports.report_prototype as rp
 import devtools.ya.test.util.shared as util_shared
 import devtools.ya.test.reports.console as rc
 import devtools.ya.test.test_node as test_node
@@ -25,15 +24,6 @@ def fill_suites_results(builder, suites, output_root):
     devtools.ya.test.result.fill_suites_results(suites, builder, output_root, resolver)
 
     return suites
-
-
-def get_report_prototype_map(builder, build_root):
-    merger_map = collections.defaultdict(list)
-    for merger in builder.ctx.mergers:
-        if merger.uid in builder.build_result.ok_nodes:
-            merger_path = merger.result_path(build_root)
-            merger_map.update(rp.load_prototype_map_from_file(merger_path))
-    return merger_map
 
 
 def generate_results_report(builder):

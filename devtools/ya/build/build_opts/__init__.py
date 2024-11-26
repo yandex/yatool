@@ -3330,7 +3330,6 @@ def distbs_options(use_distbuild=False):
         class DistbsOptions(Options):
             def __init__(self):
                 self.use_distbuild = False
-                self.use_lite_graph = False
                 self.json_prefix = None
                 self.share_results = False
                 self.graph_stat_path = None

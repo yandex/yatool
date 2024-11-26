@@ -28,7 +28,7 @@ if tp.TYPE_CHECKING:
 class BuildResultsListener(object):
     _logger = logging.getLogger('BuildResultsListener')
 
-    def __init__(self, graph, tests, mergers, report_generator, build_root, opts):
+    def __init__(self, graph, tests, report_generator, build_root, opts):
         self._lock = threading.Lock()
         self._build_metrics = st.make_targets_metrics(graph['graph'], {})
         self._report_generator = report_generator
@@ -38,7 +38,6 @@ class BuildResultsListener(object):
         self._reversed_deps = MultiDict()
         self._nodes = {}
         self._tests = {}
-        self._mergers = {}
         self._opts = opts
 
         for node in graph['graph']:
@@ -47,8 +46,6 @@ class BuildResultsListener(object):
                 self._reversed_deps.add(dep, node['uid'])
         for tst in tests:
             self._tests[tst.uid] = tst
-        for merger in mergers:
-            self._mergers[merger.uid] = merger
 
     def __call__(self, res=None, build_stage=None):
         if res is None:

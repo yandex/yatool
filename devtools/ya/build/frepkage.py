@@ -28,7 +28,6 @@ def create_frepkage(build_context, graph, arc_root):
         build_context.update(
             {
                 'graph': graph,
-                'lite_graph': bgraph.build_lite_graph(graph),
                 # Strip irrelevant tests
                 'tests': {uid: data for uid, data in six.iteritems(build_context['tests']) if uid in result_uids},
             }

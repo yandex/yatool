@@ -42,7 +42,6 @@ import exts.timer
 import exts.tmp
 import exts.windows
 import exts.yjson as json
-import devtools.ya.test.common as test_common
 import devtools.ya.test.util.tools as test_tools
 from build import build_facade, frepkage, test_results_console_printer
 from build.evlog.progress import (
@@ -499,9 +498,12 @@ class CacheFactory(object):
         return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0)
 
 
-def make_dist_cache(dist_cache_future, opts, self_uids, uids, heater_mode):
-    if not uids:
+def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
+    if not graph_nodes:
         return None
+
+    self_uids = [node.get('self_uid') or node['uid'] for node in graph_nodes]
+    uids = [node['uid'] for node in graph_nodes]
 
     try:
         logger.debug("Waiting for dist cache setup")
@@ -663,7 +665,6 @@ class BuildContext(object):
             ],
             configure_errors=data['configure_errors'],
             make_files=data['make_files'],
-            lite_graph=data['lite_graph'],
         )
         return BuildContext(builder, owners=data['owners'])
 
@@ -683,7 +684,6 @@ class BuildContext(object):
             'make_files': ctx.make_files,
             'owners': self.owners,
             'graph': ctx.graph,
-            'lite_graph': ctx.lite_graph,
         }
 
 
@@ -817,7 +817,6 @@ class Context(object):
         stripped_tests=None,
         configure_errors=None,
         make_files=None,
-        lite_graph=None,
     ):
         self._timer = timer = exts.timer.Timer('context_creation')
         context_creation_stage = stager.start('context_creation')
@@ -876,8 +875,7 @@ class Context(object):
 
         self.ymake_stats = YmakeTimeStatistic()
         self.configure_errors = {}
-        self.lite_graph = None
-        if (graph is not None or opts.use_lite_graph) and tests is not None:
+        if graph is not None and tests is not None:
             self.graph = graph
             self.tests = tests
             self.stripped_tests = []
@@ -907,18 +905,11 @@ class Context(object):
 
         self._populate_graph_fields()
 
-        nodes_map = {}
-        for node in self.graph['graph'] if self.graph is not None else lite_graph['graph']:
-            nodes_map[node['uid']] = node
-
-        self_uids = [node.get('self_uid', uid) for uid, node in nodes_map.items()]
-        uids = nodes_map.keys()
-
         print_status("Configuring local and dist store caches")
 
         with stager.scope('configure-dist-store-cache'):
             self.dist_cache = make_dist_cache(
-                dist_cache_future, self.opts, self_uids, uids, heater_mode=not self.opts.yt_store_wt
+                dist_cache_future, self.opts, self.graph['graph'], heater_mode=not self.opts.yt_store_wt
             )
         with stager.scope('configure-local-cache'):
             self.cache = self._cache_factory.get_local_cache_instance(self.garbage_dir)
@@ -936,9 +927,7 @@ class Context(object):
             results = set(self.graph['result'])
             self.tests = [x for x in self.tests if x.uid in results]
         # XXX see YA-1354
-        elif (
-            not opts.use_lite_graph and (opts.yt_replace_result or opts.dist_cache_evict_cached) and not opts.add_result
-        ):
+        elif (opts.yt_replace_result or opts.dist_cache_evict_cached) and not opts.add_result:
             new_results, cached_results = replace_yt_results(self.graph, opts, self.dist_cache)
             self.graph['result'] = new_results
             logger.debug("Strip graph due yt_replace_result mode")
@@ -1028,6 +1017,7 @@ class Context(object):
 
             # Replace ya:force_sandbox tagged result test nodes with sandbox_run_test node
             test_map = {x.uid: x for x in self.tests}
+            nodes_map = {node['uid']: node for node in self.graph['graph']}
             for uid in sandbox_run_test_uids:
                 node = nodes_map[uid]
                 new_node = test_node.create_sandbox_run_test_node(
@@ -1048,30 +1038,20 @@ class Context(object):
 
         # We assume that graph won't be modified after this point. Lite graph should be same as full one -- but lite!
 
-        if lite_graph is not None:
-            self.lite_graph = lite_graph
-        else:
-            self.lite_graph = lg.build_lite_graph(self.graph)
+        if app_config.in_house:
+            import yalibrary.diagnostics as diag
 
-        self.mergers = [
-            test_common.TestsMerger(n) for n in self.lite_graph['graph'] if node.get('node-type', '') == 'merger'
-        ]
+            if diag.is_active():
+                diag.save('ya-make-full-graph', graph=json.dumps(self.graph, sort_keys=True, indent=4, default=str))
+                timer.show_step("full graph is dumped")
 
-        if not opts.use_lite_graph:
-            if app_config.in_house:
-                import yalibrary.diagnostics as diag
+        if opts.show_command:
+            self.threads = 0
 
-                if diag.is_active():
-                    diag.save('ya-make-full-graph', graph=json.dumps(self.graph, sort_keys=True, indent=4, default=str))
-                    timer.show_step("full graph is dumped")
-
-            if opts.show_command:
-                self.threads = 0
-
-                for flt in self.opts.show_command:
-                    for node, full_match in lg.filter_nodes_by_output(self.graph, flt, warn=True):
-                        print(json.dumps(node, sort_keys=True, indent=4, separators=(',', ': ')))
-                timer.show_step("show_command finished")
+            for flt in self.opts.show_command:
+                for node, full_match in lg.filter_nodes_by_output(self.graph, flt, warn=True):
+                    print(json.dumps(node, sort_keys=True, indent=4, separators=(',', ': ')))
+            timer.show_step("show_command finished")
 
         self._dump_graph_if_needed()
 
@@ -1228,17 +1208,12 @@ class Context(object):
         if not self.opts.dump_graph:
             return
 
-        graph_to_dump = self.graph
-        if self.opts.use_lite_graph:
-            graph_to_dump = self.lite_graph
-            logger.warning("Full graph is not downloaded with option -use-lite-graph, dumping lite graph.")
-
         if self.opts.dump_graph_file:
             with open(self.opts.dump_graph_file, 'w') as gf:
-                json.dump(graph_to_dump, gf, sort_keys=True, indent=4, default=str)
+                json.dump(self.graph, gf, sort_keys=True, indent=4, default=str)
         else:
             stdout = self.opts.stdout or sys.stdout
-            json.dump(graph_to_dump, stdout, sort_keys=True, indent=4, default=str)
+            json.dump(self.graph, stdout, sort_keys=True, indent=4, default=str)
             stdout.flush()
 
         self._timer.show_step("dump_graph finished")
@@ -1304,7 +1279,6 @@ class YaMake(object):
         stripped_tests=None,
         configure_errors=None,
         make_files=None,
-        lite_graph=None,
     ):
         self.opts = opts
         if getattr(opts, 'pgo_user_path', None):
@@ -1326,7 +1300,6 @@ class YaMake(object):
             stripped_tests=stripped_tests,
             configure_errors=configure_errors,
             make_files=make_files,
-            lite_graph=lite_graph,
         )
         self._post_clean_setup(opts)
         self.build_result = br.BuildResult({}, {}, {})
@@ -1427,15 +1400,15 @@ class YaMake(object):
 
         if hasattr(self.ctx.cache, 'compact'):
             if threads == 0:
-                for node in self.ctx.lite_graph.get('graph', []):
+                for node in self.ctx.graph.get('graph', []):
                     self.ctx.cache.has(node['uid'])  # touch uid
 
                 self.ctx.cache.compact(
                     getattr(self.ctx.opts, 'new_store_ttl'), getattr(self.ctx.opts, 'cache_size'), self.app_ctx.state
                 )
         else:
-            nodes = [node['uid'] for node in self.ctx.lite_graph.get('graph', [])]
-            self.ctx.cache.strip(lambda info: info.uid in nodes)
+            node_uids = {node['uid'] for node in self.ctx.graph.get('graph', [])}
+            self.ctx.cache.strip(lambda info: info.uid in node_uids)
 
         tc_force_gc(getattr(self.ctx.opts, 'cache_size'))
 
@@ -1511,7 +1484,7 @@ class YaMake(object):
         test_results_path = self._get_results_root()
         test_node_listener = pr.TestNodeListener(self.ctx.tests, test_results_path, None)
         if not self.opts.remove_result_node:
-            self._build_results_listener.add(pr.TestResultsListener(self.ctx.lite_graph, self.app_ctx.display))
+            self._build_results_listener.add(pr.TestResultsListener(self.ctx.graph, self.app_ctx.display))
 
         if self.opts.dump_failed_node_info_to_evlog:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
@@ -1589,9 +1562,8 @@ class YaMake(object):
         self._build_results_listener.add(test_node_listener)
         self._build_results_listener.add(
             pr.BuildResultsListener(
-                self.ctx.lite_graph,
+                self.ctx.graph,
                 tests,
-                self.ctx.mergers,
                 self._reports_generator,
                 test_results_path,
                 self.opts,
@@ -1747,8 +1719,8 @@ class YaMake(object):
                     failed_deps,
                     node_build_errors,
                     node_build_errors_links,
-                ) = br.make_build_errors_by_project(self.ctx.lite_graph['graph'], err, err_links or {})
-                build_metrics = st.make_targets_metrics(self.ctx.lite_graph['graph'], tasks_metrics)
+                ) = br.make_build_errors_by_project(self.ctx.graph['graph'], err, err_links or {})
+                build_metrics = st.make_targets_metrics(self.ctx.graph['graph'], tasks_metrics)
                 self.build_result = br.BuildResult(
                     errors,
                     failed_deps,
@@ -1786,7 +1758,7 @@ class YaMake(object):
                 self.ctx.symlink_result.commit()
 
             if self.ctx.opts.get_deps and self.exit_code == 0:
-                get_deps(self.ctx.opts.rel_targets, self.ctx.lite_graph, self.build_result, self.ctx.opts.get_deps)
+                get_deps(self.ctx.opts.rel_targets, self.ctx.graph, self.build_result, self.ctx.opts.get_deps)
 
             if self.opts.dump_raw_results and self.opts.output_root:
                 self._dump_raw_build_results(self.opts.output_root)
@@ -1859,7 +1831,7 @@ class YaMake(object):
             )
 
         def upload_resources_to_sandbox():
-            for resource in self.ctx.lite_graph.get('conf', {}).get('resources', []):
+            for resource in self.ctx.graph.get('conf', {}).get('resources', []):
                 if resource.get('resource', '').startswith("file:"):
                     import yalibrary.upload.uploader as uploader
 
@@ -1873,26 +1845,24 @@ class YaMake(object):
             import devtools.ya.build.source_package as sp
 
             self.app_ctx.display.emit_status('Start to pack and upload inputs package')
-            inputs_map = self.ctx.lite_graph['inputs']
-            for node in self.ctx.lite_graph['graph']:
+            inputs_map = self.ctx.graph['inputs']
+            for node in self.ctx.graph['graph']:
                 node_inputs = dict((i, None) for i in node['inputs'])
                 inputs_map = lg.union_inputs(inputs_map, node_inputs)
             repository_package = sp.pack_and_upload(self.opts, inputs_map, self.opts.arc_root)
-            graph = self.ctx.lite_graph if self.ctx.opts.use_lite_graph else self.ctx.graph
-            graph['conf']['repos'] = gp.make_tared_repositories_config(repository_package)
+            self.ctx.graph['conf']['repos'] = gp.make_tared_repositories_config(repository_package)
 
         def run_db():
             ready = None
             try:
                 upload_resources_to_sandbox()
-                graph = self.ctx.lite_graph if self.ctx.opts.use_lite_graph else self.ctx.graph
 
                 if self.opts.repository_type == distbs_consts.DistbuildRepoType.TARED:
                     upload_repository_package()
 
                 if self.opts.dump_distbuild_graph:
                     with zcopen(self.opts.dump_distbuild_graph) as graph_file:
-                        sjson.dump(graph, graph_file)
+                        sjson.dump(self.ctx.graph, graph_file)
 
                 def activate_callback(res=None, build_stage=None):
                     try:
@@ -1916,7 +1886,7 @@ class YaMake(object):
                 if ready:
                     logger.debug("Starting distbuild")
                     res = distbs.run_dist_build(
-                        graph,
+                        self.ctx.graph,
                         self.ctx.opts,
                         display,
                         activate_callback,
@@ -2040,7 +2010,7 @@ class YaMake(object):
         def result_analyzer():
             return bs.analyze_local_result(
                 execution_log,
-                self.ctx.lite_graph,
+                self.ctx.graph,
                 self.opts.statistics_out_dir,
                 self.opts,
                 set(errors.keys()),
@@ -2064,7 +2034,7 @@ class YaMake(object):
 
     @func.lazy_property
     def distbuild_graph(self):
-        return bp.DistbuildGraph(self.ctx.lite_graph)
+        return bp.DistbuildGraph(self.ctx.graph)
 
     def _dump_raw_build_results(self, dest):
         try:
