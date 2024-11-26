@@ -196,15 +196,15 @@ namespace {
 }
 
 /// Parse toml and load step by step it (after validation) to targetReplacements
-void LoadTargetReplacements(const fs::path& path, TTargetReplacements& targetReplacements) {
-    auto ifstream = GetInputStream(path);
-    LoadTargetReplacements(ifstream, path, targetReplacements);
+void LoadTargetReplacements(const fs::path& yexportTomlPath, TTargetReplacements& targetReplacements) {
+    auto ifstream = GetInputStream(yexportTomlPath);
+    LoadTargetReplacements(ifstream, yexportTomlPath, targetReplacements);
 }
 
 /// Parse toml and load step by step it (after validation) to targetReplacements
-void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetReplacements& targetReplacements) {
+void LoadTargetReplacements(std::istream& input, const fs::path& yexportTomlPath, TTargetReplacements& targetReplacements) {
     try {
-        const auto doc = toml::parse(input, path.string());
+        const auto doc = toml::parse(input, yexportTomlPath.string());
         const auto& value = toml::get<toml::array>(find_or<toml::value>(doc, NKeys::TargetReplacements, toml::array{}));
         for (const auto& item : value) {
             auto spec = ParseTargetReplacementSpec(item, NKeys::TargetReplacements);
@@ -227,16 +227,16 @@ void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetRe
     }
 }
 
-TYexportSpec ReadYexportSpec(const std::filesystem::path& path) {
-    std::ifstream input{path};
+TYexportSpec ReadYexportSpec(const std::filesystem::path& yexportTomlPath) {
+    std::ifstream input{yexportTomlPath};
     if (!input)
-        throw std::system_error{errno, std::system_category(), "failed to open " + path.string()};
-    return ReadYexportSpec(input, path);
+        throw std::system_error{errno, std::system_category(), "failed to open " + yexportTomlPath.string()};
+    return ReadYexportSpec(input, yexportTomlPath);
 }
 
-TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& path) {
+TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& yexportTomlPath) {
     try {
-        const auto doc = toml::parse(input, path.string());
+        const auto doc = toml::parse(input, yexportTomlPath.string());
         TYexportSpec spec;
         const auto& addattrsSection = find_or<toml::value>(doc, YEXPORT_ADD_ATTRS, toml::table{});
         if (!addattrsSection.is_table()) {
@@ -262,11 +262,11 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& p
     }
 }
 
-std::optional<std::string> GetDefaultGenerator(const fs::path& path) {
-    auto spath = path.string();
-    if (fs::exists(path)) {
+std::string GetDefaultGenerator(const fs::path& yexportTomlPath) {
+    auto spath = yexportTomlPath.string();
+    if (fs::exists(yexportTomlPath)) {
         try {
-            std::ifstream input{path};
+            std::ifstream input{yexportTomlPath};
             if (!input) {
                 throw std::system_error{errno, std::system_category(), "failed to open " + spath};
             }

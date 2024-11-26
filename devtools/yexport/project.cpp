@@ -1,6 +1,7 @@
 #include "project.h"
-#include "diag/exception.h"
 #include "spec_based_generator.h"
+
+#include <devtools/yexport/diag/exception.h>
 
 namespace NYexport {
 

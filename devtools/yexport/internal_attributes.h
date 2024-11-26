@@ -18,6 +18,7 @@ namespace NInternalAttrs {
     inline static const std::string ProjectName = "project_name";///< Project name of export
     inline static const std::string ArcadiaRoot = "arcadia_root";///< Full path to arcadia root
     inline static const std::string ExportRoot = "export_root";///< Full path to export root
+    inline static const std::string ProjectRoot = "project_root";///< Full path to project root
     inline static const std::string DumpSems = "dump_sems";///< Dump of semantics
     inline static const std::string DumpAttrs = "dump_attrs";///< Dump of all attributes
     inline static const std::string Excludes = "excludes";///< Lists of excludes induced attributes

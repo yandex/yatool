@@ -363,7 +363,7 @@ const TNodeSemantics& TSpecBasedGenerator::ApplyReplacement(TPathView path, cons
 
 TYexportSpec TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     if (!configDir.empty()) {
-        auto yexportToml = configDir / YEXPORT_FILE;
+        auto yexportToml = yexportTomlPath(configDir);
         if (fs::exists(yexportToml)) {
             LoadTargetReplacements(yexportToml, TargetReplacements_);
             return ::NYexport::ReadYexportSpec(yexportToml);
@@ -515,6 +515,7 @@ void TSpecBasedGenerator::CommonFinalizeAttrs(TAttrsPtr& attrs, const jinja2::Va
     NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ArcadiaRoot, ArcadiaRoot);
     if (ExportFileManager_) {
         NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ExportRoot, ExportFileManager_->GetExportRoot());
+        NInternalAttrs::EmplaceAttr(map, NInternalAttrs::ProjectRoot, ExportFileManager_->GetProjectRoot());
     }
     if (!addAttrs.empty()) {
         NYexport::MergeTree(map, addAttrs);
@@ -599,6 +600,10 @@ const std::string& TSpecBasedGenerator::RootReplacer(const std::string& s) const
         ReplacerBuffer_ = std::regex_replace(ReplacerBuffer_, BINARY_ROOT_RE, BINARY_ROOT_REPLACE);
     }
     return ReplacerBuffer_;
+}
+
+fs::path yexportTomlPath(fs::path configDir) {
+    return TSpecBasedGenerator::yexportTomlPath(configDir);
 }
 
 }

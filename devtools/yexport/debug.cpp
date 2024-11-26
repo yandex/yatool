@@ -1,8 +1,6 @@
 #include "dump.h"
 #include "debug.h"
 
-#include <sstream>
-
 namespace NYexport {
 
 /// Parse --debug-mode argument, return empty string on success, else text with error description

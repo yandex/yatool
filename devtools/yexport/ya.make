@@ -12,6 +12,8 @@ SRCS(
     jinja_generator.cpp
     jinja_helpers.cpp
     jinja_template.cpp
+    logging.cpp
+    options.cpp
     project.cpp
     py_requirements_generator.cpp
     read_sem_graph.cpp

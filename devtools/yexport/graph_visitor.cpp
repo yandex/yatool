@@ -1,6 +1,7 @@
 #include "graph_visitor.h"
-#include "diag/exception.h"
 #include "internal_attributes.h"
+
+#include <devtools/yexport/diag/exception.h>
 
 #include <spdlog/spdlog.h>
 

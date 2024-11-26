@@ -1,9 +1,8 @@
-#include "options.h"
-#include "logging.h"
-
-#include "../generators.h"
-#include "../yexport_generator.h"
-#include "../spec_based_generator.h"
+#include <devtools/yexport/generators.h>
+#include <devtools/yexport/logging.h>
+#include <devtools/yexport/options.h>
+#include <devtools/yexport/spec_based_generator.h>
+#include <devtools/yexport/yexport_generator.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
 
@@ -18,45 +17,32 @@ using namespace NYexport;
 
 int main(int argc, char** argv) try {
     auto opts = TOpts::Parse(argc, argv);
+    if (!opts.Valid) {
+        return 1;
+    }
 
     SetupLogger(opts.LoggingOpts);
 
     if (opts.List) {
-        if (opts.ArcadiaRoot.empty()) {
-            opts.ArcadiaRoot = fs::current_path();
-            spdlog::info("-a/--arcadia-root is not specified. CWD is assumed as Arcadia root: {}", opts.ArcadiaRoot.string());
-            spdlog::info("Generators list may be incomplete.");
-        }
         for (auto const& generator : GetAvailableGenerators(opts.ArcadiaRoot)) {
             fmt::print("  {}\n", generator);
         }
         return 0;
     }
 
-    if (!opts.Generator.has_value()) {
-        if (!opts.ConfigDir.empty()) {
-            auto yexportToml = opts.ConfigDir / TSpecBasedGenerator::YEXPORT_FILE;
-            opts.Generator = GetDefaultGenerator(yexportToml);
-        }
-        if (!opts.Generator.has_value()) {
-            opts.Generator = "cmake";
-        }
-    }
-
-    const auto& generatorName = opts.Generator.value();
-    auto generator = Load(generatorName, opts.ArcadiaRoot, opts.ConfigDir, opts.DumpOpts, opts.DebugOpts);
+    auto generator = Load(opts);
     generator->SetProjectName(opts.ProjectName);
 
-    if (generatorName == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || generatorName == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
+    if (opts.Generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR || opts.Generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
         if (opts.PyDepsDump.empty()) {
-            spdlog::error("path to py dependency dump is required for the {} generator", generatorName);
+            spdlog::error("path to py dependency dump is required for the {} generator", opts.Generator);
             return 1;
         }
         generator->LoadSemGraph("", opts.PyDepsDump);
     }
     if (opts.Platforms.empty() || generator->IgnorePlatforms()) { // no platforms, load strong one semgraph with empty platform name
         if (opts.SemGraphs.size() != 1) {
-            spdlog::error("Requires exactly one semantic graph while using generator {}", generatorName);
+            spdlog::error("Requires exactly one semantic graph while using generator {}", opts.Generator);
             return 1;
         }
         generator->LoadSemGraph("", opts.SemGraphs.front());
@@ -80,7 +66,7 @@ int main(int argc, char** argv) try {
     }
 
     ECleanIgnored cleanIgnored = opts.CleanIgnored ? ECleanIgnored::Enabled : ECleanIgnored::Disabled;
-    generator->RenderTo(opts.ExportRoot, cleanIgnored);
+    generator->RenderTo(opts.ExportRoot, opts.ProjectRoot, cleanIgnored);
 
     if (opts.LoggingOpts.FailOnError && IsFailOnError()) {
         spdlog::error("There were errors during export, generate an non-success return code");

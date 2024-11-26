@@ -9,10 +9,11 @@
 
 namespace NYexport {
 
-TExportFileManager::TExportFileManager(const fs::path& exportRoot)
+TExportFileManager::TExportFileManager(const fs::path& exportRoot, const fs::path& projectRoot)
     : ExportRoot_(exportRoot)
-{
-}
+    , ProjectRoot_(projectRoot)
+{}
+
 TExportFileManager::~TExportFileManager() {
     for (const auto& file : CreatedFiles_) {
         TraceFileExported(ExportRoot_ / file);
@@ -26,6 +27,7 @@ TFile TExportFileManager::Open(const fs::path& relativeToRoot) {
     spdlog::debug("[TExportFileManager] Opened file: {}", relativeToRoot.c_str());
     return TFile{absPath, CreateAlways};
 }
+
 bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelativeToRoot, bool logError) {
     if (!fs::exists(source)) {
         if (logError) {
@@ -46,18 +48,22 @@ bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelati
     spdlog::debug("[TExportFileManager] Copied file: {}", source.c_str());
     return true;
 }
+
 bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError) {
     return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot, logError);
 }
+
 bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
     return fs::exists(ExportRoot_ / relativeToRoot);
 }
+
 void TExportFileManager::Remove(const fs::path& relativeToRoot) {
     CreatedFiles_.erase(relativeToRoot);
     const auto path = ExportRoot_ / relativeToRoot;
     NYexport::TracePathRemoved(path);
     fs::remove(path);
 }
+
 TString TExportFileManager::MD5(const fs::path& relativeToRoot) {
     if (!CreatedFiles_.contains(relativeToRoot)) {
         return {};
@@ -65,8 +71,12 @@ TString TExportFileManager::MD5(const fs::path& relativeToRoot) {
     return MD5::File((ExportRoot_ / relativeToRoot).c_str());
 }
 
-fs::path TExportFileManager::GetExportRoot() const {
+const fs::path& TExportFileManager::GetExportRoot() const {
     return ExportRoot_;
+}
+
+const fs::path& TExportFileManager::GetProjectRoot() const {
+    return ProjectRoot_.empty() ? ExportRoot_ : ProjectRoot_;
 }
 
 }

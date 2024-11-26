@@ -28,9 +28,9 @@ using TTargetReplacementSpecs = std::vector<TTargetReplacementSpec>;
 
 class TTargetReplacements;
 /// Parse toml and load step by step it (after validation) to targetReplacements
-void LoadTargetReplacements(const fs::path& path, TTargetReplacements& targetReplacements);
+void LoadTargetReplacements(const fs::path& yexportTomlPath, TTargetReplacements& targetReplacements);
 /// Parse toml and load step by step it (after validation) to targetReplacements
-void LoadTargetReplacements(std::istream& input, const fs::path& path, TTargetReplacements& targetReplacements);
+void LoadTargetReplacements(std::istream& input, const fs::path& yexportTomlPath, TTargetReplacements& targetReplacements);
 
 inline const std::string YEXPORT_ADD_ATTRS = "add_attrs"; ///< Section in yexport.toml for direct transit attributes to generator
 inline const std::string YEXPORT_ADDATTRS_ROOT = "root"; ///< Direct transit attributes for root
@@ -49,9 +49,9 @@ inline bool operator== (const TYexportSpec& a, const TYexportSpec& b) noexcept {
     return a.Dump() == b.Dump();
 };
 
-TYexportSpec ReadYexportSpec(const fs::path& path);
-TYexportSpec ReadYexportSpec(std::istream& input, const fs::path& path);
-std::optional<std::string> GetDefaultGenerator(const fs::path& path);
+TYexportSpec ReadYexportSpec(const fs::path& yexportTomlPath);
+TYexportSpec ReadYexportSpec(std::istream& input, const fs::path& yexportTomlPath);
+std::string GetDefaultGenerator(const fs::path& yexportTomlPath);
 
 struct TBadYexportSpec: public std::runtime_error {
     TBadYexportSpec(const std::string& msg)

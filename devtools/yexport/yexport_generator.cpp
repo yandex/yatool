@@ -1,5 +1,4 @@
 #include "yexport_generator.h"
-
 #include "jinja_generator.h"
 #include "generators.h"
 #include "py_requirements_generator.h"
@@ -10,20 +9,18 @@
 
 namespace NYexport {
 
-THolder<TYexportGenerator> Load(const std::string& generator, const fs::path& arcadiaRoot, const fs::path& configDir,
-    const std::optional<TDumpOpts> dumpOpts, const std::optional<TDebugOpts> debugOpts
-) {
-    if (generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
-        return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py3);
-    } else if (generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
-        return TPyRequirementsGenerator::Load(arcadiaRoot, EPyVer::Py2);
+THolder<TYexportGenerator> Load(const TOpts& opts) {
+    if (opts.Generator == NGenerators::HARDCODED_PY3_REQUIREMENTS_GENERATOR) {
+        return TPyRequirementsGenerator::Load(opts.ArcadiaRoot, EPyVer::Py3);
+    } else if (opts.Generator == NGenerators::HARDCODED_PY2_REQUIREMENTS_GENERATOR) {
+        return TPyRequirementsGenerator::Load(opts.ArcadiaRoot, EPyVer::Py2);
     } else {
-        return TJinjaGenerator::Load(arcadiaRoot, generator, configDir, dumpOpts, debugOpts);
+        return TJinjaGenerator::Load(opts);
     }
 }
 
-void TYexportGenerator::RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored) {
-    ExportFileManager_ = MakeHolder<TExportFileManager>(exportRoot);
+void TYexportGenerator::RenderTo(const fs::path& exportRoot, const fs::path& projectRoot, ECleanIgnored cleanIgnored) {
+    ExportFileManager_ = MakeHolder<TExportFileManager>(exportRoot, projectRoot);
     if (!Copies_.empty()) {
         for (const auto& [srcFullPath, dstRelPath] : Copies_) {
             ExportFileManager_->Copy(srcFullPath, dstRelPath);

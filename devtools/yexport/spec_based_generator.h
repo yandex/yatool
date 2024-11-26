@@ -72,6 +72,10 @@ public:
 
     void Copy(const fs::path& srcPath, const fs::path& dstRelPath);
 
+    static fs::path yexportTomlPath(fs::path configDir) {
+        return configDir / YEXPORT_FILE;
+    }
+
 protected:
     using TJinjaFileSystemPtr = std::shared_ptr<jinja2::RealFileSystem>;
     using TJinjaEnvPtr = std::unique_ptr<jinja2::TemplateEnv>;
@@ -120,5 +124,7 @@ private:
     TCopySpec CollectFilesToCopy() const;
 
 };
+
+fs::path yexportTomlPath(fs::path configDir);
 
 }

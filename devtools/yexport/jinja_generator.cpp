@@ -1,7 +1,7 @@
 #include "jinja_generator.h"
 #include "read_sem_graph.h"
 #include "graph_visitor.h"
-#include "attribute.h"
+#include "internal_attributes.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
@@ -19,7 +19,6 @@
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template.h>
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/template_env.h>
 
-#include <fstream>
 #include <vector>
 #include <regex>
 
@@ -315,30 +314,20 @@ private:
     }
 };
 
-THolder<TJinjaGenerator> TJinjaGenerator::Load(
-    const fs::path& arcadiaRoot,
-    const std::string& generator,
-    const fs::path& configDir,
-    const std::optional<TDumpOpts> dumpOpts,
-    const std::optional<TDebugOpts> debugOpts
-) {
-    const auto generatorDir = arcadiaRoot / GENERATORS_ROOT / generator;
+THolder<TJinjaGenerator> TJinjaGenerator::Load(const TOpts& opts) {
+    const auto generatorDir = opts.ArcadiaRoot / GENERATORS_ROOT / opts.Generator;
     const auto generatorFile = generatorDir / GENERATOR_FILE;
     if (!fs::exists(generatorFile)) {
-        YEXPORT_THROW(fmt::format("Failed to load generator {}, file {} not found", generator, generatorFile.c_str()));
+        YEXPORT_THROW(fmt::format("Failed to load generator {}, file {} not found", opts.Generator, generatorFile.c_str()));
     }
     THolder<TJinjaGenerator> result = MakeHolder<TJinjaGenerator>();
-    if (dumpOpts.has_value()) {
-        result->DumpOpts_ = dumpOpts.value();
-    }
-    if (debugOpts.has_value()) {
-        result->DebugOpts_ = debugOpts.value();
-    }
+    result->DumpOpts_ = opts.DumpOpts;
+    result->DebugOpts_ = opts.DebugOpts;
     result->GeneratorDir = generatorDir;
-    result->ArcadiaRoot = arcadiaRoot;
+    result->ArcadiaRoot = opts.ArcadiaRoot;
     result->SetupJinjaEnv();
     result->SetSpec(ReadGeneratorSpec(generatorFile), generatorFile.string());
-    result->YexportSpec = result->ReadYexportSpec(configDir);
+    result->YexportSpec = result->ReadYexportSpec(opts.ConfigDir);
     result->InitReplacer();
     result->InitToolGetter();
     return result;

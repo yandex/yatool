@@ -4,7 +4,6 @@
 
 #include <util/generic/hash_set.h>
 #include <util/system/file.h>
-#include <filesystem>
 
 namespace NYexport {
 
@@ -15,7 +14,7 @@ namespace NYexport {
  */
 class TExportFileManager {
 public:
-    TExportFileManager(const fs::path& exportRoot);
+    TExportFileManager(const fs::path& exportRoot, const fs::path& projectRoot);
     ~TExportFileManager();
 
     TFile Open(const fs::path& relativeToRoot);
@@ -26,11 +25,13 @@ public:
     TString MD5(const fs::path& relativeToRoot);
 
     //! Do not use this function to perform operations with files in ExportRoot (that may break generated file tracking)
-    fs::path GetExportRoot() const;
+    const fs::path& GetExportRoot() const;
+    const fs::path& GetProjectRoot() const;
 
 private:
     THashSet<fs::path> CreatedFiles_;
     fs::path ExportRoot_;
+    fs::path ProjectRoot_;
 };
 
 }

@@ -1,6 +1,7 @@
 
 #include "attribute.h"
-#include "diag/exception.h"
+
+#include <devtools/yexport/diag/exception.h>
 
 namespace NYexport {
 

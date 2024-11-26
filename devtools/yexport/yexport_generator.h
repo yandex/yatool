@@ -1,10 +1,10 @@
 #pragma once
 
+#include "export_file_manager.h"
+#include "options.h"
+
 #include <devtools/yexport/diag/exception.h>
 #include <devtools/yexport/diag/trace.h>
-#include <devtools/yexport/export_file_manager.h>
-#include <devtools/yexport/dump.h>
-#include <devtools/yexport/debug.h>
 
 #include <util/generic/ptr.h>
 #include <util/generic/vector.h>
@@ -26,7 +26,7 @@ public:
     virtual void LoadSemGraph(const std::string& platform, const fs::path& semGraph) = 0;
     virtual void SetProjectName(const std::string& projectName) = 0;
 
-    void RenderTo(const fs::path& exportRoot, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
+    void RenderTo(const fs::path& exportRoot, const fs::path& projectRoot = {}, ECleanIgnored cleanIgnored = ECleanIgnored::Disabled);
     TExportFileManager* GetExportFileManager();
 
     virtual void DumpSems(IOutputStream& out) const = 0; ///< Get dump of semantics tree with values for testing or debug
@@ -40,13 +40,7 @@ protected:
     THolder<TExportFileManager> ExportFileManager_;
 };
 
-THolder<TYexportGenerator> Load(
-    const std::string& generator,
-    const fs::path& arcadiaRoot,
-    const fs::path& configDir = "",
-    const std::optional<TDumpOpts> dumpOpts = {},
-    const std::optional<TDebugOpts> debugOpts = {}
-);
+THolder<TYexportGenerator> Load(const TOpts& opts);
 TVector<std::string> GetAvailableGenerators(const fs::path& arcadiaRoot);
 
 }

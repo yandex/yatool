@@ -6,7 +6,6 @@
 #include "std_helpers.h"
 #include "project.h"
 #include "yexport_generator.h"
-#include "internal_attributes.h"
 
 #include <devtools/ymake/dependency_management.h>
 
@@ -42,13 +41,7 @@ class TJinjaGenerator : public TSpecBasedGenerator {
 public:
     class TBuilder;
 
-    static THolder<TJinjaGenerator> Load(
-        const fs::path& arcadiaRoot,
-        const std::string& generator,
-        const fs::path& configDir = "",
-        const std::optional<TDumpOpts> dumpOpts = {},
-        const std::optional<TDebugOpts> debugOpts = {}
-    );
+    static THolder<TJinjaGenerator> Load(const TOpts& opts);
 
     void SetProjectName(const std::string& name) override { ProjectName = name; }
     void LoadSemGraph(const std::string& platform, const fs::path& semGraph) override;
