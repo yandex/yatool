@@ -189,6 +189,10 @@ class YaMakeOptions(YaBaseOptions):
         super(YaMakeOptions, self).__init__(**kwargs)
         self._handler = 'make'
 
+        # WARNING: be careful here when adding new options
+        # - constructor argument name MUST match field name
+        # - field names MUST NOT start with underscore
+
         self.save_statistics = self._pop('save_statistics')
         self.dump_profile = self._pop('dump_profile')
         self.dump_stages = self._pop('dump_stages')
@@ -373,7 +377,7 @@ class YaMakeOptions(YaBaseOptions):
 
         self.no_prefetch = self._pop('no_prefetch')
 
-        self._ymake_tool_servermode = self._pop('ymake_tool_servermode')
+        self.ymake_tool_servermode = self._pop('ymake_tool_servermode')
 
     def _generate_post_handler(self):
         result = []
@@ -788,8 +792,8 @@ class YaMakeOptions(YaBaseOptions):
         if self.no_prefetch:
             env['YA_PREFETCH'] = '0'
 
-        if self._ymake_tool_servermode is not None:
-            env['YA_YMAKE_TOOL_SERVERMODE'] = self._bool_to_env(self._ymake_tool_servermode)
+        if self.ymake_tool_servermode is not None:
+            env['YA_YMAKE_TOOL_SERVERMODE'] = self._bool_to_env(self.ymake_tool_servermode)
 
         return env
 
