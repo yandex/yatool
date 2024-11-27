@@ -133,4 +133,7 @@ namespace NStats {
     using TInternalCacheSaverStats = TStats<EInternalCacheSaverStats>;
     using TJsonCacheStats = TStats<EJsonCacheStats>;
     using TUidsCacheStats = TStats<EUidsCacheStats>;
+    using TStackDepthStats = TStats<EStackDepthStats>;
+
+    extern TStackDepthStats StackDepthStats;
 }

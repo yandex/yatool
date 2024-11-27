@@ -147,4 +147,10 @@ namespace NStats {
         UsedUidsCache /* "Used Uids cache, bool" */,
         BadLoops /* "Bad loops were detected, bool" */,
     };
+
+    enum class EStackDepthStats {
+        UpdIterMaxStackDepth /* "Maximum stack size in TUpdIter" */,
+        UpdReIterMaxStackDepth /* "Maximum stack size in TUpdReiter" */,
+        JsonVisitorMaxStackDepth /* "Maximum stack size in TJSONVisitor" */,
+    };
 }

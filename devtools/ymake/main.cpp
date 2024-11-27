@@ -43,6 +43,7 @@
 #include <util/generic/hash_set.h>
 #include <util/generic/maybe.h>
 #include <util/generic/ptr.h>
+#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/file.h>
@@ -795,6 +796,10 @@ int main_real(TBuildConfiguration& conf) {
 
     // This should be called after Load
     yMake->PostInit();
+
+    Y_DEFER {
+        NStats::StackDepthStats.Report();
+    };
 
     {
         TBuildGraphScope scope(*yMake.Get());
