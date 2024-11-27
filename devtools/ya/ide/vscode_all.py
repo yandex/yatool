@@ -3,6 +3,7 @@ import functools
 import json
 import os
 import platform
+import re
 import subprocess
 from collections import OrderedDict
 
@@ -16,7 +17,7 @@ import exts.asyncthread
 import exts.fs as fs
 import yalibrary.platform_matcher as pm
 import yalibrary.tools
-from yalibrary.toolscache import toolscache_version
+from yalibrary.toolscache import lock_resource, toolscache_version
 
 from ide import ide_common, vscode
 
@@ -151,13 +152,25 @@ class VSCodeProject(object):
 
         if self.params.compile_commands_fix:
             is_windows = pm.my_platform() == "win32"
-            tools_replacements = [("clang++", tool_fetcher("c++")[0]), ("clang", tool_fetcher("cc")[0])]
+            tools_replacements = [
+                ("clang++", tool_fetcher("c++")["executable"]),
+                ("clang", tool_fetcher("cc")["executable"]),
+            ]
             for item in compilation_database:
                 if item["command"].startswith("clang"):
                     item["command"] = item["command"].replace(" -I", " -isystem")
                 item["command"] = vscode.common.replace_prefix(item["command"], tools_replacements)
                 if is_windows:
                     item["command"] = item["command"].replace("\\", "/")
+
+        tools_root = core.config.tool_root(toolscache_version())
+        tool_resource_regex = re.compile(rf"({tools_root}/\d+)")
+        tools_resources_set = set()
+        for item in compilation_database:
+            for resource in tool_resource_regex.findall(item["command"]):
+                tools_resources_set.add(resource)
+        for resource in tools_resources_set:
+            lock_resource(resource)
 
         ide_common.emit_message("Writing {}".format(compile_commands_path))
         with open(compile_commands_path, "w") as f:
@@ -336,8 +349,15 @@ class VSCodeProject(object):
 
         tools_futures = self.async_fetch_tools(for_platform=self.tool_platform)
 
-        def tool_fetcher(name):
-            return tools_futures[name]()
+        def tool_fetcher(name) -> dict:
+            executable, params = tools_futures[name]()
+            if exts.windows.on_win() and not executable.endswith('.exe'):
+                executable += '.exe'
+            lock_resource(params["toolchain_root_path"])
+            return {
+                "executable": executable,
+                **params,
+            }
 
         if self.params.codegen_enabled:
             self.do_codegen()
@@ -350,7 +370,7 @@ class VSCodeProject(object):
 
         if self.is_go:
             if not self.params.goroot:
-                self.params.goroot = tool_fetcher("go")[1]["toolchain_root_path"]
+                self.params.goroot = tool_fetcher("go")["toolchain_root_path"]
             workspace["settings"]["go.goroot"] = self.params.goroot
 
             gobin_path = os.path.join(self.params.goroot, "bin", "go.exe" if pm.my_platform() == "win32" else "go")
@@ -466,9 +486,9 @@ class VSCodeProject(object):
         if self.is_go:
             alt_tools = {}
             if self.params.patch_gopls:
-                alt_tools["gopls"] = tool_fetcher("gopls")[0]
+                alt_tools["gopls"] = tool_fetcher("gopls")["executable"]
             if self.params.debug_enabled and self.params.dlv_enabled:
-                alt_tools["dlv"] = tool_fetcher("dlv")[0]
+                alt_tools["dlv"] = tool_fetcher("dlv")["executable"]
             if alt_tools:
                 workspace["settings"]["go.alternateTools"] = alt_tools
 

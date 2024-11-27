@@ -150,7 +150,7 @@ def gen_exclude_settings(params, modules):
 
 def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
     try:
-        black_binary_path = tool_fetcher("black")[0]
+        black_binary_path = tool_fetcher("black")["executable"]
     except Exception as e:
         ide_common.emit_message(f"[[warn]]Could not get \"ya tool black\"[[rst]]: {e!r}")
         return {}
@@ -187,7 +187,7 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
 
 def gen_clang_format_settings(arc_root, tool_fetcher):
     try:
-        clang_format_binary_path = tool_fetcher("clang-format")[0]
+        clang_format_binary_path = tool_fetcher("clang-format")["executable"]
     except Exception as e:
         ide_common.emit_message(f"[[warn]]Could not get \"ya tool clang-format\"[[rst]]: {e!r}")
         return {}
