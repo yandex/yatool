@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 
-import six.moves.queue as Queue
+import queue as Queue
 from exts import asyncthread
 
 
