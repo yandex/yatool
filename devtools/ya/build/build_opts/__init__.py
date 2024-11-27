@@ -1461,6 +1461,10 @@ class YMakeModeOptions(Options):
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
+            EnvConsumer(
+                'YA_YMAKE_TOOL_SERVERMODE',
+                hook=SetValueHook('ymake_tool_servermode', return_true_if_enabled),
+            ),
             ConfigConsumer('ymake_tool_servermode'),
         ]
 
