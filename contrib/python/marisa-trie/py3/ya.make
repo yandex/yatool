@@ -2,6 +2,8 @@
 
 PY3_LIBRARY()
 
+PROVIDES(MARISA-TRIE)
+
 VERSION(1.2.1)
 
 LICENSE(MIT)
@@ -11,8 +13,8 @@ PEERDIR(
 )
 
 ADDINCL(
-    contrib/python/marisa-trie/include/marisa-trie/include
-    contrib/python/marisa-trie/include/marisa-trie/lib
+    contrib/python/marisa-trie/py3/marisa-trie/include
+    contrib/python/marisa-trie/py3/marisa-trie/lib
 )
 
 NO_COMPILER_WARNINGS()

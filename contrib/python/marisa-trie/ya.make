@@ -14,7 +14,9 @@ NO_LINT()
 
 END()
 
-RECURSE(
-    py2
-    py3
-)
+IF (NOT OPENSOURCE)
+    RECURSE(
+        py2
+        py3
+    )
+ENDIF()
