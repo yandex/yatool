@@ -445,6 +445,8 @@ class _Exporter:
             str(self.config.arcadia_root),
             '--export-root',
             str(self.config.export_root),
+            '--project-root',
+            str(self.config.settings_root),
             '--configuration',
             str(self.config.ymake_root),
             '--semantic-graph',
