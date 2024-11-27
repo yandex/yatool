@@ -51,8 +51,23 @@ namespace NComputeReachability {
         }
     }
 
-    void ComputeReachableNodes(TDepGraph& graph, TVector<TTarget>& startTargets) {
+    void ComputeReachableNodes(TDepGraph& graph, const TFileConf& fileConf, TVector<TTarget>& startTargets) {
         TVisitor visitor;
-        IterateAll(graph, startTargets, visitor);
+        IterateAll(graph, startTargets, visitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
+
+        for (auto startTarget : startTargets) {
+            auto startTargetNode = graph.Get(startTarget.Id);
+            startTargetNode->State.SetReachable(true);
+
+            if (startTarget.IsModuleTarget) {
+                continue;
+            }
+
+            for (auto dep : startTargetNode.Edges()) {
+                if (IsMakeFileType(dep.To()->NodeType)) {
+                    dep.To()->State.SetReachable(true);
+                }
+            }
+        }
     }
 }
