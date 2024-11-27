@@ -106,7 +106,7 @@ public:
     bool InitTargets();
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
-    void AddPackageOutputs();
+    void ComputeDependsToModulesClosure();
     void AddStartTarget(const TString& dir) override;
     void AddTarget(const TString& dir) override;
     void SortAllEdges();

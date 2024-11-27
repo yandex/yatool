@@ -636,8 +636,8 @@ private:
     bool IsMultimodule = false;
 };
 
-void TYMake::AddPackageOutputs() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Fill package outputs"));
+void TYMake::ComputeDependsToModulesClosure() {
+    NYMake::TTraceStage scopeTracer{"Compute DEPENDS to modules closure"};
 
     if (Conf.DependsLikeRecurse) {
         // This records extra outputs for UNIONs listed in DEPENDS
@@ -656,7 +656,6 @@ void TYMake::AddPackageOutputs() {
         // Remove empty closures
         EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Fill package outputs"));
 }
 
 void TYMake::DumpMetaData() {
@@ -909,6 +908,8 @@ int main_real(TBuildConfiguration& conf) {
         return BR_CONFIGURE_FAILED;
     }
 
+    yMake->ComputeDependsToModulesClosure();
+
     if (!conf.ManagedDepTreeRoots.empty()) {
         THashSet<TNodeId> roots;
         yMake->ResolveRelationTargets(conf.ManagedDepTreeRoots, roots);
@@ -924,8 +925,6 @@ int main_real(TBuildConfiguration& conf) {
             conf.DumpDirectDM ? EManagedPeersDepth::Direct : EManagedPeersDepth::Transitive
         );
     }
-
-    yMake->AddPackageOutputs();
 
     MakeUnique(yMake->StartTargets);
 
