@@ -2,7 +2,7 @@ import threading
 import traceback
 import sys
 import signal
-from six.moves import cStringIO as StringIO
+from io import StringIO
 
 
 def format_stack(my_frame):
