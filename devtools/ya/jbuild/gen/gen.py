@@ -9,7 +9,6 @@ from . import makelist_parser2 as mp
 from . import configure
 from . import consts
 from core import stage_tracer
-from yalibrary.vcs import vcsversion
 from yalibrary import platform_matcher
 from exts.strtobool import strtobool
 import yalibrary.graph.base as graph_base
@@ -36,19 +35,6 @@ def gen_ctx(
     import jbuild.commands
 
     jbuild.commands.BuildTools.YMAKE_BIN = getattr(opts, 'ymake_bin', None)
-
-    if opts.export_to_maven and not opts.version:
-        try:
-            version = vcsversion.repo_config(opts.arc_root)[0]
-            assert version != -1
-            assert int(version)
-            version = str(version)
-
-        except Exception as e:
-            raise mp.ParseError('Can\'t determine version for maven-export: {}'.format(str(e)))
-
-    else:
-        version = opts.version
 
     rc = paths[:]
     by_path = mp.obtain_targets_graph2(dart, cpp_graph)
@@ -79,7 +65,6 @@ def gen_ctx(
         set(rc),
         by_path,
         rsrcs,
-        version,
         sonar_paths,
         target_platform,
         global_resources,
@@ -118,10 +103,6 @@ def iter_nodes(ctx):
                 yield n
         except mp.ParseError as e:
             raise mp.ParseError('{}: {}'.format(p, str(e)))
-    if ctx.opts.export_to_maven and ctx.maven_export_modules_list:
-        import jbuild.gen.actions.export_to_maven as mvn_export
-
-        yield mvn_export.export_root(ctx)
 
 
 def iter_result(ctx, nodes):

@@ -5,7 +5,6 @@ STYLE_PYTHON()
 PY_SRCS(
     NAMESPACE jbuild.gen.actions
     compile.py
-    export_to_maven.py
     fetch_test_data.py
     funcs.py
     generate_scripts.py

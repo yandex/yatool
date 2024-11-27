@@ -48,7 +48,6 @@ class Context(object):
         rclosure,
         by_path,
         resolved_sources,
-        maven_export_version,
         sonar_paths,
         target_platform,
         global_resources,
@@ -60,28 +59,14 @@ class Context(object):
         self.contrib_roots = contrib_roots
         self.by_path = by_path
 
-        self.maven_export_version = maven_export_version
         self.sonar_paths = sonar_paths
 
         self.resolved_sources = resolved_sources
         self.errs = collections.defaultdict(configure.PathConfigureError)
-        self.external_maven_import = set()
 
-        self.maven_export_modules_list = set()
-        self.maven_test_map = collections.defaultdict(set)
-
-        self._maven_export_result = None
         self.target_platform = target_platform
 
         self.global_resources = global_resources
-
-    def maven_export_result(self):
-        if self._maven_export_result is None:
-            self._maven_export_result = set()
-            for p in self.rclosure:
-                self._maven_export_result |= set(self.classpath(p))
-
-        return self._maven_export_result
 
     def choose_in_classpath(self, path, accept_target, extract_artifact, direct=False):
         chosen = []
