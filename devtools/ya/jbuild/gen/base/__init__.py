@@ -26,14 +26,6 @@ def is_proxy_library(path, ctx):
     return is_contrib(path, ctx) and any(dirname_unix_path(dep.path) == path for dep in ctx.by_path[path].deps)
 
 
-def extract_excludes(paths, ctx):
-    return []
-
-
-def is_excluded(path, exclude):
-    return (path.rstrip('/') + '/').startswith(exclude.rstrip('/') + '/')
-
-
 def strip_root(s):
     return s[3:]
 
@@ -68,7 +60,7 @@ class Context(object):
 
         self.global_resources = global_resources
 
-    def choose_in_classpath(self, path, accept_target, extract_artifact, direct=False):
+    def _choose_in_classpath(self, path, accept_target, extract_artifact, direct=False):
         chosen = []
 
         target = self.by_path[path]
@@ -76,84 +68,20 @@ class Context(object):
             chosen.append(extract_artifact(target))
         return chosen
 
-    def _filter_classpath(self, classpath, accept_target, extract_artifact):
-        chosen = []
-        checked = set()
-
-        def collect(target):
-            if accept_target(target):
-                chosen.append(extract_artifact(target))
-
-        def collect_non_java_deps(target):
-            for dep in target.deps:
-                if dep.provides_jar() or dep in checked:
-                    continue
-                checked.add(dep)
-                collect(dep)
-
-        for classpath_dir in classpath:
-            classpath_target = self.by_path[strip_root(classpath_dir)]
-            if classpath_target.path in checked:
-                continue
-            checked.add(classpath_target.path)
-
-            collect(classpath_target)
-            collect_non_java_deps(classpath_target)
-
-        return chosen
-
     def classpath(self, path, type=consts.CLS, direct=False):
-        return self.choose_in_classpath(
+        return self._choose_in_classpath(
             path,
             accept_target=lambda t: t.provides_jar_of_type(type),
             extract_artifact=lambda t: t.output_jar_of_type_path(type),
             direct=direct,
         )
 
-    def filtered_classpath(self, classpath, type=consts.CLS):
-        return self._filter_classpath(
-            classpath,
-            accept_target=lambda t: t.provides_jar_of_type(type),
-            extract_artifact=lambda t: t.output_jar_of_type_path(type),
-        )
-
     def dlls(self, path):
-        return self.choose_in_classpath(
+        return self._choose_in_classpath(
             path,
             accept_target=lambda t: t.provides_dll(),
             extract_artifact=lambda t: t.output_dll_path(),
         )
-
-    def classpath_dlls(self, classpath):
-        return self._filter_classpath(
-            classpath,
-            accept_target=lambda t: t.provides_dll(),
-            extract_artifact=lambda t: t.output_dll_path(),
-        )
-
-    def wars(self, path):
-        return self.choose_in_classpath(
-            path, accept_target=lambda t: t.provides_war(), extract_artifact=lambda t: t.output_war_path()
-        )
-
-
-class GraphMergeException(Exception):
-    pass
-
-
-def log_or_throw(msg, keepon, exception=None):
-    if keepon:
-        logger.error(msg)
-
-    else:
-        if not exception:
-            exception = GraphMergeException
-
-        raise exception(msg)
-
-
-def uniq_last_case(lst, key=None):
-    return list(base.uniq_first_case(lst[::-1], key=key))[::-1]
 
 
 def remove_prefixes(paths):
@@ -237,18 +165,6 @@ def resolve_jdk(
     raise AssertionError('Failed to resolve jdk: {}'.format(global_resources))
 
 
-def resolve_uberjar(global_resources, opts=None):
-    if opts and consts.LOCAL_UBERJAR_FLAG in opts.flags:
-        return opts.flags[consts.LOCAL_UBERJAR_FLAG]
-    return global_resources.get(consts.RESOURCE_UBERJAR, '$' + consts.RESOURCE_UBERJAR)
-
-
-def resolve_error_prone(global_resources, opts=None):
-    if opts and consts.LOCAL_ERROR_PRONE_FLAG in opts.flags:
-        return opts.flags[consts.LOCAL_ERROR_PRONE_FLAG]
-    return global_resources.get(consts.RESOURCE_ERROR_PRONE, '$' + consts.RESOURCE_ERROR_PRONE)
-
-
 def resolve_jacoco_agent(global_resources, opts=None):
     if opts and consts.LOCAL_JACOCO_AGENT_FLAG in opts.flags:
         return opts.flags[consts.LOCAL_JACOCO_AGENT_FLAG]
@@ -259,12 +175,6 @@ def resolve_kotlin_compiler(global_resources, opts=None):
     if opts and consts.LOCAL_KOTLIN_COMPILER_FLAG in opts.flags:
         return opts.flags[consts.LOCAL_KOTLIN_COMPILER_FLAG]
     return global_resources.get(consts.RESOURCE_KOTLIN_COMPILER, '$' + consts.RESOURCE_KOTLIN_COMPILER)
-
-
-def resolve_groovy_compiler(global_resources, opts=None):
-    if opts and consts.LOCAL_GROOVY_COMPILER_FLAG in opts.flags:
-        return opts.flags[consts.LOCAL_GROOVY_COMPILER_FLAG]
-    return global_resources.get(consts.RESOURCE_GROOVY_COMPILER, '$' + consts.RESOURCE_GROOVY_COMPILER)
 
 
 def resolve_jstyle_lib(global_resources, opts=None):
