@@ -32,10 +32,6 @@ def gen_ctx(
         if '_GLOBAL_RESOURCES_' in info:
             global_resources.update(graph_base.parse_resources(info['_GLOBAL_RESOURCES_']))
 
-    import jbuild.commands
-
-    jbuild.commands.BuildTools.YMAKE_BIN = getattr(opts, 'ymake_bin', None)
-
     rc = paths[:]
     by_path = mp.obtain_targets_graph2(dart, cpp_graph)
 

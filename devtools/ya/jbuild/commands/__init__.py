@@ -11,7 +11,6 @@ import yalibrary.graph.commands as graph_commands
 class BuildTools(object):  # TODO: use something from yalibrary.tools to detect executable file path
     PROTOC_PATTERN = 'PROTOC'
     PYTHON_PATTERN = 'PYTHON'
-    YMAKE_PATTERN = 'YMAKE'
     MAVEN_ARTIFACT_UPLOADER = 'MAVEN_ARTIFACT_UPLOADER'
     JSTYLE_RUNNER_PATTERN = 'JSTYLERUNNER'
     KYTHE_PATTERN = 'KYTHE'
@@ -19,8 +18,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
     UBERJAR_PATTERN = 'UBERJAR'
     UBERJAR10_PATTERN = 'UBERJAR_10'
     SCRIPTGEN_PATTERN = 'SCRIPTGEN'
-
-    YMAKE_BIN = None
 
     @staticmethod
     def maven_artifact_uploader():
@@ -37,14 +34,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
     @staticmethod
     def python():
         return os.path.join(os.path.join('$({})'.format(BuildTools.PYTHON_PATTERN), 'python'))
-
-    @staticmethod
-    def ymake():
-        if BuildTools.YMAKE_BIN:
-            return BuildTools.YMAKE_BIN
-
-        else:
-            return os.path.join('$({})'.format(BuildTools.YMAKE_PATTERN), 'ymake')
 
     @staticmethod
     def error_prone_tool(error_prone_resource):
