@@ -76,6 +76,7 @@ class SemConfig:
                 'TRAVERSE_RECURSE': 'yes',
                 'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
                 'USE_PREBUILT_TOOLS': 'no',
+                'SBOM_GENERATION_ALLOWED': 'no',
             }
         )
 
@@ -259,7 +260,7 @@ class SemGraph:
         self.skip_invalid: bool = skip_invalid
         self.sem_graph_file: Path = None
 
-    def make(self) -> None:
+    def make(self, **kwargs) -> None:
         """Make sem-graph file with current config params to ymake_root"""
 
         conf = build_facade.gen_conf(
@@ -285,6 +286,7 @@ class SemGraph:
             dump_sem_graph=True,
             ymake_bin=self.config.ymake_bin,
             abs_targets=self.config.params.abs_targets,
+            **kwargs,
         )
         if r.exit_code != 0:
             self.logger.error('Fail generate sem-graph by ymake with exit_code=%d:\n%s', r.exit_code, r.stderr)

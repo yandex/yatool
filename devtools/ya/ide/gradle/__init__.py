@@ -201,9 +201,17 @@ class _JavaSemGraph(SemGraph):
         super().__init__(config, skip_invalid=True)
         self.logger = logging.getLogger(type(self).__name__)
 
-    def make(self) -> None:
+    def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
-        super().make()
+
+        def listener(event) -> None:
+            if not isinstance(event, dict):
+                return
+            if event.get('Type') == 'Error':
+                self.logger.error("%s", event)
+            # TODO Collect non-exported for build later
+
+        super().make(**kwargs, ev_listener=listener)
         self._patch_annotation_processors()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
