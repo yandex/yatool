@@ -1,5 +1,6 @@
 import json
 import logging
+import types
 
 loader = json
 dumper = json
@@ -26,18 +27,16 @@ if True:
     try:
         import library.python.json as lpj
 
-        _loads = lpj.loads
-
         def loads(s, **kwargs):
             kwargs['intern_keys'] = True
             kwargs['intern_vals'] = True
             kwargs['may_unicode'] = True
-            return _loads(s, **kwargs)
+            return lpj.loads(s, **kwargs)
 
         def load(fp, **kwargs):
             return loads(fp.read(), **kwargs)
 
-        loader = lpj
+        loader = types.ModuleType('yjson_loader')
         loader.loads = loads
         loader.load = load
     except ImportError:
@@ -47,9 +46,6 @@ if True:
 if True:
     try:
         import ujson
-
-        _dump = ujson.dump
-        _dumps = ujson.dumps
 
         _fallback_dump = dumper.dump
         _fallback_dumps = dumper.dumps
@@ -63,7 +59,7 @@ if True:
                 kwargs['escape_forward_slashes'] = False
                 kwargs['double_precision'] = 15
                 try:
-                    return _dump(obj, fp, **kwargs)
+                    return ujson.dump(obj, fp, **kwargs)
                 except OverflowError:
                     fallback_kwargs = kwargs.copy()
                     del fallback_kwargs['escape_forward_slashes']
@@ -82,7 +78,7 @@ if True:
                 kwargs['double_precision'] = 15
                 try:
                     # XXX: Can't process NoneType in py3 with sort_keys=True
-                    return _dumps(obj, **kwargs)
+                    return ujson.dumps(obj, **kwargs)
                 except OverflowError:
                     fallback_kwargs = kwargs.copy()
                     del fallback_kwargs['escape_forward_slashes']
@@ -91,7 +87,7 @@ if True:
                     logging.info("Using fallback dumper")
                     return _fallback_dumps(obj, **fallback_kwargs)
 
-        dumper = ujson
+        dumper = types.ModuleType('yjson_dumper')
         dumper.dump = dump
         dumper.dumps = dumps
     except ImportError:
