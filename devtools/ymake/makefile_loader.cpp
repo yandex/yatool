@@ -749,6 +749,8 @@ void TDirParser::DataStatement(const TStringBuf& name, const TVector<TStringBuf>
 
         if (data.StartsWith(DATA_ATD_PREFIX)) {
             TString path = TString(data.SubStr(DATA_ATD_PREFIX.length()));
+            if (Vars().IsTrue("DISABLE_ATD"))
+                YConfErrPrecise(Misconfiguration, GetStatementRow(name), GetStatementColumn(name)) << "ATD path [[imp]]" << path << "[[rst]] is not allowed due to ATD EOL." << Endl;
             if (Conf.CheckDataPaths && !(Conf.ArcadiaTestsDataRoot / path).Exists()) {
                 TRACE(P, NEvent::TInvalidDataDir(TString{data}));
                 YConfErrPrecise(Misconfiguration, GetStatementRow(name), GetStatementColumn(name)) << "ATD path [[imp]]" << path << "[[rst]] inside [[alt1]]" << name << "[[rst]] section is missing." << Endl;
