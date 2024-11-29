@@ -90,6 +90,7 @@ class YtStore(DistStore):
                 self._xx_client = xx_client.YtStoreWrapper(
                     proxy,
                     data_dir,
+                    token,
                 )
                 logger.debug('Will use new YT store client')
             except Exception:  # ModuleNotFoundError is py3-only :(

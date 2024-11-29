@@ -57,9 +57,13 @@ static void InitializeYt() {
     }
 }
 
-YtStore::YtStore(const char* yt_proxy, const char* yt_dir) {
+YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token) {
     InitializeYt();
-    this->Client = NYT::CreateClient(yt_proxy);
+    if(yt_token && strlen(yt_token)) {
+        this->Client = NYT::CreateClient(yt_proxy, NYT::TCreateClientOptions().Token(yt_token));
+    } else {
+        this->Client = NYT::CreateClient(yt_proxy);
+    }
     this->YtDir = yt_dir;
 }
 

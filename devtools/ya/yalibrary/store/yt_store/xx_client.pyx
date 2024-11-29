@@ -24,16 +24,17 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         size_t DataSize;
         int Chunks;
     cdef cppclass YtStore:
-        YtStore(const char *yt_proxy, const char *yt_dir) except +
+        YtStore(const char *yt_proxy, const char *yt_dir, const char *yt_token) except +
         void DoTryRestore(const YtStoreClientRequest &req, YtStoreClientResponse &rsp) nogil
 
 cdef class YtStoreWrapper:
     cdef YtStore *c_ytstore
 
-    def __init__(self, yt_proxy, yt_dir):
+    def __init__(self, yt_proxy, yt_dir, yt_token):
         self.c_ytstore = new YtStore(
             PyUnicode_AsUTF8(yt_proxy),
             PyUnicode_AsUTF8(yt_dir),
+            PyUnicode_AsUTF8(yt_token or ""),
         )
 
     def do_try_restore(self, shash, into_dir, codec, chunks_count, data_size):

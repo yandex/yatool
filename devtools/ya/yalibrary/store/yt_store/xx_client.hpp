@@ -17,7 +17,7 @@ struct YtStoreClientRequest {
 };
 
 struct YtStore {
-    YtStore(const char* yt_proxy, const char* yt_dir);
+    YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token);
     ~YtStore();
     void DoTryRestore(const YtStoreClientRequest& req, YtStoreClientResponse& rsp);
     NYT::IClientPtr Client;
