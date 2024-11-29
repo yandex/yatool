@@ -884,7 +884,11 @@ int main_real(TBuildConfiguration& conf) {
         yMake->CheckIsolatedProjects();
     }
 
-    yMake->ReportConfigureEvents();
+    if (conf.ShouldUseReachabilityToReportConfErrors()) {
+        yMake->ReportConfigureEventsUsingReachableNodes();
+    } else {
+        yMake->ReportConfigureEvents();
+    }
 
     FORCE_TRACE(U, NEvent::TStageStarted("Save and compact"));
     if (conf.WriteFsCache || conf.WriteDepsCache) {

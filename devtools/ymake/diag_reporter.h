@@ -76,6 +76,25 @@ private:
     void PopModule();
 };
 
+class TDupSrcReporter: public TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats> {
+public:
+    using TBase = TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats>;
+    using TState = typename TBase::TState;
+
+    const TModules& Modules;
+    const bool RenderSemantics;
+
+public:
+    TDupSrcReporter(const TModules& modules, bool renderSemantics)
+        : Modules(modules)
+        , RenderSemantics(renderSemantics)
+    {}
+
+    bool Enter(TState& state);
+    bool AcceptDep(TState& state);
+    void Leave(TState& state);
+};
+
 class TRecurseConfigureErrorReporter: public TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats> {
 public:
     using TBase = TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats>;

@@ -121,6 +121,7 @@ public:
     void DumpJavaDart(IOutputStream& cmsg);
     void DumpMakeFilesDart(IOutputStream& cmsg);
     void ReportConfigureEvents();
+    void ReportConfigureEventsUsingReachableNodes();
     void ReportForeignPlatformEvents();
     void ReportGraphBuildStats();
     void ReportModulesStats();

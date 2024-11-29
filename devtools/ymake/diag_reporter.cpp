@@ -69,6 +69,7 @@ void TConfigureEventsReporter::PushModule(TConstDepNodeRef modNode) {
 
     TStringBuf moduleName = TDepGraph::Graph(modNode).GetFileName(elemId).GetTargetStr();
     Diag()->Where.push_back(elemId, moduleName);
+
     ConfMsgManager()->Flush(elemId);
     ConfMsgManager()->AddVisitedModule(elemId);
 }
@@ -132,6 +133,58 @@ void TConfigureEventsReporter::Leave(TState& state) {
     }
 }
 
+bool TDupSrcReporter::Enter(TState& state) {
+    bool fresh = TBase::Enter(state);
+    const auto& node = state.TopNode();
+
+    if (fresh) {
+        if (IsModule(state.Top())) {
+            auto module = Modules.Get(node->ElemId);
+            if (RenderSemantics) {
+                if (module->IsSemIgnore()) {
+                    return false;
+                }
+            }
+
+            CurEnt->WasFresh = true;
+            Diag()->Where.push_back(module->GetName().GetElemId(), module->GetName().GetTargetStr());
+        }
+
+        if (IsMakeFile(state.Top())) {
+            return false;
+        }
+
+        if (state.HasIncomingDep()) {
+            if (const auto incDep = state.IncomingDep(); IsModuleOwnNodeDep(incDep)) {
+                ConfMsgManager()->AddDupSrcLink(node->ElemId, Diag()->Where.back().first, false);
+            }
+        }
+    }
+
+    return fresh || state.Top().IsStart;
+}
+
+bool TDupSrcReporter::AcceptDep(TState& state) {
+    const auto& dep = state.NextDep();
+    const EDepType depType = dep.Value();
+
+    if (depType == EDT_Search || (depType == EDT_Search2 && !IsGlobalSrcDep(dep)) ||
+        depType == EDT_Property || depType == EDT_OutTogetherBack || IsRecurseDep(dep) || IsDirToModuleDep(dep)) { // Don't follow. Use direct Peerdirs/Tooldirs for walking
+        return false;
+    }
+
+    return TBase::AcceptDep(state);
+}
+
+void TDupSrcReporter::Leave(TState& state) {
+    TBase::Leave(state);
+
+    if (CurEnt->WasFresh && IsModule(state.Top())) {
+        CurEnt->WasFresh = false;
+        Diag()->Where.pop_back();
+    }
+}
+
 bool TRecurseConfigureErrorReporter::AcceptDep(TState& state) {
     bool result = TBase::AcceptDep(state);
     return result && !IsModuleType(state.NextDep().To()->NodeType);
@@ -175,4 +228,45 @@ void TYMake::ReportConfigureEvents() {
 
     TRecurseConfigureErrorReporter recurseErrorsReporter(Names);
     IterateAll(RecurseGraph, RecurseStartTargets, recurseErrorsReporter);
+}
+
+void FlushModuleNode(TConstDepNodeRef modNode) {
+    ui32 elemId = modNode->ElemId;
+    TScopedContext context(TDepGraph::Graph(modNode).GetFileName(elemId));
+    ConfMsgManager()->Flush(elemId);
+    ConfMsgManager()->AddVisitedModule(elemId);
+}
+
+void FlushMakeFileNode(TConstDepNodeRef makeFileNode, const TSymbols& names) {
+    const auto view = names.FileConf.GetName(makeFileNode->ElemId);
+    const auto targetView = names.FileConf.ResolveLink(view);
+    TScopedContext context(targetView);
+    ConfMsgManager()->Flush(view.GetElemId());
+    ConfMsgManager()->Flush(targetView.GetElemId());
+}
+
+void TYMake::ReportConfigureEventsUsingReachableNodes() {
+    NYMake::TTraceStage scopeTracer{"Report Configure Events"};
+    ConfMsgManager()->DisableDelay();
+
+    for (const auto& node : Graph.Nodes()) {
+        if (!node->State.GetReachable() ) {
+            continue;
+        }
+
+        if (IsModuleType(node->NodeType)) {
+            FlushModuleNode(node);
+        }
+
+        if (IsMakeFileType(node->NodeType)) {
+            FlushMakeFileNode(node, Names);
+        }
+    }
+
+    TDupSrcReporter dupSrcReporter(Modules, Conf.RenderSemantics);
+    IterateAll(Graph, StartTargets, dupSrcReporter, [](const TTarget& t) -> bool {
+        return t.IsModuleTarget;
+    });
+
+    ConfMsgManager()->ReportDupSrcConfigureErrors([this](ui32 id) { return Names.FileConf.GetName(id).GetTargetStr(); });
 }
