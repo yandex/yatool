@@ -338,7 +338,7 @@ class BuildTypeOptions(Options):
             ArgConsumer(
                 ['--sanitize'],
                 help='Sanitizer type',
-                hook=SetValueHook('sanitize', values=san_values),
+                hook=SetValueHook('sanitize', values=san_values, values_limit=1),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.BASIC,
             ),

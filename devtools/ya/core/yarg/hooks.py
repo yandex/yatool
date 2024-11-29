@@ -72,12 +72,13 @@ class ValueHook(BaseHook):
 
 
 class SetValueHook(ValueHook):
-    def __init__(self, name, transform=None, values=FILES, default_value=None):
+    def __init__(self, name, transform=None, values=FILES, default_value=None, values_limit=None):
         # type: (str, tp.Optional[tp.Callable[[tp.Any], tp.Any]], tp.Iterable[tp.Any], tp.Any) -> None
         super(SetValueHook, self).__init__(values)
         self.name = name
         self.transform = transform
         self.default_value = default_value
+        self.values_limit = values_limit
 
     def __call__(self, to, x):
         if not hasattr(to, self.name):
@@ -95,7 +96,12 @@ class SetValueHook(ValueHook):
         setattr(to, self.name, value)
 
         c_name = counter_name(self.name)
-        setattr(to, c_name, getattr(to, c_name, 0) + 1)
+        count = getattr(to, c_name, 0)
+        if self.values_limit and count >= self.values_limit:
+            raise ArgsValidatingException(
+                "You can pass '{}' option only {} time(s)".format(self.name, self.values_limit)
+            )
+        setattr(to, c_name, count + 1)
 
     def default(self, to):
         if hasattr(to, self.name):
