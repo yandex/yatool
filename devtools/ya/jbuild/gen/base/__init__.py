@@ -40,7 +40,6 @@ class Context(object):
         rclosure,
         by_path,
         resolved_sources,
-        sonar_paths,
         target_platform,
         global_resources,
     ):
@@ -50,8 +49,6 @@ class Context(object):
         self.arc_root = arc_root
         self.contrib_roots = contrib_roots
         self.by_path = by_path
-
-        self.sonar_paths = sonar_paths
 
         self.resolved_sources = resolved_sources
         self.errs = collections.defaultdict(configure.PathConfigureError)

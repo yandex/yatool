@@ -42,8 +42,6 @@ def gen_ctx(
 
     rsrcs = base.resolve_possible_srcdirs(arc_root, by_path.values())
 
-    sonar_paths = set()
-
     target_platform = None
     if target_tc and 'platform_name' in target_tc:
         try:
@@ -61,7 +59,6 @@ def gen_ctx(
         set(rc),
         by_path,
         rsrcs,
-        sonar_paths,
         target_platform,
         global_resources,
     )
@@ -132,11 +129,6 @@ def iter_result(ctx, nodes):
                 continue
             if n.res and n not in seen:
                 seen.add(n)
-                yield n
-
-    if ctx.sonar_paths:
-        for n in nodes:
-            if n.path == consts.SONAR_PATH:
                 yield n
 
 
