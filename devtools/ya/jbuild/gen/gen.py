@@ -105,10 +105,8 @@ def iter_result(ctx, nodes):
     seen = set()
 
     if ctx.opts.get_deps:
-        import jbuild.gen.actions.get_deps as get_deps
-
         for n in nodes:
-            if n.tag == get_deps.GET_DEPS_TAG and n not in seen:
+            if n.tag == consts.GET_DEPS_TAG and n not in seen:
                 seen.add(n)
 
                 yield n

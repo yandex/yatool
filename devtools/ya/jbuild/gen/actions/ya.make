@@ -8,7 +8,6 @@ PY_SRCS(
     fetch_test_data.py
     funcs.py
     generate_scripts.py
-    get_deps.py
     idea.py
     missing_dirs.py
     move_matches.py
