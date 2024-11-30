@@ -1,31 +1,25 @@
 from __future__ import annotations
 
-import abc
 import difflib
-import json
 import logging
 import os
 import subprocess
 import sys
-import tempfile
 import typing as tp
-import yaml
 
 from collections.abc import Callable
 from pathlib import Path, PurePath
 
-import core.config
-import core.resource
 import devtools.ya.test.const as const
 import exts.func
 import exts.os2
-import marisa_trie
 import yalibrary.display
 import yalibrary.makelists
 import yalibrary.tools
 
 from library.python.testing.style import rules
 from library.python.fs import replace_file
+from . import config
 from . import state_helper
 from .enums import StylerKind, STDIN_FILENAME_STAMP
 
@@ -34,23 +28,35 @@ logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
 
 
+class StylerOptions(tp.NamedTuple):
+    py2: bool
+    config_loaders: tuple[config.ConfigLoader, ...] | None = None
+
+
+class StyleOptions(tp.NamedTuple):
+    force: bool
+    dry_run: bool
+    check: bool
+    full_output: bool
+
+
 class Spec(tp.NamedTuple):
     kind: StylerKind
     ruff: bool = False
 
 
-_REGISTRY: dict[Spec, type[BaseStyler]] = {}
+_REGISTRY: dict[Spec, type[Styler]] = {}
 _SUFFIX_MAPPING: dict[str, list[Spec]] = {}
 
 
-def _register(cls: type[BaseStyler]) -> type[BaseStyler]:
+def _register(cls: type[Styler]) -> type[Styler]:
     _REGISTRY[cls.SPEC] = cls
     for suffix in cls.SUFFIXES:
         _SUFFIX_MAPPING.setdefault(suffix, []).append(cls.SPEC)
     return cls
 
 
-def select_styler(target: PurePath, ruff: bool) -> type[BaseStyler] | None:
+def select_styler(target: PurePath, ruff: bool) -> type[Styler] | None:
     """Find matching spec and return respective styler class"""
 
     if target.suffix in _SUFFIX_MAPPING:
@@ -66,16 +72,9 @@ def select_styler(target: PurePath, ruff: bool) -> type[BaseStyler] | None:
             return _REGISTRY[s]
 
 
-@exts.func.lazy
-def _find_root() -> str:
-    return core.config.find_root()
-
-
 def _flush_to_file(path: str, content: str) -> None:
-    display.emit_message(f'[[good]]fix {path}')
-
     tmp = path + ".tmp"
-    with open(tmp, 'wb') as f:
+    with open(tmp, "wb") as f:
         f.write(content.encode())
 
     # never break original file
@@ -84,18 +83,59 @@ def _flush_to_file(path: str, content: str) -> None:
     os.chmod(path, path_st_mode)
 
 
-def _flush_to_terminal(path: Path, content: str, formatted_content: str, full_output: bool = False) -> None:
+def _flush_to_terminal(content: str, formatted_content: str, full_output: bool) -> None:
     if full_output:
-        display.emit_message(f'[[good]]fix {path}[[rst]]\n{formatted_content}\n')
+        display.emit_message(formatted_content)
     else:
         diff = difflib.unified_diff(content.splitlines(), formatted_content.splitlines())
         diff = list(diff)[2:]  # Drop header with filenames
         diff = "\n".join(diff)
 
-        display.emit_message(f'[[good]]fix {path}[[rst]]\n{diff}\n')
+        display.emit_message(diff)
 
 
-class BaseStyler(abc.ABC):
+def style(style_opts: StyleOptions, styler: Styler, target: PurePath | Path, loader: Callable[..., str]):
+    """
+    Execute `format` and store or display the result.
+    Return 0 if no formatting happened, 1 otherwise
+    """
+    content = loader()
+
+    def run_format() -> str:
+        formatted_content = styler.format(target, content)
+        if formatted_content and formatted_content[-1] != "\n":
+            return formatted_content + "\n"
+        return formatted_content
+
+    if target.name.startswith(STDIN_FILENAME_STAMP):
+        print(run_format())
+        return 0
+
+    target = tp.cast(Path, target)
+    if style_opts.force or not (reason := rules.get_skip_reason(str(target), content)):
+        formatted_content = run_format()
+        if formatted_content == content:
+            return 0
+
+        if not style_opts.dry_run and style_opts.check:
+            return 1
+
+        config_ = styler.lookup(target) if config.configurable(styler) else "Not Applicable"
+        message = f"[[good]]{type(styler).__name__} styler fixed {target}[[rst]] (config: {config_})"
+        if not style_opts.dry_run and not style_opts.check:
+            display.emit_message(message)
+            _flush_to_file(str(target), formatted_content)
+        elif style_opts.dry_run:
+            display.emit_message(message)
+            _flush_to_terminal(content, formatted_content, style_opts.full_output)
+        return 1
+    else:
+        logger.warning("skip by rule: %s", reason)
+
+    return 0
+
+
+class Styler(tp.Protocol):
     # Whether a styler should run if not selected explicitly
     DEFAULT_ENABLED: tp.ClassVar[bool]
     # Unique description of a styler
@@ -103,69 +143,35 @@ class BaseStyler(abc.ABC):
     # Series of strings upon which the proper styler is selected
     SUFFIXES: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
-    def __init__(self, args) -> None:
-        self.args = args
+    def __init__(self, styler_opts: StylerOptions) -> None: ...
 
-    @abc.abstractmethod
     def format(self, path: PurePath, content: str) -> str:
         """Format and return formatted file content"""
 
-    def style(self, target: PurePath | Path, loader: Callable[..., str]):
-        """
-        Execute `format` and store or display the result.
-        Return 0 if no formatting happened, 1 otherwise
-        """
-        content = loader()
-
-        def run_format() -> str:
-            formatted_content = self.format(target, content)
-            if formatted_content and formatted_content[-1] != '\n':
-                return formatted_content + '\n'
-            return formatted_content
-
-        if target.name.startswith(STDIN_FILENAME_STAMP):
-            print(run_format())
-        else:
-            target = tp.cast(Path, target)
-            if self.args.force or not (reason := rules.get_skip_reason(str(target), content)):
-                formatted_content = run_format()
-                if formatted_content != content:
-                    if self.args.dry_run:
-                        _flush_to_terminal(target, content, formatted_content, self.args.full_output)
-                    elif not self.args.check:
-                        _flush_to_file(str(target), formatted_content)
-                    return 1
-            else:
-                logger.warning("skip by rule: %s", reason)
-        return 0
-
 
 @_register
-class Black(BaseStyler):
+class Black(config.ConfigMixin):
     DEFAULT_ENABLED = True
     SPEC = Spec(StylerKind.PY)
     SUFFIXES = (".py",)
 
-    def __init__(self, args) -> None:
-        super().__init__(args)
-        self.tool: str = yalibrary.tools.tool("black" if not self.args.py2 else "black_py2")  # type: ignore
-        self.config_file = self.load_config()
-
-    def load_config(self) -> str:
-        try:
-            config_map = core.config.config_from_arc_rel_path(const.DefaultLinterConfig.Python)
-        except Exception as e:
-            logger.warning("Couldn't obtain config from fs due to error %s, reading from memory", repr(e))
-            temp = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
-            temp.write(core.resource.try_get_resource("config.toml"))  # type: ignore
-            temp.flush()  # will be read from other subprocesses
-            config_file = temp.name
-        else:
-            config_file = os.path.join(_find_root(), config_map[const.PythonLinterName.Black])
-        return config_file
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("black" if not styler_opts.py2 else "black_py2")  # type: ignore
+        super().__init__(
+            styler_opts.config_loaders
+            if styler_opts.config_loaders
+            else (
+                config.AutoincludeConfig(linter_name=const.PythonLinterName.Black),
+                config.DefaultConfig(
+                    linter_name=const.PythonLinterName.Black,
+                    defaults_file=const.DefaultLinterConfig.Python,
+                    resource_name="config.toml",
+                ),
+            )
+        )
 
     def _run_black(self, content: str, path: PurePath) -> str:
-        black_args = [self.tool, "-q", "-", "--config", self.config_file]
+        black_args = [self._tool, "-q", "-", "--config", self.lookup(path)]
 
         p = subprocess.Popen(
             black_args,
@@ -191,57 +197,34 @@ class Black(BaseStyler):
 
 
 @_register
-class Ruff(BaseStyler):
+class Ruff(config.ConfigMixin):
     DEFAULT_ENABLED = True
     SPEC = Spec(StylerKind.PY, ruff=True)
     SUFFIXES = (".py",)
 
-    _RUFF_CONFIG_PATHS_FILE = "build/config/tests/ruff/ruff_config_paths.json"
-
-    def __init__(self, args) -> None:
-        super().__init__(args)
-        self.tool: str = yalibrary.tools.tool("ruff")  # type: ignore
-        self.config_file = ""
-        self.trie: marisa_trie.Trie | None = None
-        self.config_paths: list[str] = []
-
-        self.load_configs()
-
-    def load_configs(self) -> None:
-        arc_root = _find_root()
-        try:
-            config_map = {}
-            for prefix, config_path in core.config.config_from_arc_rel_path(self._RUFF_CONFIG_PATHS_FILE).items():
-                config_map[os.path.normpath(os.path.join(arc_root, prefix))] = config_path
-        except Exception as e:
-            logger.warning("Couldn't obtain config from fs due to error %s, reading from memory", repr(e))
-            temp = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
-            temp.write(core.resource.try_get_resource("ruff.toml"))  # type: ignore
-            temp.flush()  # will be read from other subprocesses
-            self.config_file = temp.name
-        else:
-            # Trie assigns indexes randomly, have to map back
-            self.config_paths = [''] * len(config_map)
-            self.trie = marisa_trie.Trie(config_map.keys())
-            for prefix, idx in self.trie.items():  # type: ignore
-                self.config_paths[idx] = os.path.join(arc_root, config_map[prefix])
-
-    def lookup_config(self, path: PurePath) -> str:
-        """
-        Return path to the linter's config file.
-        If config paths mapping were successfully loaded to trie,
-        find the one with the longest prefix matching the file being linted (custom config).
-        Otherwise, return path to default config
-        """
-        if self.trie:
-            keys = self.trie.prefixes(str(path))
-            key = sorted(keys, key=len)[-1]
-            return self.config_paths[self.trie[key]]
-        else:
-            return self.config_file
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
+        super().__init__(
+            styler_opts.config_loaders
+            if styler_opts.config_loaders
+            else (
+                # XXX: during migration we have the following logic:
+                # - if there is a custom config got from ruff trie, use it
+                # - else if there is a custom config got from autoincludes scheme, use it
+                # - else use default config
+                # note that we used to fallback to default config right after ruff trie search
+                config.RuffConfig(),
+                config.AutoincludeConfig(linter_name=const.PythonLinterName.Ruff),
+                config.DefaultConfig(
+                    linter_name=const.PythonLinterName.Ruff,
+                    defaults_file=const.DefaultLinterConfig.Python,
+                    resource_name="ruff.toml",
+                ),
+            )
+        )
 
     def _run_ruff(self, content: str, path: PurePath, config_path: str, cmd_args: list[str]) -> str:
-        ruff_args = [self.tool] + cmd_args + ["--config", config_path, "-s", "-"]
+        ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-s", "-"]
 
         p = subprocess.Popen(
             ruff_args,
@@ -274,7 +257,8 @@ class Ruff(BaseStyler):
         return out
 
     def format(self, path: PurePath, content: str) -> str:
-        ruff_config = self.lookup_config(path)
+        ruff_config = self.lookup(path)
+
         stdin_filename = ["--stdin-filename", path]
 
         out = self._run_ruff(content, path, ruff_config, ["format"] + stdin_filename)
@@ -284,65 +268,32 @@ class Ruff(BaseStyler):
 
 
 @_register
-class Golang(BaseStyler):
-    DEFAULT_ENABLED = True
-    SPEC = Spec(StylerKind.GO)
-    SUFFIXES = (".go",)
-
-    def __init__(self, args) -> None:
-        super().__init__(args)
-        self.tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
-
-    def format(self, path: PurePath, content: str) -> str:
-        p = subprocess.Popen(
-            [self.tool, "-"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=False,
-            text=True,
-        )
-        out, err = p.communicate(input=content)
-
-        # Abort styling on signal
-        if p.returncode < 0:
-            state_helper.stop()
-
-        if err:
-            raise Exception('error while running yoimports on file "{}": {}'.format(path, err.strip()))
-
-        return out
-
-
-@_register
-class ClangFormat(BaseStyler):
+class ClangFormat(config.ConfigMixin):
     DEFAULT_ENABLED = True
     SPEC = Spec(StylerKind.CPP)
     SUFFIXES = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
-    def __init__(self, args) -> None:
-        super().__init__(args)
-        self.tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
-        self.config = self.load_config()
-
-    def load_config(self) -> str:
-        try:
-            config_map = core.config.config_from_arc_rel_path(const.DefaultLinterConfig.Cpp)
-        except Exception as e:
-            logger.warning("Couldn't obtain config from fs due to error %s, reading from memory", repr(e))
-            style_config = core.resource.try_get_resource("config.clang-format")
-            return json.dumps(yaml.safe_load(style_config))
-        else:
-            config_file = config_map[const.CppLinterName.ClangFormat]
-            with open(os.path.join(_find_root(), config_file)) as afile:
-                return json.dumps(yaml.safe_load(afile))
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
+        super().__init__(
+            styler_opts.config_loaders
+            if styler_opts.config_loaders
+            else (
+                config.AutoincludeConfig(linter_name=const.CppLinterName.ClangFormat),
+                config.DefaultConfig(
+                    linter_name=const.CppLinterName.ClangFormat,
+                    defaults_file=const.DefaultLinterConfig.Cpp,
+                    resource_name="config.clang-format",
+                ),
+            )
+        )
 
     def format(self, path: PurePath, content: str) -> str:
         if path.suffix == ".h":
             content = self.fix_header(content)
 
         p = subprocess.Popen(
-            [self.tool, "-assume-filename=a.cpp", "-style=" + self.config],
+            [self._tool, "-assume-filename=a.cpp", f"-style=file:{self.lookup(path)}"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -382,13 +333,43 @@ class Cuda(ClangFormat):
 
 
 @_register
-class YaMake(BaseStyler):
+class Golang:
+    DEFAULT_ENABLED = True
+    SPEC = Spec(StylerKind.GO)
+    SUFFIXES = (".go",)
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
+
+    def format(self, path: PurePath, content: str) -> str:
+        p = subprocess.Popen(
+            [self._tool, "-"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            text=True,
+        )
+        out, err = p.communicate(input=content)
+
+        # Abort styling on signal
+        if p.returncode < 0:
+            state_helper.stop()
+
+        if err:
+            raise Exception('error while running yoimports on file "{}": {}'.format(path, err.strip()))
+
+        return out
+
+
+@_register
+class YaMake:
     DEFAULT_ENABLED = False
     SPEC = Spec(StylerKind.YAMAKE)
     SUFFIXES = ("ya.make", "ya.make.inc")
 
-    def __init__(self, args) -> None:
-        super().__init__(args)
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        pass
 
     def format(self, path: PurePath, content: str) -> str:
         yamake = yalibrary.makelists.from_str(content)

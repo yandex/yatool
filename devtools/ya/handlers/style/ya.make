@@ -4,8 +4,6 @@ PEERDIR(
     build/config/tests/cpp_style
     build/config/tests/py_style
     build/config/tests/ruff
-    build/plugins/lib/tests/utils
-    contrib/python/PyYAML
     contrib/python/coloredlogs
     contrib/python/marisa-trie
     devtools/ya/app
@@ -28,10 +26,12 @@ PEERDIR(
 PY_SRCS(
     NAMESPACE handlers.style
     __init__.py
+    config.py
     enums.py
     state_helper.py
     style.py
     styler.py
+    target_miner.py
 )
 
 END()
