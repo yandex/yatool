@@ -152,5 +152,6 @@ def update_test_initial_env_vars(env, suite, opts):
     for san_opts in "LSAN_OPTIONS", "ASAN_OPTIONS", "UBSAN_OPTIONS", "MSAN_OPTIONS":
         env.extend_mandatory(san_opts, "exitcode={}".format(const.SANITIZER_ERROR_RC))
     env.extend_mandatory("UBSAN_OPTIONS", "print_stacktrace=1,halt_on_error=1")
+    env.extend_mandatory("MSAN_OPTIONS", "report_umrs=1")
 
     suite.setup_environment(env, opts)
