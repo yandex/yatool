@@ -361,7 +361,11 @@ class YtStoreClient(object):
             chunks[meta['hash']] = meta['chunks_count']
             hashes_to_check.add(meta['hash'])
 
-        meta_keys = [{'uid': m['uid']} for m in meta_to_delete]
+        if self.is_table_format_v3:
+            meta_keys = [{'self_uid': m['self_uid'], 'uid': m['uid']} for m in meta_to_delete]
+        else:
+            meta_keys = [{'uid': m['uid']} for m in meta_to_delete]
+
         self._client.delete_rows(self._metadata_table, meta_keys, atomicity='none', durability='async')
 
         for content_hash in self.get_hashes_to_delete(hashes_to_check):
