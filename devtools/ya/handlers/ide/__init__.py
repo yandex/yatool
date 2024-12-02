@@ -182,9 +182,6 @@ class IdeaOptions(core.yarg.Options):
         self.iml_in_project_root = False
         self.iml_keep_relative_paths = False
         self.idea_files_root = None
-        self.project_name = None
-        self.minimal = False
-        self.directory_based = True
         self.omit_test_data = False
         self.with_content_root_modules = False
         self.external_content_root_modules = []
@@ -251,22 +248,6 @@ class IdeaOptions(core.yarg.Options):
                 ['--idea-files-root'],
                 help='Root for .ipr and .iws files',
                 hook=core.yarg.SetValueHook('idea_files_root'),
-            ),
-            core.yarg.ArgConsumer(
-                ['--project-name'],
-                help='Idea project name (.ipr and .iws file)',
-                hook=core.yarg.SetValueHook('project_name'),
-            ),
-            core.yarg.ArgConsumer(
-                ['--ascetic'],
-                help='Create the minimum set of project settings',
-                hook=core.yarg.SetConstValueHook('minimal', True),
-            ),
-            core.yarg.ArgConsumer(
-                ['--directory-based'],
-                help='Create project in actual (directory based) format',
-                hook=core.yarg.SetConstValueHook('directory_based', True),
-                visible=False,
             ),
             core.yarg.ArgConsumer(
                 ['--omit-test-data'],
@@ -355,9 +336,6 @@ class IdeaOptions(core.yarg.Options):
             core.yarg.ConfigConsumer('iml_in_project_root'),
             core.yarg.ConfigConsumer('iml_keep_relative_paths'),
             core.yarg.ConfigConsumer('idea_files_root'),
-            core.yarg.ConfigConsumer('project_name'),
-            core.yarg.ConfigConsumer('minimal'),
-            core.yarg.ConfigConsumer('directory_based'),
             core.yarg.ConfigConsumer('omit_test_data'),
             core.yarg.ConfigConsumer('with_content_root_modules'),
             core.yarg.ConfigConsumer('external_content_root_modules'),
@@ -384,11 +362,6 @@ class IdeaOptions(core.yarg.Options):
         if self.iml_keep_relative_paths and not self.iml_in_project_root:
             raise core.yarg.ArgsValidatingException(
                 '--iml-keep-relative-paths can be used only with --iml-in-project-root'
-            )
-
-        if self.generate_tests_run and not self.directory_based:
-            raise core.yarg.ArgsValidatingException(
-                'run configurations may be generated only for directory-based project'
             )
 
         for p in self.exclude_dirs:

@@ -37,7 +37,6 @@
 | auto_exclude_symlinks | false | Автоматически исключать симлинки |
 | copy_shared_index_config | false | Копировать конфигурацию Shared Index |
 | detect_leaks_in_pytest | true | Обнаруживать утечки в Pytest |
-| directory_based | true | Создавать проект в файловой структуре |
 | eager_execution | false | Быстрое выполнение |
 | exclude_dirs | [] | Исключить каталоги |
 | external_content_root_modules | [] | Добавить модули внешнего контента |

@@ -36,7 +36,6 @@ The file contains various parameters that can be configured to control the build
 | auto_exclude_symlinks | false | Add all symlink-dirs in modules to exclude dirs |
 | copy_shared_index_config | false | Copy project config for Shared Indexes if exist |
 | detect_leaks_in_pytest | true | Detect leaks in Pytest |
-| directory_based | true | Create project in actual (directory based) format |
 | eager_execution | false | Eager execution  |
 | exclude_dirs | [] | Exclude dirs with specific names from all modules |
 | external_content_root_modules | [] | Add external content root modules |

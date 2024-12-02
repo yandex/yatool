@@ -820,7 +820,7 @@ def dump_modules_javac_flags(javac_settings_root, by_path):
     for m in oo.findall('module'):
         oo.remove(m)
 
-    for module_name, flags in get_modules_javac_flags(by_path).items():
+    for module_name, flags in sorted(get_modules_javac_flags(by_path).items()):
         attrib = collections.OrderedDict()
         attrib['name'] = module_name
         attrib['options'] = ' '.join(flags)
@@ -1023,156 +1023,15 @@ def create_directory_based(by_path, project_root, ctx):
         dump_annotation_processors(cc, by_path, 'SAVE_JAVAC_GENERATED_SRCS' in ctx.opts.flags)
         dump_keys.add('.idea/compiler.xml')
 
-    if not ctx.opts.minimal:
-        js = structure['.idea/compiler.xml'].find('./component[@name="JavacSettings"]')
-        if js is None:
-            js = et.SubElement(structure['.idea/compiler.xml'], 'component', attrib={'name': 'JavacSettings'})
-        dump_modules_javac_flags(js, by_path)
-        dump_keys.add('.idea/compiler.xml')
-        dump_keys.add('.idea/kotlinc.xml')
+    js = structure['.idea/compiler.xml'].find('./component[@name="JavacSettings"]')
+    if js is None:
+        js = et.SubElement(structure['.idea/compiler.xml'], 'component', attrib={'name': 'JavacSettings'})
+    dump_modules_javac_flags(js, by_path)
+    dump_keys.add('.idea/compiler.xml')
+    dump_keys.add('.idea/kotlinc.xml')
 
     for k in dump_keys:
         print_pretty(structure[k], os.path.join(project_root, k))
-
-
-def create_ipr(by_path, project_root, ctx):
-    ipr_root = ctx.opts.idea_files_root or project_root
-    ipr_path = op.join(ipr_root, ctx.opts.project_name or os.path.basename(os.path.abspath(ipr_root))) + '.ipr'
-    language_level, sdk_default_language_level, jdk_name, kotlin_target = detect_jdk(ctx)
-    try:
-        with open(ipr_path) as f:
-            ipr = et.parse(f, OrderedXMLTreeBuilder()).getroot()
-
-    except Exception:
-        ipr = empty_ipr(ctx.opts.minimal)
-
-    mm = ipr.find('./component[@name="ProjectModuleManager"]')
-
-    if mm is None:
-        mm = et.SubElement(ipr, 'component', attrib={'name': 'ProjectModuleManager'})
-
-    ms = mm.find('modules')
-
-    if ms is None:
-        ms = et.SubElement(mm, 'modules')
-
-    for m in ms.findall('module'):
-        ms.remove(m)
-
-    rm = ipr.find('./component[@name="ProjectRootManager"]')
-
-    if rm is None:
-        attrib = collections.OrderedDict()
-        attrib['name'] = 'ProjectRootManager'
-        attrib['version'] = '2'
-        attrib['languageLevel'] = language_level
-        attrib['default'] = sdk_default_language_level
-        attrib['project-jdk-name'] = jdk_name
-        attrib['project-jdk-type'] = 'JavaSDK'
-        rm = et.SubElement(ipr, 'component', attrib=attrib)
-    output = rm.find('output')
-
-    def empty_if_dot(path):
-        return path if path != '.' else ''
-
-    if output is None:
-        relpath = (
-            '' if not ctx.opts.idea_files_root else empty_if_dot(op.relpath(project_root, ctx.opts.idea_files_root))
-        )
-        et.SubElement(
-            rm, 'output', attrib={'url': 'file://{}'.format(fix_windows(op.join('$PROJECT_DIR$', relpath, 'out')))}
-        )
-
-    lt = ipr.find('./component[@name="libraryTable"]')
-
-    if lt is None:
-        lt = et.SubElement(ipr, 'component', attrib={'name': 'libraryTable'})
-
-    for item in lt.findall('library'):
-        lt.remove(item)
-
-    modules, libs = get_modules_and_libs(by_path, project_root, ctx)
-
-    for module in [modules[i] for i in sorted(modules, key=lambda x: modules[x].get('fileurl', '').split('/'))]:
-        et.SubElement(ms, 'module', attrib=module)
-
-    def add_jar(path, x):
-        if ctx.opts.idea_files_root and path.startswith(PROJECT_DIR):
-            path = os.path.join(
-                PROJECT_DIR,
-                empty_if_dot(os.path.relpath(project_root, ctx.opts.idea_files_root)),
-                path[len(PROJECT_DIR) + 1 :],
-            )
-        et.SubElement(et.SubElement(item, x), 'root').attrib = {'url': 'jar://' + fix_windows(path)}
-
-    for lib in sorted(libs, key=lambda it: it.long_name):
-        item = et.SubElement(lt, 'library', attrib={'name': lib.long_name})
-        if lib.classes_path:
-            add_jar(lib.classes_path, 'CLASSES')
-        if lib.sources_path:
-            add_jar(lib.sources_path, 'SOURCES')
-
-    cc = ipr.find('./component[@name="CompilerConfiguration"]')
-
-    if cc is None:
-        cc = et.SubElement(ipr, 'component', attrib={'name': 'CompilerConfiguration'})
-
-    vcs = ipr.find('./component[@name="VcsDirectoryMappings"]')
-
-    if vcs is None:
-        vcs = et.SubElement(ipr, 'component', attrib={'name': 'VcsDirectoryMappings'})
-
-    vcs_map = vcs.find('mapping')
-
-    if vcs_map is None:
-        attrib = collections.OrderedDict()
-        attrib['directory'] = ''
-        attrib['vcs'] = 'none'
-        vcs_map = et.SubElement(vcs, 'mapping', attrib=attrib)
-
-    vcs_map.set('directory', ctx.opts.arc_root)
-    vcs_map.set('vcs', get_vcs(ctx.opts.arc_root))
-
-    dump_annotation_processors(cc, by_path, 'SAVE_JAVAC_GENERATED_SRCS' in ctx.opts.flags)
-
-    kotlin2jvm = ipr.find('./component[@name="Kotlin2JvmCompilerArguments"]')
-    if kotlin2jvm is None:
-        kotlin2jvm = et.SubElement(ipr, 'component', attrib={'name': 'Kotlin2JvmCompilerArguments'})
-        et.SubElement(kotlin2jvm, 'option', attrib={'name': 'jvmTarget', 'value': kotlin_target})
-
-    if not ctx.opts.minimal:
-        js = ipr.find('./component[@name="JavacSettings"]')
-        if js is None:
-            js = et.SubElement(ipr, 'component', attrib={'name': 'JavacSettings'})
-        dump_modules_javac_flags(js, by_path)
-
-    if not ctx.opts.minimal:
-        modify_run_manager(ipr, ipr_path, project_root, ctx)
-
-    fs.create_dirs(project_root)
-    if ctx.opts.idea_files_root:
-        fs.create_dirs(ctx.opts.idea_files_root)
-    print_pretty(ipr, ipr_path)
-
-
-def create_iws(project_root, ctx):
-    iws_root = ctx.opts.idea_files_root or project_root
-    iws_path = op.join(iws_root, ctx.opts.project_name or os.path.basename(os.path.abspath(iws_root))) + '.iws'
-
-    try:
-        with open(iws_path) as f:
-            iws = et.parse(f, OrderedXMLTreeBuilder()).getroot()
-
-    except Exception:
-        iws = empty_iws()
-
-    if not modify_run_manager(iws, iws_path, project_root, ctx):
-        return
-
-    fs.create_dirs(project_root)
-    if ctx.opts.idea_files_root:
-        fs.create_dirs(ctx.opts.idea_files_root)
-    print_pretty(iws, iws_path)
 
 
 def modify_run_manager(etree, path, project_root, ctx):
@@ -1812,22 +1671,9 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
 
         return f
 
-    def ipr():
-        def f():
-            create_ipr(by_path, project_root, ctx)
-
-        return f
-
     def d_based():
         def f():
             create_directory_based(by_path, project_root, ctx)
-
-        return f
-
-    def iws():
-        def f():
-            if not ctx.opts.minimal:
-                create_iws(project_root, ctx)
 
         return f
 
@@ -1907,10 +1753,6 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
             'After this choose "yandex-arcadia" in code style settings (Preferences -> Editor -> Code Style).',
             op.join(tools.tool('idea_style_config'), 'intellij-codestyle.jar'),
         )
-        if not ctx.opts.directory_based:
-            logger.warning(
-                "File based project format is deprecated and scheduled for removal: https://st.yandex-team.ru/DEVTOOLS-9330."
-            )
 
     def create_plugin():
         return create_plugin_config(project_root, ctx)
@@ -1949,11 +1791,7 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
             if not ctx.opts.omit_test_data:
                 parse.append(test_data(p))
 
-    if ctx.opts.directory_based:
-        parse.append(d_based())
-    else:
-        parse.append(ipr())
-        parse.append(iws())
+    parse.append(d_based())
 
     def add_native_settings():
         def f():
@@ -1963,7 +1801,6 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
         return f
 
     dlls = collect_dlls(ctx, res, results_root, project_root)
-    if dlls and ctx.opts.directory_based:
-        dlls.append(add_native_settings())
+    dlls.append(add_native_settings())
 
     return parse + copy + dlls + warns + [create_plugin, report]
