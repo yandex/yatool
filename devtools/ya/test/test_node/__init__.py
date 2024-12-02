@@ -2592,7 +2592,11 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
     }
     kv.update({('needs_resource' + r): True for r in suite.get_resources(opts)})
 
-    origin_cmd = list_cmd + suite.get_list_cmd("$(SOURCE_ROOT)", "$(BUILD_ROOT)", opts)
+    try:
+        origin_cmd = list_cmd + suite.get_list_cmd("$(SOURCE_ROOT)", "$(BUILD_ROOT)", opts)
+    except NotImplementedError:
+        logger.warning("Test listing is not supported for suite type '%s'", type(suite).__name__)
+        return
     if suite.special_runner == 'ios':
         cmds = make_ios_cmds(
             origin_cmd, suite.uid, get_simctl_path(platform_descriptor), get_profiles_path(platform_descriptor), opts
