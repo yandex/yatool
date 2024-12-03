@@ -89,18 +89,9 @@ def do_ya_make(params):
             custom_context_json = sjson.load(
                 custom_context_file, intern_keys=True, intern_vals=True, root_key_black_list=['lite_graph']
             )
-        if params.dist_priority:
-            custom_context_json['graph']['conf']['priority'] = params.dist_priority
-        if params.distbuild_cluster:
-            custom_context_json['graph']['conf']['cluster'] = params.distbuild_cluster
-        elif params.coordinators_filter:
-            custom_context_json['graph']['conf']['coordinator'] = params.coordinators_filter
-        if params.distbuild_pool:
-            custom_context_json['graph']['conf']['pool'] = params.distbuild_pool
-        if params.cache_namespace:
-            custom_context_json['graph']['conf']['namespace'] = params.cache_namespace
         context = ya_make.BuildContext.load(params, app_ctx, custom_context_json)
         builder = context.builder
+        del custom_context_json
     else:
         builder = ya_make.YaMake(params, app_ctx)
         context = None

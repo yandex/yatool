@@ -683,7 +683,7 @@ class BuildContext(object):
             },
             'make_files': ctx.make_files,
             'owners': self.owners,
-            'graph': ctx.graph,
+            'graph': ctx.full_graph,
         }
 
 
@@ -808,6 +808,8 @@ def replace_yt_results(graph, opts, dist_cache):
 
 
 class Context(object):
+    RELEASED = {}  # sentinel to mark released full graph
+
     def __init__(
         self,
         opts,
@@ -824,6 +826,7 @@ class Context(object):
         self.stage_times = {}
 
         self._cache_factory = CacheFactory(opts)
+        self._full_graph = None
 
         self.opts = opts
         self.cache_test_statuses = need_cache_test_statuses(opts)
@@ -1038,6 +1041,10 @@ class Context(object):
 
         # We assume that graph won't be modified after this point. Lite graph should be same as full one -- but lite!
 
+        if self.opts.use_distbuild:
+            self._full_graph = self.graph
+            self.graph = lg.build_lite_graph(self.graph)
+
         if app_config.in_house:
             import yalibrary.diagnostics as diag
 
@@ -1130,6 +1137,21 @@ class Context(object):
                 exts.fs.remove_tree_safe(os.path.join(self.garbage_dir, filename))
 
     @property
+    def full_graph(self):
+        if self._full_graph is None:
+            return self.graph
+        elif self._full_graph is Context.RELEASED:
+            raise Exception("Internal error: full_graph is requested after release")
+        else:
+            return self._full_graph
+
+    def release_full_graph(self):
+        assert self._full_graph is not Context.RELEASED and self._full_graph is not None
+        result = self._full_graph
+        self._full_graph = Context.RELEASED
+        return result
+
+    @property
     def abs_targets(self):
         return self.opts.abs_targets or [os.getcwd()]
 
@@ -1169,17 +1191,25 @@ class Context(object):
         if self.graph is None:
             return
 
-        self.graph['conf']['keepon'] = self.opts.continue_on_fail
-        self.graph['conf'].update(gp.gen_description())
+        graph_conf = self.graph['conf']
+        graph_conf['keepon'] = self.opts.continue_on_fail
+        graph_conf.update(gp.gen_description())
         if self.opts.default_node_requirements:
-            self.graph['conf']['default_node_requirements'] = self.opts.default_node_requirements
+            graph_conf['default_node_requirements'] = self.opts.default_node_requirements
         if self.opts.use_distbuild:
-            if self.opts.distbuild_cluster:
-                self.graph['cluster'] = self.opts.distbuild_cluster
-            if self.opts.coordinators_filter:
-                self.graph['conf']['coordinator'] = self.opts.coordinators_filter
             if self.opts.distbuild_pool:
-                self.graph['conf']['pool'] = self.opts.distbuild_pool
+                graph_conf['pool'] = self.opts.distbuild_pool
+            if self.opts.dist_priority:
+                graph_conf['priority'] = self.opts.dist_priority
+            if self.opts.distbuild_cluster:
+                graph_conf['cluster'] = self.opts.distbuild_cluster
+            if self.opts.distbuild_cluster:
+                graph_conf['cluster'] = self.opts.distbuild_cluster
+            elif self.opts.coordinators_filter:
+                graph_conf['coordinator'] = self.opts.coordinators_filter
+            if self.opts.cache_namespace:
+                graph_conf['namespace'] = self.opts.cache_namespace
+
             if self.opts.trace_context_json:
                 # Trace context should be extracted earlier but since `ya` doesn't use OTEL tracing
                 # we extract it here and pass it directly to DistBuild.
@@ -1210,10 +1240,10 @@ class Context(object):
 
         if self.opts.dump_graph_file:
             with open(self.opts.dump_graph_file, 'w') as gf:
-                json.dump(self.graph, gf, sort_keys=True, indent=4, default=str)
+                json.dump(self.full_graph, gf, sort_keys=True, indent=4, default=str)
         else:
             stdout = self.opts.stdout or sys.stdout
-            json.dump(self.graph, stdout, sort_keys=True, indent=4, default=str)
+            json.dump(self.full_graph, stdout, sort_keys=True, indent=4, default=str)
             stdout.flush()
 
         self._timer.show_step("dump_graph finished")
@@ -1862,7 +1892,7 @@ class YaMake(object):
 
                 if self.opts.dump_distbuild_graph:
                     with zcopen(self.opts.dump_distbuild_graph) as graph_file:
-                        sjson.dump(self.ctx.graph, graph_file)
+                        sjson.dump(self.ctx.full_graph, graph_file)
 
                 def activate_callback(res=None, build_stage=None):
                     try:
@@ -1886,7 +1916,7 @@ class YaMake(object):
                 if ready:
                     logger.debug("Starting distbuild")
                     res = distbs.run_dist_build(
-                        self.ctx.graph,
+                        self.ctx.release_full_graph(),
                         self.ctx.opts,
                         display,
                         activate_callback,
