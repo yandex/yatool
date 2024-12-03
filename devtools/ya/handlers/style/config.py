@@ -114,7 +114,7 @@ class AutoincludeConfig:
         keys = self._trie.prefixes(str(path))
         if keys:
             path = sorted(keys, key=len)[-1]
-            return self._autoinc_to_conf[path]
+            return self._autoinc_to_conf.get(path, "")
         return ""
 
 
