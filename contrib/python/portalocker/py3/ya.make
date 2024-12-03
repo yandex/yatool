@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(2.10.1)
+VERSION(3.0.0)
 
 LICENSE(BSD-3-Clause)
 
@@ -21,6 +21,7 @@ PY_SRCS(
     portalocker/exceptions.py
     portalocker/portalocker.py
     portalocker/redis.py
+    portalocker/types.py
     portalocker/utils.py
 )
 
