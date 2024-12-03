@@ -1187,15 +1187,7 @@ class CoverageOptions(core.yarg.Options):
         self.coverage_prefix_filter = None
         self.coverage_report_path = None
         self.coverage_succeed_upload_uids_file = None
-        self.coverage_ua_push_tool = None
-        self.coverage_ua_upload_data_uri = None
-        self.coverage_ua_upload_meta_uri = None
-        self.coverage_ua_upload_sid = None
-        self.coverage_upload_lb_endpoint = "logbroker.yandex.net"
-        self.coverage_upload_lb_topic_data = None
-        self.coverage_upload_lb_topic_meta = None
         self.coverage_upload_snapshot_name = None
-        self.coverage_use_ua_upload = False
         self.coverage_verbose_resolve = False
         self.coverage_yt_token_path = None
         self.enable_contrib_coverage = False
@@ -1387,71 +1379,6 @@ class CoverageOptions(core.yarg.Options):
                 visible=help_level.HelpLevel.BASIC,
             ),
             TestArgConsumer(
-                ['--upload-coverage-with-ua'],
-                help='Use new coverage scheme',
-                hook=core.yarg.SetConstValueHook('coverage_use_ua_upload', True),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            TestArgConsumer(
-                ['--upload-coverage-with-ua-only'],
-                help='Use only unified agent uploader',
-                hook=core.yarg.SetConstValueHook('coverage_direct_upload_yt', False),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            TestArgConsumer(
-                ['--coverage-ua-upload-sid'],
-                help='Sid new coverage scheme',
-                hook=core.yarg.SetValueHook('coverage_ua_upload_sid'),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            core.yarg.EnvConsumer(
-                'YA_COVERAGE_FORCE_DATA_URI',
-                hook=core.yarg.SetValueHook('coverage_ua_upload_data_uri'),
-            ),
-            core.yarg.EnvConsumer(
-                'YA_COVERAGE_FORCE_META_URI',
-                hook=core.yarg.SetValueHook('coverage_ua_upload_meta_uri'),
-            ),
-            TestArgConsumer(
-                ['--coverage-ua-push-tool'],
-                help='Unified agent coverage push tool (debug)',
-                hook=core.yarg.SetValueHook('coverage_ua_push_tool'),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            TestArgConsumer(
-                ['--coverage-upload-lb-topic-data'],
-                help='Logbroker topic for writing data',
-                hook=core.yarg.SetValueHook('coverage_upload_lb_topic_data'),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            core.yarg.EnvConsumer(
-                'YA_COVERAGE_UPLOAD_LB_TOPIC_DATA',
-                hook=core.yarg.SetValueHook('coverage_upload_lb_topic_data'),
-            ),
-            TestArgConsumer(
-                ['--coverage-upload-lb-topic-meta'],
-                help='Logbroker topic for writing meta',
-                hook=core.yarg.SetValueHook('coverage_upload_lb_topic_meta'),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            core.yarg.EnvConsumer(
-                'YA_COVERAGE_UPLOAD_LB_TOPIC_META',
-                hook=core.yarg.SetValueHook('coverage_upload_lb_topic_meta'),
-            ),
-            TestArgConsumer(
-                ['--coverage-upload-lb-endpoint'],
-                help='Logbroker host endpoint',
-                hook=core.yarg.SetValueHook('coverage_upload_lb_endpoint'),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=help_level.HelpLevel.INTERNAL,
-            ),
-            TestArgConsumer(
                 ['--coverage-verbose-resolve'],
                 help='Print debug logs during coverage resolve stage',
                 hook=core.yarg.SetConstValueHook('coverage_verbose_resolve', True),
@@ -1476,14 +1403,6 @@ class CoverageOptions(core.yarg.Options):
         if self.fast_clang_coverage_merge and not self.clang_coverage:
             raise core.yarg.ArgsValidatingException(
                 "You can use '--fast-clang-coverage-merge' only with '--clang-coverage' options"
-            )
-
-        if self.coverage_use_ua_upload and not (
-            self.coverage_upload_lb_topic_data and self.coverage_upload_lb_topic_meta
-        ):
-            raise core.yarg.ArgsValidatingException(
-                "You can use '--upload-coverage-with-ua' only if options '--coverage-upload-lb-topic-data' (or env 'YA_COVERAGE_UPLOAD_LB_TOPIC_DATA') and "
-                "'--coverage-upload-lb-topic-meta' (or env 'YA_COVERAGE_UPLOAD_LB_TOPIC_META') are both used"
             )
 
     def postprocess2(self, params):
@@ -1526,11 +1445,6 @@ class CoverageOptions(core.yarg.Options):
             params.sanitize_coverage = params.sanitize_coverage or 'trace-pc-guard,no-prune'
             params.sanitize = params.sanitize or 'address'
             coverage_requested = True
-
-        if params.coverage_ua_push_tool:
-            for flags in ['flags', 'host_flags']:
-                if hasattr(params, flags):
-                    getattr(params, flags)['USE_SYSTEM_COVERAGE_PUSH_TOOL'] = self.coverage_ua_push_tool
 
         if coverage_requested:
             if params.coverage_prefix_filter:

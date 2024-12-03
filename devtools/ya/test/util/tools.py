@@ -211,11 +211,3 @@ def get_corpus_data_path(project_path, root=None):
     if root:
         return os.path.join(root, target)
     return target
-
-
-def get_coverage_push_tool(opts, global_resources):
-    if opts and const.COVERAGE_PUSH_TOOL_LOCAL in opts.flags:
-        return opts.flags[const.COVERAGE_PUSH_TOOL_LOCAL]
-    return '{}/cov2lb'.format(
-        global_resources.get(const.COVERAGE_PUSH_TOOL_LB_RESOURCE, '$({})'.format(const.COVERAGE_PUSH_TOOL_LB_RESOURCE))
-    )

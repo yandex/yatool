@@ -93,9 +93,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
     input_file = os.path.join(test_out_path, covname)
     node_log_path = os.path.join(test_out_path, os.path.splitext(covname)[0] + "_upload.log")
     yt_table_path = get_upload_yt_table_root(arc_root, chunk, opts.coverage_upload_snapshot_name)
-    node_uid = uid_gen.get_uid(
-        deps + [yt_table_path], "coverage_upload" + ("_ua" if opts and opts.coverage_use_ua_upload else "")
-    )
+    node_uid = uid_gen.get_uid(deps + [yt_table_path], "coverage_upload")
     cmds = []
 
     if opts and opts.coverage_direct_upload_yt:
@@ -119,31 +117,6 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
         ]
 
         cmds.append({"cmd_args": stool_cmd, "cwd": "$(BUILD_ROOT)"})
-
-    if opts and opts.coverage_use_ua_upload:
-        pusher_tool = util_tools.get_coverage_push_tool(opts, suite.global_resources)
-        pusher_cmd = [
-            pusher_tool,
-            "--node-uid",
-            node_uid,
-            "--build-sid",
-            opts.coverage_ua_upload_sid or 'NULL',
-            "--test-path",
-            suite.project_path,
-            "--data-file",
-            input_file,
-            "--test-type",
-            suite.get_type(),
-            "--endpoint",
-            opts.coverage_upload_lb_endpoint,
-            "--log-filename",
-            node_log_path,
-            "--lb-topic-data",
-            opts.coverage_upload_lb_topic_data,
-            "--lb-topic-meta",
-            opts.coverage_upload_lb_topic_meta,
-        ]
-        cmds.append({"cmd_args": pusher_cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
@@ -171,9 +144,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
         "cmds": cmds,
         "tags": ['coverage_upload_node'],
     }
-    # XXX we need to be able to disable limitation for test purposes
-    upload_with_ua_only = opts and opts.coverage_use_ua_upload and not opts.coverage_direct_upload_yt
-    if int(os.environ.get("YA_COVERAGE_TAG_UPLOAD_NODES", "1")) and not upload_with_ua_only:
+    if int(os.environ.get("YA_COVERAGE_TAG_UPLOAD_NODES", "1")):
         node["tag"] = "coverage_yt_upload"
     graph.append_node(node, add_to_result=True)
     return node["uid"]

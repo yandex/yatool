@@ -2899,10 +2899,6 @@ def _resolve_test_tools(graph_maker, toolchain, debug_id, opts):
             tconst.WINE32_TOOL,
         ]
 
-    if getattr(opts, 'coverage_use_ua_upload', None):
-        targets.append(os.path.join('build', 'platform', 'coverage_push_tool'))
-        resources.append(tconst.COVERAGE_PUSH_TOOL_LB_RESOURCE)
-
     if getattr(opts, 'ts_coverage', None):
         targets.append(os.path.join('build', 'platform', 'nodejs'))
         resources.append(tconst.NODEJS_RESOURCE)
