@@ -1,7 +1,7 @@
 import math
 import os
 
-import jbuild.gen.consts
+import yalibrary.graph.const
 
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const as test_const
@@ -43,11 +43,11 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
     @property
     def test_for_path(self):
-        return os.path.join(jbuild.gen.consts.BUILD_ROOT, self.meta.ts_test_for_path)
+        return os.path.join(yalibrary.graph.const.BUILD_ROOT, self.meta.ts_test_for_path)
 
     def _get_run_cmd_opts(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             self.project_path,
             self.name,
             retry,
@@ -65,9 +65,9 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
         opts = [
             "--source-root",
-            jbuild.gen.consts.SOURCE_ROOT,
+            yalibrary.graph.const.SOURCE_ROOT,
             "--build-root",
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             "--project-path",
             self.project_path,
             "--test-work-dir",
@@ -320,15 +320,15 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
         return False
 
     def _abs_source_path(self, path):
-        prefix = os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path)
+        prefix = os.path.join(yalibrary.graph.const.SOURCE_ROOT, self.project_path)
         return path if path.startswith(prefix) else os.path.normpath(os.path.join(prefix, path))
 
     def _abs_build_path(self, path):
-        prefix = os.path.join(jbuild.gen.consts.BUILD_ROOT, self.project_path)
+        prefix = os.path.join(yalibrary.graph.const.BUILD_ROOT, self.project_path)
         return path if path.startswith(prefix) else os.path.normpath(os.path.join(prefix, path))
 
     def _rel_from_abs_source(self, path):
-        prefix = os.path.join(jbuild.gen.consts.SOURCE_ROOT, self.project_path)
+        prefix = os.path.join(yalibrary.graph.const.SOURCE_ROOT, self.project_path)
         return os.path.relpath(path, prefix) if path.startswith(prefix) else path
 
     def get_test_dependencies(self):
@@ -352,9 +352,9 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
         inputs = self.get_run_cmd_inputs(opts)
 
         return [
-            f.replace(jbuild.gen.consts.SOURCE_ROOT, arc_root)
+            f.replace(yalibrary.graph.const.SOURCE_ROOT, arc_root)
             for f in inputs
-            if f.startswith(jbuild.gen.consts.SOURCE_ROOT)
+            if f.startswith(yalibrary.graph.const.SOURCE_ROOT)
         ]
 
     def setup_dependencies(self, graph):
@@ -455,7 +455,7 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             self.project_path,
             self.name,
             retry,
@@ -474,9 +474,9 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
         )
         cmd += [
             "--source-root",
-            jbuild.gen.consts.SOURCE_ROOT,
+            yalibrary.graph.const.SOURCE_ROOT,
             "--build-root",
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             "--source-folder-path",
             self.meta.source_folder_path,
             "--nodejs",
@@ -510,7 +510,7 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
             multi_target_platform_run=multi_target_platform_run,
         )
         self._ts_config_path = self.meta.ts_config_path
-        self._files = [f.replace("$S/", jbuild.gen.consts.SOURCE_ROOT + "/") for f in sorted(self.meta.test_files)]
+        self._files = [f.replace("$S/", yalibrary.graph.const.SOURCE_ROOT + "/") for f in sorted(self.meta.test_files)]
 
     def get_type(self):
         return "tsc_typecheck"
@@ -525,7 +525,7 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         # test_work_dir: $(BUILD_ROOT)/devtools/dummy_arcadia/typescript/with_lint/test-results/eslint
         test_work_dir = test_common.get_test_suite_work_dir(
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             self.project_path,
             self.name,
             retry,
@@ -544,9 +544,9 @@ class TscTypecheckTestSuite(AbstractFrontendStyleSuite):
         )
         cmd += [
             "--source-root",
-            jbuild.gen.consts.SOURCE_ROOT,
+            yalibrary.graph.const.SOURCE_ROOT,
             "--build-root",
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             "--source-folder-path",
             self.meta.source_folder_path,
             "--nodejs",
@@ -594,7 +594,7 @@ class StylelintTestSuite(AbstractFrontendStyleSuite):
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             self.project_path,
             self.name,
             retry,
@@ -614,9 +614,9 @@ class StylelintTestSuite(AbstractFrontendStyleSuite):
 
         cmd_args = [
             "--source-root",
-            jbuild.gen.consts.SOURCE_ROOT,
+            yalibrary.graph.const.SOURCE_ROOT,
             "--build-root",
-            jbuild.gen.consts.BUILD_ROOT,
+            yalibrary.graph.const.BUILD_ROOT,
             "--project-path",
             self.meta.source_folder_path,
             "--nodejs-dir",
