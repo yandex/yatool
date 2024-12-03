@@ -1138,15 +1138,16 @@ class Context(object):
 
     @property
     def full_graph(self):
+        assert self._full_graph is not Context.RELEASED, "full_graph is requested after release"
         if self._full_graph is None:
             return self.graph
-        elif self._full_graph is Context.RELEASED:
-            raise Exception("Internal error: full_graph is requested after release")
         else:
             return self._full_graph
 
     def release_full_graph(self):
-        assert self._full_graph is not Context.RELEASED and self._full_graph is not None
+        assert (
+            self._full_graph is not Context.RELEASED and self._full_graph is not None
+        ), "releasing an uninitialized or already released graph"
         result = self._full_graph
         self._full_graph = Context.RELEASED
         return result
