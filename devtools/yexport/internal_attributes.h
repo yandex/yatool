@@ -11,6 +11,7 @@ namespace NInternalAttrs {
     inline static const std::string MacroArgs = "macro_args";///< Macro arguments of target
     inline static const std::string IsTest = "is_test";///< This target is test
     inline static const std::string Subdirs = "subdirs";///< Subdirectories of directory
+    inline static const std::string Curdir = "curdir";///< Current directory (relative to export root)
     inline static const std::string Target = "target";///< Main target of directory
     inline static const std::string ExtraTargets = "extra_targets";///< Extra targets of directory
     inline static const std::string HasTest = "has_test";///< Extra targets of directory has at least one test

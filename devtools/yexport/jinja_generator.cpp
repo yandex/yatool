@@ -519,6 +519,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
         }
         Y_ASSERT(dir->Attrs); // Attributes for all directories must be created at TProject::TBuilder::CreateDirectories
         auto& dirMap = dir->Attrs->GetWritableMap();
+        NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Curdir, dir->Path.string());
         if (!dir->Subdirs.empty()) {
             auto [subdirsIt, _] = NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::Subdirs, jinja2::ValuesList{});
             auto& subdirs = subdirsIt->second.asList();
