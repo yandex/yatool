@@ -76,7 +76,6 @@ class SemConfig:
                 'TRAVERSE_RECURSE': 'yes',
                 'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
                 'USE_PREBUILT_TOOLS': 'no',
-                'SBOM_GENERATION_ALLOWED': 'no',
             }
         )
 
