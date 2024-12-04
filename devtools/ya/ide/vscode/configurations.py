@@ -57,7 +57,7 @@ def gen_debug_configurations(
             )
         else:
             try:
-                gdb_path = tool_fetcher("gdbnew")[0]
+                gdb_path = tool_fetcher("gdbnew")["executable"]
                 cpp_debug_params = OrderedDict(
                     (
                         ("type", "cppdbg"),
