@@ -2,6 +2,8 @@
 
 #include "roots_options.h"
 
+#include <devtools/ymake/config/transition.h>
+
 #include <library/cpp/getopt/small/last_getopt.h>
 
 #include <util/folder/path.h>
@@ -20,6 +22,7 @@ struct TStartUpOptions: public TRootsOptions {
     TVector<TFsPath> Targets;
 
     bool ReadStartTargetsFromEvlog = false;
+    ETransition TransitionSource = ETransition::None;
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);

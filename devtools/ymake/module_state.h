@@ -175,6 +175,8 @@ private:
 
     TPeersRulesSavedState PeersRules;
 
+    ETransition Transition;
+
 public:
     TModuleSavedState(const TModule& mod);
 
@@ -201,7 +203,8 @@ public:
         DataPathsIds,
         SelfPeers,
         ExtraOuts,
-        PeersRules
+        PeersRules,
+        Transition
         );
 };
 
@@ -222,6 +225,7 @@ public:
     TRawIncludes RawIncludes;
     TVector<ui32> SelfPeers;
     TVector<ui32> ExtraOuts;
+    ETransition Transition;
 
     explicit TModule() = delete; // Must initialize IncDirs.
 

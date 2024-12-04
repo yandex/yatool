@@ -38,5 +38,5 @@ constexpr TStringBuf SYMLINK_POLICY = "SYMLINK_POLICY";
 constexpr TStringBuf USE_INJECTED_DATA = "USE_INJECTED_DATA";
 constexpr TStringBuf USE_PEERS_LATE_OUTS = "USE_PEERS_LATE_OUTS";
 constexpr TStringBuf FILE_GROUP = "FILE_GROUP";
-
+constexpr TStringBuf TRANSITION = "TRANSITION";
 }

@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/common/probe.h>
+#include <devtools/ymake/config/transition.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/trace.h>
 
@@ -41,6 +42,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     TRootsOptions::AddOptions(opts);
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
     opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
+    opts.AddLongOption("transition-source").StoreResult<ETransition>(&TransitionSource).Optional();
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {

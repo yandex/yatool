@@ -958,7 +958,8 @@ namespace {
                 name == NOptions::GLOBAL_CMD ||
                 name == NOptions::GLOBAL_SEM ||
                 name == NOptions::GLOBAL_EXTS ||
-                name == NOptions::EPILOGUE)
+                name == NOptions::EPILOGUE ||
+                name == NOptions::TRANSITION)
             {
                 // Do nothing
             } else if (name == NOptions::PEERDIRSELF) {

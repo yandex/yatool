@@ -109,15 +109,14 @@ namespace {
         return result;
     }
 
-    NEvent::TForeignPlatformTarget PossibleTool(TFileView modDir) {
+    NEvent::TForeignPlatformTarget PossibleForeignPlatformEvent(TFileView modDir, NEvent::TForeignPlatformTarget::EPlatform platform) {
         Y_ASSERT(modDir.InSrcDir() && !modDir.IsLink());
         NEvent::TForeignPlatformTarget res;
-        res.SetPlatform(::NEvent::TForeignPlatformTarget::TOOL);
+        res.SetPlatform(platform);
         res.SetReachable(::NEvent::TForeignPlatformTarget::POSSIBLE);
         res.SetDir(TString{modDir.CutType()});
         return res;
     }
-
 }
 
 TModuleResolveContext MakeModuleResolveContext(const TModule& mod, const TRootsOptions& conf, TDepGraph& graph, const TUpdIter& updIter,
@@ -1646,7 +1645,7 @@ inline void TUpdIter::Left(TState& state) {
         if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
             const auto dirNode = Graph.GetNodeById(LastType, LastElem);
             const auto toolDir = Graph.GetFileName(dirNode);
-            FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleTool(toolDir));
+            FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
         }
     }
 
@@ -1724,6 +1723,14 @@ inline void TUpdIter::Left(TState& state) {
                     AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
                     node->ModuleBldr->RecursiveAddInputs();
                 }
+
+                if (YMake.Conf.TransitionSource != ETransition::None && node->Module->Transition != YMake.Conf.TransitionSource) {
+                    if (node->Module->Transition == ETransition::Pic) {
+                        FORCE_UNIQ_CONFIGURE_TRACE(node->Module->GetDir(), T, PossibleForeignPlatformEvent(node->Module->GetDir(), NEvent::TForeignPlatformTarget::PIC));
+                    } else if (node->Module->Transition == ETransition::NoPic) {
+                        FORCE_UNIQ_CONFIGURE_TRACE(node->Module->GetDir(), T, PossibleForeignPlatformEvent(node->Module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC));
+                    }
+                }
             }
 
             if (IsPeerdirDep(st.Node.NodeType, dep.DepType, dep.DepNode.NodeType)) {
@@ -1778,7 +1785,7 @@ inline void TUpdIter::Left(TState& state) {
                     node->AddUniqueDep(st.Dep.DepType, libNode.Node.Value().NodeType, libNode.Node.Value().ElemId);
                     if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
                         const auto toolDir = Graph.GetFileName(dirNode);
-                        FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleTool(toolDir));
+                        FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
                     }
                 }
                 else if (libNode.Status == EPeerSearchStatus::NoModules) {

@@ -140,6 +140,7 @@ TModuleSavedState::TModuleSavedState(const TModule& mod) {
 
 TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
     : IncDirs(context.SymbolsTable)
+    , Transition(saved.Transition)
     , NodeType(saved.NodeType)
     , Id(saved.Id)
     , GlobalLibId(saved.GlobalLibId)
@@ -220,6 +221,7 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.GlobalLibId = GlobalLibId;
     saved.SelfPeers = SelfPeers;
     saved.ExtraOuts = ExtraOuts;
+    saved.Transition = Transition;
 
     saved.Attrs.AllBits = Attrs.AllBits;
 
@@ -292,6 +294,7 @@ void TModule::Init(TString fileName, TString globalFileName, TString baseName, c
 
     NodeType = conf.NodeType;
     PeerdirType = conf.PeerdirType;
+    Transition = conf.Transition;
 
     Attrs.UseInjectedData = conf.UseInjectedData;
     Attrs.UsePeers = PeerdirType == EPT_BuildFrom;

@@ -7,20 +7,30 @@
 
 namespace {
 
-    NEvent::TForeignPlatformTarget RequiredTool(const TModule& mod) {
+    NEvent::TForeignPlatformTarget RequiredForeignPlatformEvent(const TModule& mod, NEvent::TForeignPlatformTarget::EPlatform platform) {
         NEvent::TForeignPlatformTarget res;
-        res.SetPlatform(::NEvent::TForeignPlatformTarget::TOOL);
+        res.SetPlatform(platform);
         res.SetReachable(::NEvent::TForeignPlatformTarget::REQUIRED);
         res.SetDir(TString{mod.GetDir().CutType()});
         res.SetModuleTag(TString{mod.GetTag()});
         return res;
     }
-
 }
 
 bool TForeignPlatformEventsReporter::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     const auto& node = state.TopNode();
+
+    if (TransitionSource != ETransition::None && IsModule(state.Top())) {
+        auto module = Modules.Get(node->ElemId);
+        if (module->Transition != TransitionSource) {
+            if (module->Transition == ETransition::Pic) {
+                FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::PIC));
+            } else if (module->Transition == ETransition::NoPic) {
+                FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::NOPIC));
+            }
+        }
+    }
 
     if (fresh) {
         if (IsModule(state.Top())) {
@@ -43,7 +53,7 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     // We should report tool even if we visited node by non-tool edge first
     if (!CurEnt->ToolReported && state.HasIncomingDep() && IsModule(state.Top()) && IsDirectToolDep(state.IncomingDep())) {
         if (!TDepGraph::Graph(node).Names().CommandConf.GetById(TVersionedCmdId(state.IncomingDep().From()->ElemId).CmdId()).KeepTargetPlatform) {
-            FORCE_TRACE(T, RequiredTool(*Modules.Get(node->ElemId)));
+            FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::TOOL));
             CurEnt->ToolReported = true;
         }
     }
@@ -210,7 +220,7 @@ bool TRecurseConfigureErrorReporter::Enter(TState& state) {
 
 void TYMake::ReportForeignPlatformEvents() {
     NYMake::TTraceStage scopeTracer{"Report Foreign Platform Events"};
-    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics);
+    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource);
     IterateAll(Graph, StartTargets, eventReporter, [](const TTarget& t) -> bool {
         return t.IsModuleTarget;
     });

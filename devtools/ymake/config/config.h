@@ -8,6 +8,8 @@
 
 #include <devtools/ymake/common/md5sig.h>
 
+#include <devtools/ymake/config/transition.h>
+
 // TODO: fix back includes
 #include <devtools/ymake/cmd_properties.h>
 
@@ -111,6 +113,7 @@ struct TModuleConf {
     bool HasSemanticsForGlobals = false;
     bool StructCmd = false; // Marker requiring to use structured command representation DEVTOOLS-8280
     bool StructCmdSet = false;
+    ETransition Transition{ETransition::None};
 
     THashSet<TString> Restricted;
     THashSet<TString> Ignored;

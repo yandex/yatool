@@ -273,7 +273,8 @@ bool TModuleConf::IsOption(const TStringBuf name) {
         NOptions::SYMLINK_POLICY,
         NOptions::USE_INJECTED_DATA,
         NOptions::USE_PEERS_LATE_OUTS,
-        NOptions::FILE_GROUP
+        NOptions::FILE_GROUP,
+        NOptions::TRANSITION
     };
     return properties.contains(name);
 }
@@ -340,6 +341,9 @@ void TModuleConf::Inherit(const TModuleConf& parent) {
     }
     if (!SetModuleBasename && parent.ParseModuleArgs) {
         SetModuleBasename = parent.SetModuleBasename;
+    }
+    if (Transition == ETransition::None && parent.Transition != ETransition::None) {
+        Transition = parent.Transition;
     }
 
     for (const auto& i : parent.Allowed) {
@@ -562,6 +566,13 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         SelfPeers = tags.Take();
     } else if (name == NOptions::EPILOGUE) {
         Epilogue = Strip(TString(value));
+    } else if (name == NOptions::TRANSITION) {
+        auto transition = FromString<ETransition>(TString(value));
+        if (transition != ETransition::None) {
+            Transition = transition;
+        } else {
+            ReportUnexpectedValueForProperty(key, name, value);
+        }
     } else {
         return false;
     }
@@ -593,6 +604,7 @@ void TModuleConf::Load(IInputStream* input) {
     ::Load(input, HasSemanticsForGlobals);
     ::Load(input, StructCmd);
     ::Load(input, StructCmdSet);
+    ::Load(input, Transition);
 
     ::Load(input, Restricted);
     ::Load(input, Ignored);
@@ -646,6 +658,7 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, HasSemanticsForGlobals);
     ::Save(output, StructCmd);
     ::Save(output, StructCmdSet);
+    ::Save(output, Transition);
 
     ::Save(output, Restricted);
     ::Save(output, Ignored);

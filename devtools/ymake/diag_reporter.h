@@ -28,12 +28,14 @@ public:
     const TSymbols& Names;
     const TModules& Modules;
     const bool RenderSemantics;
+    const TMaybe<ETransition> TransitionSource;
 
 public:
-    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics)
+    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics, const TMaybe<ETransition>& transitionSource)
         : Names(names)
         , Modules(modules)
         , RenderSemantics(renderSemantics)
+        , TransitionSource(transitionSource)
     {}
 
     bool Enter(TState& state);

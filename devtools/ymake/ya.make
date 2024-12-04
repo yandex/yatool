@@ -188,6 +188,7 @@ ENDIF()
 
 GENERATE_ENUM_SERIALIZATION(add_iter_debug.h)
 GENERATE_ENUM_SERIALIZATION(config/config.h)
+GENERATE_ENUM_SERIALIZATION(config/transition.h)
 GENERATE_ENUM_SERIALIZATION(export_json_debug.h)
 GENERATE_ENUM_SERIALIZATION(include_processors/include.h)
 GENERATE_ENUM_SERIALIZATION(induced_props.h)

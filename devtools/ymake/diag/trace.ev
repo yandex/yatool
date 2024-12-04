@@ -116,6 +116,7 @@ message TForeignPlatformTarget {
     enum EPlatform {
         TOOL=0;
         PIC=1;
+        NOPIC=2;
     }
     enum EKind {
         POSSIBLE=0;
