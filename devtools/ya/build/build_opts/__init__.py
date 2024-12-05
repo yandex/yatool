@@ -2830,9 +2830,11 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.INTERNAL,
                 ),
                 ConfigConsumer('yt_store_refresh_on_read'),
-                EnvConsumer('YA_YT_STORE_CPP_CLIENT', hook=SetValueHook('yt_store_cpp_client')),
+                EnvConsumer('YA_YT_STORE_CPP_CLIENT', hook=SetValueHook('yt_store_cpp_client', return_true_if_enabled)),
                 ConfigConsumer('yt_store_cpp_client'),
-                EnvConsumer('YA_YT_STORE_REFRESH_ON_READ', hook=SetValueHook('yt_store_refresh_on_read')),
+                EnvConsumer(
+                    'YA_YT_STORE_REFRESH_ON_READ', hook=SetValueHook('yt_store_refresh_on_read', return_true_if_enabled)
+                ),
             ]
             + make_opt_consumers(
                 'yt_replace_result',
