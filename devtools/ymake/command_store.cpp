@@ -163,7 +163,7 @@ namespace {
             // TBD what about vector vars here?
             auto name = Values.GetVarName(id);
             auto var = Vars.Lookup(name);
-            if (!var || var->empty()) {
+            if (!var || var->DontExpand /* see InitModuleVars() */) {
                 // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
                 // note that the extra braces in the result are significant:
                 // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
@@ -285,14 +285,6 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
             ythrow TError() << "self-contradictory variable definition (" << name << ")";
     }
 
-    // validate contents
-
-    if (var->size() != 1)
-        ythrow TNotImplemented() << "unexpected variable size " << var->size() << " (" << name << ")";
-    auto& val = var->at(0);
-    if (!val.HasPrefix)
-        ythrow TError() << "unexpected variable format";
-
     // check the parser cache
 
     auto defs = LegacyVars.DefinitionCache.find(name);
@@ -305,11 +297,26 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
 
     // do the thing
 
-    ui64 scopeId;
-    TStringBuf cmdName;
-    TStringBuf cmdValue;
-    ParseLegacyCommandOrSubst(val.Name, scopeId, cmdName, cmdValue);
-    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue))));
+    if (var->size() == 1 && var->front().HasPrefix) {
+        // a conventional variable
+        ui64 scopeId;
+        TStringBuf cmdName;
+        TStringBuf cmdValue;
+        ParseLegacyCommandOrSubst(var->front().Name, scopeId, cmdName, cmdValue);
+        defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue))));
+    } else {
+        // a macro argument
+        NCommands::TSyntax syn;
+        syn.Script.emplace_back();
+        for (auto& val : *var) {
+            auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val.Name);
+            for (auto& cmd : _val.Script)
+                syn.Script.front().insert(syn.Script.front().end(),
+                    std::make_move_iterator(cmd.begin()),
+                    std::make_move_iterator(cmd.end()));
+        }
+        defs->second->push_back(MakeHolder<NCommands::TSyntax>(std::move(syn)));
+    }
     return {defs->second->back().Get(), true};
 }
 
@@ -367,18 +374,8 @@ const NCommands::TSyntax* TCommands::TInliner::VarLookup(TStringBuf name) {
 }
 
 const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const TBuildConfiguration* conf) {
-    // do not expand vars that have been overridden
-    // (e.g., ignore the global `SRCFLAGS=` from `ymake.core.conf`
-    // while dealing with the `SRCFLAGS` parameter in `_SRC()`)
-    for (auto macroVars = &AllVars; macroVars; macroVars = macroVars->Base) {
-        if (macroVars == &InlineVars)
-            break;
-        if (macroVars->Contains(name))
-            return {};
-    }
-
-    auto var = InlineVars.Lookup(name);
-    if (!var || var->DontExpand)
+    auto var = Vars.Lookup(name);
+    if (!var || var->DontExpand || var->NoInline)
         return {};
     Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
     if (conf->CommandConf.IsReservedName(name))
@@ -819,17 +816,16 @@ void TCommands::TInliner::CheckDepth() {
 NCommands::TCompiledCommand TCommands::Compile(
     TStringBuf cmd,
     const TBuildConfiguration* conf,
-    const TVars& inlineVars,
-    const TVars& allVars,
+    const TVars& vars,
     bool preevaluate,
-    EOutputAccountingMode oam
+    TCompilationIODesc io
 ) {
-    auto inliner = TInliner(conf, *this, inlineVars, allVars);
+    auto inliner = TInliner(conf, *this, vars);
     auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
     auto ast = inliner.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate)
-        return Preevaluate(ast, allVars, oam);
+        return Preevaluate(ast, vars, io);
     else
         return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast)};
 }
@@ -937,6 +933,7 @@ TString TCommands::PrintConst(NPolexpr::TConstId id) const {
         [](TMacroValues::TInput         val) { return fmt::format("Input{{{}}}", val.Coord); },
         [](TMacroValues::TInputs        val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TOutput        val) { return fmt::format("Output{{{}}}", val.Coord); },
+        [](TMacroValues::TOutputs       val) { return fmt::format("Outputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TGlobPattern   val) { return fmt::format("GlobPattern{{{}}}", val.Data); }
     }, Values.GetValue(id));
 }
@@ -972,9 +969,9 @@ void TCommands::StreamCmdRepr(
     }
 }
 
-NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam) {
+NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, TCompilationIODesc io) {
     NCommands::TCompiledCommand result;
-    switch (oam) {
+    switch (io.OutputAccountingMode) {
         case EOutputAccountingMode::Default:
             break;
         case EOutputAccountingMode::Module:
@@ -982,6 +979,12 @@ NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, con
             result.Outputs.Base = 1;
             break;
     }
+    if (io.KnownInputs)
+        for (auto& x : *io.KnownInputs)
+            result.Inputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));
+    if (io.KnownOutputs)
+        for (auto& x : *io.KnownOutputs)
+            result.Outputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));
     auto reducer = TRefReducer{Mods, Values, vars, result};
     try {
         reducer.ReduceIf(expr);
@@ -1084,27 +1087,41 @@ TVector<TStringBuf> TCommands::GetCommandTools(ui32 elemId) const {
     return result.Take();
 }
 
-TString TCommands::ConstToString(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const {
+NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const {
     return std::visit(TOverloaded{
         [](std::string_view val) {
-             return TString(val);
+             return NCommands::TTermValue(TString(val));
         },
         [&](TMacroValues::TTool val) {
             if (!ctx.CmdInfo.ToolPaths)
-                return TString("TODO/unreachable?/tool/") + val.Data;
-            return ctx.CmdInfo.ToolPaths->at(val.Data);
+                return NCommands::TTermValue(TString("TODO/unreachable?/tool/") + val.Data);
+            return NCommands::TTermValue(ctx.CmdInfo.ToolPaths->at(val.Data));
         },
-        [&](TMacroValues::TInput) -> TString {
-            Y_ABORT();
+        [&](TMacroValues::TInput input) {
+            return NCommands::TTermValue(InputToStringArray(input, ctx));
         },
-        [&](const TMacroValues::TInputs&) -> TString {
-            Y_ABORT();
+        [&](const TMacroValues::TInputs& inputs) {
+            auto result = TVector<TString>();
+            for (auto& coord : inputs.Coords) {
+                auto inputResult = InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
+                result.insert(result.end(), inputResult.begin(), inputResult.end());
+            }
+            return NCommands::TTermValue(result);
         },
         [&](TMacroValues::TOutput val) {
-            return TString(ctx.Vars.at("OUTPUT").at(val.Coord).Name);
+            auto& var = ctx.Vars.at("OUTPUT");
+            return NCommands::TTermValue(TString(var.at(val.Coord).Name));
+        },
+        [&](const TMacroValues::TOutputs& outputs) {
+            auto result = TVector<TString>();
+            auto& var = ctx.Vars.at("OUTPUT");
+            for (auto& coord : outputs.Coords) {
+                result.push_back(var.at(coord).Name);
+            }
+            return NCommands::TTermValue(result);
         },
         [](TMacroValues::TGlobPattern val) {
-            return TString(val.Data);
+            return NCommands::TTermValue(TString(val.Data));
         }
     }, value);
 }
@@ -1124,6 +1141,7 @@ TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
         [](TMacroValues::TInput       val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TInputs      val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TOutput      val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TOutputs     val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TGlobPattern val) { return TString(val.Data); }
     }, Values.GetValue(node));
 }

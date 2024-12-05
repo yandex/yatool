@@ -271,10 +271,54 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         throw yexception() << "MapMacroVars failed" << Endl;
     }
 
+    for (auto& var : ownVars)
+        var.second.NoInline = true;
+
+    if (blockData && blockData->CmdProps) {
+
+        // enable inlining for macro arguments like `IN{input}[]` etc.
+
+        // rationale: these arguments are delivered as `TVarStr` arrays,
+        // and the inliner can handle this,
+        // whereas the preevaluator currently cannot (see TBD/`Eval1` in `TRefReducer::Evaluate(NPolexpr::EVarId)`)
+
+        auto hasDeepReplacement = false;
+        for (auto& kw : blockData->CmdProps->Keywords) {
+            if (kw.second.DeepReplaceTo.size() != 0) {
+                ownVars[kw.first].NoInline = false;
+                hasDeepReplacement = true;
+            }
+        }
+
+        // enable vararg inlining for macros with "deep replacements";
+        // use cases to consider:
+        // we want this in `macro RUN_PROGRAM(<blah>, Args...) {...}`;
+        // we do NOT want this in `macro _SRC(EXT, SRC, SRCFLAGS...) {...}`;
+        // we do NOT want this in `macro SRC_C_SSE2(FILE, FLAGS...) {...}` and suchlike;
+
+        // rationale: varargs are subject to deep replacement,
+        // and the preevaluator needs to observe the resulting input/output/tool modifiers
+        // directly in the top-level expression
+
+        bool hasVarArg = !argNames.empty() && argNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
+        if (hasVarArg && hasDeepReplacement) {
+            TStringBuf name = argNames.back();
+            name.Chop(3);
+            ownVars[name].NoInline = false;
+        }
+
+    }
+
     if (blockData && blockData->StructCmd) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
-        auto compiled = CommandSink->Compile(command, Conf, Module->Vars, ownVars, true);
+        TSpecFileList* knownInputs = {};
+        TSpecFileList* knownOutputs = {};
+        if (auto specFiles = std::get_if<0>(&SpecFiles)) {
+            knownInputs = &specFiles->Input;
+            knownOutputs = &specFiles->Output;
+        }
+        auto compiled = CommandSink->Compile(command, Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
@@ -392,7 +436,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
             << "Expression error (module " << Module->GetUserType() << "), "
             << varName << "=" << varValue << ": "
             << e.what() << Endl;
-        return commands.Compile("$FAIL_EXPR", Conf, Module->Vars, Module->Vars, false);
+        return commands.Compile("$FAIL_EXPR", Conf, Module->Vars, false, {});
     };
 
     auto mkCmd = [&](TStringBuf exprVarName) {
@@ -402,7 +446,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
         auto compiled = NCommands::TCompiledCommand();
         try {
-            compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, varDefinitionSources, false);
+            compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, false, {});
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, cmdValue);
         }
@@ -456,7 +500,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         auto val = EvalAll(var);
         auto compiled = NCommands::TCompiledCommand();
         try {
-            compiled = commands.Compile(val, Conf, Module->Vars, varDefinitionSources, false);
+            compiled = commands.Compile(val, Conf, varDefinitionSources, false, {});
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, val);
         }

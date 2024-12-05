@@ -29,6 +29,13 @@ namespace NCommands {
         {
         public:
             ui32 Base = 0;
+            ui32 CollectCoord(TStringBuf s) {
+                return this->Push(TLink(s)).first + Base;
+            }
+            template<typename FUpdater>
+            void UpdateCoord(ui32 coord, FUpdater upd) {
+                this->Update(coord - Base, upd);
+            }
         };
         using TInputs = TLinks<TInput>;
         using TOutputs = TLinks<TOutput>;

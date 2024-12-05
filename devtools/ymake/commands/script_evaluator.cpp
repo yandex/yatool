@@ -129,18 +129,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, TOverloaded{
         [&](NPolexpr::TConstId id) -> TTermValue {
             auto val = Commands->Values.GetValue(id);
-            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val)) {
-                auto result = TVector<TString>();
-                for (auto& coord : inputs->Coords) {
-                    auto inputResult = Commands->InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
-                    result.insert(result.end(), inputResult.begin(), inputResult.end());
-                }
-                return result;
-            }
-            if (auto input = std::get_if<TMacroValues::TInput>(&val)) {
-                return Commands->InputToStringArray(*input, ctx);
-            }
-            return TString(Commands->ConstToString(val, ctx));
+            return Commands->EvalConst(val, ctx);
         },
         [&](NPolexpr::EVarId id) -> TTermValue {
             auto varName = Commands->Values.GetVarName(id);
@@ -253,13 +242,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
         if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
             static_assert(sizeof...(args) == 0);
             auto val = Commands->Values.GetValue(id);
-            if (auto inputs = std::get_if<TMacroValues::TInputs>(&val)) {
-                ythrow TNotImplemented();
-            }
-            if (auto input = std::get_if<TMacroValues::TInput>(&val)) {
-                return Commands->InputToStringArray(*input, ctx);
-            }
-            return TString(Commands->ConstToString(val, ctx));
+            return Commands->EvalConst(val, ctx);
         }
         else if constexpr (std::is_same_v<decltype(id), NPolexpr::EVarId>) {
             static_assert(sizeof...(args) == 0);

@@ -195,6 +195,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 IsReservedName : 1;
             ui32 HasBlockData : 1;
             mutable ui32 AddCtxFilled : 1;
+            ui32 NoInline : 1;
         };
     };
     ui32 Id; // tmp hack! only used to return id from Lookup commands

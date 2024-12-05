@@ -72,11 +72,15 @@ public:
         ui32 Coord;
         bool operator==(const TOutput&) const = default;
     };
+    struct TOutputs {
+        TVector<ui32> Coords;
+        bool operator==(const TOutputs&) const = default;
+    };
     struct TGlobPattern {
         std::string_view Data;
         bool operator==(const TGlobPattern&) const = default;
     };
-    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TGlobPattern>;
+    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TOutputs, TGlobPattern>;
 
     enum EStorageType {
         ST_LITERALS,
@@ -85,6 +89,7 @@ public:
         ST_OUTPUTS,
         ST_GLOB,
         ST_INPUT_ARRAYS,
+        ST_OUTPUT_ARRAYS,
     };
 
     NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }

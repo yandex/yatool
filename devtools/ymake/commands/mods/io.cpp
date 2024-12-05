@@ -8,16 +8,6 @@ using namespace NCommands;
 
 namespace {
 
-    template<typename TLinks>
-    ui32 CollectCoord(TStringBuf s, TLinks& links) {
-        return links.Push(s).first + links.Base;
-    }
-
-    template<typename TLinks, typename FUpdater>
-    void UpdateCoord(TLinks& links, ui32 coord, FUpdater upd) {
-        links.Update(coord - links.Base, upd);
-    }
-
     //
     //
     //
@@ -62,15 +52,15 @@ namespace {
                     // one does not simply reuse the original argument,
                     // for it might have been transformed (e.g., dequoted)
                     auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(names.front())));
-                    auto input = TMacroValues::TInput {.Coord = CollectCoord(pooledName, ctx.Sink.Inputs)};
-                    UpdateCoord(ctx.Sink.Inputs, input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
+                    auto input = TMacroValues::TInput {.Coord = ctx.Sink.Inputs.CollectCoord(pooledName)};
+                    ctx.Sink.Inputs.UpdateCoord(input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
                     return input;
                 }
                 auto result = TMacroValues::TInputs();
                 for (auto& name : names) {
                     auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
-                    result.Coords.push_back(CollectCoord(pooledName, ctx.Sink.Inputs));
-                    UpdateCoord(ctx.Sink.Inputs, result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
+                    result.Coords.push_back(ctx.Sink.Inputs.CollectCoord(pooledName));
+                    ctx.Sink.Inputs.UpdateCoord(result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
                 }
                 return result;
             };
@@ -103,12 +93,19 @@ namespace {
                 // one does not simply reuse the original argument,
                 // for it might have been transformed (e.g., dequoted)
                 auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(names.front())));
-                auto result = TMacroValues::TOutput {.Coord = CollectCoord(pooledName, ctx.Sink.Outputs)};
-                if (Id == EMacroFunction::Tmp)
-                    UpdateCoord(ctx.Sink.Outputs, result.Coord, [](auto& x) {x.IsTmp = true;});
+                auto result = TMacroValues::TOutput {.Coord = ctx.Sink.Outputs.CollectCoord(pooledName)};
+                if (Y_UNLIKELY(Id == EMacroFunction::Tmp))
+                    ctx.Sink.Outputs.UpdateCoord(result.Coord, [](auto& x) {x.IsTmp = true;});
                 return result;
             }
-            throw std::runtime_error{"Output arrays are not supported"};
+            auto result = TMacroValues::TOutputs();
+            for (auto& name : names) {
+                auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+                result.Coords.push_back(ctx.Sink.Outputs.CollectCoord(pooledName));
+                if (Y_UNLIKELY(Id == EMacroFunction::Tmp))
+                    ctx.Sink.Outputs.UpdateCoord(result.Coords.back(), [](auto& x) {x.IsTmp = true;});
+            }
+            return result;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -189,13 +186,13 @@ namespace {
             auto context = TFileConf::GetContextType(arg0);
             if (auto arg1 = std::get_if<TMacroValues::TInputs>(&args[1])) {
                 for (auto& coord : arg1->Coords)
-                    UpdateCoord(ctx.Sink.Inputs, coord, [=](auto& var) {
+                    ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) {
                         var.Context = context;
                     });
                 return *arg1;
             }
             if (auto arg1 = std::get_if<TMacroValues::TInput>(&args[1])) {
-                UpdateCoord(ctx.Sink.Inputs, arg1->Coord, [=](auto& var) {
+                ctx.Sink.Inputs.UpdateCoord(arg1->Coord, [=](auto& var) {
                     var.Context = context;
                 });
                 return *arg1;
@@ -220,7 +217,7 @@ namespace {
             auto arg0 = std::get_if<TMacroValues::TOutput>(&args[0]);
             if (!arg0)
                 throw TConfigurationError() << "Modifier [[bad]]" << ToString(Id) << "[[rst]] must be applied to a valid output";
-            UpdateCoord(ctx.Sink.Outputs, arg0->Coord, [&](auto& var) {Do(var);});
+            ctx.Sink.Outputs.UpdateCoord(arg0->Coord, [&](auto& var) {Do(var);});
             return *arg0;
         }
     protected:

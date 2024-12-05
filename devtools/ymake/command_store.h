@@ -31,6 +31,12 @@ enum class EOutputAccountingMode {
     Module // implicit main output
 };
 
+struct TCompilationIODesc {
+    EOutputAccountingMode OutputAccountingMode = EOutputAccountingMode::Default;
+    TSpecFileList* KnownInputs = nullptr;
+    TSpecFileList* KnownOutputs = nullptr;
+};
+
 struct TErrorShowerState {
     using EShowExpressionErrors = TDebugOptions::EShowExpressionErrors;
     EShowExpressionErrors Mode;
@@ -122,10 +128,9 @@ public:
     NCommands::TCompiledCommand Compile(
         TStringBuf cmd,
         const TBuildConfiguration* conf,
-        const TVars& inlineVars,
-        const TVars& allVars,
+        const TVars& vars,
         bool preevaluate,
-        EOutputAccountingMode oam = EOutputAccountingMode::Default
+        TCompilationIODesc io
     );
     ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
@@ -133,7 +138,7 @@ public:
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlightBegin = -1, size_t highlightEnd = -1) const;
     void StreamCmdRepr(const NPolexpr::TExpression& cmdExpr, std::function<void(const char* data, size_t size)> sink) const;
 
-    NCommands::TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, EOutputAccountingMode oam);
+    NCommands::TCompiledCommand Preevaluate(NCommands::TSyntax& expr, const TVars& vars, TCompilationIODesc io);
 
     void WriteShellCmd(
         ICommandSequenceWriter* writer,
@@ -168,7 +173,7 @@ protected:
     }
 
 private:
-    TString ConstToString(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const;
+    NCommands::TTermValue EvalConst(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const;
     TVector<TString> InputToStringArray(const TMacroValues::TInput& input, const NCommands::TEvalCtx& ctx) const;
     TString PrintRawCmdNode(NPolexpr::TConstId node) const;
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
@@ -182,14 +187,12 @@ private:
         TInliner(
             const TBuildConfiguration* conf,
             TCommands& commands,
-            const TVars& inlineVars,
-            const TVars& allVars
+            const TVars& vars
         ):
             Conf(conf),
             Commands(commands),
             LegacyVars{
-                .InlineVars = inlineVars,
-                .AllVars = allVars
+                .Vars = vars
             }
         {}
     public:
@@ -217,8 +220,7 @@ private:
             using TDefinitions = TVector<THolder<NCommands::TSyntax>>; // indexed by recursion depth
             using TDefinitionCache = THashMap<TStringBuf, THolder<TDefinitions>>;
             using TRecursionDepth = THashMap<NPolexpr::EVarId, size_t>;
-            const TVars& InlineVars;
-            const TVars& AllVars;
+            const TVars& Vars;
             TDefinitionCache DefinitionCache = {};
             TRecursionDepth RecursionDepth = {};
             const TYVar* VarLookup(TStringBuf name, const TBuildConfiguration* conf);

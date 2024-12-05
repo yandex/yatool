@@ -27,7 +27,13 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
             return NPolexpr::TConstId(ST_INPUT_ARRAYS, Strings.Add(encoded));
         } else if constexpr (std::is_same_v<T, TOutput>)
             return NPolexpr::TConstId(ST_OUTPUTS, val.Coord);
-        else if constexpr (std::is_same_v<T, TGlobPattern>)
+        else if constexpr (std::is_same_v<T, TOutputs>) {
+            // _obviously_, storing a proper array would be better,
+            // but a naive implementation might actually be not as efficient;
+            // TODO a general array storage
+            auto encoded = fmt::format("{}", fmt::join(val.Coords, " "));
+            return NPolexpr::TConstId(ST_OUTPUT_ARRAYS, Strings.Add(encoded));
+        } else if constexpr (std::is_same_v<T, TGlobPattern>)
             return NPolexpr::TConstId(ST_GLOB, Strings.Add(val.Data));
     }, value);
 }
@@ -52,6 +58,14 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
         }
         case ST_OUTPUTS:
             return TOutput {.Coord = id.GetIdx()};
+        case ST_OUTPUT_ARRAYS: {
+            auto idx = id.GetIdx();
+            auto result = TOutputs();
+            auto encoded = Strings.GetName<TCmdView>(idx).GetStr();
+            for (auto coord : StringSplitter(encoded).Split(' ').SkipEmpty())
+                result.Coords.push_back(FromString<ui32>(coord.Token()));
+            return result;
+        }
         case ST_GLOB:
             return TGlobPattern {.Data = Strings.GetName<TCmdView>(id.GetIdx()).GetStr()};
         default:

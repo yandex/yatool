@@ -372,7 +372,7 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
     if (args.empty() && argNames.empty()) {
         return true;
     }
-    bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX);
+    bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
     bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
     if (argNames.size() != args.size() && (argNames.empty() || (argNames.size() > args.size() && !lastMayBeEmpty))) {
         ReportWrongNumberOfArguments(argNames.size(), args.size(), argsStr);
@@ -391,13 +391,14 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
 
         isLastArg = argNamesIndex >= argNames.size() - 1;
         TStringBuf name = argNames[isLastArg ? argNames.size() - 1 : argNamesIndex];
+        bool isArrayArg = name.EndsWith(NStaticConf::ARRAY_SUFFIX);
 
-        if (!isLastArg && insideArray && !name.EndsWith(NStaticConf::ARRAY_SUFFIX)) {
+        if (!isLastArg && insideArray && !isArrayArg) {
             YErr() << "Passed array but expected element " << name << "\n" << "Args: " << argsStr << "\n";
             return false;
         }
 
-        if (name.EndsWith(NStaticConf::ARRAY_SUFFIX)) {
+        if (isArrayArg) {
             name.Chop(3);
         }
 
