@@ -741,6 +741,9 @@ def populate_contrib_unified(
         if excludes:
             macro = find_or_create(project, 'EXCLUDE')
             for exclude in excludes:
+                if exclude.group_id == "*" or exclude.artifactId == "*":
+                    continue
+
                 macro.add_value(exclude)
 
         if p.get('jar_file_id'):
