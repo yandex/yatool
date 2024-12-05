@@ -17,6 +17,7 @@ TEMPORARY_ERROR_MESSAGES = [
     'Temporary failure in name resolution',
     'The read operation timed out',
     'timeout: timed out',
+    'no response given after',  # sandbox.common.rest.Client.TimeoutExceeded
 ]
 
 
