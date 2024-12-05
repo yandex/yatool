@@ -5,8 +5,6 @@ import time
 from core import stage_tracer
 from devtools.ya.yalibrary import sjson
 import exts.fs
-import exts.yjdump as yjdump
-import exts.yjson as json
 from exts.compress import ucopen
 from exts.decompress import udopen
 from yalibrary.monitoring import YaMonEvent
@@ -17,23 +15,30 @@ stage_begin_time = {}
 distbuild_mock_data_dir_env = "__DISTBUILD_MOCK_DIR"
 
 
+def _to_json(data):
+    if isinstance(data, dict):
+        return {str(k): _to_json(v) for k, v in data.items()}
+    if isinstance(data, (set, tuple, list)):
+        return [_to_json(v) for v in data]
+    return data
+
+
+def _dump_json(root, filename, content):
+    with open(os.path.join(root, filename), 'wb') as fp:
+        sjson.dump(content, fp)
+
+
 def _dump_results(builder, owners):
-    import os
-
-    def _dump_json(root, filename, content):
-        with open(os.path.join(root, filename), 'w') as fp:
-            json.dump(content, fp)
-
     build_result = builder.build_result
 
     exts.fs.ensure_dir(builder.misc_build_info_dir)
-    _dump_json(builder.misc_build_info_dir, 'failed_dependants.json', build_result.failed_deps)
+    _dump_json(builder.misc_build_info_dir, 'failed_dependants.json', _to_json(build_result.failed_deps))
     _dump_json(builder.misc_build_info_dir, 'configure_errors.json', builder.ctx.configure_errors)
-    _dump_json(builder.misc_build_info_dir, 'make_files.json', builder.get_make_files())
-    _dump_json(builder.misc_build_info_dir, 'build_errors.json', build_result.build_errors)
+    _dump_json(builder.misc_build_info_dir, 'make_files.json', _to_json(builder.get_make_files()))
+    _dump_json(builder.misc_build_info_dir, 'build_errors.json', _to_json(build_result.build_errors))
     _dump_json(builder.misc_build_info_dir, 'ok_nodes.json', build_result.ok_nodes)
     _dump_json(builder.misc_build_info_dir, 'owners_list.json', owners)
-    _dump_json(builder.misc_build_info_dir, 'targets.json', builder.targets)
+    _dump_json(builder.misc_build_info_dir, 'targets.json', _to_json(builder.targets))
     _dump_json(builder.misc_build_info_dir, 'results2.json', builder.make_report())
 
 
@@ -119,10 +124,10 @@ def do_ya_make(params):
         graph_json = context_json.pop('graph')
 
         with ucopen(params.save_context_to, mode="wb") as context_file:
-            yjdump.dump_context_as_json(context_json, context_file)
+            sjson.dump(context_json, context_file)
 
         with ucopen(params.save_graph_to, mode="wb") as graph_file:
-            yjdump.dump_graph_as_json(graph_json, graph_file)
+            sjson.dump(graph_json, graph_file)
 
         stager.finish('save_context')
 
