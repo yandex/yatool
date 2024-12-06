@@ -1,4 +1,5 @@
 from devtools.ya.test.test_types import py_test
+import devtools.ya.test.util.shared as util_shared
 
 
 VALIDATE_RESOURCE_TEST_TYPE = "validate_resource"
@@ -49,6 +50,8 @@ class CheckResourceTestSuite(ExtResourceAbstractSuite):
 
         if dist_build:
             cmd.append('--verbose')
+
+        cmd += util_shared.get_oauth_token_options(opts)
 
         return ' '.join(cmd)
 
