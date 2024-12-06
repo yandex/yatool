@@ -225,6 +225,7 @@ class YaMakeOptions(YaBaseOptions):
         self.distbs_pool = self._pop('distbs_pool')  # TODO: Rename to distbuild_pool
         self.build_custom_json = self._pop('build_custom_json')
         self.sandboxing = self._pop('sandboxing')
+        self.strict_inputs = self._pop('strict_inputs')
         self.custom_context = self._pop('custom_context')
         self.dump_json_graph = self._pop('dump_json_graph')
         self.save_graph_to = self._pop('save_graph_to')
@@ -402,6 +403,8 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.sandboxing:
             result += ['--sandboxing']
+        if self.strict_inputs:
+            result += ['--strict-inputs']
         if self.run_tests:
             result += ['--run-tests']
         if self.report_skipped_suites:
