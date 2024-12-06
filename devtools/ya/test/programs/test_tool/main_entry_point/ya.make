@@ -11,6 +11,7 @@ PEERDIR(
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/formatter
     devtools/ya/test/programs/test_tool/lib
+    devtools/ya/app
 )
 
 END()

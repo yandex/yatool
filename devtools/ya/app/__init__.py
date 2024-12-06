@@ -511,7 +511,7 @@ def configure_fetcher_params(app_ctx):
     for f in fetcher_params_strip:
         if f.get('token', None):
             f['token'] = "<provided>"
-    logging.debug(
+    logger.debug(
         "Custom fetcher: {}, fetcher parameters: {}, sb_token {}".format(
             str(custom_fetcher), str(fetcher_params_strip), "set" if oauth_token else "none"
         )

@@ -21,8 +21,9 @@ struct TStatVfs {
 int get_statvfs(const char* path, TStatVfs& st) {
     struct statvfs buf;
     int ret = statvfs(path, &buf);
-    if (ret)
+    if (ret) {
         return ret;
+    }
 
     st = {
         buf.f_bsize,

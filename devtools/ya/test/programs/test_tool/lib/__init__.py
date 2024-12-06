@@ -4,18 +4,23 @@ import sys
 import importlib
 
 
+def get_tool_args():
+    args = []
+    for arg in sys.argv[2:]:
+        if arg.startswith("@") and arg.endswith("args"):
+            with open(arg[1:]) as cmdfile:
+                args.extend(cmdfile.read().splitlines())
+        else:
+            args.append(arg)
+    return args
+
+
 def run():
     if len(sys.argv) < 2:
         sys.stderr.write('test_tool tool_name ...')
         exit(1)
 
-    file_args = []
-    for arg in sys.argv[2:]:
-        if arg.startswith("@") and arg.endswith("args"):
-            with open(arg[1:]) as cmdfile:
-                file_args.extend(cmdfile.read().splitlines())
-        else:
-            file_args.append(arg)
+    file_args = get_tool_args()
 
     sys.argv[:] = sys.argv[:2] + file_args
     tool_name = sys.argv[1]
