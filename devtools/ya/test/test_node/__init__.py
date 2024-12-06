@@ -498,7 +498,6 @@ def create_test_node(
             ("python_coverage", pydeps, ["--python3-coverage-path"], "py3.coverage.tar"),
             ("ts_coverage", True, ["--ts-coverage-path"], "ts.coverage.tar"),
             ("nlg_coverage", True, ["--nlg-coverage-path"], "unified.coverage.tar"),
-            ("gcov_coverage", True, ["--gcov-coverage", "--cpp-coverage-path"], "coverage.tar"),
             ("sancov_coverage", True, ["--sancov-coverage", "--cpp-coverage-path"], "coverage.tar"),
             ("clang_coverage", True, ["--clang-coverage", "--cpp-coverage-path"], "coverage.tar"),
         ]:
@@ -1423,7 +1422,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         'py3.coverage.tar': [],
     }
     should_skip = {
-        'coverage.tar': getattr(opts, 'gcov_coverage', False),
+        'coverage.tar': False,
         'py3.coverage.tar': getattr(opts, 'python_coverage', False),
     }
     files_to_skip = set()
@@ -1454,16 +1453,6 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         outputs += [log_path]
 
     cmds = [{'cmd_args': cmd, "cwd": "$(BUILD_ROOT)"}]
-
-    if getattr(opts, 'gcov_coverage', False):
-        output_path = os.path.join(out_dir, 'coverage.tar')
-        node_inputs += [os.path.join("$(SOURCE_ROOT)", 'build', 'scripts', 'merge_coverage_data.py')]
-        cmd = (
-            test_common.get_python_cmd(opts=opts)
-            + [os.path.join("$(SOURCE_ROOT)", 'build', 'scripts', 'merge_coverage_data.py'), output_path]
-            + cov_inputs['coverage.tar']
-        )
-        cmds.append({'cmd_args': cmd, "cwd": "$(BUILD_ROOT)"})
 
     if getattr(opts, 'python_coverage', False):
         # TODO move to the suite method, get rid of graph

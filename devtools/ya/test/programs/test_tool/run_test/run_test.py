@@ -455,7 +455,6 @@ def parse_args(args=None):
     parser.add_argument("--cpp-coverage-path", dest="cpp_coverage_path", default=None)
     parser.add_argument("--java-coverage-path", dest="java_coverage_path", default=None)
     parser.add_argument("--sancov-coverage", dest="sancov_coverage", action='store_true', default=None)
-    parser.add_argument("--gcov-coverage", dest="gcov_coverage", action='store_true', default=None)
     parser.add_argument("--clang-coverage", dest="clang_coverage", action='store_true', default=None)
     parser.add_argument("--go-coverage-path", dest="go_coverage_path", default=None)
     parser.add_argument("--fast-clang-coverage-merge", dest="fast_clang_coverage_merge", action="store")
@@ -1472,9 +1471,6 @@ def main():
 
         if coverage.get("ts"):
             env.set_mandatory(const.COVERAGE_TS_ENV_NAME, coverage["ts"]["output_dir"])
-
-        if options.gcov_coverage:
-            env.set_mandatory(const.COVERAGE_GCOV_ENV_NAME, coverage["cpp"]["output_dir"])
 
         if options.sancov_coverage:
             envvar = "ASAN_OPTIONS"

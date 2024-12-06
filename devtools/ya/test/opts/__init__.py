@@ -1193,7 +1193,6 @@ class CoverageOptions(core.yarg.Options):
         self.enable_contrib_coverage = False
         self.enable_java_contrib_coverage = False
         self.fast_clang_coverage_merge = False
-        self.gcov_coverage = False
         self.go_coverage = False
         self.java_coverage = False
         self.merge_coverage = False
@@ -1207,20 +1206,10 @@ class CoverageOptions(core.yarg.Options):
         return [
             TestArgConsumer(
                 ['--coverage'],
-                help='Collect coverage information. (deprecated alias for "--gcov --java-coverage --python-coverage --coverage-report")',
+                help='Collect coverage information. (alias for "--clang-coverage --java-coverage --python-coverage --coverage-report")',
                 hook=core.yarg.SetConstValueHook('coverage', True),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
-                deprecated=True,
-            ),
-            TestArgConsumer(
-                ['--gcov'],
-                help='Collect gcov coverage information (automatically increases tests timeout at {} times)'.format(
-                    const.COVERAGE_TESTS_TIMEOUT_FACTOR
-                ),
-                hook=core.yarg.SetConstValueHook('gcov_coverage', True),
-                subgroup=COVERAGE_SUBGROUP,
-                visible=False,
             ),
             TestArgConsumer(
                 ['--coverage-prefix-filter'],
@@ -1390,14 +1379,14 @@ class CoverageOptions(core.yarg.Options):
     def postprocess(self):
         if self.coverage:
             self.go_coverage = True
-            self.gcov_coverage = True
+            self.clang_coverage = True
             self.java_coverage = True
             self.python_coverage = True
             self.ts_coverage = True
             # TODO backward compatibility - need to break it
             self.build_coverage_report = True
 
-        if len(tuple(_f for _f in [self.gcov_coverage, self.sancov_coverage, self.clang_coverage] if _f)) > 1:
+        if len(tuple(_f for _f in [self.sancov_coverage, self.clang_coverage] if _f)) > 1:
             raise core.yarg.ArgsValidatingException("You can collect only one type of cpp coverage at the same time")
 
         if self.fast_clang_coverage_merge and not self.clang_coverage:
@@ -1419,10 +1408,6 @@ class CoverageOptions(core.yarg.Options):
 
         if params.ts_coverage:
             params.flags['TS_COVERAGE'] = 'yes'
-            coverage_requested = True
-
-        if params.gcov_coverage:
-            params.flags['GCOV_COVERAGE'] = 'yes'
             coverage_requested = True
 
         if params.clang_coverage:

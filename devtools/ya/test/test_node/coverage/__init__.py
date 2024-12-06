@@ -19,7 +19,6 @@ def inject_coverage_nodes(arc_root, graph, suites, opts, platform_descriptor):
         resolvers_map = {}
     inplace_cov = []
     for opt_name, inject_func in [
-        ('gcov_coverage', cpp.inject_gcov_coverage_nodes),
         ('java_coverage', java.inject_java_coverage_nodes),
         ('python_coverage', python.inject_python_coverage_nodes),
         ('sancov_coverage', cpp.inject_sancov_coverage_nodes),
