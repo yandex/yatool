@@ -15,6 +15,7 @@ class VSCodeAllOptions(core.yarg.Options):
         self.black_formatter_enabled = True
         self.write_pyright_config = True
         self.python_index_enabled = True
+        self.build_venv = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
         self.clangd_extra_args = []
@@ -194,6 +195,12 @@ class VSCodeAllOptions(core.yarg.Options):
                 ["--no-python-index"],
                 help="Do not let pylance to index whole project",
                 hook=core.yarg.SetConstValueHook("python_index_enabled", False),
+                group=cls.GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                ["--build-venv"],
+                help="Build virtual environment for Python https://docs.yandex-team.ru/ya-make/usage/ya_ide/venv",
+                hook=core.yarg.SetConstValueHook("build_venv", True),
                 group=cls.GROUP,
             ),
             core.yarg.ArgConsumer(

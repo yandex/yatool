@@ -1,5 +1,6 @@
 import copy
 import functools
+import hashlib
 import json
 import os
 import platform
@@ -19,7 +20,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import lock_resource, toolscache_version
 
-from ide import ide_common, vscode
+from ide import ide_common, venv, vscode
 
 
 class VSCodeProject(object):
@@ -312,6 +313,27 @@ class VSCodeProject(object):
 
         return settings
 
+    def venv_tmp_project(self):
+        return os.path.join(
+            self.params.rel_targets[0], '_ya_venv_%s' % hashlib.md5(self.project_root.encode('utf-8')).hexdigest()
+        )
+
+    def do_venv(self):
+        venv_opts = venv.VenvOptions()
+        venv_opts.venv_add_tests = self.params.tests_enabled
+        venv_opts.venv_root = os.path.join(self.project_root, 'venv')
+        venv_opts.venv_with_pip = False
+        fs.remove_tree_safe(venv_opts.venv_root)
+        venv_opts.venv_tmp_project = self.venv_tmp_project()
+        venv_params = core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
+        venv_tmp_project_dir = os.path.join(self.params.arc_root, venv_opts.venv_tmp_project)
+        if os.path.exists(venv_tmp_project_dir):
+            ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_tmp_project_dir))
+            fs.remove_tree_safe(venv_tmp_project_dir)
+        ide_common.emit_message('Generating venv: {}'.format(venv_params.venv_root))
+        devtools.ya.app.execute(venv.gen_venv, respawn=devtools.ya.app.RespawnType.NONE)(venv_params)
+        return os.path.join(venv_params.venv_root, 'bin', 'python')
+
     def gen_workspace(self):
         self.ensure_dirs()
         workspace = OrderedDict(
@@ -408,6 +430,17 @@ class VSCodeProject(object):
             if self.is_py3:
                 vscode.dump.mine_py_main(self.params.arc_root, modules)
 
+        venv_args = None
+        if self.is_py3:
+            if self.params.build_venv:
+                self.do_venv()
+            venv_args = self.params.ya_make_extra + [
+                '--venv-root=%s' % os.path.join(self.project_root, 'venv'),
+                '--venv-tmp-project=%s' % self.venv_tmp_project(),
+            ]
+            if self.params.tests_enabled:
+                venv_args.append('--venv-add-tests')
+
         ide_common.emit_message("Generating tasks")
         ya_bin_path = os.path.join(self.params.arc_root, "ya")
         default_tasks = vscode.tasks.gen_default_tasks(self.params.abs_targets, ya_bin_path, self.common_args)
@@ -417,6 +450,7 @@ class VSCodeProject(object):
             self.common_args,
             self.params.languages,
             self.params.tests_enabled,
+            venv_args,
             self.codegen_cpp_dir,
         )
         tasks = vscode.tasks.gen_tasks(

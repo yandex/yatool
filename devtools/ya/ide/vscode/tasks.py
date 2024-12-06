@@ -206,7 +206,9 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
     ]
 
 
-def gen_codegen_tasks(abs_targets, ya_bin_path, common_args, languages, with_tests=False, codegen_cpp_dir=None):
+def gen_codegen_tasks(
+    abs_targets, ya_bin_path, common_args, languages, with_tests=False, venv_args=None, codegen_cpp_dir=None
+):
     TARGETS = " ".join(exts.shlex2.quote(arg) for arg in abs_targets)
     tasks = []
     if "CPP" in languages:
@@ -232,6 +234,19 @@ def gen_codegen_tasks(abs_targets, ya_bin_path, common_args, languages, with_tes
                     ),
                     ("group", "build"),
                 )
+            ),
+        )
+
+    if "PY3" in languages and venv_args:
+        VENV_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in venv_args)
+        tasks.append(
+            OrderedDict(
+                (
+                    ("label", "<Rebuild venv>"),
+                    ("type", "shell"),
+                    ("command", "%s ide venv %s %s" % (ya_bin_path, VENV_ARGS, TARGETS)),
+                    ("group", "build"),
+                ),
             ),
         )
 
