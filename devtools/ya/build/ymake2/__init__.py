@@ -127,6 +127,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         core.yarg.Param('source_root', default_value=None),
         core.yarg.Param('stdin_line_provider', default_value=None),
         core.yarg.Param('targets_from_evlog', default_value=False),
+        core.yarg.Param('transition_source', default_value=None),
     ]
 
 
@@ -280,6 +281,10 @@ def _cons_ymake_args(**kwargs):
     targets_from_evlog = kwargs.pop('targets_from_evlog', False)
     if targets_from_evlog:
         ret += ['--targets-from-evlog']
+
+    transition_source = kwargs.pop('transition_source', None)
+    if transition_source:
+        ret += ['--transition-source', transition_source]
 
     continue_on_fail = kwargs.pop('continue_on_fail', False)
     if continue_on_fail:

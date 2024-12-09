@@ -1567,7 +1567,7 @@ class _GraphMaker(object):
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
             tool_targets_queue_putter=tool_targets_queue_putter,
-            ymake_opts=ymake_opts,
+            ymake_opts=dict(ymake_opts or {}, transition_source='nopic'),
         )
 
     def _prepare_graph(
