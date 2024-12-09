@@ -23,7 +23,7 @@ type MaybeConfig = Config | tp.Literal[""]
 
 @exts.func.lazy
 def _find_root() -> str:
-    return core.config.find_root()
+    return core.config.find_root(fail_on_error=False)
 
 
 def configurable(obj: object) -> bool:
@@ -87,6 +87,9 @@ class AutoincludeConfig:
     def _load_trie(self) -> marisa_trie.Trie:
         paths = []
         root = _find_root()
+        if not root:
+            logger.warning("Couldn't detect arcadia root. Autoincludes won't be used for configs lookup")
+            return marisa_trie.Trie([])
         for afile in self._autoinclude_files:
             try:
                 paths.extend(os.path.join(root, path) for path in core.config.config_from_arc_rel_path(afile))
@@ -128,18 +131,25 @@ class RuffConfig:
         self._load_ruff_trie()
 
     def _load_ruff_trie(self) -> None:
-        arc_root = _find_root()
+        root = _find_root()
+        if not root:
+            logger.warning("Couldn't detect arcadia root. Ruff config mapping won't be used for configs lookup")
+            return
         try:
             config_map = {}
             for prefix, config_path in core.config.config_from_arc_rel_path(self._RUFF_CONFIG_PATHS_FILE).items():
-                config_map[os.path.normpath(os.path.join(arc_root, prefix))] = config_path
-        except Exception:
+                config_map[os.path.normpath(os.path.join(root, prefix))] = config_path
+        except Exception as e:
+            logger.warning(
+                "Couldn't load ruff config mapping due to error %s. Ruff config mapping won't be used for configs lookup",
+                repr(e),
+            )
             return
         # Trie assigns indexes randomly, have to map back
         self._config_paths = [""] * len(config_map)
         self._ruff_trie = marisa_trie.Trie(config_map.keys())
         for prefix, idx in self._ruff_trie.items():  # type: ignore
-            self._config_paths[idx] = os.path.join(arc_root, config_map[prefix])
+            self._config_paths[idx] = os.path.join(root, config_map[prefix])
 
     def lookup(self, path: PurePath) -> MaybeConfig:
         if self._ruff_trie:
