@@ -90,7 +90,7 @@ namespace {
         }
 
         std::any visitXModValueT(CmdParser::XModValueTContext *ctx) override {
-            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertStr(ctx->getText()));
+            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
             return visitChildren(ctx);
         }
 
@@ -147,15 +147,15 @@ namespace {
         std::any doVisitTermR(antlr4::RuleContext *ctx) {
             auto& arg = GetCurrentArgument();
             if (MacroCallDepth == 0)
-                arg.emplace_back(Values.InsertStr(Unescape(ctx->getText())));
+                arg.emplace_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
             else
-                arg.emplace_back(TSyntax::TIdOrString{Unescape(ctx->getText())});
+                arg.emplace_back(TSyntax::TIdOrString{UnescapeRaw(ctx->getText())});
             return visitChildren(ctx);
         }
 
         std::any doVisitTermQR(antlr4::RuleContext *ctx) {
             auto& arg = GetCurrentArgument();
-            arg.emplace_back(Values.InsertStr(Unescape(ctx->getText())));
+            arg.emplace_back(Values.InsertStr(UnescapeQuoted(ctx->getText())));
             return visitChildren(ctx);
         }
 
@@ -331,10 +331,10 @@ namespace {
         std::string UnquoteDouble(std::string_view s) {
             if (!(s.size() >= 2 && s.front() == '"' && s.back() == '"'))
                 throw yexception() << "bad string " << s;
-            return Unescape(s.substr(1, s.size() - 2));
+            return UnescapeQuoted(s.substr(1, s.size() - 2));
         }
 
-        std::string Unescape(std::string_view s) {
+        std::string UnescapeQuoted(std::string_view s) {
             std::string result;
             result.reserve(s.size());
             for (size_t i = 0; i != s.size(); ++i) {
@@ -345,6 +345,18 @@ namespace {
                     if (!(c == '\'' || c == '"' || c == '\\' || c == '/')) // see `IsValidEscapeSym`
                         result += '\\';
                 }
+                result += s[i];
+            }
+            return result;
+        }
+
+        std::string UnescapeRaw(std::string_view s) {
+            std::string result;
+            result.reserve(s.size());
+            for (size_t i = 0; i != s.size(); ++i) {
+                if (s[i] == '\\')
+                    if (++i == s.size())
+                        throw yexception() << "incomplete escape sequence in " << s;
                 result += s[i];
             }
             return result;
