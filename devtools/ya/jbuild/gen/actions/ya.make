@@ -12,7 +12,6 @@ PY_SRCS(
     missing_dirs.py
     move_matches.py
     parse.py
-    sonar.py
 )
 
 PEERDIR(
