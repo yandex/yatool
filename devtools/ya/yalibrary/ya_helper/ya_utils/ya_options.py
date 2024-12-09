@@ -379,6 +379,7 @@ class YaMakeOptions(YaBaseOptions):
         self.no_prefetch = self._pop('no_prefetch')
 
         self.ymake_tool_servermode = self._pop('ymake_tool_servermode')
+        self.store_links_in_memory = self._pop('store_links_in_memory')
 
     def _generate_post_handler(self):
         result = []
@@ -797,6 +798,9 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.ymake_tool_servermode is not None:
             env['YA_YMAKE_TOOL_SERVERMODE'] = self._bool_to_env(self.ymake_tool_servermode)
+
+        if self.store_links_in_memory is not None:
+            env['YA_STORE_LINKS_IN_MEMORY'] = self._bool_to_env(self.store_links_in_memory)
 
         return env
 
