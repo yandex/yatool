@@ -76,6 +76,7 @@ class SemConfig:
                 'TRAVERSE_RECURSE': 'yes',
                 'TRAVERSE_RECURSE_FOR_TESTS': 'yes',
                 'USE_PREBUILT_TOOLS': 'no',
+                'FAIL_MODULE_CMD': 'IGNORED',
             }
         )
 
@@ -145,6 +146,7 @@ class SemNode:
     NODE_TYPE = 'NodeType'
     TAG = 'Tag'
     TOOLS = 'Tools'
+    TESTS = 'Tests'
     SEMANTICS = 'semantics'
 
     def __init__(self, data: dict, skip_invalid: bool = False, logger: logging.Logger = None):
@@ -159,6 +161,7 @@ class SemNode:
         self.type: str = str(data[SemNode.NODE_TYPE])
         self.tag: str = str(data[SemNode.TAG]) if SemNode.TAG in data else None
         self.tools: list[int] = [int(node_id) for node_id in data[SemNode.TOOLS]] if SemNode.TOOLS in data else None
+        self.tests: list[int] = [int(node_id) for node_id in data[SemNode.TESTS]] if SemNode.TESTS in data else None
         self.semantics = None
         if SemNode.SEMANTICS in data:
             data_semantics = data[SemNode.SEMANTICS]
@@ -199,6 +202,8 @@ class SemNode:
             r[SemNode.TAG] = self.tag
         if self.tools:
             r[SemNode.TOOLS] = self.tools
+        if self.tests:
+            r[SemNode.TESTS] = self.tests
         if self.semantics:
             r[SemNode.SEMANTICS] = [semantic.as_dict() for semantic in self.semantics]
         return r
