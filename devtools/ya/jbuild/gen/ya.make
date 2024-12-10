@@ -33,5 +33,4 @@ RECURSE(
     java_target2
     makelist_parser2
     node
-    tests
 )
