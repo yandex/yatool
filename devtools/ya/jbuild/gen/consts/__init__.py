@@ -64,8 +64,6 @@ EXTERNAL_DEPENDENCIES = 'EXTERNAL_DEPENDENCIES'
 
 GET_DEPS_TAG = 'get-deps'
 
-SONAR_PATH = os.path.join('contrib', 'java', 'org', 'sonarsource', 'scanner', 'cli', 'sonar-scanner-cli', '2.8')
-
 ADD_DLLS_FROM_DEPENDS = 'ADD_DLLS_FROM_DEPENDS'
 ERROR_PRONE = 'ERROR_PRONE'
 UBERJAR = 'UBERJAR'

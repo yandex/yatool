@@ -35,9 +35,6 @@ def gen_ctx(
     rc = paths[:]
     by_path = mp.obtain_targets_graph2(dart, cpp_graph)
 
-    if getattr(opts, 'sonar', False) and by_path:
-        assert graph_base.hacked_normpath(consts.SONAR_PATH) in by_path  # It's now always in by_path
-
     assert all(p in by_path for p in paths)
 
     rsrcs = base.resolve_possible_srcdirs(arc_root, by_path.values())
