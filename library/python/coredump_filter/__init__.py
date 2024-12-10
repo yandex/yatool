@@ -130,7 +130,7 @@ ARCADIA_ROOT_DIRS = [
     "/home/",
     "/htf/",
     "/hw_watcher/",
-    "/hypercube/",
+    "/hyperenv/",
     "/iaas/",
     "/iceberg/",
     "/infra/",
