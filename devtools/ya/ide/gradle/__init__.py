@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 import shutil
 import subprocess
@@ -12,6 +13,7 @@ from build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
 from yalibrary import platform_matcher
 from exts import hashing
 from devtools.ya.yalibrary import sjson
+import xml.etree.ElementTree as eTree
 
 
 class YaIdeGradleException(Exception):
@@ -22,12 +24,12 @@ class _JavaSemConfig(SemConfig):
     """Check and use command line options for configure roots and flags"""
 
     GRADLE_PROPS_FILE: Path = Path.home() / '.gradle' / 'gradle.properties'
-    GRADLE_REQUIRED_PROPS: list[str] = [
+    GRADLE_REQUIRED_PROPS: tuple[str] = (
         'bucketUsername',
         'bucketPassword',
         'systemProp.gradle.wrapperUser',
         'systemProp.gradle.wrapperPassword',
-    ]
+    )
 
     EXPORT_ROOT_BASE: Path = Path(core_config.misc_root()) / 'gradle'  # Base folder of all export roots
 
@@ -84,14 +86,62 @@ class _JavaSemConfig(SemConfig):
         return settings_root
 
 
+class _YaSettings:
+    """Save command and cwd to ya-settings.xml"""
+
+    YA_SETTINGS_XML = 'ya-settings.xml'
+
+    def __init__(self, java_sem_config: _JavaSemConfig):
+        self.config: _JavaSemConfig = java_sem_config
+
+    def save(self) -> None:
+        self._write_xml(self._make_xml(), self.config.export_root / self.YA_SETTINGS_XML)
+
+    @classmethod
+    def _make_xml(cls) -> eTree.Element:
+        xml_root = eTree.Element('root')
+        cmd = eTree.SubElement(xml_root, 'cmd')
+        for arg in sys.argv:
+            eTree.SubElement(cmd, 'part').text = arg
+        eTree.SubElement(xml_root, 'cwd').text = str(Path.cwd())
+        return xml_root
+
+    @classmethod
+    def _write_xml(cls, xml_root: eTree.Element, path: Path) -> None:
+        cls._elem_indent(xml_root)
+        with path.open('wb') as f:
+            eTree.ElementTree(xml_root).write(f, encoding="utf-8")
+
+    @classmethod
+    def _elem_indent(cls, elem, level=0) -> None:
+        indent = "\n" + level * " " * 4
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = indent + " " * 4
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = indent
+            for elem in elem:
+                cls._elem_indent(elem, level + 1)
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = indent
+        else:
+            if level and (not elem.tail or not elem.tail.strip()):
+                elem.tail = indent
+
+
 class _SymlinkCollector:
     """Iterate on settings and build root and call collect function for every place, where symlinks waited"""
 
-    SETTINGS_FILES: list[str] = ["settings.gradle.kts", "gradlew", "gradlew.bat"]  # Files for symlink to settings root
-    SETTINGS_MKDIRS: list[str] = [".gradle", ".idea"]  # Folders for creating at settings root
-    SETTINGS_DIRS: list[str] = SETTINGS_MKDIRS + ["gradle"]  # Folders for symlink to settings root
+    SETTINGS_FILES: tuple[str] = (
+        "settings.gradle.kts",
+        "gradlew",
+        "gradlew.bat",
+        _YaSettings.YA_SETTINGS_XML,
+    )  # Files for symlink to settings root
+    SETTINGS_MKDIRS: tuple[str] = (".gradle", ".idea")  # Folders for creating at settings root
+    SETTINGS_DIRS: tuple[str] = list(SETTINGS_MKDIRS) + ["gradle"]  # Folders for symlink to settings root
 
-    BUILD_SKIP_ROOT_DIRS: list[str] = SETTINGS_DIRS + [
+    BUILD_SKIP_ROOT_DIRS: tuple[str] = list(SETTINGS_DIRS) + [
         _JavaSemConfig.YMAKE_DIR
     ]  # Skipped for build directories in export root
     BUILD_FILE: str = "build.gradle.kts"  # Filename for create build symlinks
@@ -578,6 +628,9 @@ def do_gradle(params):
 
         exporter = _Exporter(config, sem_graph)
         exporter.export()
+
+        ya_settings = _YaSettings(config)
+        ya_settings.save()
 
         new_symlinks = _NewSymlinkCollector(exists_symlinks)
         new_symlinks.collect()
