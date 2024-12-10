@@ -483,6 +483,7 @@ class _Exporter:
                     [
                         '[add_attrs.dir]',
                         f'build_contribs = {'true' if self.config.params.build_contribs else 'false'}',
+                        f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
                         '',
                         '[[target_replacements]]',
                         f'skip_path_prefixes = [ "{'", "'.join(self.config.params.rel_targets)}" ]',

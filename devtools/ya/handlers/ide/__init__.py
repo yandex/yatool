@@ -376,6 +376,7 @@ class GradleOptions(core.yarg.Options):
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_YEXPORT_BIN = '--yexport-bin'
     OPT_BUILD_CONTRIBS = '--build-contribs'
+    OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_REMOVE = '--remove'
 
     def __init__(self):
@@ -383,6 +384,7 @@ class GradleOptions(core.yarg.Options):
         self.settings_root = None
         self.yexport_bin = None
         self.build_contribs = False
+        self.disable_errorprone = False
         self.yexport_debug_mode = None
         self.login = None
         self.bucket_token = None
@@ -413,6 +415,12 @@ class GradleOptions(core.yarg.Options):
                 [GradleOptions.OPT_BUILD_CONTRIBS],
                 help='Build all contribs from arcadia to jar files',
                 hook=core.yarg.SetConstValueHook('build_contribs', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            core.yarg.ArgConsumer(
+                [GradleOptions.OPT_DISABLE_ERRORPRONE],
+                help='Disable errorprone in Gradle project',
+                hook=core.yarg.SetConstValueHook('disable_errorprone', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             core.yarg.ArgConsumer(
