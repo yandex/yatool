@@ -25,7 +25,6 @@ def dump_context_as_json(context, fp):
     if isinstance(context, dict):
         # Expected context has a small amount of keys so copy is cheap
         context_to_dump = context.copy()
-        for k in 'graph', 'lite_graph':
-            if k in context:
-                context_to_dump[k] = functools.partial(dump_graph_as_json, context[k])
+        if 'graph' in context:
+            context_to_dump['graph'] = functools.partial(dump_graph_as_json, context['graph'])
     sjson.dump(context_to_dump, fp)
