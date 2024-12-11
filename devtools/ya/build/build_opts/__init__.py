@@ -2610,6 +2610,7 @@ class DistCacheOptions(DistCacheSetupOptions):
 
         # XXX see YA-1354
         self.dist_cache_evict_binaries = False
+        self.dist_cache_evict_bundles = False
         self.dist_cache_evict_cached = False
         self.dist_cache_max_file_size = 0
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
@@ -2647,6 +2648,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.ADVANCED,
                 ),
                 ConfigConsumer('dist_cache_evict_binaries'),
+                ArgConsumer(
+                    ['--dist-cache-evict-bundles'],
+                    help='Remove all bundles from build results. Works only with --bazel-remote-put mode',
+                    hook=SetConstValueHook('dist_cache_evict_bundles', True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
+                ConfigConsumer('dist_cache_evict_bundles'),
                 ArgConsumer(
                     ['--dist-cache-evict-cached'],
                     help="Don't build or download build results if they are present in the dist cache",
@@ -2870,6 +2879,18 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ),
                 env_opts=dict(
                     hook=lambda n: SetConstValueHook('dist_cache_evict_binaries', True),
+                ),
+            )
+            + make_opt_consumers(
+                'yt_replace_result_rm_bundles',
+                help='Tune yt-replace-result option: remove all bundles from build results. Useless without --yt-replace-result',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook('dist_cache_evict_bundles', True),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetConstValueHook('dist_cache_evict_bundles', True),
                 ),
             )
             + make_opt_consumers(

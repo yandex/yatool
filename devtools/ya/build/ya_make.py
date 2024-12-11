@@ -722,20 +722,31 @@ def replace_dist_cache_results(graph, opts, dist_cache, app_ctx):
     return list(sorted(result))
 
 
+def get_module_type(node):
+    return node.get('target_properties', {}).get('module_type')
+
+
 def is_target_binary(node):
-    is_binary = node.get('target_properties', {}).get('module_type', None) == 'bin'
+    is_binary = get_module_type(node) == 'bin'
     return is_binary and not node.get('host_platform')
+
+
+def is_bundle(node):
+    return get_module_type(node) == 'bundle'
 
 
 def is_dist_cache_suitable(node, result, opts):
     if opts.dist_cache_evict_binaries and is_target_binary(node):
         return False
 
+    if opts.dist_cache_evict_bundles and is_bundle(node):
+        return False
+
     module_tag = node.get('target_properties', {}).get('module_tag', None)
     if module_tag in ('jar_runable', 'jar_runnable', 'jar_testable'):
         return False
 
-    if 'module_type' in node.get('target_properties', {}):
+    if get_module_type(node):
         return True
 
     # If all checks are passed - all result nodes are suitable
