@@ -157,10 +157,10 @@ void TModules::Save(IOutputStream* output) {
 
 void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
     ui32 modCount = ModulesById.size();
-    output->Write(&modCount, sizeof(modCount));
+    ::Save(output, modCount);
 
     for (const auto& [modId, module] : ModulesById) {
-        output->Write(&modId, sizeof(modId));
+        ::Save(output, modId);
 
         const auto& moduleLists = GetModuleNodeIds(modId);
         const auto& uniqPeers = GetNodeListStore().GetList(moduleLists.UniqPeers);

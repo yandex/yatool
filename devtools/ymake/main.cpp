@@ -911,13 +911,15 @@ int main_real(TBuildConfiguration& conf) {
         }
     }
 
-    yMake->ApplyDependencyManagement();
+    // Load Dependency Management and DependsToModulesClosure from cache if possible,
+    // otherwise compute them and save to cache.
+    if (auto result = yMake->ApplyDependencyManagement()) {
+        return result.GetRef();
+    }
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         return BR_CONFIGURE_FAILED;
     }
-
-    yMake->ComputeDependsToModulesClosure();
 
     if (!conf.ManagedDepTreeRoots.empty()) {
         THashSet<TNodeId> roots;

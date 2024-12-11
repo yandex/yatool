@@ -1511,12 +1511,14 @@ namespace NDetail {
     }
 }
 
-void TYMake::ApplyDependencyManagement() {
-    if (CanBypassConfigure()) {
-        LoadDMCache();
-        if (DMCacheLoaded_) {
+TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
+    if (CanBypassConfigure() && Conf.ReadDepManagementCache && Conf.YmakeDMCache.Exists()) {
+        auto status = LoadDependencyManagementCache(Conf.YmakeDMCache);
+        if (status == TCacheFileReader::EReadResult::Success) {
             YDebug() << "Use Dependency management cache" << Endl;
-            return;
+            return TMaybe<EBuildResult>();
+        } else if (status == TCacheFileReader::EReadResult::Exception) {
+            return TMaybe<EBuildResult>(BR_RETRYABLE_ERROR);
         }
     }
 
@@ -1526,9 +1528,15 @@ void TYMake::ApplyDependencyManagement() {
     TDependencyManagementCollectingVisitor collectorVisitor{collector};
     TDependencyManagementCollectingVisitor::TState collectorState;
     IterateAll(Graph, StartTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
-    SaveDepManagementCache();
     FORCE_TRACE(U, NEvent::TStageFinished("Apply Dependency Management"));
+
+    ComputeDependsToModulesClosure();
+
+    SaveDependencyManagementCache(Conf.YmakeDMCache, &DMCacheTempFile);
+
     collector.LogStats();
+
+    return TMaybe<EBuildResult>();
 }
 
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots) {

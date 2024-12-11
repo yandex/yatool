@@ -25,7 +25,7 @@
 
 namespace {
     const ui64 ImageVersion = 47;
-    const ui64 DMCacheVersion = 0;
+    const ui64 DMCacheVersion = 1;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -771,52 +771,94 @@ bool TYMake::LoadUids(TUidsCachable* cachable) {
     return UidsCacheLoaded_ = TryLoadUids(cachable);
 }
 
-void TYMake::LoadDMCache() {
-    if (!Conf.ReadDepManagementCache) {
-        return;
-    }
-
-    if (PrevDepsFingerprint.empty() || !Conf.YmakeDMCache.Exists()) {
-        return;
+TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPath& cacheFile) {
+    if (PrevDepsFingerprint.empty()) {
+        return TCacheFileReader::EReadResult::IncompatibleFormat;
     }
 
     NYMake::TTraceStage loadDMStage{"Load Dependency management cache"};
     YDebug() << "Loading dependency management cache" << Endl;
 
-    TCacheFileReader cacheReader(Conf, false, false);
-    if (cacheReader.Read(Conf.YmakeDMCache) != TCacheFileReader::EReadResult::Success) {
-        return;
-    }
-
-    if (cacheReader.HasNextBlob()) {
-        TBlob blob = cacheReader.GetNextBlob();
-        if (*(ui64*)blob.Begin() != DMCacheVersion) {
-            YDebug() << "Dependency management cache version is incompatible" << Endl;
-            return;
+    try {
+        TCacheFileReader cacheReader(Conf, false, false);
+        if (cacheReader.Read(cacheFile) != TCacheFileReader::EReadResult::Success) {
+            return TCacheFileReader::EReadResult::IncompatibleFormat;
         }
-    } else {
-        return;
-    }
 
-    if (cacheReader.HasNextBlob()) {
-        TBlob blob = cacheReader.GetNextBlob();
-        TString prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
-        if (prevDepsFingerprint != PrevDepsFingerprint) {
-            YDebug() << "Dependency management cache fingerprint mismatch: " << prevDepsFingerprint << " != " << PrevDepsFingerprint << Endl;
-            return;
+        if (cacheReader.HasNextBlob()) {
+            TBlob blob = cacheReader.GetNextBlob();
+            if (blob.Size() != sizeof(ui64) || *(ui64*)blob.Begin() != DMCacheVersion) {
+                YDebug() << "Dependency management cache version is incompatible" << Endl;
+                return TCacheFileReader::EReadResult::IncompatibleFormat;
+            }
+        } else {
+            return TCacheFileReader::EReadResult::IncompatibleFormat;
         }
-    } else {
-        return;
+
+        if (cacheReader.HasNextBlob()) {
+            TBlob blob = cacheReader.GetNextBlob();
+            TString prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
+            if (prevDepsFingerprint != PrevDepsFingerprint) {
+                YDebug() << "Dependency management cache fingerprint mismatch: " << prevDepsFingerprint << " != " << PrevDepsFingerprint << Endl;
+                return TCacheFileReader::EReadResult::IncompatibleFormat;
+            }
+        } else {
+            return TCacheFileReader::EReadResult::IncompatibleFormat;
+        }
+
+        if (cacheReader.HasNextBlob()) {
+            TBlob blob = cacheReader.GetNextBlob();
+            TMemoryInput input(blob.Data(), blob.Length());
+            Modules.LoadDMCache(&input, Graph);
+            DMCacheLoaded_ = true;
+        } else {
+            return TCacheFileReader::EReadResult::IncompatibleFormat;
+        }
+        // We are not able to correctly recover after this point
+        // So any format or data inconsistency have to be rported as EReadResult::Exception
+        // in order to relaunch ymake without caches
+
+        if (cacheReader.HasNextBlob()) {
+            TBlob blob = cacheReader.GetNextBlob();
+            TMemoryInput input(blob.Data(), blob.Length());
+            if (LoadDependsToModulesClosure(&input)) {
+                DependsToModulesClosureLoaded_ = true;
+            } else {
+                return TCacheFileReader::EReadResult::Exception;
+            }
+        }
+    } catch (...) {
+        YDebug() << "Unhandled exception has been caught while loading dependency management cahce..." << Endl;
+        return TCacheFileReader::EReadResult::Exception;
     }
 
-    if (cacheReader.HasNextBlob()) {
-        TBlob blob = cacheReader.GetNextBlob();
-        TMemoryInput input(blob.Data(), blob.Length());
-        Modules.LoadDMCache(&input, Graph);
+    YDebug() << "Dependency management cache has been loaded..." << Endl;
 
-        DMCacheLoaded_ = true;
-        YDebug() << "Dependency management cache has been loaded..." << Endl;
+    return TCacheFileReader::EReadResult::Success;
+}
+
+bool TYMake::LoadDependsToModulesClosure(IInputStream* input) {
+    try {
+        THashMap<TString, TVector<ui32>> cached;
+        TDependsToModulesClosure closure;
+        TVector<TNodeId> nodes;
+        ::Load(input, cached);
+        for (const auto& [dirName, elemIds]: cached) {
+            nodes.clear();
+            for (auto elemId: elemIds) {
+                nodes.push_back(Graph.GetFileNodeById(elemId).Id());
+            }
+            closure.emplace(dirName, std::move(nodes));
+        }
+        DependsToModulesClosure = std::move(closure);
+    } catch (...) {
+        YDebug() << "Unhandled exception has been caught while loading DEPENDS to modules closure..." << Endl;
+        return false;
     }
+
+    YDebug() << "DEPENDS to modules closure has been loaded from cache..." << Endl;
+
+    return true;
 }
 
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
@@ -920,25 +962,65 @@ void TYMake::SaveUids(TUidsCachable* uidsCachable) {
     }
 }
 
-void TYMake::SaveDepManagementCache() {
+bool TYMake::SaveDependencyManagementCache(const TFsPath& cacheFile, TFsPath* tempCacheFile) {
     if (!Conf.WriteDepManagementCache || !(Conf.WriteFsCache && Conf.WriteDepsCache)) {
-        return;
+        return false;
     }
 
-    NYMake::TTraceStage stage("Save Dependency management cache");
+    try {
+        NYMake::TTraceStage stage("Save Dependency management cache");
 
-    TCacheFileWriter cacheWriter(Conf, Conf.YmakeDMCache);
-    cacheWriter.AddBlob(new TBlobSaverMemory(&DMCacheVersion, sizeof(ui64)));
-    cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
+        TCacheFileWriter cacheWriter(Conf, cacheFile);
+        cacheWriter.AddBlob(new TBlobSaverMemory(&DMCacheVersion, sizeof(ui64)));
+        cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
 
-    TString dmData;
-    TStringOutput dmOutput(dmData);
-    Modules.SaveDMCache(&dmOutput, Graph);
-    cacheWriter.AddBlob(new TBlobSaverMemory(dmData.data(), dmData.size()));
+        // Save Dependency Management data
+        TString dmData;
+        {
+            TStringOutput output{dmData};
+            Modules.SaveDMCache(&output, Graph);
+        }
+        cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::NoCopy(dmData.data(), dmData.size())));
 
-    DMCacheTempFile = cacheWriter.Flush(true);
+        // Save DEPENDS to modules closure data
+        TString closureData;
+        {
+            TStringOutput output{closureData};
+            SaveDependsToModulesClosure(&output);
+        }
+        cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::NoCopy(closureData.data(), closureData.size())));
 
-    YDebug() << "DM cache has been saved..." << Endl;
+        if (tempCacheFile) {
+            *tempCacheFile = cacheWriter.Flush(true);
+        } else {
+            cacheWriter.Flush(false);
+        }
+
+        YDebug() << "DM cache has been saved..." << Endl;
+    } catch (...) {
+        YDebug() << "Unhandled exception has been caught while saving dependency management cache...";
+        return false;
+    }
+
+    return true;
+}
+
+bool TYMake::SaveDependsToModulesClosure(IOutputStream* output) {
+    try {
+        THashMap<TString, TVector<ui32>> temp;
+        TVector<ui32> elemIds;
+        for (const auto& [dirName, nodesIds]: DependsToModulesClosure) {
+            elemIds.clear();
+            for (auto nodeId: nodesIds) {
+                elemIds.push_back(Graph[nodeId]->ElemId);
+            }
+            temp.emplace(dirName, std::move(elemIds));
+        }
+        ::Save(output, temp);
+    } catch (...) {
+        return false;
+    }
+    return true;
 }
 
 void TYMake::CommitCaches() {

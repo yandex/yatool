@@ -1,6 +1,7 @@
 #pragma once
 
 #include "add_iter.h"
+#include "build_result.h"
 #include "command_store.h"
 #include "parser_manager.h"
 #include "general_parser.h"
@@ -80,6 +81,7 @@ private:
     bool DMCacheLoaded_{false};
     bool JSONCacheLoaded_{false};
     bool UidsCacheLoaded_{false};
+    bool DependsToModulesClosureLoaded_{false};
 
     TVector<ui32> PrevStartDirs_;
     TVector<ui32> CurStartDirs_;
@@ -93,7 +95,8 @@ private:
     void TransferStartDirs();
 
     void AnalyzeGraphChanges(IChanges& changes);
-    void SaveDepManagementCache();
+    bool LoadDependsToModulesClosure(IInputStream* input);
+    bool SaveDependsToModulesClosure(IOutputStream* output);
 public:
     explicit TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
@@ -127,7 +130,7 @@ public:
     void ReportModulesStats();
     void ReportMakeCommandStats();
     void FindLostIncludes();
-    void ApplyDependencyManagement();
+    TMaybe<EBuildResult> ApplyDependencyManagement();
 
     void ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& dirMods, TVector<TNodeId>& globSrcs) const;
     bool ResolveRelationTargets(const TVector<TString>& targets, THashSet<TNodeId>& result);
@@ -149,7 +152,6 @@ public:
     bool Load(const TFsPath& file);
     bool LoadPatch();
     bool LoadUids(TUidsCachable* uidsCachable);
-    void LoadDMCache();
     void Save(const TFsPath& file, bool delayed);
     void SaveStartDirs(TCacheFileWriter& writer);
     void SaveStartTargets(TCacheFileWriter& writer);
@@ -162,6 +164,8 @@ public:
         }
     }
     void SaveUids(TUidsCachable* uidsCachable);
+    TCacheFileReader::EReadResult LoadDependencyManagementCache(const TFsPath& cacheFile);
+    bool SaveDependencyManagementCache(const TFsPath& cacheFile, TFsPath* tempCacheFile = nullptr);
     void CommitCaches();
     void JSONCacheLoaded(bool jsonCacheLoaded);
     void FSCacheMonEvent() const;
