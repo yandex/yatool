@@ -737,14 +737,13 @@ def populate_contrib_unified(
                 macro.add_value(get_peerdir(peerdir, forced_deps))
 
         # EXCLUDE
-        excludes = [contrib_location(d) for d in p.get('excludes', [])]
-        if excludes:
+        if p.get('excludes', []):
             macro = find_or_create(project, 'EXCLUDE')
-            for exclude in excludes:
+            for exclude in p.get('excludes', []):
                 if exclude.group_id == "*" or exclude.artifactId == "*":
                     continue
 
-                macro.add_value(exclude)
+                macro.add_value(contrib_location(exclude))
 
         if p.get('jar_file_id'):
             macro = (
