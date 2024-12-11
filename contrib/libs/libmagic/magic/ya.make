@@ -6,7 +6,7 @@ LICENSE(BSD-2-Clause)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(5.45)
+VERSION(5.46)
 
 SRCDIR(contrib/libs/libmagic/magic/Magdir)
 
@@ -27,20 +27,20 @@ RUN_PROGRAM(
         epoc erlang espressif esri etf fcs filesystems finger firmware flash flif fonts forth fortran frame
         freebsd fsav fusecompress games gcc gconv gentoo geo geos gimp git glibc gnome gnu gnumeric gpt gpu
         grace graphviz gringotts hardware hitachi-sh hp human68k ibm370 ibm6000 icc iff images inform intel
-        interleaf island ispell isz java javascript jpeg karma kde keepass kerberos kicad kml lammps lecter
-        lex lif linux lisp llvm locoscript lua luks m4 mach macintosh macos magic mail.news make map maple
-        marc21 mathcad mathematica matroska mcrypt measure mercurial metastore meteorological microfocus mime
-        mips mirage misctools mkid mlssa mmdf modem modulefile motorola mozilla msdos msooxml msvc msx mup
-        music nasa natinst ncr netbsd netscape netware news nifty nim-lang nitpicker numpy oasis ocaml octave
-        ole2compounddocs olf openfst opentimestamps oric os2 os400 os9 osf1 palm parix parrot pascal pbf pbm
-        pc88 pc98 pci_ids pcjr pdf pdp perl pgf pgp pgp-binary-keys pkgadd plan9 playdate plus5 pmem polyml
-        printer project psdbms psl pulsar puzzle pwsafe pyramid python qt revision riff ringdove rpi rpm rpmsg
-        rst rtf ruby rust sc sccs scientific securitycerts selinux sendmail sequent sereal sgi sgml sharc
-        sinclair sisu sketch smalltalk smile sniffer softquad sosi spec spectrum sql ssh ssl statistics
-        subtitle sun svf sylk symbos sysex tcl teapot terminfo tex tgif ti-8x timezone tplink troff tuxedo
-        typeset uf2 unicode unisig unknown usd uterus uuencode vacuum-cleaner varied.out varied.script vax
-        vicar virtual virtutech visx vms vmware vorbis vxl warc weak web webassembly windows wireless
-        wordprocessors wsdl x68000 xdelta xenix xilinx xo65 xwindows yara zfs zilog zip zyxel
+        interleaf island ispell isz java javascript jpeg karma kde keepass kerberos keyman kicad kml lammps
+        lauterbach lecter lex lif linux lisp llvm locoscript lua luks m4 mach macintosh macos magic mail.news
+        make map maple marc21 mathcad mathematica matroska mcrypt measure mercurial metastore meteorological
+        microfocus mime mips mirage misctools mkid mlssa mmdf modem modulefile motorola mozilla msdos msooxml
+        msvc msx mup music nasa natinst ncr netbsd netscape netware news nifty nim-lang nitpicker numpy oasis
+        ocaml octave ole2compounddocs olf openfst opentimestamps oric os2 os400 os9 osf1 pack palm parix
+        parrot pascal pbf pbm pc98 pci_ids pcjr pdf pdp perl pgf pgp pgp-binary-keys pkgadd plan9 playdate
+        plus5 pmem polyml printer project psdbms psl pulsar puzzle pwsafe pyramid python qt revision riff
+        ringdove rpi rpm rpmsg rst rtf ruby rust sc sccs scientific securitycerts selinux sendmail sequent
+        sereal sgi sgml sharc sinclair sisu sketch smalltalk smile sniffer softquad sosi spec spectrum sql ssh
+        ssl statistics subtitle sun svf sylk symbos sysex tcl teapot terminfo tex tgif ti-8x timezone tplink
+        troff tuxedo typeset uf2 unicode unisig unknown usd uterus uuencode uxn vacuum-cleaner varied.out
+        varied.script vax vicar virtual virtutech visx vms vmware vorbis vxl warc weak web webassembly windows
+        wireless wordprocessors wsdl x68000 xdelta xenix xilinx xo65 xwindows yara zfs zilog zip zyxel
 )
 
 END()

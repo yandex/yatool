@@ -4,7 +4,7 @@ PROGRAM(file0)
 
 WITHOUT_LICENSE_TEXTS()
 
-VERSION(5.45)
+VERSION(5.46)
 
 PEERDIR(
     contrib/libs/libmagic/src

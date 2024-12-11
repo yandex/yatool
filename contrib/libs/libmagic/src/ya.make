@@ -2,7 +2,7 @@
 
 LIBRARY()
 
-VERSION(5.45)
+VERSION(5.46)
 
 LICENSE(
     BSD-2-Clause AND

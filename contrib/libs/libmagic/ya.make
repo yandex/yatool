@@ -6,9 +6,9 @@ LICENSE(Bsd-Simplified-Darwin)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(5.45)
+VERSION(5.46)
 
-ORIGINAL_SOURCE(https://github.com/file/file/archive/FILE5_45.tar.gz)
+ORIGINAL_SOURCE(https://github.com/file/file/archive/FILE5_46.tar.gz)
 
 PEERDIR(
     contrib/libs/libmagic/magic

@@ -90,6 +90,9 @@
 /* Define to 1 if you have the `gnurx' library (-lgnurx). */
 /* #undef HAVE_LIBGNURX */
 
+/* Define to 1 if you have the `lrzip' library (-llrzip). */
+/* #undef HAVE_LIBLRZIP */
+
 /* Define to 1 if you have the `lz' library (-llz). */
 /* #undef HAVE_LIBLZ */
 
@@ -107,6 +110,9 @@
 
 /* Define to 1 if you have the `localtime_r' function. */
 #define HAVE_LOCALTIME_R 1
+
+/* Define to 1 if you have the <Lrzip.h> header file. */
+/* #undef HAVE_LRZIP_H */
 
 /* Define to 1 if you have the <lzlib.h> header file. */
 /* #undef HAVE_LZLIB_H */
@@ -292,6 +298,9 @@
 /* Define to 1 if you have the <zstd.h> header file. */
 /* #undef HAVE_ZSTD_H */
 
+/* Enable lrziplib compression support */
+/* #undef LRZIPLIBSUPPORT */
+
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
 
@@ -316,7 +325,7 @@
 #define PACKAGE_NAME "file"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "file 5.45"
+#define PACKAGE_STRING "file 5.46"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "file"
@@ -325,7 +334,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.45"
+#define PACKAGE_VERSION "5.46"
 
 /* Define to 1 if all of the C90 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for
@@ -424,7 +433,7 @@
 
 
 /* Version number of package */
-#define VERSION "5.45"
+#define VERSION "5.46"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
@@ -455,6 +464,9 @@
 
 /* Define for large files, on AIX-style hosts. */
 /* #undef _LARGE_FILES */
+
+/* Number of bits in a timestamp, on hosts where this is settable. */
+/* #undef _TIME_BITS */
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
