@@ -31,7 +31,7 @@
 
 namespace {
 
-    const char* JSON_ARRAY_DELIMITER = "\", \"";
+    const char* const JSON_ARRAY_DELIMITER = "\", \"";
 
     void XXXJsonEmptyList(TString& res) {
         Y_ASSERT(res.empty());

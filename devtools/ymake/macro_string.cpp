@@ -29,10 +29,10 @@
 
 #include <ctype.h>
 
-const char CmdDelimC = ':';
-const char* CmdDelimS = ":";
-const char CmdNameDelimC = '=';
-const char* CmdNameDelimS = "=";
+static const char CmdDelimC = ':';
+static const char* const CmdDelimS = ":";
+static const char CmdNameDelimC = '=';
+static const char* const CmdNameDelimS = "=";
 
 TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value) {
     return TString::Join(ToString<ui64>(id), CmdDelimS, name, CmdNameDelimS, value);

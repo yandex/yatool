@@ -6,13 +6,13 @@
 
 namespace NStaticConf {
     // static configuration
-    static const unsigned INCLUDE_LINES_LIMIT = 60000;
-    static const unsigned CALL_STACK_SIZE = 100;
+    static constexpr const unsigned INCLUDE_LINES_LIMIT = 60000;
+    static constexpr const unsigned CALL_STACK_SIZE = 100;
 
-    static const char* ARRAY_SUFFIX = "...";
-    static const char* ARRAY_START = "[";
-    static const char* ARRAY_END = "]";
+    static constexpr const char* const ARRAY_SUFFIX = "...";
+    static constexpr const char* const ARRAY_START = "[";
+    static constexpr const char* const ARRAY_END = "]";
 
-    static const char* MODULE_INPUTS_MARKER = "GROUP_NAME=ModuleInputs";
-    static const char* INPUTS_MARKER = "GROUP_NAME=Inputs";
+    static constexpr const char* const MODULE_INPUTS_MARKER = "GROUP_NAME=ModuleInputs";
+    static constexpr const char* const INPUTS_MARKER = "GROUP_NAME=Inputs";
 }

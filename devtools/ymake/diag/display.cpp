@@ -44,7 +44,7 @@ void TDisplay::SetStream(TLockedStream* stream) {
     this->Stream = stream;
 }
 
-TDisplay::TMsgType TDisplay::msgTypesAsString[4] = {
+const TDisplay::TMsgType TDisplay::msgTypesAsString[4] = {
     std::make_pair(TStringBuf("Error"), TStringBuf("bad")),
     std::make_pair(TStringBuf("Warn"),  TStringBuf("warn")),
     std::make_pair(TStringBuf("Info"),  TStringBuf("imp")),

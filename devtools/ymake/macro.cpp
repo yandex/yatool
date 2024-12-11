@@ -28,7 +28,7 @@ namespace {
 #ifdef STD_PAIR_CTOR_IS_CONSTEXPR
     constexpr
 #endif
-    static TElemType ModifierFlagsArray[] = {
+    static const TElemType ModifierFlagsArray[] = {
         // "unknown" must be the 0-th element (see comments for ModifierFlagToModifierName
         // for additional details)
         { TStringBuf("unknown"), EMF_Unknown },

@@ -21,7 +21,7 @@ private:
     TLockedStream* Stream;
     EConfMsgType Cutoff = EConfMsgType::Count;
     using TMsgType = std::pair<TStringBuf, TStringBuf>;
-    static TMsgType msgTypesAsString[4];
+    static const TMsgType msgTypesAsString[4];
 
 public:
     typedef TAutoPtr<IOutputStream> TStreamMessage;
