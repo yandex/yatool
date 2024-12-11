@@ -2252,17 +2252,15 @@ def _build_graph_and_tests(
 
     graph['conf']['resources'].append(vcs_info())
 
-    graph['conf']['keepon'] = opts.continue_on_fail
-
-    graph['conf']['cache'] = not opts.clear_build
-    # hell, yeah
-    graph['conf']['platform'] = host_platform.lower()
-
-    graph['conf']['graph_size'] = len(graph['graph'])
-
-    graph['conf']['execution_cost'] = {'cpu': 0, 'evaluation_errors': 0}
-
-    graph['conf']['min_reqs_errors'] = 0
+    graph['conf'] |= {
+        'keepon': opts.continue_on_fail,
+        'cache': not opts.clear_build,
+        'platform': host_platform.lower(),
+        'graph_size': len(graph['graph']),
+        'execution_cost': {'cpu': 0, 'evaluation_errors': 0},
+        'min_reqs_errors': 0,
+        'explicit_remote_store_upload': True,
+    }
 
     if 0:
         graph['graph'] = list(_split_gcc(graph['graph']))

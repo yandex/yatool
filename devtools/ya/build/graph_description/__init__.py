@@ -30,6 +30,7 @@ class GraphConfSection(TypedDict):
     min_reqs_errors: int
     platform: str
     resources: list[GraphConfResourceInfo]
+    explicit_remote_store_upload: bool
 
 
 GraphNodeUid = NewType('GraphNodeUid', str)
