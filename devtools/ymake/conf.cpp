@@ -206,13 +206,13 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         CommandDefinitions.Disable();
     }
 
-    NYndex::AddBuiltinDefinitions(CommandDefinitions);
-
     TMd5Sig confMd5;
     PrepareConfiguration(confMd5);
     confData.Update(&confMd5, sizeof(confMd5));
     CompileAndRecalcAllConditions();
     FoldGlobalCommands(this);
+
+    NYndex::AddBuiltinDefinitions(CommandDefinitions);
 
     // this code hangs on win while trying to lock locked non-recursive mutex
     // (after an error that file is not found)
