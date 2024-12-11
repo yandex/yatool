@@ -66,8 +66,6 @@ class _Bottle(object):
         return self.__fetcher.fetch_if_need(cache=cache).where
 
     def get_resource_id_from_cache(self):
-        self.resolve()
-
         return self.__fetcher.resource_id_from_cache()
 
     def __getitem__(self, name):

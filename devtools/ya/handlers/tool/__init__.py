@@ -178,6 +178,12 @@ def do_tool(params):
         except Exception:
             logger.exception("Can't print arm64 warning message")
 
+    for_platform = params.platform or params.host_platform or None
+
+    if params.need_resource_id:
+        print(resource_id(tool_name, params.toolchain, for_platform))
+        return
+
     tool_path = tool(
         tool_name,
         params.toolchain,
@@ -190,11 +196,8 @@ def do_tool(params):
         tool_path += '.exe'
 
     lock_result = False
-    for_platform = params.platform or params.host_platform or None
 
-    if params.need_resource_id:
-        print(resource_id(tool_name, params.toolchain, for_platform))
-    elif params.param:
+    if params.param:
         print(param(tool_name, params.toolchain, params.param))
     elif params.print_toolchain_path:
         print(toolchain_root(tool_name, params.toolchain, for_platform))
