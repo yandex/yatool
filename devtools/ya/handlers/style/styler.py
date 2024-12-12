@@ -300,3 +300,38 @@ class YaMake:
     def format(self, path: PurePath, content: str) -> str:
         yamake = yalibrary.makelists.from_str(content)
         return yamake.dump()
+
+
+@_register
+class Yql:
+    DEFAULT_ENABLED = False
+    SPEC = Spec(StylerKind.YQL)
+    SUFFIXES = (".yql",)
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("yql-format")  # type: ignore
+
+    def _run_format(self, path: PurePath, content: str) -> str:
+        args = [self._tool]
+
+        p = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            text=True,
+        )
+        out, err = p.communicate(input=content)
+
+        # Abort styling on signal
+        if p.returncode < 0:
+            state_helper.stop()
+
+        if err:
+            raise RuntimeError('error while running sql_formatter on file "{}": {}'.format(path, err.strip()))
+
+        return out
+
+    def format(self, path: PurePath, content: str) -> str:
+        return self._run_format(path, content)

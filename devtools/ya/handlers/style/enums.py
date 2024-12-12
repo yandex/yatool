@@ -11,3 +11,4 @@ class StylerKind(StrEnum):
     CUDA = auto()
     YAMAKE = auto()
     GO = auto()
+    YQL = auto()
