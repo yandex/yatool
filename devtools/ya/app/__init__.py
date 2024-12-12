@@ -754,8 +754,6 @@ def configure_report_interceptor(ctx, report_events):
     try:
         yield
     except BaseException as e:
-        import traceback
-
         if isinstance(e, KeyboardInterrupt):
             exit_code = -1
             raise
@@ -769,6 +767,8 @@ def configure_report_interceptor(ctx, report_events):
             success = not exit_code  # only 0 is ok
         else:
             raise
+
+        import traceback
 
         e.ya_exit_code = exit_code
 
@@ -791,7 +791,7 @@ def configure_report_interceptor(ctx, report_events):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FAILED,
             labels={
-                "handler": prefix[-1],
+                "handler": prefix[-1] if len(prefix) > 0 else "undefined",
                 "prefix": " ".join(prefix),
                 "exc_info": sys.exc_info()[0].__name__,
                 "exit_code": exit_code,
