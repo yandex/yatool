@@ -1,6 +1,5 @@
 #include "makefile_loader.h"
 
-#include "autoincludes_conf.h"
 #include "builtin_macro_consts.h"
 #include "module_loader.h"
 #include "prop_names.h"
@@ -168,7 +167,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                 Module->ProcessMakelistStatement(effectiveName, args);
 
                 if (!IsFileExtRule(data)) {
-                    Module->ProcessModuleMacroCalls(effectiveName, args, !IncludeStack.empty() && NPath::Basename(IncludeStack.back()) == YA_COMMON);
+                    Module->ProcessModuleMacroCalls(effectiveName, args, !IncludeStack.empty() && NPath::Basename(IncludeStack.back()) == Conf.LintersMakeFilename);
                 }
 
                 DataStatement(effectiveName, args);
@@ -208,16 +207,16 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                 // Skip the following conditions
             } else {
                 size_t prefixLen;
-                TString YaCommon;
-                if (Conf.AutoincludePathsTrie.FindLongestPrefix(Dir + NPath::PATH_SEP_S, &prefixLen, &YaCommon)) {
-                    if (!TFsPath(Conf.RealPathEx(YaCommon)).Exists()) {
-                        TRACE(P, NEvent::TInvalidFile(YaCommon, {Dir}, TString{"File not found"}));
-                        YConfErr(Misconfiguration) << "ya.common file not found at [[imp]]" << YaCommon << Endl;
-                    } else {
-                        auto includeCtr = OnInclude(YaCommon, Makefile);
+                TString LintersMake;
+                if (Conf.AutoincludePathsTrie.FindLongestPrefix(Dir + NPath::PATH_SEP_S, &prefixLen, &LintersMake)) {
+                    if (TFsPath(Conf.RealPathEx(LintersMake)).Exists()) {
+                        auto includeCtr = OnInclude(LintersMake, Makefile);
                         Y_ASSERT(!includeCtr.Ignored());
-                        Vars().SetStoreOriginals(VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(YaCommon)), OrigVars());
-                        ReadMakeFile(YaCommon);
+                        Vars().SetStoreOriginals(VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(LintersMake)), OrigVars());
+                        ReadMakeFile(LintersMake);
+                    } else {
+                        TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));
+                        YConfErr(Misconfiguration) << "linters.make.inc file not found at [[imp]]" << Dir << Endl;
                     }
                 }
                 // Process module EPILOGUE statement if there is one

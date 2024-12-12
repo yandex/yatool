@@ -63,6 +63,7 @@ public:
     THashSet<TString> ExcludedPeerdirs;
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
+    TStringBuf LintersMakeFilename;
 
 public:
     void AddOptions(NLastGetopt::TOpts& opts);

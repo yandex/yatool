@@ -918,7 +918,8 @@ namespace {
             } else {
                 if (name == NOptions::ADDINCL ||
                     name == NOptions::PEERDIR ||
-                    name == NOptions::ALLOWED_IN_COMMON)
+                    name == NOptions::ALLOWED_IN_COMMON ||
+                    name == NOptions::ALLOWED_IN_LINTERS_MAKE)
                 {
                     // Do nothing
                 } else if (name == NOptions::GEN_FROM_FILE ||

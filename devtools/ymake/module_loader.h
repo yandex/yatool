@@ -88,8 +88,8 @@ private:
         return ModuleConf.Ignored.contains(name);
     }
 
-    bool IsMacroAllowedInYaCommon(const TStringBuf& name) {
-        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_COMMON);
+    bool IsMacroAllowedInLintersMake(const TStringBuf& name) {
+        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_LINTERS_MAKE) || Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_COMMON);
     }
 
     size_t StatementPriority(const TStringBuf& s);
@@ -120,12 +120,12 @@ private:
     bool ProcessBaseMacro(const TStringBuf& macroName, const TVector<TStringBuf>& args, const TStringBuf& name);
 
     template <typename TMacroHandler>
-    void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler&& handler, TVector<TStringBuf>& callStack, bool yacommon = false) {
+    void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler&& handler, TVector<TStringBuf>& callStack, bool lintersMake = false) {
         if (IsMacroIgnored(name)) {
             return;
         }
 
-        if (yacommon && !IsMacroAllowedInYaCommon(name)) {
+        if (lintersMake && !IsMacroAllowedInLintersMake(name)) {
             YConfErr(Misconfiguration) << name << " is not allowed in ya.common!" << Endl;
             return;
         }
@@ -170,13 +170,13 @@ public:
     void VersionSet(bool val) noexcept {HasVersion = val;}
 
     template <typename TMacroHandler>
-    void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler handler, bool yacommon = false) {
+    void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler handler, bool lintersMake = false) {
         TVector<TStringBuf> callStack;
-        ProcessConfigMacroCalls(name, args, handler, callStack, yacommon);
+        ProcessConfigMacroCalls(name, args, handler, callStack, lintersMake);
     }
 
-    void ProcessModuleMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, bool yacommon = false) {
-        ProcessConfigMacroCalls(name, args, [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);}, yacommon);
+    void ProcessModuleMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, bool lintersMake = false) {
+        ProcessConfigMacroCalls(name, args, [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);}, lintersMake);
     }
 
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});

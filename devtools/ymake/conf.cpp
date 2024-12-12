@@ -306,12 +306,15 @@ void TBuildConfiguration::LoadLicenses(MD5& confData) {
 }
 
 void TBuildConfiguration::LoadAutoincludes(MD5& confData) {
+    const char* lintersMakeFilenameVar = "LINTERS_MAKE_FILENAME";
+    LintersMakeFilename = GetCmdValue(CommandConf.Get1(lintersMakeFilenameVar));
     TString autoincludes = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf(VAR_AUTOINCLUDE_PATHS), CommandConf);
     TVector<TFsPath> autoincludeFiles;
+
     for (const auto& it : StringSplitter(autoincludes).Split(' ').SkipEmpty()) {
         autoincludeFiles.emplace_back(SourceRoot / it.Token());
     }
-    AutoincludePathsTrie = ::LoadAutoincludes(autoincludeFiles, confData);
+    AutoincludePathsTrie = ::LoadAutoincludes(autoincludeFiles, LintersMakeFilename, confData);
 }
 
 void TBuildConfiguration::LoadPeersRules(MD5& confData) {
