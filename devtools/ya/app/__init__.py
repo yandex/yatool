@@ -14,7 +14,9 @@ import core.sig_handler
 import core.stage_tracer as stage_tracer
 import core.stage_aggregator as stage_aggregator
 import core.event_handling as event_handling
+import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
+import devtools.ya.core.user as user
 import exts.os2
 import exts.strings
 import exts.windows
@@ -73,6 +75,7 @@ def execute_early(action):
         modules = []
 
         modules.append(('uid', configure_uid()))
+        modules.append(('username', configure_user_heuristic()))
 
         if no_logs or is_sensitive(args):
             modules.append(('null_log', configure_null_log(ctx)))
@@ -94,12 +97,24 @@ def execute_early(action):
             ]
         )
 
+        modules.append(
+            ('exit', configure_exit_interceptor(error_file)),
+        )
+
         if not is_sensitive(args):
-            modules.append(('report', configure_report_interceptor(ctx, report_events if no_report else 'all')))
+            modules.extend(
+                [
+                    ('metrics_reporter', configure_metrics_reporter(ctx)),
+                    ('report', configure_report_interceptor(ctx, report_events if no_report else 'all')),
+                ]
+            )
+
+        modules.append(
+            ('exit_code', configure_exit_code_definition()),
+        )
 
         modules.extend(
             [
-                ('exit', configure_exit_interceptor(error_file)),
                 ('lifecycle_ts', configure_lifecycle_timestamps()),
                 ('env_checker', configure_environment_checker()),
                 # Need for ya nile {udf.so} handler
@@ -122,7 +137,7 @@ def execute_early(action):
 
 def execute(action, respawn=RespawnType.MANDATORY):
     # noinspection PyStatementEffect
-    def helper(parameters):
+    def helper(parameters, **kwargs):
         stager.finish("handler-selection")
         modules_initialization_full_stage = stager.start("modules-initialization-full")
 
@@ -403,6 +418,10 @@ def configure_lifecycle_timestamps():
 
 def configure_uid():
     yield core.gsid.uid()
+
+
+def configure_user_heuristic():
+    yield user.get_user()
 
 
 def configure_null_log(app_ctx):
@@ -723,6 +742,7 @@ def configure_report_interceptor(ctx, report_events):
             'vcs_type': ctx.vcs_type,
         },
     )
+    ctx.metrics_reporter.report_metric(monitoring.MetricNames.YA_STARTED)
 
     start = time.time()
     for stat in stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION).values():
@@ -730,19 +750,29 @@ def configure_report_interceptor(ctx, report_events):
             start = min(intvl[0], start)
 
     success = False
-    exit_code = -1
+    exit_code = 0
     try:
         yield
-    except KeyboardInterrupt:
-        raise
-    except SystemExit as e:
-        success = not e.code  # None or 0 are OK codes
-        exit_code = e.code or 0
-        raise
-    except Exception:
+    except BaseException as e:
         import traceback
 
-        err = sys.exc_info()[1]
+        if isinstance(e, KeyboardInterrupt):
+            exit_code = -1
+            raise
+        elif isinstance(e, SystemExit):
+            success = not e.code  # None or 0 are OK codes
+            exit_code = e.code or 0
+            if exit_code == 0:
+                raise
+        elif isinstance(e, Exception):
+            exit_code = getattr(e, 'ya_exit_code', None) or -1
+            success = not exit_code  # only 0 is ok
+        else:
+            raise
+
+        e.ya_exit_code = exit_code
+
+        prefix = core.yarg.OptsHandler.latest_handled_prefix()
         telemetry.report(
             ReportTypes.FAILURE,
             {
@@ -751,12 +781,22 @@ def configure_report_interceptor(ctx, report_events):
                 'cwd': os.getcwd(),
                 '__file__': __file__,
                 'traceback': traceback.format_exc(),
-                'type': sys.exc_info()[0].__name__,
-                'prefix': core.yarg.OptsHandler.latest_handled_prefix(),
-                'mute': getattr(err, 'mute', None),
-                'retriable': getattr(err, 'retriable', None),
+                'type': e.__class__.__name__,
+                'prefix': prefix,
+                'mute': getattr(e, 'mute', None),
+                'retriable': getattr(e, 'retriable', None),
                 'version': ctx.revision,
             },
+        )
+        ctx.metrics_reporter.report_metric(
+            monitoring.MetricNames.YA_FAILED,
+            labels={
+                "handler": prefix[-1],
+                "prefix": " ".join(prefix),
+                "exc_info": sys.exc_info()[0].__name__,
+                "exit_code": exit_code,
+            },
+            urgent=True,
         )
         raise
     finally:
@@ -781,6 +821,21 @@ def configure_report_interceptor(ctx, report_events):
             ),
         )
         telemetry.stop_reporter()  # flush urgent reports
+
+
+def configure_metrics_reporter(ctx):
+    from core.report import telemetry, compact_system_info
+
+    metrics_reporter = monitoring.MetricStore(
+        {
+            'platform': compact_system_info(),
+            'version': ctx.revision,
+            'userclass': user.classify_user(ctx.username),
+        },
+        telemetry,
+    )
+
+    yield metrics_reporter
 
 
 def configure_tmp_dir_interceptor(keep_tmp_dir):
@@ -829,21 +884,16 @@ def configure_exit_interceptor(error_file):
         yield
         sys.exit(0)
     except Exception as e:
-        from core import error
-
         if exts.windows.on_win() and isinstance(e, WindowsError):
             # Transcode system Windows errors to utf-8
             from exts.windows import transcode_error
 
             transcode_error(e)
 
-        temp_error = error.is_temporary_error(e)
         mute_error = getattr(e, 'mute', False)
-        retriable_error = getattr(e, 'retriable', True)
 
         if mute_error:
             print_message(e)
-            error_code = core.error.ExitCodes.GENERIC_ERROR
         else:
             import traceback
 
@@ -859,8 +909,6 @@ def configure_exit_interceptor(error_file):
                         app_config.support_url
                     )
                 )
-
-            error_code = core.error.ExitCodes.UNHANDLED_EXCEPTION
 
         no_space_left = False
         if isinstance(e, OSError):
@@ -888,8 +936,30 @@ def configure_exit_interceptor(error_file):
             else:
                 sys.stderr.write("Can't write error into file")
 
+        sys.exit(e.ya_exit_code)
+
+
+def configure_exit_code_definition():
+    try:
+        yield
+    except Exception as e:
+        from core import error
+
+        temp_error = error.is_temporary_error(e)
+        mute_error = getattr(e, 'mute', False)
+        retriable_error = getattr(e, 'retriable', True)
+
+        if mute_error:
+            error_code = core.error.ExitCodes.GENERIC_ERROR
+        else:
+            error_code = core.error.ExitCodes.UNHANDLED_EXCEPTION
+
         if not retriable_error:
             error_code = core.error.ExitCodes.NOT_RETRIABLE_ERROR
         elif temp_error:
             error_code = core.error.ExitCodes.INFRASTRUCTURE_ERROR
-        sys.exit(error_code)
+
+        logger.debug("Derived exit code is %s", error_code)
+
+        e.ya_exit_code = error_code
+        raise

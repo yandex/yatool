@@ -5,6 +5,8 @@ import os.path
 import sys
 import logging
 
+import six
+
 import yalibrary.find_root
 
 import core.resource
@@ -314,6 +316,11 @@ def is_dev_mode():
 
 @func.lazy
 def get_user():
+    if six.PY3:
+        import devtools.ya.core.user as core_user
+
+        return core_user.get_user()
+
     return os.environ.get('YA_USER', getpass.getuser())
 
 

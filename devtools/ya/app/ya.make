@@ -15,12 +15,14 @@ PEERDIR(
     devtools/ya/core/event_handling
     devtools/ya/core/gsid
     devtools/ya/core/logger
+    devtools/ya/core/monitoring
     devtools/ya/core/report
     devtools/ya/core/respawn
     devtools/ya/core/stage_aggregator
     devtools/ya/core/stage_tracer
     devtools/ya/core/sec
     devtools/ya/core/sig_handler
+    devtools/ya/core/user
     devtools/ya/exts
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/app_ctx

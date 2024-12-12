@@ -38,6 +38,7 @@ class ReportTypes(object):
     YT_CACHE_ERROR = 'yt_cache_error'
     GRAPH_STATISTICS = 'graph_statistics'
     DISTBUILD = 'distbuild'
+    YA_METRICS = 'ya_metrics'
 
 
 @func.lazy
@@ -83,6 +84,11 @@ class ReportEncoder(json.JSONEncoder):
 @func.lazy
 def system_info():
     return platform.system() + ' ' + platform.release() + ' ' + get_distribution()
+
+
+@func.lazy
+def compact_system_info():
+    return platform.system() + ' ' + platform.machine()
 
 
 def set_suppression_filter(suppressions):

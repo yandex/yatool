@@ -12,7 +12,15 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/exts
     devtools/ya/yalibrary/find_root
+
+    contrib/python/six
 )
+
+IF (PYTHON3)
+    PEERDIR(
+        devtools/ya/core/user
+    )
+ENDIF()
 
 END()
 

@@ -31,6 +31,13 @@ PEERDIR(
     devtools/ya/yalibrary/upload/consts
 )
 
+IF (PYTHON3)
+    PEERDIR(
+        devtools/ya/core/monitoring
+        devtools/ya/core/user
+    )
+ENDIF()
+
 STYLE_PYTHON()
 
 END()
