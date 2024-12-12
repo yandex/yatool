@@ -1909,6 +1909,7 @@ class InterimOptions(core.yarg.Options):
                 hook=core.yarg.SetConstValueHook('no_tests_is_error', True),
                 visible=self.Visible,
             ),
+            core.yarg.ConfigConsumer('no_tests_is_error'),
         ]
 
     def postprocess2(self, params):
