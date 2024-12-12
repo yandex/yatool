@@ -261,7 +261,7 @@ class _JavaSemGraph(SemGraph):
                 self.logger.error("%s", event)
             # TODO Collect non-exported for build later
 
-        super().make(**kwargs, ev_listener=listener)
+        super().make(**kwargs, ev_listener=listener, dump_raw_graph=self.config.ymake_root / "raw_graph")
         self._patch_annotation_processors()
 
     def get_rel_targets(self) -> list[(Path, bool)]:

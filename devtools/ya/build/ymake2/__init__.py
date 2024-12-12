@@ -136,6 +136,7 @@ def _build_params():
         core.yarg.Param('clear_build', default_value=False),
         core.yarg.Param('no_caches_on_retry', default_value=False),
         core.yarg.Param('dump_sem_graph', default_value=None),
+        core.yarg.Param('dump_raw_graph', default_value=None),
     ]
 
 
@@ -324,6 +325,10 @@ def _cons_ymake_args(**kwargs):
     dump_sem_graph = kwargs.pop('dump_sem_graph', None)
     if dump_sem_graph:
         ret += ['--sem-graph']
+
+    dump_raw_graph = kwargs.pop('dump_raw_graph', None)
+    if dump_raw_graph:
+        ret += ['--xg', '--dump-file', dump_raw_graph]
 
     # GENGRAPH PARAMS
     # XXX
