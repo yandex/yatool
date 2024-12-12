@@ -1,6 +1,7 @@
 from enum import StrEnum, auto
 
 
+STDIN_FILENAME = 'source.cpp'
 STDIN_FILENAME_STAMP = 'STDIN_FILENAME_STAMP'
 
 

@@ -6,7 +6,7 @@ import core.yarg
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
 import core.yarg.consumers
 
-from .enums import StylerKind
+from .enums import StylerKind, STDIN_FILENAME
 from .style import run_style
 
 import devtools.ya.app
@@ -18,7 +18,7 @@ class StyleOptions(core.yarg.Options):
         self.dry_run = False
         self.check = False
         self.full_output = False
-        self.stdin_filename = 'source.cpp'
+        self.stdin_filename = STDIN_FILENAME
         self.py2 = False
         self.force = False
         self.use_ruff = False

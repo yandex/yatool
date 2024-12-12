@@ -11,7 +11,6 @@ import marisa_trie
 import core.config
 import core.resource
 import devtools.ya.test.const as const
-import exts.func
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,6 @@ type Config = Path
 type MaybeConfig = Config | tp.Literal[""]
 
 
-@exts.func.lazy
 def _find_root() -> str:
     return core.config.find_root(fail_on_error=False)
 
@@ -47,7 +45,7 @@ class ConfigLoader(tp.Protocol):
 
 
 class DefaultConfig:
-    def __init__(self, linter_name: str, defaults_file: str = "", resource_name: str = ""):
+    def __init__(self, linter_name: str, *, defaults_file: str = "", resource_name: str = ""):
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
         self._default_config = self._load_default(linter_name, defaults_file, resource_name)
 
@@ -76,7 +74,7 @@ class DefaultConfig:
 
 
 class AutoincludeConfig:
-    def __init__(self, linter_name: str, autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS):
+    def __init__(self, linter_name: str, *, autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS):
         self._linter_name = linter_name
         self._autoinclude_files = autoinclude_files
 
@@ -125,20 +123,21 @@ class AutoincludeConfig:
 class RuffConfig:
     _RUFF_CONFIG_PATHS_FILE = "build/config/tests/ruff/ruff_config_paths.json"
 
-    def __init__(self):
+    def __init__(self, config_path_trie: str = _RUFF_CONFIG_PATHS_FILE):
+        self._config_path_trie = config_path_trie
         self._ruff_trie: marisa_trie.Trie | None = None
         self._config_paths: list[str] = []
+        self._root = _find_root()
         self._load_ruff_trie()
 
     def _load_ruff_trie(self) -> None:
-        root = _find_root()
-        if not root:
+        if not self._root:
             logger.warning("Couldn't detect arcadia root. Ruff config mapping won't be used for configs lookup")
             return
         try:
             config_map = {}
-            for prefix, config_path in core.config.config_from_arc_rel_path(self._RUFF_CONFIG_PATHS_FILE).items():
-                config_map[os.path.normpath(os.path.join(root, prefix))] = config_path
+            for prefix, config_path in core.config.config_from_arc_rel_path(self._config_path_trie).items():
+                config_map[os.path.normpath(os.path.join(self._root, prefix))] = config_path
         except Exception as e:
             logger.warning(
                 "Couldn't load ruff config mapping due to error %s. Ruff config mapping won't be used for configs lookup",
@@ -149,13 +148,13 @@ class RuffConfig:
         self._config_paths = [""] * len(config_map)
         self._ruff_trie = marisa_trie.Trie(config_map.keys())
         for prefix, idx in self._ruff_trie.items():  # type: ignore
-            self._config_paths[idx] = os.path.join(root, config_map[prefix])
+            self._config_paths[idx] = os.path.join(self._root, config_map[prefix])
 
     def lookup(self, path: PurePath) -> MaybeConfig:
-        if self._ruff_trie:
-            keys = self._ruff_trie.prefixes(str(path))
-            # keys is never empty because there is `'': <default config>`` in ruff_config_paths.json
+        if self._ruff_trie and (keys := self._ruff_trie.prefixes(str(path))):
+            # even though there is `'': <default config>` in ruff_config_paths.json
+            # keys can be empty if stdin is used
             key = sorted(keys, key=len)[-1]
-            if key != _find_root():
+            if key != self._root:
                 return Path(self._config_paths[self._ruff_trie[key]])
         return ""

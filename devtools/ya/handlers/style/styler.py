@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import difflib
 import logging
 import os
 import subprocess
 import sys
 import typing as tp
 
-from collections.abc import Callable
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 import devtools.ya.test.const as const
 import exts.func
@@ -17,11 +15,9 @@ import yalibrary.display
 import yalibrary.makelists
 import yalibrary.tools
 
-from library.python.testing.style import rules
-from library.python.fs import replace_file
 from . import config
 from . import state_helper
-from .enums import StylerKind, STDIN_FILENAME_STAMP
+from .enums import StylerKind
 
 
 logger = logging.getLogger(__name__)
@@ -29,15 +25,8 @@ display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
 
 
 class StylerOptions(tp.NamedTuple):
-    py2: bool
+    py2: bool = False
     config_loaders: tuple[config.ConfigLoader, ...] | None = None
-
-
-class StyleOptions(tp.NamedTuple):
-    force: bool
-    dry_run: bool
-    check: bool
-    full_output: bool
 
 
 class Spec(tp.NamedTuple):
@@ -70,69 +59,6 @@ def select_styler(target: PurePath, ruff: bool) -> type[Styler] | None:
     for spec in _SUFFIX_MAPPING[key]:
         if (s := Spec(spec.kind, ruff)) in _REGISTRY:
             return _REGISTRY[s]
-
-
-def _flush_to_file(path: str, content: str) -> None:
-    tmp = path + ".tmp"
-    with open(tmp, "wb") as f:
-        f.write(content.encode())
-
-    # never break original file
-    path_st_mode = os.stat(path).st_mode
-    replace_file(tmp, path)
-    os.chmod(path, path_st_mode)
-
-
-def _flush_to_terminal(content: str, formatted_content: str, full_output: bool) -> None:
-    if full_output:
-        display.emit_message(formatted_content)
-    else:
-        diff = difflib.unified_diff(content.splitlines(), formatted_content.splitlines())
-        diff = list(diff)[2:]  # Drop header with filenames
-        diff = "\n".join(diff)
-
-        display.emit_message(diff)
-
-
-def style(style_opts: StyleOptions, styler: Styler, target: PurePath | Path, loader: Callable[..., str]):
-    """
-    Execute `format` and store or display the result.
-    Return 0 if no formatting happened, 1 otherwise
-    """
-    content = loader()
-
-    def run_format() -> str:
-        formatted_content = styler.format(target, content)
-        if formatted_content and formatted_content[-1] != "\n":
-            return formatted_content + "\n"
-        return formatted_content
-
-    if target.name.startswith(STDIN_FILENAME_STAMP):
-        print(run_format())
-        return 0
-
-    target = tp.cast(Path, target)
-    if style_opts.force or not (reason := rules.get_skip_reason(str(target), content)):
-        formatted_content = run_format()
-        if formatted_content == content:
-            return 0
-
-        if not style_opts.dry_run and style_opts.check:
-            return 1
-
-        config_ = styler.lookup(target) if config.configurable(styler) else "Not Applicable"
-        message = f"[[good]]{type(styler).__name__} styler fixed {target}[[rst]] (config: {config_})"
-        if not style_opts.dry_run and not style_opts.check:
-            display.emit_message(message)
-            _flush_to_file(str(target), formatted_content)
-        elif style_opts.dry_run:
-            display.emit_message(message)
-            _flush_to_terminal(content, formatted_content, style_opts.full_output)
-        return 1
-    else:
-        logger.warning("skip by rule: %s", reason)
-
-    return 0
 
 
 class Styler(tp.Protocol):
