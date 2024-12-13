@@ -19,7 +19,6 @@ from humanfriendly import format_size
 
 from core import profiler, stage_tracer
 import devtools.ya.test.const as test_const
-from build.stat.graph import CopyTask, get_critical_path
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log
 from functools import cmp_to_key
 
@@ -164,15 +163,12 @@ def _task_details(task):
 
 
 def print_all_tasks(graph, filename, display):
-    (max_critical_time, critical_path) = get_critical_path(graph)
-    for node in critical_path:
-        node.critical = True
+    (max_critical_time, critical_path) = graph.get_critical_path()
 
     tasks = []
-    for task_list in graph.resource_nodes.values():
-        for task in task_list:
-            if task.get_time_elapsed() is not None:
-                tasks.append(task)
+    for task in graph.get_all_nodes():
+        if task.get_time_elapsed() is not None:
+            tasks.append(task)
 
     if len(tasks) > 0:
         tasks.sort(key=cmp_to_key(lambda x, y: (x.start_time - y.start_time) or (x.end_time - y.end_time)))
@@ -238,21 +234,21 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
     return json_tasks[:10]
 
 
+def _get_node_activity(node, cached_mark=True):
+    SEP = ' | '
+    if node.get_type() == 'TEST':
+        return SEP.join([node.get_type(), node.abstract.meta.get('env', {}).get('TEST_NAME')])  # XXX
+    elif node.get_type() == 'Copy':
+        copied = _get_node_activity(node.depends_on_ref[0], False) if len(node.depends_on_ref) > 0 else 'UNKNOWN'
+        return SEP.join([node.get_type(), copied])
+    elif 'prepare' in node.get_type():
+        return node.get_type()
+    else:
+        return SEP.join([node.get_type(cached_mark), str(node.abstract.description)])
+
+
 def profile_critical_path(critical_path):
-    def get_node_activity(node, cached_mark=True):
-        SEP = ' | '
-        if node.get_type() == 'TEST':
-            return SEP.join([node.get_type(), node.abstract.meta.get('env', {}).get('TEST_NAME')])  # XXX
-        elif node.get_type() == 'Copy':
-            copied = get_node_activity(node.depends_on_ref[0], False) if len(node.depends_on_ref) > 0 else 'UNKNOWN'
-            return SEP.join([node.get_type(), copied])
-        elif 'prepare' in node.get_type():
-            return node.get_type()
-        else:
-            return SEP.join([node.get_type(cached_mark), str(node.abstract.description)])
-
-    to_save = [(get_node_activity(node), node.get_time_elapsed(), node.host) for node in critical_path]
-
+    to_save = [(_get_node_activity(node), node.get_time_elapsed(), node.host) for node in critical_path]
     profiler.profile_value('critical_path', json.dumps(to_save))
 
 
@@ -287,7 +283,6 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
         display.emit_message('Critical path:')
         for node in critical_path:
             nodes.append(node.as_json())
-            node.critical = True
 
             total_elapsed += node.get_time_elapsed()
             display.emit_message(
@@ -374,18 +369,13 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
 
 
 def print_biggest_copy_tasks(graph, filename, display):
-    tasks = []
-
     longest_tasks = []
 
-    for copy_task in graph.copy_tasks.values():
-        if copy_task.get_time_elapsed() is not None:
-            tasks.append(copy_task)
-
-    if len(tasks) > 0:
+    tasks = [t for t in graph.copy_tasks if t.get_time_elapsed() is not None]
+    if tasks:
         tasks.sort(key=lambda x: -int(x.size))
 
-        display.emit_message('The biggest %d tasks:' % min(10, len(tasks)))
+        display.emit_message('The %d biggest copy tasks:' % min(10, len(tasks)))
         for task in tasks[:10]:
             display.emit_message(
                 '[%s ms] ' % task.get_time_elapsed()
@@ -587,17 +577,6 @@ def get_int_length(x):
 
 
 def print_summary_times(graph, tasks, display):
-    COPY_STAGES = [
-        'dep_start',
-        'dep_pack_start',
-        'dep_pack_finish',
-        'dep_send_start',
-        'dep_send_finish',
-        'dep_extract_queue',
-        'dep_extract_start',
-        'dep_extract_finish',
-        'dep_finished',
-    ]
     time_by_type = dict()
     task_by_type = dict()
     count_by_type = collections.Counter()
@@ -633,16 +612,6 @@ def print_summary_times(graph, tasks, display):
                 timeline[task.start_time].append('+{}'.format(task_type))
                 timeline[task.end_time].append('-{}'.format(task_type))
 
-            if isinstance(task, CopyTask):
-                task.stages['dep_start'] = task.start_time
-                task.stages['dep_finished'] = task.end_time
-                for i in range(len(COPY_STAGES) - 1):
-                    start_stage_name = COPY_STAGES[i]
-                    finish_stage_name = COPY_STAGES[i + 1]
-                    if start_stage_name in task.stages and finish_stage_name in task.stages:
-                        diff_time = max(0, task.stages[finish_stage_name] - task.stages[start_stage_name])
-                        setup_time('Copy: %s -> %s' % (start_stage_name, finish_stage_name), diff_time, task)
-
     if len(time_by_type) > 0:
         display.emit_message('Total time by type:')
 
@@ -663,18 +632,6 @@ def print_summary_times(graph, tasks, display):
                     time_by_type[task_type] / count_by_type[task_type],
                 )
             )
-
-    copy_stages_times = {}
-    for i in range(len(COPY_STAGES) - 1):
-        type_name = 'Copy: %s -> %s' % (COPY_STAGES[i], COPY_STAGES[i + 1])
-        if type_name in time_by_type and 'Copy' in time_by_type:
-            copy_stages_times[type_name] = time_by_type[type_name] * 100.0 / time_by_type['Copy']
-
-    if len(copy_stages_times) > 0:
-        display.emit_message()
-        display.emit_message('Copy stages percentage:\n')
-        for type_name in sorted(copy_stages_times, key=lambda x: copy_stages_times[x], reverse=True):
-            display.emit_message('%s - %.02f%%\n' % (type_name, copy_stages_times[type_name]))
 
     total_run_task_time = 0
     total_tests_task_time = 0
