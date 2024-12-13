@@ -1010,7 +1010,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
                         UseDiagProps(*values, Add->Module->GetName(), graph, TUseDiagPropsDebugOnly{graph, Node, type});
                     }
                     else {
-                        TModuleDirBuilder(*Add->Module, *Add, graph).UseModuleProps(type, *values);
+                        TModuleDirBuilder(*Add->Module, *Add, graph, ymake.Conf.ShouldReportMissingAddincls()).UseModuleProps(type, *values);
                     }
                 }
             }

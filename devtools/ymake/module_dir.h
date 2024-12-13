@@ -25,10 +25,11 @@ constexpr TFlags<EPeerOption> operator| (EPeerOption l, EPeerOption r) noexcept 
 /// including relevant property nodes.
 class TModuleDirBuilder {
 public:
-    TModuleDirBuilder(TModule& module, TAddDepAdaptor& node, TDepGraph& graph)
+    TModuleDirBuilder(TModule& module, TAddDepAdaptor& node, TDepGraph& graph, bool reportMissingAddincls)
         : Module(module)
         , Node(node)
         , Graph(graph)
+        , ReportMissingAddincls(reportMissingAddincls)
     {
     }
 
@@ -48,4 +49,6 @@ protected:
 
 private:
     void AddMissingDir(TStringBuf dir);
+
+    bool ReportMissingAddincls = true;
 };

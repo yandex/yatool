@@ -66,7 +66,7 @@ public:
     void AddDart(TStringBuf dartName, TStringBuf dartValue, const TVector<TStringBuf>& vars) override;
 
     TModuleBuilder(TModuleDef& moduleDef, TAddDepAdaptor& node, TBuildContext ctx, const TParsersCache& parsersCache)
-       : TModuleDirBuilder(moduleDef.GetModule(), node, ctx.Graph)
+       : TModuleDirBuilder(moduleDef.GetModule(), node, ctx.Graph, ctx.Conf.ShouldReportMissingAddincls())
        , TModuleWrapper(moduleDef.GetModule(), ctx.Conf,
                         MakeModuleResolveContext(moduleDef.GetModule(), ctx.Conf, ctx.Graph, ctx.UpdIter, parsersCache))
        , ModuleDef(&moduleDef)

@@ -105,7 +105,7 @@ void TModuleDirBuilder::AddIncdir(const TStringBuf& dir, EIncDirScope scope, boo
     if (checkDir && Graph.Names().FileConf.IsNonExistedSrcDir(dir)) {
         TScopedContext context(Module.GetName());
         TRACE(P, NEvent::TInvalidAddIncl(TString{dir}));
-        if (auto conf = GlobalConf(); conf && conf->ShouldReportMissingAddincls()) {
+        if (ReportMissingAddincls) {
             YConfErr(BadDir) << "[[alt1]]ADDINCL[[rst]] to non existent source directory " << dir << Endl;
         } else {
             YConfWarn(BadDir) << "[[alt1]]ADDINCL[[rst]] to non existent source directory " << dir << Endl;
