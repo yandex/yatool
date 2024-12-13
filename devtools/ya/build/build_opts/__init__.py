@@ -3361,6 +3361,8 @@ def distbs_options(use_distbuild=False):
                 self.share_results = False
                 self.graph_stat_path = None
                 self.dump_graph_execution_cost = False
+                self.download_artifacts = False
+                self.upload_to_remote_store = False
 
         return [
             DistbsOptions(),

@@ -1519,7 +1519,7 @@ def get_merger_root_path(suites):
     return os.path.join(suites[0].project_path, "tests_merger")
 
 
-def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
+def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store):
     test_uids = [node["uid"] for node in test_nodes]
     uid = suite.uid
     out_dir = suite.work_dir()
@@ -1587,6 +1587,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
         },
         "backup": backup,
         "broadcast": False,
+        "upload": upload_to_remote_store,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -1635,7 +1636,12 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
             retry=retry,
         )
 
-        graph.append_node(node, add_to_result=(tests_retries < 2))
+        add_to_result = tests_retries < 2
+
+        if opts is not None and getattr(opts, 'upload_to_remote_store', False):  # TODO YA-316
+            node['upload'] = add_to_result
+
+        graph.append_node(node, add_to_result=add_to_result)
         test_nodes.append(node)
     return test_nodes
 
@@ -1679,8 +1685,13 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
         acc_node = create_results_accumulator_node(
             test_nodes, suite, graph, retry, opts=opts, backup=getattr(opts, 'backup_test_results', False)
         )
+
+        add_to_result = tests_retries < 2
+        if opts is not None and getattr(opts, 'upload_to_remote_store', False):  # TODO YA-316
+            acc_node['upload'] = add_to_result
+
         acc_nodes.append(acc_node)
-        graph.append_node(acc_node, add_to_result=(tests_retries < 2))
+        graph.append_node(acc_node, add_to_result=add_to_result)
 
     return acc_nodes
 
@@ -1809,7 +1820,8 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
         assert test_nodes
         if len(test_nodes) > 1:
             backup = opts is not None and getattr(opts, 'backup_test_results', False)
-            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts, backup)
+            upload_to_remote_store = opts is not None and getattr(opts, 'upload_to_remote_store', False)
+            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store)
         else:
             suite_run_node = test_nodes[0]
 

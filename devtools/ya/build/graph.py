@@ -901,6 +901,12 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
         if opts.replace_result:
             graph = strip_graph(graph)
 
+    if opts.upload_to_remote_store and opts.download_artifacts and 'result' in graph:
+        graph_result = set(graph['result'])  # TODO YA-316
+        for node in graph['graph']:
+            if node.get('uid') in graph_result:
+                node['upload'] = True
+
 
 def _load_stat(graph_stat_path):
     load_graph_stat_stage = stager.start("load_graph_stat")

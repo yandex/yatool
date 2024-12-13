@@ -62,6 +62,7 @@ GraphNode = TypedDict(
         'cache': bool,
         'type': int,
         'target_properties': NotRequired[GraphNodeTargetProperties],
+        'upload': NotRequired[bool],
     },
 )
 
