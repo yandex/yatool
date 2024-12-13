@@ -13,8 +13,13 @@ PEERDIR(
     contrib/python/pytz
 )
 
+IF(PYTHON2)
+    PEERDIR(contrib/python/pathlib2)
+    PEERDIR(contrib/deprecated/python/typing)
+ENDIF()
+
 END()
 
-RECURSE(
+RECURSE_FOR_TESTS(
     tests
 )
