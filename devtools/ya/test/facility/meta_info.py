@@ -346,7 +346,7 @@ class DartInfo(MetaInfo):
         self._strict_classpath_clash = dart_info.get("STRICT_CLASSPATH_CLASH")
         self._ignore_classpath_clash = dart_info.get("IGNORE_CLASSPATH_CLASH")
         self._java_classpath_cmd_type = dart_info.get("JAVA_CLASSPATH_CMD_TYPE")
-        self._jdk_for_tests_resource_prefix = dart_info.get(jbuild.gen.consts.JDK_FOR_TESTS_RESOURCE_PREFIX)
+        self._jdk_for_tests_resource_prefix = dart_info.get('JDK_FOR_TESTS')
         self._jdk_latest_version = dart_info.get('JDK_LATEST_VERSION')
         self._jdk_resource_prefix = dart_info.get(jbuild.gen.consts.JDK_RESOURCE_PREFIX)
         self._ktlint_baseline_file = dart_info.get('KTLINT_BASELINE_FILE')
