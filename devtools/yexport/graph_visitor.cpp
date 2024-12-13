@@ -181,12 +181,23 @@ namespace NYexport {
         }
 
         const auto& semantics = Generator_->ApplyReplacement(data.Path, data.Sem);
+
+        bool isIgnored = false;
+        for (const auto& sem : semantics) {
+            const auto& semName = sem[0];
+            const auto semNameType = SemNameToType(semName);
+            if (semNameType == ESNT_Ignored) {
+                isIgnored = true;
+                break;
+            }
+        }
+
         for (const auto& sem : semantics) {
             const auto& semName = sem[0];
             const auto semNameType = SemNameToType(semName);
             const auto semArgs = std::span{sem}.subspan(1);
 
-            OnNodeSemanticPostOrder(state, semName, semNameType, semArgs);
+            OnNodeSemanticPostOrder(state, semName, semNameType, semArgs, isIgnored);
         }
 
         TBase::Leave(state);

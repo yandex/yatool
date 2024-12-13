@@ -140,7 +140,7 @@ public:
         Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
     }
 
-    void OnNodeSemanticPostOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs) override {
+    void OnNodeSemanticPostOrder(TState& state, const std::string& semName, ESemNameType semNameType, const std::span<const std::string>& semArgs, bool isIgnored) override {
         const TSemNodeData& data = state.TopNode().Value();
         switch (semNameType) {
         case ESNT_RootAttr:
@@ -153,7 +153,9 @@ public:
             JinjaProjectBuilder_->SetDirectoryAttr(semName, semArgs, data.Path);
             break;
         case ESNT_TargetAttr:
-            JinjaProjectBuilder_->SetTargetAttr(semName, semArgs, data.Path);
+            if (!isIgnored) {
+                JinjaProjectBuilder_->SetTargetAttr(semName, semArgs, data.Path);
+            }
             break;
         case ESNT_InducedAttr:
             StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
