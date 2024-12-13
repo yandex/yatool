@@ -192,10 +192,10 @@ macro WERROR() {
     ENABLE(WERROR)
 }
 
-### @usage: NO_WERROR()
+### @usage: NO_COMPILER_WARNINGS()
 ### Override WERROR() behavior
 ### Priorities: NO_COMPILER_WARNINGS > NO_WERROR > WERROR_MODE > WERROR.
-macro NO_WERROR() {
+macro NO_COMPILER_WARNINGS() {
     DISABLE(WERROR)
 }
 ```
