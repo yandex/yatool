@@ -51,7 +51,7 @@ namespace NComputeReachability {
         }
     }
 
-    void ComputeReachableNodes(TDepGraph& graph, const TFileConf& fileConf, TVector<TTarget>& startTargets) {
+    void ComputeReachableNodes(TDepGraph& graph, const TFileConf& /* fileConf */, TVector<TTarget>& startTargets) {
         TVisitor visitor;
         IterateAll(graph, startTargets, visitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 
