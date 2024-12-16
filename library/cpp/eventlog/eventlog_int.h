@@ -26,6 +26,9 @@ static_assert(COMPRESSED_LOG_FRAME_SYNC_DATA.size() == 64);
  */
 
 enum EEventLogFormat : TEventLogFormat {
+    // Сохраняем без компрессии
+    UNCOMPRESSED_LOG_FORMAT  = 0 /* "no_compress" */,
+
     // Формат версии 1. Используется компрессор LZQ.
     COMPRESSED_LOG_FORMAT_V1 = 1,
 

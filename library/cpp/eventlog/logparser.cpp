@@ -143,6 +143,7 @@ TFrameHeader::TFrameHeader(IInputStream& in) {
             case COMPRESSED_LOG_FORMAT_V1:
                 break;
 
+            case UNCOMPRESSED_LOG_FORMAT:
             case COMPRESSED_LOG_FORMAT_V2:
             case COMPRESSED_LOG_FORMAT_V3:
             case COMPRESSED_LOG_FORMAT_V4:
@@ -556,6 +557,10 @@ TFrameDecoder::TFrameDecoder(const TFrame& fr, const TEventFilter* const filter,
 
             break;
         }
+        case UNCOMPRESSED_LOG_FORMAT: {
+            Decompressor_.Reset(new TStringStream(fr.GetCompressedFrame()));
+            break;
+        }
 
         default:
             ythrow yexception() << "unsupported log format: " << fr.LogFormat() << Endl;
@@ -597,7 +602,7 @@ bool TFrameDecoder::Next() {
 
 void TFrameDecoder::Decode() {
     Event_ = nullptr;
-    const bool framed = (Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V3) || (Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V4 || Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V5);
+    const bool framed = (Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V3) || (Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V4 || Frame_.LogFormat() == COMPRESSED_LOG_FORMAT_V5) || (Frame_.LogFormat() == UNCOMPRESSED_LOG_FORMAT);
 
     size_t evBegin = 0;
     size_t evEnd = 0;
