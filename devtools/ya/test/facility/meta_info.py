@@ -1,4 +1,3 @@
-import jbuild.gen.consts
 import devtools.ya.test.const
 
 
@@ -348,7 +347,7 @@ class DartInfo(MetaInfo):
         self._java_classpath_cmd_type = dart_info.get("JAVA_CLASSPATH_CMD_TYPE")
         self._jdk_for_tests_resource_prefix = dart_info.get('JDK_FOR_TESTS')
         self._jdk_latest_version = dart_info.get('JDK_LATEST_VERSION')
-        self._jdk_resource_prefix = dart_info.get(jbuild.gen.consts.JDK_RESOURCE_PREFIX)
+        self._jdk_resource_prefix = dart_info.get('JDK_RESOURCE')
         self._ktlint_baseline_file = dart_info.get('KTLINT_BASELINE_FILE')
         self._ktlint_binary = dart_info.get("KTLINT_BINARY")
         self._lint_configs = dart_info.get("LINT-CONFIGS")
@@ -386,7 +385,7 @@ class DartInfo(MetaInfo):
         self._test_recipes = dart_info.get('TEST-RECIPES')
         self._test_runner_bin = dart_info.get('TEST-RUNNER-BIN')
         self._test_timeout = dart_info.get('TEST-TIMEOUT')
-        self._t_jvm_args = dart_info.get(jbuild.gen.consts.T_JVM_ARGS)
+        self._t_jvm_args = dart_info.get('JVM_ARGS')
         self._ts_config_path = dart_info.get("TS_CONFIG_PATH")
         self._ts_stylelint_config = dart_info.get("TS_STYLELINT_CONFIG")
         self._ts_test_data_dirs = dart_info.get("TS-TEST-DATA-DIRS")
