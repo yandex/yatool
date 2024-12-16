@@ -1,8 +1,6 @@
 import six
 
 import os
-import base64
-import exts.yjson as json
 
 import jbuild.gen.consts as consts
 import yalibrary.graph.commands as graph_commands
@@ -794,41 +792,6 @@ def jarx(archive_path, jdk_resource, verbose=True, cwd=None):  # XXX
     return graph_commands.Cmd(cmd, cwd, [])
 
 
-def repack_manifest(target, archive_path, jdk_resource, manifest, cwd, verbose=True):
-    gen_mf = gen_vcs_info_cmds(target, archive_path, manifest=manifest, cwd=cwd)
-    if not gen_mf:
-        return []
-
-    # Temporary directory
-    mk_dir = mkdir(os.path.join('_empty', 'META-INF'), cwd=cwd)
-    temp_dir = os.path.join(cwd, '_empty')
-
-    touch_manifest = touch(os.path.join('META-INF', 'MANIFEST.MF'), cwd=temp_dir)
-    remove_manifest = jar(
-        ['META-INF/MANIFEST.MF'], archive_path, jdk_resource, verbose=verbose, cwd=temp_dir, update=True
-    )
-    update_manifest = jar([], archive_path, jdk_resource, manifest=manifest, verbose=verbose, cwd=temp_dir, update=True)
-    return [mk_dir] + gen_mf + [touch_manifest, remove_manifest, update_manifest]
-
-
-def tar(archive_path, tail, cwd=None):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'find_and_tar.py'),
-        archive_path,
-        tail,
-    ]
-
-    return graph_commands.Cmd(cmd, cwd, [])
-
-
-def tar_all(tar_name, path, cwd=None):
-    script = os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'tar_directory.py')
-    cmd = [BuildTools.python(), script, tar_name, path, path]
-
-    return graph_commands.Cmd(cmd, cwd, [script])
-
-
 def fetch_resource(resource_id, path, custom_fetcher=None, verbose=False, cwd=None):
     cmd = [
         BuildTools.python(),
@@ -909,27 +872,6 @@ def make_manifest_from_buildfile(buildfile, manifest, cwd=None):
     return graph_commands.Cmd(cmd, cwd, [])
 
 
-def make_codenav_entry(kythe_to_proto_tool, kindexes, out_name, binding_only, jdk_resource, cwd=None):
-    script_path = os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'gen_java_codenav_entry.py')
-    cmd = (
-        [
-            BuildTools.python(),
-            script_path,
-            '--java',
-            BuildTools.jdk_tool('java', jdk_path=jdk_resource),
-            '--kythe',
-            BuildTools.kythe_tool(),
-            '--kythe-to-proto',
-            kythe_to_proto_tool if kythe_to_proto_tool else BuildTools.kythe_to_proto_tool(),
-            '--out-name',
-            out_name,
-        ]
-        + (['--binding-only'] if binding_only else [])
-        + kindexes
-    )
-    return graph_commands.Cmd(cmd, cwd, [script_path])
-
-
 def kythe_to_proto(entries, out_name, build_file, kythe_to_proto_tool, source_root=consts.SOURCE_ROOT, cwd=None):
     script_path = os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'gen_java_codenav_protobuf.py')
     cmd = [
@@ -957,137 +899,6 @@ def merge_files(out, files, cwd=None):
         out,
     ] + files
     return graph_commands.Cmd(cmd, cwd, [script_path])
-
-
-def make_uberjar_cmds(
-    inputs,
-    out,
-    jdk_resource,
-    uberjar_resource,
-    shade_prefix=None,
-    shade_exclude=None,
-    path_exclude=None,
-    manifest_main=None,
-    manifest_attributes=None,
-    append_transformers=None,
-    service_transformer=False,
-    cwd=None,
-):
-    temp_name = os.path.join(os.path.dirname(out), 'uber.' + os.path.basename(out))
-    cmd = [
-        BuildTools.jdk_tool('java', jdk_path=jdk_resource),
-        '-cp',
-        BuildTools.uberjar_tool(uberjar_resource),
-        'ru.yandex.devtools.emigrante.Main',
-        '--out-jar',
-        temp_name,
-    ]
-    for inp in inputs:
-        cmd += ['--jar', inp]
-    if shade_prefix:
-        cmd += ['--shade-prefix', shade_prefix]
-    for exc in shade_exclude or []:
-        cmd += ['--shade-exclude', exc]
-    for exc in path_exclude or []:
-        cmd += ['--uber-exclude', exc]
-    if manifest_main:
-        cmd += ['--manifest-main', manifest_main]
-    for mattr in manifest_attributes or []:
-        cmd += ['--manifest-attribute', (':'.join([i.strip() for i in mattr.split(':', 1)]))]
-    for atrans in append_transformers or []:
-        cmd += ['--append-transformer', atrans]
-    if service_transformer:
-        cmd += ['--service-transformer']
-    return [graph_commands.Cmd(cmd, cwd, []), rm(out, cwd), mv(temp_name, out, cwd)]
-
-
-def run_gen_script(output, template, properties, jdk_resource, cwd=None):
-    cmd = [
-        BuildTools.scriptgen_tool(),
-        '--output',
-        output,
-    ]
-    if template:
-        cmd += ['--template', template]
-    if properties:
-        cmd += [
-            '--properties',
-            six.ensure_str(
-                base64.b64encode(six.ensure_binary(json.dumps(properties, encoding='utf-8', sort_keys=True))).strip()
-            ),
-        ]
-    cmd += ['--java', BuildTools.jdk_tool('java', jdk_path=jdk_resource)]
-
-    return graph_commands.Cmd(cmd, cwd, ([template] if template else []))
-
-
-def dump_classpaths(filename, target_jar, pierced_cp):
-    jars = []
-    for classpath in [target_jar] + pierced_cp:
-        jars.append(strip_build_root(classpath))
-    return append(filename, "\n".join(jars))
-
-
-def strip_source_root_or_drop(paths):
-    return [strip_source_root(p) for p in paths if p.startswith(consts.SOURCE_ROOT + '/')]
-
-
-def strip_source_root(path):
-    assert path.startswith(consts.SOURCE_ROOT + '/'), path
-    return path[len(consts.SOURCE_ROOT) + 1 :]
-
-
-def strip_build_root(path):
-    assert path.startswith(consts.BUILD_ROOT + '/'), path
-    return path[len(consts.BUILD_ROOT) + 1 :]
-
-
-def dump_classpath_source_files(filename, srcsfiles):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'java_pack_to_file.py'),
-        '--output',
-        filename,
-        '--source-root',
-        consts.SOURCE_ROOT,
-    ] + [strip_source_root(f) for f in srcsfiles]
-    return graph_commands.Cmd(
-        cmd,
-        None,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'java_pack_to_file.py'),
-        ],
-    )
-
-
-def gen_vcs_info_cmds(target, input, manifest, cwd=None):
-    if not target.plain.get('EMBED_VCS', None):
-        return []
-
-    script = os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'vcs_info.py')
-    cmd = [BuildTools.python(), script, 'output-java', '$(VCS)/vcs.json', manifest, input]
-    return [graph_commands.Cmd(cmd, cwd, [script])]
-
-
-def gen_jar_filter_cmds(target, jarfile, cwd=None):
-    if not target.plain.get(consts.JAR_EXCLUDE_FILTER, None) and not target.plain.get(consts.JAR_INCLUDE_FILTER, None):
-        return []
-
-    script = os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'filter_zip.py')
-    cmd = [
-        BuildTools.python(),
-        script,
-        '--file',
-        jarfile,
-    ]
-    if target.plain.get(consts.JAR_EXCLUDE_FILTER, None):
-        for f in sum(target.plain.get(consts.JAR_EXCLUDE_FILTER, []), []):
-            cmd += ['--negative', f]
-    else:
-        for f in sum(target.plain.get(consts.JAR_INCLUDE_FILTER, []), []):
-            cmd += ['--positive', f]
-
-    return [graph_commands.Cmd(cmd, cwd, [script])]
 
 
 def make_cp_file(src, dst, cwd=None):
