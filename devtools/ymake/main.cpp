@@ -1017,22 +1017,22 @@ int main_real(TBuildConfiguration& conf) {
     }
 
     if (conf.RenderSemantics) {
-        const auto* sourceRoootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_SOURCE_ROOT");
-        const auto* buildRoootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_BUILD_ROOT");
-        if (!sourceRoootVar || !buildRoootVar) {
+        const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_SOURCE_ROOT");
+        const auto* buildRootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_BUILD_ROOT");
+        if (!sourceRootVar || !buildRootVar) {
             YConfErr(UndefVar) << "Configure variables EXPORTED_BUILD_SYSTEM_SOURCE_ROOT and EXPORTED_BUILD_SYSTEM_BUILD_ROOT are required for rendering --sem-graph" << Endl;
             return BR_CONFIGURE_FAILED;
         }
-        const auto oldSourceRoot = std::exchange(yMake->Conf.SourceRoot, GetCmdValue(Get1(sourceRoootVar)));
-        const auto oldBuildRoot = std::exchange(yMake->Conf.BuildRoot, GetCmdValue(Get1(buildRoootVar)));
+        const auto oldSourceRoot = std::exchange(yMake->Conf.SourceRoot, GetCmdValue(Get1(sourceRootVar)));
+        const auto oldBuildRoot = std::exchange(yMake->Conf.BuildRoot, GetCmdValue(Get1(buildRootVar)));
         if (!yMake->Conf.SourceRoot.IsDefined() || !yMake->Conf.BuildRoot.IsDefined()) {
             YConfErr(Misconfiguration) << fmt::format(
                 "Source root or build root for rendering --sem-graph is empty.\n\t"
                 "NOTE: raw var values before converting to filesystem path are:\n\t"
                 "EXPORTED_BUILD_SYSTEM_SOURCE_ROOT='{}'\n\t"
                 "EXPORTED_BUILD_SYSTEM_BUILD_ROOT='{}'",
-                GetCmdValue(Get1(sourceRoootVar)),
-                GetCmdValue(Get1(buildRoootVar))) << Endl;
+                GetCmdValue(Get1(sourceRootVar)),
+                GetCmdValue(Get1(buildRootVar))) << Endl;
                 return BR_CONFIGURE_FAILED;
         }
         RenderSemGraph(Cout, yMake->GetRestoreContext(), yMake->Commands, yMake->GetTraverseStartsContext());
