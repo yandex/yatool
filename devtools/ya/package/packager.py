@@ -296,7 +296,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "cache_size",
         "cache_stat",
         "custom_fetcher",
-        "custom_version",
         "executor_address",
         "fetcher_params",
         "junit_args",
@@ -327,6 +326,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     ]:
         setattr(build_options, i, getattr(params, i))
 
+    if version := getattr(params, "custom_version"):
+        build_options.custom_version = version.format(**formatters)
     build_options.yt_store = params.yt_store
     build_options.yt_proxy = params.yt_proxy
     build_options.yt_dir = params.yt_dir
