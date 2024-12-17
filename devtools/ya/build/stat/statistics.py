@@ -19,7 +19,7 @@ from humanfriendly import format_size
 
 from core import profiler, stage_tracer
 import devtools.ya.test.const as test_const
-from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log
+from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
 from functools import cmp_to_key
 
 import six
@@ -145,17 +145,17 @@ def _transform_timeline(timeline):
 
 def _task_details(task):
     if not getattr(task, 'total_time', False):
-        return '[started: %s, finished: %s]\n' % (task.start_time, task.end_time)
+        return '[started: {}, finished: {}]'.format(task.start_time, task.end_time)
     if not task.get_time_elapsed() or not getattr(task, 'count', None):
-        return '\n'
+        return ''
     if getattr(task, 'failures', None):
-        return '[count: %s, cps: %.02f, ave time %.02f msec, failures %d]\n' % (
+        return '[count: {:d}, cps: {:.02f}, ave time {:.02f} msec, failures {:d}]'.format(
             task.count,
             1000.0 * task.count / task.get_time_elapsed(),
             1.0 * task.get_time_elapsed() / task.count,
             task.failures,
         )
-    return '[count: %s, cps: %.02f, ave time %.02f msec]\n' % (
+    return '[count: {:d}, cps: {:.02f}, ave time {:.02f} msec]'.format(
         task.count,
         1000.0 * task.count / task.get_time_elapsed(),
         1.0 * task.get_time_elapsed() / task.count,
@@ -165,12 +165,8 @@ def _task_details(task):
 def print_all_tasks(graph, filename, display):
     (max_critical_time, critical_path) = graph.get_critical_path()
 
-    tasks = []
-    for task in graph.get_all_nodes():
-        if task.get_time_elapsed() is not None:
-            tasks.append(task)
-
-    if len(tasks) > 0:
+    tasks = [task for task in graph.get_all_nodes() if task.get_time_elapsed() is not None]
+    if tasks:
         tasks.sort(key=cmp_to_key(lambda x, y: (x.start_time - y.start_time) or (x.end_time - y.end_time)))
         initial_time = tasks[0].start_time
         if filename is not None:
@@ -184,23 +180,21 @@ def print_all_tasks(graph, filename, display):
                             str(task.critical),
                         )
                     )
-            display.emit_message('Tasks are saved to %s' % filename)
+            display.emit_message(f'Tasks are saved to {filename}')
             display.emit_message()
 
     return tasks, (max_critical_time, critical_path)
 
 
 def print_longest_tasks(tasks, filename, display, ymake_stats=None):
-    max_elapsed_len = 0
-    for task in tasks:
-        if task.get_time_elapsed() > 0:
-            max_elapsed_len = max(max_elapsed_len, get_int_length(task.get_time_elapsed()))
-
     if ymake_stats:
         for configure_task in ymake_stats.threads_time:
             tasks.append(configure_task)
 
-    elapsed_format = '[%%%dd ms] ' % max_elapsed_len
+    max_elapsed_len = 0
+    for task in tasks:
+        if task.get_time_elapsed() > 0:
+            max_elapsed_len = max(max_elapsed_len, get_int_length(task.get_time_elapsed()))
 
     json_tasks = []
 
@@ -209,10 +203,15 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
 
         profiler.profile_value('statistics_longest_task', tasks[0].get_time_elapsed())
 
-        display.emit_message('The longest %d tasks:' % min(10, len(tasks)))
+        display.emit_message('The longest {:d} tasks:'.format(min(10, len(tasks))))
         for task in tasks[:10]:
             display.emit_message(
-                elapsed_format % task.get_time_elapsed() + task.get_colored_name() + ' ' + _task_details(task)
+                '[{:{tw}d} ms] {} {}\n'.format(
+                    int(task.get_time_elapsed()),
+                    task.get_colored_name(),
+                    _task_details(task),
+                    tw=max_elapsed_len,
+                )
             )
         display.emit_message()
 
@@ -223,12 +222,12 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
         if filename is not None:
             with open(filename, 'w') as output_file:
                 for task in tasks:
-                    output_file.write('{} {}'.format(task.name(), _task_details(task)))
+                    output_file.write('{} {}\n'.format(task.name(), _task_details(task)))
 
             with open(filename + '.json', 'w') as output_json_file:
                 json.dump(json_tasks, output_json_file, indent=4, sort_keys=True)
 
-            display.emit_message('Tasks sorted by elapsed time are saved to %s' % filename)
+            display.emit_message(f'Tasks sorted by elapsed time are saved to {filename}')
             display.emit_message()
 
     return json_tasks[:10]
@@ -267,8 +266,6 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
         max_elapsed_len = max(max_elapsed_len, get_int_length(node.get_time_elapsed()))
         total_elapsed += node.get_time_elapsed()
 
-    elapsed_format = '[%%%dd ms] ' % max_elapsed_len
-
     nodes = []
 
     if graph.get_total_time_elapsed() is None or total_elapsed == 0:
@@ -286,11 +283,15 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
 
             total_elapsed += node.get_time_elapsed()
             display.emit_message(
-                elapsed_format % node.get_time_elapsed()
-                + node.get_colored_name()
-                + ' '
-                + '[started: %s (%s), finished: %s (%s)]\n'
-                % (node.start_time - start_time, node.start_time, node.end_time - start_time, node.end_time)
+                '[{:{tw}d} ms] {} [started: {} ({}), finished: {} ({})]\n'.format(
+                    int(node.get_time_elapsed()),
+                    node.get_colored_name(),
+                    node.start_time - start_time,
+                    node.start_time,
+                    node.end_time - start_time,
+                    node.end_time,
+                    tw=max_elapsed_len,
+                )
             )
 
             node_type = node.get_type()
@@ -354,15 +355,16 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
                     )
 
                 output_file.write(
-                    'Time from start: %s, time elapsed by graph %s, time diff %s\n'
-                    % (graph.get_total_time_elapsed(), total_elapsed, graph.get_total_time_elapsed() - total_elapsed)
+                    'Time from start: {}, time elapsed by graph {}, time diff {}\n'.format(
+                        graph.get_total_time_elapsed(), total_elapsed, graph.get_total_time_elapsed() - total_elapsed
+                    )
                 )
 
             filename_json = '{}.json'.format(filename)
             with open(filename_json, 'w') as output_file:
                 json.dump(nodes, output_file)
 
-            display.emit_message('Critical path is saved to %s' % filename)
+            display.emit_message(f'Critical path is saved to {filename}')
         display.emit_message()
 
     return nodes
@@ -375,13 +377,13 @@ def print_biggest_copy_tasks(graph, filename, display):
     if tasks:
         tasks.sort(key=lambda x: -int(x.size))
 
-        display.emit_message('The %d biggest copy tasks:' % min(10, len(tasks)))
+        display.emit_message('The {} biggest copy tasks:'.format(min(10, len(tasks))))
         for task in tasks[:10]:
             display.emit_message(
-                '[%s ms] ' % task.get_time_elapsed()
+                '[{} ms] '.format(task.get_time_elapsed())
                 + task.get_colored_name()
                 + ' '
-                + '[started: %s, finished: %s]\n' % (task.start_time, task.end_time)
+                + '[started: {}, finished: {}]\n'.format(task.start_time, task.end_time)
             )
             longest_tasks.append(task.as_json())
 
@@ -391,10 +393,11 @@ def print_biggest_copy_tasks(graph, filename, display):
             with open(filename, 'w') as output_file:
                 for task in tasks:
                     output_file.write(
-                        '[%s ms] %s [started: %s, finished: %s]\n'
-                        % (task.get_time_elapsed(), task.name(), task.start_time, task.end_time)
+                        '[{} ms] {} [started: {}, finished: {}]\n'.format(
+                            task.get_time_elapsed(), task.name(), task.start_time, task.end_time
+                        )
                     )
-            display.emit_message('Copy tasks sorted by size are saved to %s' % filename)
+            display.emit_message(f'Copy tasks sorted by size are saved to {filename}')
             display.emit_message()
 
     return longest_tasks
@@ -410,7 +413,7 @@ def print_cache_statistics(graph, filename, display):
         1 for x in graph.prepare_tasks.values() if x.get_type() == 'prepare:get from dist cache'
     )
     cached_task_count = dist_cached_task_count + local_cached_task_count + dyn_cached_tasks_count
-    failed_task_count = sum(1 for x in all_run_tasks if x.abstract.status == 'FAILED')
+    failed_task_count = sum(1 for x in all_run_tasks if x.abstract.status == AbstractTask.Status.FAILED)
     not_cached_tasks = tuple(
         x for x in all_run_tasks if not x.from_cache and x.get_time_elapsed() and not x.dynamically_resolved_cache
     )
@@ -473,7 +476,7 @@ def print_cache_statistics(graph, filename, display):
 
         with open(filename, 'w') as output_file:
             json.dump(js_data, output_file, indent=4, sort_keys=True)
-        display.emit_message('Cache hit ratio is saved to %s' % filename)
+        display.emit_message(f'Cache hit ratio is saved to {filename}')
     display.emit_message()
 
     for k, v in six.iteritems(stats):
@@ -532,7 +535,7 @@ def print_dist_cache_statistics(graph, filename, display):
     if filename is not None:
         with open(filename, 'w') as output_file:
             json.dump(stats, output_file, indent=4, sort_keys=True)
-        display.emit_message('Dist cache stats are saved to %s' % filename)
+        display.emit_message(f'Dist cache stats are saved to {filename}')
 
     display.emit_message()
 
@@ -566,14 +569,14 @@ def print_disk_usage(task_stats, filename, display):
     if filename is not None:
         with open(filename, 'w') as output_file:
             json.dump(js_data, output_file, indent=4, sort_keys=True)
-        display.emit_message('Disk usage is saved to %s' % filename)
+        display.emit_message(f'Disk usage is saved to {filename}')
     display.emit_message()
 
     return js_data
 
 
-def get_int_length(x):
-    return len(str(x))
+def get_int_length(x: float) -> int:
+    return len(str(int(x)))
 
 
 def print_summary_times(graph, tasks, display):
@@ -619,17 +622,15 @@ def print_summary_times(graph, tasks, display):
         for task_type in time_by_type:
             max_elapsed_len = max(max_elapsed_len, get_int_length(time_by_type[task_type]))
 
-        task_type_format = ('[%%%dd ms] ' % max_elapsed_len) + '[[[c:%s]]%s[[rst]]] [count: %d, ave time %.02f msec]'
-
         for task_type in sorted(time_by_type, key=time_by_type.get, reverse=True):
             display.emit_message(
-                task_type_format
-                % (
+                '[{:{tw}d} ms] [[[c:{}]]{}[[rst]]] [count: {:d}, ave time {:.02f} msec]'.format(
                     time_by_type[task_type],
                     task_by_type[task_type].get_type_color(),
                     task_type,
                     count_by_type[task_type],
                     time_by_type[task_type] / count_by_type[task_type],
+                    tw=max_elapsed_len,
                 )
             )
 
@@ -640,7 +641,7 @@ def print_summary_times(graph, tasks, display):
         elapsed = task.get_time_elapsed()
         if elapsed is not None:
             total_run_task_time += elapsed
-            if task.abstract.status == 'FAILED':
+            if task.abstract.status == AbstractTask.Status.FAILED:
                 total_failed_run_task_time += elapsed
             if 'test' == task.abstract.meta.get('node-type', None):
                 total_tests_task_time += elapsed
@@ -688,7 +689,7 @@ def print_stages(event_log, display):
         display.emit_message('Durations of build stages:')
         for stage_name, start_time in sorted(six.iteritems(start_events), key=lambda x: x[1]):
             elapsed = end_events[stage_name] - start_time
-            display.emit_message('%s - %d ms\n' % (stage_name, elapsed))
+            display.emit_message(f'{stage_name} - {elapsed} ms\n')
 
 
 def print_context_stages(ctx_stages, display):
@@ -838,7 +839,7 @@ def report_coverage_upload_status(graph, report_file, fail_report_file):
     succeed, failed = [], []
     for task in (t for t in graph.run_tasks.values() if 'coverage_upload_node' in t.tags() and not t.from_cache):
         # was the task successful?
-        if task.abstract.status == 'OK' and task.start_time and task.uid not in graph.failed_uids:
+        if task.abstract.status == AbstractTask.Status.OK and task.start_time and task.uid not in graph.failed_uids:
             succeed.append(task.uid)
         else:
             failed.append(task.uid)
@@ -884,7 +885,7 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
             dump_debug=dump_debug,
         )
     except Exception:
-        stat_display.emit_message('Unable to calculate statistics because of %s' % traceback.format_exc())
+        stat_display.emit_message('Unable to calculate statistics because of {}'.format(traceback.format_exc()))
         logger.exception('While calculating statistics')
 
     if opts.coverage_succeed_upload_uids_file or opts.coverage_failed_upload_uids_file:
@@ -896,7 +897,7 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
 
     statistics_overhead = end_time - start_time
     stat_display.emit_message()
-    stat_display.emit_message('Statistics overhead %d ms' % int(statistics_overhead * 1000))
+    stat_display.emit_message('Statistics overhead {:d} ms'.format(int(statistics_overhead * 1000)))
     if stats:
         stats['statistics_overhead_sec'] = statistics_overhead
         import app_ctx

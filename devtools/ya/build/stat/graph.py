@@ -1,6 +1,7 @@
 # cython: profile=True
 
 import contextlib
+import enum
 import io
 import itertools
 import logging
@@ -9,7 +10,7 @@ import sys
 import tempfile
 import typing as tp
 from collections import defaultdict
-from collections.abc import Iterator, Iterable
+from collections.abc import Iterator, Iterable, Generator
 from dataclasses import dataclass
 
 from exts import http_client
@@ -23,24 +24,38 @@ LOCAL_HOST = 'local'
 
 _WorkerId = int
 _Hostname = str
+_PrepareType = str
+_Time = float
+_OptionalTime = tp.Optional[_Time]
+_TimeElapsed = _OptionalTime
 
 
 # This is abstract task without linkage to machine, just as in json graph
 class AbstractTask:
     __slots__ = ("uid", "meta", "status", "description", "depends_on")
 
+    class Status(enum.StrEnum):
+        OK = 'OK'
+        FAILED = 'FAILED'
+
     def __init__(self, uid: GraphNodeUid, description: str | None, meta: GraphNode):
-        self.uid: GraphNodeUid = uid
-        self.meta: GraphNode = meta
-        self.status: str = 'OK'
-        self.description: str = description
-        self.depends_on: list[GraphNodeUid] = []
+        self.uid = uid
+        self.meta = meta
+        self.status = AbstractTask.Status.OK
+        self.description = description
+        self.depends_on: list[GraphNodeUid] = meta.get('deps', [])
+
+    @classmethod
+    def from_node(cls, node: GraphNode) -> tp.Self:
+        description = format_paths(node['inputs'], node['outputs'], node.get('kv', {}))
+        return cls(node['uid'], description, node)
+
+    @classmethod
+    def from_uid(cls, uid: GraphNodeUid) -> tp.Self:
+        return cls(uid, None, {})
 
 
-# This abstract class represents two conceptions:
-# 1) Resource available on some machine. This resource can be created there or copied from another machine
-# 2) Node in critical path algorithm.
-class ResourceNode:
+class BaseTask:
     __slots__ = (
         'uid',
         'host',
@@ -55,30 +70,30 @@ class ResourceNode:
     )
 
     def __init__(self, uid: GraphNodeUid, host: _Hostname) -> None:
-        self.uid: GraphNodeUid = uid
-        self.host: _Hostname = host
+        self.uid = uid
+        self.host = host
 
         # the time resource became available
-        self.end_time = None  # type: int | float | None
-        self.start_time = None  # type: int | float | None
+        self.end_time: _OptionalTime = None
+        self.start_time: _OptionalTime = None
 
         # graph connection
-        self.depends_on_ref: list[ResourceNode] = []
+        self.depends_on_ref: list[tp.Self] = []
         self.from_cache: bool = False
 
         # the graph traverse needed stuff
         self.critical: bool = False
-        self.critical_time: int | float | None = None
+        self.critical_time: _TimeElapsed = None
         self.calculating_in_progress: bool = False
-        self.longest_path_dep: ResourceNode | None = None
+        self.longest_path_dep: tp.Self | None = None
 
     def get_type(self) -> str:
         return 'UNKNOWN'
 
-    def get_dependencies(self) -> 'list[ResourceNode]':
+    def get_dependencies(self) -> 'list[tp.Self]':
         return self.depends_on_ref
 
-    def get_time_elapsed(self) -> int | float | None:
+    def get_time_elapsed(self) -> _TimeElapsed:
         if (self.start_time is None) or (self.end_time is None):
             return None
         return self.end_time - self.start_time
@@ -94,7 +109,7 @@ class ResourceNode:
 
 
 # Todo: use @property
-class RunTask(ResourceNode):
+class RunTask(BaseTask):
     __slots__ = (
         'abstract',
         'dynamically_resolved_cache',
@@ -106,12 +121,12 @@ class RunTask(ResourceNode):
 
     def __init__(self, uid: GraphNodeUid, abstract_task: AbstractTask, host: _Hostname = LOCAL_HOST) -> None:
         super().__init__(uid, host)
-        self.abstract: AbstractTask = abstract_task
-        self.dynamically_resolved_cache: bool = False
+        self.abstract = abstract_task
+        self.dynamically_resolved_cache = False
         self.detailed_timings = None
         self.failures = None
-        self.total_time: bool = False
-        self.count = None
+        self.total_time = False
+        self.count: int | None = None
 
     def as_json(self):
         return {
@@ -169,7 +184,7 @@ class RunTask(ResourceNode):
         return self.abstract.meta.get('kv', {}).get('run_test_node', False)
 
 
-class PrepareTask(ResourceNode):
+class PrepareTask(BaseTask):
     __slots__ = (
         'prepare_type',
         'user_type',
@@ -179,14 +194,14 @@ class PrepareTask(ResourceNode):
         'count',
     )
 
-    def __init__(self, prepare_type, host) -> None:
+    def __init__(self, prepare_type: _PrepareType, host: _Hostname) -> None:
         super().__init__(prepare_type, host)
-        self.prepare_type: str = prepare_type
+        self.prepare_type = prepare_type
         self.user_type: str | None = None
         self.detailed_timings = None
         self.failures = None
-        self.total_time: bool = False
-        self.count = None
+        self.total_time = False
+        self.count: int | None = None
 
     def as_json(self):
         return {
@@ -211,7 +226,7 @@ class PrepareTask(ResourceNode):
         self.user_type = str_type
 
     def get_colored_name(self) -> str:
-        return '[%s] %s' % (self._get_long_name(), self.host)
+        return '[{}] {}'.format(self._get_long_name(), self.host)
 
     def get_type_color(self) -> str:
         return 'gray'
@@ -220,7 +235,7 @@ class PrepareTask(ResourceNode):
         return 'prepare:' + self.prepare_type
 
 
-class CopyTask(ResourceNode):
+class CopyTask(BaseTask):
     __slots__ = (
         'consuming_uid',
         'origin_host',
@@ -229,7 +244,7 @@ class CopyTask(ResourceNode):
 
     def __init__(self, dep_uid: GraphNodeUid, uid: GraphNodeUid, destination_host: _Hostname) -> None:
         super().__init__(dep_uid, destination_host)
-        self.consuming_uid: GraphNodeUid = uid
+        self.consuming_uid = uid
         self.origin_host: _Hostname | None = None
         self.size: int = 0
 
@@ -255,16 +270,12 @@ class CopyTask(ResourceNode):
         return elapsed + result
 
     def _from_depends_get_attr(self, attr_name: str) -> str:
-        if len(self.depends_on_ref) > 0:
-            node = self.depends_on_ref[0]
-            if node is self:
-                original = "SELF (CYCLIC DEPENDENCY)"
-                logger.warning("Cyclic dependency detected for node %s depends on %s", self.uid, node.uid)
-            else:
-                original = getattr(node, attr_name)()
-        else:
-            original = 'UNKNOWN'
-        return original
+        # We are interested in a RunTask only
+        run_tasks = [dep for dep in self.depends_on_ref if isinstance(dep, RunTask)]
+        if run_tasks:
+            assert len(run_tasks) == 1
+            return getattr(run_tasks[0], attr_name)()
+        return 'UNKNOWN'
 
     def get_type(self) -> str:
         return 'Copy'
@@ -275,7 +286,7 @@ class CopyTask(ResourceNode):
     def get_colored_name(self) -> str:
         original = (self._from_depends_get_attr("get_colored_name"),)
         return "[{}] (size: {} bytes): copy({} -> {}) result of {}".format(
-            'Copy',
+            self.get_type(),
             self.size,
             self.origin_host,
             self.host,
@@ -283,32 +294,24 @@ class CopyTask(ResourceNode):
         )
 
 
-class Graph:
-    def __init__(self, graph_json: DictGraph) -> None:
-        self.graph_json: DictGraph = graph_json
-        self.log_json: dict = None
+class GraphStats:
+    def __init__(self, graph_json: DictGraph, log_json: dict | None = None) -> None:
+        self.graph_json = graph_json
+        self.log_json = log_json
         self.abstract_tasks: dict[GraphNodeUid, AbstractTask] = {}
         self.run_tasks: dict[GraphNodeUid, RunTask] = {}
         self.copy_tasks: list[CopyTask] = []
         self.prepare_tasks: dict[tuple[str, _Hostname], PrepareTask] = {}
         self.failed_uids: set[GraphNodeUid] = set()
-        self.time_elapsed = None
+        self.time_elapsed: _TimeElapsed = None
         self._incomplete_copy_tasks: dict[tuple[GraphNodeUid, GraphNodeUid], CopyTask] = {}
-        self._critical_path_candidates: list[ResourceNode] = []
+        self._critical_path_candidates: list[BaseTask] = []
 
         # loading abstract dependency graph
-        graph: list[GraphNode] = self.graph_json['graph']
-        for node_info in graph:
-            description = format_paths(node_info['inputs'], node_info['outputs'], node_info.get('kv', {}))
-            task = self.get_abstract_task(node_info['uid'], description, node_info)
-            task.depends_on = node_info['deps']
+        for node in self.graph_json['graph']:
+            self.abstract_tasks[node['uid']] = AbstractTask.from_node(node)
 
-    def get_abstract_task(self, uid: GraphNodeUid, description: str, meta: GraphNode) -> AbstractTask:
-        if uid not in self.abstract_tasks:
-            self.abstract_tasks[uid] = AbstractTask(uid, description, meta)
-        return self.abstract_tasks[uid]
-
-    def get_prepare_task(self, prepare_type: str, host: _Hostname = LOCAL_HOST) -> PrepareTask:
+    def get_prepare_task(self, prepare_type: _PrepareType, host: _Hostname = LOCAL_HOST) -> PrepareTask:
         key = (prepare_type, host)
         if key not in self.prepare_tasks:
             self.prepare_tasks[key] = PrepareTask(prepare_type, host)
@@ -318,7 +321,9 @@ class Graph:
         if uid not in self.run_tasks:
             if not create:
                 return None
-            self.run_tasks[uid] = RunTask(uid, self.get_abstract_task(uid, None, {}), host)
+            if uid not in self.abstract_tasks:
+                self.abstract_tasks[uid] = AbstractTask.from_uid(uid)
+            self.run_tasks[uid] = RunTask(uid, self.abstract_tasks[uid], host)
         return self.run_tasks[uid]
 
     def get_copy_task(self, dep_uid: GraphNodeUid, uid: GeneratorExit, destination_host: _Hostname) -> CopyTask:
@@ -332,7 +337,7 @@ class Graph:
             self.copy_tasks.append(task)
             return task
 
-    def add_dependency_reference_safe(self, dependant: ResourceNode, dependency: ResourceNode) -> None:
+    def add_dependency_reference_safe(self, dependant: BaseTask, dependency: BaseTask) -> None:
         if dependant is None or dependant.get_time_elapsed() is None:
             return 0
         if dependency is None or dependency.get_time_elapsed() is None:
@@ -340,21 +345,21 @@ class Graph:
         dependant.depends_on_ref.append(dependency)
         return 1
 
-    def get_total_time_elapsed(self) -> int | float | None:
+    def get_total_time_elapsed(self) -> _TimeElapsed:
         return self.time_elapsed
 
-    def set_time_elapsed(self, min_time: int | float | None, max_time: int | float | None) -> None:
+    def set_time_elapsed(self, min_time: _OptionalTime, max_time: _OptionalTime) -> None:
         if min_time is not None and max_time is not None:
             self.time_elapsed = max_time - min_time
 
-    def get_all_nodes(self) -> "Iterator[ResourceNode]":
+    def get_all_nodes(self) -> "Iterator[BaseTask]":
         return itertools.chain(self.prepare_tasks.values(), self.copy_tasks, self.run_tasks.values())
 
-    def add_critical_path_candidates(self, nodes: 'Iterable[ResourceNode]') -> None:
+    def add_critical_path_candidates(self, nodes: 'Iterable[BaseTask]') -> None:
         self._critical_path_candidates.extend(nodes)
 
-    def get_critical_path(self) -> 'tuple[int | float, list[ResourceNode]]':
-        longest_path_node: ResourceNode | None = None
+    def get_critical_path(self) -> 'tuple[_Time, list[BaseTask]]':
+        longest_path_node: BaseTask | None = None
         for node in itertools.chain(self.run_tasks.values(), self._critical_path_candidates):
             if node.get_time_elapsed() is not None:
                 tm = self._calculate_critical_time(node)
@@ -364,7 +369,7 @@ class Graph:
         if longest_path_node is None:
             return 0, []
 
-        path: list[ResourceNode] = []
+        path: list[BaseTask] = []
         p = longest_path_node
         while p is not None:
             path.append(p)
@@ -374,8 +379,8 @@ class Graph:
 
         return longest_path_node.critical_time, path
 
-    # Combination of the DFS for topological sorting and the longest path calculation
-    def _calculate_critical_time(self, node: ResourceNode) -> int | float:
+    def _calculate_critical_time(self, node: BaseTask) -> _Time:
+        """Combination of the DFS for topological sorting and the longest path calculation"""
         if node.critical_time is not None:
             return node.critical_time
         if node.calculating_in_progress:
@@ -399,7 +404,7 @@ class Graph:
 
 
 @contextlib.contextmanager
-def _get_log(log: str) -> 'tp.Generator[io.TextIOWrapper]':
+def _get_log(log: str) -> 'Generator[io.TextIOWrapper]':
     if log and log.startswith('http://'):
         with tempfile.TemporaryDirectory() as tmpdir:
             file_name = os.path.join(tmpdir, "log.txt")
@@ -413,8 +418,8 @@ def _get_log(log: str) -> 'tp.Generator[io.TextIOWrapper]':
 
 @dataclass
 class _PrepareTasksTimes:
-    start_time: int = 0
-    end_times: dict[str, int] = {}
+    start_time: _Time = 0
+    end_times: dict[_PrepareType, _Time] = {}
 
 
 class _WorkerIdToHostBinder:
@@ -463,14 +468,15 @@ class _WorkerIdToHostBinder:
             del self._uid_to_worker_id[uid]
 
 
-def create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: dict) -> Graph:
+def create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: dict) -> GraphStats:
     with _get_log(distbuild_log_json['log']) as flog:
         return _create_graph_with_distbuild_log(graph_json, distbuild_log_json, flog)
 
 
-def _create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: dict, flog: io.TextIOWrapper) -> Graph:
-    graph = Graph(graph_json)
-    graph.log_json = distbuild_log_json
+def _create_graph_with_distbuild_log(
+    graph_json: DictGraph, distbuild_log_json: dict, flog: io.TextIOWrapper
+) -> GraphStats:
+    graph = GraphStats(graph_json, log_json=distbuild_log_json)
 
     failed_results: dict = distbuild_log_json.get('failed_results', {})
     failed_tasks_uids: list[GraphNodeUid] = failed_results.get('results', [])
@@ -481,10 +487,10 @@ def _create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: 
 
     for uid in failed_tasks_uids:
         abstract_ref = graph.abstract_tasks[uid]
-        abstract_ref.status = 'FAILED'
+        abstract_ref.status = AbstractTask.Status.FAILED
 
-    min_time: int | None = None
-    max_time: int | None = None
+    min_time: _OptionalTime = None
+    max_time: _OptionalTime = None
     wrong_ev_types: set[str] = set()
     for line in flog:
         fields = line.rstrip().split(' ')
@@ -602,6 +608,8 @@ def _create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: 
         if run_task.from_cache and run_task.host.isnumeric():
             run_task.host = worker_id_to_host_binder.get_host(int(run_task.host))
 
+    del worker_id_to_host_binder
+
     #############################################
     #            Creating dependencies          #
     #############################################
@@ -629,16 +637,16 @@ def _create_graph_with_distbuild_log(graph_json: DictGraph, distbuild_log_json: 
     # In distbuild we consider the prepare tasks when calculating the critical path
     graph.add_critical_path_candidates(graph.prepare_tasks.values())
 
-    logger.debug('Dependency count in the graph is %d.' % dependency_count)
+    logger.debug('Dependency count in the graph is %d.', dependency_count)
 
     return graph
 
 
 def create_graph_with_local_log(
-    graph: DictGraph | Graph, execution_log: dict, failed_uids: 'set[GraphNodeUid] | None' = None
-) -> Graph:
-    if not isinstance(graph, Graph):
-        graph = Graph(graph)
+    graph: DictGraph | GraphStats, execution_log: dict, failed_uids: 'set[GraphNodeUid] | None' = None
+) -> GraphStats:
+    if not isinstance(graph, GraphStats):
+        graph = GraphStats(graph)
         graph.log_json = execution_log
         graph.failed_uids = failed_uids if failed_uids else set()
 
@@ -684,8 +692,8 @@ def create_graph_with_local_log(
             dep_run_task = graph.get_run_task(dependency_uid, create=False)
             dependency_count += graph.add_dependency_reference_safe(run_task, dep_run_task)
 
-    min_time: float | None = None
-    max_time: float | None = None
+    min_time: _OptionalTime = None
+    max_time: _OptionalTime = None
     for run_task in graph.run_tasks.values():
         if run_task.start_time is not None and run_task.end_time is not None:
             if min_time is None or min_time > run_task.start_time:
@@ -695,7 +703,7 @@ def create_graph_with_local_log(
 
     graph.set_time_elapsed(min_time, max_time)
 
-    logger.debug('Node count in the dependency graph is %d.' % (len(list(graph.get_all_nodes()))))
-    logger.debug('Dependency count in the graph is %d.' % dependency_count)
+    logger.debug('Node count in the dependency graph is %d.', (len(list(graph.get_all_nodes()))))
+    logger.debug('Dependency count in the graph is %d.', dependency_count)
 
     return graph
