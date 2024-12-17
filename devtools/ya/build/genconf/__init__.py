@@ -81,7 +81,7 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
             return subprocess.check_output(tuple(args), **kwargs).strip()
 
         version = get_output('xcodebuild', '-version').split()[1]
-        expect_version = res['params']['gcc_version']
+        expect_version = res['params']['version']
         if version != expect_version:
             if ignore_mismatched_xcode_version:
                 logger.warning(
