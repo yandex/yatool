@@ -90,42 +90,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
         )
 
 
-def run_jp(classpath, args, jdk_resource, libpath=None, cwd=None):
-    if cwd is None:
-        cwd = consts.BUILD_ROOT
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fix_java_command_file_cp.py'),
-        '--build-root',
-        consts.BUILD_ROOT,
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'with_pathsep_resolve.py'),
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'setup_java_tmpdir.py'),
-        BuildTools.jdk_tool('java', jdk_path=jdk_resource),
-        '-Dfile.encoding=utf8',
-    ]
-
-    if libpath:
-        cmd += ['--fix-path-sep', '-Djava.library.path=' + '::'.join(libpath)]
-        cmd += ['--fix-path-sep', '-Djna.library.path=' + '::'.join(libpath)]
-
-    cmd += ['-classpath', '--fix-path-sep', '::'.join(classpath)] + args
-
-    cmd = [BuildTools.python(), os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'stdout2stderr.py')] + cmd
-
-    return graph_commands.Cmd(
-        cmd,
-        cwd,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fix_java_command_file_cp.py'),
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'with_pathsep_resolve.py'),
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'stdout2stderr.py'),
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'setup_java_tmpdir.py'),
-        ],
-    )
-
-
 def resolve_java_srcs(
     dir,
     sources_list,
