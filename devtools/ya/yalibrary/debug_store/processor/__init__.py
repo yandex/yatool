@@ -172,7 +172,7 @@ class BaseDumpItem(object):
             try:
                 self.logger.debug("Copy from %s to %s", item, to_)
                 if not item.exists():
-                    self.logger.warning("Path does not exists: %s", item)
+                    self.logger.debug("Path does not exists: %s", item)
                     _file_info['type'] = "NONEXISTEN"
                     continue
 

@@ -165,39 +165,42 @@
     <hr>
 {% endfor %}
 
-<h3>Ymake runs</h3>
-{% for proc_name, info in runs.items() %}
+{% if runs %}
+    <h3>Ymake runs</h3>
+    {% for proc_name, info in runs.items() %}
+        <div class=row>
+            {{ proc_name }} ({{ info.purpose }})
+            <div class=timeline>
+                {% for stage_name, stage_info in info.stages.items() | sort(attribute="1.width", reverse=True) %}
+                    <div class="item" style="margin-left: {{ stage_info.left * timeline_width }}px; width: {{ stage_info.width * timeline_width }}px"
+                        title="{{ stage_name }}: {{ stage_info.start|pretty_time }} .. {{ stage_info.finish|pretty_time }}">
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+
+
     <div class=row>
-        {{ proc_name }} ({{ info.purpose }})
-        <div class=timeline>
-            {% for stage_name, stage_info in info.stages.items() | sort(attribute="1.width", reverse=True) %}
-                <div class="item" style="margin-left: {{ stage_info.left * timeline_width }}px; width: {{ stage_info.width * timeline_width }}px"
-                     title="{{ stage_name }}: {{ stage_info.start|pretty_time }} .. {{ stage_info.finish|pretty_time }}">
+        <div class="timeline">
+            {% for x in range(timeline_items) %}
+                <div class="timestamp" style="margin-left: {{ x * timeline_width / timeline_items }}px; width: {{ timeline_width / timeline_items }}px">
+                    {{ (x / timeline_items * run_infos.duration + run_infos.start) | pretty_time }}
                 </div>
             {% endfor %}
         </div>
     </div>
-{% endfor %}
 
-<div class=row>
-    <div class="timeline">
-        {% for x in range(timeline_items) %}
-            <div class="timestamp" style="margin-left: {{ x * timeline_width / timeline_items }}px; width: {{ timeline_width / timeline_items }}px">
-                {{ (x / timeline_items * run_infos.duration + run_infos.start) | pretty_time }}
-            </div>
+    {% if run_errors %}
+    <div class="row">
+        <div>Ymake stages errors:</div>
+        {% for error in run_errors %}
+            <div><code class="traceback">
+                {{- error -}}
+            </code></div>
         {% endfor %}
     </div>
-</div>
-
-{% if run_errors %}
-<div class="row">
-    <div>Ymake stages errors:</div>
-    {% for error in run_errors %}
-        <div><code class="traceback">
-            {{- error -}}
-        </code></div>
-    {% endfor %}
-</div>
+    {% endif %}
 {% endif %}
 
 </body>

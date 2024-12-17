@@ -29,7 +29,7 @@ def pretty_time(timestamp):
     try:
         return _pretty(timestamp, TIME_FMT)
     except Exception as e:
-        logger.error("While converting time `%s`: %s", timestamp, e)
+        logger.info("While converting time `%s`: %s", timestamp, e)
         return "?"
 
 
