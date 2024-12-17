@@ -185,6 +185,11 @@ void TJsonCmdAcceptor::WriteResource(TStringBuf uri) {
     Commands.back().ResourceUris.push_back(uriStr);
 }
 
+void TJsonCmdAcceptor::WriteTaredOut(TStringBuf path) {
+    auto pathStr = TString(path);
+    Commands.back().TaredOuts.push_back(pathStr);
+}
+
 void TJsonCmdAcceptor::EndCommand() {
 }
 

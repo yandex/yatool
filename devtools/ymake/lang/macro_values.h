@@ -50,6 +50,7 @@ enum class EMacroFunction: ui32 {
     // latest additions TODO merge & sort
     ResourceUri,
     Requirements,
+    Tared,
     //
     Count
 };

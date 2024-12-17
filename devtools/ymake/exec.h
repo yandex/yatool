@@ -21,6 +21,7 @@ struct ICommandSequenceWriter {
     virtual void WriteStdout(TStringBuf path) = 0;
     virtual void WriteEnv(TStringBuf env) = 0;
     virtual void WriteResource(TStringBuf uri) = 0;
+    virtual void WriteTaredOut(TStringBuf path) = 0;
     virtual void EndCommand() = 0;
     virtual void EndScript(TCommandInfo& cmdInfo, const TVars& vars) = 0;
     virtual void PostScript(TVars& vars) = 0;
@@ -33,6 +34,7 @@ struct TCommandSequenceWriterStubs: ICommandSequenceWriter {
     virtual void WriteStdout(TStringBuf)       override { throw TNotImplemented() << "stdout settings are not supported here"; }
     virtual void WriteEnv(TStringBuf)          override { throw TNotImplemented() << "environment settings are not supported here"; }
     virtual void WriteResource(TStringBuf)     override { throw TNotImplemented() << "resource URIs are not supported here"; }
+    virtual void WriteTaredOut(TStringBuf)     override { throw TNotImplemented() << "tared outputs are not supported here"; }
     virtual void PostScript(TVars&)            override {  }
 protected:
     ~TCommandSequenceWriterStubs() = default;

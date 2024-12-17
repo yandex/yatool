@@ -104,6 +104,11 @@ void TSubst2Shell::WriteResource(TStringBuf uri) {
     Commands.back().ResourceUris.push_back(uriStr);
 }
 
+void TSubst2Shell::WriteTaredOut(TStringBuf path) {
+    auto pathStr = TString(path);
+    Commands.back().TaredOuts.push_back(pathStr);
+}
+
 void TSubst2Shell::EndCommand() {
     TSingleCmd& cmd = Commands.back();
     TString cmdStr = std::move(std::get<TString>(cmd.CmdStr));

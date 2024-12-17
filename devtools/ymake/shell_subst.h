@@ -33,6 +33,7 @@ private:
     void WriteStdout(TStringBuf path) override;
     void WriteEnv(TStringBuf env) override;
     void WriteResource(TStringBuf uri) override;
+    void WriteTaredOut(TStringBuf path) override;
     void EndCommand() override;
     void EndScript(TCommandInfo& cmdInfo, const TVars& vars) override;
     void PostScript(TVars& vars) override;
