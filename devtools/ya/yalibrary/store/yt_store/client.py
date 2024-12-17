@@ -22,6 +22,25 @@ from exts.func import memoize
 logger = logging.getLogger(__name__)
 
 
+INSERT_ROWS_LIMIT = 75000  # Shouldn't be greater than 100k (YT limitation)
+
+
+if six.PY3:
+    from itertools import batched
+else:
+    import itertools
+
+    def batched(iterable, n):
+        if n < 1:
+            raise ValueError('n must be at least one')
+        iterator = iter(iterable)
+        while True:
+            batch = tuple(itertools.islice(iterator, n))
+            if not batch:
+                break
+            yield batch
+
+
 class YtStoreClient(object):
     NOT_LOADED_META_COLUMNS = {
         'tablet_hash',
@@ -339,8 +358,9 @@ class YtStoreClient(object):
                 return u
 
             rows = [make_row(r) for r in meta_rows]
+            for batch in batched(rows, INSERT_ROWS_LIMIT):
+                self._client.insert_rows(self._metadata_table, batch, update=True, atomicity='none', durability='async')
             logger.debug("Update access_time in %d metadata rows", len(rows))
-            self._client.insert_rows(self._metadata_table, rows, update=True, atomicity='none', durability='async')
 
     def get_hashes_to_delete(self, hashes_to_check):
         hashes_in_store = set()
