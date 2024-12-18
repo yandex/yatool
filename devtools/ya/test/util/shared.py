@@ -20,7 +20,9 @@ import exts.tmp
 from devtools.ya.test import const
 from devtools.ya.test.util import tools
 from devtools.ya.test.system import process
+
 from library.python import cores
+from library.python import reservoir_sampling
 
 from yalibrary import formatter
 from yalibrary import term
@@ -870,3 +872,24 @@ def tee_execute(cmd, out, err, strip_ansi_codes=False, on_timeout=None, on_start
     with open_stream(err) as stream_err:
         with open_stream(out) as stream_out:
             return run(stream_out, stream_err)
+
+
+def limit_tests(container, limit):
+    assert limit > 0, limit
+    tests = container.tests
+
+    if len(tests) <= limit:
+        return
+
+    samples = reservoir_sampling.reservoir_sampling(tests, nsamples=20)
+
+    msg = (
+        "[[bad]]The run contains [[imp]]{}[[bad]] test cases, which exceeds the allowed limit of [[imp]]{}.[[bad]]"
+        " You may have errors in the test case generation function or"
+        " an undesirably huge test set that should be split into several ya.make files."
+        " Some test names provided below.[[rst]]\n"
+    ).format(len(tests), limit)
+    msg += '\n'.join(' - ' + str(test) for test in samples)
+
+    container.remove_tests()
+    container.add_error(msg)

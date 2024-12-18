@@ -58,6 +58,7 @@ def get_options():
     parser.add_argument("--fast-clang-coverage-merge", help="Use fast cov merge and specify path to the log file")
     parser.add_argument("--gdb-path")
     parser.add_argument("--keep-temps", default=False, action="store_true")
+    parser.add_argument("--tests-limit-in-suite", action='store', type=int, default=0)
 
     return parser.parse_args()
 
@@ -370,6 +371,11 @@ def concatenate_traces(args, files, dst):
         del suite.logs[log]
     suite.logs.update(chunk_logs)
     suite._errors.extend(errors)
+
+    if args.tests_limit_in_suite:
+        # Rough barrier to prevent flooding CI with generated test cases
+        # For more info see DEVTOOLSSUPPORT-55650
+        shared.limit_tests(suite, limit=args.tests_limit_in_suite)
 
     os.remove(dst)  # rewrite trace to delete renamed
     shared.dump_trace_file(suite, dst)

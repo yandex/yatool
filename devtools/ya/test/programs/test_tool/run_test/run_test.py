@@ -515,6 +515,8 @@ def parse_args(args=None):
         help="Disable memory monitor snippet",
         action='store_true',
     )
+    parser.add_argument("--tests-limit-in-chunk", action='store', type=int, default=0)
+
     args = parser.parse_args(args)
 
     if "--profile-wrapper" in args.command:
@@ -1988,6 +1990,11 @@ def main():
         )
 
         if suite.chunk.tests:
+            if options.tests_limit_in_chunk:
+                # Rough barrier to prevent flooding CI with generated test cases
+                # For more info see DEVTOOLSSUPPORT-55650
+                shared.limit_tests(suite.chunk, limit=options.tests_limit_in_chunk)
+
             if options.supports_canonization and any(t.result is not None for t in suite.chunk.tests):
                 import devtools.ya.test.canon.data as canon_data
 

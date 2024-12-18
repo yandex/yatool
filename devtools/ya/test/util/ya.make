@@ -16,6 +16,7 @@ PEERDIR(
     devtools/ya/yalibrary/term
     library/python/coredump_filter
     library/python/cores
+    library/python/reservoir_sampling
 )
 
 STYLE_PYTHON()

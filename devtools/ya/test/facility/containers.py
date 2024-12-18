@@ -74,6 +74,9 @@ class Chunk(Container):
         # Chunk's status should not depend on tests statuses
         return get_container_status(self.get_errors(), [])
 
+    def remove_tests(self):
+        self.tests.clear()
+
     def __str__(self):
         return repr(self)
 
@@ -93,6 +96,10 @@ class Suite(Container):
     def tests(self):
         # return tuple to prevent modification of the temporary object
         return tuple(t for c in self.chunks for t in c.tests)
+
+    def remove_tests(self):
+        for c in self.chunks:
+            c.remove_tests()
 
     @property
     def chunk(self):

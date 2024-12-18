@@ -571,6 +571,12 @@ def create_test_node(
             str(opts.max_test_comment_size),
         ]
 
+    if opts and getattr(opts, 'tests_limit_in_suite', 0):
+        runner_cmd += [
+            '--tests-limit-in-chunk',
+            str(opts.tests_limit_in_suite),
+        ]
+
     if opts and getattr(opts, 'test_keep_symlinks'):
         runner_cmd += [
             "--keep-symlinks",
@@ -1264,6 +1270,7 @@ def get_suite_uid(suite, graph, arc_root, opts, is_for_distbuild, out_dir, has_s
             'use_throttling',
             'test_prepare',
             'test_node_output_limit',
+            'tests_limit_in_suite',
         )
 
         imprint_parts = (
@@ -1391,6 +1398,12 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
 
     if opts.keep_temps:
         cmd += ["--keep-temps"]
+
+    if opts.tests_limit_in_suite:
+        cmd += [
+            '--tests-limit-in-suite',
+            str(opts.tests_limit_in_suite),
+        ]
 
     if opts.keep_temps or not opts.merge_split_tests:
         cmd += ["--keep-paths"]

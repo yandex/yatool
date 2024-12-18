@@ -1805,6 +1805,7 @@ class InterimOptions(core.yarg.Options):
         self.use_throttling = False
         self.remove_implicit_data_path = False
         self.no_tests_is_error = False
+        self.tests_limit_in_suite = 0
 
     def consumer(self):
         return [
@@ -1910,6 +1911,7 @@ class InterimOptions(core.yarg.Options):
                 visible=self.Visible,
             ),
             core.yarg.ConfigConsumer('no_tests_is_error'),
+            core.yarg.ConfigConsumer('tests_limit_in_suite'),
         ]
 
     def postprocess2(self, params):
