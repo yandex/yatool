@@ -27,11 +27,10 @@ PY_SRCS(
     NAMESPACE handlers.style
     __init__.py
     config.py
-    enums.py
     state_helper.py
     style.py
     styler.py
-    target_miner.py
+    target.py
 )
 
 END()

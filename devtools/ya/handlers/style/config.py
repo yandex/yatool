@@ -15,24 +15,19 @@ import devtools.ya.test.const as const
 
 logger = logging.getLogger(__name__)
 
-
-type Config = Path
-type MaybeConfig = Config | tp.Literal[""]
+type ConfigPath = Path
+type MaybeConfigPath = ConfigPath | tp.Literal[""]
 
 
 def _find_root() -> str:
     return core.config.find_root(fail_on_error=False)
 
 
-def configurable(obj: object) -> bool:
-    return issubclass(type(obj), ConfigMixin)
-
-
 class ConfigMixin:
     def __init__(self, config_loaders: tuple[ConfigLoader, ...]):
         self._config_loaders = config_loaders
 
-    def lookup(self, path: PurePath) -> Config:
+    def lookup(self, path: PurePath) -> ConfigPath:
         for loader in self._config_loaders:
             if config := loader.lookup(path):
                 return config
@@ -40,16 +35,19 @@ class ConfigMixin:
 
 
 class ConfigLoader(tp.Protocol):
-    def lookup(self, path: PurePath) -> MaybeConfig:
+    def lookup(self, path: PurePath) -> MaybeConfigPath:
         """Given target path return config path"""
+        ...
 
 
 class DefaultConfig:
     def __init__(self, linter_name: str, *, defaults_file: str = "", resource_name: str = ""):
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
-        self._default_config = self._load_default(linter_name, defaults_file, resource_name)
+        self._default_config: MaybeConfigPath = self._from_file(linter_name, defaults_file) or self._from_resource(
+            resource_name
+        )
 
-    def _load_default(self, linter_name: str, defaults_file: str, resource_name: str) -> MaybeConfig:
+    def _from_file(self, linter_name: str, defaults_file) -> MaybeConfigPath:
         if defaults_file:
             try:
                 config_map = core.config.config_from_arc_rel_path(defaults_file)
@@ -57,9 +55,12 @@ class DefaultConfig:
                 logger.warning("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
             else:
                 return Path(os.path.join(_find_root(), config_map[linter_name]))
+        return ""
+
+    def _from_resource(self, resource_name: str) -> MaybeConfigPath:
         if resource_name:
             try:
-                content = core.resource.try_get_resource(resource_name)
+                content: bytes = core.resource.try_get_resource(resource_name)  # type: ignore
             except Exception as e:
                 logger.warning("Couldn't obtain config from memory, resource name %s, error %s", resource_name, repr(e))
             else:
@@ -69,7 +70,7 @@ class DefaultConfig:
                 return Path(temp.name)
         return ""
 
-    def lookup(self, path: PurePath) -> MaybeConfig:
+    def lookup(self, path: PurePath) -> MaybeConfigPath:
         return self._default_config
 
 
@@ -111,11 +112,11 @@ class AutoincludeConfig:
                     map_[path] = Path(config)
         return map_
 
-    def lookup(self, path: PurePath) -> MaybeConfig:
-        keys = self._trie.prefixes(str(path))
+    def lookup(self, path: PurePath) -> MaybeConfigPath:
+        keys: list[str] = self._trie.prefixes(str(path))
         if keys:
-            path = sorted(keys, key=len)[-1]
-            return self._autoinc_to_conf.get(path, "")
+            autoinc_path = sorted(keys, key=len)[-1]
+            return self._autoinc_to_conf.get(autoinc_path, "")
         return ""
 
 
@@ -150,7 +151,7 @@ class RuffConfig:
         for prefix, idx in self._ruff_trie.items():  # type: ignore
             self._config_paths[idx] = os.path.join(self._root, config_map[prefix])
 
-    def lookup(self, path: PurePath) -> MaybeConfig:
+    def lookup(self, path: PurePath) -> MaybeConfigPath:
         if self._ruff_trie and (keys := self._ruff_trie.prefixes(str(path))):
             # even though there is `'': <default config>` in ruff_config_paths.json
             # keys can be empty if stdin is used

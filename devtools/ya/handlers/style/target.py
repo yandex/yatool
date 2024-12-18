@@ -8,8 +8,10 @@ from pathlib import Path, PurePath
 
 from . import state_helper
 from . import styler
-from .enums import StylerKind, STDIN_FILENAME, STDIN_FILENAME_STAMP
 
+
+STDIN_FILENAME = 'source.cpp'
+STDIN_FILENAME_STAMP = 'STDIN_FILENAME_STAMP'
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ type Target = tuple[Path | PurePath, Callable[..., str]]
 
 class MineOptions(tp.NamedTuple):
     targets: tuple[Path, ...]
-    file_types: tuple[StylerKind, ...] = ()
+    file_types: tuple[styler.StylerKind, ...] = ()
     stdin_filename: str = STDIN_FILENAME
     use_ruff: bool = False
     tty: bool = os.isatty(sys.stdin.fileno())
@@ -55,12 +57,12 @@ def discover_style_targets(mine_opts: MineOptions) -> dict[type[styler.Styler], 
             logger.warning('skip %s (sufficient styler not found)', target)
             continue
 
-        if mine_opts.file_types and styler_class.SPEC.kind not in mine_opts.file_types:
+        if mine_opts.file_types and styler_class.spec.kind not in mine_opts.file_types:
             logger.warning('skip %s (filtered by extensions)', target)
             continue
 
-        if not mine_opts.file_types and not styler_class.DEFAULT_ENABLED:
-            logger.warning('skip %s (require explicit --%s or --all)', target, styler_class.SPEC.kind)
+        if not mine_opts.file_types and not styler_class.default_enabled:
+            logger.warning('skip %s (require explicit --%s or --all)', target, styler_class.spec.kind)
             continue
 
         style_targets.setdefault(styler_class, []).append((target, loader))

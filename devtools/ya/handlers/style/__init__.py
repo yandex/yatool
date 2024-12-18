@@ -6,8 +6,9 @@ import core.yarg
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
 import core.yarg.consumers
 
-from .enums import StylerKind, STDIN_FILENAME
 from .style import run_style
+from .styler import StylerKind
+from .target import STDIN_FILENAME
 
 import devtools.ya.app
 

@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import typing as tp
-
+from enum import StrEnum, auto
 from pathlib import PurePath
 
 import devtools.ya.test.const as const
@@ -17,11 +17,19 @@ import yalibrary.tools
 
 from . import config
 from . import state_helper
-from .enums import StylerKind
 
 
 logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
+
+
+class StylerKind(StrEnum):
+    PY = auto()
+    CPP = auto()
+    CUDA = auto()
+    YAMAKE = auto()
+    GO = auto()
+    YQL = auto()
 
 
 class StylerOptions(tp.NamedTuple):
@@ -38,10 +46,10 @@ _REGISTRY: dict[Spec, type[Styler]] = {}
 _SUFFIX_MAPPING: dict[str, list[Spec]] = {}
 
 
-def _register(cls: type[Styler]) -> type[Styler]:
-    _REGISTRY[cls.SPEC] = cls
-    for suffix in cls.SUFFIXES:
-        _SUFFIX_MAPPING.setdefault(suffix, []).append(cls.SPEC)
+def _register[T: Styler](cls: type[T]) -> type[T]:
+    _REGISTRY[cls.spec] = cls
+    for suffix in cls.suffixes:
+        _SUFFIX_MAPPING.setdefault(suffix, []).append(cls.spec)
     return cls
 
 
@@ -63,23 +71,24 @@ def select_styler(target: PurePath, ruff: bool) -> type[Styler] | None:
 
 class Styler(tp.Protocol):
     # Whether a styler should run if not selected explicitly
-    DEFAULT_ENABLED: tp.ClassVar[bool]
+    default_enabled: tp.ClassVar[bool]
     # Unique description of a styler
-    SPEC: tp.ClassVar[Spec]
+    spec: tp.ClassVar[Spec]
     # Series of strings upon which the proper styler is selected
-    SUFFIXES: tp.ClassVar[tuple[tp.LiteralString, ...]]
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
     def __init__(self, styler_opts: StylerOptions) -> None: ...
 
     def format(self, path: PurePath, content: str) -> str:
         """Format and return formatted file content"""
+        ...
 
 
 @_register
 class Black(config.ConfigMixin):
-    DEFAULT_ENABLED = True
-    SPEC = Spec(StylerKind.PY)
-    SUFFIXES = (".py",)
+    default_enabled: tp.ClassVar[bool] = True
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.PY)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("black" if not styler_opts.py2 else "black_py2")  # type: ignore
@@ -124,9 +133,9 @@ class Black(config.ConfigMixin):
 
 @_register
 class Ruff(config.ConfigMixin):
-    DEFAULT_ENABLED = True
-    SPEC = Spec(StylerKind.PY, ruff=True)
-    SUFFIXES = (".py",)
+    default_enabled: tp.ClassVar[bool] = True
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.PY, ruff=True)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
@@ -149,7 +158,7 @@ class Ruff(config.ConfigMixin):
             )
         )
 
-    def _run_ruff(self, content: str, path: PurePath, config_path: str, cmd_args: list[str]) -> str:
+    def _run_ruff(self, content: str, path: PurePath, config_path: config.ConfigPath, cmd_args: list[str]) -> str:
         ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-s", "-"]
 
         p = subprocess.Popen(
@@ -195,9 +204,9 @@ class Ruff(config.ConfigMixin):
 
 @_register
 class ClangFormat(config.ConfigMixin):
-    DEFAULT_ENABLED = True
-    SPEC = Spec(StylerKind.CPP)
-    SUFFIXES = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
+    default_enabled: tp.ClassVar[bool] = True
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.CPP)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
@@ -253,16 +262,16 @@ class ClangFormat(config.ConfigMixin):
 
 @_register
 class Cuda(ClangFormat):
-    DEFAULT_ENABLED = False
-    SPEC = Spec(StylerKind.CUDA)
-    SUFFIXES = (".cu", ".cuh")
+    default_enabled: tp.ClassVar[bool] = False
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.CUDA)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
 
 
 @_register
 class Golang:
-    DEFAULT_ENABLED = True
-    SPEC = Spec(StylerKind.GO)
-    SUFFIXES = (".go",)
+    default_enabled: tp.ClassVar[bool] = True
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.GO)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
@@ -290,9 +299,9 @@ class Golang:
 
 @_register
 class YaMake:
-    DEFAULT_ENABLED = False
-    SPEC = Spec(StylerKind.YAMAKE)
-    SUFFIXES = ("ya.make", "ya.make.inc")
+    default_enabled: tp.ClassVar[bool] = False
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.YAMAKE)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         pass
@@ -304,9 +313,9 @@ class YaMake:
 
 @_register
 class Yql:
-    DEFAULT_ENABLED = False
-    SPEC = Spec(StylerKind.YQL)
-    SUFFIXES = (".yql",)
+    default_enabled: tp.ClassVar[bool] = False
+    spec: tp.ClassVar[Spec] = Spec(StylerKind.YQL)
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yql-format")  # type: ignore

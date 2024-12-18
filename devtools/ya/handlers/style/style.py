@@ -12,8 +12,7 @@ import yalibrary.display
 from . import config
 from . import state_helper
 from . import styler
-from . import target_miner
-from .enums import STDIN_FILENAME_STAMP, StylerKind
+from . import target
 from library.python.testing.style import rules
 from library.python.fs import replace_file
 
@@ -62,12 +61,12 @@ def _flush_to_terminal(content: str, formatted_content: str, full_output: bool) 
         display.emit_message(diff)
 
 
-def _style(style_opts: StyleOptions, styler: styler.Styler, target: target_miner.Target) -> tp.Literal[0, 1]:
+def _style(style_opts: StyleOptions, styler: styler.Styler, target_: target.Target) -> tp.Literal[0, 1]:
     """
     Execute `format` and store or display the result.
     Return 0 if no formatting happened, 1 otherwise
     """
-    target_path, loader = target
+    target_path, loader = target_
     content = loader()
 
     def run_format() -> str:
@@ -76,7 +75,7 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target: target_miner
             return formatted_content + "\n"
         return formatted_content
 
-    if target_path.name.startswith(STDIN_FILENAME_STAMP):
+    if target_path.name.startswith(target.STDIN_FILENAME_STAMP):
         print(run_format())
         return 0
 
@@ -89,7 +88,7 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target: target_miner
         if not style_opts.dry_run and style_opts.check:
             return 1
 
-        config_ = styler.lookup(target_path) if config.configurable(styler) else "Not Applicable"
+        config_ = styler.lookup(target_path) if isinstance(styler, config.ConfigMixin) else "Not Applicable"
         message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]] (config: {config_})"
         if not style_opts.dry_run and not style_opts.check:
             display.emit_message(message)
@@ -107,14 +106,14 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target: target_miner
 def run_style(args) -> int:
     _setup_logging(args.quiet)
 
-    mine_opts = target_miner.MineOptions(
+    mine_opts = target.MineOptions(
         targets=tuple(Path(t) for t in args.targets),
-        file_types=tuple(StylerKind(t) for t in args.file_types),
+        file_types=tuple(styler.StylerKind(t) for t in args.file_types),
         stdin_filename=args.stdin_filename,
         use_ruff=args.use_ruff,
     )
 
-    style_targets = target_miner.discover_style_targets(mine_opts)
+    style_targets = target.discover_style_targets(mine_opts)
 
     rc = 0
     style_opts = StyleOptions(
