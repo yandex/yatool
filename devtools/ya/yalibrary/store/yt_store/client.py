@@ -323,7 +323,8 @@ class YtStoreClient(object):
         if refresh_access_time and not self.max_data_ttl_presents:
             if self.is_table_format_v3 and content_uids:
                 # Avoid infinite cache growth
-                rows = [row for row in rows if row['uid'] in uids]
+                uids_set = set(uids)
+                rows = [row for row in rows if row['uid'] in uids_set]
 
             self.refresh_access_time(rows)
 
