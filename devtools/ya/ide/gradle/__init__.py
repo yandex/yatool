@@ -17,7 +17,7 @@ import xml.etree.ElementTree as eTree
 
 
 class YaIdeGradleException(Exception):
-    pass
+    mute = True
 
 
 class _JavaSemConfig(SemConfig):
