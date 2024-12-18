@@ -14,13 +14,14 @@ from library.python import func
 import exts.func
 from jbuild.gen import consts
 from jbuild.gen import base
-from jbuild.gen.actions import compile
 from devtools.ya.test.common import ytest_common_tools as yct
 from devtools.ya.test.common import ytest_common_tools as yc
+import devtools.ya.test.common as test_common
 import devtools.ya.test.const as test_const
 import jbuild.gen.makelist_parser2 as mp2
 
 import yalibrary.graph.base as graph_base
+import yalibrary.graph.const as graph_consts
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         self.classpath_cmd_type = self.meta.java_classpath_cmd_type
 
         self.default_vars = mp2.default_vars(graph_base.hacked_normpath(self.project_path))
+        self.python = None
         self.jdk_resource = None
         self.jdk_for_tests_resource = None
         self.jacoco_agent_resource = None
@@ -60,15 +62,15 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         self.jdk_for_tests_resource_prefix = self.meta.jdk_for_tests_resource_prefix or 'JDK_FOR_TESTS_NOT_FOUND'
 
         test_classpath = [strip_root(p) for p in self.meta.test_classpath.split()]
-        self.classpath = [os.path.join(consts.BUILD_ROOT, p) for p in test_classpath]
+        self.classpath = [os.path.join(graph_consts.BUILD_ROOT, p) for p in test_classpath]
         self.deps = test_classpath[:]
         self.classpath_package_files = self.get_classpath_package_files(test_classpath)
 
         test_libpath = [strip_root(p) for p in self.meta.test_classpath_deps.split()]
-        self.libpath = [os.path.join(consts.BUILD_ROOT, os.path.dirname(p)) for p in test_libpath]
+        self.libpath = [os.path.join(graph_consts.BUILD_ROOT, os.path.dirname(p)) for p in test_libpath]
         self.deps += test_libpath
 
-        self.tests_jar = os.path.join('$(BUILD_ROOT)', self.meta.test_jar)
+        self.tests_jar = os.path.join(graph_consts.BUILD_ROOT, self.meta.test_jar)
         self.classpath_file = os.path.splitext(self.tests_jar)[0] + '.test.cpf'
 
     def init_from_opts(self, opts):
@@ -87,13 +89,14 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         )
         self.jacoco_agent_resource = base.resolve_jacoco_agent(self.global_resources, opts)
         self.jvm_args.append('-DJAVA=' + commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_for_tests_resource))
+        self.python = test_common.get_python_cmd(opts=opts)
         self.initialized = True
 
     def get_classpath(self):
         return self.classpath
 
     def get_direct_deps(self, deps):
-        return [os.path.relpath(jar_file, consts.BUILD_ROOT) for jar_file in deps]
+        return [os.path.relpath(jar_file, graph_consts.BUILD_ROOT) for jar_file in deps]
 
     def get_classpath_deps(self, java_ctx, classpath_origins):
         # get all deps without dependency management procedure
@@ -175,7 +178,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         return list(set(_f for _f in self.deps + self._custom_dependencies if _f))
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
-        return self._get_run_cmd(consts.SOURCE_ROOT, consts.BUILD_ROOT, opts, retry=retry)
+        return self._get_run_cmd(graph_consts.SOURCE_ROOT, graph_consts.BUILD_ROOT, opts, retry=retry)
 
     def get_run_cmd_inputs(self, opts):
         return super(JavaTestSuite, self).get_run_cmd_inputs(opts)
@@ -231,7 +234,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         assert self.initialized
 
         suite_work_dir = yc.get_test_suite_work_dir(
-            consts.BUILD_ROOT,
+            graph_consts.BUILD_ROOT,
             self.project_path,
             self.name,
             retry=retry,
@@ -287,18 +290,34 @@ class JavaTestSuite(test_types.AbstractTestSuite):
     @func.memoize()
     def get_prepare_test_cmds(self):
         inputs = [
-            graph_base.hacked_path_join(consts.SOURCE_ROOT, 'build', 'scripts', 'mkdir.py'),
-            graph_base.hacked_path_join(consts.SOURCE_ROOT, 'build', 'scripts', 'run_junit.py'),
-            graph_base.hacked_path_join(consts.SOURCE_ROOT, 'build', 'scripts', 'writer.py'),
+            graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'mkdir.py'),
+            graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'run_junit.py'),
+            graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'writer.py'),
+            graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'process_command_files.py'),
         ]
-        cmds = []
-        for cmd in compile.make_build_file(
-            list(map(compile.prepare_path_to_manifest, self.classpath)), '\n', self.classpath_file
-        ):
-            p = {'cmd_args': cmd.cmd}
-            if cmd.cwd:
-                p['cwd'] = cmd.cwd
-            cmds.append(p)
+        cmds = [
+            {
+                'cmd_args': self.python
+                + [
+                    graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'mkdir.py'),
+                    os.path.dirname(self.classpath_file),
+                ]
+            },
+            {
+                'cmd_args': self.python
+                + [
+                    graph_base.hacked_path_join(graph_consts.SOURCE_ROOT, 'build', 'scripts', 'writer.py'),
+                    '--file',
+                    self.classpath_file,
+                    '-m',
+                    '--ya-start-command-file',
+                ]
+                + list(map(lambda p: os.path.relpath(p, graph_consts.BUILD_ROOT), self.classpath))
+                + [
+                    '--ya-end-command-file',
+                ]
+            },
+        ]
         return cmds, inputs
 
     @property
