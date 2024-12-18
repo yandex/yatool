@@ -316,10 +316,17 @@ class YtStoreClient(object):
     def get_metadata(self, self_uids=None, uids=None, refresh_access_time=False, content_uids=False):
         meta = {}
         rows = self.get_metadata_rows(self_uids=self_uids, uids=uids, content_uids=content_uids)
-        if refresh_access_time and not self.max_data_ttl_presents:
-            self.refresh_access_time(rows)
+
         for row in rows:
             meta[row['uid']] = row
+
+        if refresh_access_time and not self.max_data_ttl_presents:
+            if self.is_table_format_v3 and content_uids:
+                # Avoid infinite cache growth
+                rows = [row for row in rows if row['uid'] in uids]
+
+            self.refresh_access_time(rows)
+
         return meta
 
     def _lookup_rows_with_retry(self, keys):
