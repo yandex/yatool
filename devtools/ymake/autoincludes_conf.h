@@ -6,6 +6,7 @@
 #include <util/generic/string.h>
 
 class MD5;
+const TString LINTERS_MAKE_INC = TString("linters.make.inc");
 
 /// @brief loads autoinclude paths for current build
-TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& configs, TStringBuf lintersMakeFilename, MD5& confData);
+TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& configs, MD5& confData);

@@ -11,7 +11,7 @@
 #include <util/generic/yexception.h>
 #include <util/stream/file.h>
 
-TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& configs, TStringBuf lintersMakeFilename, MD5& confData) {
+TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& configs, MD5& confData) {
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     for (const auto& config : configs) {
         YDIAG(Conf) << "Reading autoinclude conf file: " << config << Endl;
@@ -26,7 +26,7 @@ TCompactTrieBuilder<char, TString> LoadAutoincludes(const TVector<TFsPath>& conf
             } else {
                 for (const auto& path : json.GetArray()) {
                     auto dir = NPath::ConstructYDir(path.GetString(), TStringBuf(), ConstrYDirDiag);
-                    auto LintersMake = NPath::SmartJoin(dir, lintersMakeFilename);
+                    auto LintersMake = NPath::SmartJoin(dir, LINTERS_MAKE_INC);
                     AutoincludePathsTrie.Add(dir + NPath::PATH_SEP_S, LintersMake);
                 }
             }

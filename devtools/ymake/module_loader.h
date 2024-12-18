@@ -89,7 +89,7 @@ private:
     }
 
     bool IsMacroAllowedInLintersMake(const TStringBuf& name) {
-        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_LINTERS_MAKE) || Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_COMMON);
+        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_LINTERS_MAKE);
     }
 
     size_t StatementPriority(const TStringBuf& s);
@@ -126,7 +126,7 @@ private:
         }
 
         if (lintersMake && !IsMacroAllowedInLintersMake(name)) {
-            YConfErr(Misconfiguration) << name << " is not allowed in ya.common!" << Endl;
+            YConfErr(Misconfiguration) << name << " is not allowed in linters.make.inc!" << Endl;
             return;
         }
 

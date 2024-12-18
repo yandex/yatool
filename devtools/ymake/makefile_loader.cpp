@@ -1,5 +1,6 @@
 #include "makefile_loader.h"
 
+#include "autoincludes_conf.h"
 #include "builtin_macro_consts.h"
 #include "module_loader.h"
 #include "prop_names.h"
@@ -167,7 +168,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                 Module->ProcessMakelistStatement(effectiveName, args);
 
                 if (!IsFileExtRule(data)) {
-                    Module->ProcessModuleMacroCalls(effectiveName, args, !IncludeStack.empty() && NPath::Basename(IncludeStack.back()) == Conf.LintersMakeFilename);
+                    Module->ProcessModuleMacroCalls(effectiveName, args, !IncludeStack.empty() && NPath::Basename(IncludeStack.back()) == LINTERS_MAKE_INC);
                 }
 
                 DataStatement(effectiveName, args);
@@ -216,7 +217,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                         ReadMakeFile(LintersMake);
                     } else {
                         TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));
-                        YConfErr(Misconfiguration) << "linters.make.inc file not found at [[imp]]" << Dir << Endl;
+                        YConfErr(Misconfiguration) << LINTERS_MAKE_INC << " file not found at [[imp]]" << Dir << Endl;
                     }
                 }
                 // Process module EPILOGUE statement if there is one
