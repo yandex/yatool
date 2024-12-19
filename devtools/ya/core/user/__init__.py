@@ -43,7 +43,7 @@ def classify_user(username: str) -> UserClass:
         return UserClass.SANDBOX
     if username in ('root'):
         return UserClass.ROOT_USER
-    if username.startswith('db-runner-key'):
+    if username.startswith('db-runner'):
         return UserClass.DISTBUILD
     if username.startswith('zomb-'):
         return UserClass.ZOMB
