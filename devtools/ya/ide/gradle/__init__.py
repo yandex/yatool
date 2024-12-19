@@ -10,7 +10,7 @@ from pathlib import Path
 from core import config as core_config, yarg, stage_tracer
 from build import build_opts, graph as build_graph, ya_make
 from build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
-from yalibrary import platform_matcher
+from yalibrary import platform_matcher, tools
 from exts import hashing
 from devtools.ya.yalibrary import sjson
 import xml.etree.ElementTree as eTree
@@ -85,6 +85,12 @@ class _JavaSemConfig(SemConfig):
             raise YaIdeGradleException('Not found settings root directory')
         return settings_root
 
+    def in_rel_targets(self, rel_target: Path) -> bool:
+        for conf_rel_target in self.params.rel_targets:
+            if rel_target.is_relative_to(Path(conf_rel_target)):
+                return True
+        return False
+
 
 class _YaSettings:
     """Save command and cwd to ya-settings.xml"""
@@ -156,7 +162,7 @@ class _SymlinkCollector:
     def _collect_settings_symlinks(self) -> Iterable[tuple[Path]]:
         """Collect symlinks for each settings files/dirs"""
         for mkdir in _SymlinkCollector.SETTINGS_MKDIRS:
-            (self.config.export_root / mkdir).mkdir(0o755, parents=True, exist_ok=True)
+            _SymlinkCollector.mkdir(self.config.export_root / mkdir)
         for export_file in self.config.export_root.iterdir():
             basename = export_file.name
             if (basename in _SymlinkCollector.SETTINGS_FILES and export_file.is_file()) or (
@@ -180,6 +186,10 @@ class _SymlinkCollector:
             elif basename == _SymlinkCollector.BUILD_FILE and export_file.is_file():
                 arcadia_file = self.config.arcadia_root / basename
                 yield export_file, arcadia_file
+
+    @staticmethod
+    def mkdir(path: Path) -> None:
+        path.mkdir(0o755, parents=True, exist_ok=True)
 
 
 class _ExistsSymlinkCollector(_SymlinkCollector):
@@ -246,10 +256,23 @@ class _JavaSemGraph(SemGraph):
 
     OLD_AP_SEM = 'annotation_processors'
     NEW_AP_SEM = 'use_annotation_processor'
+    JDK_PATH_SEM = 'jdk_path'
+    JDK_VERSION_SEM = 'jdk_version'
+
+    JDK_PATH_NOT_FOUND = 'NOT_FOUND'  # Magic const for not found JDK path
+    BUILD_ROOT = '$B/'  # Build root in graph
 
     def __init__(self, config: _JavaSemConfig):
         super().__init__(config, skip_invalid=True)
         self.logger = logging.getLogger(type(self).__name__)
+        self._graph_data: list[SemNode | SemDep] = []
+        self._graph_patched = False
+        self.used_ap_class2path: dict[str, str | list[str]] = {}
+        self.use_ap_node_ids: list[int] = []
+        self.node2dep_ids: dict[int, list[int]] = {}
+        self.dep_paths: dict[int, Path] = {}
+        self._cached_jdk_paths = {}
+        self.jdk_paths: dict[int, str] = {}
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
@@ -262,7 +285,7 @@ class _JavaSemGraph(SemGraph):
             # TODO Collect non-exported for build later
 
         super().make(**kwargs, ev_listener=listener, dump_raw_graph=self.config.ymake_root / "raw_graph")
-        self._patch_annotation_processors()
+        self._patch_graph()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
@@ -270,9 +293,11 @@ class _JavaSemGraph(SemGraph):
         for node in self.read():
             if not isinstance(node, SemNode):
                 continue  # interest only nodes
-            if not node.name.startswith('$B/') or not node.name.endswith('.jar'):  # Search only *.jar with semantics
+            if not node.name.startswith(self.BUILD_ROOT) or not node.name.endswith(
+                '.jar'
+            ):  # Search only *.jar with semantics
                 continue
-            rel_target = Path(node.name.replace('$B/', '')).parent  # Relative target - directory of *.jar
+            rel_target = Path(node.name.replace(self.BUILD_ROOT, '')).parent  # Relative target - directory of *.jar
             is_contrib = False
             for semantic in node.semantics:
                 if semantic.sems == ['consumer-type', 'contrib']:
@@ -306,18 +331,29 @@ class _JavaSemGraph(SemGraph):
         except Exception as e:
             raise YaIdeGradleException(f'Fail extract additional RUN_JAVA_PROGRAM targets from sem-graph: {e}') from e
 
+    def _patch_graph(self) -> None:
+        self._patch_annotation_processors()
+        self._patch_jdk()
+        if self._graph_patched:
+            self._update_graph()
+
+    def _update_graph(self) -> None:
+        data: list[dict] = []
+        for item in self._graph_data:
+            data.append(item.as_dict())
+        self.update(data)
+
     def _patch_annotation_processors(self) -> None:
         """Patch AP semantics in graph"""
         self._configure_patch_annotation_processors()
-        data = self._find_annotation_processors()
-        self.used_ap_class2path: dict[str, str | list[str]] = {}
-        data = self._do_patch_annotation_processors(data)
+        self._get_graph_data_and_find_annotation_processors()
+        self._do_patch_annotation_processors()
         if self.used_ap_class2path:  # Some patched
             self.logger.info(
                 "Annotation processors patched in graph:\n%s",
                 '\n'.join([f'{k} --> {v}' for k, v in self.used_ap_class2path.items()]),
             )
-            self.update(data)
+            self._graph_patched = True
 
     def _configure_patch_annotation_processors(self) -> None:
         """Read mapping AP class -> path from configure"""
@@ -329,52 +365,46 @@ class _JavaSemGraph(SemGraph):
         with annotation_processors_file.open('rb') as f:
             self.ap_class2path = sjson.load(f)
 
-    def _find_annotation_processors(self) -> list[dict]:
+    def _get_graph_data_and_find_annotation_processors(self) -> None:
         """Find nodes with AP semantics (old or new), collect dep ids for old AP semantics"""
-        self.use_ap_node_ids: list[int] = []
-        self.node2dep_ids: dict[int, list[int]] = {}
-        data: list[dict] = []
+        data: list[SemNode | SemDep] = []
         for item in self.read(all_nodes=True):
             if isinstance(item, SemDep):
                 if item.from_id in self.node2dep_ids:  # collect dep ids for patching AP
                     self.node2dep_ids[item.from_id].append(item.to_id)
             if not isinstance(item, SemNode):
-                data.append(item.as_dict())  # non-node direct append to patched graph as is
+                data.append(item)  # non-node direct append to patched graph as is
                 continue
             node = item
             if node.has_semantics():
                 for semantic in node.semantics:
                     sem0 = semantic.sems[0]
-                    if sem0 == _JavaSemGraph.OLD_AP_SEM:
+                    if sem0 == self.OLD_AP_SEM:
                         self.node2dep_ids[node.id] = []  # require collect deps for patch AP classes to AP paths
-                    elif sem0 == _JavaSemGraph.NEW_AP_SEM:
+                    elif sem0 == self.NEW_AP_SEM:
                         self.use_ap_node_ids.append(node.id)  # collect node ids to check for versions of all AP
-            data.append(node.as_dict())
-        return data
+            data.append(node)
+        self._graph_data = data
 
-    def _do_patch_annotation_processors(self, data: list[dict]) -> list[dict]:
+    def _do_patch_annotation_processors(self) -> None:
         """Patch AP semantics in graph and check all AP with versions"""
         if not self.use_ap_node_ids and not self.node2dep_ids:
-            return data, {}
+            return
 
-        self._fill_dep_paths(data)
+        self._fill_dep_paths()
 
         # patch AP paths by deps paths and check AP has version
-        for item in data:
-            if not SemGraph.is_node(item):
+        for node in self._graph_data:
+            if not isinstance(node, SemNode):
                 continue
-            node_id = SemNode.take_id(item)
             # Interest only nodes with old or new semantics with AP
-            if node_id not in self.node2dep_ids and node_id not in self.use_ap_node_ids:
+            if node.id not in self.node2dep_ids and node.id not in self.use_ap_node_ids:
                 continue
-            node = SemNode(item, skip_invalid=True)
-            if node_id in self.node2dep_ids:  # require patch old to new semantic
-                node = self._patch_node_annotation_processors(node)
-                item.update(node.as_dict())  # update current graph by patched node
+            if node.id in self.node2dep_ids:  # require patch old to new semantic
+                self._patch_node_annotation_processors(node)
             self._check_annotation_processors_has_version(node)
-        return data
 
-    def _fill_dep_paths(self, data) -> None:
+    def _fill_dep_paths(self) -> None:
         """Collect all used with AP deps as id -> path"""
         if not self.node2dep_ids:
             return
@@ -386,19 +416,17 @@ class _JavaSemGraph(SemGraph):
         dep_ids = list(set(dep_ids))
 
         # collect all deps paths
-        self.dep_paths: dict[int, Path] = {}
-        for item in data:
-            if not SemGraph.is_node(item):
+        for node in self._graph_data:
+            if not isinstance(node, SemNode):
                 continue
-            node_id = SemNode.take_id(item)
-            if node_id not in dep_ids:
+            if node.id not in dep_ids:
                 continue
-            self.dep_paths[node_id] = Path(SemNode.take_name(item).replace('$B/', ''))
+            self.dep_paths[node.id] = Path(node.name.replace(self.BUILD_ROOT, ''))
 
-    def _patch_node_annotation_processors(self, node: SemNode) -> SemNode:
+    def _patch_node_annotation_processors(self, node: SemNode) -> None:
         """Path old AP semantics in one node"""
         for semantic in node.semantics:
-            if semantic.sems[0] == _JavaSemGraph.OLD_AP_SEM:
+            if semantic.sems[0] == self.OLD_AP_SEM:
                 ap_paths = []
                 ap_classes = semantic.sems[1:]
                 for ap_class in ap_classes:
@@ -427,8 +455,7 @@ class _JavaSemGraph(SemGraph):
                     else:
                         self.logger.error("Not found path for AP class %s, skip it", ap_class)
                 # Replace old semantic with classes by new semantic with paths
-                semantic.sems = [_JavaSemGraph.NEW_AP_SEM] + ap_paths
-        return node
+                semantic.sems = [self.NEW_AP_SEM] + ap_paths
 
     def _on_patch(self, ap_class: str, ap_path: str, ap_path_by_dep: str) -> None:
         """Collect AP patching class -> path | paths"""
@@ -445,7 +472,7 @@ class _JavaSemGraph(SemGraph):
 
     def _check_annotation_processors_has_version(self, node: SemNode) -> None:
         for semantic in node.semantics:
-            if semantic.sems[0] == _JavaSemGraph.NEW_AP_SEM:
+            if semantic.sems[0] == self.NEW_AP_SEM:
                 for ap_path in semantic.sems[1:]:
                     if not _JavaSemGraph._is_path_has_version(ap_path):
                         self.logger.error(
@@ -456,9 +483,58 @@ class _JavaSemGraph(SemGraph):
     def _is_path_has_version(path: str) -> bool:
         return bool(re.fullmatch('^\\d+[.\\d]+.*$', Path(Path(path).parent).name))
 
+    def _patch_jdk(self) -> None:
+        """Patch JDK path and JDK version in graph"""
+        for node in self._graph_data:
+            if not isinstance(node, SemNode) or not node.has_semantics() or not node.name.startswith(self.BUILD_ROOT):
+                continue
+            rel_target = Path(node.name.replace(self.BUILD_ROOT, '')).parent
+            in_rel_targets = self.config.in_rel_targets(rel_target)
+            for semantic in node.semantics:
+                sem0 = semantic.sems[0]
+                if sem0 == self.JDK_VERSION_SEM and len(semantic.sems) > 1:
+                    jdk_version = _JavaSemGraph._get_jdk_version(semantic.sems[1])
+                    semantic.sems = [self.JDK_VERSION_SEM, str(jdk_version)]
+                    self._graph_patched = True
+                elif sem0 == self.JDK_PATH_SEM and len(semantic.sems) > 1:
+                    jdk_version = _JavaSemGraph._get_jdk_version(semantic.sems[1])
+                    # don't load JDK for non-targets, fill by dummy string
+                    jdk_path = self.get_jdk_path(jdk_version) if in_rel_targets else f"JDK_PATH_{jdk_version}"
+                    semantic.sems = [self.JDK_PATH_SEM, jdk_path]
+                    self._graph_patched = True
+
+    def get_jdk_path(self, jdk_version: int) -> str:
+        try:
+            if jdk_version in self._cached_jdk_paths:
+                return self._cached_jdk_paths[jdk_version]
+            else:
+                jdk_real_path = Path(tools.tool('java{}'.format(jdk_version)).replace('/bin/java', ''))
+                jdk_path = Path.home() / ".ya" / "jdk" / str(jdk_version)
+                if jdk_path.exists() and jdk_path.resolve() != jdk_real_path:
+                    jdk_path.unlink()  # remove invalid symlink to JDK
+                if not jdk_path.exists():  # create new symlink to JDK
+                    _SymlinkCollector.mkdir(jdk_path.parent)
+                    jdk_path.symlink_to(jdk_real_path, target_is_directory=True)
+        except Exception as e:
+            self.logger.error(f"Can't find JDK {jdk_version} in tools: {e}")
+            jdk_path = self.JDK_PATH_NOT_FOUND
+        jdk_path = str(jdk_path)
+        self._cached_jdk_paths[jdk_version] = jdk_path
+        if jdk_path != self.JDK_PATH_NOT_FOUND:
+            self.jdk_paths[jdk_version] = jdk_path  # Public only valid jdk paths
+        return jdk_path
+
+    @staticmethod
+    def _get_jdk_version(s: str) -> int:
+        """Extract JDK version from resource var name"""
+        m = re.search('(?:JDK|jdk)(\\d+)', s)
+        return int(m.group(1)) if m else 0
+
 
 class _Exporter:
     """Generating files to export root"""
+
+    GRADLE_JDK_VERSION = 17
 
     def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
@@ -476,14 +552,30 @@ class _Exporter:
 
         self.logger.info("Path prefixes for skip in yexport: %s", self.config.params.rel_targets)
 
+        attrs_for_all_templates = []
+
+        gradle_jdk_path = self.sem_graph.get_jdk_path(self.GRADLE_JDK_VERSION)
+        if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
+            attrs_for_all_templates = [
+                f"gradle_jdk_version = {self.GRADLE_JDK_VERSION}",
+                f"gradle_jdk_path = '{gradle_jdk_path}'",
+            ]
+
         yexport_toml = self.config.ymake_root / 'yexport.toml'
         with yexport_toml.open('w') as f:
             f.write(
                 '\n'.join(
                     [
+                        '[add_attrs.root]',
+                        *attrs_for_all_templates,
+                        '',
                         '[add_attrs.dir]',
                         f'build_contribs = {'true' if self.config.params.build_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
+                        *attrs_for_all_templates,
+                        '',
+                        '[add_attrs.target]',
+                        *attrs_for_all_templates,
                         '',
                         '[[target_replacements]]',
                         f'skip_path_prefixes = [ "{'", "'.join(self.config.params.rel_targets)}" ]',
@@ -521,6 +613,25 @@ class _Exporter:
             self.logger.error("Fail generating by yexport:\n%s", r.stderr)
             raise YaIdeGradleException(f'Fail generating by yexport with exit_code={r.returncode}')
 
+        gradle_properties_file = self.config.export_root / ".gradle" / "gradle.properties"
+        if self.sem_graph.jdk_paths:
+            _SymlinkCollector.mkdir(gradle_properties_file.parent)
+            with (self.config.export_root / ".gradle" / "gradle.properties").open('w') as f:
+                f.write(
+                    '\n'.join(
+                        [
+                            f'org.gradle.java.home={gradle_jdk_path}' if gradle_jdk_path else None,
+                            'org.gradle.java.installations.fromEnv='
+                            + ','.join('JDK' + str(jdk_version) for jdk_version in self.sem_graph.jdk_paths.keys()),
+                            'org.gradle.java.installations.paths='
+                            + ','.join(jdk_path for jdk_path in self.sem_graph.jdk_paths.values()),
+                            '',
+                        ]
+                    )
+                )
+        elif gradle_properties_file.exists():
+            gradle_properties_file.unlink()
+
 
 class _Builder:
     """Build required targets"""
@@ -536,13 +647,7 @@ class _Builder:
             build_rel_targets = self.sem_graph.get_run_java_program_rel_targets()
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, is_contrib in rel_targets:
-                in_rel_targets = False
-                for conf_rel_target in self.config.params.rel_targets:
-                    if rel_target.is_relative_to(Path(conf_rel_target)):
-                        in_rel_targets = True
-                        break
-
-                if in_rel_targets:
+                if self.config.in_rel_targets(rel_target):
                     # Skip target, already in input targets
                     continue
                 elif self.config.params.build_contribs or not is_contrib:
