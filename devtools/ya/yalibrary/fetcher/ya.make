@@ -44,6 +44,7 @@ END()
 RECURSE(
     ufetcher
     progress_info
+    http_client
 )
 
 RECURSE_FOR_TESTS(

@@ -9,8 +9,6 @@ import time
 
 import typing as tp  # noqa
 
-import six
-
 import core.config
 import core.error
 import core.report
@@ -726,6 +724,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                 execution_log,
                 dump_evlog_stat=self.opts.evlog_dump_node_stat,
                 store_links_in_memory=self.opts.store_links_in_memory,
+                use_universal_fetcher=self.opts.use_universal_fetcher_for_dist_results,
             )
 
         def dispatch_uid(self, uid, *args, **kwargs):
@@ -853,6 +852,6 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
         logger.debug('Average compression ratio: %0.2f', dist_cache.avg_compression_ratio)
 
     # Drop empty entries (with fake/suppressed artifacts)
-    res = {k: [x for x in v if x] for k, v in six.iteritems(res)}
+    res = {k: [x for x in v if x] for k, v in res.items()}
 
     return res, build_errors, merged_exit_code, execution_log, exit_code_map

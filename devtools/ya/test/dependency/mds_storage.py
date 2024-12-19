@@ -1,7 +1,8 @@
 import os
 import logging
 
-import exts.http_client
+import exts.archive
+import yalibrary.fetcher.http_client as http_client
 
 CANON_OUTPUT_STORAGE = 'canondata_storage'
 
@@ -31,7 +32,7 @@ class MdsStorage(object):
         if not os.path.exists(resource_file):
             if self._use_cached_only:
                 raise NoResourceInCacheException("There is no suitable resource {} in cache".format(resource_id))
-            exts.http_client.download_file(self.get_mds_url_by_key(resource_id), resource_file, mode=0o0644)
+            http_client.download_file(self.get_mds_url_by_key(resource_id), resource_file, additional_file_perms=0o0644)
 
         for tar_archive_suffix in (".tar.gz", ".tar"):
             if resource_file.endswith(tar_archive_suffix):

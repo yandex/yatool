@@ -1720,6 +1720,7 @@ class SonarOptions(Options):
 class UniversalFetcherOptions(Options):
     def __init__(self):
         self.use_universal_fetcher_everywhere = False
+        self.use_universal_fetcher_for_dist_results = False
 
     @staticmethod
     def consumer():
@@ -1736,6 +1737,11 @@ class UniversalFetcherOptions(Options):
                 hook=SetValueHook('use_universal_fetcher_everywhere', return_true_if_enabled),
             ),
             ConfigConsumer('use_universal_fetcher_everywhere'),
+            EnvConsumer(
+                'YA_USE_UNIVERSAL_FETCHER_FOR_DIST_RESULTS',
+                hook=SetValueHook('use_universal_fetcher_for_dist_results', return_true_if_enabled),
+            ),
+            ConfigConsumer('use_universal_fetcher_for_dist_results'),
         ]
 
 

@@ -163,7 +163,7 @@ def fetch_jar(repos, g, a, v, dest, suffix=None, snapshot_ver=None):
                 jar_md5 = None
 
             try:
-                http_client.download_file(jar_url, dest, mode=0o777, expected_md5=jar_md5)
+                http_client.download_file(jar_url, dest, additional_file_perms=0o777, expected_md5=jar_md5)
 
             except Exception as e:
                 errs.append((jar_url, e))

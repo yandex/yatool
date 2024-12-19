@@ -35,7 +35,6 @@ import exts.asyncthread as core_async
 import exts.filelock
 import exts.fs
 import exts.hashing as hashing
-import exts.http_client
 import exts.os2
 import exts.path2
 import exts.timer

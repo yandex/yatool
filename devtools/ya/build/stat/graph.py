@@ -13,7 +13,7 @@ from collections import defaultdict
 from collections.abc import Iterator, Iterable, Generator
 from dataclasses import dataclass
 
-from exts import http_client
+from yalibrary.fetcher import http_client
 from yalibrary.status_view.helpers import format_paths
 from build.graph_description import GraphNodeUid, GraphNode, DictGraph
 
