@@ -7,15 +7,10 @@ import yalibrary.graph.commands as graph_commands
 
 
 class BuildTools(object):  # TODO: use something from yalibrary.tools to detect executable file path
-    PROTOC_PATTERN = 'PROTOC'
     PYTHON_PATTERN = 'PYTHON'
     MAVEN_ARTIFACT_UPLOADER = 'MAVEN_ARTIFACT_UPLOADER'
-    JSTYLE_RUNNER_PATTERN = 'JSTYLERUNNER'
     KYTHE_PATTERN = 'KYTHE'
     KYTHE2PROTO_PATTERN = 'KYTHETOPROTO'
-    UBERJAR_PATTERN = 'UBERJAR'
-    UBERJAR10_PATTERN = 'UBERJAR_10'
-    SCRIPTGEN_PATTERN = 'SCRIPTGEN'
 
     @staticmethod
     def maven_artifact_uploader():
@@ -24,10 +19,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
     @staticmethod
     def jdk_tool(name, jdk_path):
         return os.path.join(jdk_path, 'bin', name)
-
-    @staticmethod
-    def protoc_tool(name='protoc'):
-        return os.path.join('$({})'.format(BuildTools.PROTOC_PATTERN), name)
 
     @staticmethod
     def python():
@@ -60,10 +51,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
             if uberjar_resource.endswith('.jar')
             else os.path.join(uberjar_resource, 'devtools-java_shader.jar')
         )
-
-    @staticmethod
-    def scriptgen_tool():
-        return os.path.join('$({})'.format(BuildTools.SCRIPTGEN_PATTERN), 'scriptgen')
 
     @staticmethod
     def jacoco_agent_tool(jacoco_agent_resource):
@@ -471,14 +458,6 @@ def touch(path, cwd=None):
             os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'touch.py'),
         ],
     )
-
-
-def protoc(proto_files, java_out, Ipaths=list(), cwd=None):
-    cmd = [BuildTools.protoc_tool()]
-    cmd += ['-I={}'.format(path) for path in Ipaths]
-    cmd += ['--java_out={}'.format(java_out)]
-    cmd += proto_files
-    return graph_commands.Cmd(cmd, cwd, [])
 
 
 def javac(
