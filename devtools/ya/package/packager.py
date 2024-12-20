@@ -305,7 +305,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "new_store_ttl",
         "output_style",
         "pytest_args",
-        "release_version",
         "strip_cache",
         "strip_symlinks",
         "symlinks_ttl",
@@ -328,6 +327,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     if version := getattr(params, "custom_version"):
         build_options.custom_version = version.format(**formatters)
+    if release_version := getattr(params, "release_version"):
+        build_options.release_version = release_version.format(**formatters)
     build_options.yt_store = params.yt_store
     build_options.yt_proxy = params.yt_proxy
     build_options.yt_dir = params.yt_dir
