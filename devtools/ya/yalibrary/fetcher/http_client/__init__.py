@@ -18,7 +18,6 @@ def _get_ufetcher():
         return None
 
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.CRITICAL)
 
     retry_policy = universal_fetcher.RetryPolicy(
         max_retry_count=5,
