@@ -127,7 +127,7 @@ public:
     }
     NCommands::TCompiledCommand Compile(
         TStringBuf cmd,
-        const TBuildConfiguration* conf,
+        const TBuildConfiguration& conf,
         const TVars& vars,
         bool preevaluate,
         TCompilationIODesc io
@@ -180,12 +180,12 @@ private:
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
 
-    const NCommands::TSyntax& Parse(const TBuildConfiguration* conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
+    const NCommands::TSyntax& Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
 
     struct TCmdWriter;
     struct TInliner {
         TInliner(
-            const TBuildConfiguration* conf,
+            const TBuildConfiguration& conf,
             TCommands& commands,
             const TVars& vars
         ):
@@ -211,7 +211,7 @@ private:
         void InlineArguments(const NCommands::TSyntax::TCommand& cmd, TCmdWriter& writer);
         void InlineCommands(const NCommands::TSyntax::TScript& scr, TCmdWriter& writer);
     private: // context
-        const TBuildConfiguration* Conf;
+        const TBuildConfiguration& Conf;
         TCommands& Commands;
     private: // variable layers (note that macros are variables, too)
         const NCommands::TSyntax* VarLookup(TStringBuf name);
@@ -223,7 +223,7 @@ private:
             const TVars& Vars;
             TDefinitionCache DefinitionCache = {};
             TRecursionDepth RecursionDepth = {};
-            const TYVar* VarLookup(TStringBuf name, const TBuildConfiguration* conf);
+            const TYVar* VarLookup(TStringBuf name, const TBuildConfiguration& conf);
         } LegacyVars;
     private: // misc
         int Depth = 0;

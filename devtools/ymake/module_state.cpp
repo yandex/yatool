@@ -320,7 +320,7 @@ void TModule::SetToolsComplete() noexcept {
     ToolsComplete = true;
 }
 
-void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
+void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfiguration& buildConf) {
     AssertEx(!HasId(), "Module already has ID");
     AssertEx(id != 0 && id != BAD_MODULE, "Invalid ID for module");
     Y_ASSERT(!Committed);
@@ -350,8 +350,8 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
 
     if (conf.HasSemantics && !conf.CmdIgnore.empty()) {
         auto dummyCommandStore = TCommands();
-        auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
-        auto compiled = dummyCommandStore.Compile(conf.CmdIgnore, nullptr, Vars, false, {EOutputAccountingMode::Module});
+        auto dummyCmdInfo = TCommandInfo(&buildConf, nullptr, nullptr);
+        auto compiled = dummyCommandStore.Compile(conf.CmdIgnore, buildConf, Vars, false, {EOutputAccountingMode::Module});
         auto ignore = TCommands::SimpleCommandSequenceWriter()
             .Write(dummyCommandStore, compiled.Expression, Vars, {}, dummyCmdInfo, nullptr)
             .Extract();

@@ -243,10 +243,10 @@ const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *con
     return subExpr;
 }
 
-const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration* conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src) {
+const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src) {
     auto result = ParserCache.find(src);
     if (result == ParserCache.end())
-        result = ParserCache.emplace(src, NCommands::Parse(conf, mods, values, src)).first;
+        result = ParserCache.emplace(src, NCommands::Parse(&conf, mods, values, src)).first;
     return result->second;
 }
 
@@ -266,13 +266,12 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     )
         return {};
 
-    auto buildConf = GlobalConf();
-    auto blockData = buildConf->BlockData.find(name);
-    if (blockData != buildConf->BlockData.end())
+    auto blockData = Conf.BlockData.find(name);
+    if (blockData != Conf.BlockData.end())
         if (blockData->second.IsUserMacro || blockData->second.IsGenericMacro || blockData->second.IsFileGroupMacro)
             return {}; // TODO how do we _actually_ detect non-vars?
 
-    auto var = LegacyVars.VarLookup(name, buildConf);
+    auto var = LegacyVars.VarLookup(name, Conf);
     if (!var)
         return {};
 
@@ -328,8 +327,7 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
 
     // legacy lookup
 
-    auto buildConf = GlobalConf();
-    auto var = LegacyVars.VarLookup(name, buildConf);
+    auto var = LegacyVars.VarLookup(name, Conf);
 
     // check recursion
 
@@ -373,12 +371,12 @@ const NCommands::TSyntax* TCommands::TInliner::VarLookup(TStringBuf name) {
     return {};
 }
 
-const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const TBuildConfiguration* conf) {
+const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const TBuildConfiguration& conf) {
     auto var = Vars.Lookup(name);
     if (!var || var->DontExpand || var->NoInline)
         return {};
     Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
-    if (conf->CommandConf.IsReservedName(name))
+    if (conf.CommandConf.IsReservedName(name))
         return {};
 
     return var;
@@ -455,9 +453,8 @@ private:
 void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst) {
     auto macroName = Commands.Values.GetVarName(src.Function);
 
-    Y_ASSERT(Conf);
-    auto blockDataIt = Conf->BlockData.find(macroName);
-    const TBlockData* blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
+    auto blockDataIt = Conf.BlockData.find(macroName);
+    const TBlockData* blockData = blockDataIt != Conf.BlockData.end() ? &blockDataIt->second : nullptr;
     Y_ASSERT(blockData); // TODO handle unknown macros
 
     Y_ASSERT(blockData->CmdProps->ArgNames.size() == src.Arguments.size());
@@ -815,7 +812,7 @@ void TCommands::TInliner::CheckDepth() {
 
 NCommands::TCompiledCommand TCommands::Compile(
     TStringBuf cmd,
-    const TBuildConfiguration* conf,
+    const TBuildConfiguration& conf,
     const TVars& vars,
     bool preevaluate,
     TCompilationIODesc io

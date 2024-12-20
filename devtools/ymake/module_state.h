@@ -25,6 +25,7 @@
 class TSymbols;
 class TModule;
 class TAppliedPeersRules;
+class TBuildConfiguration;
 
 enum class EPeerSearchStatus;
 struct TModuleConf;
@@ -270,7 +271,7 @@ public:
         return Id;
     }
 
-    void FinalizeConfig(ui32 id, const TModuleConf&);
+    void FinalizeConfig(ui32 id, const TModuleConf&, const TBuildConfiguration&);
 
     bool IsGlobVarsComplete() const noexcept {
         return GlobVarsComplete;

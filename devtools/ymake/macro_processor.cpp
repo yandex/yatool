@@ -318,7 +318,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
             knownInputs = &specFiles->Input;
             knownOutputs = &specFiles->Output;
         }
-        auto compiled = CommandSink->Compile(command, Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
+        auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
@@ -436,7 +436,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
             << "Expression error (module " << Module->GetUserType() << "), "
             << varName << "=" << varValue << ": "
             << e.what() << Endl;
-        return commands.Compile("$FAIL_EXPR", Conf, Module->Vars, false, {});
+        return commands.Compile("$FAIL_EXPR", *Conf, Module->Vars, false, {});
     };
 
     auto mkCmd = [&](TStringBuf exprVarName) {
@@ -446,7 +446,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         ParseCommandLikeVariable(varDefinitionSources.Get1(exprVarName), id, cmdName, cmdValue);
         auto compiled = NCommands::TCompiledCommand();
         try {
-            compiled = commands.Compile(cmdValue, Conf, varDefinitionSources, false, {});
+            compiled = commands.Compile(cmdValue, *Conf, varDefinitionSources, false, {});
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, cmdValue);
         }
@@ -500,7 +500,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         auto val = EvalAll(var);
         auto compiled = NCommands::TCompiledCommand();
         try {
-            compiled = commands.Compile(val, Conf, varDefinitionSources, false, {});
+            compiled = commands.Compile(val, *Conf, varDefinitionSources, false, {});
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, val);
         }

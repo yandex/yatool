@@ -345,7 +345,7 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
         ParseCommandLikeVariable(Vars.Get1(varName), id, cmdName, cmdValue);
         const TString res = [&]() {
             if (structCmd) {
-                auto compiled = Commands.Compile(cmdValue, &Conf, Vars, false, {});
+                auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
                 // TODO: there's no point in allocating cmdElemId for expressions
                 // that do _not_ have directly corresponding nodes
                 // (and are linked as "0:VARNAME=S:123" instead)
@@ -394,10 +394,10 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
         auto compiled = [&]() {
             try {
-                return Commands.Compile(command, &Conf, Vars, true, {EOutputAccountingMode::Module});
+                return Commands.Compile(command, Conf, Vars, true, {EOutputAccountingMode::Module});
             } catch (const std::exception& e) {
                 YConfErr(Details) << "Command processing error (module " << Module.GetUserType() << "): " << e.what() << Endl;
-                return Commands.Compile("$FAIL_MODULE_CMD", &Conf, Vars, true, {EOutputAccountingMode::Module});
+                return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {EOutputAccountingMode::Module});
             }
         }();
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
