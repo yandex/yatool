@@ -101,7 +101,7 @@ TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TA
 }
 
 TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name) {
-    callArgs = TCommandInfo(&Conf, nullptr, nullptr).SubstMacroDeeply(nullptr, macroCall.second, locals);
+    callArgs = TCommandInfo(Conf, nullptr, nullptr).SubstMacroDeeply(nullptr, macroCall.second, locals);
     callArgs.Split(' ');
     // Take appropriate macro specialization name
     TStringBuf macroName = Conf.GetSpecMacroName(macroCall.first, callArgs);
@@ -217,7 +217,7 @@ TDepsCacheId TModuleDef::Commit() {
     }
 
     if (Vars.Contains(VAR_PEERDIR_TAGS)) {
-        TString expandedTags = TCommandInfo(&Conf, nullptr, nullptr).SubstVarDeeply(VAR_PEERDIR_TAGS, Vars);
+        TString expandedTags = TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(VAR_PEERDIR_TAGS, Vars);
         Module.Set(VAR_PEERDIR_TAGS, expandedTags);
     }
 
@@ -228,14 +228,14 @@ TDepsCacheId TModuleDef::Commit() {
 }
 
 void TModuleDef::InitFromConf() {
-    TStringBuf baseName = GetCmdValue(Vars.Get1(TStringBuf("REALPRJNAME")));
+    TStringBuf baseName = GetCmdValue(Vars.Get1("REALPRJNAME"sv));
     Y_ASSERT(!baseName.empty());
     if (baseName.Contains('/')) {
         YConfErr(Misconfiguration) << "Invalid module name '" << Module.Get("REALPRJNAME") << "'. Symbol '/' is not allowed" << Endl;
     }
-    TString prefix = Vars.Contains(TStringBuf("MODULE_PREFIX")) ? TCommandInfo(&Conf, nullptr, nullptr).SubstVarDeeply(TStringBuf("MODULE_PREFIX"), Vars) : "";
-    TString ext = Vars.Contains(TStringBuf("MODULE_SUFFIX")) ? TCommandInfo(&Conf, nullptr, nullptr).SubstVarDeeply(TStringBuf("MODULE_SUFFIX"), Vars) : "";
-    TString globalExt = Vars.Contains(TStringBuf("GLOBAL_SUFFIX")) ? TCommandInfo(&Conf, nullptr, nullptr).SubstVarDeeply(TStringBuf("GLOBAL_SUFFIX"), Vars) : "";
+    TString prefix = Vars.Contains("MODULE_PREFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("MODULE_PREFIX"sv, Vars) : "";
+    TString ext = Vars.Contains("MODULE_SUFFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("MODULE_SUFFIX"sv, Vars) : "";
+    TString globalExt = Vars.Contains("GLOBAL_SUFFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("GLOBAL_SUFFIX"sv, Vars) : "";
 
     TString fileName = TString::Join(prefix, baseName, ext);
     TString globalFileName = TString::Join(prefix, baseName, globalExt);

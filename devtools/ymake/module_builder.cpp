@@ -245,7 +245,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
         }
         return true;
     }
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->SetCommandSink(&Commands);
     if (!src.IsMacro && src.ElemId && src.OutputInThisModule) {
         TAddDepAdaptor& node = AddOutput(src.ElemId, NodeTypeForVar(src));
@@ -263,7 +263,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
 }
 
 void TModuleBuilder::AddPluginCustomCmd(TMacroCmd& macroCmd) {
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->GetCommandInfoFromPluginCmd(macroCmd, Vars, Module);
     CmdAddQueue.push_back(cmdInfo);
 }
@@ -353,7 +353,7 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
                 auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
                 return FormatCmd(id, cmdName, value);
             } else {
-                TCommandInfo cmd(&Conf, &Graph, &UpdIter);
+                TCommandInfo cmd(Conf, &Graph, &UpdIter);
                 auto value = cmd.SubstVarDeeply(varName, Vars);
                 return FormatCmd(id, cmdName, value);
             }
@@ -402,7 +402,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         }();
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
-        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);
+        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         cmdInfo->InitFromModule(Module);
 
         cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), Vars);
@@ -447,7 +447,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         isMacroCall = ParseMacroCall(TStringBuf("FAIL_MODULE_CMD"), cmdName, modArgs);
     }
 
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->InitFromModule(Module);
 
     // can not fail, we've checked `cmd' already
@@ -545,7 +545,7 @@ void TModuleBuilder::ApplyVarAsMacro(const TStringBuf& name, bool force) {
             return;
         }
         TVector<TStringBuf> args;
-        TString value = TCommandInfo(&Conf, &Graph, &UpdIter).SubstVarDeeply(name, Vars);
+        TString value = TCommandInfo(Conf, &Graph, &UpdIter).SubstVarDeeply(name, Vars);
         Split(GetCmdValue(value), " ", args);
         if (args.size()) {
             //YConfWarn(Dev) << "ApplyVarAsMacro: " << name << ": " << value << Endl;
@@ -917,7 +917,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
         groupVar->push_back(varCmd);
         groupVar->back().IsMacro = true;
 
-        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(&Conf, &Graph, &UpdIter, &Module);
+        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         TVarStrEx cmd(name);
         cmd.IsMacro = true;
         cmdInfo->Init("SRCS", cmd, &args, *this);

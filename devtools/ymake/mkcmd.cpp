@@ -133,7 +133,7 @@ TMakeCommand::TMakeCommand(TYMake& yMake, const TVars* base0)
 
 TMakeCommand::TMakeCommand(const TRestoreContext& restoreContext, const TCommands& commands, TUpdIter* updIter, const TVars* base0)
     : Vars(&BaseVars) // hack for SET_APPEND
-    , CmdInfo(&restoreContext.Conf, &restoreContext.Graph, updIter)
+    , CmdInfo(restoreContext.Conf, &restoreContext.Graph, updIter)
     , BaseVars(base0)
     , Commands(&commands)
     , Conf(restoreContext.Conf)
@@ -330,7 +330,7 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
                 auto& cmdSrc = *Commands;
                 auto& conf = Graph.Names().CommandConf;
                 auto& expr = *cmdSrc.Get(pattern, &conf);
-                auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
+                auto dummyCmdInfo = TCommandInfo(Conf, nullptr, nullptr);
                 auto scr = TCommands::SimpleCommandSequenceWriter()
                     .Write(cmdSrc, expr, Vars, {}, dummyCmdInfo, &conf)
                     .Extract();

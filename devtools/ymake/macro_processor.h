@@ -52,7 +52,7 @@ struct TCommandInfo {
 
     using TSubstObserver = std::function<void(const TVarStr&)>;
 
-    explicit TCommandInfo(const TBuildConfiguration* conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
+    explicit TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
     void SetCommandSink(TCommands* commands);
     void SetCommandSource(const TCommands* commands);
     bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod);
@@ -69,6 +69,8 @@ public:
     bool KeepTargetPlatform = false;
 
 private:
+    friend struct TUnitProperty;
+    explicit TCommandInfo();
     struct TSpecFileLists {
         TSpecFileList Input;         // deps for the main output
         TSpecFileList AutoInput;     // inputs added automatically by ymake
@@ -255,6 +257,8 @@ private:
     static bool IsIncludeVar(const TStringBuf& cur);
     bool IsReservedVar(const TStringBuf& cur) const;
     bool IsGlobalReservedVar(const TStringBuf& cur) const;
+
+    TString GetToolValue(const TMacroData& macroData, const TVars& vars);
 
     const TYVar* GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroname, const TStringBuf& args, const TVars& vars);
 

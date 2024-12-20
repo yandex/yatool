@@ -42,7 +42,7 @@ size_t TCmdProperty::Key2ArrayIndex(const TString& arg) const {
 }
 
 bool TUnitProperty::AddMacroCall(const TStringBuf& name, const TStringBuf& argList) {
-    MacroCalls.push_back(std::make_pair(TString{name}, SpecVars.size() ? TCommandInfo(nullptr, nullptr, nullptr).SubstMacroDeeply(nullptr, argList, SpecVars, false) : TString{argList}));
+    MacroCalls.push_back(std::make_pair(TString{name}, SpecVars.size() ? TCommandInfo().SubstMacroDeeply(nullptr, argList, SpecVars, false) : TString{argList}));
     return true;
 }
 

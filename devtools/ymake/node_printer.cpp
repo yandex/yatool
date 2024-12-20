@@ -2134,7 +2134,7 @@ TString TDumpDartProc::SubstModuleVars(const TStringBuf& data, const TModule& mo
     }
 
     auto moduleDirsVars = module.ModuleDirsToVars();
-    TCommandInfo cmdInfo(&RestoreContext.Conf, &RestoreContext.Graph, nullptr);
+    TCommandInfo cmdInfo(RestoreContext.Conf, &RestoreContext.Graph, nullptr);
     dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, moduleDirsVars);
     dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, module.Vars);
 
@@ -2176,7 +2176,7 @@ bool TDumpDartProc::Enter(TState& state) {
                 if (NYMake::IsGlobalResource(gvar.first)) {
                     auto [it, added] = globalResources.try_emplace(gvar.first);
                     if (added) {
-                        it->second = JoinSeq(" ", EvalAll(gvar.second, vars, Commands, RestoreContext.Graph.Names().CommandConf));
+                        it->second = JoinSeq(" ", EvalAll(gvar.second, vars, Commands, RestoreContext.Graph.Names().CommandConf, RestoreContext.Conf));
                     }
                 }
             }

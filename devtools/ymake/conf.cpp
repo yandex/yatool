@@ -35,10 +35,9 @@ namespace {
     constexpr TStringBuf VAR_EXPORT_SRC_ROOT = "EXPORT_SOURCE_ROOT"sv;
     constexpr TStringBuf VAR_AUTOINCLUDE_PATHS = "AUTOINCLUDE_PATHS"sv;
 
-    void FoldGlobalCommands(TBuildConfiguration* conf) {
+    void FoldGlobalCommands(TBuildConfiguration& conf) {
         TTraceStage stage("Fold global commands");
-        Y_ASSERT(conf != nullptr);
-        auto& vars = conf->CommandConf;
+        auto& vars = conf.CommandConf;
 
         auto foldableVarsList = TCommandInfo(conf, nullptr, nullptr).SubstVarDeeply(VAR_FOLDABLE_VARS, vars);
 
@@ -210,7 +209,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     PrepareConfiguration(confMd5);
     confData.Update(&confMd5, sizeof(confMd5));
     CompileAndRecalcAllConditions();
-    FoldGlobalCommands(this);
+    FoldGlobalCommands(*this);
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
 
@@ -288,7 +287,7 @@ void TBuildConfiguration::GenerateCustomData(const TStringBuf genCustomData) {
 }
 
 void TBuildConfiguration::LoadSystemHeaders(MD5& confData) {
-    TString sysinclVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("SYSINCL"), CommandConf);
+    TString sysinclVar = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(TStringBuf("SYSINCL"), CommandConf);
     TVector<TFsPath> sysinclFiles;
     for (const auto& it : StringSplitter(sysinclVar).Split(' ').SkipEmpty()) {
         sysinclFiles.emplace_back(SourceRoot / it.Token());
@@ -297,7 +296,7 @@ void TBuildConfiguration::LoadSystemHeaders(MD5& confData) {
 }
 
 void TBuildConfiguration::LoadLicenses(MD5& confData) {
-    TString licenses = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf("LICENSES"), CommandConf);
+    TString licenses = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(TStringBuf("LICENSES"), CommandConf);
     TVector<TFsPath> licensesFiles;
     for (const auto& it : StringSplitter(licenses).Split(' ').SkipEmpty()) {
         licensesFiles.emplace_back(SourceRoot / it.Token());
@@ -306,7 +305,7 @@ void TBuildConfiguration::LoadLicenses(MD5& confData) {
 }
 
 void TBuildConfiguration::LoadAutoincludes(MD5& confData) {
-    TString autoincludes = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(TStringBuf(VAR_AUTOINCLUDE_PATHS), CommandConf);
+    TString autoincludes = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(TStringBuf(VAR_AUTOINCLUDE_PATHS), CommandConf);
     TVector<TFsPath> autoincludeFiles;
     for (const auto& it : StringSplitter(autoincludes).Split(' ').SkipEmpty()) {
         autoincludeFiles.emplace_back(SourceRoot / it.Token());
@@ -338,13 +337,13 @@ void TBuildConfiguration::LoadPeersRules(MD5& confData) {
 }
 
 void TBuildConfiguration::LoadBlackLists(MD5& confHash) {
-    const TString blacklistsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_BLACKLISTS, CommandConf);
+    const TString blacklistsVar = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(VAR_BLACKLISTS, CommandConf);
     TVector<TStringBuf> blacklistFiles = StringSplitter(blacklistsVar).Split(' ').SkipEmpty();
     BlackList.Load(SourceRoot, blacklistFiles, confHash);
 }
 
 void TBuildConfiguration::LoadIsolatedProjects(MD5& confData) {
-    const TString isolatedProjectsVar = TCommandInfo(this, nullptr, nullptr).SubstVarDeeply(VAR_ISOLATED_PROJECTS, CommandConf);
+    const TString isolatedProjectsVar = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(VAR_ISOLATED_PROJECTS, CommandConf);
     TVector<TStringBuf> isolatedProjectsFiles = StringSplitter(isolatedProjectsVar).Split(' ').SkipEmpty();
     IsolatedProjects.Load(SourceRoot, isolatedProjectsFiles, confData);
 }

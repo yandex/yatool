@@ -1,8 +1,8 @@
 #include "vars.h"
-#include "command_helpers.h"
 
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/command_store.h>
+#include <devtools/ymake/conf.h>
 #include <devtools/ymake/macro_processor.h>
 
 TStringBuf Get1(const TYVar* var) {
@@ -47,14 +47,14 @@ TString EvalAll(const TYVar* var) {
     return result;
 }
 
-TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& commands, const TCmdConf& conf) {
+TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& commands, const TCmdConf& cmdConf, const TBuildConfiguration& conf) {
     TVector<TString> result;
     for (const auto& part : var) {
         if (part.StructCmd) {
-            auto& expr = *commands.Get(part.Name, &conf);
-            auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
+            auto& expr = *commands.Get(part.Name, &cmdConf);
+            auto dummyCmdInfo = TCommandInfo(conf, nullptr, nullptr);
             auto scr = TCommands::SimpleCommandSequenceWriter()
-                .Write(commands, expr, vars, {}, dummyCmdInfo, &conf)
+                .Write(commands, expr, vars, {}, dummyCmdInfo, &cmdConf)
                 .Extract();
             for (auto& cmd : scr)
                 for (auto& arg : cmd)

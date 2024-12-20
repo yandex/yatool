@@ -17,18 +17,18 @@
 namespace {
     class TVarsEvaluator: public TEvaluatorBase {
     public:
-        TVarsEvaluator(const TVars& vars)
-            : Vars(vars)
-            , DummyCmd{nullptr, nullptr, nullptr}
+        TVarsEvaluator(const TBuildConfiguration& conf)
+            : Vars_(conf.CommandConf)
+            , DummyCmd_{conf, nullptr, nullptr}
         {
         }
         ~TVarsEvaluator() override = default;
         TString EvalVarValue(TStringBuf varName) const override {
-            return DummyCmd.SubstVarDeeply(varName, Vars);
+            return DummyCmd_.SubstVarDeeply(varName, Vars_);
         }
     private:
-        const TVars& Vars;
-        mutable TCommandInfo DummyCmd;
+        const TVars& Vars_;
+        mutable TCommandInfo DummyCmd_;
     };
 
     void ExtractVars(TSet<TStringBuf>& usedVars, TFileContentHolder& incFile) {
@@ -393,7 +393,7 @@ void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
 }
 
 void TIncParserManager::InitManager(const TParsersList& parsersList) {
-    TVarsEvaluator evaluator(Conf.CommandConf);
+    TVarsEvaluator evaluator(Conf);
     auto* cache = &Cache;
 
     ParsersByType.resize(static_cast<ui32>(EIncludesParserType::PARSERS_COUNT), nullptr);

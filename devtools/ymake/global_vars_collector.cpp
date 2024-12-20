@@ -42,7 +42,7 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
         if (RestoreContext.Conf.CommandConf.IsReservedName(varName) || varName.EndsWith("_RESOURCE_GLOBAL")) {
             auto& vars = parentVars.GetVars();
             TVars commandInfoVars(&vars);
-            TCommandInfo commandInfo(&RestoreContext.Conf, &RestoreContext.Graph, nullptr);
+            TCommandInfo commandInfo(RestoreContext.Conf, &RestoreContext.Graph, nullptr);
             TUniqVector<TNodeId> lateOuts;
             MineVariables(RestoreContext.Conf, dep.To(), commandInfo.ToolPaths, commandInfo.ResultPaths, commandInfoVars, lateOuts, RestoreContext.Modules);
             TString objd = commandInfo.SubstMacro(nullptr, depName, ESM_DoSubst, commandInfoVars, ECF_Unset, true);

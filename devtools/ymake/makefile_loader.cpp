@@ -358,7 +358,7 @@ bool TDirParser::MessageStatement(const TStringBuf& name, const TVector<TStringB
             margs.erase(margs.begin());
         }
 
-        TString msg = TCommandInfo(&conf, nullptr, nullptr).SubstMacroDeeply(nullptr, JoinStrings(margs.begin(), margs.end(), " "), vars, false);
+        TString msg = TCommandInfo(conf, nullptr, nullptr).SubstMacroDeeply(nullptr, JoinStrings(margs.begin(), margs.end(), " "), vars, false);
         if (fatal) {
             YConfErr(UserErr) << msg << Endl;
         } else {

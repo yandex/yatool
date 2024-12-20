@@ -104,7 +104,7 @@ namespace {
     }
 
     TString EvalVariable(TStringBuf name, const TVars& vars, const TBuildConfiguration& conf) {
-        return TCommandInfo(&conf, nullptr, nullptr).SubstVarDeeply(name, vars);
+        return TCommandInfo(conf, nullptr, nullptr).SubstVarDeeply(name, vars);
     }
 
     class TProvidesChecker {

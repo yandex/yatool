@@ -121,14 +121,6 @@ namespace {
 
     const auto ConstrYDirNoDiag = [](NPath::EDirConstructIssue, const TStringBuf&) {};
 
-    TString GetToolValue(const TMacroData& macroData, const TVars& vars) {
-        Y_ASSERT(macroData.Flags.Get(EMF_Tool));
-        if (macroData.RawString) {
-            return ToString(macroData.Name);
-        }
-        return TCommandInfo(nullptr, nullptr, nullptr).SubstVarDeeply(macroData.Name, vars);
-    }
-
     TString RemoveMod(EModifierFlag flag, TStringBuf expr) {
         if (!expr.starts_with("${") || !expr.ends_with('}')) {
             return TString{expr};
@@ -198,11 +190,19 @@ bool IsInternalReservedVar(const TStringBuf& cur) {
                         "ALL_SRCS");
 }
 
-TCommandInfo::TCommandInfo(const TBuildConfiguration* conf, TDepGraph* graph, TUpdIter* updIter, TModule* module)
-    : Conf(conf)
+TCommandInfo::TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module)
+    : Conf(&conf)
     , Graph(graph)
     , UpdIter(updIter)
     , Module(module)
+{
+}
+
+TCommandInfo::TCommandInfo()
+    : Conf(nullptr)
+    , Graph(nullptr)
+    , UpdIter(nullptr)
+    , Module(nullptr)
 {
 }
 
@@ -1466,6 +1466,14 @@ bool TCommandInfo::IsGlobalReservedVar(const TStringBuf& cur) const {
         EqualToOneOf(cur, "MANAGED_PEERS_CLOSURE"sv, "MANAGED_PEERS"sv, "APPLIED_EXCLUDES"sv);
 }
 
+TString TCommandInfo::GetToolValue(const TMacroData& macroData, const TVars& vars) {
+    Y_ASSERT(macroData.Flags.Get(EMF_Tool));
+    if (macroData.RawString) {
+        return ToString(macroData.Name);
+    }
+    return SubstVarDeeply(macroData.Name, vars);
+}
+
 const TYVar* TCommandInfo::GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroName, const TStringBuf& args, const TVars& vars) {
     const TYVar* specMacroVar = nullptr;
     const auto it = Conf->BlockData.find(genericMacroName);
@@ -1479,7 +1487,7 @@ const TYVar* TCommandInfo::GetSpecMacroVar(const TYVar* origin, const TStringBuf
             // 1) try to compute the actual args for this macro call
             // 2) try to find corresponding specialization of macro by the first actual arguments (temporary
             //    restriction is to take into account only the first actaul argument)
-            auto substArgs = TCommandInfo(Conf, Graph, UpdIter).SubstMacroDeeply(origin, args, vars);
+            auto substArgs = SubstMacroDeeply(origin, args, vars);
             TVector<TStringBuf> actualArgs;
             if (!SplitArgs(substArgs, actualArgs)) {
                 ythrow yexception() << "Expected argument list in () braces, but got [" << args << "]";
@@ -1888,9 +1896,8 @@ void TCommandInfo::SubstData(
                 auto& cmdSrc = *CommandSource;
                 auto& conf = Graph->Names().CommandConf;
                 auto& expr = *cmdSrc.Get(nextsubst.Name, &conf);
-                auto dummyCmdInfo = TCommandInfo(nullptr, nullptr, nullptr);
                 auto argses = TCommands::SimpleCommandSequenceWriter()
-                    .Write(cmdSrc, expr, vars, {}, dummyCmdInfo, &conf)
+                    .Write(cmdSrc, expr, vars, {}, *this, &conf)
                     .Extract();
                 TVector<TString> cmds;
                 cmds.reserve(argses.size());
@@ -1926,12 +1933,10 @@ void TCommandInfo::SubstData(
         }
         if (nextsubst.IsPathResolved) {
             if (macro.Flags.Get(EMF_PrnRootRel)) { // for both coord and non-coord
-                nextsubst.Name.assign(NPath::CutType(GlobalConf()->CanonPath(nextsubst.Name)));
+                nextsubst.Name.assign(NPath::CutType(Conf->CanonPath(nextsubst.Name)));
             }
             if (macro.Flags.Get(EMF_PrnOnlyRoot)) {
-                TBuildConfiguration* conf = GlobalConf();
-
-                nextsubst.Name.assign(conf->RealPathRoot(conf->CanonPath(nextsubst.Name)).c_str());
+                nextsubst.Name.assign(Conf->RealPathRoot(Conf->CanonPath(nextsubst.Name)).c_str());
             }
             if (macro.Flags.Get(EMF_WndBackSl)) {
                 SubstGlobal(nextsubst.Name, NPath::PATH_SEP, TPathSplitTraitsWindows::MainPathSep);
