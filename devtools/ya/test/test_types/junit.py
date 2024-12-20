@@ -21,6 +21,7 @@ import devtools.ya.test.const as test_const
 import jbuild.gen.makelist_parser2 as mp2
 
 import yalibrary.graph.base as graph_base
+import yalibrary.graph.commands as graph_commands
 import yalibrary.graph.const as graph_consts
 
 logger = logging.getLogger(__name__)
@@ -186,25 +187,18 @@ class JavaTestSuite(test_types.AbstractTestSuite):
     def get_list_cmd(self, arc_root, build_root, opts):
         assert self.initialized
 
-        return commands.run_test(
-            self.classpath_file,
-            self.tests_jar,
+        return self._make_run_test_cmd(
             arc_root,
             self.jdk_resource,
-            self.jacoco_agent_resource,
             build_root=build_root,
             output=self.test_list_output_path,
             filters=opts.tests_filters + self._additional_filters,
-            modulo=str(self._modulo),
-            modulo_i=str(self._modulo_index),
             fork_subtests=self.get_fork_mode() == 'subtests',
             list_tests=True,
-            libpath=self.libpath,
             props=self.get_cmd_props(opts),
             jvm_args=self.get_cmd_jvm_args(opts),
             coverage=opts.java_coverage,
             junit_args=opts.junit_args,
-            cmd_cp_type=self.classpath_cmd_type.lower(),
         ).cmd
 
     def get_list_cmd_inputs(self, opts):
@@ -253,23 +247,17 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         else:
             tests_tmp_dir = os.path.join(suite_work_dir, 'tests_tmp_dir')
 
-        return commands.run_test(
-            self.classpath_file,
-            self.tests_jar,
+        return self._make_run_test_cmd(
             arc_root,
             self.jdk_for_tests_resource,
-            self.jacoco_agent_resource,
             build_root=build_root,
             sandbox_resources_root=suite_work_dir,
             test_outputs_root=test_outputs_root,
             output=trace_file_path,
             filters=test_params.tests_filters + self._additional_filters,
-            modulo=str(self._modulo),
-            modulo_i=str(self._modulo_index),
             fork_subtests=self.get_fork_mode() == 'subtests',
             runner_log_path=runner_log_file_path,
             tests_tmp_dir=tests_tmp_dir,
-            libpath=self.libpath,
             allure=getattr(test_params, 'allure_report', False),
             props=self.get_cmd_props(test_params),
             jvm_args=self.get_cmd_jvm_args(test_params),
@@ -278,7 +266,6 @@ class JavaTestSuite(test_types.AbstractTestSuite):
             suite_work_dir=suite_work_dir,
             params=getattr(test_params, "test_params"),
             ytrace_file=trace_file_path,
-            cmd_cp_type=self.classpath_cmd_type.lower(),
         ).cmd
 
     def binary_path(self, root):
@@ -323,6 +310,133 @@ class JavaTestSuite(test_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
         return ["SIGUSR1"]
+
+    def _make_run_test_cmd(
+        self,
+        source_root,
+        jdk_resource,
+        build_root=None,
+        sandbox_resources_root=None,
+        test_outputs_root=None,
+        output=None,
+        filters=None,
+        fork_subtests=False,
+        list_tests=False,
+        runner_log_path=None,
+        tests_tmp_dir=None,
+        allure=False,
+        props=None,
+        jvm_args=None,
+        cwd=None,
+        coverage=False,
+        suite_work_dir=None,
+        params=None,
+        junit_args=None,
+        ytrace_file=None,
+    ):
+        properties = []
+
+        if allure:
+            allure_dir = os.path.join(suite_work_dir or os.curdir, "allure")
+            properties.append('-Dallure.results.directory=' + allure_dir)
+
+        if tests_tmp_dir:
+            properties.append('-Djava.io.tmpdir=' + tests_tmp_dir)
+
+        if self.libpath:
+            properties.append('-Djava.library.path=' + ':'.join(self.libpath))
+            properties.append('-Djna.library.path=' + ':'.join(self.libpath))
+
+        if not jvm_args:
+            jvm_args = []
+
+        if not coverage or not suite_work_dir:
+            coverage = []
+        else:
+            coverage = [
+                '-javaagent:{}=output=file,destfile={}'.format(
+                    commands.BuildTools.jacoco_agent_tool(self.jacoco_agent_resource),
+                    os.path.join(suite_work_dir, 'java.coverage', 'report.exec'),
+                )
+            ]
+
+        cmd = (
+            self.python
+            + [graph_consts.SOURCE_ROOT + '/build/scripts/run_junit.py']
+            + self.python
+            + [graph_consts.SOURCE_ROOT + '/build/scripts/unpacking_jtest_runner.py']
+        )
+        if self.classpath_cmd_type:
+            cmd += ['--classpath-option-type', self.classpath_cmd_type.lower()]
+
+        if ytrace_file:
+            cmd += ['--trace-file', ytrace_file]
+
+        cmd += (
+            [
+                '--jar-binary',
+                commands.BuildTools.jdk_tool('jar', jdk_path=jdk_resource),
+                '--tests-jar-path',
+                self.tests_jar,
+                commands.BuildTools.jdk_tool('java', jdk_path=jdk_resource),
+            ]
+            + coverage
+            + properties
+            + jvm_args
+            + [
+                '-classpath',
+                self.classpath_file if self.classpath_file.endswith('.jar') else '@' + self.classpath_file,
+                'ru.yandex.devtools.test.Runner',
+                '--tests-jar',
+                self.tests_jar,
+                '--source-root',
+                source_root,
+                '--modulo',
+                str(self._modulo),
+                '--modulo-index',
+                str(self._modulo_index),
+            ]
+        )
+
+        if build_root:
+            cmd.extend(['--build-root', build_root])
+
+        if sandbox_resources_root:
+            cmd.extend(['--sandbox-resources-root', sandbox_resources_root])
+
+        if test_outputs_root:
+            cmd.extend(['--test-outputs-root', test_outputs_root])
+
+        if output:
+            cmd.extend(['--output', output])
+
+        if filters:
+            for f in filters:
+                cmd.extend(['--filter', f])
+
+        if fork_subtests:
+            cmd.append('--fork-subtests')
+
+        if list_tests:
+            cmd.append('--list')
+
+        if runner_log_path:
+            cmd.extend(['--runner-log-path', runner_log_path])
+
+        if allure:
+            cmd.append('--allure')
+
+        if props:
+            cmd.extend(['--properties', props])
+
+        if params:
+            for key, value in six.iteritems(params):
+                cmd += ["--test-param", "{}={}".format(key, value)]
+
+        if junit_args:
+            cmd += junit_args
+
+        return graph_commands.Cmd(cmd, cwd, [])
 
 
 class Junit5TestSuite(JavaTestSuite):
