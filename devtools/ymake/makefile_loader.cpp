@@ -147,7 +147,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
             if (Module->ProcessGlobStatement(name, args, Vars(), OrigVars(), {GetStatementRow(name), GetStatementColumn(name)})) {
                 // error message for empty args for *GLOB macros are reported inside ProcessGlobStatement
                 if (!args.empty()) {
-                    GlobalConf()->Conditions.RecalcVars(TString::Join("$", args.front()), Vars(), OrigVars());
+                    Conf.Conditions.RecalcVars(TString::Join("$", args.front()), Vars(), OrigVars());
                 }
                 return true;
             }
