@@ -6,12 +6,7 @@ import yalibrary.graph.commands as graph_commands
 
 class BuildTools(object):  # TODO: use something from yalibrary.tools to detect executable file path
     PYTHON_PATTERN = 'PYTHON'
-    MAVEN_ARTIFACT_UPLOADER = 'MAVEN_ARTIFACT_UPLOADER'
     JSTYLE_RUNNER_PATTERN = 'JSTYLERUNNER'
-
-    @staticmethod
-    def maven_artifact_uploader():
-        return os.path.join('$({})'.format(BuildTools.MAVEN_ARTIFACT_UPLOADER), 'uploader')
 
     @staticmethod
     def jdk_tool(name, jdk_path):
@@ -28,25 +23,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
             if jacoco_agent_resource.endswith('.jar')
             else os.path.join(jacoco_agent_resource, 'devtools-jacoco-agent.jar')
         )
-
-
-def prepare_build_file(files, srcdirs, out, cwd=None, splitter=' '):
-    code = (
-        "import sys\n"
-        "import os\n"
-        "o = sys.argv[1]\n"
-        "n = int(sys.argv[2])\n"
-        "fs = sys.argv[3: 3 + n]\n"
-        "ss = sys.argv[3 + n: 3 + 2 * n]\n"
-        "ps = []\n"
-        "for f, s in zip(fs, ss):\n"
-        "    ps.extend([os.path.normpath(os.path.join(s, x)) for x in open(f).read().strip().split()])\n"
-        "open(o, 'w').write('{}'.join(ps))\n".format(splitter)
-    )
-
-    cmd = [BuildTools.python(), '-c', code, out, str(len(files))] + files + srcdirs
-
-    return graph_commands.Cmd(cmd, cwd, [])
 
 
 def move_if_exists(src, dest, cwd=None):
@@ -101,23 +77,6 @@ def mkdir(path, cwd=None):
     )
 
 
-def cp(source_path, dest_path, cwd=None):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'),
-        'copy',
-        source_path,
-        dest_path,
-    ]
-    return graph_commands.Cmd(
-        cmd,
-        cwd,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'),
-        ],
-    )
-
-
 def mv(s, d, cwd=None):
     cmd = [BuildTools.python(), os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'), 'rename', s, d]
     return graph_commands.Cmd(
@@ -136,34 +95,6 @@ def rm(path, cwd=None):
         cwd,
         [
             os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'),
-        ],
-    )
-
-
-def copy_all_files(source_path, dest_path, cwd=None):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'),
-        'copy_all_files',
-        source_path,
-        dest_path,
-    ]
-    return graph_commands.Cmd(
-        cmd,
-        cwd,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'fs_tools.py'),
-        ],
-    )
-
-
-def touch(path, cwd=None):
-    cmd = [BuildTools.python(), os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'touch.py'), path]
-    return graph_commands.Cmd(
-        cmd,
-        cwd,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'touch.py'),
         ],
     )
 
