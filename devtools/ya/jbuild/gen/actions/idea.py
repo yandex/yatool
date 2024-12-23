@@ -979,7 +979,7 @@ def create_directory_based(by_path, project_root, ctx):
         et.SubElement(modules_item, 'module', attrib=module)
     libraries_dir = os.path.join(project_root, '.idea', 'libraries')
     if not libs and os.path.isdir(libraries_dir):
-        os.removedirs(libraries_dir)
+        fs.ensure_removed(libraries_dir)
     elif libs:
         if not os.path.exists(libraries_dir):
             os.makedirs(libraries_dir)
