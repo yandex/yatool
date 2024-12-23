@@ -229,6 +229,9 @@ void TYMake::ReportForeignPlatformEvents() {
 
 void TYMake::ReportConfigureEvents() {
     NYMake::TTraceStage scopeTracer{"Report Configure Events"};
+
+    ConfMsgManager()->FlushTopLevel();
+
     TConfigureEventsReporter errorReporter(Names, Modules, Conf.RenderSemantics);
     IterateAll(Graph, StartTargets, errorReporter, [](const TTarget& t) -> bool {
         return t.IsModuleTarget;
@@ -257,7 +260,8 @@ void FlushMakeFileNode(TConstDepNodeRef makeFileNode, const TSymbols& names) {
 
 void TYMake::ReportConfigureEventsUsingReachableNodes() {
     NYMake::TTraceStage scopeTracer{"Report Configure Events"};
-    ConfMsgManager()->DisableDelay();
+
+    ConfMsgManager()->FlushTopLevel();
 
     for (const auto& node : Graph.Nodes()) {
         if (!node->State.GetReachable() ) {

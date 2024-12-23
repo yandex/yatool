@@ -65,9 +65,7 @@ public:
         : Names(names)
         , Modules(modules)
         , RenderSemantics(renderSemantics)
-    {
-        ConfMsgManager()->DisableDelay();
-    }
+    {}
 
     bool Enter(TState& state);
     bool AcceptDep(TState& state);

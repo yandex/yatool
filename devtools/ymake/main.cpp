@@ -796,6 +796,8 @@ int main_real(TBuildConfiguration& conf) {
 
     // This should be called after Load
     yMake->PostInit();
+    // This should be called after cache loading because all errors including top level errors restore from cache
+    ConfMsgManager()->EnableDelay();
 
     Y_DEFER {
         NStats::StackDepthStats.Report();
@@ -826,6 +828,9 @@ int main_real(TBuildConfiguration& conf) {
             // FIXME: Currently we are implementing plan "B" for Grand Bypass,
             // that is we do not want to save caches when Grand Bypass occurs
             conf.DoNotWriteAllCaches();
+        } else {
+            // we can use top level messages from cache only when Grand Bypass occurs
+            ConfMsgManager()->ClearTopLevelMessages();
         }
 
         TMaybe<EBuildResult> configureBuildRes;
@@ -884,6 +889,9 @@ int main_real(TBuildConfiguration& conf) {
         yMake->CheckIsolatedProjects();
     }
 
+    // after reporting configuration errors from the cache, all other errors must be reported immediately,
+    // so we disable the delay here
+    ConfMsgManager()->DisableDelay();
     if (conf.ShouldUseReachabilityToReportConfErrors()) {
         yMake->ReportConfigureEventsUsingReachableNodes();
     } else {

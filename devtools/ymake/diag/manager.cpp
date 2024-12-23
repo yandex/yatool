@@ -17,7 +17,7 @@ TStringStream& TConfMsgManager::SaveConfigureMessage(EConfMsgType type, TStringB
 }
 
 void TConfMsgManager::ReportConfigureEvent(ETraceEvent what, const TString& event) {
-    if (Delayed && Diag()->Where.back().first != 0) {
+    if (Delayed) {
         SaveEvent(what, event);
     } else if (NYMake::TraceEnabled(what)) {
         NYMake::Trace(event);
@@ -25,7 +25,7 @@ void TConfMsgManager::ReportConfigureEvent(ETraceEvent what, const TString& even
 }
 
 TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStringBuf var, size_t row, size_t column) {
-    if (Delayed && Diag()->Where.back().first != 0) {
+    if (Delayed) {
         return TStreamMessage(&SaveConfigureMessage(type, var, row, column, Diag()->Persistency), [](IOutputStream*) {});
     } else {
         if (type == EConfMsgType::Error) {
@@ -36,6 +36,7 @@ TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStrin
 }
 
 void TConfMsgManager::AddDupSrcLink(ui32 id, ui32 modid, bool force) {
+    Y_ASSERT(modid != 0);
     if (force) {
         DupSrcMap[id].insert(modid);
     } else if (auto iter = DupSrcMap.find(id); iter != DupSrcMap.end()) {
@@ -87,6 +88,11 @@ void TConfMsgManager::Flush(ui32 owner) {
     FlushEvents(owner);
 }
 
+void TConfMsgManager::FlushTopLevel() const {
+    FlushConfigureMessages(0);
+    FlushEvents(0);
+}
+
 void TConfMsgManager::FlushConfigureMessages(ui32 owner) const {
     if (Messages.contains(owner)) {
         for (const auto& msg : Messages.at(owner)) {
@@ -116,6 +122,11 @@ void TConfMsgManager::DisableDelay() {
     Y_ASSERT(Delayed);
     Delayed = false;
     TracesDeduplicator.Clear();
+}
+
+void TConfMsgManager::EnableDelay() {
+    Y_ASSERT(!Delayed);
+    Delayed = true;
 }
 
 void TConfMsgManager::Erase(ui32 owner) {
@@ -235,4 +246,9 @@ void TConfMsgManager::Load(IInputStream* input, THashMap<ui32, Container>& confV
 
 TConfMsgManager* ConfMsgManager() {
     return Singleton<TConfMsgManager>();
+}
+
+void TConfMsgManager::ClearTopLevelMessages() {
+    Messages[0].clear();
+    Events[0].clear();
 }

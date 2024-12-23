@@ -79,13 +79,14 @@ public:
     template<class T>
     using TConfValuesMap = THashMap<ui32, TVector<T>>;
 
-    TConfMsgManager(bool delayed = true)
+    TConfMsgManager(bool delayed = false)
         : Delayed(delayed)
     {
     }
 
     void Flush() const;
     void Flush(ui32 owner);
+    void FlushTopLevel() const;
 
     void ReportConfigureEvent(ETraceEvent what, const TString& event);
     TStreamMessage ReportConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0);
@@ -94,6 +95,7 @@ public:
     void ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32)> toString);
 
     void DisableDelay();
+    void EnableDelay();
     bool IsDelayed() const;
 
     void Erase(ui32 owner);
@@ -102,6 +104,8 @@ public:
 
     void Load(const TBlob& blob);
     void Save(TMultiBlobBuilder& builder);
+
+    void ClearTopLevelMessages();
 
 private:
     void SaveEvent(ETraceEvent what, const TString& event);
