@@ -12,7 +12,6 @@ import jbuild.commands as commands
 from library.python import func
 
 import exts.func
-from jbuild.gen import consts
 from jbuild.gen import base
 from devtools.ya.test.common import ytest_common_tools as yct
 from devtools.ya.test.common import ytest_common_tools as yc
@@ -36,8 +35,6 @@ def strip_root(s):
 
 class JavaTestSuite(test_types.AbstractTestSuite):
     test_list_output_path = 'junit_tests_list.txt'
-
-    runner_path = graph_base.hacked_normpath(consts.T_RUNNER_PATH)
 
     def __init__(self, meta, target_platform_descriptor=None, multi_target_platform_run=False):
         super(JavaTestSuite, self).__init__(
@@ -440,4 +437,4 @@ class JavaTestSuite(test_types.AbstractTestSuite):
 
 
 class Junit5TestSuite(JavaTestSuite):
-    runner_path = graph_base.hacked_normpath(consts.T_JUNIT5_RUNNER_PATH)
+    pass

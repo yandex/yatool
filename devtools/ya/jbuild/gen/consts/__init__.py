@@ -1,5 +1,3 @@
-import os
-
 import devtools.ya.test.const as tconst
 
 # Roots
@@ -42,9 +40,6 @@ T_PROPS_FILE = 'FILE'
 T_TEST_SIZE = 'SIZE'
 
 T_DEFAULT_TIMEOUT = 60
-T_RUNNER_PATH = os.path.join('devtools', 'junit-runner')
-
-T_JUNIT5_RUNNER_PATH = os.path.join('devtools', 'junit5-runner')
 
 MANAGED_PEERS = 'MANAGED_PEERS'
 MANAGED_PEERS_CLOSURE = 'MANAGED_PEERS_CLOSURE'
