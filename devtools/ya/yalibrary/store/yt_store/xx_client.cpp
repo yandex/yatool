@@ -192,12 +192,15 @@ struct YtStoreGetter {
 
 void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientResponse& rsp) {
     struct archive* a = archive_read_new();
+    struct archive* writer = archive_write_disk_new();
     struct archive_entry* entry = nullptr;
     const void* buf;
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
+    archive_write_disk_set_options(writer, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM);
     Y_DEFER {
         archive_read_free(a);
+        archive_write_free(writer);
     };
     try {
         YtStoreGetter getter(*this, req);
@@ -206,23 +209,27 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
             ythrow yexception() << "Failed to open tar: " << archive_error_string(a);
         }
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-            TFsPath dest_path = root_dir / archive_entry_pathname(entry);
             size_t size;
             la_int64_t offset;
-            dest_path.Parent().MkDirs();
-            TFile file(dest_path.c_str(), WrOnly | CreateAlways);
             int r;
-            while ((r = archive_read_data_block(a, &buf, &size, &offset)) == ARCHIVE_OK) {
-                file.Seek(offset, SeekDir::sSet);
-                file.Write(buf, size);
+            archive_entry_set_pathname(entry, (root_dir / archive_entry_pathname(entry)).c_str());
+            if(const char *src = archive_entry_hardlink(entry); src) {
+                archive_entry_set_hardlink(entry, (root_dir / src).c_str());
             }
-            file.Close();
+            if (archive_write_header(writer, entry) != ARCHIVE_OK) {
+                ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
+            }
+            while ((r = archive_read_data_block(a, &buf, &size, &offset)) == ARCHIVE_OK) {
+                if (archive_write_data_block(writer, buf, size, offset) != ARCHIVE_OK) {
+                    ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
+                }
+            }
             if (r != ARCHIVE_EOF) {
                 ythrow yexception() << "Failed to read archive: " << archive_error_string(a);
             }
-#ifndef _win_
-            ::chmod(dest_path.c_str(), archive_entry_mode(entry) & 0xFFF);
-#endif
+            if (archive_write_finish_entry(writer) != ARCHIVE_OK) {
+                ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
+            }
         }
         // Ensure we readed all from cache (and checked hash thus)
         // Possibly will never happen IRL but useful for testing
