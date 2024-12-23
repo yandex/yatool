@@ -114,16 +114,6 @@ def relativize(path, root=(consts.BUILD_ROOT, consts.SOURCE_ROOT)):
     return path
 
 
-def resolve_java_srcs(
-    srcdir, include_patterns, exclude_patterns=None, all_resources=False, resolve_kotlin=False, resolve_groovy=False
-):
-    import jbuild.resolve_java_srcs as resolver
-
-    return resolver.resolve_java_srcs(
-        srcdir, include_patterns, exclude_patterns or [], all_resources, resolve_kotlin, resolve_groovy
-    )
-
-
 def resolve_possible_srcdirs(arc_root, targets):
     return collections.defaultdict(lambda: collections.defaultdict(lambda: ([], [], [], [])))
 

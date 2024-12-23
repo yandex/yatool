@@ -12,7 +12,6 @@ PY_SRCS(
     maven/pom_parser.py
     maven/version_filter.py
     maven/maven_import.py
-    resolve_java_srcs.py
 )
 
 PEERDIR(

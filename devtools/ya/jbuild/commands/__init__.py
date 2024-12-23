@@ -30,63 +30,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
         )
 
 
-def resolve_java_srcs(
-    dir,
-    sources_list,
-    kotlins_list,
-    groovy_list,
-    others_list,
-    include_patterns,
-    exclude_patterns=None,
-    cwd=None,
-    resolve_kotlin=False,
-    resolve_groovy=False,
-):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'devtools', 'ya', 'jbuild', 'resolve_java_srcs.py'),
-        '-d',
-        dir,
-        '-s',
-        sources_list,
-        '-k',
-        kotlins_list,
-        '-g',
-        groovy_list,
-        '-r',
-        others_list,
-    ]
-    if resolve_kotlin:
-        cmd += ['--resolve-kotlin']
-    if resolve_groovy:
-        cmd += ['--resolve-groovy']
-
-    cmd += ['--include-patterns'] + include_patterns
-
-    if exclude_patterns:
-        cmd += ['--exclude-patterns'] + exclude_patterns
-
-    return graph_commands.Cmd(
-        cmd,
-        cwd,
-        [
-            os.path.join(consts.SOURCE_ROOT, 'devtools', 'ya', 'jbuild', 'resolve_java_srcs.py'),
-        ],
-    )
-
-
-def collect_java_srcs(root, files, dest, cwd=None):
-    cmd = [
-        BuildTools.python(),
-        os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'collect_java_srcs.py'),
-        consts.BUILD_ROOT,
-        root,
-        dest,
-    ] + files
-
-    return graph_commands.Cmd(cmd, cwd, [os.path.join(consts.SOURCE_ROOT, 'build', 'scripts', 'collect_java_srcs.py')])
-
-
 def prepare_build_file(files, srcdirs, out, cwd=None, splitter=' '):
     code = (
         "import sys\n"
