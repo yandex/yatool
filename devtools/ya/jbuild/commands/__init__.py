@@ -6,7 +6,12 @@ import yalibrary.graph.commands as graph_commands
 
 class BuildTools(object):  # TODO: use something from yalibrary.tools to detect executable file path
     PYTHON_PATTERN = 'PYTHON'
+    MAVEN_ARTIFACT_UPLOADER = 'MAVEN_ARTIFACT_UPLOADER'
     JSTYLE_RUNNER_PATTERN = 'JSTYLERUNNER'
+
+    @staticmethod
+    def maven_artifact_uploader():
+        return os.path.join('$({})'.format(BuildTools.MAVEN_ARTIFACT_UPLOADER), 'uploader')
 
     @staticmethod
     def jdk_tool(name, jdk_path):
