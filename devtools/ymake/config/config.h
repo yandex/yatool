@@ -324,7 +324,8 @@ struct TYmakeConfig {
 
     TVector<TImportedFileDescription> ImportedFiles;
 
-    bool RenderSemantics = false;
+    bool RenderSemantics = false; // Enable render semantics instead commands
+    bool ForeignOnNoSem = false; // On NoSem error make TForeignPlatformTarget event instead TConfigureError
 
     void ClearYmakeConfig();
 

@@ -11,6 +11,8 @@
 class TModule;
 class TModules;
 
+void IDEDependEvent(const TModule& mod);
+
 struct TForeignPlatformEventsReporterEntryStats: public TEntryStats {
     bool ToolReported = false;
 

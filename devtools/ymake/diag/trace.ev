@@ -117,6 +117,7 @@ message TForeignPlatformTarget {
         TOOL=0;
         PIC=1;
         NOPIC=2;
+        IDE_DEPEND=3;
     }
     enum EKind {
         POSSIBLE=0;

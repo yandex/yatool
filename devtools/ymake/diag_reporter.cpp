@@ -7,14 +7,34 @@
 
 namespace {
 
-    NEvent::TForeignPlatformTarget RequiredForeignPlatformEvent(const TModule& mod, NEvent::TForeignPlatformTarget::EPlatform platform) {
+    NEvent::TForeignPlatformTarget MakeForeignPlatformTargetEvent(::NEvent::TForeignPlatformTarget::EPlatform platform, NEvent::TForeignPlatformTarget::EKind kind, const TModule& mod) {
         NEvent::TForeignPlatformTarget res;
         res.SetPlatform(platform);
-        res.SetReachable(::NEvent::TForeignPlatformTarget::REQUIRED);
+        res.SetReachable(kind);
         res.SetDir(TString{mod.GetDir().CutType()});
         res.SetModuleTag(TString{mod.GetTag()});
         return res;
     }
+
+    NEvent::TForeignPlatformTarget RequiredToolEvent(const TModule& mod) {
+        return MakeForeignPlatformTargetEvent(::NEvent::TForeignPlatformTarget::TOOL, ::NEvent::TForeignPlatformTarget::REQUIRED, mod);
+    }
+
+    NEvent::TForeignPlatformTarget RequiredPicEvent(const TModule& mod) {
+        return MakeForeignPlatformTargetEvent(::NEvent::TForeignPlatformTarget::PIC, ::NEvent::TForeignPlatformTarget::REQUIRED, mod);
+    }
+
+    NEvent::TForeignPlatformTarget RequiredNoPicEvent(const TModule& mod) {
+        return MakeForeignPlatformTargetEvent(::NEvent::TForeignPlatformTarget::NOPIC, ::NEvent::TForeignPlatformTarget::REQUIRED, mod);
+    }
+
+    NEvent::TForeignPlatformTarget RequiredIDEDependEvent(const TModule& mod) {
+        return MakeForeignPlatformTargetEvent(::NEvent::TForeignPlatformTarget::IDE_DEPEND, ::NEvent::TForeignPlatformTarget::REQUIRED, mod);
+    }
+}
+
+void IDEDependEvent(const TModule& mod) {
+    FORCE_TRACE(T, RequiredIDEDependEvent(mod));
 }
 
 bool TForeignPlatformEventsReporter::Enter(TState& state) {
@@ -25,9 +45,9 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
         auto module = Modules.Get(node->ElemId);
         if (module->Transition != TransitionSource) {
             if (module->Transition == ETransition::Pic) {
-                FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::PIC));
+                FORCE_TRACE(T, RequiredPicEvent(*Modules.Get(node->ElemId)));
             } else if (module->Transition == ETransition::NoPic) {
-                FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::NOPIC));
+                FORCE_TRACE(T, RequiredNoPicEvent(*Modules.Get(node->ElemId)));
             }
         }
     }
@@ -53,7 +73,7 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     // We should report tool even if we visited node by non-tool edge first
     if (!CurEnt->ToolReported && state.HasIncomingDep() && IsModule(state.Top()) && IsDirectToolDep(state.IncomingDep())) {
         if (!TDepGraph::Graph(node).Names().CommandConf.GetById(TVersionedCmdId(state.IncomingDep().From()->ElemId).CmdId()).KeepTargetPlatform) {
-            FORCE_TRACE(T, RequiredForeignPlatformEvent(*Modules.Get(node->ElemId), NEvent::TForeignPlatformTarget::TOOL));
+            FORCE_TRACE(T, RequiredToolEvent(*Modules.Get(node->ElemId)));
             CurEnt->ToolReported = true;
         }
     }
