@@ -131,8 +131,6 @@ def _build_params():
     return _configure_params(buildable=True, check=False) + [
         core.yarg.Param('clear_build', default_value=False),
         core.yarg.Param('no_caches_on_retry', default_value=False),
-        core.yarg.Param('dump_sem_graph', default_value=None),
-        core.yarg.Param('dump_raw_graph', default_value=None),
     ]
 
 
@@ -147,7 +145,7 @@ def _gen_graph_params():
             core.yarg.Param('find_path_to', default_value=None),
             core.yarg.Param('managed_dep_tree', default_value=None),
             core.yarg.Param('classpaths', default_value=None),
-            core.yarg.Param('enabled_events', default_value='A'),
+            core.yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
             core.yarg.Param('yndex_file', default_value=None),
             core.yarg.Param('patch_path', default_value=None),
             core.yarg.Param('cache_info_file', default_value=None),
@@ -167,6 +165,15 @@ def _gen_graph_params():
     )
 
 
+def _sem_graph_params():
+    return _build_params() + [
+        core.yarg.Param('dump_sem_graph', default_value=None),
+        core.yarg.Param('dump_raw_graph', default_value=None),
+        core.yarg.Param('foreign_on_nosem', default_value=None),
+        core.yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
+    ]
+
+
 def _ymake_build(**kwargs):
     logger.debug('Run build with %s', kwargs)
     return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
@@ -174,7 +181,7 @@ def _ymake_build(**kwargs):
 
 def ymake_sem_graph(**kwargs):
     logger.debug('Run sem-graph with %s', kwargs)
-    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
+    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_sem_graph_params()))
 
 
 def ymake_dump(**kwargs):
@@ -325,6 +332,10 @@ def _cons_ymake_args(**kwargs):
     dump_raw_graph = kwargs.pop('dump_raw_graph', None)
     if dump_raw_graph:
         ret += ['--xg', '--dump-file', dump_raw_graph]
+
+    foreign_on_nosem = kwargs.pop('foreign_on_nosem', None)
+    if foreign_on_nosem:
+        ret += ['--foreign-on-nosem']
 
     # GENGRAPH PARAMS
     # XXX

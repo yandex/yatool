@@ -262,6 +262,9 @@ class _JavaSemGraph(SemGraph):
     JDK_PATH_NOT_FOUND = 'NOT_FOUND'  # Magic const for not found JDK path
     BUILD_ROOT = '$B/'  # Build root in graph
 
+    _FOREIGN_PLATFORM_TARGET_TYPENAME = 'NEvent.TForeignPlatformTarget'
+    _FOREIGN_IDE_DEPEND_PLATFORM = 3
+
     def __init__(self, config: _JavaSemConfig):
         super().__init__(config, skip_invalid=True)
         self.logger = logging.getLogger(type(self).__name__)
@@ -273,16 +276,29 @@ class _JavaSemGraph(SemGraph):
         self.dep_paths: dict[int, Path] = {}
         self._cached_jdk_paths = {}
         self.jdk_paths: dict[int, str] = {}
+        self.foreign_targets: list[str] = []
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
+        foreign_targets = []
 
         def listener(event) -> None:
             if not isinstance(event, dict):
                 return
             if event.get('Type') == 'Error':
                 self.logger.error("%s", event)
-            # TODO Collect non-exported for build later
+            if (
+                event.get('_typename') == self._FOREIGN_PLATFORM_TARGET_TYPENAME
+                and event.get('Platform') == self._FOREIGN_IDE_DEPEND_PLATFORM
+            ):
+                foreign_targets.append(event['Dir'])
+
+        super().make(
+            **kwargs, ev_listener=listener  # , foreign_on_nosem=True - TODO enable after support option in ymake
+        )
+        if foreign_targets:
+            self.foreign_targets = list(set(foreign_targets))
+            self.logger.info("Foreign targets: %s", self.foreign_targets)
 
         super().make(**kwargs, ev_listener=listener, dump_raw_graph=self.config.ymake_root / "raw_graph")
         self._patch_graph()
@@ -644,7 +660,9 @@ class _Builder:
     def build(self) -> None:
         """Extract build targets from sem-graph and build they"""
         try:
-            build_rel_targets = self.sem_graph.get_run_java_program_rel_targets()
+            build_rel_targets = list(
+                set(self.sem_graph.foreign_targets + self.sem_graph.get_run_java_program_rel_targets())
+            )
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, is_contrib in rel_targets:
                 if self.config.in_rel_targets(rel_target):
