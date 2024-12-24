@@ -22,7 +22,7 @@ from devtools.ya.test.util import tools
 from devtools.ya.test.system import process
 
 from library.python import cores
-from library.python import reservoir_sampling
+from library.python import eq_interval_sampling
 
 from yalibrary import formatter
 from yalibrary import term
@@ -881,7 +881,7 @@ def limit_tests(container, limit):
     if len(tests) <= limit:
         return
 
-    samples = reservoir_sampling.reservoir_sampling(tests, nsamples=20)
+    samples = eq_interval_sampling.eq_interval_sampling(tests, nsamples=20)
 
     msg = (
         "[[bad]]The run contains [[imp]]{}[[bad]] test cases, which exceeds the allowed limit of [[imp]]{}.[[bad]]"
