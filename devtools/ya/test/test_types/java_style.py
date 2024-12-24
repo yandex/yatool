@@ -8,7 +8,6 @@ import devtools.ya.test.const
 import devtools.ya.test.system.process
 
 from jbuild.gen import base
-from jbuild import commands
 from devtools.ya.test import common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types.py_test import LintTestSuite
@@ -96,7 +95,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
             '--out-path',
             os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             '--java',
-            commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_resource),
+            test_tools.jdk_tool('java', jdk_path=self.jdk_resource),
             '--runner-lib-path',
             self.jstyle_runner_path,
             '--config-xml',

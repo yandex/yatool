@@ -21,14 +21,6 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
     def python():
         return os.path.join(os.path.join('$({})'.format(BuildTools.PYTHON_PATTERN), 'python'))
 
-    @staticmethod
-    def jacoco_agent_tool(jacoco_agent_resource):
-        return (
-            jacoco_agent_resource
-            if jacoco_agent_resource.endswith('.jar')
-            else os.path.join(jacoco_agent_resource, 'devtools-jacoco-agent.jar')
-        )
-
 
 def move_if_exists(src, dest, cwd=None):
     cmd = [

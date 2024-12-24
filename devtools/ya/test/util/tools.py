@@ -186,6 +186,18 @@ def get_wine32_path(global_resources):
     return '{}/bin/wine'.format(global_resources.get(const.WINE32_TOOL, '$({})'.format(const.WINE32_TOOL)))
 
 
+def jdk_tool(name, jdk_path):
+    return os.path.join(jdk_path, 'bin', name)
+
+
+def jacoco_agent_tool(jacoco_agent_resource):
+    return (
+        jacoco_agent_resource
+        if jacoco_agent_resource.endswith('.jar')
+        else os.path.join(jacoco_agent_resource, 'devtools-jacoco-agent.jar')
+    )
+
+
 def get_test_tool_cmd(opts, tool_name, global_resources, wrapper=False, run_on_target_platform=False, python=None):
     cmd = [
         get_test_tool_path(

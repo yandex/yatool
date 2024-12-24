@@ -149,8 +149,6 @@ def get_create_java_coverage_command(
     opts,
     jdk_resource,
 ):
-    import jbuild.commands
-
     cmd = test_common.get_python_cmd(opts=opts)
     cmd += [
         CREATE_COVERAGE_REPORT_SCRIPT,
@@ -159,7 +157,7 @@ def get_create_java_coverage_command(
         '--output',
         output_path,
         '--java',
-        jbuild.commands.BuildTools.jdk_tool('java', jdk_resource),
+        util_tools.jdk_tool('java', jdk_resource),
         '--jars-list',
         jars_file,
         '--runner-path',
@@ -172,7 +170,7 @@ def get_create_java_coverage_command(
     if raw_output:
         cmd += ['--raw-output']
     if agent_disposition:
-        cmd += ['--agent-disposition', jbuild.commands.BuildTools.jacoco_agent_tool(agent_disposition)]
+        cmd += ['--agent-disposition', util_tools.jacoco_agent_tool(agent_disposition)]
     if prefix_filter:
         cmd += ['--prefix-filter', prefix_filter]
     if exclude_regexp:

@@ -8,7 +8,6 @@ import base64
 import six
 
 import devtools.ya.test.test_types.common as test_types
-import jbuild.commands as commands
 from library.python import func
 
 import exts.func
@@ -17,6 +16,7 @@ from devtools.ya.test.common import ytest_common_tools as yct
 from devtools.ya.test.common import ytest_common_tools as yc
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const as test_const
+import devtools.ya.test.util.tools as test_tools
 import jbuild.gen.makelist_parser2 as mp2
 
 import yalibrary.graph.base as graph_base
@@ -86,7 +86,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
             for_test=True,
         )
         self.jacoco_agent_resource = base.resolve_jacoco_agent(self.global_resources, opts)
-        self.jvm_args.append('-DJAVA=' + commands.BuildTools.jdk_tool('java', jdk_path=self.jdk_for_tests_resource))
+        self.jvm_args.append('-DJAVA=' + test_tools.jdk_tool('java', jdk_path=self.jdk_for_tests_resource))
         self.python = test_common.get_python_cmd(opts=opts)
         self.initialized = True
 
@@ -352,7 +352,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         else:
             coverage = [
                 '-javaagent:{}=output=file,destfile={}'.format(
-                    commands.BuildTools.jacoco_agent_tool(self.jacoco_agent_resource),
+                    test_tools.jacoco_agent_tool(self.jacoco_agent_resource),
                     os.path.join(suite_work_dir, 'java.coverage', 'report.exec'),
                 )
             ]
@@ -372,10 +372,10 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         cmd += (
             [
                 '--jar-binary',
-                commands.BuildTools.jdk_tool('jar', jdk_path=jdk_resource),
+                test_tools.jdk_tool('jar', jdk_path=jdk_resource),
                 '--tests-jar-path',
                 self.tests_jar,
-                commands.BuildTools.jdk_tool('java', jdk_path=jdk_resource),
+                test_tools.jdk_tool('java', jdk_path=jdk_resource),
             ]
             + coverage
             + properties
