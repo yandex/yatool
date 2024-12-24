@@ -2,8 +2,6 @@ import functools
 import itertools
 import logging
 
-import six
-
 import os
 import sys
 import tempfile
@@ -29,7 +27,7 @@ def create_frepkage(build_context, graph, arc_root):
             {
                 'graph': graph,
                 # Strip irrelevant tests
-                'tests': {uid: data for uid, data in six.iteritems(build_context['tests']) if uid in result_uids},
+                'tests': {uid: data for uid, data in build_context['tests'].items() if uid in result_uids},
             }
         )
 
@@ -108,7 +106,7 @@ def create_frepkage(build_context, graph, arc_root):
         )
     )
     # Pack external inputs
-    for filename, arcname in sorted(six.iteritems(external_inputs)):
+    for filename, arcname in sorted(external_inputs.items()):
         if arcname:
             logger.warning('Adding external input to frepkage: %s', filename)
             paths_to_arch.append(

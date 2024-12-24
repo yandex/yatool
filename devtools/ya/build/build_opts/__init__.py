@@ -90,13 +90,10 @@ logger = logging.getLogger(__name__)
 
 BUILD_THREADS_DEFAULT = 1
 
-if six.PY3:
-    long = int
-
 
 def parse_timespan_arg(span):
     try:
-        return long(span)
+        return int(span)
     except ValueError:
         pass
 
@@ -105,7 +102,7 @@ def parse_timespan_arg(span):
 
 def parse_size_arg(size):
     try:
-        return long(size)
+        return int(size)
     except ValueError:
         pass
 
@@ -118,7 +115,7 @@ def make_opt_consumers(opt_name, help=None, arg_opts=None, env_opts=None, cfg_op
 
     def evaluate(opts):
         result = {}
-        for k, v in six.iteritems(opts):
+        for k, v in opts.items():
             if callable(v):
                 result[k] = v(opt_name)
             else:
@@ -672,11 +669,11 @@ class SandboxAuthOptions(AuthOptions):
     """ Simple wrapper of AuthOptions for backward compatibility """
 
     def __init__(self, ssh_key_option_name="--key", ssh_user_option_name="--user", visible=None):
-        super(SandboxAuthOptions, self).__init__(ssh_key_option_name=ssh_key_option_name, visible=visible)
+        super().__init__(ssh_key_option_name=ssh_key_option_name, visible=visible)
         self.ssh_user_option_name = ssh_user_option_name
 
     def consumer(self):
-        return super(SandboxAuthOptions, self).consumer() + [
+        return super().consumer() + [
             ArgConsumer(
                 ['--token'],
                 help='oAuth token',
@@ -703,7 +700,7 @@ class SandboxUploadOptions(SandboxAuthOptions):
         sandbox_owner_option_name="--owner",
         visible=HelpLevel.ADVANCED,
     ):
-        super(SandboxUploadOptions, self).__init__(ssh_key_option_name, ssh_user_option_name, visible=visible)
+        super().__init__(ssh_key_option_name, ssh_user_option_name, visible=visible)
         self.sandbox = False
         self.sandbox_url = upload_consts.DEFAULT_SANDBOX_URL
         self.resource_owner = None
@@ -711,7 +708,7 @@ class SandboxUploadOptions(SandboxAuthOptions):
         self.sandbox_owner_option_name = sandbox_owner_option_name
 
     def consumer(self):
-        return super(SandboxUploadOptions, self).consumer() + [
+        return super().consumer() + [
             ArgConsumer(
                 [self.sandbox_owner_option_name],
                 help='User name to own data saved to sandbox. Required in case of inf ttl of resources in mds.',
@@ -739,7 +736,7 @@ class SandboxUploadOptions(SandboxAuthOptions):
         ]
 
     def postprocess(self):
-        super(SandboxUploadOptions, self).postprocess()
+        super().postprocess()
         if not self.resource_owner:
             self.resource_owner = self.username
         if self.task_kill_timeout is not None:
@@ -751,7 +748,7 @@ class MavenImportOptions(SandboxUploadOptions):
     visible = HelpLevel.NONE
 
     def __init__(self, visible=None):
-        super(MavenImportOptions, self).__init__(sandbox_owner_option_name='--sandbox-owner', visible=visible)
+        super().__init__(sandbox_owner_option_name='--sandbox-owner', visible=visible)
         self.libs = []
         self.remote_repos = []
         self.contrib_owner = None
@@ -770,7 +767,7 @@ class MavenImportOptions(SandboxUploadOptions):
     def consumer(self):
         import jbuild.maven.maven_import as mi
 
-        return super(MavenImportOptions, self).consumer() + [
+        return super().consumer() + [
             ArgConsumer(
                 ['-o', '--owner'],
                 help='Libraries owner. Default: {}.'.format(mi.DEFAULT_OWNER),
@@ -879,7 +876,7 @@ class MavenImportOptions(SandboxUploadOptions):
 
 class MDSUploadOptions(Options):
     def __init__(self, visible=HelpLevel.ADVANCED):
-        super(MDSUploadOptions, self).__init__(visible=visible)
+        super().__init__(visible=visible)
         self.mds = False
         self.mds_host = upload_consts.DEFAULT_MDS_HOST
         self.mds_port = upload_consts.DEFAULT_MDS_PORT
@@ -1415,7 +1412,7 @@ class DumpMetaOptions(Options):
 
 class ArcPrefetchOptions(Options):
     def __init__(self, prefetch=False, visible=None):
-        super(ArcPrefetchOptions, self).__init__(visible=visible)
+        super().__init__(visible=visible)
         self.prefetch = prefetch
 
     @staticmethod
@@ -1788,7 +1785,7 @@ class CustomFetcherOptions(Options):
 
             token_file = fet['token_file']
             try:
-                with open(token_file, 'r') as f:
+                with open(token_file) as f:
                     token = f.read().strip()
                     if token:
                         fet['token'] = f.read().strip()
@@ -2336,7 +2333,7 @@ class ToolsOptions(Options):
 
 class LocalCacheOptions(ToolsOptions):
     def __init__(self):
-        super(LocalCacheOptions, self).__init__()
+        super().__init__()
 
         self.strip_cache = False
         self.strip_symlinks = False
@@ -2446,7 +2443,7 @@ class LocalCacheOptions(ToolsOptions):
         ]
 
     def postprocess(self):
-        super(LocalCacheOptions, self).postprocess()
+        super().postprocess()
         self._set_cache_size()
         self._set_ttl('new_store_ttl', 3 * 24 * 60 * 60)
         self._set_ttl('symlinks_ttl', 7 * 24 * 60 * 60)
@@ -2471,7 +2468,7 @@ class LocalCacheOptions(ToolsOptions):
 
 class DistCacheSetupOptions(LocalCacheOptions):
     def __init__(self):
-        super(DistCacheSetupOptions, self).__init__()
+        super().__init__()
 
         if app_config.in_house:
             self.yt_proxy = 'hahn.yt.yandex.net'
@@ -2583,7 +2580,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
         ]
 
     def postprocess(self):
-        super(DistCacheSetupOptions, self).postprocess()
+        super().postprocess()
         if self.yt_token_path:
             self.yt_token_path = os.path.expanduser(self.yt_token_path)
         self._read_token_file()
@@ -2612,7 +2609,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
 
 class DistCacheOptions(DistCacheSetupOptions):
     def __init__(self):
-        super(DistCacheOptions, self).__init__()
+        super().__init__()
 
         # XXX see YA-1354
         self.dist_cache_evict_binaries = False
@@ -2914,7 +2911,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         )
 
     def postprocess(self):
-        super(DistCacheOptions, self).postprocess()
+        super().postprocess()
         if self.yt_store_exclusive:
             self.yt_store = True
 

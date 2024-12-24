@@ -1,16 +1,14 @@
-import six
-
 SOURCE_ROOT = '$(SOURCE_ROOT)'
 BUILD_ROOT = '$(BUILD_ROOT)'
 
 
 def resolve_graph_value(x, upper=True, **kwargs):
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
         x = x.replace('$({})'.format(key.upper() if upper else key), value)
     return x
 
 
-class GraphPath(object):
+class GraphPath:
     def __init__(self, path):
         self.path = path
 

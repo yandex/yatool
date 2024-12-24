@@ -23,11 +23,7 @@ namespace {
         PyGILState_STATE gilState = PyGILState_Ensure();
         Y_DEFER {PyGILState_Release(gilState);};
 
-#if PY_MAJOR_VERSION == 3
         TPyObjectPtr s{PyUnicode_FromStringAndSize(line.c_str(), line.size()), BORROW};
-#else
-        TPyObjectPtr s{PyBytes_FromStringAndSize(line.c_str(), line.size()), BORROW};
-#endif
         if (!s.Get()) {
             throw yexception() << "Cannot create string object from " << line;
         }
@@ -64,11 +60,7 @@ namespace {
         if (!result.Get()) {
             throw yexception() << "lineProvider() failed";
         }
-#if PY_MAJOR_VERSION == 3
         return PyUnicode_AsUTF8(result.Get());
-#else
-        return PyBytes_AsString(result.Get());
-#endif
     }
 
     class TInputStreamFromCallback : public IWalkInput {

@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import collections
 import copy
 import glob
@@ -13,7 +11,7 @@ import typing as tp  # noqa
 from devtools.ya.test import const
 
 import six
-import six.moves.cPickle as cPickle
+import pickle as cPickle
 
 import app_config
 import build.build_plan as bp
@@ -90,7 +88,7 @@ class ConfigurationError(Exception):
     mute = True
 
     def __init__(self, msg=None):
-        super(ConfigurationError, self).__init__(msg or 'Configure error (use -k to proceed)')
+        super().__init__(msg or 'Configure error (use -k to proceed)')
 
 
 class EmptyProfilesListException(Exception):
@@ -102,7 +100,7 @@ def match_urls_and_outputs(urls, outputs):
         return os.path.normpath(p).replace('$(BUILD_ROOT)/', '')
 
     result = {}
-    urls = set((norm(u), u) for u in urls)
+    urls = {(norm(u), u) for u in urls}
     assert len(urls) == len(outputs), (urls, outputs)
     norm_outs = [(norm(o), o) for o in outputs]
     for norm_out, out in sorted(norm_outs, key=lambda oo: len(oo[1]), reverse=True):
@@ -318,7 +316,7 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
             s = os.path.dirname(s).replace('$B/', '')
         return s
 
-    errors = {fix_dir(k): sorted(list(v)) for k, v in six.iteritems(errors_collector.errors)}
+    errors = {fix_dir(k): sorted(list(v)) for k, v in errors_collector.errors.items()}
     return graph, tests, stripped_tests, errors, make_files
 
 
@@ -356,7 +354,7 @@ def _setup_content_uids(opts, enable):
     opts.force_content_uids = True
 
 
-class CacheFactory(object):
+class CacheFactory:
     def __init__(self, opts):
         self._opts = opts
 
@@ -553,7 +551,7 @@ def load_configure_errors(errors):
     if not errors:
         return loaded_errors
 
-    for path, error_list in six.iteritems(errors):
+    for path, error_list in errors.items():
         if error_list == 'OK':
             loaded_errors[path].append(ce.ConfigureError('OK', 0, 0))
             continue
@@ -635,7 +633,7 @@ def configure_build_graph_cache_dir(app_ctx, opts):
 
 
 def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Failed):
-    statuses = set([suite.get_status() for suite in suites if not suite.is_skipped()])
+    statuses = {suite.get_status() for suite in suites if not suite.is_skipped()}
     if not statuses or statuses == {const.Status.GOOD}:
         exit_code = 0
     elif const.Status.INTERNAL in statuses:
@@ -646,10 +644,10 @@ def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Faile
 
 
 # TODO: Merge to Context
-class BuildContext(object):
+class BuildContext:
     @classmethod
     def load(cls, params, app_ctx, data):
-        kwargs = {'encoding': 'utf-8'} if six.PY3 else {}
+        kwargs = {'encoding': 'utf-8'}
         builder = YaMake(
             params,
             app_ctx,
@@ -817,7 +815,7 @@ def replace_yt_results(graph, opts, dist_cache):
     return new_results, cached_results
 
 
-class Context(object):
+class Context:
     RELEASED = {}  # sentinel to mark released full graph
 
     def __init__(
@@ -1310,7 +1308,7 @@ def get_deps(targets, graph, build_result, dest_dir):
         logger.info('Successfully dumped deps of %s: %s', target, dest_dir)
 
 
-class YaMake(object):
+class YaMake:
     def __init__(
         self,
         opts,
@@ -1406,7 +1404,7 @@ class YaMake(object):
         if gen_build_targets_result.exit_code != 0:
             cp.profile_value('gen_build_targets_exit_code', gen_build_targets_result.exit_code)
             raise ConfigurationError(
-                'Unable to get build targets names. Ymake says {0}'.format(gen_build_targets_result.stderr.strip())
+                'Unable to get build targets names. Ymake says {}'.format(gen_build_targets_result.stderr.strip())
             )
 
         return gen_build_targets_result.stdout.split()
@@ -1483,7 +1481,7 @@ class YaMake(object):
                         logger.debug("SSH multiplexing is disabled: no arcadia root specified")
                         return
 
-                    from six.moves.urllib.parse import urlparse
+                    from urllib.parse import urlparse
                     import yalibrary.svn
 
                     svn_env = os.environ.copy()
@@ -1888,7 +1886,7 @@ class YaMake(object):
             self.app_ctx.display.emit_status('Start to pack and upload inputs package')
             inputs_map = self.ctx.graph['inputs']
             for node in self.ctx.graph['graph']:
-                node_inputs = dict((i, None) for i in node['inputs'])
+                node_inputs = {i: None for i in node['inputs']}
                 inputs_map = lg.union_inputs(inputs_map, node_inputs)
             repository_package = sp.pack_and_upload(self.opts, inputs_map, self.opts.arc_root)
             self.ctx.graph['conf']['repos'] = gp.make_tared_repositories_config(repository_package)
@@ -2042,7 +2040,7 @@ class YaMake(object):
 
         def extract_tasks_metrics():
             metrics = {}
-            for u, data in six.iteritems(execution_log):
+            for u, data in execution_log.items():
                 if 'timing' in data and data['timing']:
                     elapsed = data['timing'][1] - data['timing'][0]
                     metrics[u] = {'elapsed': elapsed}
@@ -2079,12 +2077,12 @@ class YaMake(object):
 
     def _dump_raw_build_results(self, dest):
         try:
-            fd = {str(k): v for k, v in six.iteritems(self.build_result.failed_deps)}
+            fd = {str(k): v for k, v in self.build_result.failed_deps.items()}
             self._dump_json(os.path.join(dest, 'failed_dependants.json'), fd)
             self._dump_json(os.path.join(dest, 'configure_errors.json'), self.ctx.configure_errors)
             self._dump_json(os.path.join(dest, 'ok_nodes.json'), self.build_result.ok_nodes)
             self._dump_json(os.path.join(dest, 'targets.json'), self.targets)
-            be = {str(k): v for k, v in six.iteritems(self.build_result.build_errors)}
+            be = {str(k): v for k, v in self.build_result.build_errors.items()}
             self._dump_json(os.path.join(dest, 'build_errors.json'), be)
         except Exception:
             logging.exception("Error while dumping raw results")

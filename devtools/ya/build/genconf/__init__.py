@@ -75,10 +75,7 @@ def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode
     if is_local(res):
 
         def get_output(*args):
-            kwargs = {}
-            if six.PY3:
-                kwargs['text'] = True
-            return subprocess.check_output(tuple(args), **kwargs).strip()
+            return subprocess.check_output(tuple(args), text=True).strip()
 
         version = get_output('xcodebuild', '-version').split()[1]
         expect_version = res['params']['version']
@@ -297,19 +294,17 @@ def gen_conf(
         for p_dir in (os.path.join(prefix, 'plugins') for prefix in (build_path, build_internal_path)):
             if not os.path.isdir(p_dir):
                 continue
-            for f in iter_dir_files_recursively(
+            yield from iter_dir_files_recursively(
                 p_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.py')
-            ):
-                yield f
+            )
 
     def iter_conf_parts():
         for conf_dir in (os.path.join(build_path, d) for d in ('conf', 'internal/conf', 'ymake.parts')):
             if not os.path.isdir(conf_dir):
                 continue
-            for f in iter_dir_files_recursively(
+            yield from iter_dir_files_recursively(
                 conf_dir, skip_tests=True, check=lambda x: x[0] not in '~#.' and x.endswith('.conf')
-            ):
-                yield f
+            )
 
     def iter_conf_files():
         yield script
@@ -317,14 +312,11 @@ def gen_conf(
             yield custom_script
         yield core_conf
 
-        for p in iter_conf_parts():
-            yield p
+        yield from iter_conf_parts()
 
-        for p in iter_plugins():
-            yield p
+        yield from iter_plugins()
 
-        for i in iter_local_ymakes():
-            yield i
+        yield from iter_local_ymakes()
 
         if extra_conf is not None:
             yield extra_conf
@@ -335,7 +327,7 @@ def gen_conf(
         return os.path.join(conf_dir, digest, 'ymake.conf'), digest
 
     def subset(dct, white_list):
-        return {k: v for k, v in six.iteritems(dct) if k in white_list}
+        return {k: v for k, v in dct.items() if k in white_list}
 
     data = [
         "14",
@@ -373,12 +365,10 @@ def gen_conf(
 
         def iter_all_flags():
             for local_ymake in iter_local_ymakes():
-                for k, v in sorted(check_local_ymake(local_ymake).get('kv', {}).items()):
-                    yield k, v
+                yield from sorted(check_local_ymake(local_ymake).get('kv', {}).items())
 
             if extra_flags:
-                for k, v in sorted(extra_flags.items()):
-                    yield k, v
+                yield from sorted(extra_flags.items())
 
         def iter_flags():
             for k, v in iter_all_flags():

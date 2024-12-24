@@ -8,7 +8,7 @@ from build import build_opts
 from build import build_handler
 
 
-class StringIOWrapper(object):
+class StringIOWrapper:
     def __init__(self, stringio):
         self.s = stringio
 

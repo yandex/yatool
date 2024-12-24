@@ -1,6 +1,5 @@
 # cython: profile=True
 
-from __future__ import division
 
 import exts.yjson as json
 import logging
@@ -21,8 +20,6 @@ from core import profiler, stage_tracer
 import devtools.ya.test.const as test_const
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
 from functools import cmp_to_key
-
-import six
 
 
 class TaskType(enum.Enum):
@@ -330,7 +327,7 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
             'graph_tests_data_time': tests_data_prepare_elapsed,
         }
 
-        for k, v in six.iteritems(stats):
+        for k, v in stats.items():
             profiler.profile_value('statistics_{}'.format(k), v)
 
         stats['nodes'] = nodes
@@ -479,7 +476,7 @@ def print_cache_statistics(graph, filename, display):
         display.emit_message(f'Cache hit ratio is saved to {filename}')
     display.emit_message()
 
-    for k, v in six.iteritems(stats):
+    for k, v in stats.items():
         profiler.profile_value('statistics_{}'.format(k), v)
 
     return stats
@@ -687,7 +684,7 @@ def print_stages(event_log, display):
 
     if len(end_events) > 0:
         display.emit_message('Durations of build stages:')
-        for stage_name, start_time in sorted(six.iteritems(start_events), key=lambda x: x[1]):
+        for stage_name, start_time in sorted(start_events.items(), key=lambda x: x[1]):
             elapsed = end_events[stage_name] - start_time
             display.emit_message(f'{stage_name} - {elapsed} ms\n')
 
@@ -699,7 +696,7 @@ def print_context_stages(ctx_stages, display):
 
     display.emit_message()
 
-    for k, v in six.iteritems(ctx_stages):
+    for k, v in ctx_stages.items():
         display.emit_message('{} - {:.1f} s'.format(_replaces.get(k, k), float(v)))
 
     return ctx_stages
@@ -712,7 +709,7 @@ def get_detailed_timings(tasks):
 
     for task in tasks:
         if hasattr(task, 'detailed_timings') and task.detailed_timings is not None:
-            for st_name, timings in six.iteritems(task.detailed_timings):
+            for st_name, timings in task.detailed_timings.items():
                 for ev in timings:
                     stages[st_name].append((ev.stop - ev.start) * 1000)
 

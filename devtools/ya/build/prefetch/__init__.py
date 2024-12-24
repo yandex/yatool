@@ -2,7 +2,6 @@ import os
 import logging
 import queue
 import threading
-import six
 import signal
 import subprocess
 
@@ -56,7 +55,7 @@ class MixedPrefetchMeta(type(event_handling.SubscriberSpecifiedTopics), type(eve
 
 
 class ArcPrefetchSubscriber(
-    six.with_metaclass(MixedPrefetchMeta, event_handling.SubscriberSpecifiedTopics, event_handling.SingletonSubscriber)
+    event_handling.SubscriberSpecifiedTopics, event_handling.SingletonSubscriber, metaclass=MixedPrefetchMeta
 ):
     topics = {"NEvent.TNeedDirHint"}
 
@@ -146,7 +145,7 @@ class ArcStreamingPrefetcher:
             stderr=subprocess.PIPE,
             stdin=subprocess.PIPE,
             cwd=self._arc_root,
-            **({'text': True} if six.PY3 else {})
+            text=True,
         )
         logger.debug(
             'arc prefetch-files started with pid %d, cmd: %s, cwd: %s', self._arc_process.pid, cmd, self._arc_root

@@ -36,7 +36,7 @@ ERRORS_LIMIT = 30
 BROKEN_DEPS_LIMIT = 20
 
 
-class BuildErrorWithLink(object):
+class BuildErrorWithLink:
     def __init__(self, error, links):
         self.error = error
         self.links = links
@@ -235,7 +235,7 @@ def make_build_errors_by_project(
     )
 
 
-class BuildResult(object):
+class BuildResult:
     def __init__(
         self,
         errors,

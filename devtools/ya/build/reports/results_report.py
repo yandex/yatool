@@ -1,13 +1,12 @@
 import collections
 import logging
-import six
 import threading
 import time
 
 import exts.yjson as json
 
 
-class BatchEventProcessor(object):
+class BatchEventProcessor:
     _logger = logging.getLogger('BatchEventProcessor')
 
     def __init__(self, func, delay=10):
@@ -76,7 +75,7 @@ class BatchEventProcessor(object):
             self._logger.debug("Thread loop is terminated")
 
 
-class BatchReportBase(object):
+class BatchReportBase:
     _logger = logging.getLogger('BatchReportBase')
 
     def __init__(self, func, delay=10):
@@ -124,14 +123,14 @@ class AggregatingStreamingReport(BatchReportBase):
     _logger = logging.getLogger('AggregatingStreamingReport')
 
     def __init__(self, targets, client, report_config_path, keep_alive_streams, report_only_stages):
-        super(AggregatingStreamingReport, self).__init__(func=self._process, delay=self.FLUSHING_DELAY)
+        super().__init__(func=self._process, delay=self.FLUSHING_DELAY)
         self._report_config = safe_read_report_config(report_config_path)
         self._target_results = collections.defaultdict(dict)
         self._targets = collections.defaultdict(set)
         self._targets_list = set()
         self._keep_alive_streams = keep_alive_streams
         self._report_only_stages = report_only_stages
-        for uid, target in six.iteritems(targets):
+        for uid, target in targets.items():
             target_name, target_platform, _, target_tag, _ = target
             target_platform = transform_toolchain(self._report_config, target_platform)
             target_key = (target_name, target_platform, target_tag)
@@ -234,7 +233,7 @@ class AggregatingStreamingReport(BatchReportBase):
             self._closed_tests_streams.add(size)
 
     def finish(self):
-        super(AggregatingStreamingReport, self).finish()
+        super().finish()
         self.finish_style_report()
         self.finish_configure_report()
         self.finish_build_report()
@@ -252,7 +251,7 @@ class JsonLineReport(BatchReportBase):
     _logger = logging.getLogger('JsonLineReport')
 
     def __init__(self, filename, delay=5, report_progress=True, progress_delay=180):
-        super(JsonLineReport, self).__init__(func=self._process, delay=delay)
+        super().__init__(func=self._process, delay=delay)
         self._file = open(filename, 'w')
         self._lock = threading.Lock()
         self._report_progress = report_progress
@@ -338,14 +337,14 @@ class JsonLineReport(BatchReportBase):
         )
 
     def finish(self):
-        super(JsonLineReport, self).finish()
+        super().finish()
         self._log_progress()
         self._file.close()
         self._file = None
 
 
 # TODO we need to migrate users to JsonLineReport and get rid of StoredReport
-class StoredReport(object):
+class StoredReport:
     _logger = logging.getLogger('StoredReport')
 
     def __init__(self):

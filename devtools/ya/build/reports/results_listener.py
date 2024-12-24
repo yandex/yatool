@@ -25,7 +25,7 @@ if tp.TYPE_CHECKING:
     import devtools.ya.test.test_types.common as tt_common  # noqa
 
 
-class BuildResultsListener(object):
+class BuildResultsListener:
     _logger = logging.getLogger('BuildResultsListener')
 
     def __init__(self, graph, tests, report_generator, build_root, opts):
@@ -151,7 +151,7 @@ class BuildResultsListener(object):
                 self._notified.add(uid)
 
 
-class TestResultsListener(object):
+class TestResultsListener:
     _logger = logging.getLogger('TestResultsListener')
 
     def __init__(self, graph, display):
@@ -181,7 +181,7 @@ class TestResultsListener(object):
             self._logger.error("Expected test console report file was not found by {}".format(console_report))
 
 
-class TestNodeListener(object):
+class TestNodeListener:
     _logger = logging.getLogger('TestNodeListener')
 
     def __init__(self, tests, output_root, report_generator):
@@ -248,7 +248,7 @@ class TestNodeListener(object):
             self._report_generator.add_tests_results([suite], None, {}, defaultdict(list))
 
 
-class SlotListener(object):
+class SlotListener:
     _logger = logging.getLogger('SlotListener')
 
     def __init__(self, statistics_out_dir):
@@ -278,7 +278,7 @@ class SlotListener(object):
             self._slot_time += process_result.get('slot_time', 0)
 
 
-class CompositeResultsListener(object):
+class CompositeResultsListener:
     def __init__(self, listeners=None):
         self._listeners = []
         self._listeners.extend(listeners)
@@ -300,7 +300,7 @@ class CompositeResultsListener(object):
         return {name: {"duration_sec": x} for name, x in self._duration.items()}
 
 
-class FailedNodeListener(object):
+class FailedNodeListener:
     NAMESPACE = 'build.reports.failed_node_info'
     EVENT = 'node-failed'
 

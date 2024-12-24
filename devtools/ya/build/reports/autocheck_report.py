@@ -1,5 +1,3 @@
-# coding: utf-8
-
 import os
 import copy
 import exts.yjson as json
@@ -8,8 +6,6 @@ import threading
 
 from collections import defaultdict
 from itertools import chain
-
-import six
 
 import core.error
 import devtools.ya.test.common as test_common
@@ -85,9 +81,9 @@ def _fix_links_entry(entry, name, fix_from, fix_to):
 
 
 def _fix_links(entry, fix_from, fix_to):
-    for name, paths in six.iteritems(entry.get("links", {})):
+    for name in entry.get("links", {}).keys():
         _fix_links_entry(entry, name, fix_from, fix_to)
-    for key, obj in six.iteritems(entry.get("result", {})):
+    for obj in entry.get("result", {}).values():
         if fix_to.startswith("http"):
             obj['url'] = _fix_link_prefix_and_quote(obj['url'], fix_from, fix_to)
         else:
@@ -259,7 +255,7 @@ def make_target_entry(
     error_type=None,
 ):
     def get_error_message(error):
-        if isinstance(error, six.string_types):
+        if isinstance(error, str):
             return error
         elif isinstance(error, ce.ConfigureError):
             return error.message
@@ -331,7 +327,7 @@ def make_target_entry(
     return entry
 
 
-class YaMakeProgress(object):
+class YaMakeProgress:
     BUILD = 'build'
     CONFIGURE = 'configure'
     STYLE = 'style'
@@ -341,12 +337,12 @@ class YaMakeProgress(object):
         self._lock = threading.RLock()
         self.progress_without_test = defaultdict(lambda: defaultdict(lambda: {'done': 0, 'total': 0}))
         self.progress_only_test = defaultdict(lambda: defaultdict(lambda: {'done': 0, 'total': 0}))
-        for toolchain, total in six.iteritems(totals_build):
+        for toolchain, total in totals_build.items():
             self._increment(toolchain, YaMakeProgress.BUILD, total, progress_key='total')
-        for toolchain, total in six.iteritems(totals_style):
+        for toolchain, total in totals_style.items():
             self._increment(toolchain, YaMakeProgress.STYLE, total, progress_key='total')
-        for toolchain, totals_test in six.iteritems(totals_test_by_size):
-            for size, total in six.iteritems(totals_test):
+        for toolchain, totals_test in totals_test_by_size.items():
+            for size, total in totals_test.items():
                 self._increment(toolchain, YaMakeProgress.TEST, total, progress_key='total', test_size=size)
         for toolchain in set(self.progress_without_test.keys()) | set(self.progress_only_test.keys()):
             self._increment(toolchain, YaMakeProgress.CONFIGURE, 0, progress_key='total')
@@ -378,21 +374,21 @@ class YaMakeProgress(object):
             progress_only_test = copy.deepcopy(self.progress_only_test)
 
         ci_progress = defaultdict(list)
-        for toolchain, progress_by_type in six.iteritems(progress_without_test):
-            for _type, type_progress in six.iteritems(progress_by_type):
+        for toolchain, progress_by_type in progress_without_test.items():
+            for _type, type_progress in progress_by_type.items():
                 ci_type_progress = type_progress.copy()
                 ci_type_progress.update({'type': _type})
                 ci_progress[toolchain] += [ci_type_progress]
 
-        for toolchain, progress_by_size in six.iteritems(progress_only_test):
-            for size, size_progress in six.iteritems(progress_by_size):
+        for toolchain, progress_by_size in progress_only_test.items():
+            for size, size_progress in progress_by_size.items():
                 ci_test_progress = size_progress.copy()
                 ci_test_progress.update({'type': YaMakeProgress.TEST, 'size': size})
                 ci_progress[toolchain] += [ci_test_progress]
         return ci_progress
 
 
-class ReportGenerator(object):
+class ReportGenerator:
     _logger = logging.getLogger('ReportGenerator')
 
     def __init__(
@@ -440,7 +436,7 @@ class ReportGenerator(object):
 
     def setup_ya_make_progress(self, style_tests_count, tests_count):
         totals_build = defaultdict(int)
-        for uid, target in six.iteritems(self._targets):
+        for target in self._targets.values():
             _, target_platform, _, _, _ = target
             transformed_toolchain = results_report.transform_toolchain(self._report_config, target_platform)
             totals_build[transformed_toolchain] += 1 * (not self._opts.report_skipped_suites_only)
@@ -537,7 +533,7 @@ class ReportGenerator(object):
         else:
             targets = set()
 
-            for uid, target in six.iteritems(self._targets):
+            for target in self._targets.values():
                 targets.add(target[0])
 
             for target_name in configure_errors.keys():
@@ -579,7 +575,7 @@ class ReportGenerator(object):
             list(
                 map(
                     lambda toolchain_value: self.ya_make_progress.increment_configure_done(*toolchain_value),
-                    six.iteritems(progress_by_toolchain),
+                    progress_by_toolchain.items(),
                 )
             )
         self._add_entries(entries)
@@ -636,7 +632,7 @@ class ReportGenerator(object):
     def add_build_results(self, build_result):
         entries = []
         progress_by_toolchain = defaultdict(int)
-        for uid, target in six.iteritems(self._targets):
+        for uid, target in self._targets.items():
             target_name, target_platform, _, module_tag, _ = target
             key = (target_name, target_platform, uid)
             errors = build_result.build_errors.get(key)
@@ -657,7 +653,7 @@ class ReportGenerator(object):
             list(
                 map(
                     lambda toolchain_value: self.ya_make_progress.increment_build_done(*toolchain_value),
-                    six.iteritems(progress_by_toolchain),
+                    progress_by_toolchain.items(),
                 )
             )
         self._add_entries(entries)

@@ -24,8 +24,6 @@ import core.config as config
 import core.patch_tools as patch_tools
 from devtools.ya.test.dependency.uid import TestUidGenerator
 
-import six
-
 logger = logging.getLogger(__name__)
 TRUNK_PATH = '/arc/trunk/arcadia'
 DISTBUILD_API_VERSION = 2
@@ -627,7 +625,7 @@ def real_build_type(tc, opts):
     return tc.get('build_type') or opts.build_type
 
 
-PLATFORM_FLAGS = set(['MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'])
+PLATFORM_FLAGS = {'MUSL', 'ALLOCATOR', 'FAKEID', 'RACE'}
 FLAGS_MAPPING = {'USE_LTO': 'lto', 'USE_THINLTO': 'thinlto', 'MUSL': 'musl', 'USE_AFL': 'AFL', 'RACE': 'race'}
 
 
@@ -652,7 +650,7 @@ def prepare_tags(tc, extra_flags, opts):
 
     flags = copy.deepcopy(tc.get('flags', {}))
 
-    flags.update({k: v for k, v in six.iteritems(extra_flags) if k in PLATFORM_FLAGS})
+    flags.update({k: v for k, v in extra_flags.items() if k in PLATFORM_FLAGS})
 
     platform = pm.stringize_platform(tc['platform']['target']).lower()
 
@@ -660,7 +658,7 @@ def prepare_tags(tc, extra_flags, opts):
     tags.append(real_build_type(tc, opts))
 
     if flags:
-        tags.extend(sorted([_f for _f in [_fmt_tag(k, v) for k, v in six.iteritems(flags)] if _f]))
+        tags.extend(sorted([_f for _f in [_fmt_tag(k, v) for k, v in flags.items()] if _f]))
 
     return tags, platform
 

@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import division
-
 from collections import defaultdict
 
 import copy
@@ -46,7 +42,7 @@ class YMakeError(Exception):
     mute = True
 
     def __init__(self, err, exit_code=None):
-        super(YMakeError, self).__init__(err)
+        super().__init__(err)
         self.exit_code = exit_code
 
 
@@ -60,7 +56,7 @@ class YMakeNeedRetryError(YMakeError):
         self.dirty_dirs = dirty_dirs
 
 
-class YMakeResult(object):
+class YMakeResult:
     def __init__(self, exit_code, stdout, stderr, meta=None):
         self.exit_code = exit_code
         self.stdout = stdout

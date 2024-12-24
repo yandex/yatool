@@ -253,9 +253,9 @@ def gen_compilation_database(params, app_ctx):
 
     if params.update:
         try:
-            with open(params.target_file, "r") as f:
+            with open(params.target_file) as f:
                 cdb = merge_cdb(cdb, json.load(f))
-        except IOError:
+        except OSError:
             pass
 
     return sorted(cdb, key=lambda n: (n['file'], n['command']))

@@ -1,7 +1,6 @@
 import collections
 import itertools
 
-import six
 
 import exts.yjson as json
 import logging
@@ -133,13 +132,13 @@ def _prepare(deps_map, type_miner):
         return path
 
     def adj(k, edges):
-        lst = list(set([fix(x.to) for x in edges]))
+        lst = list({fix(x.to) for x in edges})
         if k in lst:
             lst.remove(k)
         return lst
 
     result = collections.defaultdict(dict)
-    for k, edges in six.iteritems(deps_map):
+    for k, edges in deps_map.items():
         kf = fix(k)
         if kf is not None:
             if type_miner:
@@ -203,8 +202,7 @@ def _scc_path(deps_map):
 
     for v in deps_map.keys():
         if v not in index:
-            for scc in dfs(v):
-                yield scc
+            yield from dfs(v)
 
 
 def _merge(component, deps_map):
@@ -341,7 +339,7 @@ def _walk(start_node):
 
     deps_map = {}
     for k, v in itertools.groupby(sorted_deps, operator.itemgetter(0)):
-        deps_map[k] = set([_Edge(type=x[2], to=x[1]) for x in v])
+        deps_map[k] = {_Edge(type=x[2], to=x[1]) for x in v}
 
     logger.debug('end walking')
 

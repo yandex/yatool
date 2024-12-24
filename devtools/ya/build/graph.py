@@ -8,7 +8,7 @@ import logging
 import os
 import re2
 import six
-from six.moves import queue
+import queue
 import sys
 import tempfile
 import devtools.ya.test.const as test_consts
@@ -80,9 +80,6 @@ except ImportError:
     bg_cache = Mock()
 
 
-if six.PY3:
-    long = int
-
 ALLOWED_EXTRA_RESOURCES = {
     'JDK': 'java',
     'JDK10': 'java10',
@@ -117,7 +114,7 @@ class GraphBuildError(Exception):
 
 class _OptimizableGraph(dict):
     def __init__(self, *args, **kwargs):
-        super(_OptimizableGraph, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.resource_pattern = re2.compile(r'\$\((.*?)\)')
         self.actual_resources_patterns = {'VCS'}
 
@@ -157,7 +154,7 @@ class _OptimizableGraph(dict):
             reduce_graph_resources_stage.finish()
 
 
-class _NodeGen(object):
+class _NodeGen:
     def __init__(self):
         self.extra_nodes: list[graph_descr.GraphNode] = []
         self._md5_cache = {}
@@ -255,8 +252,7 @@ def _iter_cmds(args):
             yield res
 
     if 'cmds' in args:
-        for c in args['cmds']:
-            yield c
+        yield from args['cmds']
 
 
 def _merge_nodes(x, y):
@@ -304,12 +300,10 @@ def _optimize_graph(graph):
                 yield x
 
                 for dep in x['deps']:
-                    for xx in visit(by_uid[dep]):
-                        yield xx
+                    yield from visit(by_uid[dep])
 
         for n in graph['result']:
-            for x in visit(by_uid[n]):
-                yield x
+            yield from visit(by_uid[n])
 
     return {
         'inputs': graph.get('inputs', {}),
@@ -356,9 +350,9 @@ def _gen_rename_nodes(graph: graph_descr.DictGraph, uid_map, src_dir):
 
     def iter_results():
         uids_to_rename = set()
-        for out, lst in six.iteritems(by_output):
+        for out, lst in by_output.items():
             if len(lst) > 1:
-                uids_to_rename |= set([n['uid'] for n in lst])
+                uids_to_rename |= {n['uid'] for n in lst}
             else:
                 yield lst[0]['uid']
 
@@ -423,7 +417,7 @@ def _union_inputs_from_graphs(g1, g2):
 
 def _add_resources(resources, to):
     to_resources = to.get('conf', {}).get('resources', [])
-    patterns = set(r['pattern'] for r in to_resources)
+    patterns = {r['pattern'] for r in to_resources}
     for r in resources:
         if r['pattern'] not in patterns:
             to_resources.append(r)
@@ -453,8 +447,7 @@ def _strip_unused_nodes(
             node = by_uid.pop(uid)
             yield node
             for dep in node['deps']:
-                for xx in visit(dep):
-                    yield xx
+                yield from visit(dep)
 
     result_nodes: list[graph_descr.GraphNode] = []
     for uid in result:
@@ -505,7 +498,7 @@ class _GenGraphResult(tp.NamedTuple):
 
 def _get_node_out_names_map(node):
     KV_PRE = 'ext_out_name_for_'
-    return dict([(k[len(KV_PRE) :], v) for k, v in node.get('kv').items() if k.startswith(KV_PRE)])
+    return {k[len(KV_PRE) :]: v for k, v in node.get('kv').items() if k.startswith(KV_PRE)}
 
 
 def _apply_out_names_map(mapping, name):
@@ -631,8 +624,7 @@ def _split_gcc_node(n):
 def _split_gcc(g):
     for n in g:
         if n.get('kv', {}).get('p', '') == 'CC':
-            for x in _split_gcc_node(n):
-                yield x
+            yield from _split_gcc_node(n)
         else:
             yield n
 
@@ -728,9 +720,7 @@ def _inject_default_requirements(graph, tests, reqs):
     for node in graph['graph']:
         is_modified = _add_requirements(node, reqs)
         if is_modified:
-            old_to_new_uids[node['uid']] = hashing.md5_value(
-                str([sorted(six.iteritems(node['requirements'])), node['uid']])
-            )
+            old_to_new_uids[node['uid']] = hashing.md5_value(str([sorted(node['requirements'].items()), node['uid']]))
 
     logger.debug('Updated requirements for %d nodes', len(old_to_new_uids))
     _substitute_uids(graph, tests, old_to_new_uids)
@@ -750,7 +740,7 @@ def _propagate_cache_false_from_kv(graph):
 # TODO: do the common tag removing in the runner before start (not in graph generating like this).
 # TODO: assign tool tag in _build_tools().
 def _strip_tags(nodes):
-    by_tag = collections.defaultdict(long)
+    by_tag = collections.defaultdict(int)
     node_count = 0
 
     for node in nodes:
@@ -1008,9 +998,6 @@ def _update_graph_execution_cost(stat, cost_info):
 
 
 def _prepare_local_change_list_generator(opts):
-    if six.PY2:
-        return None
-
     if not getattr(opts, "build_graph_cache_force_local_cl", False):
         return None
 
@@ -1028,7 +1015,7 @@ def _prepare_local_change_list_generator(opts):
         return bg_cache.BuildGraphCacheCLFromArc(evlog, opts, store=store)
 
 
-class _AsyncContext(object):
+class _AsyncContext:
     __slots__ = ('_future', '_done')
 
     def __init__(self, future):
@@ -1055,7 +1042,7 @@ class _AsyncContext(object):
             self._done = True
 
 
-class _ToolTargetsQueue(object):
+class _ToolTargetsQueue:
     def __init__(self):
         self._queue = queue.Queue()
         self._sources_ids = {}
@@ -1110,7 +1097,7 @@ class _ToolTargetsQueue(object):
 
 class _ToolEventsQueueServerMode(_ToolTargetsQueue):
     def __init__(self):
-        super(_ToolEventsQueueServerMode, self).__init__()
+        super().__init__()
         self.__bypasses_received = 0
         self.__finals_received = set()
 
@@ -1171,7 +1158,7 @@ class _GraphKind(Enum):
     GLOBAL_TOOLS = 2
 
 
-class _ToolEventListener(object):
+class _ToolEventListener:
     TOOL_PLATFORM = 0
 
     def __init__(self, ev_listener, queue_putter):
@@ -1206,7 +1193,7 @@ class _ToolEventListener(object):
 
 class _ToolEventListenerServerMode(_ToolEventListener):
     def __init__(self, ev_listener, queue_putter):
-        super(_ToolEventListenerServerMode, self).__init__(ev_listener, queue_putter)
+        super().__init__(ev_listener, queue_putter)
 
     def _process_target_event(self, event):
         self._queue_putter(event)
@@ -1218,7 +1205,7 @@ class _ToolEventListenerServerMode(_ToolEventListener):
         self._queue_putter(event)
 
     def __call__(self, event):
-        super(_ToolEventListenerServerMode, self).__call__(event)
+        super().__call__(event)
         if event["_typename"] == "NEvent.TBypassConfigure":
             self._process_bypass_event(event)
 
@@ -1244,11 +1231,7 @@ def build_graph_and_tests(opts, check, event_queue=None, display=None):
             return _build_graph_and_tests(opts, check, event_queue, exit_stack, display)
         except AssertionError:
             ex_type, ex_val, ex_bt = sys.exc_info()
-            six.reraise(
-                GraphBuildError,
-                GraphBuildError("{} from {} exception".format(ex_val, ex_type)),
-                ex_bt,
-            )
+            raise GraphBuildError("{} from {} exception".format(ex_val, ex_type)).with_traceback(ex_bt)
 
 
 def _clang_tidy_strip_deps(plan, suites):
@@ -1297,7 +1280,7 @@ def _shorten_debug_id(debug_id, limit=64):
         return debug_id[:delim_pos]
 
 
-class _ConfErrorReporter(object):
+class _ConfErrorReporter:
     def __init__(self, ev_listener):
         self.__ev_listener = ev_listener
 
@@ -1313,7 +1296,7 @@ class _ConfErrorReporter(object):
         self.__ev_listener(event)
 
 
-class _GraphMaker(object):
+class _GraphMaker:
     def __init__(
         self,
         opts,
@@ -2526,7 +2509,7 @@ def _clean_maven_deploy_from_run_java_program(graph):
         queue.extend(dep for dep in all_exported[uid].get('deps', []) if dep in all_exported)
         reachable_exported.add(uid)
 
-    for uid, node in six.viewitems(all_exported):
+    for uid, node in all_exported.items():
         if uid in reachable_exported:
             continue
         node['kv']['mvn_export'] = 'no'
@@ -2705,11 +2688,9 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
 def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
     yndexer_script = '$(SOURCE_ROOT)/build/scripts/python_yndexer.py'
     pyxref = next(
-        (
-            os.path.join('$(' + r['pattern'] + ')', 'pyxref')
-            for r in graph['conf']['resources']
-            if r['pattern'].startswith('PYNDEXER-')
-        )
+        os.path.join('$(' + r['pattern'] + ')', 'pyxref')
+        for r in graph['conf']['resources']
+        if r['pattern'].startswith('PYNDEXER-')
     )
 
     pyndex_nodes = []
@@ -2747,11 +2728,9 @@ def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
 
 def _gen_py3_yndexer_nodes(graph):
     py3_indexer = next(
-        (
-            os.path.join('$(' + r['pattern'] + ')', 'py3yndexer')
-            for r in graph['conf']['resources']
-            if r['pattern'].startswith('PY3YNDEXER-')
-        )
+        os.path.join('$(' + r['pattern'] + ')', 'py3yndexer')
+        for r in graph['conf']['resources']
+        if r['pattern'].startswith('PY3YNDEXER-')
     )
 
     pyndex_nodes = []
@@ -2803,7 +2782,7 @@ def _gen_merge_nodes(nodes):
         if yndex_file:
             nodes_by_dir[os.path.dirname(yndex_file)].append(node)
 
-    for deps in six.itervalues(nodes_by_dir):
+    for deps in nodes_by_dir.values():
         if len(deps) == 1:
             alone_nodes.append(deps[0])
         else:
@@ -2861,7 +2840,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
     return graph_tools
 
 
-class _HostToolResolver(object):
+class _HostToolResolver:
     def __init__(self, parsed_host_p, res_dir):
         self._host_tool = self.generate_host_platform_str(parsed_host_p)
         self._res_dir = res_dir
@@ -3058,7 +3037,7 @@ def _build_merged_graph(
                 stripped_tests += stripped
 
                 if tpc.get('flags', {}).get('SANDBOXING') == 'yes':
-                    sandboxing_test_uids |= set([test.uid for test in requested])
+                    sandboxing_test_uids |= {test.uid for test in requested}
                 ytexec_required |= tpc_test_opts.run_tagged_tests_on_yt
 
         with stager.scope('merge-target-graphs-{}'.format(target_graph_num)):
@@ -3306,7 +3285,7 @@ def _strip_graph_results(
     graph: graph_descr.DictGraph, node_checker: tp.Callable[[graph_descr.GraphNode], bool], node_type_name: str
 ) -> graph_descr.DictGraph:
     results = set(graph['result'])
-    stripped = set([node['uid'] for node in graph['graph'] if node['uid'] in results and node_checker(node)])
+    stripped = {node['uid'] for node in graph['graph'] if node['uid'] in results and node_checker(node)}
     logger.debug("Going to remove %d nodes from results as %s node results", len(stripped), node_type_name)
     graph['result'] = list(results - stripped)
     return graph
@@ -3344,7 +3323,7 @@ def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_ver
     fake_data = strtobool(flags.get('NO_VCS_DEPENDS', 'no'))
     fake_build_info = strtobool(flags.get('CONSISTENT_BUILD', 'no'))
     if outer_file:
-        with open(outer_file, 'r') as f:
+        with open(outer_file) as f:
             json_str = f.read()
     else:
         json_str = vcsversion.get_version_info(
