@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import exts.shlex2
 
-from ide import ide_common
+from devtools.ya.ide import ide_common
 from . import common, consts
 
 

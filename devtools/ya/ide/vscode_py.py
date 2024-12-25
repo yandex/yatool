@@ -25,7 +25,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import toolscache_version
 
-from ide import ide_common, venv, vscode
+from devtools.ya.ide import ide_common, venv, vscode
 
 TEST_WRAPPER_TEMPLATE = """#!/bin/sh
 export Y_PYTHON_ENTRY_POINT=:main

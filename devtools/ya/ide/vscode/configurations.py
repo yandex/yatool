@@ -5,7 +5,7 @@ from collections import OrderedDict
 import exts.fs as fs
 
 import yalibrary.platform_matcher as pm
-from ide import ide_common
+from devtools.ya.ide import ide_common
 from . import common, consts, dump, tasks
 
 

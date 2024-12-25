@@ -21,7 +21,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import toolscache_version
 
-from ide import ide_common, vscode
+from devtools.ya.ide import ide_common, vscode
 
 CODEGEN_EXTS = [".go", ".gosrc"]
 SUPPRESS_OUTPUTS = [".cgo1.go", ".res.go", "_cgo_gotypes.go", "_cgo_import.go"]

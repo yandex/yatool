@@ -11,7 +11,7 @@ import core.yarg
 from exts import fs
 from exts import path2
 from yalibrary.tools import toolchain_root
-import ide.ide_common
+import devtools.ya.ide.ide_common
 from .clion2016 import create_plugin_config, get_vcs
 from six.moves import map
 from six.moves import filterfalse
@@ -309,7 +309,7 @@ def norm_graph_path(data):
 
 
 def do_codegen(params):
-    ide.ide_common.emit_message("Running codegen")
+    devtools.ya.ide.ide_common.emit_message("Running codegen")
     build_params = copy.deepcopy(params)
     build_params.add_result = list(CODEGEN_EXTS)
     build_params.suppress_outputs = list(SUPPRESS_CODEGEN_EXTS)
@@ -325,9 +325,9 @@ def do_goland(params):
     params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     import app_ctx  # XXX
 
-    stub_info = ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)
+    stub_info = devtools.ya.ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)
 
-    ide_graph = ide.ide_common.IdeGraph(params)
+    ide_graph = devtools.ya.ide.ide_common.IdeGraph(params)
     src_dirs = sorted(
         set(
             itertools.chain(

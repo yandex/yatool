@@ -18,7 +18,7 @@ import yalibrary.tools
 import exts.fs
 import exts.process
 import exts.windows
-import ide.ide_common
+import devtools.ya.ide.ide_common
 import six
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class GDBServer(object):
     def __init__(self, host, remote_cache, port='0'):
         self.host = host
         self.remote_cache = remote_cache
-        self.sshproxy = ide.ide_common.SSHProxy(self.host, ssh_args=['-n'])
+        self.sshproxy = devtools.ya.ide.ide_common.SSHProxy(self.host, ssh_args=['-n'])
         self.port = port if port != '0' else self.sshproxy.get_free_port(self.remote_cache)
         self.started = False
         self.pinger = None
@@ -105,7 +105,7 @@ class GDBServer(object):
         logger.debug('Server stopped: %s:%s', self.host, self.port)
 
     def _ping_server(self, interval=60):
-        self.sshproxy.touch(ide.ide_common.get_pidfile_path(self.remote_cache, self.port), opts=['-c'])
+        self.sshproxy.touch(devtools.ya.ide.ide_common.get_pidfile_path(self.remote_cache, self.port), opts=['-c'])
         self.pinger = threading.Timer(interval, self._ping_server, args=[interval])
         self.pinger.start()
 
@@ -144,7 +144,7 @@ def run_wrapper(params):
         print(port)
         return
     if params.stop_server:
-        pid_file = ide.ide_common.get_pidfile_path(params.remote_cache_path, params.port)
+        pid_file = devtools.ya.ide.ide_common.get_pidfile_path(params.remote_cache_path, params.port)
         if not os.path.exists(pid_file):
             raise GDBServerException('PID file not found. Gdbserver could be still running.')
         pid = int(exts.fs.read_file(pid_file).strip())
@@ -155,7 +155,7 @@ def run_wrapper(params):
         exts.fs.ensure_removed(pid_file)
         return
     if params.patrol_server:
-        pid_file = ide.ide_common.get_pidfile_path(params.remote_cache_path, params.port)
+        pid_file = devtools.ya.ide.ide_common.get_pidfile_path(params.remote_cache_path, params.port)
         try:
             pid = int(exts.fs.read_file(pid_file).strip())
         except Exception as e:

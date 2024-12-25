@@ -11,7 +11,7 @@ import core.yarg
 import exts.fs
 import exts.path2
 import exts.process
-import ide.ide_common
+import devtools.ya.ide.ide_common
 from . import qt
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,12 @@ class QtRemoteDevEnv(object):
         remote_params = {
             'remote_host': self.params.remote_host,
         }
-        sshp = ide.ide_common.SSHProxy(self.params.remote_host)
+        sshp = devtools.ya.ide.ide_common.SSHProxy(self.params.remote_host)
         self.remote_source_path = sshp.get_real_path(
-            os.path.join(self.params.remote_cache_path, ide.ide_common.REMOTE_SOURCE_SUBDIR)
+            os.path.join(self.params.remote_cache_path, devtools.ya.ide.ide_common.REMOTE_SOURCE_SUBDIR)
         )
         self.remote_build_root = os.path.normpath(
-            os.path.join(self.remote_source_path, '..', ide.ide_common.REMOTE_BUILD_SUBDIR, 'build_root')
+            os.path.join(self.remote_source_path, '..', devtools.ya.ide.ide_common.REMOTE_BUILD_SUBDIR, 'build_root')
         )
         remote_params['remote_path'] = self.remote_source_path
         self.project_storage = self.qt_dev_env.project_storage
@@ -103,7 +103,7 @@ class QtRemoteDevEnv(object):
 
         for bin_path in binaries:
             executable_path = os.path.join(self.qt_dev_env.project.output_conf_path('Debug'), bin_path)
-            output_path = os.path.join(self.params.remote_cache_path, ide.ide_common.REMOTE_OUTPUT_SUBDIR)
+            output_path = os.path.join(self.params.remote_cache_path, devtools.ya.ide.ide_common.REMOTE_OUTPUT_SUBDIR)
             connect_command = '!{0}!{1}!'.format(
                 self.params.remote_host,
                 os.path.join(output_path, bin_path),
@@ -164,7 +164,7 @@ class QtRemoteDevEnv(object):
             self.params.arc_root, add_extra=self.params.source_mine_hacks, exclude_regexps=self.exclude_sync
         )
         with open(
-            os.path.join(self.project_info.instance_path, ide.ide_common.SYNC_LIST_FILE_NAME), 'w'
+            os.path.join(self.project_info.instance_path, devtools.ya.ide.ide_common.SYNC_LIST_FILE_NAME), 'w'
         ) as sync_list_file:
             sync_list_file.write('\n'.join(self.sync_files))
         if self.params.reset:
@@ -177,17 +177,17 @@ def generate_remote_project(params):
 
     app_ctx.display.emit_message('[[imp]]Generating Remote IDE project[[rst]]')
 
-    ide.ide_common.set_up_remote(params, app_ctx)
+    devtools.ya.ide.ide_common.set_up_remote(params, app_ctx)
 
-    project_info = ide.ide_common.IdeProjectInfo(
+    project_info = devtools.ya.ide.ide_common.IdeProjectInfo(
         params, app_ctx, instance_per_title=True, default_output_name=qt.DEFAULT_QT_OUTPUT_DIR
     )
     dev_env = QtRemoteDevEnv(params, app_ctx, project_info)
     dev_env.generate()
     run_cmd = 'ya ide qt --run'
-    if project_info.title != ide.ide_common.DEFAULT_PROJECT_TITLE:
+    if project_info.title != devtools.ya.ide.ide_common.DEFAULT_PROJECT_TITLE:
         run_cmd += ' -T ' + project_info.title
-    if project_info.output_path != ide.ide_common.IdeProjectInfo.output_path_from_default(
+    if project_info.output_path != devtools.ya.ide.ide_common.IdeProjectInfo.output_path_from_default(
         params, qt.DEFAULT_QT_OUTPUT_DIR
     ):
         run_cmd += ' -P ' + project_info.output_path
@@ -199,7 +199,7 @@ class QtRemoteProject(qt.QtCMakeProject):
         super(QtRemoteProject, self).__init__(
             params,
             *args,
-            selected_targets=('REMOTE_BUILD_AND_DOWNLOAD_' + ide.ide_common.JOINT_TARGET_REMOTE_NAME,),
+            selected_targets=('REMOTE_BUILD_AND_DOWNLOAD_' + devtools.ya.ide.ide_common.JOINT_TARGET_REMOTE_NAME,),
             **kwargs
         )
         self.cmake_file = self.cmake_stub.project_path

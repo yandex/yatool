@@ -20,7 +20,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import lock_resource, toolscache_version
 
-from ide import ide_common, venv, vscode
+from devtools.ya.ide import ide_common, venv, vscode
 
 
 class VSCodeProject(object):

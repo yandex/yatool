@@ -20,7 +20,7 @@ import yalibrary.qxml
 
 import core.yarg
 
-import ide.ide_common
+import devtools.ya.ide.ide_common
 
 logger = logging.getLogger(__name__)
 
@@ -155,14 +155,14 @@ class QtCreatorOptions(core.yarg.Options):
             raise core.yarg.ArgsValidatingException('--daemon option requires --run one')
 
 
-QT_OPTS = ide.ide_common.ide_via_ya_make_opts() + [
-    ide.ide_common.IdeProjectVersionOptions(),
+QT_OPTS = devtools.ya.ide.ide_common.ide_via_ya_make_opts() + [
+    devtools.ya.ide.ide_common.IdeProjectVersionOptions(),
     QtDevEnvOptions(),
     QtConfigOptions(),
     GenQtOptions(),
-    ide.ide_common.RemoteOptions(),
-    ide.ide_common.IdeRemoteOptions(),
-    ide.ide_common.RemoteDevEnvOptions(),
+    devtools.ya.ide.ide_common.RemoteOptions(),
+    devtools.ya.ide.ide_common.IdeRemoteOptions(),
+    devtools.ya.ide.ide_common.RemoteDevEnvOptions(),
     QtCreatorOptions(),
 ]
 
@@ -567,9 +567,9 @@ class QtCMakeProject(object):
         self.app_ctx = app_ctx
         self.info = info
         self.version = version
-        self.cmake_stub = ide.ide_common.CMakeStubProject(params, app_ctx, info, mask_output_roots=True)
+        self.cmake_stub = devtools.ya.ide.ide_common.CMakeStubProject(params, app_ctx, info, mask_output_roots=True)
         self.selected_targets = frozenset(
-            (ide.ide_common.JOINT_TARGET_NAME,) if not selected_targets else selected_targets
+            (devtools.ya.ide.ide_common.JOINT_TARGET_NAME,) if not selected_targets else selected_targets
         )
         logger.debug('Selected targets: %s', ', '.join(sorted(self.selected_targets)))
 
@@ -727,9 +727,9 @@ class QtDevEnv(object):
             self.version = qt_version(get_version_from_qtc(path_to_ide) or DEFAULT_QT_VERSION)
         if not self._version_supported:
             raise IdeQtError('Unsupported QtCreator version: {}.{}'.format(*self.version))
-        self.project_storage = ide.ide_common.IdeProjectStorage(self.project_info)
+        self.project_storage = devtools.ya.ide.ide_common.IdeProjectStorage(self.project_info)
         self.project = create_project(params, app_ctx, self.project_info, self.version)
-        ide.ide_common.memo_gen(self.project_storage)
+        devtools.ya.ide.ide_common.memo_gen(self.project_storage)
         self.settings_path = self.project.project_path + '.shared'
         app_ctx.display.emit_message('QtCreator version: [[imp]]{}.{}[[rst]]'.format(*self.version))
         app_ctx.display.emit_message('Project settings: [[path]]{}[[rst]]'.format(self.settings_path))
@@ -907,15 +907,15 @@ def gen_qt_project(params):
         project_creator = QtCMakeProject
     else:
         raise IdeQtError('QtCreator generation mode not implemented: {}'.format(params.project_type))
-    project_info = ide.ide_common.IdeProjectInfo(
+    project_info = devtools.ya.ide.ide_common.IdeProjectInfo(
         params, app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR
     )
     dev_env = QtDevEnv(params, app_ctx, config, project_info, project_creator)
     dev_env.generate()
     run_cmd = 'ya ide qt --run'
-    if project_info.title != ide.ide_common.DEFAULT_PROJECT_TITLE:
+    if project_info.title != devtools.ya.ide.ide_common.DEFAULT_PROJECT_TITLE:
         run_cmd += ' -T ' + project_info.title
-    if project_info.output_path != ide.ide_common.IdeProjectInfo.output_path_from_default(
+    if project_info.output_path != devtools.ya.ide.ide_common.IdeProjectInfo.output_path_from_default(
         params, DEFAULT_QT_OUTPUT_DIR
     ):
         run_cmd += ' -P ' + project_info.output_path
@@ -928,20 +928,20 @@ def run_qtcreator(params):
     logger.warning("ya ide qt is deprecated")
     import app_ctx
 
-    fake_app_ctx = ide.ide_common.FakeAppCtx()
+    fake_app_ctx = devtools.ya.ide.ide_common.FakeAppCtx()
 
-    project_info = ide.ide_common.IdeProjectInfo(
+    project_info = devtools.ya.ide.ide_common.IdeProjectInfo(
         params, fake_app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR
     )
-    project_storage = ide.ide_common.IdeProjectStorage(project_info)
+    project_storage = devtools.ya.ide.ide_common.IdeProjectStorage(project_info)
     if len(project_storage.data) == 0:
-        raise ide.ide_common.RemoteIdeError('There\'s no such project: {}'.format(project_info.title))
+        raise devtools.ya.ide.ide_common.RemoteIdeError('There\'s no such project: {}'.format(project_info.title))
     target = project_storage.data['project_runnable']
     if not os.path.exists(target):
-        raise ide.ide_common.RemoteIdeError('Can\'t locate project: file {} doesn\'t exist'.format(target))
+        raise devtools.ya.ide.ide_common.RemoteIdeError('Can\'t locate project: file {} doesn\'t exist'.format(target))
     path_to_ide = params.ide_path or project_storage.data['ide_path']
     if not path_to_ide:
-        raise ide.ide_common.RemoteIdeError(
+        raise devtools.ya.ide.ide_common.RemoteIdeError(
             'Couldn\'t find Qt Creator installed :-( Please, set the binary path manually with -I option'
         )
     app_ctx.display.emit_message('Using IDE: ' + path_to_ide)

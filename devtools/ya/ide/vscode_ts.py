@@ -14,7 +14,7 @@ import core.yarg
 import exts.shlex2
 import yalibrary.tools
 
-from ide import ide_common, vscode
+from devtools.ya.ide import ide_common, vscode
 
 
 class VSCodeTypeScriptOptions(core.yarg.Options):

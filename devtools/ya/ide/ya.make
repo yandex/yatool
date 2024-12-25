@@ -30,7 +30,6 @@ PEERDIR(
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE ide
     clion2016.py
     gdb_wrapper.py
     goland.py

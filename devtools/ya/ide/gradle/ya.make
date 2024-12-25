@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE ide.gradle
     __init__.py
 )
 

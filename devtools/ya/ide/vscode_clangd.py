@@ -22,7 +22,7 @@ import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import toolscache_version
 
-from ide import ide_common, vscode
+from devtools.ya.ide import ide_common, vscode
 
 CODEGEN_EXTS = [".h", ".hh", ".hpp", ".inc", ".c", ".cc", ".cpp", ".C", ".cxx"]
 CODEGEN_TASK = "%s make --force-build-depends --replace-result --keep-going --no-src-links --output=%s %s %s"

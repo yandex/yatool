@@ -11,7 +11,7 @@ import core.yarg
 import exts.fs as fs
 import yalibrary.makelists
 
-from ide import ide_common
+from devtools.ya.ide import ide_common
 
 from . import consts
 
