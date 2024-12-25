@@ -78,6 +78,7 @@ SRCS(
     compute_reachability.cpp
     conf.cpp
     config/config.cpp
+    dump_graph_info.cpp
     debug_log.cpp
     dependency_management.cpp
     diag_reporter.cpp

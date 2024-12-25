@@ -116,10 +116,10 @@ public:
     void CheckBlacklist();
     void CheckIsolatedProjects();
     void CheckStartDirsChanges();
-    void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false);
+    void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false) const;
     void DumpSrcDeps(IOutputStream& cmsg);
-    void PrintTargetDeps(IOutputStream& cmsg);
-    void DumpBuildTargets(IOutputStream& cmsg);
+    void PrintTargetDeps(IOutputStream& cmsg) const;
+    void DumpBuildTargets(IOutputStream& cmsg) const;
     void DumpTestDart(IOutputStream& cmsg);
     void DumpJavaDart(IOutputStream& cmsg);
     void DumpMakeFilesDart(IOutputStream& cmsg);

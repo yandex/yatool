@@ -72,7 +72,7 @@ void TSymbols::Clear() {
     StaticStore.Drop();
 }
 
-void TSymbols::Dump(IOutputStream& out) {
+void TSymbols::Dump(IOutputStream& out) const{
     CommandConf.Dump(out);
     FileConf.Dump(out);
 }

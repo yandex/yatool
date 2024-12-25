@@ -39,5 +39,5 @@ public:
 
     void Clear();
 
-    void Dump(IOutputStream& out);
+    void Dump(IOutputStream& out) const;
 };

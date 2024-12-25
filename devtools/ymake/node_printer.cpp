@@ -1937,7 +1937,7 @@ void TYMake::DumpSrcDeps(IOutputStream& cmsg) {
     IterateAll(Graph, ModuleStartTargets, printer);
 }
 
-void TYMake::DumpDependentDirs(IOutputStream& cmsg, bool skipDepends) {
+void TYMake::DumpDependentDirs(IOutputStream& cmsg, bool skipDepends) const {
     if (HasNonDirTargets) {
         return;
     }
@@ -2088,7 +2088,7 @@ bool TBuildTargetDepsPrinter::AcceptDep(TState& state) {
     return TBase::AcceptDep(state);
 }
 
-void TYMake::PrintTargetDeps(IOutputStream& cmsg) {
+void TYMake::PrintTargetDeps(IOutputStream& cmsg) const {
     if (HasNonDirTargets) {
         return;
     }
@@ -2097,7 +2097,7 @@ void TYMake::PrintTargetDeps(IOutputStream& cmsg) {
     IterateAll(Graph, StartTargets, proc, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 }
 
-void TYMake::DumpBuildTargets(IOutputStream& cmsg) {
+void TYMake::DumpBuildTargets(IOutputStream& cmsg) const {
     for (const auto& target : StartTargets) {
         if (!target.IsModuleTarget) {
             continue;
