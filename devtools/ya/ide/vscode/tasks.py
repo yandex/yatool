@@ -3,6 +3,7 @@ import sys
 from collections import OrderedDict
 
 import exts.shlex2
+import yalibrary.platform_matcher as pm
 
 from devtools.ya.ide import ide_common
 from . import common, consts
@@ -206,10 +207,8 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
     ]
 
 
-def gen_codegen_tasks(
-    abs_targets, ya_bin_path, common_args, languages, with_tests=False, venv_args=None, codegen_cpp_dir=None
-):
-    TARGETS = " ".join(exts.shlex2.quote(arg) for arg in abs_targets)
+def gen_codegen_tasks(params, ya_bin_path, common_args, languages, venv_args=None, codegen_cpp_dir=None):
+    TARGETS = " ".join(exts.shlex2.quote(arg) for arg in params.abs_targets)
     tasks = []
     if "CPP" in languages:
         codegen_args = (
@@ -218,7 +217,7 @@ def gen_codegen_tasks(
             + ["--no-output-for=%s" % ext for ext in consts.SUPRESS_EXTS_BY_LANG.get("CPP", [])]
             + ["--no-src-links"]
         )
-        if with_tests:
+        if params.tests_enabled:
             codegen_args.append("-DTRAVERSE_RECURSE_FOR_TESTS=yes")
         CODEGEN_ARGS = " ".join(exts.shlex2.quote(arg) for arg in codegen_args)
         tasks.append(
@@ -257,7 +256,9 @@ def gen_codegen_tasks(
             + ["--add-result=%s" % ext for lang in languages for ext in consts.CODEGEN_EXTS_BY_LANG.get(lang, [])]
             + ["--no-output-for=%s" % ext for lang in languages for ext in consts.SUPRESS_EXTS_BY_LANG.get(lang, [])]
         )
-        if with_tests:
+        if pm.my_platform() == "win32":
+            codegen_args.append("--output=%s" % params.output_root or params.arc_root)
+        if params.tests_enabled:
             codegen_args.append("-DTRAVERSE_RECURSE_FOR_TESTS=yes")
         CODEGEN_ARGS = " ".join(exts.shlex2.quote(arg) for arg in codegen_args)
         tasks.append(

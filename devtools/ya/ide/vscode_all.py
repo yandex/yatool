@@ -188,8 +188,7 @@ class VSCodeProject(object):
             build_params.add_result = [ext for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get("CPP", [])]
             build_params.suppress_outputs = [ext for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get("CPP", [])]
             build_params.output_root = self.codegen_cpp_dir
-            if pm.my_platform() == "win32":
-                build_params.create_symlinks = False
+            build_params.create_symlinks = False
 
             ide_common.emit_message("Running codegen for C++")
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
@@ -205,6 +204,8 @@ class VSCodeProject(object):
 
             if pm.my_platform() == "win32":
                 build_params.create_symlinks = False
+                build_params.output_root = self.params.output_root or self.params.arc_root
+
             if self.is_go:
                 build_params.flags["CGO_ENABLED"] = "0"
 
@@ -445,11 +446,9 @@ class VSCodeProject(object):
         ya_bin_path = os.path.join(self.params.arc_root, "ya")
         default_tasks = vscode.tasks.gen_default_tasks(self.params.abs_targets, ya_bin_path, self.common_args)
         codegen_tasks = vscode.tasks.gen_codegen_tasks(
-            self.params.abs_targets,
+            self.params,
             ya_bin_path,
             self.common_args,
-            self.params.languages,
-            self.params.tests_enabled,
             venv_args,
             self.codegen_cpp_dir,
         )
