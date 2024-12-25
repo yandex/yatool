@@ -180,7 +180,7 @@ namespace {
     EChangeType GetChangeType(TStringBuf type) {
         if (type == "modified") {
             return EChangeType::Modify;
-        } else if (type == "new_file") {
+        } else if (EqualToOneOf(type, "new file", "new_file")) {
             return EChangeType::Create;
         }
         return EChangeType::Remove;
