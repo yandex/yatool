@@ -17,7 +17,7 @@ from . import consts
 
 
 def module_info(params):
-    import devtools.ya.handlers.dump as dump
+    from devtools.ya.handlers import dump
 
     dump_params = core.yarg.merge_params(
         copy.deepcopy(params),
