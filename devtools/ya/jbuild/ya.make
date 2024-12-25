@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE jbuild
     execute.py
     jbuild_opts.py
     java_build2.py

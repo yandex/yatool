@@ -1,8 +1,8 @@
 import os
 
-import jbuild.commands as commands
-import jbuild.gen.consts as consts
-import jbuild.gen.node as node
+import devtools.ya.jbuild.commands as commands
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.node as node
 
 import yalibrary.graph.commands as graph_commands
 

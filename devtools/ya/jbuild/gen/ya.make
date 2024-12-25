@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE jbuild.gen
     gen.py
 )
 

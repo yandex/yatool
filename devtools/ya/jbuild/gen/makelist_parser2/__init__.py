@@ -3,8 +3,8 @@ import string
 
 import six
 
-import jbuild.gen.consts as consts
-import jbuild.gen.java_target2 as jt
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.java_target2 as jt
 
 import yalibrary.graph.base as graph_base
 
@@ -113,7 +113,7 @@ def replace_vars(arg, vars):
 
 
 def obtain_targets_graph2(dart, cpp_graph):
-    from jbuild.gen.actions import parse
+    from devtools.ya.jbuild.gen.actions import parse
 
     by_path = {}
     extra_idea_paths = {}

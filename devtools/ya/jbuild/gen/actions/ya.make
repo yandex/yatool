@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE jbuild.gen.actions
     compile.py
     fetch_test_data.py
     funcs.py

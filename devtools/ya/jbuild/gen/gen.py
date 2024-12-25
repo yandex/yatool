@@ -106,7 +106,7 @@ def iter_result(ctx, nodes):
                 yield n
 
     if ctx.opts.idea_project_root:
-        import jbuild.gen.actions.idea as idea
+        import devtools.ya.jbuild.gen.actions.idea as idea
 
         idea_result, _ = idea.idea_results(ctx, nodes)
 
@@ -136,7 +136,7 @@ def iter_scarab(nodes):
 
 
 def default_opts():
-    import jbuild.jbuild_opts as jbuild_opts
+    import devtools.ya.jbuild.jbuild_opts as jbuild_opts
     import core.yarg
 
     return core.yarg.merge_opts(jbuild_opts.jbuild_opts()).params()

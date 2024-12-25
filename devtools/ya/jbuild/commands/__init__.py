@@ -1,6 +1,6 @@
 import os
 
-import jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.consts as consts
 import yalibrary.graph.commands as graph_commands
 
 

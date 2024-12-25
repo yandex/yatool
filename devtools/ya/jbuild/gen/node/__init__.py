@@ -1,9 +1,9 @@
 import os
 import collections
 
-import jbuild.gen.base as base
-import jbuild.gen.consts as consts
-import jbuild.commands as commands
+import devtools.ya.jbuild.gen.base as base
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.commands as commands
 from exts import hashing
 import yalibrary.graph.base as graph_base
 import yalibrary.graph.node as graph_node

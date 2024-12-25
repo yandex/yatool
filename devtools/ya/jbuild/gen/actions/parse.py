@@ -12,7 +12,7 @@ def extract_word(words, key):
                 return words[i + 1], words[:i] + words[i + 2 :]
 
             except KeyError:
-                import jbuild.gen.makelist_parser2 as mp
+                import devtools.ya.jbuild.gen.makelist_parser2 as mp
 
                 raise mp.ParseError('no value after {}'.format(key))
 

@@ -765,7 +765,7 @@ class MavenImportOptions(SandboxUploadOptions):
         self.repo_auth_password = None
 
     def consumer(self):
-        import jbuild.maven.maven_import as mi
+        import devtools.ya.jbuild.maven.maven_import as mi
 
         return super().consumer() + [
             ArgConsumer(

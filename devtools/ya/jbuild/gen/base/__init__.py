@@ -3,9 +3,9 @@ import logging
 import collections
 
 import exts.path2 as path2
-import jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.consts as consts
 import yalibrary.graph.base as base
-from jbuild.gen import configure
+from devtools.ya.jbuild.gen import configure
 
 logger = logging.getLogger(__name__)
 

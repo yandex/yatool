@@ -11,8 +11,8 @@ from build.build_facade import gen_managed_dep_tree, gen_targets_classpath
 from exts.tmp import temp_dir
 import yalibrary.formatter as yaformatter
 
-from jbuild.gen import base
-from jbuild.gen import consts
+from devtools.ya.jbuild.gen import base
+from devtools.ya.jbuild.gen import consts
 from six.moves import map
 
 

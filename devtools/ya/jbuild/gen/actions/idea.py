@@ -11,10 +11,10 @@ import xml.etree.ElementTree as et
 import xml.sax.saxutils as saxutils
 
 import six
-import jbuild.gen.base as base
-import jbuild.gen.consts as consts
-import jbuild.gen.node as node
-import jbuild.gen.makelist_parser2 as mp2
+import devtools.ya.jbuild.gen.base as base
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.node as node
+import devtools.ya.jbuild.gen.makelist_parser2 as mp2
 import yalibrary.graph.base as graph_base
 import exts.archive as archive
 import exts.fs as fs

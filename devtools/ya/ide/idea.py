@@ -7,8 +7,8 @@ import logging
 import json
 
 import exts.tmp as tmp
-import jbuild.gen.consts as consts
-import jbuild.gen.actions.idea as idea
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.actions.idea as idea
 import build.graph as bg
 import build.build_opts as bo
 import build.ya_make as ya_make

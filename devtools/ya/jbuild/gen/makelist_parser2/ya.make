@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE jbuild.gen.makelist_parser2
     __init__.py
 )
 

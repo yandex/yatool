@@ -3252,7 +3252,7 @@ def _get_tpc_test_opts(opts, tpc):
 
 
 def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph, graph):
-    import jbuild.gen.gen as jb
+    import devtools.ya.jbuild.gen.gen as jb
 
     pic, no_pic, target_tc = first_target_graph.pic, first_target_graph.no_pic, first_target_graph.target_tc
     java_darts = pic().java_darts + no_pic().java_darts

@@ -1,4 +1,4 @@
-from jbuild.gen import consts
+from devtools.ya.jbuild.gen import consts
 
 import yalibrary.graph.base as graph_base
 

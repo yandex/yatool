@@ -24,14 +24,14 @@ import build.build_handler
 import core.yarg
 import core.config
 
-import jbuild.gen.gen as gen
-import jbuild.gen.base as base
-import jbuild.gen.consts as consts
-import jbuild.gen.node as jnode
-import jbuild.execute as execute
-import jbuild.commands as commands
-import jbuild.maven.license as license
-import jbuild.maven.version_filter as vf
+import devtools.ya.jbuild.gen.gen as gen
+import devtools.ya.jbuild.gen.base as base
+import devtools.ya.jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.node as jnode
+import devtools.ya.jbuild.execute as execute
+import devtools.ya.jbuild.commands as commands
+import devtools.ya.jbuild.maven.license as license
+import devtools.ya.jbuild.maven.version_filter as vf
 
 import yalibrary.graph.base as graph_base
 

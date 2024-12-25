@@ -84,10 +84,10 @@ def inject_create_java_coverage_report_node(
             jars.add(out)
             jars_uids.add(node['uid'])
 
-    import jbuild.gen.actions.compile
+    import devtools.ya.jbuild.gen.actions.compile
 
     jars_file = '$(BUILD_ROOT)/cls.lst'
-    jars_file_cmds = jbuild.gen.actions.compile.make_build_file(sorted(jars), ' ', jars_file)
+    jars_file_cmds = devtools.ya.jbuild.gen.actions.compile.make_build_file(sorted(jars), ' ', jars_file)
 
     cmds = []
     for cmd in jars_file_cmds:

@@ -1270,8 +1270,8 @@ def get_deps(targets, graph, build_result, dest_dir):
         logger.warning('Don\'t know which deps to dump. Candidates are %s', ', '.join(targets))
         return
 
-    import jbuild.gen.base as base
-    import jbuild.gen.actions.funcs as funcs
+    import devtools.ya.jbuild.gen.base as base
+    import devtools.ya.jbuild.gen.actions.funcs as funcs
 
     result = frozenset(graph['result'])
     target = targets[0]

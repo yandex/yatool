@@ -6,7 +6,7 @@ import sys
 
 import six
 
-import jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.consts as consts
 
 import exts.yjson as json
 

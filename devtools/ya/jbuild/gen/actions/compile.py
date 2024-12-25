@@ -1,10 +1,10 @@
 import os
 import logging
 
-import jbuild.commands as commands
+import devtools.ya.jbuild.commands as commands
 from . import parse
-import jbuild.gen.makelist_parser2 as mp
-import jbuild.gen.consts as consts
+import devtools.ya.jbuild.gen.makelist_parser2 as mp
+import devtools.ya.jbuild.gen.consts as consts
 
 logger = logging.getLogger(__name__)
 

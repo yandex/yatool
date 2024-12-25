@@ -11,13 +11,13 @@ import devtools.ya.test.test_types.common as test_types
 from library.python import func
 
 import exts.func
-from jbuild.gen import base
+from devtools.ya.jbuild.gen import base
 from devtools.ya.test.common import ytest_common_tools as yct
 from devtools.ya.test.common import ytest_common_tools as yc
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const as test_const
 import devtools.ya.test.util.tools as test_tools
-import jbuild.gen.makelist_parser2 as mp2
+import devtools.ya.jbuild.gen.makelist_parser2 as mp2
 
 import yalibrary.graph.base as graph_base
 import yalibrary.graph.commands as graph_commands

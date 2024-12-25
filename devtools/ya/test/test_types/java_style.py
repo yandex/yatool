@@ -7,7 +7,7 @@ import devtools.ya.test.common
 import devtools.ya.test.const
 import devtools.ya.test.system.process
 
-from jbuild.gen import base
+from devtools.ya.jbuild.gen import base
 from devtools.ya.test import common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types.py_test import LintTestSuite
