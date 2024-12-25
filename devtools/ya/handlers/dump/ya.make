@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE handlers.dump
     __init__.py
     gen_conf_docs.py
 )

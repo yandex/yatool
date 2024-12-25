@@ -35,7 +35,7 @@ import jbuild.maven.version_filter as vf
 
 import yalibrary.graph.base as graph_base
 
-from handlers.dump import FullForcedDepsOptions, do_forced_deps
+from devtools.ya.handlers.dump import FullForcedDepsOptions, do_forced_deps
 
 logger = logging.getLogger(__name__)
 

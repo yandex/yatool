@@ -1,7 +1,6 @@
 PY3_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE handlers.buf
     __init__.py
 )
 

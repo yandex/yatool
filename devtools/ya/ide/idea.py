@@ -105,7 +105,7 @@ def do_idea(params):
     jopts.flags['YA_IDE_IDEA'] = 'yes'
     jopts.flags['SOURCES_JAR'] = 'yes'
     if jopts.generate_tests_for_deps:
-        from handlers.dump import do_module_info, DumpModuleInfoOptions
+        from devtools.ya.handlers.dump import do_module_info, DumpModuleInfoOptions
 
         jopts.__dict__.update(DumpModuleInfoOptions().__dict__)
         res = do_module_info(jopts, False)

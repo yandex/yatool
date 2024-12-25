@@ -1,7 +1,6 @@
 PY3_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE handlers.analyze_make.timeline
     __init__.py
 )
 

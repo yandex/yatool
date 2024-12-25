@@ -2,8 +2,8 @@ import core.yarg
 import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
-import handlers.analyze_make.timeline as timeline
-import handlers.analyze_make.timebloat as timebloat
+import devtools.ya.handlers.analyze_make.timeline as timeline
+import devtools.ya.handlers.analyze_make.timebloat as timebloat
 import os
 import devtools.ya.yalibrary.app_ctx
 import yalibrary.tools

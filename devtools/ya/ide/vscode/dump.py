@@ -17,15 +17,19 @@ from . import consts
 
 
 def module_info(params):
-    import handlers.dump
+    import devtools.ya.handlers.dump as dump
 
     dump_params = core.yarg.merge_params(
-        copy.deepcopy(params), handlers.dump.DumpModuleInfoOptions(), handlers.dump.DataOptions()
+        copy.deepcopy(params),
+        dump.DumpModuleInfoOptions(),
+        dump.DataOptions(),
     )
     if params.tests_enabled:
         dump_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
+
     return devtools.ya.app.execute(
-        action=partial(handlers.dump.do_module_info, write_stdout=False), respawn=devtools.ya.app.RespawnType.NONE
+        action=partial(dump.do_module_info, write_stdout=False),
+        respawn=devtools.ya.app.RespawnType.NONE,
     )(dump_params).stdout
 
 

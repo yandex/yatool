@@ -45,12 +45,12 @@ def explore_plugins(loader_hook, suffix):
     result = PluginMap()
 
     for m in sys.extra_modules:
-        if m.startswith('handlers.') and m.endswith('.__init__'):
+        if m.startswith('devtools.ya.handlers.') and m.endswith('.__init__'):
             m = m.replace('.__init__', '')
             parts = m.split('.')
-            if len(parts) != 2:
+            if len(parts) != 4:
                 continue
-            _, full_name = parts[:2]
+            full_name = parts[-1]
             name = full_name.replace(suffix, '').replace('_', '-')
             result.add(name, make_loader(m))
 

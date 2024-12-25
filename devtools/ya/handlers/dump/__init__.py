@@ -8,7 +8,7 @@ import os
 import sys
 import enum
 import six
-from handlers.dump.debug import debug_handler
+from devtools.ya.handlers.dump.debug import debug_handler
 
 from build.build_facade import (
     gen_all_loops,
@@ -28,7 +28,7 @@ from build.build_facade import (
     gen_filelist,
     gen_relation,
 )
-from handlers.dump.gen_conf_docs import dump_mmm_docs
+from devtools.ya.handlers.dump.gen_conf_docs import dump_mmm_docs
 from build.dir_graph import reachable, gen_dir_graph
 from build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
 from exts.strtobool import strtobool

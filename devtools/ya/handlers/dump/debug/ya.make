@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE handlers.dump.debug
     __init__.py
 )
 
@@ -23,7 +22,6 @@ PEERDIR(
 
 IF (NOT YA_OPENSOURCE)
     PY_SRCS(
-        NAMESPACE handlers.dump.debug
         dump_upload.py
     )
     PEERDIR(

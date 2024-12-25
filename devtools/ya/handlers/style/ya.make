@@ -24,7 +24,6 @@ PEERDIR(
 )
 
 PY_SRCS(
-    NAMESPACE handlers.style
     __init__.py
     config.py
     state_helper.py
