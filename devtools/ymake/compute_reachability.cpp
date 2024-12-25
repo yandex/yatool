@@ -7,6 +7,7 @@
 namespace NComputeReachability {
     struct TStackData {
         bool IsIndirectPeerdir = false;
+        bool IsDirStartTarget = false;
     };
     using TStateItem = TGraphIteratorStateItem<TStackData, false>;
 
@@ -20,12 +21,13 @@ namespace NComputeReachability {
         }
 
         bool AcceptDep(TState& state) {
-            if (state.Top().IsIndirectPeerdir) {
+            const auto& st = state.Top();
+            if (st.IsDirStartTarget || st.IsIndirectPeerdir) {
                 const auto& dep = state.NextDep();
                 if (EDT_Include == *dep && IsMakeFileType(dep.To()->NodeType)) {
                     // Do nothing
                 } else {
-                     return false;
+                    return false;
                 }
             }
             return TBase::AcceptDep(state);
@@ -33,14 +35,16 @@ namespace NComputeReachability {
 
         bool Enter(TState& state) {
             bool fresh  = TBase::Enter(state);
-
             if (fresh) {
-                if (state.HasIncomingDep() && IsPeerdirDep(state.IncomingDep())) {
+                if (!state.HasIncomingDep()) {
+                    if (state.TopNode()->NodeType == EMNT_Directory) {
+                        state.Stack().begin()->IsDirStartTarget = true;
+                    }
+                } else if (IsPeerdirDep(state.IncomingDep())) {
                     state.Top().IsIndirectPeerdir = true;
                 }
                 state.TopNode()->State.SetReachable(true);
             }
-
             return fresh;
         }
     };
@@ -51,23 +55,8 @@ namespace NComputeReachability {
         }
     }
 
-    void ComputeReachableNodes(TDepGraph& graph, const TFileConf& /* fileConf */, TVector<TTarget>& startTargets) {
+    void ComputeReachableNodes(TDepGraph& graph, TVector<TTarget>& startTargets) {
         TVisitor visitor;
-        IterateAll(graph, startTargets, visitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
-
-        for (auto startTarget : startTargets) {
-            auto startTargetNode = graph.Get(startTarget.Id);
-            startTargetNode->State.SetReachable(true);
-
-            if (startTarget.IsModuleTarget) {
-                continue;
-            }
-
-            for (auto dep : startTargetNode.Edges()) {
-                if (IsMakeFileType(dep.To()->NodeType)) {
-                    dep.To()->State.SetReachable(true);
-                }
-            }
-        }
+        IterateAll(graph, startTargets, visitor);
     }
 }

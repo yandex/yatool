@@ -7,5 +7,5 @@
 
 namespace NComputeReachability {
     void ResetReachableNodes(TDepGraph& graph);
-    void ComputeReachableNodes(TDepGraph& graph, const TFileConf& fileConf, TVector<TTarget>& startTargets);
+    void ComputeReachableNodes(TDepGraph& graph, TVector<TTarget>& startTargets);
 }

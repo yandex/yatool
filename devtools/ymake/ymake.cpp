@@ -186,7 +186,7 @@ void TYMake::ComputeReachableNodes() {
     }
 
     NYMake::TTraceStage scopeTracer{"Set reachable nodes"};
-    NComputeReachability::ComputeReachableNodes(Graph, Names.FileConf, StartTargets);
+    NComputeReachability::ComputeReachableNodes(Graph, StartTargets);
 }
 
 void TYMake::UpdateExternalFilesChanges() {
