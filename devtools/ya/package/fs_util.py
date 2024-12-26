@@ -26,8 +26,8 @@ def cleanup(path, force=False):
     exts.fs.ensure_removed(path)
 
 
-def copy_tree(source, destination):
-    # type: (str, str) -> None
+def copy_tree(source, destination, symlinks=False):
+    # type: (str, str, bool) -> None
 
     def copy_function_with_follback_on_dirs(src, dst):
         # type: (str, str) -> None
@@ -36,10 +36,10 @@ def copy_tree(source, destination):
             return shutil.copy2(src, dst)
         except IOError as e:
             if e.errno == errno.EISDIR:
-                return exts.fs.copytree3(src, dst)
+                return exts.fs.copytree3(src, dst, symlinks=symlinks)
             raise
 
-    exts.fs.copytree3(source, destination, copy_function=copy_function_with_follback_on_dirs)
+    exts.fs.copytree3(source, destination, copy_function=copy_function_with_follback_on_dirs, symlinks=symlinks)
 
 
 def hardlink_or_copy(src, lnk, copy_function=exts.fs.copy2_safe):

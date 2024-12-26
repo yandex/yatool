@@ -1593,7 +1593,7 @@ def do_package(params):
             finally:
                 if not params.cleanup and os.path.exists(output_root):
                     build_temp = f"build.{package_context.package_name}.{random.random()}"
-                    package.fs_util.copy_tree(output_root, build_temp)
+                    package.fs_util.copy_tree(output_root, build_temp, symlinks=True)
                     package.display.emit_message(f'Build temp directory: [[imp]]{build_temp}')
 
         with exts.tmp.temp_dir() as output_root:

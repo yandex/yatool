@@ -239,7 +239,7 @@ class Source(object):
         if self.keep_symlinks() and os.path.islink(source):
             self._copy_link(source, destination)
         else:
-            package.fs_util.copy_tree(source, destination)
+            package.fs_util.copy_tree(source, destination, symlinks=self.keep_symlinks())
 
     def copy(self, source, destination):
         if _is_dir_path(source):
