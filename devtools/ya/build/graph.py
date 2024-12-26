@@ -3298,6 +3298,7 @@ def build_lite_graph(graph):
         lite_node = {}
         for key in [
             'deps',
+            'self_uid',
             'uid',
             'target_properties',
             'node-type',
