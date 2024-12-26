@@ -1,7 +1,6 @@
 import getpass
 import socket
 import os
-import six
 
 import build.build_opts
 import build.targets_deref
@@ -27,7 +26,7 @@ def conf(platform, pattern_tool_map):
         'platform': platform,
         'priority': -rev,
         'resources': [
-            {'pattern': p, 'resource': tools.resource_id(t, None, platform)} for p, t in six.iteritems(pattern_tool_map)
+            {'pattern': p, 'resource': tools.resource_id(t, None, platform)} for p, t in pattern_tool_map.items()
         ],
         'revision': rev,
     }

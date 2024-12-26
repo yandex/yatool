@@ -1,19 +1,18 @@
-import os
-import six
 import logging
+import os
 
-from . import node
-from . import base
-from .actions import fetch_test_data as fetch_test_data
-from . import makelist_parser2 as mp
-from . import configure
-from . import consts
-from core import stage_tracer
-from yalibrary import platform_matcher
-from exts.strtobool import strtobool
 import yalibrary.graph.base as graph_base
 import yalibrary.graph.node as graph_node
-from six.moves import map
+from core import stage_tracer
+from exts.strtobool import strtobool
+from yalibrary import platform_matcher
+
+from . import base
+from . import configure
+from . import consts
+from . import node
+from . import makelist_parser2 as mp
+from .actions import fetch_test_data
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("jbuild")
@@ -136,8 +135,8 @@ def iter_scarab(nodes):
 
 
 def default_opts():
-    import devtools.ya.jbuild.jbuild_opts as jbuild_opts
     import core.yarg
+    import devtools.ya.jbuild.jbuild_opts as jbuild_opts
 
     return core.yarg.merge_opts(jbuild_opts.jbuild_opts()).params()
 
@@ -177,10 +176,10 @@ def gen(
 
     ins_unresolved_ = graph_node.calc_uids(arc_root, achievable)
 
-    for n, ins in six.iteritems(ins_unresolved_):
+    for n, ins in ins_unresolved_.items():
         ins_unresolved[n].extend(ins)
 
-    for n, ins in six.iteritems(ins_unresolved):
+    for n, ins in ins_unresolved.items():
         if n in achievable:
             ctx.errs[n.path].missing_inputs.extend([x[0] for x in ins])
             ctx.errs[n.path].missing_inputs.extend(
@@ -191,7 +190,7 @@ def gen(
                 ]
             )  # For selective checkout from JAVA_SRCS
 
-    for e in six.itervalues(ctx.errs):
+    for e in ctx.errs.values():
         e.missing_inputs = sorted(set(e.missing_inputs))
     insert_java_detect_unversioned.finish()
 
