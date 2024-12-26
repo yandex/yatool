@@ -5,7 +5,10 @@
 void TGraphChangesPredictor::AnalyzeChanges() {
 
     auto&& markChanged = [this](const IChanges::TChange& change) {
-        YDebug() << "Check Changes: " << change.Name << Endl;
+        if (HasChanges_) {
+            return;
+        }
+
         auto type = change.Type;
 
         if (type == EChangeType::Remove) {
