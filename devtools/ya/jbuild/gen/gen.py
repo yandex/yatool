@@ -3,7 +3,7 @@ import os
 
 import yalibrary.graph.base as graph_base
 import yalibrary.graph.node as graph_node
-from core import stage_tracer
+from devtools.ya.core import stage_tracer
 from exts.strtobool import strtobool
 from yalibrary import platform_matcher
 

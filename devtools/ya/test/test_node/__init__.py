@@ -11,10 +11,10 @@ import time
 
 import app_config
 import build.gen_plan as gen_plan
-import core.error
-import core.imprint.imprint as imprint
+import devtools.ya.core.error
+import devtools.ya.core.imprint.imprint as imprint
 import core.yarg
-import core.profiler
+import devtools.ya.core.profiler
 
 import devtools.ya.test.dependency.mds_storage as mds_storage
 import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
@@ -2699,7 +2699,7 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
 
     show_list_cmd = util_tools.get_test_tool_cmd(opts, "list_result_node", all_resources) + [
         "--fail-exit-code",
-        str(core.error.ExitCodes.TEST_FAILED),
+        str(devtools.ya.core.error.ExitCodes.TEST_FAILED),
     ]
 
     if tests_filter_descr:

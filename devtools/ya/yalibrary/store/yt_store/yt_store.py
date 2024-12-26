@@ -10,7 +10,7 @@ import exts.archive as archive
 import yalibrary.store.yt_store.client as client
 import yalibrary.store.yt_store.consts as consts
 import yalibrary.store.yt_store.utils as utils
-from core import report
+from devtools.ya.core import report
 from exts import fs, tmp, asyncthread
 from exts.timer import AccumulateTime
 from yalibrary.store.dist_store import DistStore

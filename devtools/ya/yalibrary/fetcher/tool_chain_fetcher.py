@@ -14,7 +14,7 @@ from yalibrary import guards
 from yalibrary import platform_matcher
 from yalibrary import toolscache
 
-from core import config
+from devtools.ya.core import config
 
 from yalibrary.fetcher.uri_parser import parse_resource_uri
 

@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-import core.common_opts
+import devtools.ya.core.common_opts
 import core.yarg
 
 from . import gen_config
@@ -35,7 +35,7 @@ class GenConfigYaHandler(core.yarg.OptsHandler):
             action=self.do_generate,
             description=self.description,
             opts=[
-                core.common_opts.ShowHelpOptions(),
+                devtools.ya.core.common_opts.ShowHelpOptions(),
                 GenConfigOptions(),
             ],
         )

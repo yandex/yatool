@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import core.yarg
 import devtools.ya.jbuild.maven.maven_import as mi
-import core.common_opts as common_opts
+import devtools.ya.core.common_opts as common_opts
 import build.build_opts as build_opts
 import devtools.ya.app
 import app_config

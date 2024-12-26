@@ -4,8 +4,8 @@ import os.path
 import six
 
 import core.yarg
-import core.config
-import core.common_opts
+import devtools.ya.core.config
+import devtools.ya.core.common_opts
 
 import build.build_opts
 import build.compilation_database as bcd
@@ -522,7 +522,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             + [
                 CLionOptions(),
                 TidyOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
 
@@ -534,9 +534,9 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 IdeaOptions(),
-                core.common_opts.OutputStyleOptions(),
-                core.common_opts.CrossCompilationOptions(),
-                core.common_opts.PrintStatisticsOptions(),
+                devtools.ya.core.common_opts.OutputStyleOptions(),
+                devtools.ya.core.common_opts.CrossCompilationOptions(),
+                devtools.ya.core.common_opts.PrintStatisticsOptions(),
                 build.build_opts.ContinueOnFailOptions(),
                 build.build_opts.YMakeDebugOptions(),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
@@ -547,7 +547,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.ExecutorOptions(),
                 build.build_opts.CustomFetcherOptions(),
                 build.build_opts.SandboxAuthOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             unknown_args_as_free=True,
         )
@@ -562,7 +562,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.FlagsOptions(),
                 build.build_opts.CustomFetcherOptions(),
                 build.build_opts.SandboxAuthOptions(),
-                core.common_opts.CrossCompilationOptions(),
+                devtools.ya.core.common_opts.CrossCompilationOptions(),
                 build.build_opts.ToolsOptions(),
                 build.build_opts.BuildTypeOptions('release'),
                 build.build_opts.JavaSpecificOptions(),
@@ -572,7 +572,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
         self['qt'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(self._choose_qt_handler),
             description='[[imp]]ya ide qt[[rst]] is deprecated, please use clangd-based tooling instead',
-            opts=devtools.ya.ide.qt.QT_OPTS + [core.common_opts.YaBin3Options()],
+            opts=devtools.ya.ide.qt.QT_OPTS + [devtools.ya.core.common_opts.YaBin3Options()],
         )
         self['goland'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.goland.do_goland),
@@ -580,7 +580,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
             opts=devtools.ya.ide.ide_common.ide_via_ya_make_opts()
             + [
                 devtools.ya.ide.goland.GolandOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
         self['pycharm'] = core.yarg.OptsHandler(
@@ -592,7 +592,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 build.build_opts.DistCacheOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -609,7 +609,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -624,7 +624,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
         self['vscode-py'] = core.yarg.OptsHandler(
@@ -638,7 +638,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -653,7 +653,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -670,7 +670,7 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.BuildThreadsOptions(build_threads=None),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.ToolsOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
         self['venv'] = core.yarg.OptsHandler(
@@ -684,11 +684,11 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 build.build_opts.FlagsOptions(),
                 build.build_opts.IgnoreRecursesOptions(),
                 build.build_opts.RebuildOptions(),
-                core.common_opts.BeVerboseOptions(),
-                core.common_opts.CrossCompilationOptions(),
+                devtools.ya.core.common_opts.BeVerboseOptions(),
+                devtools.ya.core.common_opts.CrossCompilationOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 devtools.ya.ide.venv.VenvOptions(),
-                core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -698,10 +698,10 @@ class IdeYaHandler(core.yarg.CompositeHandler):
                 description='Replace fsnotifier for JB IDEs.',
                 opts=[
                     devtools.ya.ide.fsnotifier.FixFsNotifierOptions(),
-                    core.common_opts.ShowHelpOptions(),
-                    core.common_opts.DumpDebugOptions(),
-                    core.common_opts.AuthOptions(),
-                    core.common_opts.YaBin3Options(),
+                    devtools.ya.core.common_opts.ShowHelpOptions(),
+                    devtools.ya.core.common_opts.DumpDebugOptions(),
+                    devtools.ya.core.common_opts.AuthOptions(),
+                    devtools.ya.core.common_opts.YaBin3Options(),
                 ],
             )
 

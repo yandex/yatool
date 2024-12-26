@@ -19,11 +19,11 @@ import build.build_handler
 import build.build_opts
 import build.targets_deref
 import build.ya_make
-import core.common_opts
-import core.config
-import core.error
-import core.profiler
-import core.stage_tracer as stage_tracer
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
+import devtools.ya.core.error
+import devtools.ya.core.profiler
+import devtools.ya.core.stage_tracer as stage_tracer
 import core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
@@ -140,11 +140,11 @@ def timeit(func):
 
 
 def stage_started(stage_name):
-    core.profiler.profile_step_started(stage_name)
+    devtools.ya.core.profiler.profile_step_started(stage_name)
 
 
 def stage_finished(stage_name):
-    core.profiler.profile_step_finished(stage_name)
+    devtools.ya.core.profiler.profile_step_finished(stage_name)
 
 
 @timeit
@@ -221,7 +221,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     if build_info.get("target-platforms"):
         target_platforms = [
-            core.common_opts.CrossCompilationOptions.make_platform(p) for p in build_info["target-platforms"]
+            devtools.ya.core.common_opts.CrossCompilationOptions.make_platform(p)
+            for p in build_info["target-platforms"]
         ]
         if params.target_platforms and params.target_platforms != target_platforms:
             raise YaPackageException(
@@ -364,9 +365,9 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     # TODO: Rewrite with statuses
     if not build_options.run_tests and builder.exit_code:
         msg = f"{build_key_str}Building targets: [[bad]]failed"
-    elif build_options.run_tests and builder.exit_code != core.error.ExitCodes.TEST_FAILED:
+    elif build_options.run_tests and builder.exit_code != devtools.ya.core.error.ExitCodes.TEST_FAILED:
         msg = f"{build_key_str}Building targets: [[bad]]failed with exit code {builder.exit_code}[[rst]], testing: not lauched"
-    elif build_options.run_tests and builder.exit_code == core.error.ExitCodes.TEST_FAILED:
+    elif build_options.run_tests and builder.exit_code == devtools.ya.core.error.ExitCodes.TEST_FAILED:
         msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[bad]]failed"
     elif build_options.run_tests:
         msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[good]]done"
@@ -376,7 +377,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     package.display.emit_message(msg)
 
     if builder.exit_code:
-        if builder.exit_code == core.error.ExitCodes.TEST_FAILED:
+        if builder.exit_code == devtools.ya.core.error.ExitCodes.TEST_FAILED:
             if not params.ignore_fail_tests:
                 # stop when tests are failed, and we wont ignore that ...
                 raise YaPackageTestException()
@@ -1354,7 +1355,7 @@ def _get_arcadia_root(params):
     if not arcadia_root and os.path.exists(params.packages[0]):
         arcadia_root = find_root.detect_root(params.packages[0])
     if not arcadia_root:
-        arcadia_root = core.config.find_root()
+        arcadia_root = devtools.ya.core.config.find_root()
     arcadia_root = exts.path2.abspath(arcadia_root)
     package.display.emit_message('Source root: [[imp]]{}'.format(arcadia_root))
     if not os.path.exists(arcadia_root):
@@ -1600,7 +1601,7 @@ def do_package(params):
             try:
                 is_package_skipped = build_package(package_params, output_root)
             except YaPackageTestException:
-                return core.error.ExitCodes.TEST_FAILED
+                return devtools.ya.core.error.ExitCodes.TEST_FAILED
             except YaPackageBuildException as e:
                 return e.original_error_code
             finally:
@@ -1735,7 +1736,7 @@ def do_dump_input(params, arcadia_root, output):
         if not package_file.startswith(arcadia_root):
             arcadia_root = find_root.detect_root(package_file)
             if not arcadia_root:
-                arcadia_root = exts.path2.abspath(core.config.find_root())
+                arcadia_root = exts.path2.abspath(devtools.ya.core.config.find_root())
             logger.info("Find new arcadia root %s", arcadia_root)
 
         package_context = PackageContext(arcadia_root, package_file, params)

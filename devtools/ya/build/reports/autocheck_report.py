@@ -7,7 +7,7 @@ import threading
 from collections import defaultdict
 from itertools import chain
 
-import core.error
+import devtools.ya.core.error
 import devtools.ya.test.common as test_common
 import yalibrary.term.console as term_console
 from build.reports import configure_error as ce
@@ -590,7 +590,7 @@ class ReportGenerator:
 
         if errors:
             status = rp.TestStatus.Fail
-            if exit_code == core.error.ExitCodes.INFRASTRUCTURE_ERROR:
+            if exit_code == devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR:
                 error_type = rp.ErrorType.Internal
             else:
                 error_type = rp.ErrorType.Regular

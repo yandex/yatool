@@ -6,7 +6,6 @@ import build.build_opts
 import build.targets_deref
 import build.ya_make
 import core.yarg
-import core.config
 import yalibrary.tools as tools
 import yalibrary.platform_matcher as pm
 

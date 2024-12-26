@@ -10,8 +10,8 @@ import library.python.resource
 
 import build.build_handler
 import build.build_opts
-import core.common_opts
-import core.config
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import core.yarg
 import exts.fs
 import exts.hashing
@@ -42,7 +42,7 @@ class PyOptions(core.yarg.Options):
     def __init__(self):
         self.py3 = True
         self.py_bare = False
-        self.py_tmp_project = os.path.join('junk', core.config.get_user(), '_ya_py')
+        self.py_tmp_project = os.path.join('junk', devtools.ya.core.config.get_user(), '_ya_py')
         self.kernel_connection_file = None
 
     @staticmethod
@@ -94,7 +94,7 @@ def run(params):
 
     env = os.environ.copy()
 
-    cache = os.path.join(core.config.misc_root(), 'py')
+    cache = os.path.join(devtools.ya.core.config.misc_root(), 'py')
     locks = exts.fs.create_dirs(os.path.join(cache, 'locks'))
     binary = os.path.join(cache, 'yapy')
     logger.debug('Cache: %s', cache)

@@ -7,7 +7,7 @@ import time
 
 import six
 
-import core.error
+import devtools.ya.core.error
 
 from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher import resource_fetcher
@@ -59,7 +59,11 @@ class PreparePattern(object):
             if getattr(e, 'mute', False) is not True:
                 logging.exception('Unable to fetch resource %s', self._pattern)
 
-            self._exit_code = core.error.ExitCodes.INFRASTRUCTURE_ERROR if core.error.is_temporary_error(e) else 1
+            self._exit_code = (
+                devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
+                if devtools.ya.core.error.is_temporary_error(e)
+                else 1
+            )
 
             self._ctx.fast_fail()
 

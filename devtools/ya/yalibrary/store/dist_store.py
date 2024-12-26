@@ -4,7 +4,7 @@ import six
 import time
 
 import humanfriendly
-from core import report
+from devtools.ya.core import report
 from exts.timer import AccumulateTime
 
 import logging

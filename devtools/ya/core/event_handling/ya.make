@@ -9,7 +9,6 @@ PEERDIR(
 )
 
 PY_SRCS(
-    NAMESPACE core.event_handling
     __init__.py
     base_subscriber.py
     common_subscribers.py

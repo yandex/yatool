@@ -1,4 +1,4 @@
-import core.report as report
+import devtools.ya.core.report as report
 import enum
 
 

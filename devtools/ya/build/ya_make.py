@@ -23,11 +23,11 @@ import build.reports.autocheck_report as ar
 import build.reports.results_listener as pr
 import build.stat.graph_metrics as st
 import build.stat.statistics as bs
-import core.config as core_config
-import core.error
-import core.event_handling as event_handling
-import core.profiler as cp
-import core.report
+import devtools.ya.core.config as core_config
+import devtools.ya.core.error
+import devtools.ya.core.event_handling as event_handling
+import devtools.ya.core.profiler as cp
+import devtools.ya.core.report
 import core.yarg
 import exts.asyncthread as core_async
 import exts.filelock
@@ -48,7 +48,7 @@ from build.evlog.progress import (
 from build.reports import build_reports as build_report
 from build.reports import configure_error as ce
 from build.reports import results_report
-from core import stage_tracer
+from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
 from exts import func
 from exts.decompress import udopen
@@ -523,8 +523,8 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
         return cache
     except Exception as e:
         err = str(e)
-        core.report.telemetry.report(
-            core.report.ReportTypes.YT_CACHE_ERROR,
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.YT_CACHE_ERROR,
             {
                 "error": "Can't use YT cache",
                 "user": core_config.get_user(),
@@ -1633,7 +1633,7 @@ class YaMake:
         # in order to separate standard test execution errors from test errors associated with configuration errors.
         # TODO remove ignore_configure_errors check when YA-1456 is done
         if not self.opts.ignore_configure_errors and self.ctx.configure_errors:
-            return self.exit_code or core.error.ExitCodes.CONFIGURE_ERROR
+            return self.exit_code or devtools.ya.core.error.ExitCodes.CONFIGURE_ERROR
 
         if self.ctx.threads:
             # XXX Don't try to inspect test statuses in listing mode.
@@ -1645,7 +1645,7 @@ class YaMake:
                     # TODO Remove --no-tests-is-error option and fail with NO_TESTS_COLLECTED exit code by default. For more info see YA-1087
                     # Return a special exit code if tests were requested, but no tests were run.
                     if self.opts.no_tests_is_error:
-                        return self.exit_code or core.error.ExitCodes.NO_TESTS_COLLECTED
+                        return self.exit_code or devtools.ya.core.error.ExitCodes.NO_TESTS_COLLECTED
 
         return self.exit_code
 
@@ -1819,7 +1819,7 @@ class YaMake:
             self.ctx.unlock()
 
     def _calc_msg(self, exit_code):
-        if exit_code == core.error.ExitCodes.NO_TESTS_COLLECTED:
+        if exit_code == devtools.ya.core.error.ExitCodes.NO_TESTS_COLLECTED:
             return "[[bad]]Failed - No tests collected[[rst]]"
         elif exit_code:
             return '[[bad]]Failed[[rst]]'

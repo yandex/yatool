@@ -4,7 +4,7 @@ import re
 import shlex
 
 import core.yarg
-from core import error
+from devtools.ya.core import error
 from core.yarg import help_level
 from exts import path2
 from devtools.ya.test import const

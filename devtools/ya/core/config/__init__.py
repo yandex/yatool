@@ -9,7 +9,7 @@ import six
 
 import yalibrary.find_root
 
-import core.resource
+import devtools.ya.core.resource
 from exts import fs
 from exts import func
 from exts import strtobool
@@ -114,7 +114,7 @@ def junk_path(arc_root, *path):
 
 
 def entry_point_path():
-    return sys.executable if core.resource.am_i_binary() else main_file()
+    return sys.executable if devtools.ya.core.resource.am_i_binary() else main_file()
 
 
 class CannotDetermineRootException(Exception):
@@ -129,7 +129,7 @@ def find_root(fail_on_error=True):
     # type: (bool) -> str
     if 'YA_SOURCE_ROOT' in os.environ:
         return os.path.abspath(os.environ['YA_SOURCE_ROOT'])
-    starts_from_path = os.getcwd() if core.resource.am_i_binary() else __file__
+    starts_from_path = os.getcwd() if devtools.ya.core.resource.am_i_binary() else __file__
     root = yalibrary.find_root.detect_root(starts_from_path)
     if fail_on_error and root is None:
         raise CannotDetermineRootException("can't determine root by path {}".format(starts_from_path))
@@ -173,8 +173,8 @@ def _get_config(name="ya.conf.json"):
                 return config
     except CannotDetermineRootException:
         pass
-    if core.resource.am_i_binary() and name == "ya.conf.json":
-        conf_res = core.resource.try_get_resource('ya.conf.json')
+    if devtools.ya.core.resource.am_i_binary() and name == "ya.conf.json":
+        conf_res = devtools.ya.core.resource.try_get_resource('ya.conf.json')
         if conf_res is not None:
             logger.debug('Use conf from resource')
             return json.loads(conf_res)
@@ -193,8 +193,8 @@ def _get_config_from_arc_rel_path(path):
         config = _try_read_from(abs_path)
         if config is not None:
             return config
-    if core.resource.am_i_binary():
-        conf_res = core.resource.try_get_resource(path)
+    if devtools.ya.core.resource.am_i_binary():
+        conf_res = devtools.ya.core.resource.try_get_resource(path)
         if conf_res is not None:
             logger.debug('Read config "{}" from resource'.format(path))
             return json.loads(conf_res)

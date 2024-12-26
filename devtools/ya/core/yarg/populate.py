@@ -5,7 +5,7 @@ import logging
 import os
 import re
 
-from core.config import find_root
+from devtools.ya.core.config import find_root
 from core.yarg.aliases import Alias
 from core.yarg.config_files import apply_config, load_config_by_file
 from core.yarg.consumers import Consumer  # noqa: F401

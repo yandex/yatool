@@ -12,7 +12,7 @@ from yt.wrapper.default_config import retries_config, retry_backoff_config, get_
 from yt.wrapper.format import YsonFormat
 from yt.yson import YsonList, get_bytes
 
-import core.gsid  # XXX
+import devtools.ya.core.gsid  # XXX
 import yalibrary.store.yt_store.consts as consts
 import yalibrary.store.yt_store.retries as retries
 import yalibrary.store.yt_store.utils as utils
@@ -221,7 +221,7 @@ class YtStoreClient(object):
             'hash': _hash,
             'name': kwargs.get('name'),
             'hostname': platform.node(),
-            'GSID': core.gsid.flat_session_id(),
+            'GSID': devtools.ya.core.gsid.flat_session_id(),
             'codec': codec,
         }
 

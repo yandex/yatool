@@ -1,7 +1,7 @@
 import os
 import time
 
-import core.error
+import devtools.ya.core.error
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner.tasks.enums import WorkerPoolType
 
@@ -160,7 +160,7 @@ class RestoreFromDistCacheTask(object):
                 # Restoration failed, but we know that this node is presented
                 # (at least was presented at preparation stage) in the distributed cache.
                 # Treat this problem as infra error which may be fixed with retry.
-                self._exit_code = core.error.ExitCodes.INFRASTRUCTURE_ERROR
+                self._exit_code = devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
                 self._ctx.fast_fail()
             else:
                 self._ctx.exec_run_node(self._node, self)

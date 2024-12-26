@@ -8,15 +8,17 @@ import sys
 import time
 
 import app_config
-import core.config
-import core.gsid
-import core.sig_handler
-import core.stage_tracer as stage_tracer
-import core.stage_aggregator as stage_aggregator
-import core.event_handling as event_handling
+import devtools.ya.core.config
+import devtools.ya.core.gsid
+import devtools.ya.core.sig_handler
+import devtools.ya.core.stage_tracer as stage_tracer
+import devtools.ya.core.stage_aggregator as stage_aggregator
+import devtools.ya.core.error
+import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
 import devtools.ya.core.user as user
+import core.yarg
 import exts.os2
 import exts.strings
 import exts.windows
@@ -252,7 +254,7 @@ def aggregate_stages():
 
 def report_params(app_ctx):
     try:
-        from core.report import telemetry, ReportTypes
+        from devtools.ya.core.report import telemetry, ReportTypes
 
         params = app_ctx.params
         reportable_keys = params.as_dict()
@@ -315,7 +317,7 @@ def configure_debug(app_ctx):
             AppEvLogStore.logger.debug("While store ya version: %s", e)
 
         try:
-            tools_root = core.config.tool_root(4)
+            tools_root = devtools.ya.core.config.tool_root(4)
             dump_store_obj['tools_cache_root'] = tools_root
         except Exception as e:
             AppEvLogStore.logger.debug("While store tools cache: %s", e)
@@ -346,21 +348,21 @@ def configure_debug(app_ctx):
             AppEvLogStore.logger.debug("While store env: %s", e)
 
         try:
-            from core.report import system_info
+            from devtools.ya.core.report import system_info
 
             dump_store_obj['system_info'] = system_info()
         except Exception as e:
             AppEvLogStore.logger.debug("While store system_info: %s", e)
 
         try:
-            from core import gsid
+            from devtools.ya.core import gsid
 
             dump_store_obj['session_id'] = gsid.session_id()
         except Exception as e:
             AppEvLogStore.logger.debug("While store system_id: %s", e)
 
         try:
-            from core import gsid
+            from devtools.ya.core import gsid
 
             dump_store_obj['cwd'] = os.getcwd()
         except Exception as e:
@@ -417,7 +419,7 @@ def configure_lifecycle_timestamps():
 
 
 def configure_uid():
-    yield core.gsid.uid()
+    yield devtools.ya.core.gsid.uid()
 
 
 def configure_user_heuristic():
@@ -437,7 +439,7 @@ def configure_null_log(app_ctx):
 def configure_file_log(app_ctx):
     from yalibrary.loggers import file_log
 
-    for x in file_log.with_file_log(core.config.logs_root(), app_ctx.uid):
+    for x in file_log.with_file_log(devtools.ya.core.config.logs_root(), app_ctx.uid):
         yield x
 
 
@@ -445,7 +447,7 @@ def configure_changelist_store(app_ctx):
     from devtools.ya.yalibrary.build_graph_cache import changelist_storage
 
     if getattr(app_ctx.params, "build_graph_cache_force_local_cl", False):
-        for x in changelist_storage.with_changelist_storage(core.config.logs_root(), app_ctx.uid):
+        for x in changelist_storage.with_changelist_storage(devtools.ya.core.config.logs_root(), app_ctx.uid):
             yield x
     else:
         yield
@@ -453,7 +455,7 @@ def configure_changelist_store(app_ctx):
 
 def configure_in_memory_log(app_ctx, level=None):
     from yalibrary.loggers import in_memory_log
-    from core import logger
+    from devtools.ya.core import logger
 
     level = level or logger.level()
 
@@ -470,7 +472,7 @@ def configure_custom_file_log(app_ctx):
 
 def configure_display_log(app_ctx):
     from yalibrary.loggers import display_log
-    from core import logger  # XXX
+    from devtools.ya.core import logger  # XXX
 
     for x in display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token):
         yield x
@@ -511,7 +513,7 @@ def configure_fetcher_params(app_ctx):
         not oauth_token
         and not custom_fetcher_is_top_priority()
         and getattr(app_ctx.params, 'oauth_exchange_ssh_keys', False)
-        and not core.config.has_mapping()
+        and not devtools.ya.core.config.has_mapping()
     ):
         if not app_config.have_oauth_support:
             yield custom_fetcher, fetcher_params, None
@@ -619,7 +621,7 @@ def configure_active_state(app_ctx):
     import devtools.ya.yalibrary.active_state
 
     state = devtools.ya.yalibrary.active_state.ActiveState(__name__)
-    sigint_exit_handler = core.sig_handler.create_sigint_exit_handler()
+    sigint_exit_handler = devtools.ya.core.sig_handler.create_sigint_exit_handler()
 
     signal.signal(signal.SIGINT, sigint_exit_handler)
     signal.signal(signal.SIGTERM, lambda _, __: state.stopping())
@@ -669,9 +671,9 @@ def check_and_respawn_if_possible():
     arcadia_root = yalibrary.find_root.detect_root(os.getcwd())
     logger.debug("Cwd arcadia root: {}".format(arcadia_root))
     if arcadia_root is not None:
-        import core.respawn
+        import devtools.ya.core.respawn
 
-        core.respawn.check_for_respawn(arcadia_root)
+        devtools.ya.core.respawn.check_for_respawn(arcadia_root)
 
 
 def _ya_downloads_report():
@@ -722,7 +724,7 @@ def _resources_report():
 
 def configure_report_interceptor(ctx, report_events):
     # we can only do that after respawn with valid python
-    from core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args
+    from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args
 
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
 
@@ -824,7 +826,7 @@ def configure_report_interceptor(ctx, report_events):
 
 
 def configure_metrics_reporter(ctx):
-    from core.report import telemetry, compact_system_info
+    from devtools.ya.core.report import telemetry, compact_system_info
 
     metrics_reporter = monitoring.MetricStore(
         {
@@ -842,7 +844,7 @@ def configure_tmp_dir_interceptor(keep_tmp_dir):
     from exts import tmp
 
     try:
-        tmp.set_tmp_dir(core.config.tmp_path(), keep_dir=keep_tmp_dir)
+        tmp.set_tmp_dir(devtools.ya.core.config.tmp_path(), keep_dir=keep_tmp_dir)
     except OSError as e:
         import errno
 
@@ -865,7 +867,7 @@ def configure_diag_interceptor():
         yield
     finally:
         url = diag.finish_diagnostics()
-        from core.report import telemetry, ReportTypes
+        from devtools.ya.core.report import telemetry, ReportTypes
 
         telemetry.report(
             ReportTypes.DIAGNOSTICS,
@@ -943,21 +945,21 @@ def configure_exit_code_definition():
     try:
         yield
     except Exception as e:
-        from core import error
+        from devtools.ya.core import error
 
         temp_error = error.is_temporary_error(e)
         mute_error = getattr(e, 'mute', False)
         retriable_error = getattr(e, 'retriable', True)
 
         if mute_error:
-            error_code = core.error.ExitCodes.GENERIC_ERROR
+            error_code = devtools.ya.core.error.ExitCodes.GENERIC_ERROR
         else:
-            error_code = core.error.ExitCodes.UNHANDLED_EXCEPTION
+            error_code = devtools.ya.core.error.ExitCodes.UNHANDLED_EXCEPTION
 
         if not retriable_error:
-            error_code = core.error.ExitCodes.NOT_RETRIABLE_ERROR
+            error_code = devtools.ya.core.error.ExitCodes.NOT_RETRIABLE_ERROR
         elif temp_error:
-            error_code = core.error.ExitCodes.INFRASTRUCTURE_ERROR
+            error_code = devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
 
         logger.debug("Derived exit code is %s", error_code)
 

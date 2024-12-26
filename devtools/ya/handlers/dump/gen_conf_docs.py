@@ -5,7 +5,7 @@ import re
 import os
 import six
 
-import core.config
+import devtools.ya.core.config
 
 import build.genconf
 import build.ymake2
@@ -361,7 +361,7 @@ def dump_mmm_docs(
     replacements=False,
 ):
     json_dump_name = os.path.join(build_root, 'ymake.dump.ydx.json')
-    arc_root = core.config.find_root_from(build_targets)
+    arc_root = devtools.ya.core.config.find_root_from(build_targets)
     null_ya_make = os.path.join(arc_root, 'build', 'docs', 'empty')
 
     if not conf_docs_json:

@@ -10,7 +10,7 @@ import signal
 import sys
 
 import app_config
-import core.error
+import devtools.ya.core.error
 import devtools.ya.test.util.shared
 from devtools.ya.test.dependency import sandbox_storage
 
@@ -132,9 +132,9 @@ def main():
         logger.debug("downloaded resource info (compacted): %s", compact_resinfo(resource))
     except Exception as e:
         logger.exception("Error while downloading resource %s", resource_id)
-        if core.error.is_temporary_error(e):
+        if devtools.ya.core.error.is_temporary_error(e):
             logger.exception("Error is considered to be temporary - exit with INFRASTRUCTURE_ERROR")
-            return core.error.ExitCodes.INFRASTRUCTURE_ERROR
+            return devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
         return 1
     return 0
 

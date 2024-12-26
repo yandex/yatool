@@ -10,7 +10,7 @@ import os
 import logging
 import time
 
-import core.report
+import devtools.ya.core.report
 from exts import fs
 from exts.timer import AccumulateTime
 
@@ -365,5 +365,5 @@ class NewStore(object):
                 'type': 'new-store',
                 'failures': self.failures[k],
             }
-            core.report.telemetry.report('new_store_stats-{}'.format(k), stat_dict)
+            devtools.ya.core.report.telemetry.report('new_store_stats-{}'.format(k), stat_dict)
             execution_log["$(new-store-{})".format(k)] = stat_dict

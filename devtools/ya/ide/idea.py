@@ -12,7 +12,7 @@ import devtools.ya.jbuild.gen.actions.idea as idea
 import build.graph as bg
 import build.build_opts as bo
 import build.ya_make as ya_make
-import core.event_handling
+import devtools.ya.core.event_handling
 import core.yarg
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def do_idea(params):
 
     subscribers = [
         ya_make.DisplayMessageSubscriber(jopts, app_ctx.display),
-        core.event_handling.EventToLogSubscriber(),
+        devtools.ya.core.event_handling.EventToLogSubscriber(),
     ]
     if getattr(app_ctx, 'evlog', None):
         subscribers.append(ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')))

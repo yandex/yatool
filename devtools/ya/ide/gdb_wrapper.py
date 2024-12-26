@@ -11,8 +11,8 @@ import sys
 import threading
 import time
 
-import core.common_opts
-import core.config
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import core.yarg
 import yalibrary.tools
 import exts.fs
@@ -39,13 +39,13 @@ class GDBWrapperOpts(core.yarg.Options):
     @staticmethod
     def consumer():
         return (
-            core.common_opts.ArgConsumer(
+            devtools.ya.core.common_opts.ArgConsumer(
                 ['-P', '--port'],
                 help='Port to run gdbserver on. If 0 will be automatically chosen',
                 hook=core.yarg.SetValueHook('port'),
                 group=core.yarg.ADVANCED_OPT_GROUP,
             )
-            + core.common_opts.ArgConsumer(
+            + devtools.ya.core.common_opts.ArgConsumer(
                 ['--find-port'],
                 help='Find a free port, print it and terminate',
                 hook=core.yarg.SetConstValueHook('find_port', True),

@@ -4,7 +4,7 @@ import os
 import sys
 import logging
 
-from core.common_opts import CrossCompilationOptions
+from devtools.ya.core.common_opts import CrossCompilationOptions
 from core.yarg import (
     ArgConsumer,
     CompositeHandler,
@@ -19,6 +19,8 @@ from core.yarg import (
     ShowHelpException,
     SetAppendHook,
     NoValueDummyHook,
+    UsageExample,
+    ArgsValidatingException,
 )
 
 import devtools.ya.app
@@ -29,8 +31,8 @@ from core.yarg.help_level import HelpLevel
 from yalibrary.tools import environ, param, resource_id, tool, tools, toolchain_root, toolchain_sys_libs
 from yalibrary.toolscache import lock_resource
 from yalibrary.platform_matcher import is_darwin_rosetta
-import core.config
-import core.respawn
+import devtools.ya.core.config
+import devtools.ya.core.respawn
 import exts.process
 import exts.windows
 
@@ -49,9 +51,9 @@ class ToolYaHandler(CompositeHandler):
             self,
             description=self.description,
             examples=[
-                core.yarg.UsageExample('{prefix} --ya-help', 'Print yatool specific options'),
-                core.yarg.UsageExample('{prefix} --print-path', 'Print path to tool executable file'),
-                core.yarg.UsageExample(
+                UsageExample('{prefix} --ya-help', 'Print yatool specific options'),
+                UsageExample('{prefix} --print-path', 'Print path to tool executable file'),
+                UsageExample(
                     '{prefix} --force-update',
                     'Check tool for updates before the update interval elapses',
                 ),
@@ -143,7 +145,7 @@ class ToolOptions(Options):
         if self.show_help:
             raise ShowHelpException()
         if self.toolchain and self.target_platforms:
-            raise core.yarg.ArgsValidatingException("Do not use --toolchain and --target-platform args together")
+            raise ArgsValidatingException("Do not use --toolchain and --target-platform args together")
         if self.force_update:
             os.environ['YA_TOOL_FORCE_UPDATE'] = "1"
 
@@ -209,7 +211,7 @@ def do_tool(params):
         print(tool_path)
         lock_result = True
     elif os.path.isfile(tool_path):
-        env = core.respawn.filter_env(os.environ.copy())
+        env = devtools.ya.core.respawn.filter_env(os.environ.copy())
 
         # Remove environment variables set by 'ya' wrapper.
         # They are actually one-time ya-bin parameters rather than inheritable environment
@@ -244,7 +246,7 @@ def do_tool(params):
                         logger.exception("While setting RLIMIT_STACK")
             arc_root = os.environ.get('YA_TOOL_GDB_ARCADIA_ROOT', None)
             if arc_root is None:
-                arc_root = core.config.find_root(fail_on_error=False)
+                arc_root = devtools.ya.core.config.find_root(fail_on_error=False)
             if arc_root:
                 logger.debug('Arcadia root: [%s]', arc_root)
                 extra_args = ['-ex', 'set substitute-path /-S/ {}/'.format(arc_root)] + extra_args
@@ -258,7 +260,7 @@ def do_tool(params):
                 'Please, use natively installed arc, install guide:'
                 ' https://docs.yandex-team.ru/devtools/intro/quick-start-guide#arc-setup'
             )
-            raise core.yarg.ArgsValidatingException(message)
+            raise ArgsValidatingException(message)
         exts.process.execve(tool_path, extra_args, env=env)
 
     if lock_result:

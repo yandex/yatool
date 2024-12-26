@@ -2,7 +2,7 @@ import itertools
 import sys
 import logging
 
-import core.error
+import devtools.ya.core.error
 import exts.uniq_id
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner import topo
@@ -79,7 +79,7 @@ class PrepareAllNodesTask(UniqueTask):
 
             if resolve_status == NodeResolveStatus.ERROR:
                 logger.error("Failed to find {0} in the distributed cache".format(node))
-                self._exit_code = core.error.ExitCodes.YT_STORE_FETCH_ERROR
+                self._exit_code = devtools.ya.core.error.ExitCodes.YT_STORE_FETCH_ERROR
                 self._ctx.fast_fail(fatal=True)
                 raise PrepareAllNodesTask._ResolveError()
 

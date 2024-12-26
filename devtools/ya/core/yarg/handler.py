@@ -8,8 +8,7 @@ import typing as tp  # noqa: F401
 from collections import defaultdict
 
 import core.yarg
-import core.report
-import core.config
+import devtools.ya.core.report
 
 import exts.strings
 import exts.yjson as json
@@ -396,8 +395,8 @@ class OptsHandler(BaseHandler):
     def handle(self, root_handler, args, prefix):
         try:
             OptsHandler._latest_handled_prefix = prefix
-            core.report.telemetry.report(
-                core.report.ReportTypes.HANDLER,
+            devtools.ya.core.report.telemetry.report(
+                devtools.ya.core.report.ReportTypes.HANDLER,
                 {
                     'args': [exts.strings.to_unicode(arg, exts.strings.guess_default_encoding()) for arg in args],
                     'prefix': prefix,

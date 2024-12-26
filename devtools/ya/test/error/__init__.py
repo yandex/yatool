@@ -3,7 +3,7 @@ import logging
 import six
 import traceback
 
-import core.config
+import devtools.ya.core.config
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class _SuiteCtx:
             raise
 
     def add_error(self, exc):
-        if core.config.is_test_mode():
+        if devtools.ya.core.config.is_test_mode():
             log_func = logger.exception
         else:
             log_func = logger.warning
@@ -46,7 +46,7 @@ class _SuiteCtx:
                 log_func("Broken suite: %s", msg)
         else:
             msg = "Failed to register suite error outside of suite context: {}".format(_format_exception(exc))
-            if core.config.is_test_mode():
+            if devtools.ya.core.config.is_test_mode():
                 raise RuntimeError(msg)
             else:
                 log_func(msg)

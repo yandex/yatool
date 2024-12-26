@@ -9,7 +9,7 @@ import tempfile
 import exts.path2
 
 import core.yarg
-import core.config
+import devtools.ya.core.config
 
 import build.build_opts
 import build.gen_plan2
@@ -125,7 +125,7 @@ def create_patterns(params, graph, app_ctx):
     try:
         temp_dir = tempfile.mkdtemp()
         build_root = params.cmd_build_root or temp_dir
-        tool_root = core.config.tool_root(toolscache_version(params))
+        tool_root = devtools.ya.core.config.tool_root(toolscache_version(params))
         patterns['TOOL_ROOT'] = tool_root
         for resource in graph['conf']['resources']:
             resource_desc = resource_fetcher.select_resource(resource)

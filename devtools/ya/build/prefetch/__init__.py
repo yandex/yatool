@@ -10,8 +10,8 @@ import yalibrary.vcs
 import yalibrary.tools
 import exts.process
 import exts.asyncthread
-import core.event_handling as event_handling
-import core.gsid
+import devtools.ya.core.event_handling as event_handling
+import devtools.ya.core.gsid
 
 import typing as tp  # noqa
 
@@ -35,7 +35,7 @@ def prefetch_condition(arc_root, prefetch_enabled, vcs_type):
     else:
         from devtools.distbuild.libs.gsid_classifier.python import gsid_classifier
 
-        if not gsid_classifier.is_user_build(core.gsid.flat_session_id()):
+        if not gsid_classifier.is_user_build(devtools.ya.core.gsid.flat_session_id()):
             logger.debug("Prefetch disabled due to non-local run")
             return False
 

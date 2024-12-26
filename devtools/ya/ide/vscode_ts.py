@@ -9,7 +9,6 @@ import subprocess
 
 import termcolor
 
-import core.common_opts
 import core.yarg
 import exts.shlex2
 import yalibrary.tools

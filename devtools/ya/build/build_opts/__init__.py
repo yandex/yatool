@@ -30,7 +30,7 @@ from core.yarg.help_level import HelpLevel
 from devtools.ya.test import opts as test_opts
 import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
 
-from core.common_opts import (
+from devtools.ya.core.common_opts import (
     PrintStatisticsOptions,
     BeVerboseOptions,
     DetailedArgsOptions,
@@ -81,8 +81,6 @@ from core.yarg import (
     RawParamsOptions,
     return_true_if_enabled,
 )
-
-import core.error
 
 from library.python.fs import supports_clone
 
@@ -3052,7 +3050,7 @@ class JavaSpecificOptions(Options):
             ArgConsumer(
                 ['--disable-run-script-generation'],
                 help='Disable run.sh(run.bat) scripts generation for JAVA_PROGRAM',
-                hook=core.yarg.SetConstValueHook('disable_scriptgen', True),
+                hook=SetConstValueHook('disable_scriptgen', True),
                 group=JAVA_BUILD_OPT_GROUP,
                 visible=HelpLevel.ADVANCED,
             ),

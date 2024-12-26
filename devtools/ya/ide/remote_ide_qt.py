@@ -5,9 +5,8 @@ import os
 import six
 import stat
 
-import core.common_opts
-import core.config
-import core.yarg
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import exts.fs
 import exts.path2
 import exts.process
@@ -67,7 +66,7 @@ class QtRemoteDevEnv(object):
         exts.fs.ensure_removed(qt_config_path)
         exts.fs.copy_tree(os.path.join(qt.discover_qt_config()), os.path.join(qt_config_path, 'QtProject'))
         script_text = '#!/bin/sh -e\n' + 'exec {0} remote_gdb --host {1} --remote-cache {2} -- "$@"\n'.format(
-            _shell_quote(core.config.ya_path(self.params.arc_root, 'ya')),
+            _shell_quote(devtools.ya.core.config.ya_path(self.params.arc_root, 'ya')),
             self.params.remote_host,
             self.params.remote_cache_path,
         )

@@ -1,6 +1,6 @@
 import os
 
-import core.config
+import devtools.ya.core.config
 import exts.func
 import exts.uniq_id
 
@@ -17,13 +17,13 @@ def uid():
 
 @exts.func.lazy
 def _get_current_session():
-    ya_name = 'YA-DEV' if core.config.is_developer_ya_version() else 'YA'
+    ya_name = 'YA-DEV' if devtools.ya.core.config.is_developer_ya_version() else 'YA'
     return [ya_name + ':' + uid()]
 
 
 @exts.func.lazy
 def _get_user_session():
-    return ['USER' + ':' + core.config.get_user()]
+    return ['USER' + ':' + devtools.ya.core.config.get_user()]
 
 
 @exts.func.lazy

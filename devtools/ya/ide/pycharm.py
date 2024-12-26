@@ -10,9 +10,9 @@ import sys
 import build.build_opts as bo
 import build.graph as bg
 import build.ya_make as ya_make
-import core.event_handling
+import devtools.ya.core.event_handling
 import core.yarg
-import core.resource as resource
+import devtools.ya.core.resource as resource
 import exts.fs
 
 
@@ -73,7 +73,7 @@ def generate_wrappers(params, arcadia_root):
 
     subscribers = [
         ya_make.DisplayMessageSubscriber(params, app_ctx.display),
-        core.event_handling.EventToLogSubscriber(),
+        devtools.ya.core.event_handling.EventToLogSubscriber(),
     ]
     if getattr(app_ctx, 'evlog', None):
         subscribers.append(ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')))

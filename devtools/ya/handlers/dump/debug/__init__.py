@@ -25,9 +25,9 @@ from core.yarg import (
     UsageExample,
 )
 from core.yarg import OptsHandler
-from core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHelpOptions
-import core.config
-import core.logger
+from devtools.ya.core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHelpOptions
+import devtools.ya.core.config
+import devtools.ya.core.logger
 import core.yarg.help_level
 
 import yalibrary.evlog as evlog_lib
@@ -140,7 +140,7 @@ def do_dump_debug(params):
     # TODO: В идеале нужно вынести работу с чанками в отдельную библиотеку
     _LOG_DIR_NAME_FMT = '%Y-%m-%d'
 
-    misc_root = Path(core.config.misc_root())
+    misc_root = Path(devtools.ya.core.config.misc_root())
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
 

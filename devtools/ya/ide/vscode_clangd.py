@@ -13,7 +13,7 @@ import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
-import core.config
+import devtools.ya.core.config
 import core.yarg
 import exts.asyncthread
 import exts.shlex2
@@ -665,7 +665,7 @@ def gen_vscode_workspace(params):
         )
 
     workspace["settings"]["yandex.arcRoot"] = params.arc_root
-    workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
+    workspace["settings"]["yandex.toolRoot"] = devtools.ya.core.config.tool_root(toolscache_version())
     workspace["settings"]["yandex.codegenRoot"] = params.output_root
 
     ide_common.emit_message('Generating debug configurations')

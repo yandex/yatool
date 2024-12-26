@@ -13,8 +13,8 @@ import termcolor
 
 import build.build_handler as bh
 import build.build_opts as build_opts
-import core.common_opts
-import core.config
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import core.yarg
 import exts.fs as fs
 import exts.shlex2
@@ -189,7 +189,7 @@ class PyProject(object):
             ]
 
         workspace["settings"]["yandex.arcRoot"] = self.params.arc_root
-        workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
+        workspace["settings"]["yandex.toolRoot"] = devtools.ya.core.config.tool_root(toolscache_version())
         workspace["settings"]["yandex.codegenRoot"] = self.params.arc_root
 
         workspace["settings"]["python.defaultInterpreterPath"] = python_binary_path

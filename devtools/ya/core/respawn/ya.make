@@ -9,7 +9,6 @@ PEERDIR(
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE core.respawn
     __init__.py
 )
 

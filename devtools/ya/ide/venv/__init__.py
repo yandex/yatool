@@ -5,6 +5,7 @@ import six
 
 import build.build_opts
 import core.yarg
+import devtools.ya.core.config
 import exts.fs
 import yalibrary.platform_matcher as pm
 import exts.path2
@@ -103,7 +104,7 @@ class VenvOptions(core.yarg.Options):
         self.venv_root = None
         self.venv_with_pip = False
         self.venv_add_tests = False
-        self.venv_tmp_project = os.path.join('junk', core.config.get_user(), '_ya_venv')
+        self.venv_tmp_project = os.path.join('junk', devtools.ya.core.config.get_user(), '_ya_venv')
         self.venv_excluded_peerdirs = []
 
     @staticmethod

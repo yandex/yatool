@@ -10,11 +10,11 @@ import time
 
 import app_config
 
-import core.gsid
-import core.report
+import devtools.ya.core.gsid
+import devtools.ya.core.report
 import exts.process as extp
 
-from core.config import tool_root, misc_root, build_root
+from devtools.ya.core.config import tool_root, misc_root, build_root
 from exts.windows import on_win
 from exts import fs
 from exts import func
@@ -54,7 +54,10 @@ def _log_name():
         directory = os.path.join(misc_root(), 'logs', now.strftime(_LOG_DIR_NAME_FMT))
         try:
             fs.ensure_dir(directory)
-            log_file = os.path.join(directory, '{}.{}.tclog'.format(now.strftime(_LOG_FILE_NAME_FMT), core.gsid.uid()))
+            log_file = os.path.join(
+                directory,
+                '{}.{}.tclog'.format(now.strftime(_LOG_FILE_NAME_FMT), devtools.ya.core.gsid.uid()),
+            )
 
             import app_ctx
 
@@ -293,7 +296,7 @@ class _Server(object):
         else:
             from devtools.distbuild.libs.gsid_classifier.python import gsid_classifier
 
-            return gsid_classifier.is_user_build(core.gsid.flat_session_id())
+            return gsid_classifier.is_user_build(devtools.ya.core.gsid.flat_session_id())
 
     @classmethod
     def _run_tc_binary(cls, thr_ident):
@@ -311,7 +314,7 @@ class _Server(object):
             + (["--tools_cache-disk_limit={}".format(cls._tc_cache_size)] if cls._tc_cache_size is not None else [])
             + ["--tools_cache-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._tc_config_options.items()]
             + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._gl_config_options.items()]
-            + [("ALL-" if cls._single_instance else "TC-") + core.gsid.flat_session_id()]
+            + [("ALL-" if cls._single_instance else "TC-") + devtools.ya.core.gsid.flat_session_id()]
         )
 
         new_args = ["--grpc-service=all"] if cls._single_instance else ["--grpc-service=tools_cache"]
@@ -361,7 +364,7 @@ class _Server(object):
             + ["--grpc-service=build_cache"]
             + ["--ac-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._ac_config_options.items()]
             + ["--grpc-{k}={v}".format(k=k, v=v if v else '') for k, v in cls._gl_config_options.items()]
-            + ["AC-" + core.gsid.flat_session_id()]
+            + ["AC-" + devtools.ya.core.gsid.flat_session_id()]
         )
 
         logger.debug("run {0} with args {1}".format(cls._full_path, args))
@@ -792,7 +795,7 @@ def get_task_stats():
 
 def post_local_cache_report():
     if supported() and _Server._is_user_build():
-        core.report.telemetry.report('ya_tc_stats', _SERVER._Report.get_stat_dict())
+        devtools.ya.core.report.telemetry.report('ya_tc_stats', _SERVER._Report.get_stat_dict())
 
 
 def release_all_data():
@@ -978,5 +981,5 @@ class ACCache(object):
                 'type': 'AC',
                 'failures': self.failures[k],
             }
-            core.report.telemetry.report('AC_stats-{}'.format(k), stat_dict)
+            devtools.ya.core.report.telemetry.report('AC_stats-{}'.format(k), stat_dict)
             execution_log["$(AC-{})".format(k)] = stat_dict

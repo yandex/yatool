@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-import core.common_opts
+import devtools.ya.core.common_opts
 import core.yarg
 
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
@@ -126,7 +126,7 @@ class StyleYaHandler(core.yarg.OptsHandler):
             opts=[
                 StyleOptions(),
                 ReportOptions(),
-                core.common_opts.ShowHelpOptions(),
+                devtools.ya.core.common_opts.ShowHelpOptions(),
                 CustomFetcherOptions(),
                 SandboxAuthOptions(),
                 ToolsOptions(),

@@ -17,8 +17,8 @@ import yalibrary.guards as guards
 import yalibrary.platform_matcher as pm
 
 import yalibrary.tools as tools
-import core.config
-import core.report
+import devtools.ya.core.config
+import devtools.ya.core.report
 from exts import hashing
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def is_system(tc):
 def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode_version=False):
     if c_compiler or cxx_compiler:
         res = resolve_system_cxx(cxx_compiler, host, target, c_compiler)
-    elif core.config.has_mapping() and exts.windows.on_win():
+    elif devtools.ya.core.config.has_mapping() and exts.windows.on_win():
         # XXX for small ya, TODO move to proper place
         res = resolve_system_cxx("cl.exe", host, target)
     else:
@@ -128,7 +128,7 @@ def host_platform_name():
 
 
 def mine_platform_name(s):
-    aliases = {k.upper(): v for k, v in core.config.config().get('toolchain_aliases', {}).items()}
+    aliases = {k.upper(): v for k, v in devtools.ya.core.config.config().get('toolchain_aliases', {}).items()}
     if s.upper() in aliases:
         platform_name = aliases[s.upper()].upper()
         logger.debug('Platform %s is alias for %s', s, platform_name)
@@ -222,8 +222,8 @@ def check_local_ymake(local_ymake):
         else:
             logger.info('Using local.ymake: %s with %s', local_ymake, ', '.join(lines))
 
-        core.report.telemetry.report(
-            core.report.ReportTypes.LOCAL_YMAKE,
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.LOCAL_YMAKE,
             {
                 'path': local_ymake,
                 'content': local_ymake_content,

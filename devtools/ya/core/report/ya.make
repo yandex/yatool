@@ -19,7 +19,6 @@ ENDIF()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE core.report
     __init__.py
 )
 

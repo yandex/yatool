@@ -6,7 +6,7 @@ import os
 import re
 import traceback
 
-import core.error
+import devtools.ya.core.error
 import exts.archive
 import exts.func
 import exts.fs
@@ -258,7 +258,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
             derived_status = None
             # Exit codes are provided by local runner
             exit_codes = [1] + [builder.build_result.exit_code_map.get(u, 1) for u, _ in node_errors]
-            exit_code = core.error.merge_exit_codes(exit_codes)
+            exit_code = devtools.ya.core.error.merge_exit_codes(exit_codes)
             if exit_code == devtools.ya.test.const.TestRunExitCode.InfrastructureError:
                 test_status = devtools.ya.test.const.Status.INTERNAL
             else:

@@ -22,9 +22,9 @@ import app_config
 import yalibrary.tools as tools
 
 import core.yarg
-import core.config
-import core.report
-import core.event_handling
+import devtools.ya.core.config
+import devtools.ya.core.report
+import devtools.ya.core.event_handling
 
 import build.genconf
 import build.prefetch as prefetch
@@ -408,7 +408,7 @@ def _cons_ymake_args(**kwargs):
 
 def run_ymake_build(**kwargs):
     if kwargs.get('use_local_conf', None):
-        arc_root = core.config.find_root_from(kwargs.get('abs_targets', None))
+        arc_root = devtools.ya.core.config.find_root_from(kwargs.get('abs_targets', None))
         if arc_root:
             build.genconf.check_local_ymake(os.path.join(arc_root, 'local.ymake'))
     return _ymake_build(**kwargs)
@@ -420,7 +420,7 @@ def _prepare_and_run_ymake(**kwargs):
         logger.debug('XXX Generate fake custom_conf')
         host_platform = build.genconf.host_platform_name()
         toolchain_params = build.genconf.gen_tc(host_platform)
-        arc_root = core.config.find_root_from(kwargs['abs_targets'])
+        arc_root = devtools.ya.core.config.find_root_from(kwargs['abs_targets'])
         custom_conf, _ = build.genconf.gen_conf(
             arc_dir=arc_root,
             conf_dir=build.genconf.detect_conf_root(arc_root, kwargs['custom_build_directory']),
@@ -473,7 +473,7 @@ def _run_ymake(**kwargs):
     _caches = defaultdict(lambda: {'loaded': False, 'saved': False, 'loading_enabled': False, 'saving_enabled': False})
     _stages = defaultdict(lambda: {'start': None, 'finish': None, 'duration': None})
 
-    _run_info = {  # for core.report
+    _run_info = {  # for devtools.ya.core.report
         'ymake_run_uid': _ymake_unique_run_id,
         'stats': _stat_info,
         'purpose': kwargs.pop('_purpose', None),
@@ -562,7 +562,9 @@ def _run_ymake(**kwargs):
 
     meta_data = {}
 
-    arc_root = kwargs.get('source_root', None) or core.config.find_root_from(kwargs.get('abs_targets', None))
+    arc_root = kwargs.get('source_root', None) or devtools.ya.core.config.find_root_from(
+        kwargs.get('abs_targets', None)
+    )
     if arc_root:
         plugins_roots = [os.path.join(arc_root, build.genconf.ymake_build_dir())]
         if not kwargs.pop('disable_customization', False):
@@ -710,11 +712,11 @@ def _run_ymake(**kwargs):
             logger.exception("While store debug info")
 
         logger.debug("ymake_run_info: %s", json.dumps(_run_info))
-        core.report.telemetry.report(core.report.ReportTypes.RUN_YMAKE, _run_info)
+        devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.RUN_YMAKE, _run_info)
 
     return YMakeResult(exit_code, stdout, stderr, meta_data), events
 
 
 def _mine_ymake_binary():
-    suffix = '_dev' if core.config.is_dev_mode() else ''
+    suffix = '_dev' if devtools.ya.core.config.is_dev_mode() else ''
     return tools.tool('ymake' + suffix)

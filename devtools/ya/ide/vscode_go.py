@@ -12,8 +12,8 @@ import termcolor
 import devtools.ya.app
 import build.build_opts as build_opts
 import build.build_handler as bh
-import core.common_opts
-import core.config
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import core.yarg
 import exts.shlex2
 import yalibrary.makelists
@@ -525,7 +525,7 @@ def gen_vscode_workspace(params):
     )
 
     workspace["settings"]["yandex.arcRoot"] = params.arc_root
-    workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
+    workspace["settings"]["yandex.toolRoot"] = devtools.ya.core.config.tool_root(toolscache_version())
     workspace["settings"]["yandex.codegenRoot"] = params.arc_root
 
     if params.patch_gopls:

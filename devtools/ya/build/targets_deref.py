@@ -1,8 +1,8 @@
 import os
 
 import build.targets
-import core.respawn
-import core.config
+import devtools.ya.core.respawn
+import devtools.ya.core.config
 import core.yarg
 
 
@@ -17,7 +17,7 @@ def intercept(func, params, old_style_bld_root=False):
     build_root = kwargs.pop('custom_build_root', None)
 
     info = build.targets.resolve(source_root, old_targets)
-    core.respawn.check_for_respawn(info.root)
+    devtools.ya.core.respawn.check_for_respawn(info.root)
 
     kwargs['abs_targets'] = info.targets
     kwargs['rel_targets'] = [os.path.relpath(x, info.root) for x in info.targets]
@@ -30,7 +30,7 @@ def intercept(func, params, old_style_bld_root=False):
             # XXX: wipe out
             bld_dir = os.path.normpath(os.path.join(info.root, '..', 'ybuild'))
         else:
-            bld_dir = core.config.build_root()
+            bld_dir = devtools.ya.core.config.build_root()
 
     kwargs['bld_dir'] = bld_dir
     kwargs['bld_root'] = build_root or os.path.join(bld_dir, 'build_root')

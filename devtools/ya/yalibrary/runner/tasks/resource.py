@@ -3,7 +3,7 @@ import sys
 import logging
 import time
 
-import core.error
+import devtools.ya.core.error
 import yalibrary.worker_threads as worker_threads
 
 from devtools.ya.yalibrary.active_state import Cancelled
@@ -118,7 +118,11 @@ class PrepareResource(object):
             raise
         except Exception as e:
             logging.exception('Unable to fetch resource %s', self._uri_description)
-            self._exit_code = core.error.ExitCodes.INFRASTRUCTURE_ERROR if core.error.is_temporary_error(e) else 1
+            self._exit_code = (
+                devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
+                if devtools.ya.core.error.is_temporary_error(e)
+                else 1
+            )
 
             self._ctx.fast_fail()
 

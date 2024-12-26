@@ -12,7 +12,7 @@ import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
-import core.config
+import devtools.ya.core.config
 import core.yarg
 import exts.asyncthread
 import exts.fs as fs
@@ -164,7 +164,7 @@ class VSCodeProject(object):
                 if is_windows:
                     item["command"] = item["command"].replace("\\", "/")
 
-        tools_root = core.config.tool_root(toolscache_version())
+        tools_root = devtools.ya.core.config.tool_root(toolscache_version())
         tool_resource_regex = re.compile(rf"({tools_root}/\d+)")
         tools_resources_set = set()
         for item in compilation_database:
@@ -368,7 +368,7 @@ class VSCodeProject(object):
 
         workspace["settings"] = self.get_default_settings()
         workspace["settings"]["yandex.arcRoot"] = self.params.arc_root
-        workspace["settings"]["yandex.toolRoot"] = core.config.tool_root(toolscache_version())
+        workspace["settings"]["yandex.toolRoot"] = devtools.ya.core.config.tool_root(toolscache_version())
 
         tools_futures = self.async_fetch_tools(for_platform=self.tool_platform)
 

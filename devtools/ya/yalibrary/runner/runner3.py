@@ -9,9 +9,9 @@ import time
 
 import typing as tp  # noqa
 
-import core.config
-import core.error
-import core.report
+import devtools.ya.core.config
+import devtools.ya.core.error
+import devtools.ya.core.report
 import exts.archive
 import exts.os2
 import exts.process
@@ -128,7 +128,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
 
         # Don't cache_stderr to avoid belated reading of special tags
         _, local_executor_address, wait_local_executor_init_fn = executor.start_executor(
-            cache_stderr=False, debug=core.config.is_test_mode(), wait_init=False
+            cache_stderr=False, debug=devtools.ya.core.config.is_test_mode(), wait_init=False
         )
 
     build_time_cache = None
@@ -821,7 +821,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
                     truncated_stderr = "\n".join((stderr[:TRUNCATE_STDERR], "...", stderr[-TRUNCATE_STDERR:]))
                 logger.debug("Task %s has stderr:\n%s", task_info.task, truncated_stderr)
 
-    merged_exit_code = core.error.merge_exit_codes([0] + list(exit_code_map.values()))
+    merged_exit_code = devtools.ya.core.error.merge_exit_codes([0] + list(exit_code_map.values()))
     logger.debug("Merged exit code: %d", merged_exit_code)
 
     def calc_critical_path():
@@ -846,7 +846,7 @@ def _run(ctx, app_ctx, callback, exit_stack, output_replacements=None):
     )
 
     logger.debug('Profile of graph execution %s', json.dumps(data))
-    core.report.telemetry.report(core.report.ReportTypes.PROFILE_BY_TYPE, data)
+    devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.PROFILE_BY_TYPE, data)
 
     if dist_cache:
         logger.debug('Average compression ratio: %0.2f', dist_cache.avg_compression_ratio)

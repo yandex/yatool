@@ -9,8 +9,8 @@ import textwrap
 import build.build_opts
 import build.graph
 import build.ya_make
-import core.common_opts
-import core.event_handling
+import devtools.ya.core.common_opts
+import devtools.ya.core.event_handling
 import core.yarg
 import exts.tmp
 
@@ -57,7 +57,7 @@ class RunYaHandler(core.yarg.OptsHandler):
             self._opt = core.yarg.merge_opts([RunOptsSupplement(free_args)] + _reduced_ya_make_options())
         else:
             self._unknown_args_as_free = True
-            self._opt = core.yarg.merge_opts([RunOptsStandalone(), core.common_opts.AuthOptions()])
+            self._opt = core.yarg.merge_opts([RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions()])
 
         return super(RunYaHandler, self).handle(root_handler, args, prefix)
 
@@ -139,7 +139,7 @@ def run(params):
 
     subscribers = [
         build.ya_make.DisplayMessageSubscriber(opts, app_ctx.display),
-        core.event_handling.EventToLogSubscriber(),
+        devtools.ya.core.event_handling.EventToLogSubscriber(),
     ]
 
     if getattr(app_ctx, 'evlog', None):
@@ -199,7 +199,7 @@ def _build(opts, app_ctx, graph):
 
 def _reduced_ya_make_options():
     import core.yarg.options
-    import core.common_opts
+    import devtools.ya.core.common_opts
     import devtools.ya.test.opts
 
     build_graph_cache_opts = build.build_opts.build_graph_cache_config_opts()
@@ -227,12 +227,12 @@ def _reduced_ya_make_options():
             build.build_opts.TestenvReportDirOptions,
             build.build_opts.YaMakeOptions,
             build.build_opts.YndexerOptions,
-            core.common_opts.CommonUploadOptions,
-            core.common_opts.MiniYaOpts,
-            core.common_opts.PrintStatisticsOptions,
-            core.common_opts.ProfileOptions,
-            core.common_opts.ProfilerOptions,
-            core.common_opts.TeamcityOptions,
+            devtools.ya.core.common_opts.CommonUploadOptions,
+            devtools.ya.core.common_opts.MiniYaOpts,
+            devtools.ya.core.common_opts.PrintStatisticsOptions,
+            devtools.ya.core.common_opts.ProfileOptions,
+            devtools.ya.core.common_opts.ProfilerOptions,
+            devtools.ya.core.common_opts.TeamcityOptions,
             core.yarg.options.RawParamsOptions,
             devtools.ya.test.opts.ArcadiaTestsDataOptions,
             devtools.ya.test.opts.CanonizationOptions,

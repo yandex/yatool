@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE core.config
     __init__.py
 )
 
@@ -12,7 +11,6 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/exts
     devtools/ya/yalibrary/find_root
-
     contrib/python/six
 )
 

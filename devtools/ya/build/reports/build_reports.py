@@ -33,7 +33,7 @@ def generate_results_report(builder):
         return
 
     import devtools.ya.test.util.tools
-    import core.error
+    import devtools.ya.core.error
     import build.reports.autocheck_report as ar2
 
     result_root_link = devtools.ya.test.util.tools.get_log_results_link(builder.opts)
@@ -65,7 +65,7 @@ def generate_results_report(builder):
 
     if builder.opts.junit_path:
         # don't generate junit for broken build if --keep-going isn't specified
-        if builder.opts.continue_on_fail or builder.exit_code in [0, core.error.ExitCodes.TEST_FAILED]:
+        if builder.opts.continue_on_fail or builder.exit_code in [0, devtools.ya.core.error.ExitCodes.TEST_FAILED]:
             devtools.ya.test.reports.JUnitReportGenerator().create(
                 builder.opts.junit_path,
                 suites,

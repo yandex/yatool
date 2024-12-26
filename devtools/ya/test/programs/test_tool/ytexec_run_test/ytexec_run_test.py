@@ -15,7 +15,7 @@ from devtools.ya.test.system import process
 from devtools.ya.test import const
 from devtools.ya.test.util import shared
 
-import core.config
+import devtools.ya.core.config
 import exts.archive
 import exts.fs
 import exts.func
@@ -120,7 +120,7 @@ def setup_yt_token(args):
             logger.debug("Use oauth to get yt_token")
             from yalibrary import oauth
 
-            token = oauth.get_token(core.config.get_user())
+            token = oauth.get_token(devtools.ya.core.config.get_user())
             if token is not None:
                 os.environ[yt_token_var_name] = token
             else:

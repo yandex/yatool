@@ -14,14 +14,14 @@ import exts.process as process
 from subprocess import CalledProcessError
 
 import build.ymake2 as ymake2
-import core.gsid
+import devtools.ya.core.gsid
 from exts.strtobool import strtobool
 import yalibrary.platform_matcher as pm
 import yalibrary.vcs.vcsversion as vcsversion
 from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 import yalibrary.tools as tools
-import core.config as config
-import core.patch_tools as patch_tools
+import devtools.ya.core.config as config
+import devtools.ya.core.patch_tools as patch_tools
 from devtools.ya.test.dependency.uid import TestUidGenerator
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ def _platform():
 
 def gen_description():
     return {
-        'gsid': core.gsid.flat_session_id(),
+        'gsid': devtools.ya.core.gsid.flat_session_id(),
         'description': {
             'platform': _platform(),
             'host': platform.node(),

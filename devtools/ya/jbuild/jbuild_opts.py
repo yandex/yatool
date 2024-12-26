@@ -1,7 +1,7 @@
 import build.build_opts as build_opts
 
 import core.yarg
-import core.common_opts as common_opts
+import devtools.ya.core.common_opts as common_opts
 
 import devtools.ya.test.opts as test_opts
 

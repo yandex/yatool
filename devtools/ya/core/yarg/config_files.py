@@ -6,7 +6,7 @@ import six
 import platform
 
 import app_config
-import core.config
+import devtools.ya.core.config
 import toml
 
 from core.yarg.consumers import ConfigConsumer, get_consumer
@@ -88,14 +88,14 @@ def get_config_files(cmd_name=None, user_config=True, global_config=True):
         path = os.environ['YA_CONFIG_PATH']
         if os.path.isabs(path):
             return [path]
-        return [os.path.join(core.config.find_root(), path)]
+        return [os.path.join(devtools.ya.core.config.find_root(), path)]
 
     if 'YA_TEST_CONFIG_PATH' in os.environ:
         config_files.append(os.environ['YA_TEST_CONFIG_PATH'])
 
-    if core.config.find_root(fail_on_error=False):
-        repository_root = core.config.find_root()
-        user = core.config.get_user()
+    if devtools.ya.core.config.find_root(fail_on_error=False):
+        repository_root = devtools.ya.core.config.find_root()
+        user = devtools.ya.core.config.get_user()
         system = platform.system().lower()
         # Respect XDG directory specification, as defined in
         # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
@@ -106,19 +106,19 @@ def get_config_files(cmd_name=None, user_config=True, global_config=True):
         # NB:
         #   this code intentionally does not takes ${XDG_CONFIG_HOME} into account,
         #   as nobody needs this override at the time
-        xdg_config_home = os.path.join(core.config.home_dir(), ".config")
+        xdg_config_home = os.path.join(devtools.ya.core.config.home_dir(), ".config")
 
         if global_config:
             filename = "ya.conf"
             if app_config.in_house:
                 config_files.append(os.path.join(repository_root, filename))
             else:
-                extra_conf_path = core.config.extra_conf_dir()
+                extra_conf_path = devtools.ya.core.config.extra_conf_dir()
                 assert extra_conf_path, 'extra_conf_root parameter must be specified for non "in_house" ya'
                 public_conf_path = os.path.join(repository_root, extra_conf_path, filename)
                 if os.path.exists(public_conf_path):
                     config_files.append(public_conf_path)
-                elif core.config.is_test_mode():
+                elif devtools.ya.core.config.is_test_mode():
                     raise AssertionError(
                         "opensource ya didn't find opensource ya.conf: {} is missing".format(public_conf_path)
                     )
@@ -138,11 +138,11 @@ def get_config_files(cmd_name=None, user_config=True, global_config=True):
             dirs = []
             # Don't try load user's config from junk using opensource ya
             if app_config.in_house:
-                dirs.append(core.config.junk_path(repository_root))
+                dirs.append(devtools.ya.core.config.junk_path(repository_root))
 
             dirs += [
                 os.path.dirname(repository_root),
-                core.config.misc_root(),
+                devtools.ya.core.config.misc_root(),
                 xdg_config_home,
             ]
 

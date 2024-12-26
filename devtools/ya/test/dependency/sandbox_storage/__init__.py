@@ -3,7 +3,7 @@
 import sys
 import os
 
-import core.config
+import devtools.ya.core.config
 import exts.yjson as json
 import exts.fs
 import shutil
@@ -84,7 +84,7 @@ class SandboxStorage(object):
             logger.debug("Initializing sandbox client")
             self._sandbox_client = sandbox.SandboxClient(
                 token=self._oauth_token,
-                api_url=core.config.custom_sandbox_api_url(),  # can be removed after code sync with Nebius ends (NDT-277)
+                api_url=devtools.ya.core.config.custom_sandbox_api_url(),  # can be removed after code sync with Nebius ends (NDT-277)
             )
         logger.debug("Getting sandbox resource id %s from storage %s", resource_id, self._storage_root)
         with filelock.FileLock(os.path.join(self._storage_root, str(resource_id) + ".lock")):

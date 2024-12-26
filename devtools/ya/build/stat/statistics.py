@@ -12,11 +12,12 @@ import enum
 import math
 
 import exts.fs
-import core.report
+import devtools.ya.core.report
 
 from humanfriendly import format_size
 
-from core import profiler, stage_tracer
+from devtools.ya.core import profiler
+from devtools.ya.core import stage_tracer
 import devtools.ya.test.const as test_const
 from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
 from functools import cmp_to_key
@@ -900,7 +901,7 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
         import app_ctx
 
         app_ctx.dump_debug['stats'] = stats
-        core.report.telemetry.report(core.report.ReportTypes.GRAPH_STATISTICS, stats)
+        devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.GRAPH_STATISTICS, stats)
 
 
 def analyze_distbuild_result(

@@ -10,8 +10,7 @@ import time
 import six
 import zstandard as zstd
 
-import core.config
-import core.gsid
+import devtools.ya.core.gsid
 from exts import fs, os2, yjson, archive
 
 import typing as tp  # noqa
@@ -292,7 +291,7 @@ class EvlogFacade(BaseEvlogFacade):
         return self.file_finder.get_latest()
 
     def _gen_default_filepath(self, compress_evlog):
-        run_uid = core.gsid.uid()
+        run_uid = devtools.ya.core.gsid.uid()
         sfx = EvlogSuffix.ZST if compress_evlog else EvlogSuffix.JSON
         default_filename = self._now_time.strftime(_LOG_FILE_NAME_FMT) + '.' + run_uid + sfx
         chunk_name = self._now_time.strftime(_LOG_DIR_NAME_FMT)

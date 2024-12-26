@@ -8,7 +8,7 @@ import json
 
 import six
 
-import core.resource
+import devtools.ya.core.resource
 import exts.fs
 import exts.archive
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_style():
-    return core.resource.try_get_resource("res/style.html")
+    return devtools.ya.core.resource.try_get_resource("res/style.html")
 
 
 def parse_args():

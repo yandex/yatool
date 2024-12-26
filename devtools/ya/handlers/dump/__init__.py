@@ -50,7 +50,7 @@ from core.yarg import (
     Group,
 )
 from yalibrary.vcs import vcsversion
-from core.imprint import imprint
+from devtools.ya.core.imprint import imprint
 from build.build_opts import (
     YMakeDebugOptions,
     YMakeBinOptions,
@@ -69,7 +69,7 @@ from build.build_opts import (
     ContinueOnFailOptions,
 )
 from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
-from core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
+from devtools.ya.core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 

@@ -5,7 +5,7 @@ import logging
 import os
 import six
 
-import core.config
+import devtools.ya.core.config
 import yalibrary.fetcher.tool_chain_fetcher
 import yalibrary.platform_matcher as pm
 from yalibrary.toolscache import toolscache_version
@@ -53,7 +53,7 @@ class _Bottle(object):
         else:
             binname = None
         self.__fetcher = yalibrary.fetcher.tool_chain_fetcher.get_tool_chain_fetcher(
-            core.config.tool_root(toolscache_version()),
+            devtools.ya.core.config.tool_root(toolscache_version()),
             toolchain_name,
             bottle_name,
             self.__formula,
@@ -87,7 +87,7 @@ class _Bottle(object):
 class _Bottler(object):
     def get(self, toolchain_name, bottle_name, for_platform, force_refetch):
         visited = set()
-        bottles = core.config.config()['bottles']
+        bottles = devtools.ya.core.config.config()['bottles']
         while True:
             if bottle_name in visited:
                 raise Exception('loop detected')
@@ -118,7 +118,7 @@ class _ToolInfo(object):
 
 
 def tools():
-    for name, value in sorted(six.iteritems(core.config.config()['tools'])):
+    for name, value in sorted(six.iteritems(devtools.ya.core.config.config()['tools'])):
         yield _ToolInfo(name, value.get('visible', True), value.get('description'))
 
 
@@ -128,7 +128,7 @@ class _ToolChain(object):
         native_with_target_tc = []
         native_tc = []
         other_tc = []
-        for tc, value in six.iteritems(core.config.config()['toolchain']):
+        for tc, value in six.iteritems(devtools.ya.core.config.config()['toolchain']):
             for pl in value['platforms']:
                 if pl.get('default', False):
                     current_os = yalibrary.platform_matcher.current_os()
@@ -144,8 +144,8 @@ class _ToolChain(object):
     def __find_toolchain(self, tool_name):
         logger.debug('Using old-style toolchain for: %s', tool_name)
         for tc in self.order:
-            if tc in core.config.config()['toolchain']:
-                toolchain = core.config.config()['toolchain'][tc]
+            if tc in devtools.ya.core.config.config()['toolchain']:
+                toolchain = devtools.ya.core.config.config()['toolchain'][tc]
                 if tool_name in toolchain['tools']:
                     location = toolchain['tools'][tool_name]
                     if 'system' in location and location['system']:
@@ -281,8 +281,8 @@ ToolInfo = tp.TypedDict(
 
 def iter_tools(name, tn_filter=None):
     # type: (str, tp.Callable | None) -> tp.Iterator[ToolInfo]
-    tc = core.config.config()['toolchain']  # type: dict[str, dict]
-    bt = core.config.config()['bottles']
+    tc = devtools.ya.core.config.config()['toolchain']  # type: dict[str, dict]
+    bt = devtools.ya.core.config.config()['bottles']
 
     for tn, descr in tc.items():
         if tn_filter is not None and not tn_filter(tn, descr):

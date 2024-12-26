@@ -4,7 +4,7 @@ import logging
 import devtools.ya.app
 import app_config
 import core.yarg
-import core.common_opts
+import devtools.ya.core.common_opts
 import build.ya_make
 import build.targets_deref
 import build.build_opts
@@ -36,11 +36,11 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 package_opts.PackageOperationalOptions(),
                 package_opts.PackageCustomizableOptions(),
                 package_opts.InterimOptions(),
-                core.common_opts.LogFileOptions(),
-                core.common_opts.EventLogFileOptions(),
+                devtools.ya.core.common_opts.LogFileOptions(),
+                devtools.ya.core.common_opts.EventLogFileOptions(),
                 build.build_opts.BuildTypeOptions('release'),
                 build.build_opts.BuildThreadsOptions(build_threads=None),
-                core.common_opts.CrossCompilationOptions(),
+                devtools.ya.core.common_opts.CrossCompilationOptions(),
                 build.build_opts.ArcPrefetchOptions(),
                 build.build_opts.ContentUidsOptions(),
                 build.build_opts.KeepTempsOptions(),
@@ -59,15 +59,15 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 build.build_opts.IgnoreRecursesOptions(),
                 build.build_opts.GraphFilterOutputResultOptions(),
                 build.build_opts.GraphOperateResultsOptions(),
-                core.common_opts.CustomSourceRootOptions(),
-                core.common_opts.CustomBuildRootOptions(),
-                core.common_opts.ShowHelpOptions(),
-                core.common_opts.BeVerboseOptions(),
-                core.common_opts.HtmlDisplayOptions(),
-                core.common_opts.CommonUploadOptions(),
+                devtools.ya.core.common_opts.CustomSourceRootOptions(),
+                devtools.ya.core.common_opts.CustomBuildRootOptions(),
+                devtools.ya.core.common_opts.ShowHelpOptions(),
+                devtools.ya.core.common_opts.BeVerboseOptions(),
+                devtools.ya.core.common_opts.HtmlDisplayOptions(),
+                devtools.ya.core.common_opts.CommonUploadOptions(),
                 build.build_opts.SandboxUploadOptions(ssh_key_option_name="--ssh-key", visible=HelpLevel.BASIC),
                 build.build_opts.MDSUploadOptions(),
-                core.common_opts.TransportOptions(),
+                devtools.ya.core.common_opts.TransportOptions(),
                 build.build_opts.CustomFetcherOptions(),
                 build.build_opts.DistCacheOptions(),
                 build.build_opts.FlagsOptions(),
@@ -85,9 +85,9 @@ class PackageYaHandler(core.yarg.OptsHandler):
                 test_opts.TestToolOptions(),
                 test_opts.UidCalculationOptions(cache_tests=False),
                 test_opts.LintersOptions(),
-                core.common_opts.YaBin3Options(),
-                core.common_opts.OutputStyleOptions(),
-                core.common_opts.PrintStatisticsOptions(),
+                devtools.ya.core.common_opts.YaBin3Options(),
+                devtools.ya.core.common_opts.OutputStyleOptions(),
+                devtools.ya.core.common_opts.PrintStatisticsOptions(),
             ]
             + build.build_opts.distbs_options()
             + build.build_opts.checkout_options()

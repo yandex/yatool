@@ -21,7 +21,7 @@ import exts.fs as fs
 import exts.path2 as path2
 from . import compile
 from . import funcs
-import core.resource as resource
+import devtools.ya.core.resource as resource
 import sys
 import re
 import yalibrary.tools as tools

@@ -2,7 +2,7 @@ import logging
 import os
 import time
 
-from core import stage_tracer
+from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
 import exts.fs
 from exts.compress import ucopen

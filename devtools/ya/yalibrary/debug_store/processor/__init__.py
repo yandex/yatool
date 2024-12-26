@@ -296,7 +296,7 @@ class BaseDumpProcessor:
         # type: () -> Path
 
         if self._path is None:
-            from core.config import misc_root
+            from devtools.ya.core.config import misc_root
 
             self._path = Path(misc_root(), self.MISC_ROOT_SUB_PATH)
 

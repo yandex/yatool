@@ -1,7 +1,7 @@
 import devtools.ya.core.sec as sec
 
 from yalibrary import loggers
-from core.report import set_suppression_filter
+from devtools.ya.core.report import set_suppression_filter
 
 
 def configure(app_ctx):

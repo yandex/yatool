@@ -8,8 +8,8 @@ from pathlib import PurePath, Path
 
 import marisa_trie
 
-import core.config
-import core.resource
+import devtools.ya.core.config
+import devtools.ya.core.resource
 import devtools.ya.test.const as const
 
 
@@ -20,7 +20,7 @@ type MaybeConfigPath = ConfigPath | tp.Literal[""]
 
 
 def _find_root() -> str:
-    return core.config.find_root(fail_on_error=False)
+    return devtools.ya.core.config.find_root(fail_on_error=False)
 
 
 class ConfigMixin:
@@ -50,7 +50,7 @@ class DefaultConfig:
     def _from_file(self, linter_name: str, defaults_file) -> MaybeConfigPath:
         if defaults_file:
             try:
-                config_map = core.config.config_from_arc_rel_path(defaults_file)
+                config_map = devtools.ya.core.config.config_from_arc_rel_path(defaults_file)
             except Exception as e:
                 logger.warning("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
             else:
@@ -60,7 +60,7 @@ class DefaultConfig:
     def _from_resource(self, resource_name: str) -> MaybeConfigPath:
         if resource_name:
             try:
-                content: bytes = core.resource.try_get_resource(resource_name)  # type: ignore
+                content: bytes = devtools.ya.core.resource.try_get_resource(resource_name)  # type: ignore
             except Exception as e:
                 logger.warning("Couldn't obtain config from memory, resource name %s, error %s", resource_name, repr(e))
             else:
@@ -91,7 +91,7 @@ class AutoincludeConfig:
             return marisa_trie.Trie([])
         for afile in self._autoinclude_files:
             try:
-                paths.extend(os.path.join(root, path) for path in core.config.config_from_arc_rel_path(afile))
+                paths.extend(os.path.join(root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile))
             except Exception as e:
                 logger.warning(
                     "Couldn't load autoinclude paths due to error %s. Autoincludes won't be used for configs lookup",
@@ -137,7 +137,7 @@ class RuffConfig:
             return
         try:
             config_map = {}
-            for prefix, config_path in core.config.config_from_arc_rel_path(self._config_path_trie).items():
+            for prefix, config_path in devtools.ya.core.config.config_from_arc_rel_path(self._config_path_trie).items():
                 config_map[os.path.normpath(os.path.join(self._root, prefix))] = config_path
         except Exception as e:
             logger.warning(

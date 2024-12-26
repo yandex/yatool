@@ -22,7 +22,7 @@ import yalibrary.makelists.macro_definitions as md
 import build.build_opts as bo
 import build.build_handler
 import core.yarg
-import core.config
+import devtools.ya.core.config
 
 import devtools.ya.jbuild.gen.gen as gen
 import devtools.ya.jbuild.gen.base as base
@@ -394,11 +394,11 @@ def find_jdk_pattern(resources):
 
 
 def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, resolve_type):
-    temp_project = os.path.join(core.config.user_junk_dir(), 'maven_import_tmp')
+    temp_project = os.path.join(devtools.ya.core.config.user_junk_dir(), 'maven_import_tmp')
     temp_project_path = os.path.join(opts.arc_root, temp_project)
     session_id = str(uuid.uuid4())
 
-    cache = os.path.join(core.config.misc_root(), 'maven_import')
+    cache = os.path.join(devtools.ya.core.config.misc_root(), 'maven_import')
     locks = fs.create_dirs(os.path.join(cache, 'locks'))
     lock_path = os.path.join(locks, '{}.lock'.format(hashing.md5_value(temp_project_path)))
     with library.python.filelock.FileLock(lock_path):

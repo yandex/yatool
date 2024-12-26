@@ -1,7 +1,7 @@
 import os
 import collections
 
-from core.imprint import imprint
+from devtools.ya.core.imprint import imprint
 from . import base
 from . import const
 from exts import hashing

@@ -20,8 +20,8 @@ import build.genconf
 import build.graph_path
 import build.makelist
 import build.targets_deref
-import core.common_opts
-import core.config
+import devtools.ya.core.common_opts
+import devtools.ya.core.config
 import core.yarg
 import exts.filelock
 import exts.fs
@@ -52,7 +52,7 @@ RE_PROJECT_TITLE = re.compile('[a-z0-9_]+', re.I)
 RE_ESCAPE_IN_UNQUOTED = re.compile(r'[ ()#"\\]')
 
 
-class IdeOutputStyle(core.common_opts.OutputStyleOptions):
+class IdeOutputStyle(devtools.ya.core.common_opts.OutputStyleOptions):
     @staticmethod
     def additional_style_opts():
         return []
@@ -154,9 +154,9 @@ def ide_minimal_opts(targets_free=False, prefetch=False):
     return [
         build.build_opts.BuildTargetsOptions(with_free=targets_free),
         build.build_opts.ArcPrefetchOptions(prefetch=prefetch),
-        core.common_opts.ShowHelpOptions(),
-        core.common_opts.DumpDebugOptions(),
-        core.common_opts.AuthOptions(),
+        devtools.ya.core.common_opts.ShowHelpOptions(),
+        devtools.ya.core.common_opts.DumpDebugOptions(),
+        devtools.ya.core.common_opts.AuthOptions(),
         IdeOutputStyle(),
     ]
 

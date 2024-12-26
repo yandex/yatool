@@ -5,7 +5,7 @@ import sys
 import yalibrary.find_root
 import exts.process
 
-import core.config
+import devtools.ya.core.config
 
 RESPAWNS_PARAM = 'YA_RESPAWNS'
 
@@ -83,7 +83,7 @@ class EmptyValue:
 
 def check_for_respawn(new_root):
     try:
-        prev_root = core.config.find_root(fail_on_error=False)
+        prev_root = devtools.ya.core.config.find_root(fail_on_error=False)
 
         root_change = prev_root != new_root
 
@@ -95,7 +95,7 @@ def check_for_respawn(new_root):
         if root_change:
             logger.debug('New source root %s is not the same as prev %s', new_root, prev_root)
 
-        entry_root = yalibrary.find_root.detect_root(core.config.entry_point_path())
+        entry_root = yalibrary.find_root.detect_root(devtools.ya.core.config.entry_point_path())
 
         entry_root_change = entry_root != new_root
 

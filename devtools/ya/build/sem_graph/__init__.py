@@ -10,7 +10,7 @@ from build.ymake2 import ymake_sem_graph
 from yalibrary import tools
 from devtools.ya.yalibrary import sjson
 from build import build_facade
-from core import config as core_config
+from devtools.ya.core import config as core_config
 
 
 class SemException(Exception):

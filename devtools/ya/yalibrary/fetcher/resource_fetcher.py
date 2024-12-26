@@ -9,7 +9,7 @@ from yalibrary import guards
 from yalibrary import platform_matcher
 from devtools.libs.yaplatform.python.platform_map import get_resource_dir_name
 
-from core import config
+from devtools.ya.core import config
 
 from yalibrary.fetcher.uri_parser import parse_resource_uri, get_mapped_parsed_uri_and_info
 

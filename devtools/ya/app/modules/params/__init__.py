@@ -1,7 +1,8 @@
 import os
 import build.targets
 import core.yarg
-import core.respawn
+import devtools.ya.core.respawn
+import devtools.ya.core.config
 import logging
 from exts.windows import win_path_fix
 
@@ -17,7 +18,7 @@ def resolve_and_respawn(params):
     build_root = kwargs.pop('custom_build_root', None)
 
     info = build.targets.resolve(source_root, old_targets)
-    core.respawn.check_for_respawn(info.root)
+    devtools.ya.core.respawn.check_for_respawn(info.root)
 
     kwargs['abs_targets'] = list(map(win_path_fix, info.targets))
     kwargs['rel_targets'] = [win_path_fix(os.path.relpath(x, info.root)) for x in info.targets]
@@ -26,7 +27,7 @@ def resolve_and_respawn(params):
     if custom_build_directory:
         bld_dir = os.path.abspath(custom_build_directory)
     else:
-        bld_dir = core.config.build_root()
+        bld_dir = devtools.ya.core.config.build_root()
 
     kwargs['bld_dir'] = win_path_fix(bld_dir)
     kwargs['bld_root'] = win_path_fix(build_root or os.path.join(bld_dir, 'build_root'))

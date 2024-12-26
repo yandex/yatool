@@ -8,11 +8,11 @@ import six
 
 import devtools.ya.app
 import core.yarg
-import core.common_opts
-import core.config as cc
+import devtools.ya.core.common_opts
+import devtools.ya.core.config as cc
 import build.ya_make as ym
 from exts import fs
-from core.common_opts import CustomBuildRootOptions
+from devtools.ya.core.common_opts import CustomBuildRootOptions
 from build.build_opts import LocalCacheOptions, DistCacheSetupOptions, parse_size_arg, parse_timespan_arg
 from exts.windows import on_win
 from yalibrary.runner import result_store
@@ -93,17 +93,21 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
             action=devtools.ya.app.execute(action=do_cache, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description='Strip build cache and old build directories',
             opts=[
-                core.common_opts.ShowHelpOptions(),
+                devtools.ya.core.common_opts.ShowHelpOptions(),
                 CollectCacheOptions(),
                 CustomBuildRootOptions(),
-                core.common_opts.AuthOptions(),
+                devtools.ya.core.common_opts.AuthOptions(),
             ],
             visible=True,
         )
         self['dist_cache'] = core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=do_strip_yt_cache, respawn=devtools.ya.app.RespawnType.NONE),
             description='Strip distributed (YT) cache',
-            opts=[core.common_opts.ShowHelpOptions(), DistCacheSetupOptions(), core.common_opts.AuthOptions()],
+            opts=[
+                devtools.ya.core.common_opts.ShowHelpOptions(),
+                DistCacheSetupOptions(),
+                devtools.ya.core.common_opts.AuthOptions(),
+            ],
             visible=False,
         )
 

@@ -4,8 +4,9 @@ import os
 import six
 
 
-import core.stages_profiler
-from core import config, profiler
+import devtools.ya.core.stages_profiler
+from devtools.ya.core import config
+from devtools.ya.core import profiler
 from core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
     CHECKOUT_ONLY_GROUP,
@@ -45,7 +46,7 @@ import exts.func
 import exts.path2
 
 import devtools.ya.test.const
-import core.config as cc
+import devtools.ya.core.config as cc
 
 import yalibrary.upload.consts
 from yalibrary.platform_matcher import is_darwin_rosetta
@@ -244,7 +245,7 @@ class ProfileOptions(Options):
 
     def postprocess(self):
         profiler.clear(self.profile_to_file)
-        core.stages_profiler.clear(self.stages_profile)
+        devtools.ya.core.stages_profiler.clear(self.stages_profile)
 
 
 class CustomSourceRootOptions(Options):
@@ -1047,7 +1048,7 @@ class AuthOptions(Options):
     def _find_docker_config(self):
         if self.docker_config_path:
             return
-        docker_config_path = core.config.get_docker_config_path()
+        docker_config_path = cc.get_docker_config_path()
         if os.path.exists(docker_config_path):
             self.docker_config_path = docker_config_path
 
@@ -1059,7 +1060,7 @@ class AuthOptions(Options):
             return
 
         if self.oauth_token_path is None:
-            self.oauth_token_path = core.config.get_ya_token_path()
+            self.oauth_token_path = cc.get_ya_token_path()
 
         try:
             with open(self.oauth_token_path, 'r') as f:

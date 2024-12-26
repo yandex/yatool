@@ -8,7 +8,7 @@ import operator
 import os
 
 import build.build_facade
-import core.config
+import devtools.ya.core.config
 
 logger = logging.getLogger(__name__)
 
@@ -279,7 +279,7 @@ def _walk(start_node):
         if path.startswith('$B'):
             return path
         elif path.startswith('$S'):
-            real_name = path.replace('$S', core.config.find_root())
+            real_name = path.replace('$S', devtools.ya.core.config.find_root())
             if os.path.isdir(real_name):
                 return path
             elif os.path.isfile(real_name):

@@ -5,21 +5,21 @@ import six
 import sys
 import time
 import signal
-import core.config
+import devtools.ya.core.config
 import logging
 import argparse
 
 import app_config
 
-import core.error
-import core.respawn
-import core.sig_handler
+import devtools.ya.core.error
+import devtools.ya.core.respawn
+import devtools.ya.core.sig_handler
 import core.yarg
-import core.stage_tracer as stage_tracer
+import devtools.ya.core.stage_tracer as stage_tracer
 
 from core.yarg import LazyCommand, try_load_handler
-from core.logger import init_logger
-from core.plugin_loader import explore_plugins
+from devtools.ya.core.logger import init_logger
+from devtools.ya.core.plugin_loader import explore_plugins
 from library.python import mlockall
 
 import devtools.ya.app
@@ -120,7 +120,7 @@ def format_msg(args):
 
 
 def main(args):
-    exit_handler = core.sig_handler.create_sigint_exit_handler()
+    exit_handler = devtools.ya.core.sig_handler.create_sigint_exit_handler()
     signal.signal(signal.SIGINT, exit_handler)
 
     _mlockall()

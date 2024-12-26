@@ -31,10 +31,10 @@ import app_config
 import yalibrary.fetcher.tool_chain_fetcher as fetcher
 import yalibrary.tools as tools
 import core.yarg
-import core.report
-import core.event_handling
-from core.imprint import imprint
-from core import stage_tracer
+import devtools.ya.core.report
+import devtools.ya.core.event_handling
+from devtools.ya.core.imprint import imprint
+from devtools.ya.core import stage_tracer
 import devtools.ya.test.const as tconst
 
 import yalibrary.platform_matcher as pm
@@ -907,8 +907,8 @@ def _load_stat(graph_stat_path):
     except Exception as e:
         logger.exception("Can not load statistics: %r", e)
         try:
-            core.report.telemetry.report(
-                core.report.ReportTypes.WTF_ERRORS, {"graph.load_stat": traceback.format_exc()}
+            devtools.ya.core.report.telemetry.report(
+                devtools.ya.core.report.ReportTypes.WTF_ERRORS, {"graph.load_stat": traceback.format_exc()}
             )
         except Exception as ee:
             logger.exception("Can not report error: %r", ee)
@@ -963,8 +963,8 @@ def _get_full_platform_name(platform, tags):
 def _handle_error(*msg):
     logger.exception(*msg)
     try:
-        core.report.telemetry.report(
-            core.report.ReportTypes.WTF_ERRORS, {"graph.add_stat_to_graph": traceback.format_exc()}
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.WTF_ERRORS, {"graph.add_stat_to_graph": traceback.format_exc()}
         )
     except Exception as e:
         logger.exception("Can not report error: %r", e)
@@ -1224,7 +1224,7 @@ def build_graph_and_tests(opts, check, event_queue=None, display=None):
 
             event_queue = app_ctx.event_queue
         except ImportError:
-            event_queue = core.event_handling.EventQueue()
+            event_queue = devtools.ya.core.event_handling.EventQueue()
 
     with contextlib2.ExitStack() as exit_stack:
         try:
@@ -1963,8 +1963,8 @@ class _GraphMaker:
 
 def _build_graph_and_tests(
     opts, check, event_queue, exit_stack, display
-):  # ?, True, core.event_handling.event_queue.EventQueue, contextlib2.ExitStack, yalibrary.display.Display
-    import core.config
+):  # ?, True, devtools.ya.core.event_handling.event_queue.EventQueue, contextlib2.ExitStack, yalibrary.display.Display
+    import devtools.ya.core.config
 
     build_graph_and_tests_stage = stager.start('build_graph_and_tests')
 
@@ -1980,7 +1980,7 @@ def _build_graph_and_tests(
         )
 
     bld_dir = opts.bld_dir
-    res_dir = core.config.tool_root(toolscache_version(opts))
+    res_dir = devtools.ya.core.config.tool_root(toolscache_version(opts))
     src_dir = opts.arc_root
 
     vcs_info = exit_stack.enter_context(
@@ -2114,7 +2114,7 @@ def _build_graph_and_tests(
             for target_tc in target_tcs
         ],
     }
-    core.report.telemetry.report(core.report.ReportTypes.PLATFORMS, platforms_info)
+    devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.PLATFORMS, platforms_info)
     yalibrary.debug_store.dump_debug['platforms'] = platforms_info
 
     timer = exts.timer.Timer(__name__)
@@ -3342,7 +3342,7 @@ def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_ver
         report_json.pop('SCM_DATA', None)
         report_json.pop('BUILD_DATE', None)
         report_json.pop('BUILD_TIMESTAMP', None)
-        core.report.telemetry.report(core.report.ReportTypes.VCS_INFO, report_json)
+        devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.VCS_INFO, report_json)
         yalibrary.debug_store.dump_debug['vcs_info'] = report_json
 
     timer.show_step('vcs info')

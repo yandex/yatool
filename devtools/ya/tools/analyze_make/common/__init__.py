@@ -4,7 +4,7 @@ import logging
 
 import zstandard as zstd
 
-import core.config as core_config
+import devtools.ya.core.config as core_config
 import yalibrary.display
 import yalibrary.evlog
 import yalibrary.formatter

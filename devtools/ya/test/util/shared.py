@@ -765,7 +765,7 @@ def get_oauth_token_options(opts, test_tool_mode=False):
         token_path = getattr(opts, "token_path", None)
         return ['--token-path', token_path] if token_path else (['--token', token] if token else [])
 
-    import core.config as cc
+    import devtools.ya.core.config as cc
 
     oauth_token = getattr(opts, "oauth_token", None)
 

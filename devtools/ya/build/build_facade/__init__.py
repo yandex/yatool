@@ -5,7 +5,7 @@ import exts.yjson as json
 from exts.strtobool import strtobool
 from exts.tmp import temp_file
 
-import core.config
+import devtools.ya.core.config
 import core.yarg
 
 import build.evlog
@@ -103,7 +103,7 @@ def gen_conf(
         toolchain_params = build.genconf.gen_tc(host_platform)
     logger.debug('Toolchain params for config generation: %s', json.dumps(toolchain_params, indent=2))
     if not arc_root:
-        arc_root = core.config.find_root_from(build_targets)
+        arc_root = devtools.ya.core.config.find_root_from(build_targets)
     generation_conf, _ = build.genconf.gen_conf(
         arc_dir=arc_root,
         conf_dir=custom_conf_dir or build.genconf.detect_conf_root(arc_root, build_root),
@@ -409,7 +409,7 @@ def gen_relation(
     host_platform=None,
     target_platforms=None,
 ):
-    arc_root = core.config.find_root_from(build_targets)
+    arc_root = devtools.ya.core.config.find_root_from(build_targets)
 
     def normalize_targets(targets):
         prefix_targets = [x for x in targets if x[0] == '$']

@@ -8,6 +8,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/build/targets
+    devtools/ya/core/stage_tracer
     devtools/ya/exts
     devtools/ya/jbuild/gen/actions
     devtools/ya/jbuild/gen/base

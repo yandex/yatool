@@ -6,7 +6,7 @@ import exts.func
 import exts.tmp
 import exts.uniq_id
 from . import testdeps
-from core.imprint import imprint
+from devtools.ya.core.imprint import imprint
 import devtools.ya.test.const as const
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ class TestUidGenerator(object):
 
         tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
         if tests_paths:
-            from core.imprint.atd import ArcadiaTestData
+            from devtools.ya.core.imprint.atd import ArcadiaTestData
 
             _, path_to_rev = cls._get_atd_revisions(arc_root)
             if path_to_rev:

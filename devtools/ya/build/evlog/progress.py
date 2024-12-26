@@ -3,7 +3,7 @@ import threading
 import collections
 import six
 
-import core.event_handling as event_handling
+import devtools.ya.core.event_handling as event_handling
 
 
 class Mode(Enum):

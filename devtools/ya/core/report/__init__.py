@@ -12,8 +12,8 @@ import six
 from exts import func
 from exts import flatten
 from exts import strings
-from core import config
-from core import gsid
+from devtools.ya.core import config
+from devtools.ya.core import gsid
 from devtools.ya.core import sec
 
 

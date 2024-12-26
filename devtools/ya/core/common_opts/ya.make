@@ -1,13 +1,11 @@
 PY23_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE core.common_opts
     __init__.py
 )
 
 PEERDIR(
     contrib/python/six
-
     devtools/ya/core/config
     devtools/ya/core/profiler
     devtools/ya/core/stages_profiler
