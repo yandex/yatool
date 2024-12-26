@@ -1,7 +1,3 @@
-# encoding: utf-8
-
-from __future__ import unicode_literals
-
 import itertools
 
 import json
@@ -11,15 +7,10 @@ import shutil
 import six
 import typing as tp  # noqa: F401
 from collections import defaultdict
+from pathlib import Path
 
 from yalibrary.debug_store.processor._common import pretty_date
 from yalibrary.debug_store.processor.html_generator import HTMLGenerator
-
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
-
 from exts import yjson
 import exts.fs
 import exts.windows
@@ -33,7 +24,7 @@ class JsonEncoder(json.JSONEncoder):
         return repr(o)
 
 
-class BaseDumpItem(object):
+class BaseDumpItem:
     logger = logging.getLogger(__name__ + ':BaseDumpItem')
 
     DUMP_FILE_NAME = "debug.json"
@@ -83,7 +74,7 @@ class BaseDumpItem(object):
 
     def _filter_line(self, line, keys):
         # type: (tp.Union[str, dict], tp.Sequence[str]) -> tp.Tuple[tp.Optional[str], tp.Optional[tp.Any]]
-        if isinstance(line, six.string_types):
+        if isinstance(line, str):
             data = yjson.loads(six.ensure_str(line))
         else:
             data = line
@@ -262,7 +253,7 @@ class DumpItem(BaseDumpItem):
 
         self.path = Path(path)  # type: Path
 
-        super(DumpItem, self).__init__(None if workdir is None else workdir / self.path.name)
+        super().__init__(None if workdir is None else workdir / self.path.name)
 
     def _lazy_read(self):
         filepath = str(self.path)
@@ -284,10 +275,10 @@ class DumpItem(BaseDumpItem):
 
         data = record['value']
 
-        return super(DumpItem, self)._filter_line(data, keys)
+        return super()._filter_line(data, keys)
 
 
-class BaseDumpProcessor(object):
+class BaseDumpProcessor:
     MISC_ROOT_SUB_PATH = "dump_debug"
     logger = logging.getLogger(__name__ + ':' + "BaseDumpProcessor")
 
@@ -338,7 +329,7 @@ class DumpProcessor(BaseDumpProcessor):
 
         self._file_list = sorted(self.evlog) if self.evlog else []
 
-        super(DumpProcessor, self).__init__(path)
+        super().__init__(path)
 
     def _generate_items_list(self):
         for evlog_path in self._file_list:

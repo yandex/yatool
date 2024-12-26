@@ -1,12 +1,6 @@
-from __future__ import unicode_literals
-
 import typing as tp  # noqa: F401
 import logging
-
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
+from pathlib import Path
 
 import six
 
@@ -81,7 +75,7 @@ class HTMLGenerator:
 
         orig_file_name = str(orig_file_name)
 
-        for path, item in six.iteritems(self.files):
+        for path, item in self.files.items():
             if item['original_path'] == orig_file_name:
                 if item['status'] != 'OK':
                     return None
@@ -133,7 +127,7 @@ class HTMLGenerator:
         }
         runs = info['runs'] = {}
 
-        for key, value in six.iteritems(self.debug_bundle):
+        for key, value in self.debug_bundle.items():
             if "ymake" not in key or 'run' not in key or not isinstance(value, dict):
                 continue
 
@@ -141,7 +135,7 @@ class HTMLGenerator:
             run['stages'] = value['run']['stages']
             run['purpose'] = value['run']['purpose']
 
-            for stage_info in six.itervalues(value['run']['stages']):
+            for stage_info in value['run']['stages'].values():
                 if stage_info['start'] < info['start']:
                     info['start'] = stage_info['start']
 
@@ -153,11 +147,11 @@ class HTMLGenerator:
         items = {}
         errors = []
 
-        for key, run in six.iteritems(runs):
+        for key, run in runs.items():
             item = items[key] = {'purpose': run['purpose'], 'stages': {}}
 
             try:
-                for stage, stage_info in six.iteritems(run['stages']):
+                for stage, stage_info in run['stages'].items():
                     if None in stage_info.values():
                         errors.append("Error in stage {}: {}".format(stage, stage_info))
                         continue

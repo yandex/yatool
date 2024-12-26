@@ -1,19 +1,13 @@
-# encoding: utf-8
 import enum
 from time import time
 
 import typing as tp  # noqa: F401
-import six
-
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
+from pathlib import Path
 
 import logging
 
 
-class Store(object):
+class Store:
     logger = logging.getLogger(__name__ + ':Store')
     VERSION = 1
 
@@ -41,7 +35,7 @@ class Store(object):
 
     def __setitem__(self, key, value):
         self.log_item(key, value)
-        assert isinstance(key, (str, six.text_type)), "Key must be string, not {}".format(type(key))
+        assert isinstance(key, str), "Key must be string, not {}".format(type(key))
 
         if key in self.data and self.data[key] != value:
             self.logger.warning("Rewrite item (%s) in debug_store", key)
@@ -66,7 +60,7 @@ class Store(object):
         if isinstance(data, Path):
             return str(data.absolute())
         if isinstance(data, dict):
-            return {k: cls.prepare_item_to_dump(v) for k, v in six.iteritems(data)}
+            return {k: cls.prepare_item_to_dump(v) for k, v in data.items()}
         if isinstance(data, (list, tuple, set)):
             return tuple(cls.prepare_item_to_dump(item) for item in data)
         if isinstance(data, enum.Enum):
