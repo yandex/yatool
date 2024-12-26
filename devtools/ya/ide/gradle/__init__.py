@@ -197,57 +197,115 @@ class _SymlinkCollector:
 class _ExistsSymlinkCollector(_SymlinkCollector):
     """Collect exists symlinks for remove later"""
 
+    _SYMLINKS_FILE = 'symlinks.json'
+
     def __init__(self, java_sem_config: _JavaSemConfig):
         super().__init__(java_sem_config)
         self.logger = logging.getLogger(type(self).__name__)
         self.symlinks: dict[Path, Path] = {}
 
-    def collect(self):
+    def collect(self) -> None:
         """Collect already exists symlinks"""
         if not self.config.export_root.exists():
             return
+
+        try:
+            if self._load():
+                return
+        except Exception as e:
+            self.logger.error("Can't load symlinks from file %s: %s", self._symlinks_path, e)
+
         for export_file, arcadia_file in self.collect_symlinks():
             if arcadia_file.is_symlink() and arcadia_file.resolve() == export_file:
-                self.symlinks[arcadia_file] = export_file
+                self.add_symlink(arcadia_file, export_file)
 
-    def remove_symlinks(self) -> None:
+    def add_symlink(self, arcadia_file: Path, export_file: Path) -> None:
+        self.symlinks[arcadia_file] = export_file
+
+    def del_symlink(self, arcadia_file: Path) -> None:
+        del self.symlinks[arcadia_file]
+
+    def save(self) -> None:
+        if not self.config.export_root.exists():
+            return
+        symlinks_path = self._symlinks_path
+        symlinks: dict[str, str] = {
+            str(arcadia_file): str(export_file) for arcadia_file, export_file in self.symlinks.items()
+        }
+        with symlinks_path.open('wb') as f:
+            sjson.dump(symlinks, f)
+
+    def _load(self) -> bool:
+        symlinks_path = self._symlinks_path
+        if not symlinks_path.exists():
+            return False
+        with symlinks_path.open('rb') as f:
+            symlinks: dict[str, str] = sjson.load(f)
+        self.symlinks = {Path(arcadia_file): Path(export_file) for arcadia_file, export_file in symlinks.items()}
+        return True
+
+    @property
+    def _symlinks_path(self) -> Path:
+        """Make filename for store symlinks"""
+        return self.config.export_root / self._SYMLINKS_FILE
+
+
+class _RemoveSymlinkCollector(_SymlinkCollector):
+    """Collect for remove symlinks"""
+
+    def __init__(self, exists_symlinks: _ExistsSymlinkCollector):
+        super().__init__(exists_symlinks.config)
+        self.logger = logging.getLogger(type(self).__name__)
+        self.symlinks: dict[Path, Path] = exists_symlinks.symlinks.copy()
+        self.exists_symlinks: _ExistsSymlinkCollector = exists_symlinks
+
+    def remove(self) -> None:
         """Remove symlinks from arcadia files to export files"""
         for arcadia_file, export_file in self.symlinks.items():
             try:
                 arcadia_file.unlink()
+                self.exists_symlinks.del_symlink(arcadia_file)  # remove deleted from exists
             except Exception as e:
                 self.logger.warning(
                     "Can't remove symlink '%s' -> '%s': %s", arcadia_file, export_file, e, exc_info=True
                 )
 
+    def add_symlink(self, arcadia_file: Path, export_file: Path) -> None:
+        self.symlinks[arcadia_file] = export_file
+
+    def del_symlink(self, arcadia_file: Path) -> None:
+        del self.symlinks[arcadia_file]
+
 
 class _NewSymlinkCollector(_SymlinkCollector):
     """Collect new symlinks for create later, exclude already exists"""
 
-    def __init__(self, exists_symlinks: _ExistsSymlinkCollector):
+    def __init__(self, exists_symlinks: _ExistsSymlinkCollector, remove_symlinks: _RemoveSymlinkCollector):
         super().__init__(exists_symlinks.config)
         self.logger = logging.getLogger(type(self).__name__)
         self.exists_symlinks: _ExistsSymlinkCollector = exists_symlinks
+        self.remove_symlinks: _RemoveSymlinkCollector = remove_symlinks
         self.symlinks: dict[Path, Path] = {}
         self.has_errors: bool = False
 
     def collect(self):
         """Collect new symlinks for creating, skip already exists symlinks"""
         for export_file, arcadia_file in self.collect_symlinks():
-            if arcadia_file in self.exists_symlinks.symlinks:
-                # Already exists, do nothing
-                del self.exists_symlinks.symlinks[arcadia_file]
+            if arcadia_file in self.remove_symlinks.symlinks:
+                # Already exists, don't remove it
+                self.remove_symlinks.del_symlink(arcadia_file)
             elif not arcadia_file.exists():
                 self.symlinks[arcadia_file] = export_file
             elif arcadia_file.is_symlink() and arcadia_file.resolve().is_relative_to(_JavaSemConfig.EXPORT_ROOT_BASE):
                 self.logger.error("Already symlink to another project %s -> %s", arcadia_file, arcadia_file.resolve())
                 self.has_errors = True
 
-    def create_symlinks(self) -> None:
+    def create(self) -> None:
         """Create symlinks from arcadia files to export files"""
         for arcadia_file, export_file in self.symlinks.items():
             try:
                 arcadia_file.symlink_to(export_file, export_file.is_dir())
+                self.exists_symlinks.add_symlink(arcadia_file, export_file)  # add created symlink as exists
             except Exception as e:
                 self.logger.error("Can't create symlink '%s' -> '%s': %s", arcadia_file, export_file, e, exc_info=True)
                 self.has_errors = True
@@ -714,16 +772,16 @@ class _Builder:
 class _Remover:
     """Remove all symlinks and export root"""
 
-    def __init__(self, java_sem_config: _JavaSemConfig, exists_symlinks: _ExistsSymlinkCollector):
+    def __init__(self, java_sem_config: _JavaSemConfig, remove_symlinks: _RemoveSymlinkCollector):
         self.logger = logging.getLogger(type(self).__name__)
         self.config: _JavaSemConfig = java_sem_config
-        self.exists_symlinks: _ExistsSymlinkCollector = exists_symlinks
+        self.remove_symlinks: _RemoveSymlinkCollector = remove_symlinks
 
     def remove(self) -> None:
         """Remove all exists symlinks and then remove export root"""
-        if self.exists_symlinks.symlinks:
-            self.logger.info("Remove %d symlinks from arcadia to export root", len(self.exists_symlinks.symlinks))
-            self.exists_symlinks.remove_symlinks()
+        if self.remove_symlinks.symlinks:
+            self.logger.info("Remove %d symlinks from arcadia to export root", len(self.remove_symlinks.symlinks))
+            self.remove_symlinks.remove()
         if self.config.export_root.exists():
             try:
                 self.logger.info("Remove export root %s", self.config.export_root)
@@ -743,9 +801,10 @@ def do_gradle(params):
 
         exists_symlinks = _ExistsSymlinkCollector(config)
         exists_symlinks.collect()
+        remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
 
         if config.params.remove:
-            remover = _Remover(config, exists_symlinks)
+            remover = _Remover(config, remove_symlinks)
             remover.remove()
             return
 
@@ -758,14 +817,15 @@ def do_gradle(params):
         ya_settings = _YaSettings(config)
         ya_settings.save()
 
-        new_symlinks = _NewSymlinkCollector(exists_symlinks)
+        new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
         new_symlinks.collect()
 
         if new_symlinks.has_errors:
             raise YaIdeGradleException('Some errors during creating symlinks, read the logs for more information')
 
-        exists_symlinks.remove_symlinks()
-        new_symlinks.create_symlinks()
+        remove_symlinks.remove()
+        new_symlinks.create()
+        exists_symlinks.save()
 
         builder = _Builder(config, sem_graph)
         builder.build()
