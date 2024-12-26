@@ -35,7 +35,7 @@ class _Markdown:
     }
 
     def __init__(self, arc_root, dump_all_descs, use_svn, replacements):
-        self.descs = {'macros': {}, 'modules': {}, 'multimodules': {}, 'unknowns': {}}
+        self.descs = {'macros': {}, 'modules': {}, 'multimodules': {}, 'properties': {}, 'unknowns': {}}
         self.links = {}
         self.anchors = {}
         self.replacements = replacements
@@ -54,7 +54,7 @@ class _Markdown:
     def dump(self):
         res = self._dump_toc()
 
-        for type in ['multimodules', 'modules', 'macros', 'unknowns']:
+        for type in ['multimodules', 'modules', 'macros', 'properties', 'unknowns']:
             if self.descs[type]:
                 res += _Markdown._format_section(type)
 
@@ -62,7 +62,7 @@ class _Markdown:
                     for d in self.descs[type][name]['text']:
                         res += six.ensure_str(d)
 
-        for type in ['multimodules', 'modules', 'macros', 'unknowns']:
+        for type in ['multimodules', 'modules', 'macros', 'properties', 'unknowns']:
             if self.descs[type]:
                 for name in sorted(self.descs[type]):
                     link = self.descs[type][name]['link']
@@ -71,6 +71,11 @@ class _Markdown:
             res = self.apply_replacements(res)
 
         return res
+
+    def _get_plural_form(self, type):
+        if type == 'property':
+            return 'properties'
+        return type + 's'
 
     def _add_entry_optionally(self, file, entry):
         props = entry['properties']
@@ -86,8 +91,8 @@ class _Markdown:
         descs, link = self._format_entry(doc)
 
         dictionary = (
-            self.descs[doc['type'] + 's']
-            if doc['type'] in ['macro', 'module', 'multimodule']
+            self.descs[self._get_plural_form(doc['type'])]
+            if doc['type'] in ['macro', 'module', 'multimodule', 'property']
             else self.descs['unknowns']
         )
 
@@ -112,7 +117,7 @@ class _Markdown:
         )
         res += '{markup} Table of contents\n\n'.format(markup=_Markdown.header * 2)
 
-        for type in ['multimodules', 'modules', 'macros', 'unknowns']:
+        for type in ['multimodules', 'modules', 'macros', 'properties', 'unknowns']:
             if self.descs[type]:
                 res += _Markdown._format_toc_section(type)
                 if type != 'macros':
@@ -163,7 +168,7 @@ class _Markdown:
 
     @classmethod
     def _format_toc_header(cls, doc):
-        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule'] else "Unknown"
+        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule', 'property'] else "Unknown"
         return '{indent} - {qual} [{name}](#{type}_{name})\n'.format(
             indent=' ' * cls.dcount, qual=qual, name=doc['name'], type=doc['type']
         )
@@ -181,7 +186,7 @@ class _Markdown:
         usage = doc['usage'] if 'usage' in doc else ""
         usage = name if not usage else usage
 
-        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule'] else "Unknown"
+        qual = doc['type'].capitalize() if doc['type'] in ['macro', 'module', 'multimodule', 'property'] else "Unknown"
 
         usage = _Markdown._remove_formatting(usage.rstrip().lstrip())
         name = _Markdown._remove_formatting(name)

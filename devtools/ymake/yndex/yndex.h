@@ -50,7 +50,8 @@ namespace NYndex {
         Macro /* "macro" */,
         Module /* "module" */,
         MultiModule /* "multimodule" */,
-        Variable /* "variable" */
+        Variable /* "variable" */,
+        Property /* "property" */,
     };
 
     struct TDefinition {

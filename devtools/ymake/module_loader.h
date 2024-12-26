@@ -89,7 +89,7 @@ private:
     }
 
     bool IsMacroAllowedInLintersMake(const TStringBuf& name) {
-        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NOptions::ALLOWED_IN_LINTERS_MAKE);
+        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NProperties::ALLOWED_IN_LINTERS_MAKE);
     }
 
     size_t StatementPriority(const TStringBuf& s);

@@ -27,8 +27,8 @@ struct TToolOptions {
     TString AddIncl;
     TString AddPeers;
 
-    bool SetOption(TStringBuf name, TStringBuf value);
-    bool SetMultiValueOption(TStringBuf name, TStringBuf value);
+    bool SetProperty(TStringBuf name, TStringBuf value);
+    bool SetMultiValueProperty(TStringBuf name, TStringBuf value);
 
     Y_SAVELOAD_DEFINE(
         AddIncl,
@@ -161,9 +161,9 @@ struct TModuleConf {
 
     bool AddSubmodule(const TString& tag, TModuleConf& sub);
 
-    bool SetOption(TStringBuf key, TStringBuf name, TStringBuf val, TVars& vars, bool renderSemantics);
+    bool SetProperty(TStringBuf key, TStringBuf name, TStringBuf val, TVars& vars, bool renderSemantics);
 
-    static bool IsOption(const TStringBuf name);
+    static bool IsProperty(const TStringBuf name);
 
     void Inherit(const TModuleConf& parent);
 
@@ -206,10 +206,10 @@ struct TBlockData {
 
     bool SetOption(TStringBuf blockName, TStringBuf name, TStringBuf value, TVars& commandConf, bool renderSemantics) {
         YDIAG(DG) << "SetOption: " << blockName << "->" << name << "=" << value << Endl;
-        if (!GetOrInit(ToolOptions).SetOption(name, value)) {
+        if (!GetOrInit(ToolOptions).SetProperty(name, value)) {
             if (!commandConf[blockName].SetOption(name)) {
-                if (TModuleConf::IsOption(name)) {
-                    return GetOrInit(ModuleConf).SetOption(blockName, name, value, commandConf, renderSemantics);
+                if (TModuleConf::IsProperty(name)) {
+                    return GetOrInit(ModuleConf).SetProperty(blockName, name, value, commandConf, renderSemantics);
                 } else {
                     return false;
                 }

@@ -1,6 +1,7 @@
 #include "builtin.h"
 
 #include <devtools/ymake/builtin_macro_consts.h>
+#include <devtools/ymake/lang/properties.h>
 
 using namespace NYndex;
 
@@ -244,5 +245,9 @@ void NYndex::AddBuiltinDefinitions(TDefinitions& definitions) {
     NYndex::TSourceRange range = {static_cast<size_t>(BuiltinDocLink.Line) + 1, 0, static_cast<size_t>(BuiltinDocLink.Line) + 1, 0};
     for (const auto& def : BuiltinDefinitions) {
         definitions.AddDefinition(TString{def.Name}, TString(BuiltinDocLink.File), range, def.DocText, NYndex::EDefinitionType::Macro);
+    }
+    for (const auto& option : NProperties::ALL_PROPERTIES) {
+        NYndex::TSourceRange range = {static_cast<size_t>(option.Link.Line), 0, static_cast<size_t>(option.Link.Line), 0};
+        definitions.AddDefinition(TString{option}, TString(option.Link.File), range, TString{option.Description}, NYndex::EDefinitionType::Property);
     }
 }

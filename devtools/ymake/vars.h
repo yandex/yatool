@@ -7,7 +7,7 @@
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/diag/dbg.h>
-#include <devtools/ymake/lang/option_names.h>
+#include <devtools/ymake/lang/properties.h>
 
 #include <util/generic/fwd.h>
 #include <util/generic/hash.h>
@@ -254,10 +254,10 @@ struct TYVar: public TVector<TVarStr> {
     }
 
     bool SetOption(TStringBuf name) {
-        if (name == NOptions::GEN_FROM_FILE) {
+        if (name == NProperties::GEN_FROM_FILE) {
             GenFromFile = true;
             return true;
-        } else if (name == NOptions::NO_EXPAND) {
+        } else if (name == NProperties::NO_EXPAND) {
             DontExpand = true;
             return true;
         }

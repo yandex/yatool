@@ -2,7 +2,7 @@
 
 #include <contrib/libs/antlr4_cpp_runtime/src/antlr4-runtime.h>
 
-#include "devtools/ymake/lang/option_names.h"
+#include "devtools/ymake/lang/properties.h"
 #include <devtools/ymake/lang/TConfLexer.h>
 #include <devtools/ymake/lang/TConfParser.h>
 #include <devtools/ymake/lang/TConfBaseVisitor.h>
@@ -871,21 +871,21 @@ namespace {
             const auto& block = BlockStack.back();
             Y_ASSERT(block.IsMacro());
 
-            if (name == NOptions::CMD) {
+            if (name == NProperties::CMD) {
                 if (!Conf.RenderSemantics || !block.BlockData().HasSemantics) {
                     SetCommand(value);
                 }
                 return;
-            } else if (name == NOptions::SEM) {
+            } else if (name == NProperties::SEM) {
                 if (Conf.RenderSemantics) {
                     BlockStack.back().BlockData().HasSemantics = true;
                     SetCommand(value);
                 }
                 return;
-            } else if (name == NOptions::PROXY) {
+            } else if (name == NProperties::PROXY) {
                 SetProxyProp();
                 return;
-            } else if (name == NOptions::STRUCT_CMD) {
+            } else if (name == NProperties::STRUCT_CMD) {
                 if (Conf.RenderSemantics)
                     return;
                 if (value == "yes") {
@@ -896,7 +896,7 @@ namespace {
                     ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
                 }
                 return;
-            } else if (name == NOptions::STRUCT_SEM) {
+            } else if (name == NProperties::STRUCT_SEM) {
                 if (!Conf.RenderSemantics)
                     return;
                 if (value == "yes") {
@@ -907,7 +907,7 @@ namespace {
                     ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
                 }
                 return;
-            } else if (name == NOptions::FILE_GROUP) {
+            } else if (name == NProperties::FILE_GROUP) {
                 if (value == "yes") {
                     BlockStack.back().BlockData().IsFileGroupMacro = true;
                 } else if (value == "no") {
@@ -916,13 +916,13 @@ namespace {
                     ReportError(TString::Join("Only yes or no are expected for macro property [", block.Name(), ".", name, "]"));
                 }
             } else {
-                if (name == NOptions::ADDINCL ||
-                    name == NOptions::PEERDIR ||
-                    name == NOptions::ALLOWED_IN_LINTERS_MAKE)
+                if (name == NProperties::ADDINCL ||
+                    name == NProperties::PEERDIR ||
+                    name == NProperties::ALLOWED_IN_LINTERS_MAKE)
                 {
                     // Do nothing
-                } else if (name == NOptions::GEN_FROM_FILE ||
-                           name == NOptions::NO_EXPAND) {
+                } else if (name == NProperties::GEN_FROM_FILE ||
+                           name == NProperties::NO_EXPAND) {
                     if (value == "yes") {
                         // Do nothing
                     } else if (value != "no") {
@@ -941,40 +941,40 @@ namespace {
             const auto& block = BlockStack.back();
             Y_ASSERT(block.IsModule() || block.IsMultiModule());
 
-            if (name == NOptions::ALIASES ||
-                name == NOptions::ALLOWED ||
-                name == NOptions::CMD ||
-                name == NOptions::DEFAULT_NAME_GENERATOR ||
-                name == NOptions::ARGS_PARSER ||
-                name == NOptions::SEM ||
-                name == NOptions::SEM_IGNORE ||
-                name == NOptions::EXTS ||
-                name == NOptions::GLOBAL ||
-                name == NOptions::IGNORED ||
-                name == NOptions::NODE_TYPE ||
-                name == NOptions::PEERDIR_POLICY ||
-                name == NOptions::SYMLINK_POLICY ||
-                name == NOptions::RESTRICTED ||
-                name == NOptions::GLOBAL_CMD ||
-                name == NOptions::GLOBAL_SEM ||
-                name == NOptions::GLOBAL_EXTS ||
-                name == NOptions::EPILOGUE ||
-                name == NOptions::TRANSITION)
+            if (name == NProperties::ALIASES ||
+                name == NProperties::ALLOWED ||
+                name == NProperties::CMD ||
+                name == NProperties::DEFAULT_NAME_GENERATOR ||
+                name == NProperties::ARGS_PARSER ||
+                name == NProperties::SEM ||
+                name == NProperties::SEM_IGNORE ||
+                name == NProperties::EXTS ||
+                name == NProperties::GLOBAL ||
+                name == NProperties::IGNORED ||
+                name == NProperties::NODE_TYPE ||
+                name == NProperties::PEERDIR_POLICY ||
+                name == NProperties::SYMLINK_POLICY ||
+                name == NProperties::RESTRICTED ||
+                name == NProperties::GLOBAL_CMD ||
+                name == NProperties::GLOBAL_SEM ||
+                name == NProperties::GLOBAL_EXTS ||
+                name == NProperties::EPILOGUE ||
+                name == NProperties::TRANSITION)
             {
                 // Do nothing
-            } else if (name == NOptions::PEERDIRSELF) {
+            } else if (name == NProperties::PEERDIRSELF) {
                 if (!block.IsFromMultimodule()) {
                     ReportError(TStringBuilder() << "Property [.PEERDIRSELF] is set for module ["
                         << block.Name() << "] which is not a sub-module of a multi-module.");
                 }
-            } else if (name == NOptions::FINAL_TARGET ||
-                       name == NOptions::INCLUDE_TAG ||
-                       name == NOptions::PROXY ||
-                       name == NOptions::VERSION_PROXY ||
-                       name == NOptions::STRUCT_CMD ||
-                       name == NOptions::STRUCT_SEM ||
-                       name == NOptions::USE_INJECTED_DATA ||
-                       name == NOptions::USE_PEERS_LATE_OUTS)
+            } else if (name == NProperties::FINAL_TARGET ||
+                       name == NProperties::INCLUDE_TAG ||
+                       name == NProperties::PROXY ||
+                       name == NProperties::VERSION_PROXY ||
+                       name == NProperties::STRUCT_CMD ||
+                       name == NProperties::STRUCT_SEM ||
+                       name == NProperties::USE_INJECTED_DATA ||
+                       name == NProperties::USE_PEERS_LATE_OUTS)
             {
                 if (value == "yes") {
                     // Do nothing
@@ -984,7 +984,7 @@ namespace {
             } else {
                 ReportError(TString::Join("Unknown property [", name, "] in module [", block.Name(), "]"));
             }
-            if (block.IsMultiModule() && name != NOptions::ALIASES) {
+            if (block.IsMultiModule() && name != NProperties::ALIASES) {
                 ReportError(TString::Join( "Unexpected property [", name, "] in multimodule [", block.Name(), "]"));
             }
 

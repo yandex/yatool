@@ -5,7 +5,7 @@
 
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/manager.h>
-#include <devtools/ymake/lang/option_names.h>
+#include <devtools/ymake/lang/properties.h>
 
 #include <library/cpp/iterator/mapped.h>
 
@@ -232,49 +232,49 @@ static TStringBuf GetSectionPattern(const decltype(TYmakeConfig::BlockData)& blo
     return GetSectionPattern(it->second, patternName);
 }
 
-bool TToolOptions::SetMultiValueOption(TStringBuf name, const TStringBuf value) {
-    if (!EqualToOneOf(name, NOptions::ADDINCL, NOptions::PEERDIR)) {
+bool TToolOptions::SetMultiValueProperty(TStringBuf name, const TStringBuf value) {
+    if (!EqualToOneOf(name, NProperties::ADDINCL, NProperties::PEERDIR)) {
         return false;
     }
-    TString& option = name == NOptions::ADDINCL ? AddIncl : AddPeers;
-    option = option.empty() ? TString(value) : TString::Join(option, " ", value);
+    TString& property = name == NProperties::ADDINCL ? AddIncl : AddPeers;
+    property = property.empty() ? TString(value) : TString::Join(property, " ", value);
     return true;
 }
 
-bool TToolOptions::SetOption(TStringBuf name, TStringBuf value) {
-    return SetMultiValueOption(name, value);
+bool TToolOptions::SetProperty(TStringBuf name, TStringBuf value) {
+    return SetMultiValueProperty(name, value);
 }
 
-bool TModuleConf::IsOption(const TStringBuf name) {
+bool TModuleConf::IsProperty(const TStringBuf name) {
     static const THashSet<TStringBuf> properties{
-        NOptions::ALIASES,
-        NOptions::ALLOWED,
-        NOptions::CMD,
-        NOptions::STRUCT_CMD,
-        NOptions::STRUCT_SEM,
-        NOptions::DEFAULT_NAME_GENERATOR,
-        NOptions::ARGS_PARSER,
-        NOptions::GLOBAL,
-        NOptions::GLOBAL_CMD,
-        NOptions::GLOBAL_EXTS,
-        NOptions::GLOBAL_SEM,
-        NOptions::EPILOGUE,
-        NOptions::EXTS,
-        NOptions::FINAL_TARGET,
-        NOptions::IGNORED,
-        NOptions::INCLUDE_TAG,
-        NOptions::NODE_TYPE,
-        NOptions::PEERDIRSELF,
-        NOptions::PEERDIR_POLICY,
-        NOptions::PROXY,
-        NOptions::RESTRICTED,
-        NOptions::SEM,
-        NOptions::SEM_IGNORE,
-        NOptions::SYMLINK_POLICY,
-        NOptions::USE_INJECTED_DATA,
-        NOptions::USE_PEERS_LATE_OUTS,
-        NOptions::FILE_GROUP,
-        NOptions::TRANSITION
+        NProperties::ALIASES,
+        NProperties::ALLOWED,
+        NProperties::CMD,
+        NProperties::STRUCT_CMD,
+        NProperties::STRUCT_SEM,
+        NProperties::DEFAULT_NAME_GENERATOR,
+        NProperties::ARGS_PARSER,
+        NProperties::GLOBAL,
+        NProperties::GLOBAL_CMD,
+        NProperties::GLOBAL_EXTS,
+        NProperties::GLOBAL_SEM,
+        NProperties::EPILOGUE,
+        NProperties::EXTS,
+        NProperties::FINAL_TARGET,
+        NProperties::IGNORED,
+        NProperties::INCLUDE_TAG,
+        NProperties::NODE_TYPE,
+        NProperties::PEERDIRSELF,
+        NProperties::PEERDIR_POLICY,
+        NProperties::PROXY,
+        NProperties::RESTRICTED,
+        NProperties::SEM,
+        NProperties::SEM_IGNORE,
+        NProperties::SYMLINK_POLICY,
+        NProperties::USE_INJECTED_DATA,
+        NProperties::USE_PEERS_LATE_OUTS,
+        NProperties::FILE_GROUP,
+        NProperties::TRANSITION
     };
     return properties.contains(name);
 }
@@ -414,8 +414,8 @@ bool TModuleConf::AddSubmodule(const TString& tag, TModuleConf& sub) {
     return added;
 }
 
-bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, TVars& topVars, bool renderSemantics) {
-    if (EqualToOneOf(name, NOptions::RESTRICTED, NOptions::IGNORED, NOptions::ALLOWED, NOptions::GLOBAL)) {
+bool TModuleConf::SetProperty(TStringBuf key, TStringBuf name, TStringBuf value, TVars& topVars, bool renderSemantics) {
+    if (EqualToOneOf(name, NProperties::RESTRICTED, NProperties::IGNORED, NProperties::ALLOWED, NProperties::GLOBAL)) {
         auto updateCollection = [value, renderSemantics, &topVars] (bool isGlobal, auto& collection) {
             for (const auto arg : StringSplitter(value).Split(' ').SkipEmpty()) {
                 collection.insert(TString(arg));
@@ -436,43 +436,43 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
             }
         };
 
-        if (name == NOptions::RESTRICTED) {
+        if (name == NProperties::RESTRICTED) {
             updateCollection(false, Restricted);
-        } else if (name == NOptions::IGNORED) {
+        } else if (name == NProperties::IGNORED) {
             updateCollection(false, Ignored);
-        } else if (name == NOptions::ALLOWED) {
+        } else if (name == NProperties::ALLOWED) {
             updateCollection(false, Allowed);
-        } else if (name == NOptions::GLOBAL) {
+        } else if (name == NProperties::GLOBAL) {
             updateCollection(true, Globals);
         }
-    } else if (name == NOptions::CMD) {
+    } else if (name == NProperties::CMD) {
         if (!renderSemantics || !HasSemantics) {
             Cmd = value;
         }
-    } else if (name == NOptions::SEM) {
+    } else if (name == NProperties::SEM) {
         if (renderSemantics) {
             Cmd = value;
             HasSemantics = true;
         }
-    } else if (name == NOptions::SEM_IGNORE) {
+    } else if (name == NProperties::SEM_IGNORE) {
         if (renderSemantics) {
             CmdIgnore = value;
             HasSemantics = true;
         }
-    } else if (bool global = name == NOptions::GLOBAL_EXTS; name == NOptions::EXTS || global) {
+    } else if (bool global = name == NProperties::GLOBAL_EXTS; name == NProperties::EXTS || global) {
         for (const auto ext : StringSplitter(value).Split(' ').SkipEmpty()) {
             AddExt(ext, global);
         }
-    } else if (name == NOptions::GLOBAL_CMD) {
+    } else if (name == NProperties::GLOBAL_CMD) {
         if (!renderSemantics || !HasSemanticsForGlobals) {
             GlobalCmd = value;
         }
-    } else if (name == NOptions::GLOBAL_SEM) {
+    } else if (name == NProperties::GLOBAL_SEM) {
         if (renderSemantics) {
             GlobalCmd = value;
             HasSemanticsForGlobals = true;
         }
-    } else if (name == NOptions::ALIASES) {
+    } else if (name == NProperties::ALIASES) {
         for (const auto alias : StringSplitter(value).Split(' ').SkipEmpty()) {
             TStringBuf from, to;
             Split(alias, "=", from, to);
@@ -481,7 +481,7 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
                 YErr() << "Duplicate alias for macro " << from << " in module " << Name << " ignored"<< Endl;
             }
         }
-    } else if (name == NOptions::NODE_TYPE) {
+    } else if (name == NProperties::NODE_TYPE) {
         if (value == "Library") {
             NodeType = EMNT_Library;
         } else if (value == "Program") {
@@ -491,7 +491,7 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NOptions::SYMLINK_POLICY) {
+    } else if (name == NProperties::SYMLINK_POLICY) {
         if (value == "SO") {
             SymlinkType = EST_So;
         } else if (value == "EXE") {
@@ -501,7 +501,7 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NOptions::PEERDIR_POLICY) {
+    } else if (name == NProperties::PEERDIR_POLICY) {
         if (value == "as_include") {
             PeerdirType = EPT_Include;
         } else if (value == "as_build_from") {
@@ -509,7 +509,7 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NOptions::DEFAULT_NAME_GENERATOR) {
+    } else if (name == NProperties::DEFAULT_NAME_GENERATOR) {
         if (value == "DirName") {
             SetModuleBasename = &SetDirNameBasename;
         } else if (value == "UseDirNameOrSetGoPackage") {
@@ -523,7 +523,7 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NOptions::ARGS_PARSER) {
+    } else if (name == NProperties::ARGS_PARSER) {
         if (value == "DLL") {
             ParseModuleArgs = &ParseDllModuleArgs;
         } else if (value == "Base") {
@@ -533,40 +533,40 @@ bool TModuleConf::SetOption(TStringBuf key, TStringBuf name, TStringBuf value, T
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NOptions::USE_INJECTED_DATA) {
+    } else if (name == NProperties::USE_INJECTED_DATA) {
         ApplyBoolProperty(UseInjectedData, key, name, value);
         if (UseInjectedData) {
             YDebug() << "Use injected data for " << name << Endl;
         }
-    } else if (name == NOptions::USE_PEERS_LATE_OUTS) {
+    } else if (name == NProperties::USE_PEERS_LATE_OUTS) {
         ApplyBoolProperty(UsePeersLateOuts, key, name, value);
-    } else if (name == NOptions::STRUCT_CMD) {
+    } else if (name == NProperties::STRUCT_CMD) {
         if (!renderSemantics) {
             ApplyBoolProperty(StructCmd, key, name, value);
             StructCmdSet = true;
         }
-    } else if (name == NOptions::STRUCT_SEM) {
+    } else if (name == NProperties::STRUCT_SEM) {
         if (renderSemantics) {
             ApplyBoolProperty(StructCmd, key, name, value);
             StructCmdSet = true;
         }
-    } else if (name == NOptions::INCLUDE_TAG) {
+    } else if (name == NProperties::INCLUDE_TAG) {
         ApplyBoolProperty(IncludeTag, key, name, value);
-    } else if (name == NOptions::FINAL_TARGET) {
+    } else if (name == NProperties::FINAL_TARGET) {
         ApplyBoolProperty(FinalTarget, key, name, value);
-    } else if (name == NOptions::PROXY) {
+    } else if (name == NProperties::PROXY) {
         ApplyBoolProperty(ProxyLibrary, key, name, value);
-    } else if (name == NOptions::VERSION_PROXY) {
+    } else if (name == NProperties::VERSION_PROXY) {
         ApplyBoolProperty(DepManagementVersionProxy, key, name, value);
-    } else if (name == NOptions::PEERDIRSELF) {
+    } else if (name == NProperties::PEERDIRSELF) {
         TUniqVector<TString> tags;
         for (const auto tag : StringSplitter(value).Split(' ').SkipEmpty()) {
             tags.Push(TString{tag});
         }
         SelfPeers = tags.Take();
-    } else if (name == NOptions::EPILOGUE) {
+    } else if (name == NProperties::EPILOGUE) {
         Epilogue = Strip(TString(value));
-    } else if (name == NOptions::TRANSITION) {
+    } else if (name == NProperties::TRANSITION) {
         auto transition = FromString<ETransition>(TString(value));
         if (transition != ETransition::None) {
             Transition = transition;
@@ -816,19 +816,19 @@ void TYmakeConfig::VerifyModuleConfs() {
         }
         bool moduleNotDefined = false;
         if (mod->Cmd.empty()) {
-            YErr() << data.first << " ." << NOptions::CMD << " not defined" << Endl;
+            YErr() << data.first << " ." << NProperties::CMD << " not defined" << Endl;
             moduleNotDefined = true;
         }
         if (!mod->NodeType) {
-            YErr() << data.first << " ." << NOptions::NODE_TYPE << " not defined" << Endl;
+            YErr() << data.first << " ." << NProperties::NODE_TYPE << " not defined" << Endl;
             moduleNotDefined = true;
         }
         if (mod->InputExts.empty() && !mod->AllExtsAreInputs) {
-            YErr() << data.first << " ." << NOptions::EXTS << " not defined" << Endl;
+            YErr() << data.first << " ." << NProperties::EXTS << " not defined" << Endl;
             moduleNotDefined = true;
         }
         if (!mod->GlobalCmd.empty() && mod->InputExts.empty() && !mod->AllGlobalExtsAreInputs) {
-            YErr() << data.first << " ." << NOptions::GLOBAL_CMD << " is defined but " << NOptions::GLOBAL_EXTS << " not defined" << Endl;
+            YErr() << data.first << " ." << NProperties::GLOBAL_CMD << " is defined but " << NProperties::GLOBAL_EXTS << " not defined" << Endl;
             moduleNotDefined = true;
         }
         for (auto i : mod->Restricted) {
@@ -841,11 +841,11 @@ void TYmakeConfig::VerifyModuleConfs() {
         if (!mod->Epilogue.empty()) {
             const auto it = BlockData.find(mod->Epilogue);
             if (it == BlockData.end()) {
-                YErr() << mod->Epilogue << " macro set in ." << NOptions::EPILOGUE << " property of module " << mod->Name << " does not exist." << Endl;
+                YErr() << mod->Epilogue << " macro set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " does not exist." << Endl;
             } else if (it->second.ModuleConf) {
-                YErr() << "The value " << mod->Epilogue << " set in ." << NOptions::EPILOGUE << " property of module " << mod->Name << " should define a macro name." << Endl;
+                YErr() << "The value " << mod->Epilogue << " set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " should define a macro name." << Endl;
             } else if (it->second.CmdProps && !it->second.CmdProps->ArgNames.empty()) {
-                YErr() << "Macro set in ." << NOptions::EPILOGUE << " property of module " << mod->Name << " should be a macro without arguments." << Endl;
+                YErr() << "Macro set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " should be a macro without arguments." << Endl;
             }
         }
 
