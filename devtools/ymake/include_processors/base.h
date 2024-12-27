@@ -164,7 +164,7 @@ public:
 
         bool hasCachedResult = ParsersCache->Get(cacheResultId, cachedIncludes);
         if (!hasCachedResult) {
-            return true;
+            return false;
         }
 
         TVector<TInclude> currentIncludes;
