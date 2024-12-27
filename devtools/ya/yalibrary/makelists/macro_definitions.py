@@ -134,6 +134,7 @@ class Node(object):
         return not bool(self.children)
 
     def find_nodes(self, name):
+        # type: (str) -> list[Node]
         nodes = []
         for child in self.children:
             if child.name == name:
