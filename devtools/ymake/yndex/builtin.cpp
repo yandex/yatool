@@ -63,13 +63,6 @@ namespace NYndex {
         { "DLL_FOR",
             "@usage: DLL_FOR(path/to/lib [libname] [major_ver [minor_ver]] [EXPORTS symlist_file])  #builtin\n\n"
                 "DLL module definition based on specified LIBRARY" },
-        { "OWNER",
-            "@usage: OWNER(owners...)  # builtin\n\n"
-                "Add reviewers/responsibles of the code.\n"
-                "In the OWNER macro you can use:\n"
-                "1. login-s from staff.yandex-team.ru\n"
-                "2. Review group (to specify the Code-review group need to use the prefix g:)\n\n"
-                "Ask devtools@yandex-team.ru if you need more information" },
         { "SUBSCRIBER",
             "@usage: SUBSCRIBER(subscribers...)  # builtin\n\n"
                 "Add observers of the code.\n"

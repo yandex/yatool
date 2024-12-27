@@ -428,7 +428,7 @@ bool TDirParser::KnownStatement(const TStringBuf& name, const TVector<TStringBuf
             }
             Discarded = Discarded || strict;
         }
-    } else if (name == "OWNER" || name == "SUBSCRIBER" ) {
+    } else if (name == "SUBSCRIBER") {
         Owners.insert(args.begin(), args.end());
     } else if (name == NMacro::VERSION) {
         Vars().SetStoreOriginals("MODVER", JoinStrings(args.begin(), args.end(), "."), OrigVars());
