@@ -74,7 +74,7 @@ PEERDIR(
     devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/vcs/vcsversion
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
-    devtools/ya/yalibrary/ya_helper/ya_utils
+    devtools/autocheck/ya_helper/ya_utils
     library/python/cityhash
     library/python/compress
 )

@@ -27,7 +27,7 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
-from yalibrary.ya_helper.ya_utils import ya_options
+from devtools.autocheck.ya_helper.ya_utils import ya_options
 
 from .modules import evlog
 from .modules import params

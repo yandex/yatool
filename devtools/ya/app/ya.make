@@ -40,7 +40,7 @@ PEERDIR(
     devtools/ya/yalibrary/profiler
     devtools/ya/yalibrary/showstack
     devtools/ya/yalibrary/vcs
-    devtools/ya/yalibrary/ya_helper/ya_utils
+    devtools/autocheck/ya_helper/ya_utils
 )
 
 IF (NOT YA_OPENSOURCE)
