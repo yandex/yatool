@@ -6,13 +6,13 @@ import os
 import re
 
 from devtools.ya.core.config import find_root
-from core.yarg.aliases import Alias
-from core.yarg.config_files import apply_config, load_config_by_file
-from core.yarg.consumers import Consumer  # noqa: F401
-from core.yarg.consumers import EnvConsumer, BaseArgConsumer, get_consumer
-from core.yarg.excs import ArgsBindingException
-from core.yarg.options import Options  # noqa: F401
-from core.yarg.options import _MergedOptions
+from devtools.ya.core.yarg.aliases import Alias
+from devtools.ya.core.yarg.config_files import apply_config, load_config_by_file
+from devtools.ya.core.yarg.consumers import Consumer  # noqa: F401
+from devtools.ya.core.yarg.consumers import EnvConsumer, BaseArgConsumer, get_consumer
+from devtools.ya.core.yarg.excs import ArgsBindingException
+from devtools.ya.core.yarg.options import Options  # noqa: F401
+from devtools.ya.core.yarg.options import _MergedOptions
 
 
 logger = logging.getLogger(__name__)

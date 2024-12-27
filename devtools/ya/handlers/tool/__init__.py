@@ -5,7 +5,7 @@ import sys
 import logging
 
 from devtools.ya.core.common_opts import CrossCompilationOptions
-from core.yarg import (
+from devtools.ya.core.yarg import (
     ArgConsumer,
     CompositeHandler,
     EnvConsumer,
@@ -26,8 +26,8 @@ from core.yarg import (
 import devtools.ya.app
 
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
-from core.yarg.groups import PRINT_CONTROL_GROUP
-from core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.groups import PRINT_CONTROL_GROUP
+from devtools.ya.core.yarg.help_level import HelpLevel
 from yalibrary.tools import environ, param, resource_id, tool, tools, toolchain_root, toolchain_sys_libs
 from yalibrary.toolscache import lock_resource
 from yalibrary.platform_matcher import is_darwin_rosetta

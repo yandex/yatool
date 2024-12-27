@@ -6,7 +6,7 @@ import json
 
 import toml
 
-import core.yarg
+import devtools.ya.core.yarg
 import six
 
 toml_encoder = toml.TomlEncoder()
@@ -24,10 +24,10 @@ def is_jsonable(x):
 
 def iter_ya_options(root_handler, all_opts=False):
     # prefer setvalue over setconstvalue to provide correct description and default value
-    hook_prefer_order = [core.yarg.SetValueHook, core.yarg.SetConstValueHook]
+    hook_prefer_order = [devtools.ya.core.yarg.SetValueHook, devtools.ya.core.yarg.SetConstValueHook]
 
     def get_hook_priority(hook, consumer):
-        if isinstance(consumer, core.yarg.ConfigConsumer):
+        if isinstance(consumer, devtools.ya.core.yarg.ConfigConsumer):
             return -1
 
         htype = type(hook)
@@ -64,7 +64,7 @@ def iter_ya_options(root_handler, all_opts=False):
                 continue
 
             top_consumer = options.consumer()
-            if isinstance(top_consumer, core.yarg.Compound):
+            if isinstance(top_consumer, devtools.ya.core.yarg.Compound):
                 consumers = top_consumer.parts
             else:
                 consumers = [top_consumer]
@@ -72,7 +72,7 @@ def iter_ya_options(root_handler, all_opts=False):
             # pairwise config option with command line name if it's possible
             params = {}
             for consumer in consumers:
-                if not isinstance(consumer, (core.yarg.ArgConsumer, core.yarg.ConfigConsumer)):
+                if not isinstance(consumer, (devtools.ya.core.yarg.ArgConsumer, devtools.ya.core.yarg.ConfigConsumer)):
                     continue
 
                 hook = consumer.hook
@@ -91,7 +91,7 @@ def iter_ya_options(root_handler, all_opts=False):
                 entry = params[opt_name]
                 priority = get_hook_priority(hook, consumer)
 
-                entry['configurable'] |= isinstance(consumer, core.yarg.ConfigConsumer)
+                entry['configurable'] |= isinstance(consumer, devtools.ya.core.yarg.ConfigConsumer)
                 if priority > entry.get('_priority', -2):
                     entry['cmdline_names'] = get_arg_consumer_names(consumer) or entry.get('cmdline_names')
                     entry['trace'] = trace or entry.get('trace')
@@ -110,7 +110,7 @@ def iter_ya_options(root_handler, all_opts=False):
 
 
 def get_arg_consumer_names(consumer):
-    if isinstance(consumer, core.yarg.ArgConsumer):
+    if isinstance(consumer, devtools.ya.core.yarg.ArgConsumer):
         return list([_f for _f in [consumer.short_name, consumer.long_name] if _f])
     return []
 
@@ -246,8 +246,8 @@ def dump_config(options, handler_map, user_config):
 
 def generate_config(root_handler, output=None, dump_defaults=None):
     # Don't load global config files to avoid penetration of the global options into user config
-    config_files = core.yarg.get_config_files(global_config=False)
-    user_config = core.yarg.load_config(config_files)
+    config_files = devtools.ya.core.yarg.get_config_files(global_config=False)
+    user_config = devtools.ya.core.yarg.load_config(config_files)
 
     options = {}
     handler_map = {}

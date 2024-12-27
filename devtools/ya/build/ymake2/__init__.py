@@ -21,7 +21,7 @@ import exts.windows
 import app_config
 import yalibrary.tools as tools
 
-import core.yarg
+import devtools.ya.core.yarg as yarg
 import devtools.ya.core.config
 import devtools.ya.core.report
 import devtools.ya.core.event_handling
@@ -83,54 +83,54 @@ def _get_ev_listener_param():
 
 def _ymake_params(check=True):
     return [
-        core.yarg.Param(name='ymake_bin', default_value=None),
-        core.yarg.Param(name='use_local_conf', default_value=True),
-        core.yarg.Param(name='check', default_value=check),
-        core.yarg.Param(name='extra_env', default_value=None),
-        core.yarg.Param(name='mode', default_value=None),  # XXX: remove me
-        core.yarg.Param(name='ev_listener', default_value=_get_ev_listener_param()),
-        core.yarg.Param(name='_purpose', default_value='UNKNOWN'),
+        yarg.Param(name='ymake_bin', default_value=None),
+        yarg.Param(name='use_local_conf', default_value=True),
+        yarg.Param(name='check', default_value=check),
+        yarg.Param(name='extra_env', default_value=None),
+        yarg.Param(name='mode', default_value=None),  # XXX: remove me
+        yarg.Param(name='ev_listener', default_value=_get_ev_listener_param()),
+        yarg.Param(name='_purpose', default_value='UNKNOWN'),
     ]
 
 
 def _global_params(check):
     return _ymake_params(check=check) + [
-        core.yarg.Param(name='be_verbose', default_value=False),
-        core.yarg.Param(name='warn_mode', default_value=[]),
-        core.yarg.Param(name='dump_meta', default_value=None),
-        core.yarg.Param(name='debug_options', default_value=[]),
-        core.yarg.Param(name='flags', default_value={}),
-        core.yarg.Param(name='dump_file', default_value=None),
+        yarg.Param(name='be_verbose', default_value=False),
+        yarg.Param(name='warn_mode', default_value=[]),
+        yarg.Param(name='dump_meta', default_value=None),
+        yarg.Param(name='debug_options', default_value=[]),
+        yarg.Param(name='flags', default_value={}),
+        yarg.Param(name='dump_file', default_value=None),
     ]
 
 
 def _configure_params(buildable, build_type=None, continue_on_fail=False, check=True):
     return _global_params(check=check) + [
-        core.yarg.Param('custom_build_directory', default_value=None),
-        core.yarg.Param('abs_targets', default_value=[]),
-        core.yarg.Param('build_type', default_value=build_type),
-        core.yarg.Param('continue_on_fail', default_value=continue_on_fail),
-        core.yarg.Param('dump_info', default_value=None),
-        core.yarg.Param('custom_conf', default_value=None),
-        core.yarg.Param('no_ymake_resource', default_value=False),
-        core.yarg.Param('build_depends', default_value=False),
-        core.yarg.Param('dump_make_files', default_value=None),
-        core.yarg.Param('dump_tests', default_value=None),
-        core.yarg.Param('arcadia_tests_data_path', default_value=None),
-        core.yarg.Param('checkout_data_by_ya', default_value=False),
-        core.yarg.Param('dump_java', default_value=None),
-        core.yarg.Param('disable_customization', default_value=False),
-        core.yarg.Param('source_root', default_value=None),
-        core.yarg.Param('stdin_line_provider', default_value=None),
-        core.yarg.Param('targets_from_evlog', default_value=False),
-        core.yarg.Param('transition_source', default_value=None),
+        yarg.Param('custom_build_directory', default_value=None),
+        yarg.Param('abs_targets', default_value=[]),
+        yarg.Param('build_type', default_value=build_type),
+        yarg.Param('continue_on_fail', default_value=continue_on_fail),
+        yarg.Param('dump_info', default_value=None),
+        yarg.Param('custom_conf', default_value=None),
+        yarg.Param('no_ymake_resource', default_value=False),
+        yarg.Param('build_depends', default_value=False),
+        yarg.Param('dump_make_files', default_value=None),
+        yarg.Param('dump_tests', default_value=None),
+        yarg.Param('arcadia_tests_data_path', default_value=None),
+        yarg.Param('checkout_data_by_ya', default_value=False),
+        yarg.Param('dump_java', default_value=None),
+        yarg.Param('disable_customization', default_value=False),
+        yarg.Param('source_root', default_value=None),
+        yarg.Param('stdin_line_provider', default_value=None),
+        yarg.Param('targets_from_evlog', default_value=False),
+        yarg.Param('transition_source', default_value=None),
     ]
 
 
 def _build_params():
     return _configure_params(buildable=True, check=False) + [
-        core.yarg.Param('clear_build', default_value=False),
-        core.yarg.Param('no_caches_on_retry', default_value=False),
+        yarg.Param('clear_build', default_value=False),
+        yarg.Param('no_caches_on_retry', default_value=False),
     ]
 
 
@@ -138,57 +138,57 @@ def _gen_graph_params():
     return (
         _configure_params(buildable=False, continue_on_fail=True)
         + [
-            core.yarg.Param('dump_inputs_map', default_value=False),
-            core.yarg.Param('strict_inputs', default_value=False),
-            core.yarg.Param('dump_graph', default_value=None),
-            core.yarg.Param('find_path_from', default_value=None),
-            core.yarg.Param('find_path_to', default_value=None),
-            core.yarg.Param('managed_dep_tree', default_value=None),
-            core.yarg.Param('classpaths', default_value=None),
-            core.yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
-            core.yarg.Param('yndex_file', default_value=None),
-            core.yarg.Param('patch_path', default_value=None),
-            core.yarg.Param('cache_info_file', default_value=None),
-            core.yarg.Param('cache_info_name', default_value=None),
-            core.yarg.Param('modules_info_file', default_value=None),
-            core.yarg.Param('modules_info_filter', default_value=None),
-            core.yarg.Param('lic_link_type', default_value=None),
-            core.yarg.Param('lic_custom_tags', default_value=[]),
-            core.yarg.Param('no_caches_on_retry', default_value=False),
-            core.yarg.Param('no_ymake_retry', default_value=False),
-            core.yarg.Param('cpp', default_value=False),
-            core.yarg.Param('compress_ymake_output_codec', default_value=None),
+            yarg.Param('dump_inputs_map', default_value=False),
+            yarg.Param('strict_inputs', default_value=False),
+            yarg.Param('dump_graph', default_value=None),
+            yarg.Param('find_path_from', default_value=None),
+            yarg.Param('find_path_to', default_value=None),
+            yarg.Param('managed_dep_tree', default_value=None),
+            yarg.Param('classpaths', default_value=None),
+            yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
+            yarg.Param('yndex_file', default_value=None),
+            yarg.Param('patch_path', default_value=None),
+            yarg.Param('cache_info_file', default_value=None),
+            yarg.Param('cache_info_name', default_value=None),
+            yarg.Param('modules_info_file', default_value=None),
+            yarg.Param('modules_info_filter', default_value=None),
+            yarg.Param('lic_link_type', default_value=None),
+            yarg.Param('lic_custom_tags', default_value=[]),
+            yarg.Param('no_caches_on_retry', default_value=False),
+            yarg.Param('no_ymake_retry', default_value=False),
+            yarg.Param('cpp', default_value=False),
+            yarg.Param('compress_ymake_output_codec', default_value=None),
         ]
         + [
-            core.yarg.Param(name='changelist_generator', default_value=None),
+            yarg.Param(name='changelist_generator', default_value=None),
         ]
     )
 
 
 def _sem_graph_params():
     return _build_params() + [
-        core.yarg.Param('dump_sem_graph', default_value=None),
-        core.yarg.Param('dump_raw_graph', default_value=None),
-        core.yarg.Param('foreign_on_nosem', default_value=None),
-        core.yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
+        yarg.Param('dump_sem_graph', default_value=None),
+        yarg.Param('dump_raw_graph', default_value=None),
+        yarg.Param('foreign_on_nosem', default_value=None),
+        yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
     ]
 
 
 def _ymake_build(**kwargs):
     logger.debug('Run build with %s', kwargs)
-    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
+    return yarg.behave(kwargs, yarg.Behaviour(action=_prepare_and_run_ymake, params=_build_params()))
 
 
 def ymake_sem_graph(**kwargs):
     logger.debug('Run sem-graph with %s', kwargs)
-    return core.yarg.behave(kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_sem_graph_params()))
+    return yarg.behave(kwargs, yarg.Behaviour(action=_prepare_and_run_ymake, params=_sem_graph_params()))
 
 
 def ymake_dump(**kwargs):
     logger.debug('Run dump with %s', kwargs)
-    return core.yarg.behave(
+    return yarg.behave(
         kwargs,
-        core.yarg.Behaviour(
+        yarg.Behaviour(
             action=_prepare_and_run_ymake,
             params=_gen_graph_params(),
         ),
@@ -198,9 +198,7 @@ def ymake_dump(**kwargs):
 def ymake_gen_graph(**kwargs):
     logger.debug('Run gen graph with %s', kwargs)
 
-    res, evlog = core.yarg.behave(
-        kwargs, core.yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_graph_params())
-    )
+    res, evlog = yarg.behave(kwargs, yarg.Behaviour(action=_prepare_and_run_ymake, params=_gen_graph_params()))
 
     if app_config.in_house:
         import yalibrary.diagnostics as diag

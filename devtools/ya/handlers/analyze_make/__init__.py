@@ -1,4 +1,4 @@
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
@@ -27,7 +27,7 @@ def execute(action):
     return helper
 
 
-class EvlogFileOptions(core.yarg.Options):
+class EvlogFileOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         super(EvlogFileOptions, self).__init__()
         self.analyze_evlog_file = None
@@ -37,21 +37,21 @@ class EvlogFileOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
-                ['--evlog'], help='Event log file', hook=core.yarg.SetValueHook('analyze_evlog_file')
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--evlog'], help='Event log file', hook=devtools.ya.core.yarg.SetValueHook('analyze_evlog_file')
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--distbuild-json-from-yt'],
                 help='Event log file',
-                hook=core.yarg.SetValueHook('analyze_distbuild_json_file'),
+                hook=devtools.ya.core.yarg.SetValueHook('analyze_distbuild_json_file'),
             ),
-            core.yarg.ArgConsumer(
-                ['--detailed'], help='Draw detailed data', hook=core.yarg.SetConstValueHook('detailed', True)
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--detailed'], help='Draw detailed data', hook=devtools.ya.core.yarg.SetConstValueHook('detailed', True)
             ),
         ]
 
 
-class AnalyzeYaMakeOpts(core.yarg.Options):
+class AnalyzeYaMakeOpts(devtools.ya.core.yarg.Options):
     def __init__(self):
         super(AnalyzeYaMakeOpts, self).__init__()
         self.print_path = False
@@ -60,16 +60,16 @@ class AnalyzeYaMakeOpts(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--print-path'],
                 help='print the path to analyze-make executable',
-                hook=core.yarg.SetConstValueHook('print_path', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('print_path', True),
             ),
-            core.yarg.FreeArgConsumer(help='analyze-make args', hook=core.yarg.ExtendHook('args')),
+            devtools.ya.core.yarg.FreeArgConsumer(help='analyze-make args', hook=devtools.ya.core.yarg.ExtendHook('args')),
         ]
 
 
-class TimeBloatOpts(core.yarg.Options):
+class TimeBloatOpts(devtools.ya.core.yarg.Options):
     def __init__(self) -> None:
         super(TimeBloatOpts, self).__init__()
         self.show_leaf_nodes = False
@@ -79,23 +79,23 @@ class TimeBloatOpts(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--show-leaf-nodes'],
                 help='Display leaf nodes (compilation/linking/etc) in dispatch_build stage. Use with caution (or filters) on large evlogs',
-                hook=core.yarg.SetConstValueHook('show_leaf_nodes', True),
-                group=core.yarg.FILTERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('show_leaf_nodes', True),
+                group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--file-filter'],
                 help="Show only build nodes that match <file-filter>. Syntax is the same as in --test-filter",
-                hook=core.yarg.SetAppendHook('file_filters'),
-                group=core.yarg.FILTERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetAppendHook('file_filters'),
+                group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--threshold-sec'],
                 help="Do not show build nodes that were shorter than threshold",
-                hook=core.yarg.SetValueHook('threshold', transform=float),
-                group=core.yarg.FILTERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('threshold', transform=float),
+                group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             ),
         ]
 
@@ -111,26 +111,26 @@ def run_analyze_make_task_contention(params):
 
 def basic_options():
     return [
-        core.yarg.help.ShowHelpOptions(),
+        devtools.ya.core.yarg.help.ShowHelpOptions(),
         EvlogFileOptions(),
     ]
 
 
-class AnalyzeMakeYaHandler(core.yarg.CompositeHandler):
+class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
     def __init__(self):
         super(AnalyzeMakeYaHandler, self).__init__('Analysis tools for ya make')
-        self['timeline'] = core.yarg.OptsHandler(
+        self['timeline'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(timeline.main),
             description='Timeline of build events',
             opts=basic_options(),
         )
-        self['timebloat'] = core.yarg.OptsHandler(
+        self['timebloat'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(timebloat.main),
             description='build events in bloat format',
             opts=basic_options() + [TimeBloatOpts()],
         )
         if app_config.in_house:
-            self['task-contention'] = core.yarg.OptsHandler(
+            self['task-contention'] = devtools.ya.core.yarg.OptsHandler(
                 action=run_analyze_make_task_contention,
                 description='Plot waiting processes with plotly',
                 opts=basic_options() + [AnalyzeYaMakeOpts()],

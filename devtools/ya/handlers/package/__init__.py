@@ -3,7 +3,7 @@ import logging
 
 import devtools.ya.app
 import app_config
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.common_opts
 import build.ya_make
 import build.targets_deref
@@ -13,12 +13,12 @@ import devtools.ya.test.opts as test_opts
 import package.docker
 import package.packager
 import devtools.ya.handlers.package.opts as package_opts
-from core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.help_level import HelpLevel
 
 logger = logging.getLogger(__name__)
 
 
-class PackageYaHandler(core.yarg.OptsHandler):
+class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
     description = "Build package using json package description in the release build type by default."
     in_house_docs = "For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package"
 
@@ -27,7 +27,7 @@ class PackageYaHandler(core.yarg.OptsHandler):
             action=devtools.ya.app.execute(package.packager.do_package, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description + ("\n" + self.in_house_docs if app_config.in_house else ""),
             examples=[
-                core.yarg.UsageExample(
+                devtools.ya.core.yarg.UsageExample(
                     cmd='{prefix} <path to json description>',
                     description='Create tarball package from json description',
                 )

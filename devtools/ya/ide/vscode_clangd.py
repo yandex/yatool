@@ -14,7 +14,7 @@ import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.asyncthread
 import exts.shlex2
 import yalibrary.makelists
@@ -39,8 +39,8 @@ FINISH_HELP = (
 )
 
 
-class VSCodeClangdOptions(core.yarg.Options):
-    GROUP = core.yarg.Group('VSCode workspace options', 0)
+class VSCodeClangdOptions(devtools.ya.core.yarg.Options):
+    GROUP = devtools.ya.core.yarg.Group('VSCode workspace options', 0)
 
     def __init__(self):
         self.project_output = None
@@ -60,99 +60,99 @@ class VSCodeClangdOptions(core.yarg.Options):
     @classmethod
     def consumer(cls):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-P', '--project-output'],
                 help='Custom IDE workspace output directory',
-                hook=core.yarg.SetValueHook('project_output'),
+                hook=devtools.ya.core.yarg.SetValueHook('project_output'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-W', '--workspace-name'],
                 help='Custom IDE workspace name',
-                hook=core.yarg.SetValueHook('workspace_name'),
+                hook=devtools.ya.core.yarg.SetValueHook('workspace_name'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-codegen'],
                 help="Do not run codegeneration",
-                hook=core.yarg.SetConstValueHook('codegen_enabled', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('codegen_enabled', False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-debug'],
                 help="Do not create debug configurations",
-                hook=core.yarg.SetConstValueHook('debug_enabled', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('debug_enabled', False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--use-arcadia-root'],
                 help="Use arcadia root as workspace folder",
-                hook=core.yarg.SetConstValueHook('use_arcadia_root', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_arcadia_root', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--files-visibility'],
                 help='Limit files visibility in VS Code Explorer/Search',
-                hook=core.yarg.SetValueHook(
+                hook=devtools.ya.core.yarg.SetValueHook(
                     'files_visibility',
                     values=("targets", "targets-and-deps", "all"),
                     default_value=lambda _: "targets-and-deps",
                 ),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-t', '--tests'],
                 help="Generate tests configurations for debug",
-                hook=core.yarg.SetConstValueHook('tests_enabled', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('tests_enabled', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--allow-project-inside-arc'],
                 help="Allow creating project inside Arc repository",
-                hook=core.yarg.SetConstValueHook('allow_project_inside_arc', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('allow_project_inside_arc', True),
                 group=cls.GROUP,
-                visible=core.yarg.HelpLevel.ADVANCED,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--add-codegen-folder'],
                 help="Add codegen folder to workspace",
-                hook=core.yarg.SetConstValueHook('add_codegen_folder', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('add_codegen_folder', True),
                 group=cls.GROUP,
-                visible=core.yarg.HelpLevel.ADVANCED,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--setup-tidy'],
                 help="Setup default arcadia's clang-tidy config in a project",
-                hook=core.yarg.SetConstValueHook('clang_tidy_enabled', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                visible=core.yarg.HelpLevel.ADVANCED,
+                hook=devtools.ya.core.yarg.SetConstValueHook('clang_tidy_enabled', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--no-clangd-tidy"],
                 help="Disable clangd-tidy linting",
-                hook=core.yarg.SetConstValueHook("clang_tidy_enabled", False),
+                hook=devtools.ya.core.yarg.SetConstValueHook("clang_tidy_enabled", False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--clangd-extra-args"],
                 help="Additional arguments for clangd",
-                hook=core.yarg.SetAppendHook("clangd_extra_args"),
+                hook=devtools.ya.core.yarg.SetAppendHook("clangd_extra_args"),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--clangd-index-mode"],
                 help="Configure clangd background indexing",
-                hook=core.yarg.SetValueHook(
+                hook=devtools.ya.core.yarg.SetValueHook(
                     "clangd_index_mode",
                     values=("full", "disabled"),
                     default_value=lambda _: "full",
                 ),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--clangd-index-threads"],
                 help="clangd indexing threads count",
-                hook=core.yarg.SetValueHook('clangd_index_threads', int),
+                hook=devtools.ya.core.yarg.SetValueHook('clangd_index_threads', int),
                 group=cls.GROUP,
             ),
         ]
@@ -398,13 +398,13 @@ def gen_vscode_workspace(params):
         "[[c:dark-cyan]]https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode[[rst]]"
     )
     orig_flags = copy.copy(params.flags)
-    ya_make_opts = core.yarg.merge_opts(
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(
         build_opts.ya_make_options(free_build_targets=True) + [bc.CompilationDatabaseOptions()],
     )
     params.ya_make_extra.append('-DBUILD_LANGUAGES=CPP')
     params.ya_make_extra.append("-DCONSISTENT_DEBUG=yes")
     extra_params = ya_make_opts.initialize(params.ya_make_extra)
-    params = core.yarg.merge_params(extra_params, params)
+    params = devtools.ya.core.yarg.merge_params(extra_params, params)
     params.flags.update(extra_params.flags)
 
     if params.project_output:

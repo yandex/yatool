@@ -24,7 +24,7 @@ import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.profiler
 import devtools.ya.core.stage_tracer as stage_tracer
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
 import exts.archive
@@ -156,7 +156,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     # TODO: This is very bad. Need to automatically copy all copiable parameters from params to merged_opts
 
-    merged_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
+    merged_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options())
     merged_opts.export_to_maven = build_info.get("maven-export", False)
     merged_opts.dump_sources = build_info.get("sources", False)
     merged_opts.disable_flake8_migrations = params.disable_flake8_migrations
@@ -1191,7 +1191,7 @@ def update_params(parsed_package, package_params, filename):
         else:
             logger.warning("Skipping unknown '%s' option from %s", opt, filename)
 
-    return core.yarg.merge_params(package_params, core.yarg.Params(**new_params))
+    return devtools.ya.core.yarg.merge_params(package_params, devtools.ya.core.yarg.Params(**new_params))
 
 
 class PackageContext:

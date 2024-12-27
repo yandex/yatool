@@ -2,7 +2,7 @@ from six.moves import cStringIO as StringIO
 
 from exts import yjson
 
-import core.yarg
+import devtools.ya.core.yarg
 
 from build import build_opts
 from build import build_handler
@@ -35,11 +35,11 @@ class StringIOWrapper:
 
 def ya_make_graph(opts, app, real_ya_make_opts=False, extra_ya_make_opts=None):
     ya_make_out = StringIOWrapper(StringIO())
-    ya_make_params = core.yarg.merge_opts(build_opts.ya_make_options()).params()
+    ya_make_params = devtools.ya.core.yarg.merge_opts(build_opts.ya_make_options()).params()
     if real_ya_make_opts:
-        ya_make_params = core.yarg.merge_params(ya_make_params, opts)
+        ya_make_params = devtools.ya.core.yarg.merge_params(ya_make_params, opts)
     if extra_ya_make_opts:
-        ya_make_params = core.yarg.merge_params(ya_make_params, extra_ya_make_opts)
+        ya_make_params = devtools.ya.core.yarg.merge_params(ya_make_params, extra_ya_make_opts)
     ya_make_params.build_threads = 0
     ya_make_params.stdout = ya_make_out
     ya_make_params.dump_graph = 'json'

@@ -11,7 +11,7 @@ import build.graph
 import build.ya_make
 import devtools.ya.core.common_opts
 import devtools.ya.core.event_handling
-import core.yarg
+import devtools.ya.core.yarg as yarg
 import exts.tmp
 
 import devtools.ya.app
@@ -20,18 +20,18 @@ import devtools.ya.app
 logger = logging.getLogger(__name__)
 
 
-class RunYaHandler(core.yarg.OptsHandler):
+class RunYaHandler(yarg.OptsHandler):
     def __init__(self):
-        core.yarg.OptsHandler.__init__(
+        yarg.OptsHandler.__init__(
             self,
             action=devtools.ya.app.execute(run, respawn=devtools.ya.app.RespawnType.MANDATORY),
             description="Compile and run a target",
             examples=[
-                core.yarg.UsageExample(
+                yarg.UsageExample(
                     "{prefix} tools/uc --help",
                     "Build and run 'tools/uc' utility",
                 ),
-                core.yarg.UsageExample(
+                yarg.UsageExample(
                     "{prefix} -d --musl tools/uc -- --help",
                     "Build 'tools/uc' tool with musl and in debug mode and run it",
                 ),
@@ -54,10 +54,10 @@ class RunYaHandler(core.yarg.OptsHandler):
             i = args.index("--")
             args, free_args = args[:i], args[i + 1 :]
             self._unknown_args_as_free = False
-            self._opt = core.yarg.merge_opts([RunOptsSupplement(free_args)] + _reduced_ya_make_options())
+            self._opt = yarg.merge_opts([RunOptsSupplement(free_args)] + _reduced_ya_make_options())
         else:
             self._unknown_args_as_free = True
-            self._opt = core.yarg.merge_opts([RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions()])
+            self._opt = yarg.merge_opts([RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions()])
 
         return super(RunYaHandler, self).handle(root_handler, args, prefix)
 
@@ -65,7 +65,7 @@ class RunYaHandler(core.yarg.OptsHandler):
         return "[OPTIONS] TARGET [--] [TARGET_ARGS]..."
 
 
-class RunOptsBase(core.yarg.Options):
+class RunOptsBase(yarg.Options):
     def __init__(self, ya_run_args=None, build_type=None):
         self.ya_run_build_type = build_type
         self.ya_run_gdb = False
@@ -74,15 +74,15 @@ class RunOptsBase(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            yarg.ArgConsumer(
                 names=["--ya-run-build-type"],
                 help="Target build type",
-                hook=core.yarg.SetValueHook(name="ya_run_build_type"),
+                hook=yarg.SetValueHook(name="ya_run_build_type"),
             ),
-            core.yarg.ArgConsumer(
+            yarg.ArgConsumer(
                 names=["--ya-run-gdb"],
                 help="Run target with ya tool gdb",
-                hook=core.yarg.SetConstValueHook(name="ya_run_gdb", const=True),
+                hook=yarg.SetConstValueHook(name="ya_run_gdb", const=True),
             ),
         ]
 
@@ -95,14 +95,14 @@ class RunOptsStandalone(RunOptsBase):
     @staticmethod
     def consumer():
         return RunOptsBase.consumer() + [
-            core.yarg.FreeArgConsumer(help="ARGS", hook=core.yarg.ExtendHook("ya_run_args")),
+            yarg.FreeArgConsumer(help="ARGS", hook=yarg.ExtendHook("ya_run_args")),
         ]
 
     def postprocess(self):
         if not self.ya_run_args:
             self.build_targets = [os.getcwd()]
         elif self.ya_run_args[0] in ["-h", "--help"]:
-            raise core.yarg.ShowHelpException()
+            raise yarg.ShowHelpException()
         else:
             self.build_targets = [self.ya_run_args.pop(0)]
 
@@ -115,8 +115,8 @@ class RunOptsSupplement(RunOptsBase):
 def run(params):
     import app_ctx
 
-    ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options())
-    opts = core.yarg.merge_params(ya_make_opts.initialize([]), params)
+    ya_make_opts = yarg.merge_opts(build.build_opts.ya_make_options())
+    opts = yarg.merge_params(ya_make_opts.initialize([]), params)
     opts.show_final_ok = False
 
     if opts.ya_run_build_type is not None:
@@ -198,7 +198,7 @@ def _build(opts, app_ctx, graph):
 
 
 def _reduced_ya_make_options():
-    import core.yarg.options
+    import yarg.options
     import devtools.ya.core.common_opts
     import devtools.ya.test.opts
 
@@ -233,7 +233,7 @@ def _reduced_ya_make_options():
             devtools.ya.core.common_opts.ProfileOptions,
             devtools.ya.core.common_opts.ProfilerOptions,
             devtools.ya.core.common_opts.TeamcityOptions,
-            core.yarg.options.RawParamsOptions,
+            yarg.options.RawParamsOptions,
             devtools.ya.test.opts.ArcadiaTestsDataOptions,
             devtools.ya.test.opts.CanonizationOptions,
             devtools.ya.test.opts.ConsoleReportOptions,

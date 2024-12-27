@@ -33,7 +33,7 @@ from build.dir_graph import reachable, gen_dir_graph
 from build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
 from exts.strtobool import strtobool
 from exts.tmp import temp_dir
-from core.yarg import (
+from devtools.ya.core.yarg import (
     CompositeHandler,
     OptsHandler,
     ArgConsumer,

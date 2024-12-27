@@ -9,13 +9,13 @@ import app_config
 import devtools.ya.core.config
 import toml
 
-from core.yarg.consumers import ConfigConsumer, get_consumer
+from devtools.ya.core.yarg.consumers import ConfigConsumer, get_consumer
 
 logger = logging.getLogger(__name__)
 
 if tp.TYPE_CHECKING:
-    from core.yarg.options import Options  # noqa: F401
-    from core.yarg.consumers import Consumer  # noqa: F401
+    from devtools.ya.core.yarg.options import Options  # noqa: F401
+    from devtools.ya.core.yarg.consumers import Consumer  # noqa: F401
 
 
 def encode_config(config_data):

@@ -8,7 +8,7 @@ from exts import fs
 
 import build.build_opts
 import build.graph_path
-import core.yarg
+import devtools.ya.core.yarg
 
 from . import ide_common
 
@@ -553,8 +553,8 @@ def do_clion(params):
         else:
             params.ya_make_extra.append('-DBUILD_LANGUAGES=CPP')
 
-    ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
-    params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+    params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
 
     cmake_stub_info = ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)
     if params.lite_mode:

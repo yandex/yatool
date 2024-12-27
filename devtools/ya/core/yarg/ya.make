@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE core.yarg
     __init__.py
     behaviour.py
     dispatch.py

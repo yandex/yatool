@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 
 import devtools.ya.core.common_opts
-import core.yarg
+import devtools.ya.core.yarg
 
 from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
-import core.yarg.consumers
+import devtools.ya.core.yarg.consumers
 
 from .style import run_style
 from .styler import StylerKind
@@ -13,7 +13,7 @@ from .target import STDIN_FILENAME
 import devtools.ya.app
 
 
-class StyleOptions(core.yarg.Options):
+class StyleOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.targets: list[str] = []
         self.dry_run = False
@@ -27,53 +27,53 @@ class StyleOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.FreeArgConsumer(help='file or dir', hook=core.yarg.ExtendHook(name='targets')),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.FreeArgConsumer(help='file or dir', hook=devtools.ya.core.yarg.ExtendHook(name='targets')),
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--dry-run'],
                 help='Print diff instead of overwriting files',
-                hook=core.yarg.SetConstValueHook('dry_run', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('dry_run', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--check'],
                 help="Don't format files but return code 3 if some files would be reformatted",
-                hook=core.yarg.SetConstValueHook('check', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('check', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-diff'],
                 help="Print full file's content instead of diff. Can be used only with --dry-run",
-                hook=core.yarg.SetConstValueHook('full_output', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('full_output', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--stdin-filename'],
                 help="File name for stdin input",
-                hook=core.yarg.SetValueHook('stdin_filename'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('stdin_filename'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--py2'],
                 help='Use Black with Python 2 support',
-                hook=core.yarg.SetConstValueHook('py2', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('py2', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-f', '--force'],
                 help="Don't skip files",
-                hook=core.yarg.SetConstValueHook('force', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('force', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--ruff'],
                 help="Use ruff format, instead black for python files",
-                hook=core.yarg.SetConstValueHook('use_ruff', True),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_ruff', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
 
-class FilterOptions(core.yarg.Options):
+class FilterOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.file_types: list[str] = []
 
@@ -82,44 +82,44 @@ class FilterOptions(core.yarg.Options):
         checks = [kind for kind in StylerKind]
 
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--{file_type}'.format(file_type=file_type)],
                 help='Process only {filetype} files'.format(filetype=file_type),
-                hook=core.yarg.SetConstAppendHook('file_types', file_type),
-                group=core.yarg.FILTERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstAppendHook('file_types', file_type),
+                group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             )
             for file_type in checks
         ] + [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--all'],
                 help='Run all checks: {}'.format(', '.join(checks)),
-                hook=core.yarg.SetConstValueHook('file_types', checks),
-                group=core.yarg.FILTERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks),
+                group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             )
         ]
 
 
-class ReportOptions(core.yarg.Options):
+class ReportOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.quiet = False
 
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-q', '--quiet'],
                 help="Skip warning messages",
-                hook=core.yarg.SetConstValueHook('quiet', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('quiet', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
 
-class StyleYaHandler(core.yarg.OptsHandler):
+class StyleYaHandler(devtools.ya.core.yarg.OptsHandler):
     description = 'Run styler'
 
     def __init__(self):
-        core.yarg.OptsHandler.__init__(
+        devtools.ya.core.yarg.OptsHandler.__init__(
             self,
             action=devtools.ya.app.execute(action=run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description,
@@ -134,13 +134,13 @@ class StyleYaHandler(core.yarg.OptsHandler):
                 FilterOptions(),
             ],
             examples=[
-                core.yarg.UsageExample('{prefix}', 'restyle text from <stdin>, write result to <stdout>'),
-                core.yarg.UsageExample('{prefix} .', 'restyle all files in current directory'),
-                core.yarg.UsageExample(
+                devtools.ya.core.yarg.UsageExample('{prefix}', 'restyle text from <stdin>, write result to <stdout>'),
+                devtools.ya.core.yarg.UsageExample('{prefix} .', 'restyle all files in current directory'),
+                devtools.ya.core.yarg.UsageExample(
                     '{prefix} file.cpp',
                     'restyle file.cpp',
                 ),
-                core.yarg.UsageExample('{prefix} folder/', 'restyle all files in subfolders recursively'),
+                devtools.ya.core.yarg.UsageExample('{prefix} folder/', 'restyle all files in subfolders recursively'),
             ],
             unknown_args_as_free=False,
         )

@@ -7,7 +7,7 @@ import six
 import devtools.ya.core.stages_profiler
 from devtools.ya.core import config
 from devtools.ya.core import profiler
-from core.yarg.groups import (
+from devtools.ya.core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
     CHECKOUT_ONLY_GROUP,
     OUTPUT_CONTROL_GROUP,
@@ -17,8 +17,8 @@ from core.yarg.groups import (
     FEATURES_GROUP,
     COMMON_UPLOAD_OPT_GROUP,
 )
-from core.yarg.help_level import HelpLevel
-from core.yarg import (
+from devtools.ya.core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg import (
     Options,
     ArgConsumer,
     ConfigConsumer,
@@ -40,7 +40,7 @@ from core.yarg import (
 )
 
 # TODO: Fix imports everywhere
-from core.yarg import ShowHelpOptions  # noqa: F401
+from devtools.ya.core.yarg import ShowHelpOptions  # noqa: F401
 
 import exts.func
 import exts.path2

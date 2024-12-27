@@ -1,5 +1,5 @@
 import exts.func
-from core.yarg.handler import BaseHandler
+from devtools.ya.core.yarg.handler import BaseHandler
 
 
 def try_load_handler(loader):

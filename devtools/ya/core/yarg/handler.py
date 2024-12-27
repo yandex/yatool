@@ -7,7 +7,7 @@ import traceback
 import typing as tp  # noqa: F401
 from collections import defaultdict
 
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.report
 
 import exts.strings
@@ -15,10 +15,10 @@ import exts.yjson as json
 
 from six import iteritems
 
-from core.yarg.help import format_help, format_usage, format_examples, ShowHelpException
-from core.yarg.options import merge_opts
-from core.yarg.excs import ArgsBindingException
-from core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.help import format_help, format_usage, format_examples, ShowHelpException
+from devtools.ya.core.yarg.options import merge_opts
+from devtools.ya.core.yarg.excs import ArgsBindingException
+from devtools.ya.core.yarg.help_level import HelpLevel
 
 from yalibrary.display import build_term_display
 
@@ -370,7 +370,7 @@ class OptsHandler(BaseHandler):
         if self._use_simple_args:
             return self._action(**args)
         else:
-            return self._action(core.yarg.Params(**args))
+            return self._action(devtools.ya.core.yarg.Params(**args))
 
     @property
     def visible(self):

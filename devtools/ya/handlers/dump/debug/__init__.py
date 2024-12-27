@@ -15,7 +15,7 @@ import exts.yjson
 
 from build.build_opts import SandboxAuthOptions
 
-from core.yarg import (
+from devtools.ya.core.yarg import (
     Options,
     SingleFreeArgConsumer,
     SetValueHook,
@@ -24,11 +24,11 @@ from core.yarg import (
     ArgsValidatingException,
     UsageExample,
 )
-from core.yarg import OptsHandler
+from devtools.ya.core.yarg import OptsHandler
 from devtools.ya.core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHelpOptions
 import devtools.ya.core.config
 import devtools.ya.core.logger
-import core.yarg.help_level
+import devtools.ya.core.yarg.help_level
 
 import yalibrary.evlog as evlog_lib
 
@@ -65,19 +65,19 @@ class DumpDebugProcessingOptions(Options):
                 ['--no-upload'],
                 help="Do not upload to sandbox",
                 hook=SetConstValueHook('upload', False),
-                visible=core.yarg.help_level.HelpLevel.ADVANCED,
+                visible=devtools.ya.core.yarg.help_level.HelpLevel.ADVANCED,
             ),
             ArgConsumer(
                 ['--dry-run'],
                 help="Dry run",
                 hook=SetConstValueHook('dry_run', True),
-                visible=core.yarg.help_level.HelpLevel.BASIC,
+                visible=devtools.ya.core.yarg.help_level.HelpLevel.BASIC,
             ),
             ArgConsumer(
                 ['--resource-owner'],
                 help="Sandbox resource owner",
                 hook=SetValueHook('resource_owner'),
-                visible=core.yarg.help_level.HelpLevel.ADVANCED,
+                visible=devtools.ya.core.yarg.help_level.HelpLevel.ADVANCED,
             ),
         ]
 

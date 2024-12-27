@@ -3,7 +3,7 @@ from __future__ import print_function
 import time
 import sys
 
-import core.yarg
+import devtools.ya.core.yarg
 import build.build_opts as build_opts
 import build.graph as build_graph
 import build.ya_make as ya_make
@@ -25,7 +25,7 @@ def fix_windows(path):
 
 
 def get_java_ctx_with_tests(opts):
-    jopts = core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True)).params()
+    jopts = devtools.ya.core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True)).params()
     jopts.dump_sources = True
     jopts.create_symlinks = False
     jopts.__dict__.update(opts.__dict__)

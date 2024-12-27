@@ -14,10 +14,10 @@ import app_config
 import devtools.ya.core.error
 import devtools.ya.core.respawn
 import devtools.ya.core.sig_handler
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.stage_tracer as stage_tracer
 
-from core.yarg import LazyCommand, try_load_handler
+from devtools.ya.core.yarg import LazyCommand, try_load_handler
 from devtools.ya.core.logger import init_logger
 from devtools.ya.core.plugin_loader import explore_plugins
 from library.python import mlockall
@@ -40,10 +40,10 @@ def do_main(args, extra_help):
         suffix='_handler',
     )
 
-    handler = core.yarg.CompositeHandler(description=app_config.description, extra_help=extra_help)
+    handler = devtools.ya.core.yarg.CompositeHandler(description=app_config.description, extra_help=extra_help)
     for plugin_name in sorted(plugin_map.names()):
         handler[plugin_name] = LazyCommand(plugin_name, plugin_map.get(plugin_name))
-    handler['-'] = core.yarg.FeedbackHandler(handler)
+    handler['-'] = devtools.ya.core.yarg.FeedbackHandler(handler)
     stager.start("handler-selection")
     res = handler.handle(handler, args, prefix=['ya'])
     if isinstance(res, six.integer_types):

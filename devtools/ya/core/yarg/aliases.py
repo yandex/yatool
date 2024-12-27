@@ -3,12 +3,12 @@ import typing as tp  # noqa: F401
 import six
 
 import logging
-from core.yarg.consumers import Consumer  # noqa: F401
-from core.yarg.consumers import ArgConsumer, EnvConsumer, ConfigConsumer
-from core.yarg.hooks import BaseHook
-from core.yarg.config_files import apply_config
-from core.yarg.options import Options
-from core.yarg import Params  # noqa: F401
+from devtools.ya.core.yarg.consumers import Consumer  # noqa: F401
+from devtools.ya.core.yarg.consumers import ArgConsumer, EnvConsumer, ConfigConsumer
+from devtools.ya.core.yarg.hooks import BaseHook
+from devtools.ya.core.yarg.config_files import apply_config
+from devtools.ya.core.yarg.options import Options
+from devtools.ya.core.yarg import Params  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class Alias(object):
     def _generate_arg_consumer(self):
         arg_params = self._settings.pop('arg')  # type: dict
 
-        from core.yarg.groups import Group
+        from devtools.ya.core.yarg.groups import Group
 
         arg_params['group'] = Group.search_in_registry(arg_params.get('group', None))
 

@@ -15,7 +15,7 @@ import build.build_handler as bh
 import build.build_opts as build_opts
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.fs as fs
 import exts.shlex2
 import devtools.ya.app
@@ -35,8 +35,8 @@ exec '{path}' \"$@\"
 """
 
 
-class VSCodePyOptions(core.yarg.Options):
-    GROUP = core.yarg.Group('VSCode workspace options', 0)
+class VSCodePyOptions(devtools.ya.core.yarg.Options):
+    GROUP = devtools.ya.core.yarg.Group('VSCode workspace options', 0)
 
     def __init__(self):
         self.project_output = None
@@ -53,68 +53,68 @@ class VSCodePyOptions(core.yarg.Options):
     @classmethod
     def consumer(cls):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-P', '--project-output'],
                 help='Custom IDE workspace output directory',
-                hook=core.yarg.SetValueHook('project_output'),
+                hook=devtools.ya.core.yarg.SetValueHook('project_output'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-W', '--workspace-name'],
                 help='Custom IDE workspace name',
-                hook=core.yarg.SetValueHook('workspace_name'),
+                hook=devtools.ya.core.yarg.SetValueHook('workspace_name'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-codegen'],
                 help="Do not run codegeneration",
-                hook=core.yarg.SetConstValueHook('codegen_enabled', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('codegen_enabled', False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--use-arcadia-root'],
                 help="Use arcadia root as workspace folder",
-                hook=core.yarg.SetConstValueHook('use_arcadia_root', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_arcadia_root', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--files-visibility'],
                 help='Limit files visibility in VS Code Explorer/Search',
-                hook=core.yarg.SetValueHook(
+                hook=devtools.ya.core.yarg.SetValueHook(
                     'files_visibility',
                     values=("targets", "targets-and-deps", "all"),
                     default_value=lambda _: "targets-and-deps",
                 ),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-t', '--tests'],
                 help="Generate tests configurations for debug",
-                hook=core.yarg.SetConstValueHook('tests_enabled', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('tests_enabled', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--black-formatter'],
                 help="Add 'black' code style formatting",
-                hook=core.yarg.SetConstValueHook('black_enabled', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('black_enabled', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--venv-excluded-peerdirs'],
                 help='Totally exclude specified peerdirs',
-                hook=core.yarg.SetAppendHook('venv_excluded_peerdirs'),
+                hook=devtools.ya.core.yarg.SetAppendHook('venv_excluded_peerdirs'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--allow-project-inside-arc'],
                 help="Allow creating project inside Arc repository",
-                hook=core.yarg.SetConstValueHook('allow_project_inside_arc', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('allow_project_inside_arc', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--no-python-index"],
                 help="Do not let pylance to index whole project",
-                hook=core.yarg.SetConstValueHook("python_index_enabled", False),
+                hook=devtools.ya.core.yarg.SetConstValueHook("python_index_enabled", False),
                 group=cls.GROUP,
             ),
         ]
@@ -325,7 +325,7 @@ class PyProject(object):
         venv_opts.venv_with_pip = False
         fs.remove_tree_safe(venv_opts.venv_root)
         venv_opts.venv_tmp_project = self.venv_tmp_project
-        venv_params = core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
+        venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
         if os.path.exists(venv_opts.venv_tmp_project):
             ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_opts.venv_tmp_project))
             shutil.rmtree(venv_opts.venv_tmp_project)
@@ -818,10 +818,10 @@ def gen_vscode_workspace(params):
         return
 
     orig_flags = copy.copy(params.flags)
-    ya_make_opts = core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
     params.ya_make_extra.extend(['-DBUILD_LANGUAGES=PY3'])
     extra_params = ya_make_opts.initialize(params.ya_make_extra)
-    params = core.yarg.merge_params(extra_params, params)
+    params = devtools.ya.core.yarg.merge_params(extra_params, params)
     params.flags.update(extra_params.flags)
     project = PyProject(params, orig_flags)
     project.gen_workspace()

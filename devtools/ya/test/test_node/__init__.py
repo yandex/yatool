@@ -13,7 +13,7 @@ import app_config
 import build.gen_plan as gen_plan
 import devtools.ya.core.error
 import devtools.ya.core.imprint.imprint as imprint
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.profiler
 
 import devtools.ya.test.dependency.mds_storage as mds_storage
@@ -275,7 +275,7 @@ class TestFramer(object):
 
         if self.opts.test_disable_timeout:
             if self.opts.cache_tests or self.distbuild_runner:
-                raise core.yarg.FlagNotSupportedException(
+                raise devtools.ya.core.yarg.FlagNotSupportedException(
                     "Cannot turn timeout off when using test cache or running on distbuild"
                 )
             logger.info("Timeout for test %s is turned off", suite)
@@ -1870,9 +1870,11 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
 def in_canonize_mode(test_opts):
     if getattr(test_opts, "canonize_tests", False):
         if test_opts.use_distbuild:
-            raise core.yarg.FlagNotSupportedException("Cannon perform test canonization on distbuild")
+            raise devtools.ya.core.yarg.FlagNotSupportedException("Cannon perform test canonization on distbuild")
         if getattr(test_opts, "tests_retries", 1) > 1:
-            raise core.yarg.FlagNotSupportedException("Cannon perform test canonization on multiple test runs")
+            raise devtools.ya.core.yarg.FlagNotSupportedException(
+                "Cannon perform test canonization on multiple test runs"
+            )
         return True
     return False
 
@@ -1880,7 +1882,7 @@ def in_canonize_mode(test_opts):
 def in_fuzzing_mode(test_opts):  # XXX
     if getattr(test_opts, "fuzzing", False):
         if test_opts.use_distbuild:
-            raise core.yarg.FlagNotSupportedException("Fuzzing is currently not supported on distbuild")
+            raise devtools.ya.core.yarg.FlagNotSupportedException("Fuzzing is currently not supported on distbuild")
         return True
     return False
 
@@ -1894,7 +1896,7 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
     custom_deps = []
     if getattr(test_opts, 'checkout', False) and not getattr(test_opts, 'checkout_data_by_ya', False):
         if test_opts.use_distbuild:
-            raise core.yarg.FlagNotSupportedException(
+            raise devtools.ya.core.yarg.FlagNotSupportedException(
                 "--dist & -t & --checkout are not supported together, you can try --checkout --checkout-by-ya"
             )
         custom_deps.extend(
@@ -1938,17 +1940,19 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
     # XXX
     if test_opts.use_distbuild:
         if plan.get_context().get('sandbox_run_test_result_uids'):
-            raise core.yarg.FlagNotSupportedException("--run-tagged-tests-on-sandbox and --dist are not compatible")
+            raise devtools.ya.core.yarg.FlagNotSupportedException(
+                "--run-tagged-tests-on-sandbox and --dist are not compatible"
+            )
 
         if getattr(test_opts, 'test_diff', False):
-            raise core.yarg.FlagNotSupportedException("--canon-diff and --dist are not compatible")
+            raise devtools.ya.core.yarg.FlagNotSupportedException("--canon-diff and --dist are not compatible")
 
     if (
         getattr(test_opts, 'checkout', False)
         and not getattr(test_opts, 'checkout_data_by_ya', False)
         and plan.get_context().get('sandbox_run_test_result_uids')
     ):
-        raise core.yarg.FlagNotSupportedException(
+        raise devtools.ya.core.yarg.FlagNotSupportedException(
             "--run-tagged-tests-on-sandbox and --checkout are not supported together by default, you can try --checkout --checkout-by-ya"
         )
 

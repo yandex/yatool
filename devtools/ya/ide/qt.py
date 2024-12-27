@@ -18,7 +18,7 @@ import exts.windows
 
 import yalibrary.qxml
 
-import core.yarg
+import devtools.ya.core.yarg
 
 import devtools.ya.ide.ide_common
 
@@ -46,23 +46,23 @@ class IdeQtDiscoverConfError(IdeQtError):
     pass
 
 
-class QtConfigOptions(core.yarg.Options):
+class QtConfigOptions(devtools.ya.core.yarg.Options):
     def __init__(self, **kwargs):
         self.kit = None
 
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--kit'],
                 help='Specify QtCreator kit to use',
-                hook=core.yarg.SetValueHook('kit'),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('kit'),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             ),
         ]
 
 
-class QtDevEnvOptions(core.yarg.Options):
+class QtDevEnvOptions(devtools.ya.core.yarg.Options):
     def __init__(self, **kwargs):
         self.reset = True
         self.verify = True
@@ -70,22 +70,22 @@ class QtDevEnvOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-reset'],
                 help='Avoid removing .user project settings or build cache',
-                hook=core.yarg.SetConstValueHook('reset', False),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('reset', False),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-verify'],
                 help='Skip QtCreator config verification',
-                hook=core.yarg.SetConstValueHook('verify', False),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('verify', False),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
 
-class GenQtOptions(core.yarg.Options):
+class GenQtOptions(devtools.ya.core.yarg.Options):
     def __init__(self, **kwargs):
         self.project_type = DEFAULT_QT_PROJECT_TYPE
         self.install = False
@@ -94,28 +94,28 @@ class GenQtOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--install'],
                 help='Install required configs for QtCreator (modifies user configuration)',
-                hook=core.yarg.SetConstValueHook('install', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('install', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--project-type'],
                 help='Project type: {}'.format(', '.join(str(x) for x in VALID_QT_PROJECT_TYPES)),
-                hook=core.yarg.SetValueHook('project_type'),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('project_type'),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-symlink'],
                 help='Do not create symlink to Arcadia in project directory. Always set for Arc VCS.',
-                hook=core.yarg.SetConstValueHook('symlink', False),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('symlink', False),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
 
-class QtCreatorOptions(core.yarg.Options):
+class QtCreatorOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.ide_path = None
         self.run = False
@@ -124,23 +124,23 @@ class QtCreatorOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return (
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-I', '--ide-path'],
                 help='Path to QtCreator binary (normally it will be autodetected)',
-                hook=core.yarg.SetValueHook('ide_path'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('ide_path'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['-R', '--run'],
                 help='Run Qt Creator on the created project. '
                 'If it\'s a remote project, it will be run with environment ready for remote debugging',
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
-                hook=core.yarg.SetConstValueHook('run', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('run', True),
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--daemonize'],
                 help='Makes --run to start QtCreator like a daemon',
-                hook=core.yarg.SetConstValueHook('daemonize', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('daemonize', True),
             )
         )
 
@@ -148,11 +148,11 @@ class QtCreatorOptions(core.yarg.Options):
         if self.ide_path:
             self.ide_path = exts.path2.abspath(self.ide_path, expand_user=True)
             if not os.path.isfile(self.ide_path) and not os.access(self.ide_path, os.X_OK):
-                raise core.yarg.ArgsValidatingException(
+                raise devtools.ya.core.yarg.ArgsValidatingException(
                     '{} doesn\'t look like an executable file'.format(self.ide_path)
                 )
         if self.daemonize and not self.run:
-            raise core.yarg.ArgsValidatingException('--daemon option requires --run one')
+            raise devtools.ya.core.yarg.ArgsValidatingException('--daemon option requires --run one')
 
 
 QT_OPTS = devtools.ya.ide.ide_common.ide_via_ya_make_opts() + [

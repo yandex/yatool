@@ -10,7 +10,7 @@ import exts.fs
 import exts.func
 
 import yalibrary.upload.consts as upload_consts
-from core.yarg.groups import (
+from devtools.ya.core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
     CHECKOUT_ONLY_GROUP,
     OUTPUT_CONTROL_GROUP,
@@ -26,7 +26,7 @@ from core.yarg.groups import (
     MAVEN_OPT_GROUP,
     GRAPH_GENERATION_GROUP,
 )
-from core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.help_level import HelpLevel
 from devtools.ya.test import opts as test_opts
 import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
 
@@ -57,7 +57,7 @@ from devtools.ya.core.common_opts import (
     DumpDebugOptions,
     YaBin3Options,
 )
-from core.yarg import (
+from devtools.ya.core.yarg import (
     ArgConsumer,
     EnvConsumer,
     ConfigConsumer,

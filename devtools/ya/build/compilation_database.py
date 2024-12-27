@@ -8,7 +8,7 @@ import tempfile
 
 import exts.path2
 
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.config
 
 import build.build_opts
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 SOURCE_EXTS = ('cpp', 'c', 'cc', 'cxx')
 CLANG_NAMES = ('clang', 'clang++')
 
-COMPILATION_DATABASE_OPTS_GROUP = core.yarg.Group('Compilation database options', 1)
+COMPILATION_DATABASE_OPTS_GROUP = devtools.ya.core.yarg.Group('Compilation database options', 1)
 
 
-class CompilationDatabaseOptions(core.yarg.Options):
+class CompilationDatabaseOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.file_prefixes = []
         self.file_prefixes_use_targets = False
@@ -41,52 +41,52 @@ class CompilationDatabaseOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--files-in'],
                 help='Filter files using this source-root relative prefix',
-                hook=core.yarg.SetAppendHook('file_prefixes'),
+                hook=devtools.ya.core.yarg.SetAppendHook('file_prefixes'),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--files-in-targets'],
                 help='Filter files using target directories prefixes',
-                hook=core.yarg.SetConstValueHook('file_prefixes_use_targets', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('file_prefixes_use_targets', True),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-generated'],
                 help='Filter out generated source files',
-                hook=core.yarg.SetConstValueHook('files_generated', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('files_generated', False),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--cmd-build-root'],
                 help='Build root to use in commands',
-                hook=core.yarg.SetValueHook('cmd_build_root'),
+                hook=devtools.ya.core.yarg.SetValueHook('cmd_build_root'),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--cmd-extra-args'],
                 help='Extra arguments for commands in compilation database',
-                hook=core.yarg.SetAppendHook('cmd_extra_args'),
+                hook=devtools.ya.core.yarg.SetAppendHook('cmd_extra_args'),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--output-file'],
                 help='Compilation database file name',
-                hook=core.yarg.SetValueHook('target_file'),
+                hook=devtools.ya.core.yarg.SetValueHook('target_file'),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--update'],
                 help='Update compilation database, preserve other records',
-                hook=core.yarg.SetConstValueHook('update', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('update', True),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--dont-fix-roots'],
                 help='Dont replace BUILD_ROOT, SOURCE_ROOT, etc. on absolute paths',
-                hook=core.yarg.SetConstValueHook('dont_fix_roots', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('dont_fix_roots', True),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
         ]
@@ -94,7 +94,7 @@ class CompilationDatabaseOptions(core.yarg.Options):
     def postprocess(self):
         if self.target_file is None and self.update:
             # TODO: Raise exception when ya ide vscode is ready
-            # raise core.yarg.ArgsValidatingException("--update flag can't be used without --target-file option")
+            # raise devtools.ya.core.yarg.ArgsValidatingException("--update flag can't be used without --target-file option")
             logger.debug("--update flag is ignored since --target-file is not specified")
             self.update = False
 

@@ -6,7 +6,7 @@ from exts.strtobool import strtobool
 from exts.tmp import temp_file
 
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 
 import build.evlog
 import build.gen_plan
@@ -571,7 +571,7 @@ def gen_plan_options(
     dump_inputs_map=False,
     vcs_file=None,
 ):
-    return core.yarg.Params(
+    return devtools.ya.core.yarg.Params(
         arc_root=arc_root,
         debug_options=debug_options,
         mode='gen_graph',

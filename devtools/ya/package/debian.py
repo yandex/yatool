@@ -11,7 +11,7 @@ import exts.os2
 import exts.path2
 import exts.retry
 
-import core.yarg
+import devtools.ya.core.yarg
 import package
 import package.debian_uploader as uploader
 import package.packager
@@ -155,7 +155,7 @@ def create_debian_package(
                 )
 
                 if publish_to_list:
-                    upload_opts = core.yarg.merge_opts([])
+                    upload_opts = devtools.ya.core.yarg.merge_opts([])
                     upload_opts.force = force
                     upload_opts.dupload_no_mail = dupload_no_mail
                     upload_opts.dupload_max_attempts = dupload_max_attempts

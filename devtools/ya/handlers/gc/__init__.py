@@ -7,7 +7,7 @@ import time
 import six
 
 import devtools.ya.app
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.common_opts
 import devtools.ya.core.config as cc
 import build.ya_make as ym
@@ -60,36 +60,36 @@ class CollectCacheOptions(LocalCacheOptions):
 
     def consumer(self):
         return super(CollectCacheOptions, self).consumer() + [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--size-limit'],
                 help='Strip build cache to size (in GiB if not set explicitly)',
-                hook=core.yarg.SetValueHook(
+                hook=devtools.ya.core.yarg.SetValueHook(
                     'cache_size',
                     transform=_to_size_in_gb,
                     default_value=lambda x: str(_to_size_in_gb(x) * 1.0 / 1024 / 1024 / 1024),
                 ),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
                 visible=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--object-size-limit'],
                 help='Strip build cache from large objects (in MiB if not set explicitly)',
-                hook=core.yarg.SetValueHook('object_size_limit', transform=_to_size_in_mb),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('object_size_limit', transform=_to_size_in_mb),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--age-limit'],
                 help='Strip build cache from old objects (in hours if not set explicitly)',
-                hook=core.yarg.SetValueHook('age_limit', transform=_to_timespan_in_hours),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('age_limit', transform=_to_timespan_in_hours),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
 
-class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
+class GarbageCollectionYaHandler(devtools.ya.core.yarg.CompositeHandler):
     def __init__(self):
-        core.yarg.CompositeHandler.__init__(self, description='Collect garbage')
-        self['cache'] = core.yarg.OptsHandler(
+        devtools.ya.core.yarg.CompositeHandler.__init__(self, description='Collect garbage')
+        self['cache'] = devtools.ya.core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=do_cache, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description='Strip build cache and old build directories',
             opts=[
@@ -100,7 +100,7 @@ class GarbageCollectionYaHandler(core.yarg.CompositeHandler):
             ],
             visible=True,
         )
-        self['dist_cache'] = core.yarg.OptsHandler(
+        self['dist_cache'] = devtools.ya.core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=do_strip_yt_cache, respawn=devtools.ya.app.RespawnType.NONE),
             description='Strip distributed (YT) cache',
             opts=[

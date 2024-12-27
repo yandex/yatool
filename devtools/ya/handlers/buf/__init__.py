@@ -14,8 +14,8 @@ from exts.process import run_process, execve
 import yalibrary.tools
 from build.build_facade import gen_json_graph
 from build.build_opts import ShowHelpOptions, BuildTargetsOptions
-from core.yarg import CompositeHandler, OptsHandler
-from core.yarg import Options, ArgConsumer, SetValueHook, ArgsValidatingException, SetConstValueHook
+from devtools.ya.core.yarg import CompositeHandler, OptsHandler
+from devtools.ya.core.yarg import Options, ArgConsumer, SetValueHook, ArgsValidatingException, SetConstValueHook
 
 
 import devtools.ya.app

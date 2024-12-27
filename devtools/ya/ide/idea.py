@@ -13,7 +13,7 @@ import build.graph as bg
 import build.build_opts as bo
 import build.ya_make as ya_make
 import devtools.ya.core.event_handling
-import core.yarg
+import devtools.ya.core.yarg
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,8 @@ def do_idea(params):
     if params.dry_run:
         logger.info("--- DRY-RUN MODE ---")
 
-    ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
-    jopts = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
+    jopts = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     jopts.dump_sources = True
     jopts.create_symlinks = False
     jopts.flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'yes'

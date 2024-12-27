@@ -14,7 +14,7 @@ import build.build_opts as build_opts
 import build.build_handler as bh
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.shlex2
 import yalibrary.makelists
 import yalibrary.platform_matcher as pm
@@ -37,8 +37,8 @@ FINISH_HELP = (
 )
 
 
-class VSCodeGoOptions(core.yarg.Options):
-    GROUP = core.yarg.Group('VSCode workspace options', 0)
+class VSCodeGoOptions(devtools.ya.core.yarg.Options):
+    GROUP = devtools.ya.core.yarg.Group('VSCode workspace options', 0)
 
     def __init__(self):
         self.project_output = None
@@ -52,54 +52,54 @@ class VSCodeGoOptions(core.yarg.Options):
     @classmethod
     def consumer(cls):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-P', '--project-output'],
                 help='Custom IDE workspace output directory',
-                hook=core.yarg.SetValueHook('project_output'),
+                hook=devtools.ya.core.yarg.SetValueHook('project_output'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-W', '--workspace-name'],
                 help='Custom IDE workspace name',
-                hook=core.yarg.SetValueHook('workspace_name'),
+                hook=devtools.ya.core.yarg.SetValueHook('workspace_name'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-codegen'],
                 help="Do not run codegeneration",
-                hook=core.yarg.SetConstValueHook('codegen_enabled', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('codegen_enabled', False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--apple-arm-platform'],
                 help='Build native Apple ARM64 binaries',
-                hook=core.yarg.SetConstValueHook('darwin_arm64_platform', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('darwin_arm64_platform', True),
                 group=cls.GROUP,
                 visible=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--patch-gopls'],
                 help='Use gopls patched for arcadia',
-                hook=core.yarg.SetConstValueHook('patch_gopls', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('patch_gopls', True),
                 group=cls.GROUP,
                 visible=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--no-gopls-fix"],
                 help="Do not use patched gopls",
-                hook=core.yarg.SetConstValueHook("patch_gopls", False),
+                hook=devtools.ya.core.yarg.SetConstValueHook("patch_gopls", False),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--goroot'],
                 help='Custom GOROOT directory',
-                hook=core.yarg.SetValueHook('goroot'),
+                hook=devtools.ya.core.yarg.SetValueHook('goroot'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-t', '--tests'],
                 help="Generate tests configurations for debug",
-                hook=core.yarg.SetConstValueHook('tests_enabled', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('tests_enabled', True),
                 group=cls.GROUP,
             ),
         ]
@@ -231,7 +231,7 @@ def gen_vscode_workspace(params):
         "[[c:dark-cyan]]https://docs.yandex-team.ru/ya-make/usage/ya_ide/vscode#ya-ide-vscode[[rst]]"
     )
     orig_flags = copy.copy(params.flags)
-    ya_make_opts = core.yarg.merge_opts(
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(
         build_opts.ya_make_options(free_build_targets=True),
     )
     if pm.my_platform() == 'win32':
@@ -239,7 +239,7 @@ def gen_vscode_workspace(params):
     params.ya_make_extra.append('-DBUILD_LANGUAGES=GO')
     extra_params = ya_make_opts.initialize(params.ya_make_extra)
     ya_make_opts.postprocess2(extra_params)
-    params = core.yarg.merge_params(extra_params, params)
+    params = devtools.ya.core.yarg.merge_params(extra_params, params)
     params.flags.update(extra_params.flags)
     params.flags["CGO_ENABLED"] = "0"
     params.hide_arm64_host_warning = True

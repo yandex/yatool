@@ -2,13 +2,13 @@ import os
 import six
 import typing as tp  # noqa: F401
 
-from core.yarg.config_files import get_config_files
-from core.yarg.consumers import Consumer  # noqa: F401
-from core.yarg.consumers import Compound, ArgConsumer, FreeArgConsumer, get_consumer
-from core.yarg.help_level import HelpLevel
-from core.yarg.hooks import SetRawParamsHook, ExtendHook, SetRawParamsFileHook
-from core.yarg.groups import OPERATIONAL_CONTROL_GROUP
-from core.yarg.params import Params, merge_params
+from devtools.ya.core.yarg.config_files import get_config_files
+from devtools.ya.core.yarg.consumers import Consumer  # noqa: F401
+from devtools.ya.core.yarg.consumers import Compound, ArgConsumer, FreeArgConsumer, get_consumer
+from devtools.ya.core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.hooks import SetRawParamsHook, ExtendHook, SetRawParamsFileHook
+from devtools.ya.core.yarg.groups import OPERATIONAL_CONTROL_GROUP
+from devtools.ya.core.yarg.params import Params, merge_params
 
 
 class Options(object):
@@ -97,7 +97,7 @@ class _MergedOptions(Options):
         return merge_params(*[x.params() for x in self._opts])
 
     def initialize(self, args, prefix=None, unknown_args_as_free=False, global_config=True, user_config=True):
-        from core.yarg.populate import populate  # to avoid circular import options <-> populate
+        from devtools.ya.core.yarg.populate import populate  # to avoid circular import options <-> populate
 
         config_files = get_config_files(
             cmd_name='_'.join(prefix[1:]) if prefix else None, global_config=global_config, user_config=user_config

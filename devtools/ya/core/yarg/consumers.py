@@ -3,10 +3,10 @@ import typing as tp  # noqa: F401
 import six
 
 import logging
-from core.yarg.excs import ArgsBindingException
-from core.yarg.help_level import HelpLevel
-from core.yarg.hooks import BaseHook  # noqa: F401
-from core.yarg.hooks import SetValueHook
+from devtools.ya.core.yarg.excs import ArgsBindingException
+from devtools.ya.core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.hooks import BaseHook  # noqa: F401
+from devtools.ya.core.yarg.hooks import SetValueHook
 from exts.strtobool import strtobool
 
 

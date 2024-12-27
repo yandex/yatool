@@ -1,12 +1,12 @@
 import build.build_opts as build_opts
 
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.common_opts as common_opts
 
 import devtools.ya.test.opts as test_opts
 
 
-class MavenExportOptions(core.yarg.Options):
+class MavenExportOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.export_to_maven = False
         self.version = None
@@ -18,46 +18,46 @@ class MavenExportOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--maven-export'],
                 help='Export to maven',
-                hook=core.yarg.SetConstValueHook('export_to_maven', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('export_to_maven', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--version'],
                 help="Version of artifacts for exporting to maven",
-                hook=core.yarg.SetValueHook('version'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('version'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--deploy'],
                 help='Deploy artifact to repository',
-                hook=core.yarg.SetConstValueHook('deploy', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('deploy', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--repository-id'],
                 help="Maven repository id",
-                hook=core.yarg.SetValueHook('repository_id'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('repository_id'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--repository-url'],
                 help="Maven repository url",
-                hook=core.yarg.SetValueHook('repository_url'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('repository_url'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--settings'],
                 help="Maven settings.xml file path",
-                hook=core.yarg.SetValueHook('maven_settings'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('maven_settings'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
 
-class JavaBuildOptions(core.yarg.Options):
+class JavaBuildOptions(devtools.ya.core.yarg.Options):
     def __init__(self, use_distbuild=False):
         self.get_deps = None
         self.dump_graph = False
@@ -70,40 +70,40 @@ class JavaBuildOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-D', '--get-deps'],
                 help='Compile and collect all dependencies in specified directory',
-                hook=core.yarg.SetValueHook('get_deps'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('get_deps'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-G', '--dump-json-graph'],
                 help='Dump build graph json',
-                hook=core.yarg.SetConstValueHook('dump_graph', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('dump_graph', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--javac-core.yarg', '-J'],
                 help='Set common javac flags',
-                hook=core.yarg.DictPutHook('javac_flags', None),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.DictPutHook('javac_flags', None),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-s', '--sources'],
                 help='Make sources jar also',
-                hook=core.yarg.SetConstValueHook('dump_sources', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('dump_sources', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--validate'],
                 help='Validate dependencies',
-                hook=core.yarg.SetConstValueHook('validate', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('validate', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
 
-class IdeaProjectOptions(core.yarg.Options):
+class IdeaProjectOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.idea_project_root = None
         self.local = False
@@ -111,13 +111,13 @@ class IdeaProjectOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
-                ['--idea'], help='Idea project path', hook=core.yarg.SetValueHook('idea_project_root')
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--idea'], help='Idea project path', hook=devtools.ya.core.yarg.SetValueHook('idea_project_root')
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-l', '--local'],
                 help='Only recurse reachable projects are idea modules',
-                hook=core.yarg.SetConstValueHook('local', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('local', True),
             ),
         ]
 

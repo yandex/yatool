@@ -21,7 +21,7 @@ import yalibrary.makelists.macro_definitions as md
 
 import build.build_opts as bo
 import build.build_handler
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.config
 
 import devtools.ya.jbuild.gen.gen as gen
@@ -421,7 +421,7 @@ def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, res
                     repo_auth_password=opts.repo_auth_password,
                 )
             )
-    merge_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
+    merge_opts = devtools.ya.core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
     merge_opts.create_symlinks = False
     merge_opts.output_root = tempfile.mkdtemp()
     build_opts = merge_opts.initialize([])
@@ -1354,8 +1354,8 @@ def get_dm_line(dep, forced_deps):
 def get_forced_deps(params):
     forced_deps = []
     try:
-        dump_opts = core.yarg.merge_opts(FullForcedDepsOptions())
-        params = core.yarg.merge_params(dump_opts.initialize([]), params)
+        dump_opts = devtools.ya.core.yarg.merge_opts(FullForcedDepsOptions())
+        params = devtools.ya.core.yarg.merge_params(dump_opts.initialize([]), params)
         params.json_forced_deps = True
         lib2lib_with_ver = json.loads(do_forced_deps(params, False))
         forced_deps = lib2lib_with_ver.keys()

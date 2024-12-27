@@ -1,11 +1,11 @@
 from __future__ import absolute_import
 import devtools.ya.core.common_opts
-import core.yarg
+import devtools.ya.core.yarg
 
 from . import gen_config
 
 
-class GenConfigOptions(core.yarg.Options):
+class GenConfigOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.output = None
         self.dump_defaults = False
@@ -13,20 +13,20 @@ class GenConfigOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.SingleFreeArgConsumer(
+            devtools.ya.core.yarg.SingleFreeArgConsumer(
                 help='ya.conf',
-                hook=core.yarg.SetValueHook('output'),
+                hook=devtools.ya.core.yarg.SetValueHook('output'),
                 required=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--dump-defaults'],
                 help='Dump default values as JSON',
-                hook=core.yarg.SetConstValueHook('dump_defaults', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('dump_defaults', True),
             ),
         ]
 
 
-class GenConfigYaHandler(core.yarg.OptsHandler):
+class GenConfigYaHandler(devtools.ya.core.yarg.OptsHandler):
     description = 'Generate default ya config'
 
     def __init__(self):

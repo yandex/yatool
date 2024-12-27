@@ -5,14 +5,14 @@ from itertools import groupby
 import six
 
 import app_config
-from core.yarg.consumers import Consumer  # noqa: F401
-from core.yarg.consumers import ArgConsumer, get_consumer
-from core.yarg.excs import BaseOptsFrameworkException
-from core.yarg.help_level import HelpLevel
-from core.yarg.hooks import UpdateValueHook
-from core.yarg.groups import Group  # noqa: F401
-from core.yarg.groups import OPERATIONAL_CONTROL_GROUP, UNCATEGORIZED_GROUP
-from core.yarg.options import Options  # noqa: F401
+from devtools.ya.core.yarg.consumers import Consumer  # noqa: F401
+from devtools.ya.core.yarg.consumers import ArgConsumer, get_consumer
+from devtools.ya.core.yarg.excs import BaseOptsFrameworkException
+from devtools.ya.core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg.hooks import UpdateValueHook
+from devtools.ya.core.yarg.groups import Group  # noqa: F401
+from devtools.ya.core.yarg.groups import OPERATIONAL_CONTROL_GROUP, UNCATEGORIZED_GROUP
+from devtools.ya.core.yarg.options import Options  # noqa: F401
 
 
 class ShowHelpException(BaseOptsFrameworkException):

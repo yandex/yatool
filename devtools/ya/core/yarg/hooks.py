@@ -4,7 +4,7 @@ import six
 
 import base64
 import logging
-from core.yarg.excs import TransformationException, ArgsValidatingException
+from devtools.ya.core.yarg.excs import TransformationException, ArgsValidatingException
 from exts import yjson as json
 from exts import compatible23  # noqa
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 if tp.TYPE_CHECKING:
-    from core.yarg.options import Options  # noqa: F401
+    from devtools.ya.core.yarg.options import Options  # noqa: F401
 
 
 # used for autocompletion

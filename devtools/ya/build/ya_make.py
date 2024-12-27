@@ -28,7 +28,7 @@ import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.profiler as cp
 import devtools.ya.core.report
-import core.yarg
+import devtools.ya.core.yarg
 import exts.asyncthread as core_async
 import exts.filelock
 import exts.fs
@@ -982,7 +982,7 @@ class Context:
             #  - currently doesn't support ATD (it's quite easy to fix, but we want people to use Sandbox instead of ATD)
 
             if self.opts.use_distbuild:
-                raise core.yarg.FlagNotSupportedException(
+                raise devtools.ya.core.yarg.FlagNotSupportedException(
                     "--run-tagged-tests-on-sandbox option doesn't support --dist mode"
                 )
 
@@ -1829,9 +1829,11 @@ class YaMake:
 
     def _validate_opts(self):
         if self.opts.build_results_report_file and not self.opts.output_root:
-            raise core.yarg.FlagNotSupportedException("--build-results-report must be used with not empty --output")
+            raise devtools.ya.core.yarg.FlagNotSupportedException(
+                "--build-results-report must be used with not empty --output"
+            )
         if self.opts.junit_path and not self.opts.output_root:
-            raise core.yarg.FlagNotSupportedException("--junit must be used with not empty --output")
+            raise devtools.ya.core.yarg.FlagNotSupportedException("--junit must be used with not empty --output")
         # Use os.path.commonpath when YA-71 is done (`import six` - keywords for simplifying the search for technical debt)
         if self.opts.output_root:
             abs_output = os.path.normpath(os.path.abspath(self.opts.output_root))
@@ -1859,7 +1861,7 @@ class YaMake:
         if self.opts.ymake_bin and any(
             [self.opts.make_context_on_distbuild, self.opts.make_context_on_distbuild_only, self.opts.make_context_only]
         ):
-            raise core.yarg.FlagNotSupportedException(
+            raise devtools.ya.core.yarg.FlagNotSupportedException(
                 "Context generation on distbuild with specified ymake binary is not supported yet"
             )
 

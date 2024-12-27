@@ -8,7 +8,7 @@ from typing import Iterable
 from pathlib import Path
 
 from devtools.ya.core import config as core_config
-from core import yarg
+from devtools.ya.core import yarg
 from devtools.ya.core import stage_tracer
 from build import build_opts, graph as build_graph, ya_make
 from build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph

@@ -11,7 +11,7 @@ import build.build_opts as bo
 import build.graph as bg
 import build.ya_make as ya_make
 import devtools.ya.core.event_handling
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.resource as resource
 import exts.fs
 
@@ -59,8 +59,8 @@ def do_pycharm(params):
 
 def generate_wrappers(params, arcadia_root):
     params.ya_make_extra.extend(['-DBUILD_LANGUAGES=PY3', '-r'])
-    ya_make_opts = core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
-    params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
+    params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     old_add_result = params.add_result or []
     if '_pb2.pyi' not in old_add_result:
         params.add_result = old_add_result + ['_pb2.pyi']

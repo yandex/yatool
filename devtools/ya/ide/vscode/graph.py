@@ -1,18 +1,5 @@
 import os
 
-import build.gen_plan2
-import core.yarg
-
-
-def gen_graph(params):
-    import devtools.ya.app
-
-    opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
-    ya_make_extra = getattr(params, "ya_make_extra", [])
-    build_params = opts.initialize(ya_make_extra)
-    build_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
-    return build.gen_plan2.ya_make_graph(params, devtools.ya.app, extra_ya_make_opts=build_params)
-
 
 def get_modules(graph, rel_targets=None, is_final=False, kv_p=None, target_properties=None):
     def check_module_params(module_target_properties, module_kv_p):

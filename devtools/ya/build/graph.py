@@ -30,7 +30,7 @@ from exts.strtobool import strtobool
 import app_config
 import yalibrary.fetcher.tool_chain_fetcher as fetcher
 import yalibrary.tools as tools
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.report
 import devtools.ya.core.event_handling
 from devtools.ya.core.imprint import imprint
@@ -2053,7 +2053,9 @@ def _build_graph_and_tests(
             t['flags']['FAKEID'] = t['flags'].get('FAKEID', '') + sandboxing_salt
 
     if len(target_platforms) > 1 and opts.canonize_tests:
-        raise core.yarg.ArgsBindingException('Canonization is not supported for more than one target platform')
+        raise devtools.ya.core.yarg.ArgsBindingException(
+            'Canonization is not supported for more than one target platform'
+        )
 
     host_tc = bg.gen_tc(
         host, opts.c_compiler, opts.cxx_compiler, opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'

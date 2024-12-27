@@ -9,15 +9,15 @@ import subprocess
 
 import termcolor
 
-import core.yarg
+import devtools.ya.core.yarg
 import exts.shlex2
 import yalibrary.tools
 
 from devtools.ya.ide import ide_common, vscode
 
 
-class VSCodeTypeScriptOptions(core.yarg.Options):
-    GROUP = core.yarg.Group('VSCode workspace options', 0)
+class VSCodeTypeScriptOptions(devtools.ya.core.yarg.Options):
+    GROUP = devtools.ya.core.yarg.Group('VSCode workspace options', 0)
 
     def __init__(self):
         self.project_output = None
@@ -28,28 +28,28 @@ class VSCodeTypeScriptOptions(core.yarg.Options):
     @classmethod
     def consumer(cls):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-P', '--project-output'],
                 help='Custom IDE workspace output directory',
-                hook=core.yarg.SetValueHook('project_output'),
+                hook=devtools.ya.core.yarg.SetValueHook('project_output'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-W', '--workspace-name'],
                 help='Custom IDE workspace name',
-                hook=core.yarg.SetValueHook('workspace_name'),
+                hook=devtools.ya.core.yarg.SetValueHook('workspace_name'),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--install-deps'],
                 help='Install project dependencies',
-                hook=core.yarg.SetConstValueHook('install_deps', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('install_deps', True),
                 group=cls.GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--build-target'],
                 help='Run build additionally',
-                hook=core.yarg.SetConstValueHook('build_enabled', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('build_enabled', True),
                 group=cls.GROUP,
             ),
         ]

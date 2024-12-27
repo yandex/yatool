@@ -135,10 +135,10 @@ def iter_scarab(nodes):
 
 
 def default_opts():
-    import core.yarg
+    import devtools.ya.core.yarg as yarg
     import devtools.ya.jbuild.jbuild_opts as jbuild_opts
 
-    return core.yarg.merge_opts(jbuild_opts.jbuild_opts()).params()
+    return yarg.merge_opts(jbuild_opts.jbuild_opts()).params()
 
 
 def gen(

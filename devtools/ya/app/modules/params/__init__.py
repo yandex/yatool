@@ -1,6 +1,6 @@
 import os
 import build.targets
-import core.yarg
+import devtools.ya.core.yarg
 import devtools.ya.core.respawn
 import devtools.ya.core.config
 import logging
@@ -36,7 +36,7 @@ def resolve_and_respawn(params):
     if kwargs.get('output_root'):
         kwargs['output_root'] = win_path_fix(os.path.abspath(kwargs.get('output_root')))
 
-    return core.yarg.Params(**kwargs)
+    return devtools.ya.core.yarg.Params(**kwargs)
 
 
 def configure(params, with_respawn):

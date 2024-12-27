@@ -22,7 +22,7 @@ import build.makelist
 import build.targets_deref
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.filelock
 import exts.fs
 import exts.func
@@ -179,29 +179,29 @@ def ide_via_ya_make_opts(targets_free=True):
     ]
 
 
-class IdeProjectInstallOptions(core.yarg.Options):
+class IdeProjectInstallOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.install = False
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--install'],
                 help='Install settings for Ide',
-                hook=core.yarg.SetConstValueHook('install', True),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('install', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
 
-class IdeProjectVersionOptions(core.yarg.Options):
+class IdeProjectVersionOptions(devtools.ya.core.yarg.Options):
     def __init__(self, **kwargs):
         self.project_version = kwargs.get('default_version')
         self.valid_project_versions = kwargs.get('valid_versions')
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-V', '--project-version'],
                 help='IDE version'
                 + (
@@ -209,21 +209,21 @@ class IdeProjectVersionOptions(core.yarg.Options):
                     if self.valid_project_versions
                     else ''
                 ),
-                hook=core.yarg.SetValueHook('project_version'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('project_version'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
     def postprocess(self):
         if self.valid_project_versions and self.project_version not in self.valid_project_versions:
-            raise core.yarg.ArgsValidatingException(
+            raise devtools.ya.core.yarg.ArgsValidatingException(
                 'Unsupported IDE version \'{}\', valid versions: {}'.format(
                     self.project_version, ', '.join(self.valid_project_versions)
                 )
             )
 
 
-class IdeProjectTitleOptions(core.yarg.Options):
+class IdeProjectTitleOptions(devtools.ya.core.yarg.Options):
     def __init__(self, consume_free_args=False):
         self._consume_free_args = consume_free_args
         self.project_title = DEFAULT_PROJECT_TITLE
@@ -231,22 +231,24 @@ class IdeProjectTitleOptions(core.yarg.Options):
 
     def consumer(self):
         consumers = [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-T', '--project-title'],
                 help='Custom IDE project title',
-                hook=core.yarg.SetValueHook('project_title'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('project_title'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--dirname-as-project-title'],
                 help='Use cwd dirname as default IDE project title',
-                hook=core.yarg.SetConstValueHook('dirname_as_project_title', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('dirname_as_project_title', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
         if self._consume_free_args:
             consumers.append(
-                core.yarg.FreeArgConsumer(help='project_title', hook=core.yarg.SetValueHook('project_title'))
+                devtools.ya.core.yarg.FreeArgConsumer(
+                    help='project_title', hook=devtools.ya.core.yarg.SetValueHook('project_title')
+                )
             )
         return consumers
 
@@ -255,40 +257,42 @@ class IdeProjectTitleOptions(core.yarg.Options):
             self.project_title = os.path.basename(os.getcwd())
         if self.project_title is not None and not RE_PROJECT_TITLE.match(self.project_title):
             if self.dirname_as_project_title:
-                raise core.yarg.ArgsValidatingException(
+                raise devtools.ya.core.yarg.ArgsValidatingException(
                     "You cwd directory name '{}' do not match pattern '{}'. "
                     "Please specify project name using -T or --project-title option".format(
                         self.project_title, RE_PROJECT_TITLE.pattern
                     )
                 )
-            raise core.yarg.ArgsValidatingException('Invalid IDE project title \'{}\''.format(self.project_title))
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                'Invalid IDE project title \'{}\''.format(self.project_title)
+            )
 
 
-class IdeProjectJavaFixOptions(core.yarg.Options):
+class IdeProjectJavaFixOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.java_fix = True
 
     @staticmethod
     def consumer():
-        return core.yarg.ArgConsumer(
+        return devtools.ya.core.yarg.ArgConsumer(
             ['--disable-java'],
-            hook=core.yarg.SetConstValueHook('java_fix', False),
-            group=core.yarg.ADVANCED_OPT_GROUP,
+            hook=devtools.ya.core.yarg.SetConstValueHook('java_fix', False),
+            group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             visible=False,
         )
 
 
-class IdeProjectOutputOptions(core.yarg.Options):
+class IdeProjectOutputOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.project_output = None
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-P', '--project-output'],
                 help='Custom IDE project output directory',
-                hook=core.yarg.SetValueHook('project_output'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('project_output'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
 
@@ -297,22 +301,22 @@ class IdeProjectOutputOptions(core.yarg.Options):
             self.project_output = exts.path2.abspath(self.project_output, expand_user=True)
 
 
-class YaExtraArgsOptions(core.yarg.Options):
+class YaExtraArgsOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.ya_make_extra = []
 
     def consumer(self):
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--make-args'],
                 help='Extra ya make arguments',
-                hook=core.yarg.SetAppendHook('ya_make_extra'),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetAppendHook('ya_make_extra'),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
 
-class IdeYaMakeOptions(core.yarg.Options):
+class IdeYaMakeOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.ya_make_symlinks = False
         self.download_artifacts = False
@@ -320,17 +324,17 @@ class IdeYaMakeOptions(core.yarg.Options):
 
     def consumer(self):
         consumers = [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--make-src-links'],
                 help='Create ya make symlinks in source tree',
-                hook=core.yarg.SetConstValueHook('ya_make_symlinks', True),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('ya_make_symlinks', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--dist'],
                 help='Use distbuild',
-                hook=core.yarg.SetConstValueHook('use_distbuild', True),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_distbuild', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
         return consumers
@@ -340,7 +344,7 @@ class IdeYaMakeOptions(core.yarg.Options):
             self.download_artifacts = True
 
 
-class RemoteOptions(core.yarg.Options):
+class RemoteOptions(devtools.ya.core.yarg.Options):
     def __init__(self, require_remote=False):
         self.require_remote = require_remote
         self.remote_host = None
@@ -348,24 +352,24 @@ class RemoteOptions(core.yarg.Options):
 
     @staticmethod
     def consumer():
-        return core.yarg.ArgConsumer(
+        return devtools.ya.core.yarg.ArgConsumer(
             ['-H', '--host'],
             help='Host machine address',
-            hook=core.yarg.SetValueHook('remote_host'),
-            group=core.yarg.BULLET_PROOF_OPT_GROUP,
-        ) + core.yarg.ArgConsumer(
+            hook=devtools.ya.core.yarg.SetValueHook('remote_host'),
+            group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
+        ) + devtools.ya.core.yarg.ArgConsumer(
             ['--remote-cache'],
             help='Path to the service directory on the remote machine',
-            hook=core.yarg.SetValueHook('remote_cache_path'),
-            group=core.yarg.ADVANCED_OPT_GROUP,
+            hook=devtools.ya.core.yarg.SetValueHook('remote_cache_path'),
+            group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
         )
 
     def postprocess(self):
         if self.require_remote and not self.remote_host:
-            raise core.yarg.ArgsValidatingException('Remote host must be specified with \'--host\' option')
+            raise devtools.ya.core.yarg.ArgsValidatingException('Remote host must be specified with \'--host\' option')
 
 
-class IdeRemoteOptions(core.yarg.Options):
+class IdeRemoteOptions(devtools.ya.core.yarg.Options):
     def __init__(self, require_remote=False):
         self.require_remote = require_remote
         self.remote_clean_output = True
@@ -380,54 +384,54 @@ class IdeRemoteOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return (
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--remote-keep-output'],
                 help='Don\'t clean remote output dir after build',
-                hook=core.yarg.SetConstValueHook('remote_clean_output', False),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('remote_clean_output', False),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--rsync_up_args'],
                 help='Rsync arguments for uploading sources',
-                hook=core.yarg.SetValueHook('rsync_upload_args'),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('rsync_upload_args'),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--rsync_down_args'],
                 help='Rsync arguments for downloading build results',
-                hook=core.yarg.SetValueHook('rsync_down_args'),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('rsync_down_args'),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--remote-ya'],
                 help='Path to \'ya\' on the remote machine',
-                hook=core.yarg.SetValueHook('remote_ya_path'),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('remote_ya_path'),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--remote-env-ready'],
                 help='Skip preparing remote environment',
-                hook=core.yarg.SetConstValueHook('remote_prepare_env', False),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('remote_prepare_env', False),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--forward-key'],
                 help='Literally, run ssh with -A argument when initiate remote dirs',
-                hook=core.yarg.SetConstValueHook('forward_key', True),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('forward_key', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--no-get-sources-build'],
                 help='Don\'t download generated source files in build-only targets',
-                hook=core.yarg.SetConstValueHook('in_build_get_source', False),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('in_build_get_source', False),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             )
         )
 
     def postprocess(self):
         if self.require_remote:
             if not self.remote_ya_path and self.remote_prepare_env:
-                raise core.yarg.ArgsValidatingException(
+                raise devtools.ya.core.yarg.ArgsValidatingException(
                     'To prepare remote environment you must specify path to remote \'ya\' tool '
                     '(or use \'--remote-env-ready\')'
                 )
@@ -521,7 +525,7 @@ class IdeGraph(object):
         self.params = params
         logger.debug('Generating graph')
         ya_make_extra = getattr(params, "ya_make_extra", [])
-        opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+        opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
         build_params = opts.initialize(ya_make_extra)
         build_params.flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'yes'
         self.graph = build.gen_plan2.ya_make_graph(params, devtools.ya.app, extra_ya_make_opts=build_params)
@@ -1072,17 +1076,17 @@ def set_up_remote(params, app_ctx):
         emit_message('Remote environment set')
 
 
-class RemoteDevEnvOptions(core.yarg.Options):
+class RemoteDevEnvOptions(devtools.ya.core.yarg.Options):
     def __init__(self, **kwargs):
         self.source_mine_hacks = True
 
     @staticmethod
     def consumer():
-        return core.yarg.ArgConsumer(
+        return devtools.ya.core.yarg.ArgConsumer(
             ['--simple-source-mining'],
             help='Turn off special mining for source files (works if host is specified)',
-            hook=core.yarg.SetConstValueHook('source_mine_hacks', False),
-            group=core.yarg.DEVELOPERS_OPT_GROUP,
+            hook=devtools.ya.core.yarg.SetConstValueHook('source_mine_hacks', False),
+            group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
         )
 
 

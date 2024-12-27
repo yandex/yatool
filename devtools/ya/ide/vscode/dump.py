@@ -7,7 +7,7 @@ import six
 import termcolor
 
 import devtools.ya.app
-import core.yarg
+import devtools.ya.core.yarg
 import exts.fs as fs
 import yalibrary.makelists
 
@@ -19,7 +19,7 @@ from . import consts
 def module_info(params):
     from devtools.ya.handlers import dump
 
-    dump_params = core.yarg.merge_params(
+    dump_params = devtools.ya.core.yarg.merge_params(
         copy.deepcopy(params),
         dump.DumpModuleInfoOptions(),
         dump.DataOptions(),

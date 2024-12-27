@@ -18,7 +18,7 @@ import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
 import devtools.ya.core.user as user
-import core.yarg
+import devtools.ya.core.yarg
 import exts.os2
 import exts.strings
 import exts.windows
@@ -774,7 +774,7 @@ def configure_report_interceptor(ctx, report_events):
 
         e.ya_exit_code = exit_code
 
-        prefix = core.yarg.OptsHandler.latest_handled_prefix()
+        prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
         telemetry.report(
             ReportTypes.FAILURE,
             {
@@ -816,7 +816,7 @@ def configure_report_interceptor(ctx, report_events):
                 cmd_args=mine_cmd_args(),
                 success=success,
                 exit_code=exit_code,
-                prefix=core.yarg.OptsHandler.latest_handled_prefix(),
+                prefix=devtools.ya.core.yarg.OptsHandler.latest_handled_prefix(),
                 version=ctx.revision,
                 total_walltimes=aggregate_stages(),
                 **additional_fields,

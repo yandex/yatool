@@ -2,7 +2,7 @@ import logging
 import os
 
 import build.build_handler
-import core.yarg
+import devtools.ya.core.yarg
 import exts.fs
 import yalibrary.makelists
 import yalibrary.makelists.macro_definitions
@@ -89,7 +89,7 @@ class Project(object):
         logger.debug('Makefile: %s\n%s', makefile_path, open(makefile_path, 'rb').read())
 
     def build(self):
-        build_params = core.yarg.Params(**self.params.as_dict())
+        build_params = devtools.ya.core.yarg.Params(**self.params.as_dict())
         build_params.abs_targets = [self.source_path]
         build_params.output_root = self.output_path
         build_params.flags['YA_IDE_VENV'] = 'yes'

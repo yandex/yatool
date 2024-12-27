@@ -13,7 +13,7 @@ import time
 
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import yalibrary.tools
 import exts.fs
 import exts.process
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 GDBSERVER_TIMEOUT = 5 * 60  # five minutes
 
 
-class GDBWrapperOpts(core.yarg.Options):
+class GDBWrapperOpts(devtools.ya.core.yarg.Options):
     def __init__(self):
         super(GDBWrapperOpts, self).__init__()
         self.port = '0'
@@ -42,34 +42,34 @@ class GDBWrapperOpts(core.yarg.Options):
             devtools.ya.core.common_opts.ArgConsumer(
                 ['-P', '--port'],
                 help='Port to run gdbserver on. If 0 will be automatically chosen',
-                hook=core.yarg.SetValueHook('port'),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('port'),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             )
             + devtools.ya.core.common_opts.ArgConsumer(
                 ['--find-port'],
                 help='Find a free port, print it and terminate',
-                hook=core.yarg.SetConstValueHook('find_port', True),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('find_port', True),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--start-server'],
                 help='Start gdbserver, saving it\'s PID before',
-                hook=core.yarg.SetConstValueHook('start_server', True),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('start_server', True),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--stop-server'],
                 help='Stop gdbserver, killing it with pid saved before',
-                hook=core.yarg.SetConstValueHook('stop_server', True),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('stop_server', True),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.ArgConsumer(
+            + devtools.ya.core.yarg.ArgConsumer(
                 ['--patrol-server'],
                 help='Kill server if pid file has too late modification time',
-                hook=core.yarg.SetConstValueHook('patrol_server', True),
-                group=core.yarg.DEVELOPERS_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('patrol_server', True),
+                group=devtools.ya.core.yarg.DEVELOPERS_OPT_GROUP,
             )
-            + core.yarg.FreeArgConsumer(help='GDB args', hook=core.yarg.ExtendHook('args'))
+            + devtools.ya.core.yarg.FreeArgConsumer(help='GDB args', hook=devtools.ya.core.yarg.ExtendHook('args'))
         )
 
 

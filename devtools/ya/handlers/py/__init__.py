@@ -12,7 +12,7 @@ import build.build_handler
 import build.build_opts
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.fs
 import exts.hashing
 import exts.process
@@ -27,7 +27,7 @@ import devtools.ya.app
 logger = logging.getLogger(__name__)
 
 
-class PyYaHandler(core.yarg.OptsHandler):
+class PyYaHandler(devtools.ya.core.yarg.OptsHandler):
     def __init__(self):
         super(PyYaHandler, self).__init__(
             action=devtools.ya.app.execute(run),
@@ -38,7 +38,7 @@ class PyYaHandler(core.yarg.OptsHandler):
         )
 
 
-class PyOptions(core.yarg.Options):
+class PyOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.py3 = True
         self.py_bare = False
@@ -48,39 +48,39 @@ class PyOptions(core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-2', '--py2'],
                 help='Build with Python 2',
-                hook=core.yarg.SetConstValueHook('py3', False),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('py3', False),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-3', '--py3'],
                 help='Build with Python 3',
-                hook=core.yarg.SetConstValueHook('py3', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('py3', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['-b', '--py-bare'],
                 help='Bare build (without additional projects)',
-                hook=core.yarg.SetConstValueHook('py_bare', True),
-                group=core.yarg.BULLET_PROOF_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetConstValueHook('py_bare', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--py-tmp-project'],
                 help='Temporary project path',
-                hook=core.yarg.SetValueHook('py_tmp_project'),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('py_tmp_project'),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
-            core.yarg.ConfigConsumer(
+            devtools.ya.core.yarg.ConfigConsumer(
                 name='py_tmp_project',
-                hook=core.yarg.SetValueHook('py_tmp_project'),
+                hook=devtools.ya.core.yarg.SetValueHook('py_tmp_project'),
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--py-jupyter-kernel-connection-file'],
                 help='Run python in jupyter kernel mode with the given connection file',
-                hook=core.yarg.SetValueHook('kernel_connection_file'),
-                group=core.yarg.ADVANCED_OPT_GROUP,
+                hook=devtools.ya.core.yarg.SetValueHook('kernel_connection_file'),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
 
@@ -206,7 +206,7 @@ class Project(object):
         return targets
 
     def build(self):
-        build_params = core.yarg.Params(**self.params.as_dict())
+        build_params = devtools.ya.core.yarg.Params(**self.params.as_dict())
         build_params.abs_targets = [self.source_path]
         build_params.output_root = self.output_path
         build.build_handler.do_ya_make(build_params)

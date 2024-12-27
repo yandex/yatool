@@ -7,7 +7,7 @@ import xml.etree.ElementTree as et
 import devtools.ya.app
 import build.build_handler as bh
 import build.build_opts
-import core.yarg
+import devtools.ya.core.yarg
 from exts import fs
 from exts import path2
 from yalibrary.tools import toolchain_root
@@ -119,8 +119,8 @@ WATCHERS = """
 """
 
 
-class GolandOptions(core.yarg.Options):
-    GROUP = core.yarg.Group('Goland options', 0)
+class GolandOptions(devtools.ya.core.yarg.Options):
+    GROUP = devtools.ya.core.yarg.Group('Goland options', 0)
 
     def __init__(self):
         self.go_modules = True
@@ -130,38 +130,38 @@ class GolandOptions(core.yarg.Options):
     @classmethod
     def consumer(cls):
         consumers = [
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--with-go-modules'],
                 help='Enable go modules support',
-                hook=core.yarg.SetConstValueHook('go_modules', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('go_modules', True),
                 group=cls.GROUP,
                 visible=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--without-go-modules'],
                 help='Disable go modules support',
-                hook=core.yarg.SetConstValueHook('go_modules', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('go_modules', False),
                 group=cls.GROUP,
                 visible=True,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--with-yoimports'],
                 help='Enable yoimports watcher',
-                hook=core.yarg.SetConstValueHook('yoimports', True),
+                hook=devtools.ya.core.yarg.SetConstValueHook('yoimports', True),
                 group=cls.GROUP,
                 visible=True,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--without-yoimports'],
                 help='Disable yoimports watcher',
-                hook=core.yarg.SetConstValueHook('yoimports', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('yoimports', False),
                 group=cls.GROUP,
                 visible=False,
             ),
-            core.yarg.ArgConsumer(
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--no-codegen'],
                 help="Do not run codegeneration",
-                hook=core.yarg.SetConstValueHook('codegen_enabled', False),
+                hook=devtools.ya.core.yarg.SetConstValueHook('codegen_enabled', False),
                 group=cls.GROUP,
             ),
         ]
@@ -321,8 +321,8 @@ def do_codegen(params):
 
 def do_goland(params):
     params.ya_make_extra.append('-DBUILD_LANGUAGES=GO')
-    ya_make_opts = core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
-    params = core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+    params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     import app_ctx  # XXX
 
     stub_info = devtools.ya.ide.ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)

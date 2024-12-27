@@ -3,7 +3,7 @@ import os
 import build.targets
 import devtools.ya.core.respawn
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 
 
 # XXX: remove
@@ -39,4 +39,4 @@ def intercept(func, params, old_style_bld_root=False):
     if kwargs.get('output_root'):
         kwargs['output_root'] = os.path.abspath(kwargs.get('output_root'))
 
-    return func(core.yarg.Params(**kwargs))
+    return func(devtools.ya.core.yarg.Params(**kwargs))

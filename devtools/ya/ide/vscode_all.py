@@ -13,7 +13,7 @@ import build.build_handler as bh
 import build.build_opts as build_opts
 import build.compilation_database as bc
 import devtools.ya.core.config
-import core.yarg
+import devtools.ya.core.yarg
 import exts.asyncthread
 import exts.fs as fs
 import yalibrary.platform_matcher as pm
@@ -58,12 +58,12 @@ class VSCodeProject(object):
         self.vscode_config_dir = os.path.join(self.project_root, ".vscode")
 
         flags = copy.copy(params.flags)
-        ya_make_opts = core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
+        ya_make_opts = devtools.ya.core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
         extra_values = ["-DBUILD_LANGUAGES=%s" % " ".join(params.languages), "-DCONSISTENT_DEBUG=yes", "--prefetch"]
         params.ya_make_extra.extend(extra_values)
         extra_params = ya_make_opts.initialize(params.ya_make_extra)
         ya_make_opts.postprocess2(extra_params)
-        params = core.yarg.merge_params(extra_params, params)
+        params = devtools.ya.core.yarg.merge_params(extra_params, params)
         params.hide_arm64_host_warning = True
         params.flags.update(extra_params.flags)
         if self.is_go:
@@ -326,7 +326,7 @@ class VSCodeProject(object):
         venv_opts.venv_with_pip = False
         fs.remove_tree_safe(venv_opts.venv_root)
         venv_opts.venv_tmp_project = self.venv_tmp_project()
-        venv_params = core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
+        venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
         venv_tmp_project_dir = os.path.join(self.params.arc_root, venv_opts.venv_tmp_project)
         if os.path.exists(venv_tmp_project_dir):
             ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_tmp_project_dir))
