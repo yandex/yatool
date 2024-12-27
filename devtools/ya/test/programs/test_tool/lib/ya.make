@@ -62,7 +62,6 @@ IF (PYTHON3)
         devtools/ya/test/programs/test_tool/resolve_java_coverage
         devtools/ya/test/programs/test_tool/resolve_python_coverage
         devtools/ya/test/programs/test_tool/resolve_ts_coverage
-        devtools/ya/test/programs/test_tool/result_node
         devtools/ya/test/programs/test_tool/results_accumulator
         devtools/ya/test/programs/test_tool/results_merger
         devtools/ya/test/programs/test_tool/run_boost_test

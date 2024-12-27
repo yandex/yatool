@@ -1522,9 +1522,6 @@ class YaMake:
         self._build_results_listener = pr.CompositeResultsListener([])
         test_results_path = self._get_results_root()
         test_node_listener = pr.TestNodeListener(self.ctx.tests, test_results_path, None)
-        if not self.opts.remove_result_node:
-            self._build_results_listener.add(pr.TestResultsListener(self.ctx.graph, self.app_ctx.display))
-
         if self.opts.dump_failed_node_info_to_evlog:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
 
@@ -1615,7 +1612,7 @@ class YaMake:
         if not self.opts.report_skipped_suites_only:
             self._reports_generator.add_configure_results(self.ctx.configure_errors)
 
-        if self.opts.remove_result_node and (self.opts.report_skipped_suites or self.opts.report_skipped_suites_only):
+        if self.opts.report_skipped_suites or self.opts.report_skipped_suites_only:
             self._reports_generator.add_tests_results(
                 self.ctx.stripped_tests, build_errors=None, node_build_errors_links=[]
             )
@@ -1678,18 +1675,11 @@ class YaMake:
             self._reports_generator.add_build_results(self.build_result)
         self._reports_generator.finish_build_report()
 
-        if self.opts.remove_result_node:
-            suites = []
-            if self.opts.report_skipped_suites_only or self.opts.report_skipped_suites:
-                suites = self.ctx.stripped_tests
-            if not self.opts.report_skipped_suites_only:
-                suites += build_report.fill_suites_results(self, self.ctx.tests, self._output_root)
-        else:
-            suites = [t for t in self.ctx.tests if t.is_skipped()]
-            if not self.opts.report_skipped_suites_only:
-                suites += build_report.fill_suites_results(
-                    self, [t for t in self.ctx.tests if not t.is_skipped()], self._output_root
-                )
+        suites = []
+        if self.opts.report_skipped_suites_only or self.opts.report_skipped_suites:
+            suites = self.ctx.stripped_tests
+        if not self.opts.report_skipped_suites_only:
+            suites += build_report.fill_suites_results(self, self.ctx.tests, self._output_root)
 
         report_prototype = collections.defaultdict(list)
 

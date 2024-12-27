@@ -43,7 +43,6 @@ import devtools.ya.test.filter as test_filter
 import devtools.ya.test.system.env as sysenv
 import devtools.ya.test.test_types.fuzz_test as fuzz_test
 import devtools.ya.test.util.shared as util_shared
-import devtools.ya.test.util.tools as test_tools
 import devtools.ya.test.util.tools as util_tools
 
 import yalibrary.last_failed.last_failed as last_failed
@@ -2101,7 +2100,6 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
 
 def inject_tests_result_node(arc_root, graph, tests, test_opts, res_node_deps=None):
     res_node_deps = res_node_deps or []
-    timer = exts.timer.Timer('inject_tests_result_node')
     # all_tests contains skipped suites with required annotations
     filter_descr = ", ".join(_get_skipped_tests_annotations(tests))
 
@@ -2125,31 +2123,6 @@ def inject_tests_result_node(arc_root, graph, tests, test_opts, res_node_deps=No
             if not test_opts.report_skipped_suites_only:
                 listing_suites += injected_tests
             inject_list_result_node(graph, listing_suites, test_opts, filter_descr)
-        elif not test_opts.remove_result_node:
-            if test_opts.fail_fast:
-                for suite in injected_tests:
-                    uid = inject_result_node(
-                        graph,
-                        [suite],
-                        tests_filter_descr=filter_descr,
-                        show_passed=test_opts.show_passed_tests,
-                        show_skipped=test_opts.show_skipped_tests,
-                        show_failed_only=True,
-                        opts=test_opts,
-                    )
-                    res_node_deps.append(uid)
-
-            # merge tests reports
-            inject_result_node(
-                graph,
-                injected_tests,
-                tests_filter_descr=filter_descr,
-                show_passed=test_opts.show_passed_tests,
-                show_skipped=test_opts.show_skipped_tests,
-                opts=test_opts,
-                extra_deps=res_node_deps,
-            )
-            timer.show_step('inject result nodes')
 
 
 def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=None):
@@ -2199,103 +2172,6 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
         "cmds": _generate_projects_file_cmds(tests, opts=opts) + [{"cmd_args": allure_cmd, "cwd": "$(BUILD_ROOT)"}],
     }
     graph.append_node(node, add_to_result=True)
-
-    return uid
-
-
-# TODO remove all result node code
-def inject_result_node(
-    graph, tests, show_passed, show_skipped, tests_filter_descr, show_failed_only=False, opts=None, extra_deps=None
-):
-    if not tests:
-        return
-
-    deps = uid_gen.get_test_result_uids(tests)
-    if extra_deps:
-        deps += extra_deps
-
-    uid = "report(tty={})-{}".format(str(exts.os2.is_tty()), imprint.combine_imprints(*deps))
-
-    all_resources = {}
-    for suite in tests:
-        all_resources.update(suite.global_resources)
-
-    node_log_path = os.path.join("$(BUILD_ROOT)", "result.log")
-    out_path = os.path.join("$(BUILD_ROOT)", "test_results.out")
-    result_cmd = util_tools.get_test_tool_cmd(opts, "result_node", all_resources) + [
-        "--source-root",
-        "$(SOURCE_ROOT)",
-        "--log-path",
-        node_log_path,
-        "--fail-exit-code",
-        str(opts.test_fail_exit_code),
-        "--out-path",
-        out_path,
-        # "--log-level", "DEBUG"
-    ]
-
-    result_cmd += ["--result-root", test_tools.get_results_root(opts) or "$(BUILD_ROOT)"]
-
-    if show_passed:
-        result_cmd.append("--show-passed")
-
-    if show_skipped:
-        result_cmd.append("--show-skipped")
-
-    if opts and opts.show_deselected_tests:
-        result_cmd += ["--show-deselected"]
-
-    if opts and (opts.report_skipped_suites or opts.report_skipped_suites_only):
-        result_cmd += ["--show-discovered"]
-
-    if opts and (opts.keep_temps or opts.show_test_cwd):
-        result_cmd += ["--show-test-cwd"]
-
-    if opts and opts.show_metrics:
-        result_cmd += ["--show-metrics"]
-
-    if opts and opts.inline_diff:
-        result_cmd += ["--inline-diff"]
-
-    if opts.run_tagged_tests_on_sandbox:
-        result_cmd += ['--show-suite-logs-for-tags', devtools.ya.test.const.YaTestTags.ForceSandbox]
-
-    if opts and opts.tests_filters:
-        for tf in opts.tests_filters:
-            result_cmd.extend(["--test-name-filter", tf])
-
-    if opts and opts.omitted_test_statuses:
-        for status in opts.omitted_test_statuses:
-            result_cmd += ["--omitted-test-status", status]
-
-    if show_failed_only:
-        result_cmd += ["--show-failed"]
-
-    if tests_filter_descr:
-        result_cmd += ["--filter-description", tests_filter_descr]
-
-    node = {
-        "node-type": devtools.ya.test.const.NodeType.TEST_RESULTS,
-        "cache": opts.cache_tests if opts else True,
-        "broadcast": False,
-        "inputs": PROJECTS_FILE_INPUTS,
-        "uid": uid,
-        "cwd": "$(BUILD_ROOT)",
-        "priority": 0,
-        "deps": testdeps.unique(deps),
-        "env": sysenv.get_common_py_env().dump(),
-        "target_properties": {},
-        "outputs": [node_log_path, out_path],
-        'kv': {
-            "p": "TC",
-            "pc": 'light-cyan',
-            "show_out": True,
-            "add_to_report": False,
-            "test_results_node": True,
-        },
-        "cmds": _generate_projects_file_cmds(tests, opts=opts) + [{"cmd_args": result_cmd, "cwd": "$(BUILD_ROOT)"}],
-    }
-    graph.append_node(node, add_to_result=not show_failed_only)
 
     return uid
 
@@ -2781,9 +2657,7 @@ def _get_skipped_tests_annotations(suites):
 def split_stripped_tests(tests, opts):
     injected_tests, skipped_tests = [], []
     for t in tests:
-        if (t.is_skipped() and opts.remove_result_node) or (
-            t.is_skipped() and not (opts.report_skipped_suites or opts.report_skipped_suites_only)
-        ):
+        if t.is_skipped():
             skipped_tests.append(t)
         else:
             injected_tests.append(t)

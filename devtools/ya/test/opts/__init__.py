@@ -1852,7 +1852,7 @@ class InterimOptions(devtools.ya.core.yarg.Options):
         self.cache_fs_read = False
         self.cache_fs_write = False
         self.merge_split_tests = True
-        self.remove_result_node = False
+        self.remove_result_node = True
         self.remove_tos = False
         self.test_fail_exit_code = error.ExitCodes.TEST_FAILED
         self.detect_leaks_in_pytest = True

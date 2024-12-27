@@ -45,17 +45,9 @@ def generate_results_report(builder):
     skipped_suites = []
 
     if builder.opts.report_skipped_suites_only or builder.opts.report_skipped_suites:
-        if builder.opts.remove_result_node:
-            skipped_suites = builder.ctx.stripped_tests
-        else:
-            skipped_suites = [t for t in builder.ctx.tests if t.is_skipped()]
+        skipped_suites = builder.ctx.stripped_tests
     if not builder.opts.report_skipped_suites_only:
-        if builder.opts.remove_result_node:
-            not_skipped_suites = fill_suites_results(builder, builder.ctx.tests, output_dir)
-        else:
-            not_skipped_suites = fill_suites_results(
-                builder, [t for t in builder.ctx.tests if not t.is_skipped()], output_dir
-            )
+        not_skipped_suites = fill_suites_results(builder, builder.ctx.tests, output_dir)
 
     suites = not_skipped_suites + skipped_suites
 
@@ -122,21 +114,3 @@ def generate_empty_tests_result_report(builder):
             rc.get_display().emit_message(filter_message)
             rc.get_display().emit_message()
         rc.get_display().emit_message("Total 0 suites")
-    elif not builder.opts.remove_result_node:
-        filter_message = util_shared.build_filter_message(
-            ', '.join(test_node._get_skipped_tests_annotations(stripped_tests or [])),
-            builder.opts.tests_filters if builder.opts else [],
-            0,
-        )
-        if filter_message:
-            rc.get_display().emit_message(filter_message)
-        reporter = rc.ConsoleReporter(
-            show_passed=False,
-            show_deselected=builder.opts and builder.opts.show_deselected_tests,
-            show_test_cwd=builder.opts and builder.opts.keep_temps,
-            show_metrics=builder.opts and builder.opts.show_metrics,
-            truncate=not (builder.opts and builder.opts.inline_diff),
-            omitted_test_statuses=[],
-            display=builder.app_ctx.display,
-        )
-        reporter.on_tests_finish([])
