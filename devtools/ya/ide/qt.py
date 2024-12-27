@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import glob
 import exts.yjson as json
 import logging
@@ -6,8 +5,6 @@ import os
 import re
 import platform
 import itertools
-
-import six
 
 import exts.fs
 import exts.path2
@@ -149,7 +146,7 @@ class QtCreatorOptions(devtools.ya.core.yarg.Options):
             self.ide_path = exts.path2.abspath(self.ide_path, expand_user=True)
             if not os.path.isfile(self.ide_path) and not os.access(self.ide_path, os.X_OK):
                 raise devtools.ya.core.yarg.ArgsValidatingException(
-                    '{} doesn\'t look like an executable file'.format(self.ide_path)
+                    f'{self.ide_path} doesn\'t look like an executable file'
                 )
         if self.daemonize and not self.run:
             raise devtools.ya.core.yarg.ArgsValidatingException('--daemon option requires --run one')
@@ -171,11 +168,10 @@ def find_qt_creator():
     def candidates():
         def iter_patterns(roots, subpaths):
             for root, subpath in itertools.product(roots, subpaths):
-                for path in glob.iglob(os.path.join(root, subpath)):
-                    yield path
+                yield from glob.iglob(os.path.join(root, subpath))
 
         if platform.system() == 'Linux':
-            for path in iter_patterns(
+            yield from iter_patterns(
                 (
                     os.path.expanduser('~'),
                     '/opt',
@@ -184,11 +180,10 @@ def find_qt_creator():
                     'qtcreator*/bin/qtcreator',
                     'Qt*/Tools/QtCreator/bin/qtcreator',
                 ),
-            ):
-                yield path
+            )
             yield '/usr/bin/qtcreator'
         elif platform.system() == 'Darwin':
-            for path in iter_patterns(
+            yield from iter_patterns(
                 (
                     os.path.expanduser('~/Applications'),
                     os.path.expanduser('~'),
@@ -198,8 +193,7 @@ def find_qt_creator():
                     'Qt Creator.app/Contents/MacOS/Qt Creator',
                     'Qt*/Qt Creator.app/Contents/MacOS/Qt Creator',
                 ),
-            ):
-                yield path
+            )
 
     execs = [cand for cand in candidates() if os.path.isfile(cand) and os.access(cand, os.X_OK)]
     logger.debug('Candidates for QtCreator are: %s', execs)
@@ -211,7 +205,7 @@ def discover_qt_config():
         raise NotImplementedError('QtCreator config discovery is not supported on Windows for now')
     config_path = exts.path2.abspath(os.path.join('~', '.config', 'QtProject'), expand_user=True)
     if not os.path.isdir(config_path):
-        raise IdeQtDiscoverConfError('Cannot discover QtCreator config directory: {}'.format(config_path))
+        raise IdeQtDiscoverConfError(f'Cannot discover QtCreator config directory: {config_path}')
     logger.debug('Discovered config: %s', config_path)
     return config_path
 
@@ -219,13 +213,13 @@ def discover_qt_config():
 def qt_version(version):
     matched = RE_VERSION.match(version)
     if not matched:
-        raise IdeQtError('Cannot parse QtCreator version: {}'.format(version))
+        raise IdeQtError(f'Cannot parse QtCreator version: {version}')
     if not matched.group('minor'):
         return int(matched.group('major')), 0
     return int(matched.group('major')), int(matched.group('minor'))
 
 
-class QtConfigFile(object):
+class QtConfigFile:
     VERSION = 1
     ELEM = 'Elem'
     ELEM_ID_KEY = 'Elem.Id'
@@ -235,10 +229,10 @@ class QtConfigFile(object):
     def __init__(self, path):
         self.path = path
         if not os.path.isfile(self.path):
-            raise IdeQtError('QtCreator config not found: {}'.format(self.path))
+            raise IdeQtError(f'QtCreator config not found: {self.path}')
         self.data, self.root_tag = yalibrary.qxml.load(self.path)
         if not self.validate():
-            raise IdeQtError('Invalid QtCreator config: {}'.format(self.path))
+            raise IdeQtError(f'Invalid QtCreator config: {self.path}')
 
     @classmethod
     def validate_data(cls, data):
@@ -247,12 +241,12 @@ class QtConfigFile(object):
         assert data['Version'] == cls.VERSION
         assert isinstance(data.get(cls.ELEM + '.Count'), int)
         assert data[cls.ELEM + '.Count'] >= 0
-        assert not cls.DEFAULT_FIELD or isinstance(data.get(cls.ELEM + '.Default'), six.text_type)
+        assert not cls.DEFAULT_FIELD or isinstance(data.get(cls.ELEM + '.Default'), str)
         ids = set()
-        for n in six.moves.xrange(data[cls.ELEM + '.Count']):
-            key = '{}.{}'.format(cls.ELEM, n)
+        for n in range(data[cls.ELEM + '.Count']):
+            key = f'{cls.ELEM}.{n}'
             assert isinstance(data.get(key), dict)
-            assert isinstance(data[key].get(cls.ELEM_ID_KEY), six.text_type)
+            assert isinstance(data[key].get(cls.ELEM_ID_KEY), str)
             ids.add(data[key][cls.ELEM_ID_KEY])
         assert not cls.DEFAULT_FIELD or not ids or not data[cls.ELEM + '.Default'] or data[cls.ELEM + '.Default'] in ids
 
@@ -272,12 +266,12 @@ class QtConfigFile(object):
     def _elem_keys(self):
         return {
             elem[self.ELEM_ID_KEY]: k
-            for k, elem in six.iteritems(self.data)
+            for k, elem in self.data.items()
             if k.startswith(self.ELEM + '.') and isinstance(elem, dict) and self.ELEM_ID_KEY in elem
         }
 
     def ids(self):
-        return frozenset(six.iterkeys(self._elem_keys()))
+        return frozenset(self._elem_keys().keys())
 
     def has_id(self, elem_id):
         return elem_id in self.ids()
@@ -310,7 +304,7 @@ class QtProfileConfig(QtConfigFile):
         profile.update(
             {
                 'PE.Profile.Name': exts.strings.to_unicode(name),
-                'PE.Profile.Icon': u':///DESKTOP///',
+                'PE.Profile.Icon': ':///DESKTOP///',
                 'PE.Profile.SDK': False,
                 'PE.Profile.MutableInfo': [],
                 'PE.Profile.AutoDetected': False,
@@ -319,9 +313,9 @@ class QtProfileConfig(QtConfigFile):
         data = profile.setdefault('PE.Profile.Data', {})
         data.update(
             {
-                'PE.Profile.Device': u'Desktop Device',
+                'PE.Profile.Device': 'Desktop Device',
                 'PE.Profile.DeviceType': 'Desktop',
-                'PE.Profile.SysRoot': u'',
+                'PE.Profile.SysRoot': '',
                 'PE.Profile.ToolChain': exts.strings.to_unicode(tools['c++-clang']),
                 'QtSupport.QtInformation': -1,
             }
@@ -331,9 +325,9 @@ class QtProfileConfig(QtConfigFile):
                 {
                     'CMakeProjectManager.CMakeKitInformation': exts.strings.to_unicode(tools['cmake']),
                     'CMake.ConfigurationKitInformation': [
-                        u'CMAKE_CXX_COMPILER:STRING=%{Compiler:Executable}',
+                        'CMAKE_CXX_COMPILER:STRING=%{Compiler:Executable}',
                     ],
-                    'CMake.GeneratorKitInformation': u'CodeBlocks - Unix Makefiles',
+                    'CMake.GeneratorKitInformation': 'CodeBlocks - Unix Makefiles',
                 }
             )
         if gdb_inline is None:
@@ -401,7 +395,7 @@ class QtCMakeToolsConfig(QtConfigFile):
         self.save()
 
 
-class QtConfig(object):
+class QtConfig:
     KIT_TOOLS = {
         'cmake': 'Ya.Ide.Qt.Kit.CMake',
         'c++-clang': 'ProjectExplorer.ToolChain.Clang:Ya.Ide.Qt.Kit.Cpp',
@@ -447,7 +441,7 @@ class QtConfig(object):
                 )
                 raise
         if not os.path.isdir(self.path):
-            raise IdeQtError('Cannot find QtCreator config directory: {}'.format(self.path))
+            raise IdeQtError(f'Cannot find QtCreator config directory: {self.path}')
         logger.debug('QtCreator config path: %s', self.path)
         logger.debug('Loading QtCreator config')
         self.profiles = QtProfileConfig(self.qtcreator_subpath('profiles.xml'))
@@ -499,11 +493,11 @@ class QtConfig(object):
                         self.KIT_TOOLS['cmake'], ', '.join(sorted(self.cmaketools.ids()))
                     )
                 )
-            not_installed_tools = set((tool for tool in self.TOOLS if tool not in self.tools))
+            not_installed_tools = {tool for tool in self.TOOLS if tool not in self.tools}
             if not_installed_tools:
                 self.app_ctx.display.emit_message(
                     '[[warn]]QtCreator external tools are available: {}, run [[imp]]ya ide qt --install[[warn]] to install them[[rst]]'.format(
-                        ', '.join('[[imp]]{}[[warn]]'.format(x) for x in sorted(not_installed_tools))
+                        ', '.join(f'[[imp]]{x}[[warn]]' for x in sorted(not_installed_tools))
                     )
                 )
         except IdeQtDiscoverConfError:
@@ -530,7 +524,7 @@ class QtConfig(object):
         )
         gdb_inline = None
         if self.debuggers:
-            self.app_ctx.display.emit_message('Installing debugger: [[path]]{}[[rst]]'.format(self.gdb_path))
+            self.app_ctx.display.emit_message(f'Installing debugger: [[path]]{self.gdb_path}[[rst]]')
             self.debuggers.add_debugger(
                 self.KIT_TOOLS['gdb'], 'Ya Tool Gdb', self.gdb_path, self.abi(), self.GDB_ENGINE_TYPE
             )
@@ -545,11 +539,11 @@ class QtConfig(object):
         )
         exts.fs.ensure_dir(self.qtcreator_subpath('externaltools'))
         for tool in self.TOOLS:
-            tool_src_path = self.toolspath('{}.xml'.format(tool))
+            tool_src_path = self.toolspath(f'{tool}.xml')
             if not os.path.isfile(tool_src_path):
-                raise IdeQtError('Cannot find external tool: {}'.format(tool_src_path))
-            tool_dst_path = os.path.join(self.qtcreator_subpath('externaltools'), 'ya_ide_qt_{}.xml'.format(tool))
-            self.app_ctx.display.emit_message('Installing external tool: [[imp]]{}[[rst]]'.format(tool))
+                raise IdeQtError(f'Cannot find external tool: {tool_src_path}')
+            tool_dst_path = os.path.join(self.qtcreator_subpath('externaltools'), f'ya_ide_qt_{tool}.xml')
+            self.app_ctx.display.emit_message(f'Installing external tool: [[imp]]{tool}[[rst]]')
             exts.fs.copy_file(tool_src_path, tool_dst_path)
 
     def abi(self):
@@ -558,10 +552,10 @@ class QtConfig(object):
         elif self.platform == 'darwin':
             return 'x86-macos-generic-mach_o-64bit'
         else:
-            raise IdeQtError('Unsupported platform: {}'.format(self.platform))
+            raise IdeQtError(f'Unsupported platform: {self.platform}')
 
 
-class QtCMakeProject(object):
+class QtCMakeProject:
     def __init__(self, params, app_ctx, info, version, selected_targets=None):
         self.params = params
         self.app_ctx = app_ctx
@@ -614,12 +608,12 @@ endif()
 
     def build_conf_settings(self, conf):
         settings = {
-            'id': u'CMakeProjectManager.CMakeBuildConfiguration',
+            'id': 'CMakeProjectManager.CMakeBuildConfiguration',
             'env': [],
             'build_dir': exts.strings.to_unicode(self.build_conf_path(conf)),
             'build_steps': [
                 {
-                    'id': u'CMakeProjectManager.MakeStep',
+                    'id': 'CMakeProjectManager.MakeStep',
                     'params': {
                         'CMakeProjectManager.MakeStep.Clean': False,
                         'CMakeProjectManager.MakeStep.UseNinja': False,
@@ -632,17 +626,17 @@ endif()
             'build_steps_clean': [],
             'extra_conf': {
                 'CMake.Configuration': [
-                    u'CMAKE_BUILD_TYPE:STRING={}'.format(self._cmake_build_type(conf)),
-                    u'CMAKE_YA_IDE_QT_CONF:STRING={}'.format(conf),
-                    u'CMAKE_SKIP_PREPROCESSED_SOURCE_RULES=ON',
-                    u'CMAKE_SKIP_ASSEMBLY_SOURCE_RULES=ON',
-                    u'YACMAKE_SKIP_OBJECT_SOURCE_RULES=ON',
+                    f'CMAKE_BUILD_TYPE:STRING={self._cmake_build_type(conf)}',
+                    f'CMAKE_YA_IDE_QT_CONF:STRING={conf}',
+                    'CMAKE_SKIP_PREPROCESSED_SOURCE_RULES=ON',
+                    'CMAKE_SKIP_ASSEMBLY_SOURCE_RULES=ON',
+                    'YACMAKE_SKIP_OBJECT_SOURCE_RULES=ON',
                 ],
             },
         }
 
         if self.version < (4, 0):
-            settings['env'].append(u'CMAKE_YA_IDE_QT_CONF={}'.format(self._cmake_build_type(conf)))
+            settings['env'].append(f'CMAKE_YA_IDE_QT_CONF={self._cmake_build_type(conf)}')
 
         if self.version >= (2, 8) and self.version < (3, 0):
             settings['extra_conf']['CMakeProjectManager.CMakeBuildConfiguration.BuildDirectory'] = (
@@ -712,7 +706,7 @@ def get_version_from_qtc(path_to_ide):
     return version_string.group(1) if version_string else None
 
 
-class QtDevEnv(object):
+class QtDevEnv:
     BUILD_CONFIGURATIONS = ('Debug', 'Release')
 
     def __init__(self, params, app_ctx, config, project_info, create_project, verify_config=True):
@@ -732,7 +726,7 @@ class QtDevEnv(object):
         devtools.ya.ide.ide_common.memo_gen(self.project_storage)
         self.settings_path = self.project.project_path + '.shared'
         app_ctx.display.emit_message('QtCreator version: [[imp]]{}.{}[[rst]]'.format(*self.version))
-        app_ctx.display.emit_message('Project settings: [[path]]{}[[rst]]'.format(self.settings_path))
+        app_ctx.display.emit_message(f'Project settings: [[path]]{self.settings_path}[[rst]]')
         if verify_config and params.verify:
             config.verify()
         self.project_storage.data['ide_path'] = (
@@ -740,7 +734,7 @@ class QtDevEnv(object):
         )
         self.project_storage.data['settings_path'] = None
         if path_to_ide:
-            app_ctx.display.emit_message('Using QtCreator: {}'.format(path_to_ide))
+            app_ctx.display.emit_message(f'Using QtCreator: {path_to_ide}')
         else:
             app_ctx.display.emit_message(
                 '[[warn]]QtCreator is not detected and -I option is not used, you\'ll have to use -I option with \'run\' command further[[rst]]'
@@ -795,7 +789,7 @@ class QtDevEnv(object):
         )
 
         for num, conf in enumerate(self.BUILD_CONFIGURATIONS):
-            build_configuration = target.setdefault('ProjectExplorer.Target.BuildConfiguration.{}'.format(num), {})
+            build_configuration = target.setdefault(f'ProjectExplorer.Target.BuildConfiguration.{num}', {})
             build_configuration.update(
                 {
                     'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(conf),
@@ -804,10 +798,10 @@ class QtDevEnv(object):
                     'ProjectExplorer.BuildConfiguration.UserEnvironmentChanges': [],
                     'ProjectExplorer.BuildConfiguration.BuildStepListCount': 2,
                     'ProjectExplorer.BuildConfiguration.BuildStepList.0': {
-                        'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Build',
+                        'ProjectExplorer.ProjectConfiguration.Id': 'ProjectExplorer.BuildSteps.Build',
                     },
                     'ProjectExplorer.BuildConfiguration.BuildStepList.1': {
-                        'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.BuildSteps.Clean',
+                        'ProjectExplorer.ProjectConfiguration.Id': 'ProjectExplorer.BuildSteps.Clean',
                     },
                 }
             )
@@ -828,12 +822,12 @@ class QtDevEnv(object):
                     'build_dir'
                 )
             for bsl_num, bsl in enumerate(build_step_lists):
-                bsl_key = 'ProjectExplorer.BuildConfiguration.BuildStepList.{}'.format(bsl_num)
+                bsl_key = f'ProjectExplorer.BuildConfiguration.BuildStepList.{bsl_num}'
                 assert bsl_key in build_configuration
                 build_configuration[bsl_key]['ProjectExplorer.BuildStepList.StepsCount'] = len(project_build_conf[bsl])
                 for bs_num, bs_conf in enumerate(project_build_conf[bsl]):
                     assert 'id' in bs_conf
-                    bs_key = 'ProjectExplorer.BuildStepList.Step.{}'.format(bs_num)
+                    bs_key = f'ProjectExplorer.BuildStepList.Step.{bs_num}'
                     build_step = build_configuration[bsl_key].setdefault(bs_key, {})
                     build_step.update(
                         {
@@ -848,17 +842,17 @@ class QtDevEnv(object):
         logger.debug('Project run conf settings: %s', json.dumps(project_run_conf, sort_keys=True, indent=2))
         assert all(field in project_run_conf for field in ('output_dir',))
 
-        for num, runnable in enumerate(sorted(six.iterkeys(self.project.runnables))):
-            run_configuration = target.setdefault('ProjectExplorer.Target.RunConfiguration.{}'.format(num), {})
+        for num, runnable in enumerate(sorted(self.project.runnables.keys())):
+            run_configuration = target.setdefault(f'ProjectExplorer.Target.RunConfiguration.{num}', {})
             run_configuration.update(
                 {
-                    'ProjectExplorer.ProjectConfiguration.Id': u'ProjectExplorer.CustomExecutableRunConfiguration',
+                    'ProjectExplorer.ProjectConfiguration.Id': 'ProjectExplorer.CustomExecutableRunConfiguration',
                     'ProjectExplorer.ProjectConfiguration.DefaultDisplayName': exts.strings.to_unicode(runnable),
                     'ProjectExplorer.ProjectConfiguration.DisplayName': exts.strings.to_unicode(runnable),
                     'ProjectExplorer.CustomExecutableRunConfiguration.Executable': exts.strings.to_unicode(
                         self.project.runnables[runnable]
                     ),
-                    'ProjectExplorer.CustomExecutableRunConfiguration.Arguments': u'',
+                    'ProjectExplorer.CustomExecutableRunConfiguration.Arguments': '',
                     'ProjectExplorer.CustomExecutableRunConfiguration.UseTerminal': False,
                     'ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory': project_run_conf.get(
                         'output_dir'
@@ -906,7 +900,7 @@ def gen_qt_project(params):
     if params.project_type == 'cmake':
         project_creator = QtCMakeProject
     else:
-        raise IdeQtError('QtCreator generation mode not implemented: {}'.format(params.project_type))
+        raise IdeQtError(f'QtCreator generation mode not implemented: {params.project_type}')
     project_info = devtools.ya.ide.ide_common.IdeProjectInfo(
         params, app_ctx, instance_per_title=True, default_output_name=DEFAULT_QT_OUTPUT_DIR
     )
@@ -920,7 +914,7 @@ def gen_qt_project(params):
     ):
         run_cmd += ' -P ' + project_info.output_path
     app_ctx.display.emit_message(
-        '[[good]]Ready. Project created: {}. To start IDE use: {}[[rst]]'.format(dev_env.project.project_path, run_cmd)
+        f'[[good]]Ready. Project created: {dev_env.project.project_path}. To start IDE use: {run_cmd}[[rst]]'
     )
 
 
@@ -935,10 +929,10 @@ def run_qtcreator(params):
     )
     project_storage = devtools.ya.ide.ide_common.IdeProjectStorage(project_info)
     if len(project_storage.data) == 0:
-        raise devtools.ya.ide.ide_common.RemoteIdeError('There\'s no such project: {}'.format(project_info.title))
+        raise devtools.ya.ide.ide_common.RemoteIdeError(f'There\'s no such project: {project_info.title}')
     target = project_storage.data['project_runnable']
     if not os.path.exists(target):
-        raise devtools.ya.ide.ide_common.RemoteIdeError('Can\'t locate project: file {} doesn\'t exist'.format(target))
+        raise devtools.ya.ide.ide_common.RemoteIdeError(f'Can\'t locate project: file {target} doesn\'t exist')
     path_to_ide = params.ide_path or project_storage.data['ide_path']
     if not path_to_ide:
         raise devtools.ya.ide.ide_common.RemoteIdeError(

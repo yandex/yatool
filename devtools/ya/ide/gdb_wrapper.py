@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
-import six.moves.queue
 import errno
 import logging
 import os
@@ -10,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import queue
 
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
@@ -19,7 +17,6 @@ import exts.fs
 import exts.process
 import exts.windows
 import devtools.ya.ide.ide_common
-import six
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,7 @@ GDBSERVER_TIMEOUT = 5 * 60  # five minutes
 
 class GDBWrapperOpts(devtools.ya.core.yarg.Options):
     def __init__(self):
-        super(GDBWrapperOpts, self).__init__()
+        super().__init__()
         self.port = '0'
         self.find_port = False
         self.start_server = False
@@ -77,7 +74,7 @@ class GDBServerException(Exception):
     mute = True
 
 
-class GDBServer(object):
+class GDBServer:
     def __init__(self, host, remote_cache, port='0'):
         self.host = host
         self.remote_cache = remote_cache
@@ -170,7 +167,7 @@ def run_wrapper(params):
             logger.debug('Can\'t kill process %d: %s', pid, e.args)
         exts.fs.ensure_removed(pid_file)
 
-    gdb_exec = yalibrary.tools.tool(u'gdb')
+    gdb_exec = yalibrary.tools.tool('gdb')
     if gdb_exec:
         gdb_run_cmd = [gdb_exec] + params.args
     else:
@@ -180,7 +177,7 @@ def run_wrapper(params):
     else:
         with GDBServer(params.remote_host, params.remote_cache_path, params.port) as gdbserver:
 
-            class _GDBStreamsModifier(object):
+            class _GDBStreamsModifier:
                 def __init__(self):
                     self.is_waiting = False
 
@@ -191,7 +188,7 @@ def run_wrapper(params):
                     if 'target remote' not in input_command or input_command.count('!') != 3:
                         return input_command
                     pre_server, server, target, stuff = input_command.split('!')
-                    new_command = '{0}target extended-remote {1}:{2}\nset remote exec-file {3}\n'.format(
+                    new_command = '{}target extended-remote {}:{}\nset remote exec-file {}\n'.format(
                         input_command[: input_command.index('target remote')], server, gdbserver.port, target
                     )
                     logger.debug('Changed gdb input: %s into %s', input_command, new_command)
@@ -214,7 +211,7 @@ def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, alwa
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
-    msg_queue = six.moves.queue.Queue()
+    msg_queue = queue.Queue()
 
     def process_pipe(pipe, pipe_id, queue, read_by_line=False):
         characters = True
@@ -229,7 +226,7 @@ def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, alwa
     channels_read = {'sysin': sys.stdin, 'procout': proc.stdout, 'procerr': proc.stderr}
     channels_write = {'sysin': proc.stdin, 'procout': sys.stdout, 'procerr': sys.stderr}
     modifiers = {'sysin': sysin_mod, 'procout': procout_mod, 'procerr': procerr_mod}
-    modifiers = {k: (v or f_id) for k, v in six.iteritems(modifiers)}
+    modifiers = {k: (v or f_id) for k, v in modifiers.items()}
     threads = [
         threading.Thread(
             target=process_pipe, args=(channels_read[_id], _id, msg_queue), kwargs={'read_by_line': (_id == 'sysin')}
@@ -253,7 +250,7 @@ def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, alwa
             else:
                 channels_write[pipe_id].write(modifiers[pipe_id](msg))
                 channels_write[pipe_id].flush()
-        except IOError as e:
+        except OSError as e:
             if e.errno == errno.EPIPE:
                 logger.debug('Trying to write to finished process. Suppressing the error.')
             else:

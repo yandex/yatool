@@ -63,7 +63,7 @@ def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_p
                         ("label", build_task_name(name, module_lang)),
                         ("detail", module["path"]),
                         ("type", "shell"),
-                        ("command", "%s make %s %s" % (ya_bin_path, module_args, abs_module_path)),
+                        ("command", f"{ya_bin_path} make {module_args} {abs_module_path}"),
                         ("group", "build"),
                     )
                 )
@@ -120,7 +120,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Build: ALL (debug)"),
                 ("type", "shell"),
-                ("command", "%s make -d %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} make -d {COMMON_ARGS} {TARGETS}"),
                 (
                     "group",
                     OrderedDict(
@@ -136,7 +136,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Build: ALL (release)"),
                 ("type", "shell"),
-                ("command", "%s make -r %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} make -r {COMMON_ARGS} {TARGETS}"),
                 ("group", "build"),
             )
         ),
@@ -144,7 +144,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (small)"),
                 ("type", "shell"),
-                ("command", "%s test %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test {COMMON_ARGS} {TARGETS}"),
                 (
                     "group",
                     OrderedDict(
@@ -160,7 +160,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (style)"),
                 ("type", "shell"),
-                ("command", "%s test --style %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test --style {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -168,7 +168,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (medium)"),
                 ("type", "shell"),
-                ("command", "%s test --test-size=MEDIUM %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test --test-size=MEDIUM {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -176,7 +176,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (small + medium)"),
                 ("type", "shell"),
-                ("command", "%s test -tt %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test -tt {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -184,7 +184,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (large)"),
                 ("type", "shell"),
-                ("command", "%s test --test-size=LARGE %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test --test-size=LARGE {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -192,7 +192,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (small + medium + large)"),
                 ("type", "shell"),
-                ("command", "%s test -A %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test -A {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -200,7 +200,7 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
             (
                 ("label", "Test: ALL (restart failed)"),
                 ("type", "shell"),
-                ("command", "%s test -A -X %s %s" % (ya_bin_path, COMMON_ARGS, TARGETS)),
+                ("command", f"{ya_bin_path} test -A -X {COMMON_ARGS} {TARGETS}"),
                 ("group", "test"),
             )
         ),
@@ -243,7 +243,7 @@ def gen_codegen_tasks(params, ya_bin_path, common_args, languages, venv_args=Non
                 (
                     ("label", "<Rebuild venv>"),
                     ("type", "shell"),
-                    ("command", "%s ide venv %s %s" % (ya_bin_path, VENV_ARGS, TARGETS)),
+                    ("command", f"{ya_bin_path} ide venv {VENV_ARGS} {TARGETS}"),
                     ("group", "build"),
                 ),
             ),

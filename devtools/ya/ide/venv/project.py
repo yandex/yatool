@@ -27,7 +27,7 @@ class ProjectError(Exception):
     mute = True
 
 
-class Project(object):
+class Project:
     def __init__(self, params, app_ctx, output_path, exe_name='yapython'):
         self.params = params
 
@@ -99,8 +99,8 @@ class Project(object):
             build_params.flags['EXCLUDED_PEERDIRS'] = ' '.join(self.params.venv_excluded_peerdirs)
         exit_code = build.build_handler.do_ya_make(build_params)
         if exit_code:
-            raise ProjectError('Python interpreter build failed with exist code={}'.format(exit_code))
-        assert os.path.isfile(self.exe_path), 'Cannot find executable: {}'.format(self.exe_name)
+            raise ProjectError(f'Python interpreter build failed with exist code={exit_code}')
+        assert os.path.isfile(self.exe_path), f'Cannot find executable: {self.exe_name}'
 
     def _discover_peers(self):
         projects = []

@@ -124,7 +124,7 @@ def mine_test_cwd(params, modules):
             makelist = yalibrary.makelists.ArcProject(params.arc_root, module["module_path"]).makelist()
         except Exception as e:
             ide_common.emit_message(
-                termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow")
+                termcolor.colored("Error in module \"{}\": {}".format(module["module_path"], repr(e)), "yellow")
             )
             continue
 
@@ -175,7 +175,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
         return any(is_flatbuf(child) for child in node.children)
 
     def root_src_path(path, namespace):
-        path_hash = "%s_%s" % (namespace, hashlib.md5((path + namespace).encode("utf-8")).hexdigest()[:8])
+        path_hash = "{}_{}".format(namespace, hashlib.md5((path + namespace).encode("utf-8")).hexdigest()[:8])
         name_parts = namespace.split(".") if (namespace and namespace != ".") else []
         while name_parts and path:
             name_part = name_parts.pop()
@@ -204,7 +204,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
         try:
             makelist = yalibrary.makelists.ArcProject(arc_root, module_dir).makelist()
         except Exception as e:
-            ide_common.emit_message(termcolor.colored("Error in module \"%s\": %s" % (module_dir, repr(e)), "yellow"))
+            ide_common.emit_message(termcolor.colored(f"Error in module \"{module_dir}\": {repr(e)}", "yellow"))
             continue
         if not makelist:
             continue
@@ -263,7 +263,7 @@ def mine_py_main(arc_root, modules):
             makelist = yalibrary.makelists.ArcProject(arc_root, module["module_path"]).makelist()
         except Exception as e:
             ide_common.emit_message(
-                termcolor.colored("Error in module \"%s\": %s" % (module["module_path"], repr(e)), "yellow")
+                termcolor.colored("Error in module \"{}\": {}".format(module["module_path"], repr(e)), "yellow")
             )
             continue
 

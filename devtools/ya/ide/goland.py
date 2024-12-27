@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import copy
 import os
 import itertools
@@ -13,8 +12,7 @@ from exts import path2
 from yalibrary.tools import toolchain_root
 import devtools.ya.ide.ide_common
 from .clion2016 import create_plugin_config, get_vcs
-from six.moves import map
-from six.moves import filterfalse
+from itertools import filterfalse
 
 
 CODEGEN_EXTS = [".go", ".gosrc"]
@@ -252,7 +250,7 @@ def gen_idea_prj(project_info, app_ctx, targets, params):
         )
 
         for x in excludes:
-            go_iml.write('<excludeFolder url="file://{}" />\n'.format(x))
+            go_iml.write(f'<excludeFolder url="file://{x}" />\n')
 
         go_iml.write(
             """

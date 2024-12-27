@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import logging
 import xml.etree.ElementTree as et
 import os
@@ -218,14 +217,14 @@ def find_jdk_table(params):
         params.ide_version = find_latest_pycharm(dirs)
 
     if not os.path.exists(os.path.join(base_ide_config_dir, params.ide_version)):
-        logger.error("Can't find IDE settings dir for {}".format(params.ide_version))
+        logger.error(f"Can't find IDE settings dir for {params.ide_version}")
         logger.info("Available IDE: {}".format(" ".join(dirs)))
-        raise Exception("Can't find IDE settings dir for {}".format(params.ide_version))
+        raise Exception(f"Can't find IDE settings dir for {params.ide_version}")
 
     logger.info('%s was selected for updating SDK table', params.ide_version)
     jdk_table_file = os.path.join(base_ide_config_dir, params.ide_version, 'options', JDK_TABLE_XML)
     if not os.path.exists(jdk_table_file):
-        raise Exception("Can't find jdk.table.xml for {}".format(params.ide_version))
+        raise Exception(f"Can't find jdk.table.xml for {params.ide_version}")
     return jdk_table_file
 
 
@@ -335,6 +334,6 @@ def pycharm_template(name):
     s = resource.try_get_resource(name)
 
     if s is None:
-        raise Exception("Can't find resource {}".format(name))
+        raise Exception(f"Can't find resource {name}")
 
     return et.fromstring(s)

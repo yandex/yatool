@@ -16,7 +16,7 @@ def merge_workspace(new, workspace_path):
     shutil.copyfile(workspace_path, backup_path)
     ide_common.emit_message("Old workspace file backed up to[[alt1]] %s" % os.path.basename(backup_path))
     try:
-        with open(workspace_path, "r") as f:
+        with open(workspace_path) as f:
             old = json.load(f, object_pairs_hook=OrderedDict)
     except (ValueError, TypeError) as e:
         ide_common.emit_message(
@@ -25,7 +25,7 @@ def merge_workspace(new, workspace_path):
         )
         return new
 
-    new_folders = OrderedDict(((f["path"], f) for f in new["folders"]))
+    new_folders = OrderedDict((f["path"], f) for f in new["folders"])
     for folder in old.get("folders"):
         new_folders[folder["path"]] = folder
     new["folders"] = list(new_folders.values())
@@ -220,7 +220,7 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
         try:
             shutil.copyfile(config_path, target_path, follow_symlinks=False)
         except OSError as e:
-            ide_common.emit_message("[[warn]]Failed to setup clang-format config[[rst]]: '{}'".format(e.strerror))
+            ide_common.emit_message(f"[[warn]]Failed to setup clang-format config[[rst]]: '{e.strerror}'")
             return {}
     else:
         create_symlink = False
@@ -245,7 +245,7 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
                 target_path.symlink_to(config_path)
             except OSError as e:
                 ide_common.emit_message(
-                    "[[warn]]Failed to create link to the clang-format config[[rst]]: '{}'".format(e.strerror)
+                    f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{e.strerror}'"
                 )
                 return {}
 
@@ -273,7 +273,7 @@ def gen_pyrights_excludes(arc_root, srcdirs):
 
 def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
     def _write_config(config, path):
-        ide_common.emit_message("Writing {}".format(path))
+        ide_common.emit_message(f"Writing {path}")
         with open(path, "w") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 

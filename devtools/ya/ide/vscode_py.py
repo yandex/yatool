@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import copy
 import hashlib
 import json
@@ -126,7 +125,7 @@ class VSCodePyOptions(devtools.ya.core.yarg.Options):
             self.use_arcadia_root = True
 
 
-class PyProject(object):
+class PyProject:
     class PyMain(str):
         pass
 
@@ -158,7 +157,7 @@ class PyProject(object):
             )
 
         self.common_args = (
-            params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
+            params.ya_make_extra + [f"-j{params.build_threads}"] + [f"-D{k}={v}" for k, v in flags.items()]
         )
         if params.prefetch:
             self.common_args.append('--prefetch')
@@ -167,12 +166,12 @@ class PyProject(object):
 
     def gen_workspace(self):
         if not os.path.exists(self.project_root):
-            ide_common.emit_message('Creating directory: {}'.format(self.project_root))
+            ide_common.emit_message(f'Creating directory: {self.project_root}')
             fs.ensure_dir(self.project_root)
 
         links_dir = os.path.join(self.project_root, '.links')
         if not os.path.exists(links_dir):
-            ide_common.emit_message('Creating directory: {}'.format(links_dir))
+            ide_common.emit_message(f'Creating directory: {links_dir}')
             fs.ensure_dir(links_dir)
 
         python_binary_path = self.do_venv()
@@ -213,7 +212,7 @@ class PyProject(object):
             ide_common.emit_message('Generating tests debug configurations')
             test_wrappers_dir = os.path.join(self.project_root, 'test_wrappers')
             if not os.path.exists(test_wrappers_dir):
-                ide_common.emit_message('Creating directory: {}'.format(test_wrappers_dir))
+                ide_common.emit_message(f'Creating directory: {test_wrappers_dir}')
                 fs.ensure_dir(test_wrappers_dir)
             tasks, configurations = self.gen_test_configurations(run_modules, test_wrappers_dir)
             workspace['tasks']['tasks'].extend(tasks)
@@ -231,7 +230,7 @@ class PyProject(object):
         vscode.workspace.sort_configurations(workspace)
         workspace["settings"]["yandex.codenv"] = vscode.workspace.gen_codenv_params(self.params, ["py3"])
 
-        ide_common.emit_message('Writing {}'.format(workspace_path))
+        ide_common.emit_message(f'Writing {workspace_path}')
         with open(workspace_path, 'w') as f:
             json.dump(workspace, f, indent=4, ensure_ascii=True)
 
@@ -252,7 +251,7 @@ class PyProject(object):
 
     def write_pyrightconfig(self, srcdirs, extraPaths):
         def _write_config(config, path):
-            ide_common.emit_message('Writing {}'.format(path))
+            ide_common.emit_message(f'Writing {path}')
             with open(path, 'w') as f:
                 json.dump(config, f, indent=4, ensure_ascii=False)
 
@@ -327,9 +326,9 @@ class PyProject(object):
         venv_opts.venv_tmp_project = self.venv_tmp_project
         venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
         if os.path.exists(venv_opts.venv_tmp_project):
-            ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_opts.venv_tmp_project))
+            ide_common.emit_message(f'Removing existing venv temporary project: {venv_opts.venv_tmp_project}')
             shutil.rmtree(venv_opts.venv_tmp_project)
-        ide_common.emit_message('Generating venv: {}'.format(venv_params.venv_root))
+        ide_common.emit_message(f'Generating venv: {venv_params.venv_root}')
         devtools.ya.app.execute(venv.gen_venv, respawn=devtools.ya.app.RespawnType.NONE)(venv_params)
         return os.path.join(venv_params.venv_root, 'bin', 'python')
 
@@ -386,7 +385,7 @@ class PyProject(object):
             return any(has_srcs(child) for child in node.children)
 
         def root_src_path(path, namespace):
-            path_hash = "%s_%s" % (namespace, hashlib.md5((path + namespace).encode('utf-8')).hexdigest()[:8])
+            path_hash = "{}_{}".format(namespace, hashlib.md5((path + namespace).encode('utf-8')).hexdigest()[:8])
             name_parts = namespace.split('.') if (namespace and namespace != '.') else []
             while name_parts and path:
                 name_part = name_parts.pop()
@@ -408,7 +407,7 @@ class PyProject(object):
             try:
                 makelist = yalibrary.makelists.ArcProject(self.params.arc_root, module_dir).makelist()
             except Exception as e:
-                ide_common.emit_message('[[warn]]Error in module "%s": %s[[rst]]' % (module_dir, repr(e)))
+                ide_common.emit_message(f'[[warn]]Error in module "{module_dir}": {repr(e)}[[rst]]')
                 continue
             if not makelist:
                 continue
@@ -466,7 +465,9 @@ class PyProject(object):
             try:
                 makelist = yalibrary.makelists.ArcProject(self.params.arc_root, module['module_path']).makelist()
             except Exception as e:
-                ide_common.emit_message('[[warn]]Error in module "%s": %s[[rst]]' % (module['module_path'], repr(e)))
+                ide_common.emit_message(
+                    '[[warn]]Error in module "{}": {}[[rst]]'.format(module['module_path'], repr(e))
+                )
                 continue
 
             if not makelist:
@@ -479,7 +480,7 @@ class PyProject(object):
         tasks, configurations = [], []
         run_modules = [m for m in modules.items() if m[1].get('MANGLED_MODULE_TYPE') == 'PY3_BIN__from__PY3_PROGRAM']
         for index, (name, module) in enumerate(sorted(run_modules, key=lambda item: item[0])):
-            name = name.replace('/', u'\uff0f')
+            name = name.replace('/', '\uff0f')
             tasks.append(
                 OrderedDict(
                     (
@@ -537,7 +538,7 @@ class PyProject(object):
             if m[1].get('MANGLED_MODULE_TYPE') in ('PY3TEST_PROGRAM__from__PY23_TEST', 'PY3TEST_PROGRAM__from__PY3TEST')
         ]
         for index, (name, module) in enumerate(sorted(test_modules, key=lambda item: item[0]), 1):
-            name = (os.path.dirname(name) or name).replace('/', u'\uff0f')
+            name = (os.path.dirname(name) or name).replace('/', '\uff0f')
             python_wrapper_dir = os.path.join(test_wrappers_dir, os.path.basename(module['path']))
             fs.ensure_dir(python_wrapper_dir)
             python_wrapper_path = os.path.join(python_wrapper_dir, 'python')
@@ -706,7 +707,7 @@ class PyProject(object):
                                         (
                                             ("label", "<Rebuild venv>"),
                                             ("type", "shell"),
-                                            ("command", "%s ide venv %s %s" % (self.YA_PATH, VENV_ARGS, TARGETS)),
+                                            ("command", f"{self.YA_PATH} ide venv {VENV_ARGS} {TARGETS}"),
                                             ("group", "build"),
                                         )
                                     ),
@@ -714,7 +715,7 @@ class PyProject(object):
                                         (
                                             ("label", "Build: ALL (release)"),
                                             ("type", "shell"),
-                                            ("command", "%s make %s -r %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            ("command", f"{self.YA_PATH} make {COMMON_ARGS} -r {TARGETS}"),
                                             ("group", "build"),
                                         )
                                     ),
@@ -722,7 +723,10 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -t -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            (
+                                                "command",
+                                                f"{self.YA_PATH} make -t -r {COMMON_ARGS} {TARGETS}",
+                                            ),
                                             (
                                                 "group",
                                                 OrderedDict(
@@ -750,7 +754,10 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small + medium)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -tt -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            (
+                                                "command",
+                                                f"{self.YA_PATH} make -tt -r {COMMON_ARGS} {TARGETS}",
+                                            ),
                                             ("group", "test"),
                                         )
                                     ),
@@ -770,7 +777,10 @@ class PyProject(object):
                                         (
                                             ("label", "Test: ALL (small + medium + large)"),
                                             ("type", "shell"),
-                                            ("command", "%s make -tA -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS)),
+                                            (
+                                                "command",
+                                                f"{self.YA_PATH} make -tA -r {COMMON_ARGS} {TARGETS}",
+                                            ),
                                             ("group", "test"),
                                         )
                                     ),
@@ -780,7 +790,7 @@ class PyProject(object):
                                             ("type", "shell"),
                                             (
                                                 "command",
-                                                "%s make -tA -X -r %s %s" % (self.YA_PATH, COMMON_ARGS, TARGETS),
+                                                f"{self.YA_PATH} make -tA -X -r {COMMON_ARGS} {TARGETS}",
                                             ),
                                             ("group", "test"),
                                         )

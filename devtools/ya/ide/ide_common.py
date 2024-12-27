@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import collections
 import itertools
 import exts.yjson as json
@@ -9,8 +8,7 @@ import shutil
 import sys
 import subprocess
 import traceback
-
-import six
+import io
 
 import devtools.ya.app
 import build.build_facade
@@ -31,7 +29,6 @@ import exts.path2
 import exts.process
 import yalibrary.display
 import yalibrary.platform_matcher
-from six.moves import filter
 
 
 logger = logging.getLogger(__name__)
@@ -58,11 +55,11 @@ class IdeOutputStyle(devtools.ya.core.common_opts.OutputStyleOptions):
         return []
 
 
-class FakeAppCtx(object):
+class FakeAppCtx:
     display = yalibrary.display.DevNullDisplay()
 
 
-class SSHProxy(object):
+class SSHProxy:
     SSH = 'ssh'
 
     def __init__(self, host, ssh_args=None):
@@ -75,7 +72,7 @@ class SSHProxy(object):
         try:
             socket.getaddrinfo(self.host, None)
             return True
-        except socket.error:
+        except OSError:
             return False
 
     def is_exec(self, path):
@@ -263,9 +260,7 @@ class IdeProjectTitleOptions(devtools.ya.core.yarg.Options):
                         self.project_title, RE_PROJECT_TITLE.pattern
                     )
                 )
-            raise devtools.ya.core.yarg.ArgsValidatingException(
-                'Invalid IDE project title \'{}\''.format(self.project_title)
-            )
+            raise devtools.ya.core.yarg.ArgsValidatingException(f'Invalid IDE project title \'{self.project_title}\'')
 
 
 class IdeProjectJavaFixOptions(devtools.ya.core.yarg.Options):
@@ -437,7 +432,7 @@ class IdeRemoteOptions(devtools.ya.core.yarg.Options):
                 )
 
 
-class IdeProjectInfo(object):
+class IdeProjectInfo:
     def __init__(
         self,
         params,
@@ -458,11 +453,11 @@ class IdeProjectInfo(object):
                 self.output_path = os.getcwd()
             else:
                 self.output_path = self.output_path_from_default(params, default_output_name)
-        emit_message('Project title: [[imp]]{}[[rst]]'.format(self.title))
-        emit_message('Project source path: [[path]]{}[[rst]]'.format(params.arc_root))
-        emit_message('Project output path: [[path]]{}[[rst]]'.format(self.output_path))
+        emit_message(f'Project title: [[imp]]{self.title}[[rst]]')
+        emit_message(f'Project source path: [[path]]{params.arc_root}[[rst]]')
+        emit_message(f'Project output path: [[path]]{self.output_path}[[rst]]')
         if instance_per_title:
-            emit_message('Project instance: [[path]]{}[[rst]]'.format(self.instance_path))
+            emit_message(f'Project instance: [[path]]{self.instance_path}[[rst]]')
 
     @staticmethod
     def output_path_from_default(params, default_output_name):
@@ -477,7 +472,7 @@ class IdeProjectInfo(object):
 
 # Project storage persists between 'ya ide' launches
 # Info is serialized into project output directory
-class IdeProjectStorage(object):
+class IdeProjectStorage:
     def __init__(self, project_info, subpath='.ya.ide.project.json'):
         self.project_info = project_info
         self.path = os.path.join(project_info.output_path, subpath)
@@ -520,7 +515,7 @@ def fix_win_path(path):
     return path.replace('\\', '/')
 
 
-class IdeGraph(object):
+class IdeGraph:
     def __init__(self, params):
         self.params = params
         logger.debug('Generating graph')
@@ -590,7 +585,7 @@ class IdeGraph(object):
         )
         entry_re = re.compile('^file: (?P<entry_type>[a-zA-Z0-9_]+) (?P<path>.+)$')
         orig_count = len(self.files)
-        for line in six.StringIO(filelist.stdout):
+        for line in io.StringIO(filelist.stdout):
             matched_entry = entry_re.match(line)
             if not matched_entry:
                 continue
@@ -615,7 +610,7 @@ class IdeGraph(object):
         def uniq_module_name(m_name):
             qty = all_module_names[m_name]
             all_module_names[m_name] += 1
-            suff = '_{}'.format(qty) if qty else ''
+            suff = f'_{qty}' if qty else ''
             return m_name + suff
 
         modules = {}
@@ -711,7 +706,7 @@ class CMakeStubGenerationException(Exception):
     mute = True
 
 
-class CMakeStubProject(object):
+class CMakeStubProject:
     YA_MAKE_CMD = 'add_custom_target({name} COMMAND {wrapper}${{PROJECT_SOURCE_DIR}}/ya make --build=${{CMAKE_BUILD_TYPE}} --output=${{PROJECT_OUTPUT_DIR}}{opts} {targets})'
     SOURCE_EXTS = ('h', 'cpp', 'cc', 'c', 'cxx', 'C')
     FORBIDDEN_TARGET_NAMES = ('all', 'help', 'test')
@@ -740,7 +735,7 @@ class CMakeStubProject(object):
         self.project_files = set()
         self.targets = set()
         self.inc_dirs = set()
-        emit_message('Project path: [[path]]{}[[rst]]'.format(self.project_path))
+        emit_message(f'Project path: [[path]]{self.project_path}[[rst]]')
         logger.debug('Required CMake version: %s', self.required_cmake_version)
         logger.debug('Extra make args: %s', self.params.ya_make_extra)
         logger.debug('Make symlinks: %s', self.source_symlinks)
@@ -822,11 +817,11 @@ endif()
             strip_non_final,
         )
         self.inc_dirs = self.ide_graph.inc_dirs
-        logger.debug('Targets: %s', ', '.join(sorted(six.iterkeys(self.targets))))
+        logger.debug('Targets: %s', ', '.join(sorted(self.targets.keys())))
         logger.debug('Project files: %s', len(self.project_files))
         logger.debug('Project incl dirs: %s', len(self.inc_dirs))
-        self.binaries = {k: v.get('path') for k, v in six.iteritems(self.targets) if v.get('runnable')}
-        logger.debug('Binaries: %s', ', '.join(six.iterkeys(self.binaries)))
+        self.binaries = {k: v.get('path') for k, v in self.targets.items() if v.get('runnable')}
+        logger.debug('Binaries: %s', ', '.join(self.binaries.keys()))
 
     def _create_stub(
         self,
@@ -851,9 +846,9 @@ endif()
 
         def gen_ya_make_cmd(name, paths, with_tests, replace_result=False, extra=None):
             target_name = name + '_' if name in self.FORBIDDEN_TARGET_NAMES else name
-            make_opts = ['--add-result=.{}'.format(ext) for ext in self.SOURCE_EXTS]
+            make_opts = [f'--add-result=.{ext}' for ext in self.SOURCE_EXTS]
             if remote_dir:
-                make_opts = ['$<$<NOT:$<BOOL:${{YA_REMOTE}}>>:{}>'.format(opt) for opt in make_opts]
+                make_opts = [f'$<$<NOT:$<BOOL:${{YA_REMOTE}}>>:{opt}>' for opt in make_opts]
             if with_tests:
                 make_opts.append('-t')
             if not self.source_symlinks:
@@ -870,7 +865,7 @@ endif()
                 make_opts.extend(extra)
             make_opts.extend(['-T', '--no-emit-status'])
             make_opts_str = (' ' + ' '.join(opt.replace(' ', r'\ ') for opt in make_opts)) if make_opts else ''
-            targets = ['${{PROJECT_SOURCE_DIR}}/{}'.format(fix_win_path(path)) for path in paths]
+            targets = [f'${{PROJECT_SOURCE_DIR}}/{fix_win_path(path)}' for path in paths]
             build_command = self.YA_MAKE_CMD.format(
                 name=target_name,
                 wrapper=(wrapper + ' ') if wrapper else '',
@@ -951,31 +946,31 @@ endif()
             def emit_block(block):
                 if not block:
                     return
-                if isinstance(block, (str, six.text_type)):
+                if isinstance(block, str):
                     block = block.split('\n')
                 for line in block:
                     emit(line)
 
             emit(self.header)
 
-            emit('cmake_minimum_required(VERSION {})'.format(min_version))
-            emit('project({})'.format(self.info.title))
+            emit(f'cmake_minimum_required(VERSION {min_version})')
+            emit(f'project({self.info.title})')
             emit_block(custom_block_base_vars)
             if remote_dir:
                 emit('if (YA_REMOTE)')
-                emit('    set(PROJECT_SOURCE_DIR {})'.format(fix_win_path(remote_dir)))
+                emit(f'    set(PROJECT_SOURCE_DIR {fix_win_path(remote_dir)})')
                 emit('else()')
-                emit('    set(PROJECT_SOURCE_DIR {})'.format(fix_win_path(src_dir)))
+                emit(f'    set(PROJECT_SOURCE_DIR {fix_win_path(src_dir)})')
                 emit('endif()')
             else:
-                emit('set(PROJECT_SOURCE_DIR {})'.format(fix_win_path(src_dir)))
-            emit('set(PROJECT_OUTPUT_DIR {})'.format(out_dir))
+                emit(f'set(PROJECT_SOURCE_DIR {fix_win_path(src_dir)})')
+            emit(f'set(PROJECT_OUTPUT_DIR {out_dir})')
             emit('set(CMAKE_CXX_STANDARD 20)')
             emit_block(custom_block)
 
-            filtered_files = set(
-                (f for f in files if any(build.graph_path.GraphPath(f).strip().startswith(x) for x in roots))
-            )
+            filtered_files = {
+                f for f in files if any(build.graph_path.GraphPath(f).strip().startswith(x) for x in roots)
+            }
 
             indent = ''
             if remote_dir:
@@ -992,14 +987,14 @@ endif()
             emit()
 
             for x in sorted(self.ide_graph.inc_dirs):
-                emit('include_directories({})'.format(subst(x)))
+                emit(f'include_directories({subst(x)})')
             emit()
             cmake_defines = [x for x in sorted(self.ide_graph.defines) if not x.startswith('FAKEID')]
             emit('add_definitions({})'.format(' '.join(['-D' + subst(x) for x in cmake_defines])))
             emit()
 
             targets = self.ide_graph.get_modules(roots, strip_non_final)
-            for module_name in sorted(six.iterkeys(targets)):
+            for module_name in sorted(targets.keys()):
                 emit(
                     gen_ya_make_cmd(
                         module_name, [targets[module_name]['module_path']], False, False, self.params.ya_make_extra
@@ -1027,16 +1022,16 @@ endif()
                 )
                 emit('        COMMAND echo "Done")')
 
-                for module_name in sorted(six.iterkeys(targets)):
+                for module_name in sorted(targets.keys()):
                     emit(
                         '    add_dependencies({} _arcadia_remote_sync)'.format(
                             module_name + '_' if module_name in self.FORBIDDEN_TARGET_NAMES else module_name
                         )
                     )
                 if joint_target:
-                    emit('    add_dependencies({} _arcadia_remote_sync)'.format(JOINT_TARGET_NAME))
+                    emit(f'    add_dependencies({JOINT_TARGET_NAME} _arcadia_remote_sync)')
                 if codegen_target:
-                    emit('    add_dependencies({} _arcadia_remote_sync)'.format(CODEGEN_TARGET_NAME))
+                    emit(f'    add_dependencies({CODEGEN_TARGET_NAME} _arcadia_remote_sync)')
                 emit('endif()')
 
         exts.fs.replace_file(stub_tmp_path, self._stub_path)
@@ -1091,7 +1086,7 @@ class RemoteDevEnvOptions(devtools.ya.core.yarg.Options):
 
 
 def get_pidfile_path(cache_path, port):
-    return os.path.join(cache_path, 'server', 'gdbserver-{0}.pid'.format(port))
+    return os.path.join(cache_path, 'server', f'gdbserver-{port}.pid')
 
 
 def emit_message(*args):
@@ -1106,7 +1101,7 @@ def emit_message(*args):
 def setup_tidy_config(source_root):
     config_path = os.path.join(source_root, "build/config/tests/clang_tidy/config.yaml")
     if not os.path.exists(config_path):
-        emit_message("[[warn]]Failed to find clang_tidy's config[[rst]]: '{}' doesn't exist".format(config_path))
+        emit_message(f"[[warn]]Failed to find clang_tidy's config[[rst]]: '{config_path}' doesn't exist")
         return
 
     target_name = ".clang-tidy"
@@ -1123,7 +1118,7 @@ def setup_tidy_config(source_root):
         try:
             shutil.copyfile(config_path, target_path, follow_symlinks=False)
         except OSError as e:
-            emit_message("[[warn]]Failed to setup clang_tidy's config[[rst]]: '{}'".format(e.strerror))
+            emit_message(f"[[warn]]Failed to setup clang_tidy's config[[rst]]: '{e.strerror}'")
         return
 
     create_symlink = False
@@ -1142,12 +1137,10 @@ def setup_tidy_config(source_root):
             os.unlink(target_path)
             create_symlink = True
     else:
-        emit_message(
-            "[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{}' is not a link".format(target_path)
-        )
+        emit_message(f"[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{target_path}' is not a link")
 
     if create_symlink:
         try:
             os.symlink(config_path, target_path)
         except OSError as e:
-            emit_message("[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{}'".format(e.strerror))
+            emit_message(f"[[warn]]Failed to create link to the clang_tidy's config[[rst]]: '{e.strerror}'")

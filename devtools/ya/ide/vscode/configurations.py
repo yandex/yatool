@@ -187,9 +187,7 @@ def gen_debug_configurations(
                 configuration["preLaunchTask"] = tasks.prepare_task_name(name, module_lang)
                 configuration["presentation"] = {"group": "Tests"}
             else:
-                ide_common.emit_message(
-                    "Did not create run configuration for unknown module %s(%s)" % (module_type, name)
-                )
+                ide_common.emit_message(f"Did not create run configuration for unknown module {module_type}({name})")
                 continue
 
         elif module_lang == "CPP":
@@ -230,9 +228,7 @@ def gen_debug_configurations(
                 else:
                     configuration["environment"] = [{"name": n, "value": m} for n, m in environment.items()]
             else:
-                ide_common.emit_message(
-                    "Did not create run configuration for unknown module %s(%s)" % (module_type, name)
-                )
+                ide_common.emit_message(f"Did not create run configuration for unknown module {module_type}({name})")
                 continue
         elif module_lang == "GO":
             if not goroot:
@@ -262,13 +258,9 @@ def gen_debug_configurations(
                 configuration["env"] = {"YA_TEST_CONTEXT_FILE": os.path.join(test_results_path, 'test.context')}
                 configuration["preLaunchTask"] = tasks.prepare_task_name(name, module_lang)
             else:
-                ide_common.emit_message(
-                    "Did not create run configuration for unknown module %s(%s)" % (module_type, name)
-                )
+                ide_common.emit_message(f"Did not create run configuration for unknown module {module_type}({name})")
         else:
-            ide_common.emit_message(
-                "Did not create run configuration for unknown language %s(%s)" % (module_lang, name)
-            )
+            ide_common.emit_message(f"Did not create run configuration for unknown language {module_lang}({name})")
             continue
         configurations.append(configuration)
 

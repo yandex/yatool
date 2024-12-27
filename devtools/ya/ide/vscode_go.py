@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import copy
 import json
 import os
@@ -134,7 +133,7 @@ def gen_run_configurations(params, modules, args, YA_PATH):
         mangle_module_type = module.get('MANGLED_MODULE_TYPE')
         if mangle_module_type != 'GO_PROGRAM':
             name = os.path.dirname(name) or name
-        name = name.replace('/', u'\uff0f')
+        name = name.replace('/', '\uff0f')
 
         configuration = OrderedDict(
             (
@@ -273,7 +272,7 @@ def gen_vscode_workspace(params):
     if params.project_output:
         project_root = os.path.abspath(os.path.expanduser(params.project_output))
         if not os.path.exists(project_root):
-            ide_common.emit_message('Creating directory: {}'.format(project_root))
+            ide_common.emit_message(f'Creating directory: {project_root}')
             os.makedirs(project_root)
     else:
         project_root = os.path.abspath(os.curdir)
@@ -282,9 +281,7 @@ def gen_vscode_workspace(params):
         do_codegen(params)
 
     TARGETS = ' '.join(exts.shlex2.quote(arg) for arg in params.abs_targets)
-    common_args = (
-        params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in orig_flags.items()]
-    )
+    common_args = params.ya_make_extra + ["-j%s" % params.build_threads] + [f"-D{k}={v}" for k, v in orig_flags.items()]
     if params.prefetch:
         common_args.append('--prefetch')
     COMMON_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in common_args)
@@ -428,7 +425,7 @@ def gen_vscode_workspace(params):
                                     (
                                         ("label", "Build: ALL (release)"),
                                         ("type", "shell"),
-                                        ("command", "%s make -r %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("command", f"{YA_PATH} make -r {COMMON_ARGS} {TARGETS}"),
                                         ("group", "build"),
                                     )
                                 ),
@@ -436,7 +433,7 @@ def gen_vscode_workspace(params):
                                     (
                                         ("label", "Test: ALL (small)"),
                                         ("type", "shell"),
-                                        ("command", "%s make -t %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("command", f"{YA_PATH} make -t {COMMON_ARGS} {TARGETS}"),
                                         (
                                             "group",
                                             OrderedDict(
@@ -454,7 +451,7 @@ def gen_vscode_workspace(params):
                                         ("type", "shell"),
                                         (
                                             "command",
-                                            "%s make -t --test-size=MEDIUM %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                            f"{YA_PATH} make -t --test-size=MEDIUM {COMMON_ARGS} {TARGETS}",
                                         ),
                                         ("group", "test"),
                                     )
@@ -463,7 +460,7 @@ def gen_vscode_workspace(params):
                                     (
                                         ("label", "Test: ALL (small + medium)"),
                                         ("type", "shell"),
-                                        ("command", "%s make -tt %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("command", f"{YA_PATH} make -tt {COMMON_ARGS} {TARGETS}"),
                                         ("group", "test"),
                                     )
                                 ),
@@ -473,7 +470,7 @@ def gen_vscode_workspace(params):
                                         ("type", "shell"),
                                         (
                                             "command",
-                                            "%s make -t --test-size=LARGE %s %s" % (YA_PATH, COMMON_ARGS, TARGETS),
+                                            f"{YA_PATH} make -t --test-size=LARGE {COMMON_ARGS} {TARGETS}",
                                         ),
                                         ("group", "test"),
                                     )
@@ -482,7 +479,7 @@ def gen_vscode_workspace(params):
                                     (
                                         ("label", "Test: ALL (small + medium + large)"),
                                         ("type", "shell"),
-                                        ("command", "%s make -tA %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("command", f"{YA_PATH} make -tA {COMMON_ARGS} {TARGETS}"),
                                         ("group", "test"),
                                     )
                                 ),
@@ -490,7 +487,7 @@ def gen_vscode_workspace(params):
                                     (
                                         ("label", "Test: ALL (restart failed)"),
                                         ("type", "shell"),
-                                        ("command", "%s make -tA -X %s %s" % (YA_PATH, COMMON_ARGS, TARGETS)),
+                                        ("command", f"{YA_PATH} make -tA -X {COMMON_ARGS} {TARGETS}"),
                                         ("group", "test"),
                                     )
                                 ),
@@ -550,7 +547,7 @@ def gen_vscode_workspace(params):
         vscode.workspace.merge_workspace(workspace, workspace_path)
     vscode.workspace.sort_configurations(workspace)
     workspace["settings"]["yandex.codenv"] = vscode.workspace.gen_codenv_params(params, ["go"])
-    ide_common.emit_message('Writing {}'.format(workspace_path))
+    ide_common.emit_message(f'Writing {workspace_path}')
     with open(workspace_path, 'w') as f:
         json.dump(workspace, f, indent=4, ensure_ascii=True)
 

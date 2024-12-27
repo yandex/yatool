@@ -1,5 +1,5 @@
 def pretty_name(name):
-    return name.replace("/", u"\uff0f")
+    return name.replace("/", "\uff0f")
 
 
 def replace_prefix(s, pairs):

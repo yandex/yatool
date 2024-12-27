@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import os
 import xml.etree.ElementTree as eTree
 import sys
@@ -25,7 +24,7 @@ def find_excludes(main_root, fringe, recursive_includes):
     exclude_roots = set()
 
     def go(root, fringe):
-        fringe_roots = set([x[0] for x in fringe])
+        fringe_roots = {x[0] for x in fringe}
         for x in os.listdir(root):
             cur = os.path.join(root, x)
             if os.path.isdir(cur):
@@ -100,7 +99,7 @@ def gen_idea_prj(
 ):
     targets = dict(
         {ide_common.JOINT_TARGET_NAME: {'runnable': False}, ide_common.CODEGEN_TARGET_NAME: {'runnable': False}},
-        **targets
+        **targets,
     )
     exclude_roots = find_excludes(
         project_info.params.arc_root, sorted([x.split('/') for x in fringe]), recursive_includes
@@ -127,12 +126,12 @@ def gen_idea_prj(
         )
 
         misc_out.write("<sourceRoots>\n")
-        misc_out.write('<file path="{}" />\n'.format(content_root))
+        misc_out.write(f'<file path="{content_root}" />\n')
         misc_out.write("</sourceRoots>\n")
 
         misc_out.write("<excludeRoots>\n")
         for x in exclude_roots:
-            misc_out.write('<file path="{}" />\n'.format(x))
+            misc_out.write(f'<file path="{x}" />\n')
         misc_out.write('<file path="$PROJECT_DIR$/_current_build_target" />')
         misc_out.write('<file path="$PROJECT_DIR$/sync.py" />')
         misc_out.write('<file path="$PROJECT_DIR$/sync.lock" />')
@@ -250,7 +249,7 @@ def gen_idea_prj(
     if configurations is None:
         configurations = eTree.SubElement(component, 'configurations')
     for profile_name, config_name, generation_options, generation_dir, is_remote in configs:
-        configuration = configurations.find('configuration[@PROFILE_NAME="{}"]'.format(profile_name))
+        configuration = configurations.find(f'configuration[@PROFILE_NAME="{profile_name}"]')
         if configuration is None:
             if is_remote and remote_toolchain is None:
                 continue
@@ -287,7 +286,7 @@ def gen_idea_prj(
         component = eTree.SubElement(root, 'component')
         component.set('name', 'RunManager')
     for name, params in targets.items():
-        configuration = component.find('configuration[@name="{}"]'.format(name))
+        configuration = component.find(f'configuration[@name="{name}"]')
         if configuration is None:
             configuration = eTree.SubElement(component, 'configuration')
             method = eTree.SubElement(configuration, 'method')
@@ -348,10 +347,10 @@ def gen_idea_prj(
     if configurations_list is None:
         configurations_list = eTree.SubElement(component, 'list')
     for name, params in targets.items():
-        list_item = configurations_list.find('item[@itemvalue="CMake Application.{}"]'.format(name))
+        list_item = configurations_list.find(f'item[@itemvalue="CMake Application.{name}"]')
         if list_item is None:
             list_item = eTree.SubElement(configurations_list, 'item')
-            list_item.set('itemvalue', 'CMake Application.{}'.format(name))
+            list_item.set('itemvalue', f'CMake Application.{name}')
     if remote_toolchain is not None:
         list_item = configurations_list.find('item[@itemvalue="Shell Script.start sync server"]')
         if list_item is None:
@@ -385,7 +384,7 @@ def gen_idea_prj(
         server_data = component.find('serverData')
         if server_data is None:
             server_data = eTree.SubElement(component, 'serverData')
-        paths = server_data.find('paths[@name="{}"]'.format(remote_deploy_config))
+        paths = server_data.find(f'paths[@name="{remote_deploy_config}"]')
         if paths is None:
             paths = eTree.SubElement(server_data, 'paths')
             paths.set('name', remote_deploy_config)
@@ -400,7 +399,7 @@ def gen_idea_prj(
             '$PROJECT_DIR$', os.path.relpath(project_info.params.arc_root, project_info.output_path)
         )
         for deploy, local in [(remote_build_path, '$PROJECT_DIR$'), (remote_repo_path, local_repo_path)]:
-            mapping = mappings.find('mapping[@local="{}"]'.format(local))
+            mapping = mappings.find(f'mapping[@local="{local}"]')
             if mapping is None:
                 mapping = eTree.SubElement(mappings, 'mapping')
             mapping.set('deploy', deploy)
@@ -409,10 +408,10 @@ def gen_idea_prj(
         excluded_paths = paths_server_data.find('excludedPaths')
         if excluded_paths is None:
             excluded_paths = eTree.SubElement(paths_server_data, 'excludedPaths')
-        generation_dirs = ['$PROJECT_DIR$/{}'.format(generation_dir) for (_, _, _, generation_dir, _) in configs]
+        generation_dirs = [f'$PROJECT_DIR$/{generation_dir}' for (_, _, _, generation_dir, _) in configs]
         generation_dirs += ['$PROJECT_DIR$/_current_build_target', project_info.params.arc_root]
         for generation_dir in generation_dirs:
-            excluded_path = excluded_paths.find('excludedPath[@path="{}"]'.format(generation_dir))
+            excluded_path = excluded_paths.find(f'excludedPath[@path="{generation_dir}"]')
             if excluded_path is None:
                 excluded_path = eTree.SubElement(excluded_paths, 'excludedPath')
                 excluded_path.set('path', generation_dir)
@@ -472,7 +471,7 @@ def gen_idea_prj(
             )
 
         def set_opt(name, value):
-            opt = task.find('option[@name="{}"]'.format(name))
+            opt = task.find(f'option[@name="{name}"]')
             if opt is None:
                 opt = eTree.SubElement(task, 'option')
             opt.set('name', name)
@@ -516,7 +515,7 @@ def gen_lite_solution(info, filters, required_cmake_version):
     if not filters:
         filters = ['.']
     for proj_dir in [os.path.normpath(os.path.join(os.getcwd(), i)) for i in filters]:
-        ide_common.emit_message("Generate lite project for [[imp]]{}[[rst]]".format(proj_dir))
+        ide_common.emit_message(f"Generate lite project for [[imp]]{proj_dir}[[rst]]")
         with open(os.path.join(proj_dir, MAKE_LIST), 'w') as solution:
             solution.write(
                 '''cmake_minimum_required(VERSION {cmake_version})
@@ -539,7 +538,7 @@ set_target_properties({proj_name} PROPERTIES LINKER_LANGUAGE CXX)
                     proj_name=os.path.basename(proj_dir),
                 )
             )
-        ide_common.emit_message("File to open [[imp]]{}[[rst]]".format(os.path.join(proj_dir, MAKE_LIST)))
+        ide_common.emit_message(f"File to open [[imp]]{os.path.join(proj_dir, MAKE_LIST)}[[rst]]")
 
 
 def do_clion(params):

@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from collections import OrderedDict
 
 import os
@@ -389,7 +388,7 @@ def gen_vscode_workspace(params):
     if params.project_output:
         project_root = os.path.abspath(os.path.expanduser(params.project_output))
         if not os.path.exists(project_root):
-            ide_common.emit_message('Creating directory: {}'.format(project_root))
+            ide_common.emit_message(f'Creating directory: {project_root}')
             os.makedirs(project_root)
     else:
         project_root = os.path.abspath(os.curdir)
@@ -418,7 +417,7 @@ def gen_vscode_workspace(params):
     if os.path.exists(workspace_path):
         vscode.workspace.merge_workspace(workspace, workspace_path)
 
-    ide_common.emit_message('Writing {}'.format(workspace_path))
+    ide_common.emit_message(f'Writing {workspace_path}')
     with open(workspace_path, 'w') as f:
         json.dump(workspace, f, indent=4, ensure_ascii=True)
 

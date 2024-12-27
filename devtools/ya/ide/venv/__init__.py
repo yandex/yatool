@@ -81,7 +81,7 @@ def _create_venv(params, exe_path):
 
 def _update_config(params):
     with open(os.path.join(params.venv_root, CONF_BASENAME), 'a') as f:
-        f.write('{} = {}\n'.format(SOURCE_ROOT_KEY, params.arc_root))
+        f.write(f'{SOURCE_ROOT_KEY} = {params.arc_root}\n')
 
 
 def _install_pip(params):

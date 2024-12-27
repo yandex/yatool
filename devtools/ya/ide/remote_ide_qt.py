@@ -1,8 +1,7 @@
-from __future__ import absolute_import
 import configparser
 import logging
 import os
-import six
+import io
 import stat
 
 import devtools.ya.core.common_opts
@@ -17,17 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 def _shell_quote(s):
-    if six.PY3:
-        import shlex
+    import shlex
 
-        return shlex.quote(s)
-    else:
-        import pipes
-
-        return pipes.quote(s)
+    return shlex.quote(s)
 
 
-class QtRemoteDevEnv(object):
+class QtRemoteDevEnv:
     def __init__(self, params, app_ctx, project_info):
         self.params = params
         self.app_ctx = app_ctx
@@ -62,10 +56,10 @@ class QtRemoteDevEnv(object):
         self.exclude_sync = (r'^(.*{0})?\.svn{0}.*'.format(os.path.sep), r'.*\.autosave')
 
     def _prepare_qtcreator_config(self, qt_config_path, gdbwrapper):
-        self.app_ctx.display.emit_message('QtCreator internal config: {}'.format(qt_config_path))
+        self.app_ctx.display.emit_message(f'QtCreator internal config: {qt_config_path}')
         exts.fs.ensure_removed(qt_config_path)
         exts.fs.copy_tree(os.path.join(qt.discover_qt_config()), os.path.join(qt_config_path, 'QtProject'))
-        script_text = '#!/bin/sh -e\n' + 'exec {0} remote_gdb --host {1} --remote-cache {2} -- "$@"\n'.format(
+        script_text = '#!/bin/sh -e\n' + 'exec {} remote_gdb --host {} --remote-cache {} -- "$@"\n'.format(
             _shell_quote(devtools.ya.core.config.ya_path(self.params.arc_root, 'ya')),
             self.params.remote_host,
             self.params.remote_cache_path,
@@ -103,7 +97,7 @@ class QtRemoteDevEnv(object):
         for bin_path in binaries:
             executable_path = os.path.join(self.qt_dev_env.project.output_conf_path('Debug'), bin_path)
             output_path = os.path.join(self.params.remote_cache_path, devtools.ya.ide.ide_common.REMOTE_OUTPUT_SUBDIR)
-            connect_command = '!{0}!{1}!'.format(
+            connect_command = '!{}!{}!'.format(
                 self.params.remote_host,
                 os.path.join(output_path, bin_path),
             )
@@ -133,19 +127,19 @@ class QtRemoteDevEnv(object):
             size = config.getint(section_name, 'size')
         else:
             size = 0
-        config.set(section_name, r'{}\Source'.format(size + 1), source_path)
-        config.set(section_name, r'{}\Target'.format(size + 1), local_source_path)
-        config.set(section_name, r'{}\Source'.format(size + 2), '#' + build_path)
-        config.set(section_name, r'{}\Target'.format(size + 2), local_output_path)
+        config.set(section_name, fr'{size + 1}\Source', source_path)
+        config.set(section_name, fr'{size + 1}\Target', local_source_path)
+        config.set(section_name, fr'{size + 2}\Source', '#' + build_path)
+        config.set(section_name, fr'{size + 2}\Target', local_output_path)
         config.set(section_name, 'size', str(size + 2))
 
     @staticmethod
     def _write_special_ini(config, settings_file):
-        ini_buffer = six.StringIO()
+        ini_buffer = io.StringIO()
         config.write(ini_buffer)
         ini_buffer.seek(0)
         output = [x.replace(' = ', '=', 1) for x in ini_buffer.readlines()]
-        with open(settings_file, 'wt') as sf:
+        with open(settings_file, 'w') as sf:
             sf.write(''.join(output))
 
     def _modify_qtcreator_config(self):
@@ -190,18 +184,18 @@ def generate_remote_project(params):
         params, qt.DEFAULT_QT_OUTPUT_DIR
     ):
         run_cmd += ' -P ' + project_info.output_path
-    app_ctx.display.emit_message('[[good]]Ready. Project created. To start Remote IDE use: {}[[rst]]'.format(run_cmd))
+    app_ctx.display.emit_message(f'[[good]]Ready. Project created. To start Remote IDE use: {run_cmd}[[rst]]')
 
 
 class QtRemoteProject(qt.QtCMakeProject):
     def __init__(self, params, *args, **kwargs):
-        super(QtRemoteProject, self).__init__(
+        super().__init__(
             params,
             *args,
             selected_targets=('REMOTE_BUILD_AND_DOWNLOAD_' + devtools.ya.ide.ide_common.JOINT_TARGET_REMOTE_NAME,),
-            **kwargs
+            **kwargs,
         )
         self.cmake_file = self.cmake_stub.project_path
 
     def generate(self):
-        super(QtRemoteProject, self).generate()
+        super().generate()

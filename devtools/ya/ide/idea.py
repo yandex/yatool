@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import shutil
 import sys
 import os
@@ -146,7 +144,7 @@ def do_idea(params):
             if not dump.startswith('tools-') and not dump.endswith('-global.txt') and not dump.endswith('-pic.txt')
         ]
         for dump in target_dumps:
-            with open(os.path.join(dump_dir, dump), 'r') as dump_file:
+            with open(os.path.join(dump_dir, dump)) as dump_file:
                 for recurse in json.load(dump_file):
                     recurses.append(recurse)
 

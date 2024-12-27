@@ -23,7 +23,7 @@ from yalibrary.toolscache import lock_resource, toolscache_version
 from devtools.ya.ide import ide_common, venv, vscode
 
 
-class VSCodeProject(object):
+class VSCodeProject:
     app_ctx = None
     params = None
     project_root = None
@@ -81,7 +81,7 @@ class VSCodeProject(object):
                 self.tool_platform = params.host_platform
 
         self.common_args = (
-            params.ya_make_extra + ["-j%s" % params.build_threads] + ["-D%s=%s" % (k, v) for k, v in flags.items()]
+            params.ya_make_extra + [f"-j{params.build_threads}"] + [f"-D{k}={v}" for k, v in flags.items()]
         )
         if params.output_root:
             self.common_args.append("--output=%s" % params.output_root)
@@ -89,24 +89,24 @@ class VSCodeProject(object):
 
     def ensure_dirs(self):
         if not os.path.exists(self.project_root):
-            ide_common.emit_message("Creating directory: {}".format(self.project_root))
+            ide_common.emit_message(f"Creating directory: {self.project_root}")
             fs.ensure_dir(self.project_root)
 
         if self.is_cpp:
             self.codegen_cpp_dir = self.params.output_root or os.path.join(self.project_root, ".build")
             if not os.path.exists(self.codegen_cpp_dir):
-                ide_common.emit_message("Creating directory: {}".format(self.codegen_cpp_dir))
+                ide_common.emit_message(f"Creating directory: {self.codegen_cpp_dir}")
                 fs.ensure_dir(self.codegen_cpp_dir)
 
         if self.is_py3:
             self.links_dir = os.path.join(self.project_root, ".links")
             if not os.path.exists(self.links_dir):
-                ide_common.emit_message("Creating directory: {}".format(self.links_dir))
+                ide_common.emit_message(f"Creating directory: {self.links_dir}")
                 fs.ensure_dir(self.links_dir)
             if self.params.debug_enabled:
                 self.python_wrappers_dir = os.path.join(self.project_root, "python_wrappers")
                 if not os.path.exists(self.python_wrappers_dir):
-                    ide_common.emit_message("Creating directory: {}".format(self.python_wrappers_dir))
+                    ide_common.emit_message(f"Creating directory: {self.python_wrappers_dir}")
                     fs.ensure_dir(self.python_wrappers_dir)
 
     def async_fetch_tools(self, for_platform=None):
@@ -173,7 +173,7 @@ class VSCodeProject(object):
         for resource in tools_resources_set:
             lock_resource(resource)
 
-        ide_common.emit_message("Writing {}".format(compile_commands_path))
+        ide_common.emit_message(f"Writing {compile_commands_path}")
         with open(compile_commands_path, "w") as f:
             json.dump(compilation_database, f, indent=4)
 
@@ -329,9 +329,9 @@ class VSCodeProject(object):
         venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
         venv_tmp_project_dir = os.path.join(self.params.arc_root, venv_opts.venv_tmp_project)
         if os.path.exists(venv_tmp_project_dir):
-            ide_common.emit_message('Removing existing venv temporary project: {}'.format(venv_tmp_project_dir))
+            ide_common.emit_message(f'Removing existing venv temporary project: {venv_tmp_project_dir}')
             fs.remove_tree_safe(venv_tmp_project_dir)
-        ide_common.emit_message('Generating venv: {}'.format(venv_params.venv_root))
+        ide_common.emit_message(f'Generating venv: {venv_params.venv_root}')
         devtools.ya.app.execute(venv.gen_venv, respawn=devtools.ya.app.RespawnType.NONE)(venv_params)
         return os.path.join(venv_params.venv_root, 'bin', 'python')
 
@@ -534,7 +534,7 @@ class VSCodeProject(object):
         vscode.workspace.sort_tasks(workspace)
         vscode.workspace.sort_configurations(workspace)
         workspace["settings"]["yandex.codenv"] = vscode.workspace.gen_codenv_params(self.params, self.params.languages)
-        ide_common.emit_message("Writing {}".format(workspace_path))
+        ide_common.emit_message(f"Writing {workspace_path}")
         with open(workspace_path, "w") as f:
             json.dump(workspace, f, indent=4, ensure_ascii=True)
 

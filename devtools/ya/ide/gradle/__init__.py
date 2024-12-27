@@ -4,7 +4,7 @@ import logging
 import shutil
 import subprocess
 import re
-from typing import Iterable
+from collections.abc import Iterable
 from pathlib import Path
 
 from devtools.ya.core import config as core_config
@@ -584,7 +584,7 @@ class _JavaSemGraph(SemGraph):
             if jdk_version in self._cached_jdk_paths:
                 return self._cached_jdk_paths[jdk_version]
             else:
-                jdk_real_path = Path(tools.tool('java{}'.format(jdk_version)).replace('/bin/java', ''))
+                jdk_real_path = Path(tools.tool(f'java{jdk_version}').replace('/bin/java', ''))
                 jdk_path = Path.home() / ".ya" / "jdk" / str(jdk_version)
                 if jdk_path.exists() and jdk_path.resolve() != jdk_real_path:
                     jdk_path.unlink()  # remove invalid symlink to JDK
