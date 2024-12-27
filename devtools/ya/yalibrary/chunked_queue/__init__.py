@@ -113,13 +113,9 @@ class FileChunk(object):
     def __open_stream(data_path):
         if os.path.exists(data_path):
             os.remove(data_path)
-
-        old_mask = os.umask(0o177)
-        try:
-            fd = os.open(data_path, os.O_CREAT | os.O_WRONLY, 0o600)
-            return os.fdopen(fd, 'w')
-        finally:
-            os.umask(old_mask)
+        f = open(data_path, 'w')
+        os.chmod(data_path, 0o600)
+        return f
 
     def __repr__(self):
         return "<{} with {} items for {}>".format(
