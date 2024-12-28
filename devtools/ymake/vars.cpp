@@ -54,7 +54,7 @@ TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& c
             auto& expr = *commands.Get(part.Name, &cmdConf);
             auto dummyCmdInfo = TCommandInfo(conf, nullptr, nullptr);
             auto scr = TCommands::SimpleCommandSequenceWriter()
-                .Write(commands, expr, vars, {}, dummyCmdInfo, &cmdConf)
+                .Write(commands, expr, vars, {}, dummyCmdInfo, &cmdConf, conf)
                 .Extract();
             for (auto& cmd : scr)
                 for (auto& arg : cmd)

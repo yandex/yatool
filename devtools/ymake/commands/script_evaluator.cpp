@@ -125,7 +125,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoCommand(const NPolexpr::TExpres
 }
 
 TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::TExpression* expr, size_t begin, ICommandSequenceWriter* writer) {
-    TEvalCtx ctx{*Vars, *CmdInfo, *Inputs};
+    TEvalCtx ctx{BuildConf, *Vars, *CmdInfo, *Inputs};
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, TOverloaded{
         [&](NPolexpr::TConstId id) -> TTermValue {
             auto val = Commands->Values.GetValue(id);
@@ -237,7 +237,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
     size_t begin,
     TArgAccumulator* writer
 ) {
-    TEvalCtx ctx{*Vars, *CmdInfo, *Inputs};
+    TEvalCtx ctx{BuildConf, *Vars, *CmdInfo, *Inputs};
     auto [term, end] = ::NPolexpr::Evaluate<TTermValue>(*expr, begin, [&](auto id, auto&&... args) -> TTermValue {
         if constexpr (std::is_same_v<decltype(id), NPolexpr::TConstId>) {
             static_assert(sizeof...(args) == 0);

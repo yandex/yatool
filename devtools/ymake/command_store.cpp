@@ -1000,9 +1000,10 @@ void TCommands::WriteShellCmd(
     const TVector<std::span<TVarStr>>& inputs,
     TCommandInfo& cmd,
     const TCmdConf* cmdConf,
+    const TBuildConfiguration& buildConf,
     TErrorShowerState* errorShower
 ) const {
-    NCommands::TScriptEvaluator se(this, cmdConf, &vars, &inputs, &cmd);
+    NCommands::TScriptEvaluator se(this, cmdConf, buildConf, &vars, &inputs, &cmd);
     writer->BeginScript();
     auto result = se.DoScript(&cmdExpr, 0, errorShower, writer);
     Y_DEBUG_ABORT_UNLESS(result.End == cmdExpr.GetNodes().size());

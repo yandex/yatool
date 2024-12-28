@@ -73,10 +73,11 @@ public:
             const TVars& vars,
             const TVector<std::span<TVarStr>>& inputs,
             TCommandInfo& cmd,
-            const TCmdConf* cmdConf
+            const TCmdConf* cmdConf,
+            const TBuildConfiguration& buildConf
         ) {
             auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
-            commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf, &ignoreErrors);
+            commands.WriteShellCmd(this, cmdExpr, vars, inputs, cmd, cmdConf, buildConf, &ignoreErrors);
             return *this;
         }
         auto Extract() {
@@ -147,6 +148,7 @@ public:
         const TVector<std::span<TVarStr>>& inputs,
         TCommandInfo& cmd,
         const TCmdConf* cmdConf,
+        const TBuildConfiguration& buildConf,
         TErrorShowerState* errorShower
     ) const;
 

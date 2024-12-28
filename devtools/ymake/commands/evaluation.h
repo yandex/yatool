@@ -14,6 +14,7 @@ namespace NCommands {
     };
 
     struct TEvalCtx {
+        const TBuildConfiguration& BuildConf;
         const TVars& Vars;
         TCommandInfo& CmdInfo;
         const TVector<std::span<TVarStr>>& Inputs;

@@ -332,7 +332,7 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
                 auto& expr = *cmdSrc.Get(pattern, &conf);
                 auto dummyCmdInfo = TCommandInfo(Conf, nullptr, nullptr);
                 auto scr = TCommands::SimpleCommandSequenceWriter()
-                    .Write(cmdSrc, expr, Vars, {}, dummyCmdInfo, &conf)
+                    .Write(cmdSrc, expr, Vars, {}, dummyCmdInfo, &conf, Conf)
                     .Extract();
                 for (auto& cmd : scr)
                     for (auto& arg : cmd)
@@ -365,7 +365,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorSh
         }
         auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
         Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, errorShower);
+        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";

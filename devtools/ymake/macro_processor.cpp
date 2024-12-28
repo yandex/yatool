@@ -1897,7 +1897,7 @@ void TCommandInfo::SubstData(
                 auto& conf = Graph->Names().CommandConf;
                 auto& expr = *cmdSrc.Get(nextsubst.Name, &conf);
                 auto argses = TCommands::SimpleCommandSequenceWriter()
-                    .Write(cmdSrc, expr, vars, {}, *this, &conf)
+                    .Write(cmdSrc, expr, vars, {}, *this, &conf, *Conf)
                     .Extract();
                 TVector<TString> cmds;
                 cmds.reserve(argses.size());

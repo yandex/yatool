@@ -15,6 +15,7 @@ namespace NCommands {
 
         const TCommands* Commands;
         const TCmdConf* CmdConf;
+        const TBuildConfiguration& BuildConf;
         const TVars* Vars;
         // Field `Inputs` is replacement for `Var["INPUT"]`.
         // The difference between them only in a representation of inputs:
@@ -26,12 +27,14 @@ namespace NCommands {
         TScriptEvaluator(
             const TCommands* commands,
             const TCmdConf* cmdConf,
+            const TBuildConfiguration& buildConf,
             const TVars* vars,
             const TVector<std::span<TVarStr>>* inputs,
             TCommandInfo* cmdInfo
         ):
             Commands(commands),
             CmdConf(cmdConf),
+            BuildConf(buildConf),
             Vars(vars),
             Inputs(inputs),
             CmdInfo(cmdInfo)

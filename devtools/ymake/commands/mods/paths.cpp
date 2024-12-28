@@ -22,9 +22,9 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            auto apply = [](TString s) {
+            auto apply = [&ctx](TString s) {
                 // lifted from EMF_PrnRootRel processing:
-                return TString(NPath::CutType(GlobalConf()->CanonPath(s)));
+                return TString(NPath::CutType(ctx.BuildConf.CanonPath(s)));
             };
             return std::visit(TOverloaded{
                 [](TTermError) -> TTermValue {
