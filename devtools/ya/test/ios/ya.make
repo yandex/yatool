@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE test.ios
     simctl_control.py
 )
 

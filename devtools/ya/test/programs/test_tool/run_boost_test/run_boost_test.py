@@ -21,8 +21,8 @@ from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test.util import shared
 
 import devtools.ya.test.filter as test_filter
-import test.ios.simctl_control as ios_simctl_control
-import test.android.android_emulator as android_control
+import devtools.ya.test.ios.simctl_control as ios_simctl_control
+import devtools.ya.test.android.android_emulator as android_control
 import exts.uniq_id
 
 from yatest.common import cores
