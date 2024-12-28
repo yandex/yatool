@@ -486,6 +486,8 @@ bool TMakePlanCache::LoadFromFile() {
         return false;
     }
 
+    NYMake::TTraceStage stage{"Load JSON cache"};
+
     TCacheFileReader cacheReader(Conf, false, false, JsonConfHash);
     if (cacheReader.Read(CachePath) != TCacheFileReader::EReadResult::Success) {
         return false;
@@ -503,6 +505,8 @@ TFsPath TMakePlanCache::SaveToFile() {
     if (!SaveToCache) {
         return {};
     }
+
+    NYMake::TTraceStage stage{"Save JSON cache"};
 
     TCacheFileWriter cacheWriter(Conf, CachePath, JsonConfHash);
     Save(cacheWriter.GetBuilder());

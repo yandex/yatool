@@ -267,6 +267,8 @@ namespace {
         {}
 
         TFsPath Save(bool delayedWrite) {
+            NYMake::TTraceStage stage{"Save Deps cache"};
+
             TString modulesData;
 
             if (!SaveFsCacheOnly) {
@@ -567,6 +569,7 @@ bool TYMake::Load(const TFsPath& file) {
 }
 
 bool TYMake::LoadImpl(const TFsPath& file) {
+    NYMake::TTraceStage stage{"Load Deps cache"};
     YDebug() << "load cache from " << file << Endl;
 
     bool useYmakeCache = !Conf.CachePath.empty();
