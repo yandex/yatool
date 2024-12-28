@@ -15,6 +15,7 @@ cdef extern void YaYtStoreLoggingHook(const char *msg) with gil:
 cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
     cdef cppclass YtStoreClientResponse nogil:
         bool Success;
+        bool NetworkErrors;
         size_t DecodedSize;
         char ErrorMsg[4096];
     cdef cppclass YtStoreClientRequest nogil:
@@ -26,6 +27,9 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
     cdef cppclass YtStore:
         YtStore(const char *yt_proxy, const char *yt_dir, const char *yt_token) except +
         void DoTryRestore(const YtStoreClientRequest &req, YtStoreClientResponse &rsp) nogil
+
+class NetworkException(Exception):
+    pass
 
 cdef class YtStoreWrapper:
     cdef YtStore *c_ytstore
@@ -52,7 +56,7 @@ cdef class YtStoreWrapper:
             )
         if resp.ErrorMsg[0] and not resp.Success:
             errmsg = str(resp.ErrorMsg)
-            raise Exception(errmsg)
+            raise (NetworkException if resp.NetworkErrors else Exception)(errmsg)
         result = resp.DecodedSize
         return result
 

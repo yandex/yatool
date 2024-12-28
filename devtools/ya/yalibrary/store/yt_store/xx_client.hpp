@@ -4,6 +4,7 @@
 
 struct YtStoreClientResponse {
     bool Success;
+    bool NetworkErrors;
     size_t DecodedSize;
     char ErrorMsg[4096];
 };

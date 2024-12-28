@@ -59,11 +59,15 @@ static void InitializeYt() {
 
 YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token) {
     InitializeYt();
-    if(yt_token && strlen(yt_token)) {
+    if (yt_token && strlen(yt_token)) {
         this->Client = NYT::CreateClient(yt_proxy, NYT::TCreateClientOptions().Token(yt_token));
     } else {
         this->Client = NYT::CreateClient(yt_proxy);
     }
+    NYT::TConfig::Get()->ConnectTimeout = TDuration::Seconds(5);
+    NYT::TConfig::Get()->SocketTimeout = TDuration::Seconds(5);
+    NYT::TConfig::Get()->RetryInterval = TDuration::MilliSeconds(500);
+    NYT::TConfig::Get()->RetryCount = 5;
     this->YtDir = yt_dir;
 }
 
@@ -73,6 +77,7 @@ YtStore::~YtStore() {
 struct ChunkFetcher: public IWalkInput {
     YtStore& parent;
     const YtStoreClientRequest& req;
+    YtStoreClientResponse& rsp;
     int chunk_no;
     std::unordered_map<int, NYT::TNode> chunks;
     std::optional<TStreamingCityHash64> sch;
@@ -83,7 +88,13 @@ struct ChunkFetcher: public IWalkInput {
         if (~chunk_j && chunk_j != chunk_i) {
             keys.push_back(NYT::TNode()("hash", req.Hash)("chunk_i", chunk_j));
         }
-        auto rows = parent.Client->LookupRows(parent.YtDir + "/data", keys);
+        TNode::TListType rows;
+        try {
+            rows = parent.Client->LookupRows(parent.YtDir + "/data", keys, TLookupRowsOptions().Timeout(TDuration::Seconds(60)));
+        } catch (std::exception& e) {
+            rsp.NetworkErrors = true;
+            throw;
+        }
         for (auto& row : rows) {
             chunks[row.ChildAsUint64("chunk_i")] = std::move(row);
         }
@@ -95,9 +106,10 @@ struct ChunkFetcher: public IWalkInput {
         }
     }
 
-    ChunkFetcher(YtStore& parent, const YtStoreClientRequest& req)
+    ChunkFetcher(YtStore& parent, const YtStoreClientRequest& req, YtStoreClientResponse& rsp)
         : parent(parent)
         , req(req)
+        , rsp(rsp)
         , chunk_no(0)
     {
         fetch(0, req.Chunks - 1);
@@ -162,10 +174,10 @@ struct YtStoreGetter {
     TTempBuf buf;
     size_t decoded_size;
 
-    YtStoreGetter(YtStore& parent, const YtStoreClientRequest& req)
+    YtStoreGetter(YtStore& parent, const YtStoreClientRequest& req, YtStoreClientResponse& rsp)
         : parent(parent)
         , req(req)
-        , fetcher(parent, req)
+        , fetcher(parent, req, rsp)
         , decoded_size(0)
     {
         if (req.Codec != nullptr && strcmp(req.Codec, "")) {
@@ -202,8 +214,9 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
         archive_read_free(a);
         archive_write_free(writer);
     };
+    rsp.NetworkErrors = false;
     try {
-        YtStoreGetter getter(*this, req);
+        YtStoreGetter getter(*this, req, rsp);
         TFsPath root_dir = req.IntoDir;
         if (archive_read_open(a, &getter, nullptr, YtStoreGetter::archive_read_callback, nullptr) != ARCHIVE_OK) {
             ythrow yexception() << "Failed to open tar: " << archive_error_string(a);
@@ -213,7 +226,7 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
             la_int64_t offset;
             int r;
             archive_entry_set_pathname(entry, (root_dir / archive_entry_pathname(entry)).c_str());
-            if(const char *src = archive_entry_hardlink(entry); src) {
+            if (const char* src = archive_entry_hardlink(entry); src) {
                 archive_entry_set_hardlink(entry, (root_dir / src).c_str());
             }
             if (archive_write_header(writer, entry) != ARCHIVE_OK) {

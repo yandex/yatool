@@ -308,7 +308,10 @@ class YtStore(DistStore):
                 self._inc_data_size(meta['data_size'], 'get')
                 if sz_decoded:
                     self._update_compression_ratio(sz_decoded, meta['data_size'])
-        except Exception:
+        except Exception as e:
+            # it is possible for xx_client module to not exist in common case (py2)
+            if e.__class__.__name__ == 'NetworkException':
+                self._client.retry_policy.on_error(e)
             logger.debug('Try restore %s from YT failed', uid, exc_info=True)
             self._count_failure('get')
             return False

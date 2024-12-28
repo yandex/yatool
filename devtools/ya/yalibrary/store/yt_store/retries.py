@@ -29,6 +29,7 @@ class RetryPolicy:
 
     def __init__(self, max_retries=5):
         self.max_retries = max_retries
+        self.disabled = False
         self._retryable_errors = yt.http_helpers.get_retriable_errors()
 
     def execute(self, name, func):
@@ -39,17 +40,21 @@ class RetryPolicy:
                     return func(*args, **kwargs)
                 except Exception as err:
                     if self.should_raise_error(err, attempt_num):
-                        logger.warning(
-                            "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
-                            err.__repr__()[:100],
-                        )
-                        logger.debug("Disabling dist cache. Last caught error: %s", err.__repr__())
-
+                        self.on_error(err)
                         raise err
 
                     time.sleep(self.SLEEP_S)
 
         return wrapper
+
+    def on_error(self, err):
+        if not self.disabled:
+            logger.warning(
+                "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
+                err.__repr__()[:100],
+            )
+            logger.debug("Disabling dist cache. Last caught error: %s", err.__repr__())
+            self.disabled = True
 
     def _is_yt_error_retryable(self, err):
         # type: (Exception) -> bool

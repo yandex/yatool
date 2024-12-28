@@ -56,6 +56,7 @@ class YtStoreClient(object):
         self._token = token
         self._tls = threading.local()
         self._enable_proxy_cache()
+        self.retry_policy = retries.RetryPolicy()
 
     @property
     @memoize()
@@ -89,7 +90,7 @@ class YtStoreClient(object):
 
     @property
     def is_disabled(self):
-        return hasattr(self._tls, "yt_client") and self._tls.yt_client.is_disabled
+        return self.retry_policy.disabled
 
     def exists(self, path):
         return self._client.exists(path)
@@ -136,8 +137,7 @@ class YtStoreClient(object):
     def _client(self):
         if not hasattr(self._tls, 'yt_client'):
             client = retries.get_default_client(self._proxy, self._token)
-            retry_policy = retries.RetryPolicy()
-            self._tls.yt_client = retries.YtClientProxy(client, retry_policy)
+            self._tls.yt_client = retries.YtClientProxy(client, self.retry_policy)
         return self._tls.yt_client
 
     def _create_table(self, table, attrs):
