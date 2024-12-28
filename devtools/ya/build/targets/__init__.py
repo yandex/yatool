@@ -3,7 +3,7 @@ import logging
 
 import yalibrary.find_root
 
-from build import makelist
+from devtools.ya.build import makelist
 
 
 logger = logging.getLogger(__name__)

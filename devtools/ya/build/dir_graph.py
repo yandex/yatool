@@ -7,7 +7,7 @@ import logging
 import operator
 import os
 
-import build.build_facade
+import devtools.ya.build.build_facade
 import devtools.ya.core.config
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def gen_dir_graph(
     target_platforms=None,
     split_by_types=False,
 ):
-    res = build.build_facade.gen_json_graph(
+    res = devtools.ya.build.build_facade.gen_json_graph(
         build_root=build_root,
         build_type=build_type,
         build_targets=build_targets,

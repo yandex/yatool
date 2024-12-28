@@ -1,4 +1,4 @@
-import build.graph_description as graph_descr
+import devtools.ya.build.graph_description as graph_descr
 
 
 def is_module(n: graph_descr.GraphNode) -> bool:

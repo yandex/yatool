@@ -1,7 +1,7 @@
 import collections
 import logging
 
-import build.build_opts
+import devtools.ya.build.build_opts
 import devtools.ya.core.yarg
 import devtools.ya.test.opts as test_opts
 from devtools.ya.package import const
@@ -648,13 +648,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 ['--upload-resource-type'],
                 help='Created resource type',
                 hook=devtools.ya.core.yarg.SetValueHook('resource_type'),
-                group=build.build_opts.SANDBOX_UPLOAD_OPT_GROUP,
+                group=devtools.ya.build.build_opts.SANDBOX_UPLOAD_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ['--upload-resource-attr'],
                 help='Resource attr, set it in the <name>=<value> form',
                 hook=devtools.ya.core.yarg.DictPutHook(name='resource_attrs'),
-                group=build.build_opts.SANDBOX_UPLOAD_OPT_GROUP,
+                group=devtools.ya.build.build_opts.SANDBOX_UPLOAD_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--dupload-max-attempts'],

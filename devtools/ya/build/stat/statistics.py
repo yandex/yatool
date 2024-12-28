@@ -19,7 +19,7 @@ from humanfriendly import format_size
 from devtools.ya.core import profiler
 from devtools.ya.core import stage_tracer
 import devtools.ya.test.const as test_const
-from build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
+from devtools.ya.build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
 from functools import cmp_to_key
 
 

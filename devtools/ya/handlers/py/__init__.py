@@ -8,8 +8,8 @@ from contextlib import contextmanager
 import library.python.filelock
 import library.python.resource
 
-import build.build_handler
-import build.build_opts
+import devtools.ya.build.build_handler
+import devtools.ya.build.build_opts
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.yarg
@@ -32,7 +32,7 @@ class PyYaHandler(devtools.ya.core.yarg.OptsHandler):
         super(PyYaHandler, self).__init__(
             action=devtools.ya.app.execute(run),
             description='Run IPython shell with python libraries baked in',
-            opts=build.build_opts.ya_make_options(free_build_targets=True) + [
+            opts=devtools.ya.build.build_opts.ya_make_options(free_build_targets=True) + [
                 PyOptions(),
             ],
         )
@@ -209,7 +209,7 @@ class Project(object):
         build_params = devtools.ya.core.yarg.Params(**self.params.as_dict())
         build_params.abs_targets = [self.source_path]
         build_params.output_root = self.output_path
-        build.build_handler.do_ya_make(build_params)
+        devtools.ya.build.build_handler.do_ya_make(build_params)
         assert os.path.isfile(self.exe_path), 'Cannot find executable: {}'.format(self.exe_path)
 
     def cleanup(self):

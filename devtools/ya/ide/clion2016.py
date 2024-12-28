@@ -5,8 +5,8 @@ import six
 
 from exts import fs
 
-import build.build_opts
-import build.graph_path
+import devtools.ya.build.build_opts
+import devtools.ya.build.graph_path
 import devtools.ya.core.yarg
 
 from . import ide_common
@@ -552,7 +552,9 @@ def do_clion(params):
         else:
             params.ya_make_extra.append('-DBUILD_LANGUAGES=CPP')
 
-    ya_make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(
+        devtools.ya.build.build_opts.ya_make_options(free_build_targets=True)
+    )
     params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
 
     cmake_stub_info = ide_common.IdeProjectInfo(params, app_ctx, default_output_here=True)
@@ -603,8 +605,10 @@ def do_clion(params):
             use_sync_server=params.use_sync_server,
             strip_non_final=params.strip_non_final_targets,
         )
-        source_roots = {build.graph_path.GraphPath(os.path.dirname(x)).strip() for x in cmake_stub.project_files}
-        inc_dirs = {build.graph_path.GraphPath(x).strip() for x in cmake_stub.inc_dirs}
+        source_roots = {
+            devtools.ya.build.graph_path.GraphPath(os.path.dirname(x)).strip() for x in cmake_stub.project_files
+        }
+        inc_dirs = {devtools.ya.build.graph_path.GraphPath(x).strip() for x in cmake_stub.inc_dirs}
         source_roots.update(inc_dirs)
         gen_idea_prj(
             cmake_stub_info,

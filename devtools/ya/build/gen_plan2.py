@@ -4,8 +4,8 @@ from exts import yjson
 
 import devtools.ya.core.yarg
 
-from build import build_opts
-from build import build_handler
+from devtools.ya.build import build_opts
+from devtools.ya.build import build_handler
 
 
 class StringIOWrapper:

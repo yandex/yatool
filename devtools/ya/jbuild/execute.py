@@ -2,9 +2,8 @@ import getpass
 import socket
 import os
 
-import build.build_opts
-import build.targets_deref
-import build.ya_make
+import devtools.ya.build.build_opts
+import devtools.ya.build.ya_make
 import devtools.ya.core.yarg
 import yalibrary.tools as tools
 import yalibrary.platform_matcher as pm
@@ -32,7 +31,7 @@ def conf(platform, pattern_tool_map):
 
 
 def execute(graph, result, opts, app_ctx, host_platform=None, pattern_tool_map=None, graph_conf=None):
-    make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options()).params()
+    make_opts = devtools.ya.core.yarg.merge_opts(devtools.ya.build.build_opts.ya_make_options()).params()
     make_opts.__dict__.update(opts.__dict__)
     make_opts.checkout = False
     make_opts.get_deps = None
@@ -58,7 +57,7 @@ def execute(graph, result, opts, app_ctx, host_platform=None, pattern_tool_map=N
         'conf': result_conf,
     }
 
-    builder = build.ya_make.YaMake(make_opts, app_ctx, graph=task, tests=[])
+    builder = devtools.ya.build.ya_make.YaMake(make_opts, app_ctx, graph=task, tests=[])
 
     builder.go()
 

@@ -1,4 +1,4 @@
-import build.build_opts as build_opts
+import devtools.ya.build.build_opts as build_opts
 
 import devtools.ya.core.yarg
 import devtools.ya.core.common_opts as common_opts

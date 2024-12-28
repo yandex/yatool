@@ -4,8 +4,8 @@ import typing
 import logging
 from collections import defaultdict
 
-from build.node_checks import is_module, is_binary
-from build.graph_description import GraphNodeUid, GraphNode
+from devtools.ya.build.node_checks import is_module, is_binary
+from devtools.ya.build.graph_description import GraphNodeUid, GraphNode
 
 try:
     RecursionError

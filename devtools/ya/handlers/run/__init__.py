@@ -6,9 +6,9 @@ import subprocess
 import sys
 import textwrap
 
-import build.build_opts
-import build.graph
-import build.ya_make
+import devtools.ya.build.build_opts as build_opts
+import devtools.ya.build.graph
+import devtools.ya.build.ya_make
 import devtools.ya.core.common_opts
 import devtools.ya.core.event_handling
 import devtools.ya.core.yarg as yarg
@@ -115,7 +115,7 @@ class RunOptsSupplement(RunOptsBase):
 def run(params):
     import app_ctx
 
-    ya_make_opts = yarg.merge_opts(build.build_opts.ya_make_options())
+    ya_make_opts = yarg.merge_opts(build_opts.ya_make_options())
     opts = yarg.merge_params(ya_make_opts.initialize([]), params)
     opts.show_final_ok = False
 
@@ -138,17 +138,17 @@ def run(params):
     app_ctx.params.update(opts.as_dict())
 
     subscribers = [
-        build.ya_make.DisplayMessageSubscriber(opts, app_ctx.display),
+        devtools.ya.build.ya_make.DisplayMessageSubscriber(opts, app_ctx.display),
         devtools.ya.core.event_handling.EventToLogSubscriber(),
     ]
 
     if getattr(app_ctx, 'evlog', None):
         subscribers.append(
-            build.ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
+            devtools.ya.build.ya_make.YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
         )
 
     with app_ctx.event_queue.subscription_scope(*subscribers):
-        graph = build.graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)[0]
+        graph = devtools.ya.build.graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)[0]
 
     bin_rel_path = _get_bin_rel_path(app_ctx, graph, opts.rel_targets[0])
 
@@ -190,7 +190,7 @@ def _get_bin_rel_path(app_ctx, graph, target):
 
 
 def _build(opts, app_ctx, graph):
-    builder = build.ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
+    builder = devtools.ya.build.ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
     builder.go()
     rc = builder.exit_code
     if rc != 0:
@@ -202,31 +202,31 @@ def _reduced_ya_make_options():
     import devtools.ya.core.common_opts
     import devtools.ya.test.opts
 
-    build_graph_cache_opts = build.build_opts.build_graph_cache_config_opts()
-    checkout_opts = build.build_opts.svn_checkout_options()
+    build_graph_cache_opts = build_opts.build_graph_cache_config_opts()
+    checkout_opts = build_opts.svn_checkout_options()
 
     useless = set(
         [
-            build.build_opts.ContinueOnFailOptions,
-            build.build_opts.CreateSymlinksOptions,
-            build.build_opts.CustomGraphAndContextOptions,
-            build.build_opts.DefaultNodeRequirementsOptions,
-            build.build_opts.DumpReportOptions,
-            build.build_opts.ExecutorOptions,
-            build.build_opts.ForceDependsOptions,
-            build.build_opts.GenerateLegacyDirOptions,
-            build.build_opts.IgnoreNodesExitCode,
-            build.build_opts.IgnoreRecursesOptions,
-            build.build_opts.InstallDirOptions,
-            build.build_opts.JavaSpecificOptions,
-            build.build_opts.MDSUploadOptions,
-            build.build_opts.OutputOptions,
-            build.build_opts.SandboxUploadOptions,
-            build.build_opts.SonarOptions,
-            build.build_opts.StreamReportOptions,
-            build.build_opts.TestenvReportDirOptions,
-            build.build_opts.YaMakeOptions,
-            build.build_opts.YndexerOptions,
+            build_opts.ContinueOnFailOptions,
+            build_opts.CreateSymlinksOptions,
+            build_opts.CustomGraphAndContextOptions,
+            build_opts.DefaultNodeRequirementsOptions,
+            build_opts.DumpReportOptions,
+            build_opts.ExecutorOptions,
+            build_opts.ForceDependsOptions,
+            build_opts.GenerateLegacyDirOptions,
+            build_opts.IgnoreNodesExitCode,
+            build_opts.IgnoreRecursesOptions,
+            build_opts.InstallDirOptions,
+            build_opts.JavaSpecificOptions,
+            build_opts.MDSUploadOptions,
+            build_opts.OutputOptions,
+            build_opts.SandboxUploadOptions,
+            build_opts.SonarOptions,
+            build_opts.StreamReportOptions,
+            build_opts.TestenvReportDirOptions,
+            build_opts.YaMakeOptions,
+            build_opts.YndexerOptions,
             devtools.ya.core.common_opts.CommonUploadOptions,
             devtools.ya.core.common_opts.MiniYaOpts,
             devtools.ya.core.common_opts.PrintStatisticsOptions,
@@ -267,7 +267,7 @@ def _reduced_ya_make_options():
     useless |= {opt.__class__ for opt in checkout_opts}
 
     useful = []
-    for opt in build.build_opts.ya_make_options(free_build_targets=True, build_type="release"):
+    for opt in build_opts.ya_make_options(free_build_targets=True, build_type="release"):
         if opt.__class__ not in useless:
             useful.append(opt)
 

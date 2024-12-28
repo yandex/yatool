@@ -4,9 +4,9 @@ import enum
 import dataclasses
 import collections.abc
 
-from build.build_plan import BuildPlan
-import build.graph_description as graph_description
-import build.node_checks as node_checks
+from devtools.ya.build.build_plan import BuildPlan
+import devtools.ya.build.graph_description as graph_description
+import devtools.ya.build.node_checks as node_checks
 
 import typing as tp
 

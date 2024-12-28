@@ -10,8 +10,8 @@ from pathlib import PurePath
 
 import termcolor
 
-import build.build_handler as bh
-import build.build_opts as build_opts
+import devtools.ya.build.build_handler as bh
+import devtools.ya.build.build_opts as build_opts
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.yarg

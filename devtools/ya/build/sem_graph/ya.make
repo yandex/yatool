@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build.sem_graph
     __init__.py
 )
 

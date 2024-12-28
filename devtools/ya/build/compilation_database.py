@@ -11,9 +11,9 @@ import exts.path2
 import devtools.ya.core.yarg
 import devtools.ya.core.config
 
-import build.build_opts
-import build.gen_plan2
-import build.graph_path
+import devtools.ya.build.build_opts
+import devtools.ya.build.gen_plan2
+import devtools.ya.build.graph_path
 
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.toolscache import toolscache_version
@@ -99,11 +99,13 @@ class CompilationDatabaseOptions(devtools.ya.core.yarg.Options):
             self.update = False
 
 
-COMPILATION_DATABASE_OPTS = build.build_opts.ya_make_options(free_build_targets=True) + [CompilationDatabaseOptions()]
+COMPILATION_DATABASE_OPTS = devtools.ya.build.build_opts.ya_make_options(free_build_targets=True) + [
+    CompilationDatabaseOptions()
+]
 
 
 def _fix_macros(s, **patterns):
-    return build.graph_path.resolve_graph_value(s, upper=False, **patterns)
+    return devtools.ya.build.graph_path.resolve_graph_value(s, upper=False, **patterns)
 
 
 def _log_compiler(app_ctx, compilers, compiler):
@@ -154,7 +156,7 @@ def gen_compilation_database(params, app_ctx):
     if params.file_prefixes_use_targets:
         params.file_prefixes += params.rel_targets
 
-    graph = build.gen_plan2.ya_make_graph(params, devtools.ya.app, real_ya_make_opts=True)
+    graph = devtools.ya.build.gen_plan2.ya_make_graph(params, devtools.ya.app, real_ya_make_opts=True)
     if params.dont_fix_roots:
         patterns = {}
     else:
@@ -171,12 +173,12 @@ def gen_compilation_database(params, app_ctx):
             return
 
         if not params.files_generated:
-            inputs = [inp for inp in inputs if not build.graph_path.GraphPath(inp).build]
+            inputs = [inp for inp in inputs if not devtools.ya.build.graph_path.GraphPath(inp).build]
 
         if params.file_prefixes:
 
             def filter_by_prefix(inp):
-                arcadia_path = build.graph_path.GraphPath(inp).strip()
+                arcadia_path = devtools.ya.build.graph_path.GraphPath(inp).strip()
                 return any(exts.path2.path_startswith(arcadia_path, prefix) for prefix in params.file_prefixes)
 
             inputs = [inp for inp in inputs if filter_by_prefix(inp)]

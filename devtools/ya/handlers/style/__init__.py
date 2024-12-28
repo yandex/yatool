@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
 
-from build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
+from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
 import devtools.ya.core.yarg.consumers
 
 from .style import run_style

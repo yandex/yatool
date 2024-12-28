@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build
     build_handler.py
     compilation_database.py
     dir_graph.py

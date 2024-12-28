@@ -10,7 +10,7 @@ import socket
 import time
 
 import app_config
-import build.gen_plan as gen_plan
+import devtools.ya.build.gen_plan as gen_plan
 import devtools.ya.core.error
 import devtools.ya.core.imprint.imprint as imprint
 import devtools.ya.core.yarg

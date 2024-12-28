@@ -19,8 +19,8 @@ import exts.hashing as hashing
 import yalibrary.makelists as ml
 import yalibrary.makelists.macro_definitions as md
 
-import build.build_opts as bo
-import build.build_handler
+import devtools.ya.build.build_opts as bo
+import devtools.ya.build.build_handler
 import devtools.ya.core.yarg
 import devtools.ya.core.config
 
@@ -427,7 +427,7 @@ def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, res
     build_opts = merge_opts.initialize([])
     build_opts.__dict__.update(opts.__dict__)
     build_opts.abs_targets = [os.path.join(opts.arc_root, temp_project)]
-    rc = build.build_handler.do_ya_make(build_opts)
+    rc = devtools.ya.build.build_handler.do_ya_make(build_opts)
     fs.remove_tree_safe(temp_project_path)
 
     if rc != 0:

@@ -1,7 +1,6 @@
 PY3_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE build.prefetch
     __init__.py
 )
 

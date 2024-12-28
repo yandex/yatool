@@ -1,5 +1,5 @@
 # coding: utf-8
-import build.gen_plan as gen_plan
+import devtools.ya.build.gen_plan as gen_plan
 
 import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
 import devtools.ya.test.dependency.sandbox_storage as sandbox_storage

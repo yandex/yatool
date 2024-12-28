@@ -47,14 +47,14 @@ import yalibrary.vcs.vcsversion as vcsversion
 import yalibrary.debug_store
 from yalibrary.monitoring import YaMonEvent
 
-import build.makelist as bml
-import build.node_checks as node_checks
-import build.gen_plan as gen_plan
-import build.ymake2 as ymake2
-import build.graph_description as graph_descr
-from build.ymake2.consts import YmakeEvents
-import build.genconf as bg
-from build.evlog.progress import get_print_status_func
+import devtools.ya.build.makelist as bml
+import devtools.ya.build.node_checks as node_checks
+import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.ymake2 as ymake2
+import devtools.ya.build.graph_description as graph_descr
+from devtools.ya.build.ymake2.consts import YmakeEvents
+import devtools.ya.build.genconf as bg
+from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
 
 if tp.TYPE_CHECKING:
@@ -3092,7 +3092,7 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     assert test_opts is not None
     import devtools.ya.test.filter as test_filter
     import devtools.ya.test.test_node
-    import build.build_plan
+    import devtools.ya.build.build_plan
 
     timer = exts.timer.Timer('inject_tests')
     print_status("Configuring tests execution")
@@ -3102,7 +3102,7 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
         tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
 
     logger.debug("Generating build plan")
-    plan = build.build_plan.BuildPlan(graph)
+    plan = devtools.ya.build.build_plan.BuildPlan(graph)
 
     logger.debug("Preparing test suites")
     test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
@@ -3130,9 +3130,9 @@ def _split_stripped_tests(tests, opts):
 
 def _inject_tests_result_node(src_dir, graph: graph_descr.DictGraph, tests, opts) -> None:
     import devtools.ya.test.test_node
-    import build.build_plan
+    import devtools.ya.build.build_plan
 
-    buildplan = build.build_plan.BuildPlan(graph)
+    buildplan = devtools.ya.build.build_plan.BuildPlan(graph)
 
     if opts.strip_idle_build_results:
         _strip_idle_build_results(graph, buildplan, tests)

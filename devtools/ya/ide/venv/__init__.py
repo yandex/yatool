@@ -3,7 +3,7 @@ import os
 import subprocess
 import six
 
-import build.build_opts
+import devtools.ya.build.build_opts
 import devtools.ya.core.yarg
 import devtools.ya.core.config
 import exts.fs
@@ -29,7 +29,9 @@ def do_venv(params):
     if pm.my_platform() == 'win32':
         logger.error("Handler 'venv' doesn't work on Windows")
         return
-    ya_make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(
+        devtools.ya.build.build_opts.ya_make_options(free_build_targets=True)
+    )
     params.ya_make_extra.append('-DBUILD_LANGUAGES=PY3')
     params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     gen_venv(params)

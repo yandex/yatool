@@ -10,7 +10,7 @@ import enum
 import six
 from devtools.ya.handlers.dump.debug import debug_handler
 
-from build.build_facade import (
+from devtools.ya.build.build_facade import (
     gen_all_loops,
     gen_dir_loops,
     gen_graph,
@@ -29,8 +29,9 @@ from build.build_facade import (
     gen_relation,
 )
 from devtools.ya.handlers.dump.gen_conf_docs import dump_mmm_docs
-from build.dir_graph import reachable, gen_dir_graph
-from build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
+from devtools.ya.build.dir_graph import reachable, gen_dir_graph
+from devtools.ya.build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
+
 from exts.strtobool import strtobool
 from exts.tmp import temp_dir
 from devtools.ya.core.yarg import (
@@ -51,7 +52,7 @@ from devtools.ya.core.yarg import (
 )
 from yalibrary.vcs import vcsversion
 from devtools.ya.core.imprint import imprint
-from build.build_opts import (
+from devtools.ya.build.build_opts import (
     YMakeDebugOptions,
     YMakeBinOptions,
     YMakeModeOptions,
@@ -61,14 +62,14 @@ from build.build_opts import (
     SandboxAuthOptions,
     JavaSpecificOptions,
 )
-from build.build_opts import (
+from devtools.ya.build.build_opts import (
     BuildTypeOptions,
     BuildTargetsOptions,
     ShowHelpOptions,
     CustomBuildRootOptions,
     ContinueOnFailOptions,
 )
-from build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
+from devtools.ya.build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
 from devtools.ya.core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline

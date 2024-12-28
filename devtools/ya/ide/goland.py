@@ -4,8 +4,8 @@ import itertools
 import xml.etree.ElementTree as et
 
 import devtools.ya.app
-import build.build_handler as bh
-import build.build_opts
+import devtools.ya.build.build_handler as bh
+import devtools.ya.build.build_opts
 import devtools.ya.core.yarg
 from exts import fs
 from exts import path2
@@ -319,7 +319,9 @@ def do_codegen(params):
 
 def do_goland(params):
     params.ya_make_extra.append('-DBUILD_LANGUAGES=GO')
-    ya_make_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options(free_build_targets=True))
+    ya_make_opts = devtools.ya.core.yarg.merge_opts(
+        devtools.ya.build.build_opts.ya_make_options(free_build_targets=True)
+    )
     params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
     import app_ctx  # XXX
 

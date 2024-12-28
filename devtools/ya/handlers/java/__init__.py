@@ -3,7 +3,7 @@ from . import helpers
 
 import devtools.ya.app
 import devtools.ya.core.yarg
-from build import build_opts
+from devtools.ya.build import build_opts
 import devtools.ya.test.opts as test_opts
 
 

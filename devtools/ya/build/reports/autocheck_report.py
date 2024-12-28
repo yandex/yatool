@@ -10,9 +10,9 @@ from itertools import chain
 import devtools.ya.core.error
 import devtools.ya.test.common as test_common
 import yalibrary.term.console as term_console
-from build.reports import configure_error as ce
+from devtools.ya.build.reports import configure_error as ce
 from exts.fs import create_dirs, ensure_removed
-import build.owners as ow
+import devtools.ya.build.owners as ow
 from devtools.ya.test import const as constants
 from devtools.ya.test.const import Status, TestSize
 from devtools.ya.test.reports import trace_comment

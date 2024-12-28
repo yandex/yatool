@@ -14,15 +14,15 @@ import six
 import pickle as cPickle
 
 import app_config
-import build.build_plan as bp
-import build.build_result as br
-import build.gen_plan as gp
-import build.graph as lg
-import build.owners as ow
-import build.reports.autocheck_report as ar
-import build.reports.results_listener as pr
-import build.stat.graph_metrics as st
-import build.stat.statistics as bs
+import devtools.ya.build.build_plan as bp
+import devtools.ya.build.build_result as br
+import devtools.ya.build.gen_plan as gp
+import devtools.ya.build.graph as lg
+import devtools.ya.build.owners as ow
+import devtools.ya.build.reports.autocheck_report as ar
+import devtools.ya.build.reports.results_listener as pr
+import devtools.ya.build.stat.graph_metrics as st
+import devtools.ya.build.stat.statistics as bs
 import devtools.ya.core.config as core_config
 import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
@@ -40,14 +40,15 @@ import exts.tmp
 import exts.windows
 import exts.yjson as json
 import devtools.ya.test.util.tools as test_tools
-from build import build_facade, frepkage, test_results_console_printer
-from build.evlog.progress import (
+from devtools.ya.build import build_facade
+from devtools.ya.build import frepkage, test_results_console_printer
+from devtools.ya.build.evlog.progress import (
     get_print_status_func,
     YmakeTimeStatistic,
 )
-from build.reports import build_reports as build_report
-from build.reports import configure_error as ce
-from build.reports import results_report
+from devtools.ya.build.reports import build_reports as build_report
+from devtools.ya.build.reports import configure_error as ce
+from devtools.ya.build.reports import results_report
 from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
 from exts import func
@@ -235,7 +236,7 @@ def _checkout(opts, display=None):
 
     fetcher = checkout.VcsFetcher(opts.arc_root)
 
-    from build import evlog
+    from devtools.ya.build import evlog
 
     fetcher.fetch_base_dirs(
         thin_checkout=opts.thin_checkout, extra_paths=opts.checkout_extra_paths, quiet=opts.checkout_quiet

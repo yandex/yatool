@@ -57,7 +57,7 @@ def monitoring_stage_finished(stage_name):
 
 
 def do_ya_make(params):
-    from build import ya_make
+    from devtools.ya.build import ya_make
 
     import app_ctx  # XXX
 

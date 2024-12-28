@@ -15,10 +15,9 @@ import six
 from jsonschema import Draft4Validator, ValidationError
 
 import app_config
-import build.build_handler
-import build.build_opts
-import build.targets_deref
-import build.ya_make
+import devtools.ya.build.build_opts
+import devtools.ya.build.targets_deref
+import devtools.ya.build.ya_make
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.error
@@ -156,7 +155,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     # TODO: This is very bad. Need to automatically copy all copiable parameters from params to merged_opts
 
-    merged_opts = devtools.ya.core.yarg.merge_opts(build.build_opts.ya_make_options())
+    merged_opts = devtools.ya.core.yarg.merge_opts(devtools.ya.build.build_opts.ya_make_options())
     merged_opts.export_to_maven = build_info.get("maven-export", False)
     merged_opts.dump_sources = build_info.get("sources", False)
     merged_opts.disable_flake8_migrations = params.disable_flake8_migrations
@@ -357,7 +356,9 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     logger.debug("Build options %s", json.dumps(build_options.__dict__, sort_keys=True, indent=2))
 
-    builder = build.targets_deref.intercept(lambda x: build.ya_make.YaMake(x, app_ctx), build_options)
+    builder = devtools.ya.build.targets_deref.intercept(
+        lambda x: devtools.ya.build.ya_make.YaMake(x, app_ctx), build_options
+    )
     builder.go()
 
     logger.info("Build finished with exit code %d, tests: %s", builder.exit_code, build_options.run_tests)

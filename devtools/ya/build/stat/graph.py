@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from yalibrary.fetcher import http_client
 from yalibrary.status_view.helpers import format_paths
-from build.graph_description import GraphNodeUid, GraphNode, DictGraph
+from devtools.ya.build.graph_description import GraphNodeUid, GraphNode, DictGraph
 
 logger = logging.getLogger(__name__)
 

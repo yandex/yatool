@@ -1,7 +1,6 @@
 PY3_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE build.stat
     CYTHONIZE_PY
     __init__.py
     graph.py

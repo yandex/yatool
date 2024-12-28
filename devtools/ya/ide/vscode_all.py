@@ -9,9 +9,9 @@ import subprocess
 from collections import OrderedDict
 
 import devtools.ya.app
-import build.build_handler as bh
-import build.build_opts as build_opts
-import build.compilation_database as bc
+import devtools.ya.build.build_handler as bh
+import devtools.ya.build.build_opts as build_opts
+import devtools.ya.build.compilation_database as bc
 import devtools.ya.core.config
 import devtools.ya.core.yarg
 import exts.asyncthread

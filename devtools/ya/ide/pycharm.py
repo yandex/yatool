@@ -6,9 +6,9 @@ import re
 import shutil
 import sys
 
-import build.build_opts as bo
-import build.graph as bg
-import build.ya_make as ya_make
+import devtools.ya.build.build_opts as bo
+import devtools.ya.build.graph as bg
+import devtools.ya.build.ya_make as ya_make
 import devtools.ya.core.event_handling
 import devtools.ya.core.yarg
 import devtools.ya.core.resource as resource

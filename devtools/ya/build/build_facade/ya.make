@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build.build_facade
     __init__.py
 )
 
@@ -15,6 +14,7 @@ PEERDIR(
     devtools/ya/build/genconf
     devtools/ya/build/gen_plan
     devtools/ya/build/ymake2
+    devtools/ya/build/targets
 )
 
 END()

@@ -7,11 +7,10 @@ import six
 
 import devtools.ya.core.config
 
-import build.genconf
-import build.ymake2
+import devtools.ya.build.ymake2
 
 from yalibrary.vcs import vcsversion
-from build.build_facade import gen_conf
+from devtools.ya.build.build_facade import gen_conf
 from exts.strtobool import strtobool
 
 
@@ -330,7 +329,7 @@ def _gen(
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
-    res, evlog_dump = build.ymake2.ymake_dump(
+    res, evlog_dump = devtools.ya.build.ymake2.ymake_dump(
         custom_build_directory=custom_build_directory,
         build_type=build_type,
         abs_targets=build_targets,

@@ -12,8 +12,8 @@ import exts.fs
 
 from collections import defaultdict
 
-import build.build_plan as bp
-import build.stat.graph_metrics as st
+import devtools.ya.build.build_plan as bp
+import devtools.ya.build.stat.graph_metrics as st
 import devtools.ya.test.const as test_const
 import devtools.ya.test.common as test_common
 import devtools.ya.test.result as test_result
@@ -301,7 +301,7 @@ class CompositeResultsListener:
 
 
 class FailedNodeListener:
-    NAMESPACE = 'build.reports.failed_node_info'
+    NAMESPACE = 'devtools.ya.build.reports.failed_node_info'
     EVENT = 'node-failed'
 
     def __init__(self, evlog):

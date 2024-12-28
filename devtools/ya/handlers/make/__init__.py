@@ -1,6 +1,6 @@
 from __future__ import absolute_import
-from build.build_handler import do_ya_make
-from build.build_opts import ya_make_options
+from devtools.ya.build.build_handler import do_ya_make
+from devtools.ya.build.build_opts import ya_make_options
 
 import devtools.ya.core.yarg
 

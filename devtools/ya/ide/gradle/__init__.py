@@ -7,11 +7,9 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
-from devtools.ya.core import config as core_config
-from devtools.ya.core import yarg
-from devtools.ya.core import stage_tracer
-from build import build_opts, graph as build_graph, ya_make
-from build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
+from devtools.ya.core import config as core_config, yarg, stage_tracer
+from devtools.ya.build import build_opts, graph as build_graph, ya_make
+from devtools.ya.build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
 from yalibrary import platform_matcher, tools
 from exts import hashing
 from devtools.ya.yalibrary import sjson

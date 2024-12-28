@@ -8,10 +8,11 @@ from exts.tmp import temp_file
 import devtools.ya.core.config
 import devtools.ya.core.yarg
 
-import build.evlog
-import build.gen_plan
-import build.genconf
-import build.ymake2
+import devtools.ya.build.evlog
+import devtools.ya.build.gen_plan
+import devtools.ya.build.genconf
+import devtools.ya.build.targets
+import devtools.ya.build.ymake2
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ def _gen(
         target_platforms=target_platforms,
         custom_conf_dir=custom_conf_dir,
     )
-    res, evlog_dump = build.ymake2.ymake_dump(
+    res, evlog_dump = devtools.ya.build.ymake2.ymake_dump(
         custom_build_directory=custom_build_directory,
         build_type=build_type,
         abs_targets=build_targets,
@@ -87,26 +88,26 @@ def gen_conf(
     **kwargs
 ):
     if not host_platform:
-        host_platform = build.genconf.host_platform_name()
+        host_platform = devtools.ya.build.genconf.host_platform_name()
     else:
-        host_platform = build.genconf.mine_platform_name(host_platform)
+        host_platform = devtools.ya.build.genconf.mine_platform_name(host_platform)
     if target_platforms:
         if len(target_platforms) > 1:
             logger.error('Multiple target platforms are not supported by this code for now')
             raise NotImplementedError
-        toolchain_params = build.genconf.gen_cross_tc(
-            host_platform, build.genconf.mine_platform_name(target_platforms[0]['platform_name'])
+        toolchain_params = devtools.ya.build.genconf.gen_cross_tc(
+            host_platform, devtools.ya.build.genconf.mine_platform_name(target_platforms[0]['platform_name'])
         )
         flags = flags.copy()
         flags.update(target_platforms[0].get('flags', {}))
     else:
-        toolchain_params = build.genconf.gen_tc(host_platform)
+        toolchain_params = devtools.ya.build.genconf.gen_tc(host_platform)
     logger.debug('Toolchain params for config generation: %s', json.dumps(toolchain_params, indent=2))
     if not arc_root:
         arc_root = devtools.ya.core.config.find_root_from(build_targets)
-    generation_conf, _ = build.genconf.gen_conf(
+    generation_conf, _ = devtools.ya.build.genconf.gen_conf(
         arc_dir=arc_root,
-        conf_dir=custom_conf_dir or build.genconf.detect_conf_root(arc_root, build_root),
+        conf_dir=custom_conf_dir or devtools.ya.build.genconf.detect_conf_root(arc_root, build_root),
         build_type=build_type,
         use_local_conf=True,
         local_conf_path=None,
@@ -415,7 +416,7 @@ def gen_relation(
         prefix_targets = [x for x in targets if x[0] == '$']
         path_targets = [x for x in targets if x[0] != '$']
         if path_targets:
-            info = build.targets.resolve(arc_root, path_targets)
+            info = devtools.ya.build.targets.resolve(arc_root, path_targets)
             path_targets = [os.path.relpath(x, info.root) for x in info.targets]
         return prefix_targets + path_targets
 
@@ -605,7 +606,7 @@ def gen_plan(
     no_ymake_resource=False,
     vcs_file=None,
 ):
-    return build.gen_plan.gen_plan(
+    return devtools.ya.build.gen_plan.gen_plan(
         gen_plan_options(
             arc_root=arc_root,
             build_root=build_root,
@@ -623,7 +624,7 @@ def gen_plan(
 
 def gen_java_projects(build_root, build_targets, flags, ymake_bin=None):
     f = 'java_targets_paths.lst'
-    res, _ = build.ymake2.ymake_dump(
+    res, _ = devtools.ya.build.ymake2.ymake_dump(
         custom_build_directory=build_root,
         abs_targets=build_targets,
         dump_info=['java_projects:{}'.format(f)],
@@ -646,7 +647,7 @@ def gen_test_dart(build_root, **kwargs):
             )
         )
 
-        res, _ = build.ymake2.ymake_dump(**kwargs)
+        res, _ = devtools.ya.build.ymake2.ymake_dump(**kwargs)
 
         def read_if_exists(path):
             if os.path.exists(path):
@@ -671,7 +672,7 @@ def _extract_uids(build_plan):
 
 def gen_uids(arc_root, build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None):
     return _extract_uids(
-        build.gen_plan.gen_plan(
+        devtools.ya.build.gen_plan.gen_plan(
             gen_plan_options(
                 arc_root=arc_root,
                 build_root=build_root,

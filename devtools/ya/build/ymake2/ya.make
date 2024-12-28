@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build.ymake2
     __init__.py
     consts.py
     run_ymake.pyx

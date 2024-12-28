@@ -13,7 +13,7 @@ import platform
 import exts.process as process
 from subprocess import CalledProcessError
 
-import build.ymake2 as ymake2
+import devtools.ya.build.ymake2 as ymake2
 import devtools.ya.core.gsid
 from exts.strtobool import strtobool
 import yalibrary.platform_matcher as pm
@@ -324,7 +324,7 @@ def _gen_graph_file(opts, extra_dict=None):
     if 'dump_graph' in params:
         params.pop('dump_graph')
 
-    from build.graph import get_version_info
+    from devtools.ya.build.graph import get_version_info
 
     vcs_info = core_async.future(
         lambda: get_version_info(

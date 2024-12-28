@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 
-from build import graph as bgraph
+from devtools.ya.build import graph as bgraph
 import exts.yjdump as yjdump
 import exts.archive as archive
 

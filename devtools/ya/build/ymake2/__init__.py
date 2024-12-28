@@ -26,13 +26,13 @@ import devtools.ya.core.config
 import devtools.ya.core.report
 import devtools.ya.core.event_handling
 
-import build.genconf
-import build.prefetch as prefetch
-from build.ymake2 import consts
-from build.ymake2 import run_ymake
+import devtools.ya.build.genconf as genconf
+import devtools.ya.build.prefetch as prefetch
+from devtools.ya.build.ymake2 import consts
+from devtools.ya.build.ymake2 import run_ymake
 from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 
-from build.evlog.progress import PrintProgressSubscriber
+from devtools.ya.build.evlog.progress import PrintProgressSubscriber
 
 
 logger = logging.getLogger(__name__)
@@ -408,7 +408,7 @@ def run_ymake_build(**kwargs):
     if kwargs.get('use_local_conf', None):
         arc_root = devtools.ya.core.config.find_root_from(kwargs.get('abs_targets', None))
         if arc_root:
-            build.genconf.check_local_ymake(os.path.join(arc_root, 'local.ymake'))
+            genconf.check_local_ymake(os.path.join(arc_root, 'local.ymake'))
     return _ymake_build(**kwargs)
 
 
@@ -416,12 +416,12 @@ def _prepare_and_run_ymake(**kwargs):
     if kwargs['custom_conf'] is None:
         # XXX
         logger.debug('XXX Generate fake custom_conf')
-        host_platform = build.genconf.host_platform_name()
-        toolchain_params = build.genconf.gen_tc(host_platform)
+        host_platform = genconf.host_platform_name()
+        toolchain_params = genconf.gen_tc(host_platform)
         arc_root = devtools.ya.core.config.find_root_from(kwargs['abs_targets'])
-        custom_conf, _ = build.genconf.gen_conf(
+        custom_conf, _ = genconf.gen_conf(
             arc_dir=arc_root,
-            conf_dir=build.genconf.detect_conf_root(arc_root, kwargs['custom_build_directory']),
+            conf_dir=genconf.detect_conf_root(arc_root, kwargs['custom_build_directory']),
             build_type=kwargs['build_type'],
             use_local_conf=True,
             local_conf_path=None,
@@ -564,9 +564,9 @@ def _run_ymake(**kwargs):
         kwargs.get('abs_targets', None)
     )
     if arc_root:
-        plugins_roots = [os.path.join(arc_root, build.genconf.ymake_build_dir())]
+        plugins_roots = [os.path.join(arc_root, genconf.ymake_build_dir())]
         if not kwargs.pop('disable_customization', False):
-            plugins_roots.append(os.path.join(arc_root, build.genconf.ymake_build_internal_dir()))
+            plugins_roots.append(os.path.join(arc_root, genconf.ymake_build_internal_dir()))
         kwargs['plugins_dir'] = ','.join(os.path.join(x, 'plugins') for x in plugins_roots)
 
     if not kwargs.get('custom_build_directory'):

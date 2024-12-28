@@ -3,7 +3,6 @@ PY3_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build.reports
     autocheck_report.py
     build_reports.py
     configure_error.py

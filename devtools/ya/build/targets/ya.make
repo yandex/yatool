@@ -3,7 +3,6 @@ PY23_LIBRARY()
 STYLE_PYTHON()
 
 PY_SRCS(
-    NAMESPACE build.targets
     __init__.py
 )
 

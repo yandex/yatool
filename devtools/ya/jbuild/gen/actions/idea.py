@@ -25,7 +25,7 @@ import devtools.ya.core.resource as resource
 import sys
 import re
 import yalibrary.tools as tools
-import build.targets
+import devtools.ya.build.targets
 
 logger = logging.getLogger(__name__)
 
@@ -1765,7 +1765,7 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
         for p in ctx.opts.rel_targets:
             external_content_roots.add(p)
     if ctx.opts.external_content_root_modules:
-        info = build.targets.resolve(
+        info = devtools.ya.build.targets.resolve(
             ctx.arc_root, [os.path.join(os.getcwd(), x) for x in ctx.opts.external_content_root_modules]
         )
         for p in info.targets:

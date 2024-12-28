@@ -13,7 +13,7 @@ import exts.fs
 import exts.archive
 import exts.yjson
 
-from build.build_opts import SandboxAuthOptions
+from devtools.ya.build.build_opts import SandboxAuthOptions
 
 from devtools.ya.core.yarg import (
     Options,

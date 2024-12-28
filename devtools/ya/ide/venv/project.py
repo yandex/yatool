@@ -1,7 +1,7 @@
 import logging
 import os
 
-import build.build_handler
+import devtools.ya.build.build_handler
 import devtools.ya.core.yarg
 import exts.fs
 import yalibrary.makelists
@@ -97,7 +97,7 @@ class Project:
         build_params.flags['EXCLUDE_SUBMODULES'] = 'PY3TEST_PROGRAM'
         if self.params.venv_excluded_peerdirs:
             build_params.flags['EXCLUDED_PEERDIRS'] = ' '.join(self.params.venv_excluded_peerdirs)
-        exit_code = build.build_handler.do_ya_make(build_params)
+        exit_code = devtools.ya.build.build_handler.do_ya_make(build_params)
         if exit_code:
             raise ProjectError(f'Python interpreter build failed with exist code={exit_code}')
         assert os.path.isfile(self.exe_path), f'Cannot find executable: {self.exe_name}'

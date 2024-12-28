@@ -4,10 +4,10 @@ import time
 import sys
 
 import devtools.ya.core.yarg
-import build.build_opts as build_opts
-import build.graph as build_graph
-import build.ya_make as ya_make
-from build.build_facade import gen_managed_dep_tree, gen_targets_classpath
+import devtools.ya.build.build_opts as build_opts
+import devtools.ya.build.graph as build_graph
+import devtools.ya.build.ya_make as ya_make
+from devtools.ya.build.build_facade import gen_managed_dep_tree, gen_targets_classpath
 from exts.tmp import temp_dir
 import yalibrary.formatter as yaformatter
 

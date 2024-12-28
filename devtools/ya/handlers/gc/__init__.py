@@ -10,10 +10,10 @@ import devtools.ya.app
 import devtools.ya.core.yarg
 import devtools.ya.core.common_opts
 import devtools.ya.core.config as cc
-import build.ya_make as ym
+import devtools.ya.build.ya_make as ym
 from exts import fs
 from devtools.ya.core.common_opts import CustomBuildRootOptions
-from build.build_opts import LocalCacheOptions, DistCacheSetupOptions, parse_size_arg, parse_timespan_arg
+from devtools.ya.build.build_opts import LocalCacheOptions, DistCacheSetupOptions, parse_size_arg, parse_timespan_arg
 from exts.windows import on_win
 from yalibrary.runner import result_store
 import yalibrary.toolscache as tc

@@ -1,5 +1,5 @@
 import os
-import build.targets
+import devtools.ya.build.targets
 import devtools.ya.core.yarg
 import devtools.ya.core.respawn
 import devtools.ya.core.config
@@ -17,7 +17,7 @@ def resolve_and_respawn(params):
     custom_build_directory = kwargs.pop('custom_build_directory', None)
     build_root = kwargs.pop('custom_build_root', None)
 
-    info = build.targets.resolve(source_root, old_targets)
+    info = devtools.ya.build.targets.resolve(source_root, old_targets)
     devtools.ya.core.respawn.check_for_respawn(info.root)
 
     kwargs['abs_targets'] = list(map(win_path_fix, info.targets))

@@ -1,6 +1,6 @@
 from . import rigel
 
-import build.gen_plan as gen_plan
+import devtools.ya.build.gen_plan as gen_plan
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import exts.path2 as path2

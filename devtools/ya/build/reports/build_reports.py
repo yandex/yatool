@@ -34,7 +34,7 @@ def generate_results_report(builder):
 
     import devtools.ya.test.util.tools
     import devtools.ya.core.error
-    import build.reports.autocheck_report as ar2
+    import devtools.ya.build.reports.autocheck_report as ar2
 
     result_root_link = devtools.ya.test.util.tools.get_log_results_link(builder.opts)
     output_dir = builder.opts.output_root

@@ -6,10 +6,10 @@ import tempfile
 from pathlib import Path
 from typing import Iterable
 
-from build.ymake2 import ymake_sem_graph
+from devtools.ya.build.ymake2 import ymake_sem_graph
 from yalibrary import tools
 from devtools.ya.yalibrary import sjson
-from build import build_facade
+from devtools.ya.build import build_facade
 from devtools.ya.core import config as core_config
 
 
