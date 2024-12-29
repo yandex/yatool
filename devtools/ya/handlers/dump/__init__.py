@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
 import csv
 import pickle
 import exts.yjson as json
@@ -7,7 +5,6 @@ import logging
 import os
 import sys
 import enum
-import six
 from devtools.ya.handlers.dump.debug import debug_handler
 
 from devtools.ya.build.build_facade import (
@@ -466,7 +463,7 @@ def do_dir_graph(params):
 
         def get_plain_deps():
             plain_deps = set()
-            for k, v in six.iteritems(dg):
+            for k, v in dg.items():
                 plain_deps.add(k)
                 plain_deps |= set(v)
             return sorted(list(plain_deps))
@@ -1126,7 +1123,8 @@ def do_test_list(params):
 def do_conf(params):
     with temp_dir() as tmp:
         generation_conf = _do_dump(gen_conf, params, write_stdout=False, build_root=tmp)
-        print(open(generation_conf, 'r').read())
+        with open(generation_conf) as afile:
+            print(afile.read())
 
 
 def do_conf_docs(params):

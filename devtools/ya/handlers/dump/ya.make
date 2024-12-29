@@ -8,7 +8,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/pathlib2
     contrib/python/six
     contrib/python/toml
     devtools/ya/app

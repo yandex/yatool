@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
 import time
 import sys
 
@@ -13,7 +11,6 @@ import yalibrary.formatter as yaformatter
 
 from devtools.ya.jbuild.gen import base
 from devtools.ya.jbuild.gen import consts
-from six.moves import map
 
 
 def _get_subscribers(opts, app_ctx):

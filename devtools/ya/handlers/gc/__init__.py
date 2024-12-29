@@ -1,10 +1,8 @@
-from __future__ import absolute_import
 import glob
 import os
 import logging
 import sys
 import time
-import six
 
 import devtools.ya.app
 import devtools.ya.core.yarg
@@ -17,9 +15,6 @@ from devtools.ya.build.build_opts import LocalCacheOptions, DistCacheSetupOption
 from exts.windows import on_win
 from yalibrary.runner import result_store
 import yalibrary.toolscache as tc
-
-if six.PY3:
-    long = int
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +48,13 @@ def _to_timespan_in_hours(timespan):
 
 class CollectCacheOptions(LocalCacheOptions):
     def __init__(self):
-        super(CollectCacheOptions, self).__init__()
+        super().__init__()
         self.object_size_limit = None
         self.age_limit = None
         self.symlinks_ttl = 0
 
     def consumer(self):
-        return super(CollectCacheOptions, self).consumer() + [
+        return super().consumer() + [
             devtools.ya.core.yarg.ArgConsumer(
                 ['--size-limit'],
                 help='Strip build cache to size (in GiB if not set explicitly)',
@@ -112,7 +107,7 @@ class GarbageCollectionYaHandler(devtools.ya.core.yarg.CompositeHandler):
         )
 
 
-class FilterBySize(object):
+class FilterBySize:
     def __init__(self, size_limit):
         self.size_limit = size_limit
         self.total_size = 0
@@ -127,7 +122,7 @@ class FilterBySize(object):
         return self.total_size < self.size_limit
 
 
-class FilterByObjectSize(object):
+class FilterByObjectSize:
     def __init__(self, size_limit):
         self.size_limit = size_limit
 
@@ -135,7 +130,7 @@ class FilterByObjectSize(object):
         return item.size < self.size_limit
 
 
-class FilterByAge(object):
+class FilterByAge:
     def __init__(self, age_limit):
         self.age_limit = age_limit
         self.now = time.time()
@@ -206,7 +201,7 @@ def _clean_tools():
         elif os.path.isfile(full_path):
             try:
                 if os.path.getsize(full_path) < 1024 * 100:
-                    with open(full_path, 'r') as f:
+                    with open(full_path) as f:
                         if base_running_ya_bin_dir in f.read():
                             continue
             except Exception:

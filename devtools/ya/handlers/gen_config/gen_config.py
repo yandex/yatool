@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import sys
 import itertools
 import collections
@@ -7,7 +6,6 @@ import json
 import toml
 
 import devtools.ya.core.yarg
-import six
 
 toml_encoder = toml.TomlEncoder()
 
@@ -37,7 +35,7 @@ def iter_ya_options(root_handler, all_opts=False):
             pos = len(hook_prefer_order)
         return len(hook_prefer_order) - pos
 
-    for handler_name, command in six.iteritems(root_handler.sub_handlers):
+    for handler_name, command in root_handler.sub_handlers.items():
         if not command.visible:
             continue
 
@@ -137,7 +135,7 @@ def get_comment(entry):
 
 def compress_keys(data, result, trace=None):
     trace = trace or []
-    for key, val in six.iteritems(data):
+    for key, val in data.items():
         if isinstance(val, dict):
             result[".".join(trace + [key])] = val
             compress_keys(val, result, trace + [key])
@@ -222,7 +220,7 @@ def dump_config(options, handler_map, user_config):
     specific_opts = {}
     user_handler_map = {}
     compress_keys(user_config, user_handler_map)
-    for section, keys in six.iteritems(user_handler_map):
+    for section, keys in user_handler_map.items():
         if section not in handler_map:
             continue
         entries = []

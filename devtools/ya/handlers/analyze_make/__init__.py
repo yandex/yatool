@@ -29,7 +29,7 @@ def execute(action):
 
 class EvlogFileOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
-        super(EvlogFileOptions, self).__init__()
+        super().__init__()
         self.analyze_evlog_file = None
         self.analyze_distbuild_json_file = None
         self.detailed = False
@@ -53,7 +53,7 @@ class EvlogFileOptions(devtools.ya.core.yarg.Options):
 
 class AnalyzeYaMakeOpts(devtools.ya.core.yarg.Options):
     def __init__(self):
-        super(AnalyzeYaMakeOpts, self).__init__()
+        super().__init__()
         self.print_path = False
         self.args = []
 
@@ -71,7 +71,7 @@ class AnalyzeYaMakeOpts(devtools.ya.core.yarg.Options):
 
 class TimeBloatOpts(devtools.ya.core.yarg.Options):
     def __init__(self) -> None:
-        super(TimeBloatOpts, self).__init__()
+        super().__init__()
         self.show_leaf_nodes = False
         self.file_filters = []
         self.threshold = 0.1
@@ -118,7 +118,7 @@ def basic_options():
 
 class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
     def __init__(self):
-        super(AnalyzeMakeYaHandler, self).__init__('Analysis tools for ya make')
+        super().__init__('Analysis tools for ya make')
         self['timeline'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(timeline.main),
             description='Timeline of build events',

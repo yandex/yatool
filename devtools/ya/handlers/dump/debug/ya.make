@@ -7,7 +7,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/pathlib2
     devtools/ya/app
     devtools/ya/build/build_opts
     devtools/ya/core/common_opts

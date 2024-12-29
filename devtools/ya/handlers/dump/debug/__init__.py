@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import absolute_import, unicode_literals
 import datetime
 import itertools
 
@@ -32,10 +29,8 @@ import devtools.ya.core.yarg.help_level
 
 import yalibrary.evlog as evlog_lib
 
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
+from pathlib import Path
+
 try:
     from . import dump_upload
 except ImportError:

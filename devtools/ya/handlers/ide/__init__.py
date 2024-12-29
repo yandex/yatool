@@ -1,7 +1,4 @@
-from __future__ import absolute_import
 import os.path
-
-import six
 
 import devtools.ya.core.yarg as yarg
 import devtools.ya.core.config
@@ -24,6 +21,7 @@ import devtools.ya.ide.vscode_go
 import devtools.ya.ide.vscode_py
 import devtools.ya.ide.vscode_ts
 import devtools.ya.ide.vscode.opts
+import devtools.ya.ide.gradle
 
 import yalibrary.platform_matcher as pm
 
@@ -34,9 +32,6 @@ if app_config.in_house:
     import devtools.ya.ide.fsnotifier
 
 from devtools.ya.core.yarg.help_level import HelpLevel
-
-if six.PY3:
-    import devtools.ya.ide.gradle
 
 
 class TidyOptions(yarg.Options):

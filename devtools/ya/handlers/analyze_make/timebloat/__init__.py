@@ -61,7 +61,7 @@ def unify_paths(paths: list[str]) -> str:
     return result + "{" + ", ".join(sorted(residues)) + "}"
 
 
-class TreeNode(object):
+class TreeNode:
     def __init__(
         self,
         node: tp.Optional[common.Node] = None,
@@ -194,7 +194,7 @@ class TreeNode(object):
                 children.append(dct)
 
         return dict(
-            name='%s %s' % (self.name, self.text_size),
+            name='{} {}'.format(self.name, self.text_size),
             size=self._relative_size or self.get_size(),
             type=self._colorizer.css_name(self).value,
             children=children,
@@ -385,8 +385,8 @@ def gather_color_statistics(root: TreeNode) -> dict[Color, int]:
 def copy_html_resources_without_changes(resources: list[str], to: pathlib.Path):
     for item in resources:
         r = resource.find(str(RESOURCE_PREFIX / item))
-        with (to / item).open("wb") as file:
-            file.write(r)
+        with (to / item).open("wb") as afile:
+            afile.write(r)
 
 
 def get_css_colors_and_legend(colors: dict[Color, int], n_top=9, levels=10) -> tuple[list[str], list[str]]:

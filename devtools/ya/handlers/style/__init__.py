@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
 

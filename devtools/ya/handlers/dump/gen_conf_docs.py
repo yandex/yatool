@@ -1,5 +1,3 @@
-from __future__ import absolute_import, unicode_literals
-
 import exts.yjson as json
 import re
 import os
@@ -382,10 +380,10 @@ def dump_mmm_docs(
     )
 
     if conf_docs_json:
-        with open(json_dump_name, 'r') as jfile:
+        with open(json_dump_name) as jfile:
             res.stdout += jfile.read()
     else:
-        with open(json_dump_name, 'r') as jfile:
+        with open(json_dump_name) as jfile:
             contents = jfile.read()
             jdata = json.loads(contents)
         no_svn = True if 'NO_SVN_DEPENDS' in flags and strtobool(flags['NO_SVN_DEPENDS']) else False

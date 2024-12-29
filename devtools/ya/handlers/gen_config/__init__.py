@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
 
@@ -31,7 +30,7 @@ class GenConfigYaHandler(devtools.ya.core.yarg.OptsHandler):
 
     def __init__(self):
         self._root_handler = None
-        super(GenConfigYaHandler, self).__init__(
+        super().__init__(
             action=self.do_generate,
             description=self.description,
             opts=[
@@ -42,7 +41,7 @@ class GenConfigYaHandler(devtools.ya.core.yarg.OptsHandler):
 
     def handle(self, root_handler, args, prefix):
         self._root_handler = root_handler
-        super(GenConfigYaHandler, self).handle(root_handler, args, prefix)
+        super().handle(root_handler, args, prefix)
 
     def do_generate(self, args):
         gen_config.generate_config(self._root_handler, args.output, args.dump_defaults)

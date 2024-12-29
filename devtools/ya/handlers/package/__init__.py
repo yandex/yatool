@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import logging
 
 import devtools.ya.app
@@ -21,7 +20,7 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
     in_house_docs = "For more info see https://docs.yandex-team.ru/ya-make/usage/ya_package"
 
     def __init__(self):
-        super(PackageYaHandler, self).__init__(
+        super().__init__(
             action=devtools.ya.app.execute(package.packager.do_package, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description + ("\n" + self.in_house_docs if app_config.in_house else ""),
             examples=[

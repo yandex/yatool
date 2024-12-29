@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from . import helpers
 
 import devtools.ya.app
@@ -21,7 +20,7 @@ def default_options():
 
 class JavaYaHandler(devtools.ya.core.yarg.CompositeHandler):
     def __init__(self):
-        super(JavaYaHandler, self).__init__(description='Java build helpers')
+        super().__init__(description='Java build helpers')
 
         self['dependency-tree'] = devtools.ya.core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=helpers.print_ymake_dep_tree),

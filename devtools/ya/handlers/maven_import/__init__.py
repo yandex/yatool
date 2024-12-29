@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import devtools.ya.core.yarg
 import devtools.ya.jbuild.maven.maven_import as mi
 import devtools.ya.core.common_opts as common_opts
@@ -14,7 +13,7 @@ class MavenImportYaHandler(devtools.ya.core.yarg.OptsHandler):
     visible = app_config.in_house
 
     def __init__(self):
-        super(MavenImportYaHandler, self).__init__(
+        super().__init__(
             action=devtools.ya.app.execute(mi.do_import),
             opts=[
                 build_opts.MavenImportOptions(visible=HelpLevel.BASIC),

@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import collections
 import logging
 import os
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class PyYaHandler(devtools.ya.core.yarg.OptsHandler):
     def __init__(self):
-        super(PyYaHandler, self).__init__(
+        super().__init__(
             action=devtools.ya.app.execute(run),
             description='Run IPython shell with python libraries baked in',
             opts=devtools.ya.build.build_opts.ya_make_options(free_build_targets=True) + [
@@ -136,7 +135,7 @@ def run(params):
     exts.process.execve(binary, env=env, args=args)
 
 
-class Project(object):
+class Project:
     def __init__(self, params, app_ctx):
         self.params = params
         self.app_ctx = app_ctx
@@ -167,13 +166,13 @@ class Project(object):
                 py3 = True
             targets.add(target)
 
-        programs = set(target.path for target in targets if target.program)
+        programs = {target.path for target in targets if target.program}
         if len(programs) > 1:
             raise Error('Multiple programs baking is not supported: {}'.format(' '.join(sorted(programs))))
 
         unit_type = 'PY3_PROGRAM' if py3 else 'PY2_PROGRAM'
         program = None
-        deps = set(('contrib/python/ipython',))
+        deps = {'contrib/python/ipython'}
         for target in targets:
             if target.program:
                 program = target
@@ -227,7 +226,7 @@ def tmp_project(params, app_ctx):
 
 class _Target(collections.namedtuple('Target', ('path', 'makefile', 'program'))):
     def __new__(cls, path, makefile, program=False):
-        return super(_Target, cls).__new__(cls, path, makefile, program)
+        return super().__new__(cls, path, makefile, program)
 
 
 def _parse_target(target, root):

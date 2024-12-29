@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import logging
 import os.path
 import subprocess
@@ -59,7 +57,7 @@ class RunYaHandler(yarg.OptsHandler):
             self._unknown_args_as_free = True
             self._opt = yarg.merge_opts([RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions()])
 
-        return super(RunYaHandler, self).handle(root_handler, args, prefix)
+        return super().handle(root_handler, args, prefix)
 
     def format_usage(self):
         return "[OPTIONS] TARGET [--] [TARGET_ARGS]..."
@@ -90,7 +88,7 @@ class RunOptsBase(yarg.Options):
 class RunOptsStandalone(RunOptsBase):
     def __init__(self):
         self.build_targets = []
-        super(RunOptsStandalone, self).__init__(ya_run_args=[], build_type="release")
+        super().__init__(ya_run_args=[], build_type="release")
 
     @staticmethod
     def consumer():
@@ -109,7 +107,7 @@ class RunOptsStandalone(RunOptsBase):
 
 class RunOptsSupplement(RunOptsBase):
     def __init__(self, ya_run_args):
-        super(RunOptsSupplement, self).__init__(ya_run_args)
+        super().__init__(ya_run_args)
 
 
 def run(params):
@@ -205,62 +203,59 @@ def _reduced_ya_make_options():
     build_graph_cache_opts = build_opts.build_graph_cache_config_opts()
     checkout_opts = build_opts.svn_checkout_options()
 
-    useless = set(
-        [
-            build_opts.ContinueOnFailOptions,
-            build_opts.CreateSymlinksOptions,
-            build_opts.CustomGraphAndContextOptions,
-            build_opts.DefaultNodeRequirementsOptions,
-            build_opts.DumpReportOptions,
-            build_opts.ExecutorOptions,
-            build_opts.ForceDependsOptions,
-            build_opts.GenerateLegacyDirOptions,
-            build_opts.IgnoreNodesExitCode,
-            build_opts.IgnoreRecursesOptions,
-            build_opts.InstallDirOptions,
-            build_opts.JavaSpecificOptions,
-            build_opts.MDSUploadOptions,
-            build_opts.OutputOptions,
-            build_opts.SandboxUploadOptions,
-            build_opts.SonarOptions,
-            build_opts.StreamReportOptions,
-            build_opts.TestenvReportDirOptions,
-            build_opts.YaMakeOptions,
-            build_opts.YndexerOptions,
-            devtools.ya.core.common_opts.CommonUploadOptions,
-            devtools.ya.core.common_opts.MiniYaOpts,
-            devtools.ya.core.common_opts.PrintStatisticsOptions,
-            devtools.ya.core.common_opts.ProfileOptions,
-            devtools.ya.core.common_opts.ProfilerOptions,
-            devtools.ya.core.common_opts.TeamcityOptions,
-            yarg.options.RawParamsOptions,
-            devtools.ya.test.opts.ArcadiaTestsDataOptions,
-            devtools.ya.test.opts.CanonizationOptions,
-            devtools.ya.test.opts.ConsoleReportOptions,
-            devtools.ya.test.opts.CoverageOptions,
-            devtools.ya.test.opts.DebuggingOptions,
-            devtools.ya.test.opts.DepsOptions,
-            devtools.ya.test.opts.DistbuildOptions,
-            devtools.ya.test.opts.FileReportsOptions,
-            devtools.ya.test.opts.FilteringOptions,
-            devtools.ya.test.opts.FuzzOptions,
-            devtools.ya.test.opts.HermioneOptions,
-            devtools.ya.test.opts.InterimOptions,
-            devtools.ya.test.opts.InternalDebugOptions,
-            devtools.ya.test.opts.JavaOptions,
-            devtools.ya.test.opts.JUnitOptions,
-            devtools.ya.test.opts.LintersOptions,
-            devtools.ya.test.opts.ListingOptions,
-            devtools.ya.test.opts.OutputOptions,
-            devtools.ya.test.opts.PytestOptions,
-            devtools.ya.test.opts.RunTestOptions,
-            devtools.ya.test.opts.RuntimeEnvironOptions,
-            devtools.ya.test.opts.TestsOverSandboxOptions,
-            devtools.ya.test.opts.TestsOverYtOptions,
-            devtools.ya.test.opts.TestToolOptions,
-            devtools.ya.test.opts.UidCalculationOptions,
-        ]
-    )
+    useless = {
+        build_opts.ContinueOnFailOptions,
+        build_opts.CreateSymlinksOptions,
+        build_opts.CustomGraphAndContextOptions,
+        build_opts.DefaultNodeRequirementsOptions,
+        build_opts.DumpReportOptions,
+        build_opts.ExecutorOptions,
+        build_opts.ForceDependsOptions,
+        build_opts.GenerateLegacyDirOptions,
+        build_opts.IgnoreNodesExitCode,
+        build_opts.InstallDirOptions,
+        build_opts.JavaSpecificOptions,
+        build_opts.MDSUploadOptions,
+        build_opts.OutputOptions,
+        build_opts.SandboxUploadOptions,
+        build_opts.SonarOptions,
+        build_opts.StreamReportOptions,
+        build_opts.TestenvReportDirOptions,
+        build_opts.YaMakeOptions,
+        build_opts.YndexerOptions,
+        devtools.ya.core.common_opts.CommonUploadOptions,
+        devtools.ya.core.common_opts.MiniYaOpts,
+        devtools.ya.core.common_opts.PrintStatisticsOptions,
+        devtools.ya.core.common_opts.ProfileOptions,
+        devtools.ya.core.common_opts.ProfilerOptions,
+        devtools.ya.core.common_opts.TeamcityOptions,
+        yarg.options.RawParamsOptions,
+        devtools.ya.test.opts.ArcadiaTestsDataOptions,
+        devtools.ya.test.opts.CanonizationOptions,
+        devtools.ya.test.opts.ConsoleReportOptions,
+        devtools.ya.test.opts.CoverageOptions,
+        devtools.ya.test.opts.DebuggingOptions,
+        devtools.ya.test.opts.DepsOptions,
+        devtools.ya.test.opts.DistbuildOptions,
+        devtools.ya.test.opts.FileReportsOptions,
+        devtools.ya.test.opts.FilteringOptions,
+        devtools.ya.test.opts.FuzzOptions,
+        devtools.ya.test.opts.HermioneOptions,
+        devtools.ya.test.opts.InterimOptions,
+        devtools.ya.test.opts.InternalDebugOptions,
+        devtools.ya.test.opts.JavaOptions,
+        devtools.ya.test.opts.JUnitOptions,
+        devtools.ya.test.opts.LintersOptions,
+        devtools.ya.test.opts.ListingOptions,
+        devtools.ya.test.opts.OutputOptions,
+        devtools.ya.test.opts.PytestOptions,
+        devtools.ya.test.opts.RunTestOptions,
+        devtools.ya.test.opts.RuntimeEnvironOptions,
+        devtools.ya.test.opts.TestsOverSandboxOptions,
+        devtools.ya.test.opts.TestsOverYtOptions,
+        devtools.ya.test.opts.TestToolOptions,
+        devtools.ya.test.opts.UidCalculationOptions,
+    }
 
     # FOR OPENSOURCE
     useless |= {opt.__class__ for opt in build_graph_cache_opts}
