@@ -186,8 +186,7 @@ class PrepareAllDistNodesTask(UniqueTask):
     node_type = 'PrepareAllDistNodes'
     worker_pool_type = WorkerPoolType.BASE
 
-    def __init__(self, nodes, ctx, download_artifacts, results):
-        self._nodes = nodes
+    def __init__(self, ctx, download_artifacts, results):
         self._ctx = ctx
         self._download_artifacts = download_artifacts
         self._results = results

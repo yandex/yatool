@@ -14,12 +14,11 @@ class PutInDistCacheTask(object):
     node_type = 'PutInDistCache'
     worker_pool_type = WorkerPoolType.SERVICE
 
-    def __init__(self, node, build_root, dist_cache, dist_cache_codec, fmt_node, execution_log):
+    def __init__(self, node, build_root, dist_cache, dist_cache_codec, execution_log):
         self._node = node
         self._build_root = build_root
         self._dist_cache = dist_cache
         self._dist_cache_codec = dist_cache_codec
-        self._fmt_node = fmt_node
         self._ok = True
         self._skipped = False
         self._execution_log = execution_log
@@ -69,18 +68,17 @@ class PutInDistCacheTask(object):
             tags.append('[[unimp]]SKIPPED[[rst]]')
         elif not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
-        return self._fmt_node(self._node, tags)
+        return self._node.fmt(tags)
 
 
 class RestoreFromDistCacheTask(object):
     node_type = 'RestoreFromDistCache'
     worker_pool_type = WorkerPoolType.SERVICE
 
-    def __init__(self, node, build_root_set, ctx, dist_cache, fmt_node, execution_log, save_links_for_files):
+    def __init__(self, node, build_root_set, ctx, dist_cache, execution_log, save_links_for_files):
         self._node = node
         self._ctx = ctx
         self._dist_cache = dist_cache
-        self._fmt_node = fmt_node
         self._ok = True
         self._exit_code = 0
         self._execution_log = execution_log
@@ -190,4 +188,4 @@ class RestoreFromDistCacheTask(object):
         tags = ['[[c:green]]{}_DOWNLOAD[[rst]]'.format(self._dist_cache.tag())]
         if not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
-        return self._fmt_node(self._node, tags)
+        return self._node.fmt(tags)

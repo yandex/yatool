@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 
+from devtools.ya.build.graph_description import GraphNodeUid
 from exts.fs import get_file_size
 from exts.windows import on_win, RETRIABLE_FILE_ERRORS
 import exts.archive
@@ -13,6 +14,9 @@ from yalibrary.runner.tasks.enums import WorkerPoolType
 
 
 logger = logging.getLogger(__name__)
+
+
+type ResultArtifacts = dict[GraphNodeUid, list[dict]]
 
 
 TARED_NONE = 0
@@ -179,7 +183,6 @@ class ResultNodeTask(object):
         bin_result,
         lib_result,
         res,
-        fmt_node,
         need_test_trace_file,
         provider=None,
     ):
@@ -197,7 +200,6 @@ class ResultNodeTask(object):
         self._bin_result = bin_result
         self._lib_result = lib_result
         self._res = res
-        self._fmt_node = fmt_node
         self._need_test_trace_file = need_test_trace_file
 
         self._provider = provider
@@ -258,7 +260,7 @@ class ResultNodeTask(object):
         if not self._ok:
             tags.append('[[bad]]FAILED[[rst]]')
 
-        return self._fmt_node(self._node, tags)
+        return self._node.fmt(tags)
 
     def prio(self):
         return sys.maxsize

@@ -34,6 +34,9 @@ class GraphConfSection(TypedDict):
 
 
 GraphNodeUid = NewType('GraphNodeUid', str)
+SelfUid = NewType('SelfUid', str)
+StatsUid = NewType('StatsUid', str)
+StaticUid = NewType('StaticUid', str)
 
 
 class GraphNodeTargetProperties(TypedDict):
@@ -63,6 +66,9 @@ GraphNode = TypedDict(
         'type': int,
         'target_properties': NotRequired[GraphNodeTargetProperties],
         'upload': NotRequired[bool],
+        'self_uid': NotRequired[SelfUid],
+        'stats_uid': NotRequired[StatsUid],
+        'static_uid': NotRequired[StaticUid],
     },
 )
 

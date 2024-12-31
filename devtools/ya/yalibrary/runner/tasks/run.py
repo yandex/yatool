@@ -8,6 +8,7 @@ import time
 import typing as tp
 
 import exts.shlex2
+import exts.windows
 import six
 
 import devtools.ya.test.const as const
@@ -140,6 +141,8 @@ class ExecutorBase(object):
 
 
 class PopenExecutor(ExecutorBase):
+    _close_fds = not exts.windows.on_win()
+
     def run(self, **kwargs):
         retries = self.text_file_busy_retries
         while retries > 0:
@@ -152,7 +155,7 @@ class PopenExecutor(ExecutorBase):
                 logger.warning("Text file busy, retrying...")
                 time.sleep(self.text_file_busy_retry_delay)
 
-    def _run_process(self, args, stdout, env, cwd, close_fds, nice, **kwargs):
+    def _run_process(self, args, stdout, env, cwd, nice, **kwargs):
         proc = None
 
         def set_nice():
@@ -183,7 +186,13 @@ class PopenExecutor(ExecutorBase):
 
         with self._state.with_finalizer(cancel_cb):
             proc = exts.process.popen(
-                args, stderr=subprocess.PIPE, stdout=stdout, env=env, cwd=cwd, close_fds=close_fds, preexec_fn=set_nice
+                args,
+                stderr=subprocess.PIPE,
+                stdout=stdout,
+                env=env,
+                cwd=cwd,
+                close_fds=self._close_fds,
+                preexec_fn=set_nice,
             )
             stderr = ""
 
@@ -275,7 +284,6 @@ class RunNodeTask(object):
         execution_log,
         build_errors,
         display,
-        close_fds,
         preexec_fn,
         callback,
         cache,
@@ -290,7 +298,6 @@ class RunNodeTask(object):
         self._execution_log = execution_log
         self._build_errors = build_errors
         self._display = display
-        self._close_fds = close_fds
         self._preexec_fn = preexec_fn
         self._callback = callback
         self._cache = cache
@@ -394,9 +401,8 @@ class RunNodeTask(object):
                     stdout=stdout,
                     env=this_env,
                     cwd=cwd,
-                    close_fds=self._close_fds,
                     nice=self._ctx.opts.set_nice_value,
-                    executor_address=getattr(self._ctx.opts, 'executor_address', None),
+                    executor_address=self._ctx.executor_address,
                     requirements=requirements,
                 )
                 self._detailed_timings.start_stage(DetailedStages.POSTPROCESSING_COMMAND, time.time())

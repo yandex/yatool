@@ -24,6 +24,7 @@ PEERDIR(
     devtools/libs/limits/python
     devtools/executor/python
     devtools/ya/app_config
+    devtools/ya/build/graph_description
     devtools/ya/exts
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/formatter
