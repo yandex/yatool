@@ -18,6 +18,7 @@ namespace {
 
     const std::initializer_list<std::pair<TStringBuf, TStringBuf>> AllowedReplacements = {
         {"js"sv, "ts"sv},
+        {"js"sv, "tsx"sv},
     };
 
     const TStringBuf indexName = "index"sv;
