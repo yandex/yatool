@@ -686,10 +686,10 @@ def create_test_node(
                 "ASAN_SYMBOLIZER_PATH": symb_path,
                 "LSAN_SYMBOLIZER_PATH": symb_path,
                 "MSAN_SYMBOLIZER_PATH": symb_path,
+                "TSAN_SYMBOLIZER_PATH": symb_path,
                 "UBSAN_SYMBOLIZER_PATH": symb_path,
             }
         )
-        env.extend_mandatory("TSAN_OPTIONS", "external_symbolizer_path={}".format(symb_path))
 
     env["YA_CXX"] = platform_descriptor.get("params", {}).get("cxx_compiler", "")
     env["YA_CC"] = platform_descriptor.get("params", {}).get("c_compiler", "")
