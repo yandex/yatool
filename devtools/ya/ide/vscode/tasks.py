@@ -207,10 +207,10 @@ def gen_default_tasks(abs_targets, ya_bin_path, common_args):
     ]
 
 
-def gen_codegen_tasks(params, ya_bin_path, common_args, languages, venv_args=None, codegen_cpp_dir=None):
+def gen_codegen_tasks(params, ya_bin_path, common_args, venv_args=None, codegen_cpp_dir=None):
     TARGETS = " ".join(exts.shlex2.quote(arg) for arg in params.abs_targets)
     tasks = []
-    if "CPP" in languages:
+    if "CPP" in params.languages:
         codegen_args = (
             common_args
             + ["--add-result=%s" % ext for ext in consts.CODEGEN_EXTS_BY_LANG.get("CPP", [])]
@@ -236,7 +236,7 @@ def gen_codegen_tasks(params, ya_bin_path, common_args, languages, venv_args=Non
             ),
         )
 
-    if "PY3" in languages and venv_args:
+    if "PY3" in params.languages and venv_args:
         VENV_ARGS = ' '.join(exts.shlex2.quote(arg) for arg in venv_args)
         tasks.append(
             OrderedDict(
@@ -249,7 +249,7 @@ def gen_codegen_tasks(params, ya_bin_path, common_args, languages, venv_args=Non
             ),
         )
 
-    languages = [lang for lang in languages if lang != "CPP"]
+    languages = [lang for lang in params.languages if lang != "CPP"]
     if languages:
         codegen_args = (
             common_args
