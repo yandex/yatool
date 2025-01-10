@@ -744,7 +744,10 @@ def configure_report_interceptor(ctx, report_events):
             'vcs_type': ctx.vcs_type,
         },
     )
-    ctx.metrics_reporter.report_metric(monitoring.MetricNames.YA_STARTED)
+    ctx.metrics_reporter.report_metric(
+        monitoring.MetricNames.YA_STARTED,
+        urgent=True,
+    )
 
     start = time.time()
     for stat in stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION).values():
