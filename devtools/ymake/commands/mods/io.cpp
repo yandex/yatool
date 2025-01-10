@@ -28,8 +28,10 @@ namespace {
                 // for it might have been transformed (e.g., dequoted)
                 auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(names.front())));
                 return TMacroValues::TTool {.Data = pooledName};
+            } else if (names.size() > 1) {
+                throw std::runtime_error{"Tool arrays are not supported"};
             }
-            throw std::runtime_error{"Tool arrays are not supported"};
+            return TMacroValues::TTool {.Data = ""};
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

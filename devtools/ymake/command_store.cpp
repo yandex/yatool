@@ -1091,6 +1091,8 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
              return NCommands::TTermValue(TString(val));
         },
         [&](TMacroValues::TTool val) {
+            if (val.Data.empty())
+                return NCommands::TTermValue(NCommands::TTermNothing{});
             if (!ctx.CmdInfo.ToolPaths)
                 return NCommands::TTermValue(TString("TODO/unreachable?/tool/") + val.Data);
             return NCommands::TTermValue(ctx.CmdInfo.ToolPaths->at(val.Data));
