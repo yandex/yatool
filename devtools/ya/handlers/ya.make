@@ -40,7 +40,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/vmctl
         devtools/ya/handlers/whoami
         devtools/ya/handlers/wine
-        devtools/ya/handlers/yav
+        devtools/ya/handlers/vault
         devtools/ya/handlers/vim
         devtools/ya/handlers/curl
         devtools/ya/handlers/neovim
@@ -103,12 +103,12 @@ RECURSE(
     test
     tool
     upload
+    vault
     vim
     vmctl
     # webide
     whoami
     wine
-    yav
     ydb
     yql
 )
