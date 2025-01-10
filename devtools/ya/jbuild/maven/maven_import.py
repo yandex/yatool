@@ -301,13 +301,13 @@ def upload_artifacts_parallel_and_cacheble(nodes, opts, app_ctx):
 
 
 def upload_artifacts_parallel_and_cacheble_unified(poms, opts, app_ctx):
-    def get_nodes(fname, artifact):
+    def get_nodes(fname):
         result_path = os.path.join(consts.BUILD_ROOT, os.path.splitext(os.path.basename(fname))[0] + '_resource_id')
 
         # Create cachable node to upload jar
         real_upload_node = jnode.JNode('', [], [(fname, jnode.FILE)], [(result_path, jnode.FILE)]).to_serializable()
         real_upload_node['uid'] = six.ensure_str(
-            base64.b64encode(six.ensure_binary(str(hashing.fast_filehash(fname)) + str(artifact)))
+            base64.b64encode(six.ensure_binary(str(hashing.fast_filehash(fname)) + str(os.path.basename(fname))))
         )
         real_upload_node['kv']['pc'] = 'yellow'
         real_upload_node['kv']['p'] = 'UPLOAD'
@@ -347,9 +347,9 @@ def upload_artifacts_parallel_and_cacheble_unified(poms, opts, app_ctx):
 
     for pom in poms:
         if pom.get('jar_file'):
-            graph.extend(get_nodes(pom['jar_file'], pom['artifact']))
+            graph.extend(get_nodes(pom['jar_file']))
         if pom.get('source_file'):
-            graph.extend(get_nodes(pom['source_file'], pom['artifact']))
+            graph.extend(get_nodes(pom['source_file']))
 
     # Collapse nodes by uid because the same jar may have different coordinates in different repos
     by_uid = {n['uid']: n for n in graph}
