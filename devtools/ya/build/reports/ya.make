@@ -11,7 +11,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    contrib/python/multidict
     devtools/ya/build/owners
     devtools/ya/build/stat
     devtools/ya/exts
