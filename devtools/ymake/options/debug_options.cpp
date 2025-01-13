@@ -296,10 +296,10 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
         .StoreResult(&BinaryLogFileName);
     opts.AddLongOption("disable-text-log", "Disable text debug logging to stderr").SetFlag(&DisableTextLog).NoArgument();
     opts.AddLongOption("xCC", "Cache configuration")
-        .RequiredArgument("(f|d|j|u):(a|r|w|n)[,(f|d|j|u):(a|r|w|n)]*")
+        .RequiredArgument("(c|f|d|j|u):(a|r|w|n)[,(c|f|d|j|u):(a|r|w|n)]*")
         .SplitHandler(&CacheConfig, ',');
     opts.AddLongOption("xRC", "Retry ymake with given cache configuration restrictions")
-        .RequiredArgument("(f|d|j|u):(a|r|w|n)[,(f|d|j|u):(a|r|w|n)]*")
+        .RequiredArgument("(c|f|d|j|u):(a|r|w|n)[,(c|f|d|j|u):(a|r|w|n)]*")
         .SplitHandler(&RetryConfig, ',');
 }
 
