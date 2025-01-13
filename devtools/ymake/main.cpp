@@ -830,27 +830,9 @@ int main_real(TBuildConfiguration& conf) {
         yMake->CheckIsolatedProjects();
     }
 
-    // after reporting configuration errors from the cache, all other errors must be reported immediately,
-    // so we disable the delay here
-    ConfMsgManager()->DisableDelay();
-    if (conf.ShouldUseReachabilityToReportConfErrors()) {
-        yMake->ReportConfigureEventsUsingReachableNodes();
-    } else {
-        yMake->ReportConfigureEvents();
-    }
-
-    FORCE_TRACE(U, NEvent::TStageStarted("Save and compact"));
-    if (conf.WriteFsCache || conf.WriteDepsCache) {
-        bool needCompact = !yMake->CanBypassConfigure();
-        yMake->Save(conf.YmakeCache, needCompact);
-    } else if (!yMake->CanBypassConfigure()) {
-        yMake->Graph.Compact();
-    }
-
     if (!yMake->CanBypassConfigure()) {
-        yMake->Modules.Compact();
+        yMake->Compact();
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Save and compact"));
 
     bool hasBadLoops = yMake->DumpLoops();
     if (hasBadLoops) {
@@ -866,10 +848,6 @@ int main_real(TBuildConfiguration& conf) {
         return result.GetRef();
     }
 
-    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        return BR_CONFIGURE_FAILED;
-    }
-
     MakeUnique(yMake->StartTargets);
 
     if (!yMake->CanBypassConfigure()) {
@@ -881,6 +859,19 @@ int main_real(TBuildConfiguration& conf) {
     }
 
     PerformDumps(conf, *yMake);
+
+    // after reporting configuration errors from the cache, all other errors must be reported immediately,
+    // so we disable the delay here
+    ConfMsgManager()->DisableDelay();
+    if (conf.ShouldUseReachabilityToReportConfErrors()) {
+        yMake->ReportConfigureEventsUsingReachableNodes();
+    } else {
+        yMake->ReportConfigureEvents();
+    }
+
+    if (conf.WriteFsCache || conf.WriteDepsCache) {
+        yMake->Save(conf.YmakeCache, true);
+    }
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         return BR_CONFIGURE_FAILED;

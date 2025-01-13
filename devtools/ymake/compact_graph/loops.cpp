@@ -10,6 +10,8 @@
 #include <util/generic/hash_set.h>
 #include <util/stream/format.h>
 
+#include <fmt/format.h>
+
 namespace {
 
 struct TLoopId {
@@ -418,15 +420,13 @@ void TGraphLoops::RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTarget
     startTargets = std::move(newStartTargets);
 
     // 2. Remove bad nodes with connected edges and print error messages
-    const TStringBuf errorMessage = "the module will not be built due to deprecated loop";
     for (const auto& target : nodesForRemove) {
         const TDepGraph::TConstNodeRef node = graph.Get(target);
         if (node.IsValid() && IsModuleType(node.Value().NodeType)) {
-            TScopedContext context(graph.GetFileName(node));
             if (Diag()->ShowBuildLoops) {
-                YConfErr(ShowBuildLoops) << errorMessage << Endl;
+                YConfErr(ShowBuildLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
             } else {
-                YConfErr(ShowDirLoops) << errorMessage << Endl;
+                YConfErr(ShowDirLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
             }
         }
         graph.DeleteNode(target);
