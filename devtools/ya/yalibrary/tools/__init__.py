@@ -191,20 +191,6 @@ class _ToolChain(object):
         params = self.__find_toolchain(tool_name)[1].get('params', {})
         return params.get(param)
 
-    def system_libs(self, tool_name, for_platform):
-        platf = for_platform.upper() if for_platform else pm.current_os()
-
-        params = self.__find_toolchain(tool_name)[1].get('params', {})
-        sys_libs = params.get('sys_lib', {}).get(platf, [])
-        tool_root = params.get('match_root')
-        resolved_sys_libs = []
-        if tool_root is not None:
-            tool_name_var = "$({0})".format(tool_root.upper())
-            resolved_sys_libs = [
-                path.replace(tool_name_var, self.toolchain_root(tool_name, for_platform)) for path in sys_libs
-            ]
-        return ' '.join(resolved_sys_libs)
-
     def environ(self, tool_name):
         tc, toolchain, location = self.__find_toolchain(tool_name)
         params = toolchain.get('params', {})
@@ -258,10 +244,6 @@ def resource_id(name, toolchain_extra, for_platform):
 def toolchain_root(name, toolchain_extra, for_platform):
     return _ToolChain(toolchain_extra).toolchain_root(name, for_platform)
     # return ToolChain(toolchain_extra).toolchain_root(name, for_platform)
-
-
-def toolchain_sys_libs(name, toolchain_extra, for_platform):
-    return _ToolChain(toolchain_extra).system_libs(name, for_platform)
 
 
 ToolInfo = tp.TypedDict(
@@ -337,10 +319,6 @@ def iter_tools(name, tn_filter=None):
 
             for p in iter_platforms():
                 pp = descr.get('params', {})
-
-                if 'sys_lib' in pp:
-                    pp = pp.copy()
-                    pp['sys_lib'] = pp['sys_lib'].get(p['target']['os'], [])
 
                 res = {
                     'platform': p,

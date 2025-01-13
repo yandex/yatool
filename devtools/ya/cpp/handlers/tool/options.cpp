@@ -30,7 +30,6 @@ namespace NYa::NTool {
         "--key",
         "--noya-tc",
         "--platform",
-        "--print-toolchain-sys-libs",
         "--target-platform",
         "--token",
         "--toolchain",
