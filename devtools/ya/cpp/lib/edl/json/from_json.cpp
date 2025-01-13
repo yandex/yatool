@@ -1,6 +1,6 @@
 #include "from_json.h"
 
-#include <devtools/ya/cpp/lib/json_sax/reader.h>
+#include <devtools/libs/json_sax/reader.h>
 
 #include <library/cpp/json/common/defs.h>
 #include <library/cpp/json/fast_sax/parser.h>

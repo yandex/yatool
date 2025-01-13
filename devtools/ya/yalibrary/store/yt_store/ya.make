@@ -46,6 +46,7 @@ CHECK_DEPENDENT_DIRS(
     tools
     util
 
+    devtools/libs/json_sax
     devtools/ya
 
     yt/python

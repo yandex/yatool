@@ -1,4 +1,4 @@
-#include <devtools/ya/cpp/lib/json_sax/parser.h>
+#include <devtools/libs/json_sax/parser.h>
 
 namespace NYa::NJson {
     // forward machine declaration

@@ -17,7 +17,7 @@ SRCS(
 
 PEERDIR(
     contrib/python/six
-    devtools/ya/cpp/lib/json_sax
+    devtools/libs/json_sax
     library/cpp/pybind
 )
 

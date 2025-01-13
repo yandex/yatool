@@ -21,7 +21,7 @@ Streaming - описываемая реализация.
 $ ls -lh ~/dev/tmp/graph.json
 -rw-rw-r-- 1 say say 3,1G янв 15 09:53 /home/say/dev/tmp/graph.json
 
-$ devtools/ya/cpp/lib/json_sax/bench/bench ~/dev/tmp/graph.json
+$ ya run devtools/libs/json_sax/bench ~/dev/tmp/graph.json
 Fast: 9.590s: 5.993s (read) + 3.597s (parse)
 Rapid: 21.710s
 Streaming: 5.330s
@@ -31,7 +31,7 @@ Streaming: 5.330s
 $ ls -lh ~/dev/tmp/graph.json.uc
 -rw-rw-r-- 1 say say 160M фев  1 08:59 /home/say/dev/tmp/graph.json.uc
 
-$ devtools/ya/cpp/lib/json_sax/bench/bench ~/dev/tmp/graph.json.uc
+$ ya run devtools/libs/json_sax/bench ~/dev/tmp/graph.json.uc
 Fast: 12.317s: 8.941s (read) + 3.375s (parse)
 Rapid: 20.170s
 Streaming: 5.799s

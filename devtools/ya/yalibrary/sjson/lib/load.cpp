@@ -4,7 +4,7 @@
 
 #include <Python.h>
 
-#include <devtools/ya/cpp/lib/json_sax/reader.h>
+#include <devtools/libs/json_sax/reader.h>
 
 #include <library/cpp/pybind/ptr.h>
 
