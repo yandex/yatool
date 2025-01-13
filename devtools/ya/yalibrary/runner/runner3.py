@@ -609,11 +609,8 @@ class TaskContext(object):
                 res_nodes = [x for x in res_nodes if x.uid in res_set]
             download_test_results = bool(self.opts.run_tests)
             if not self.opts.download_artifacts and download_test_results:
-                if self.opts.remove_result_node:
-                    save_links_for += _get_link_outputs(res_nodes)
-                    save_links_for = list(set(save_links_for))
-                else:
-                    res_nodes = [n for n in res_nodes if "test_results_node" in n.kv]
+                save_links_for += _get_link_outputs(res_nodes)
+                save_links_for = list(set(save_links_for))
 
             self.results: frozenset[GraphNodeUid] = frozenset([n.uid for n in res_nodes])
             self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllDistNodesTask(

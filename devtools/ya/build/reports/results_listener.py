@@ -150,36 +150,6 @@ class BuildResultsListener:
                 self._notified.add(uid)
 
 
-class TestResultsListener:
-    _logger = logging.getLogger('TestResultsListener')
-
-    def __init__(self, graph, display):
-        self._nodes = {}
-        self._display = display
-        for node in graph['graph']:
-            self._nodes[node['uid']] = node
-
-    def __call__(self, res=None, build_stage=None):
-        if not res:
-            return
-        kv = self._nodes[res["uid"]].get('kv')
-        if res and kv and "test_results_node" in kv:
-            self._on_test_results_node(res)
-
-    def _on_test_results_node(self, res):
-        if 'build_root' not in res:
-            return
-        build_root = res['build_root']
-        console_report = os.path.join(build_root, "test_results.out")
-        if os.path.exists(console_report):
-            with open(console_report) as f:
-                data = f.read().strip()
-            if data:
-                self._display.emit_message(data)
-        else:
-            self._logger.error("Expected test console report file was not found by {}".format(console_report))
-
-
 class TestNodeListener:
     _logger = logging.getLogger('TestNodeListener')
 
