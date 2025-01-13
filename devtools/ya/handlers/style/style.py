@@ -88,8 +88,11 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target_: target.Targ
         if not style_opts.dry_run and style_opts.check:
             return 1
 
-        config_ = styler.lookup(target_path) if isinstance(styler, config.ConfigMixin) else "Not Applicable"
-        message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]] (config: {config_})"
+        message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]]"
+        if isinstance(styler, config.ConfigMixin):
+            path = styler.lookup(target_path, root_relative=True)
+            message += f" [[unimp]](config: {path})[[rst]]"
+
         if not style_opts.dry_run and not style_opts.check:
             display.emit_message(message)
             _flush_to_file(str(target_path), formatted_content)

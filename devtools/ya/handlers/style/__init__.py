@@ -25,7 +25,9 @@ class StyleOptions(devtools.ya.core.yarg.Options):
     @staticmethod
     def consumer():
         return [
-            devtools.ya.core.yarg.FreeArgConsumer(help='file or dir', hook=devtools.ya.core.yarg.ExtendHook(name='targets')),
+            devtools.ya.core.yarg.FreeArgConsumer(
+                help='file or dir', hook=devtools.ya.core.yarg.ExtendHook(name='targets')
+            ),
             devtools.ya.core.yarg.ArgConsumer(
                 ['--dry-run'],
                 help='Print diff instead of overwriting files',

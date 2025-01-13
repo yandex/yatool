@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import tempfile
@@ -19,6 +20,7 @@ type ConfigPath = Path
 type MaybeConfigPath = ConfigPath | tp.Literal[""]
 
 
+@functools.cache
 def _find_root() -> str:
     return devtools.ya.core.config.find_root(fail_on_error=False)
 
@@ -26,10 +28,13 @@ def _find_root() -> str:
 class ConfigMixin:
     def __init__(self, config_loaders: tuple[ConfigLoader, ...]):
         self._config_loaders = config_loaders
+        self._source_root = _find_root()
 
-    def lookup(self, path: PurePath) -> ConfigPath:
+    def lookup(self, path: PurePath, root_relative: bool = False) -> ConfigPath:
         for loader in self._config_loaders:
             if config := loader.lookup(path):
+                if self._source_root and root_relative:
+                    return config.relative_to(self._source_root)
                 return config
         raise FileNotFoundError(f"Couldn't find config for target {path}")
 
@@ -91,7 +96,9 @@ class AutoincludeConfig:
             return marisa_trie.Trie([])
         for afile in self._autoinclude_files:
             try:
-                paths.extend(os.path.join(root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile))
+                paths.extend(
+                    os.path.join(root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
+                )
             except Exception as e:
                 logger.warning(
                     "Couldn't load autoinclude paths due to error %s. Autoincludes won't be used for configs lookup",
