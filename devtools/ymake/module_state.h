@@ -339,6 +339,11 @@ public:
         InitComplete = true;
     }
 
+    void NotifyBuildComplete() {
+        BuildComplete = true;
+        OnBuildCompleted();
+    }
+
     bool IsCommitted() const {
         Y_ASSERT(!Committed || HasId());
         return Committed;
@@ -495,7 +500,7 @@ private:
 
     union {
         ui32 AllInitializationFlags = 0;
-        struct { // 9 bits used
+        struct { // 10 bits used
             ui32 Loaded: 1;
             ui32 Committed: 1;
             ui32 InitComplete: 1;
@@ -505,6 +510,7 @@ private:
             ui32 IncludesComplete: 1;
             ui32 Accessed: 1;
             ui32 GlobVarsComplete: 1;
+            ui32 BuildComplete: 1;
         };
     };
 
@@ -523,6 +529,7 @@ private:
     void AddInternalRule();
 
     void TrimVars();
+    void OnBuildCompleted();
 
     bool IsStaticLib() const {
         return GetNodeType() == EMNT_Library && !IsCompleteTarget();

@@ -574,6 +574,12 @@ void TModule::TrimVars() {
     std::swap(Vars, newVars);
 }
 
+void TModule::OnBuildCompleted() {
+    if (!IsLoaded()) {
+        TrimVars();
+    }
+}
+
 void DumpModuleInfo(IOutputStream& out, const TModule& module) {
     out << module.GetName() << Endl;
     out << "\tModule Dir: " << module.GetDir() << Endl;

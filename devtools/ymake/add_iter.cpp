@@ -1417,6 +1417,7 @@ inline void TUpdIter::Leave(TState& state) {
     if (st.Add && st.Add->IsModule) {
         delete st.Add->ModuleBldr;
         st.Add->ModuleBldr = nullptr;
+        st.Add->Module->NotifyBuildComplete();
         ResolveCaches.Drop(st.Add->Module->GetId());
         YDIAG(GUpd) << "Deleted builder for module " << st.Add->ElemId << "\n";
     }

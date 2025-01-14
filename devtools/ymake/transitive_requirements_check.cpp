@@ -661,9 +661,11 @@ namespace {
     class TFeatureVersionsLoader {
     public:
         static constexpr TStringBuf CHECK_FEATURE_VERSION_CONFLICTS = "CHECK_FEATURE_VERSION_CONFLICTS";
+        static constexpr TStringBuf FEATURE_VERSIONS = "FEATURE_VERSIONS";
 
         constexpr static const TStringBuf CONF_VARS[] = {
-            TStringBuf(CHECK_FEATURE_VERSION_CONFLICTS)
+            TStringBuf(CHECK_FEATURE_VERSION_CONFLICTS),
+            TStringBuf(FEATURE_VERSIONS),
         };
 
         static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars&) {
@@ -713,7 +715,6 @@ namespace {
         }
 
     private:
-        static constexpr TStringBuf FEATURE_VERSIONS = "FEATURE_VERSIONS";
 
         using TFeature2Version = THashMap<TStringBuf, TStringBuf>;
         using TModuleId = ui32;
