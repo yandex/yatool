@@ -985,9 +985,12 @@ struct TTarget {
         };
     };
 
-    TTarget(TNodeId id, ui32 allFlags = 0)
+    TString Tag;
+
+    TTarget(TNodeId id, ui32 allFlags = 0, TString tag = "")
         : Id(id)
         , AllFlags(allFlags)
+        , Tag(tag)
 
     {
     }

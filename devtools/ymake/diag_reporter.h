@@ -30,14 +30,16 @@ public:
     const TSymbols& Names;
     const TModules& Modules;
     const bool RenderSemantics;
-    const TMaybe<ETransition> TransitionSource;
+    const ETransition TransitionSource;
+    const bool ReportPicNopic;
 
 public:
-    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics, const TMaybe<ETransition>& transitionSource)
+    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics, const ETransition& transitionSource, bool reportPicNopic)
         : Names(names)
         , Modules(modules)
         , RenderSemantics(renderSemantics)
         , TransitionSource(transitionSource)
+        , ReportPicNopic(reportPicNopic)
     {}
 
     bool Enter(TState& state);

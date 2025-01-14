@@ -41,9 +41,9 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     const auto& node = state.TopNode();
 
-    if (TransitionSource != ETransition::None && IsModule(state.Top())) {
+    if (ReportPicNopic && TransitionSource != ETransition::None && IsModule(state.Top())) {
         auto module = Modules.Get(node->ElemId);
-        if (module->Transition != TransitionSource) {
+        if (module->Transition != ETransition::None && module->Transition != TransitionSource) {
             if (module->Transition == ETransition::Pic) {
                 FORCE_TRACE(T, RequiredPicEvent(*Modules.Get(node->ElemId)));
             } else if (module->Transition == ETransition::NoPic) {
@@ -240,7 +240,7 @@ bool TRecurseConfigureErrorReporter::Enter(TState& state) {
 
 void TYMake::ReportForeignPlatformEvents() {
     NYMake::TTraceStage scopeTracer{"Report Foreign Platform Events"};
-    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource);
+    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource, Conf.ReportPicNoPic);
     IterateAll(Graph, StartTargets, eventReporter, [](const TTarget& t) -> bool {
         return t.IsModuleTarget;
     });

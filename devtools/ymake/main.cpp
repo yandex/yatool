@@ -474,7 +474,7 @@ void TYMake::AddModulesToStartTargets() {
         auto languagesStr = GetCmdValue(langCmd);
         Split(languagesStr, " ", buildLanguages);
     }
-    auto filter = [&buildLanguages](const TModule& mod) {
+    auto langFilter = [&buildLanguages](const TModule& mod) {
         if (!mod.IsStartTarget()) {
             return false;
         }
@@ -484,11 +484,20 @@ void TYMake::AddModulesToStartTargets() {
         auto langIt = std::find(buildLanguages.begin(), buildLanguages.end(), mod.GetLang());
         return langIt != buildLanguages.end();
     };
+    auto tagFilter = [](const TModule& mod, const TTarget& target) {
+        if (!mod.IsStartTarget()) {
+            return false;
+        }
+        if (target.Tag.empty()) {
+            return true;
+        }
+        return target.Tag == mod.GetTag();
+    };
     auto startTargetsModules = GetStartTargetsModules(Graph, StartTargets);
     for (const auto& target : startTargetsModules) {
         auto mod = Modules.Get(Graph.GetFileName(Graph.Get(target.Id)).GetElemId());
         Y_ASSERT(mod);
-        if (target.IsDependsTarget || filter(*mod)) {
+        if (target.IsDependsTarget || langFilter(*mod) && tagFilter(*mod, target)) {
             StartTargets.push_back(target);
             ModuleStartTargets.insert(target);
         }
@@ -756,6 +765,7 @@ int main_real(TBuildConfiguration& conf) {
             evlogServer.ProcessStreamBlocking(Cin);
 
             if (conf.StartDirs.empty()) {
+                FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
                 return BR_OK;
             }
         }

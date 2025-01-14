@@ -23,6 +23,8 @@ struct TStartUpOptions: public TRootsOptions {
 
     bool ReadStartTargetsFromEvlog = false;
     ETransition TransitionSource = ETransition::None;
+    bool DescendIntoForeignPlatform = true;
+    bool ReportPicNoPic = false;
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);

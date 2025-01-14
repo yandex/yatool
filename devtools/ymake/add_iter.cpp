@@ -1165,6 +1165,7 @@ inline bool TUpdIter::Enter(TState& state) {
         if (isModule) {
             auto* module = YMake.Modules.Get(st.Node.ElemId);
             Y_ASSERT(module);
+
             if (module->IsLoaded()) {
                 module->ResetIncDirs();
                 for (const auto [dirId, ghostType]: module->GhostPeers) {
@@ -1328,6 +1329,24 @@ inline bool TUpdIter::Enter(TState& state) {
     }
 
     st.WasFresh = fresh;
+
+    if (isModule) {
+        auto* module = YMake.Modules.Get(st.Node.ElemId);
+        Y_ASSERT(module);
+
+        if (YMake.Conf.TransitionSource != ETransition::None && module->Transition != ETransition::None && module->Transition != YMake.Conf.TransitionSource) {
+            if (YMake.Conf.ReportPicNoPic) {
+                if (module->Transition == ETransition::Pic) {
+                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::PIC));
+                } else if (module->Transition == ETransition::NoPic) {
+                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC));
+                }
+            }
+            if (!YMake.Conf.DescendIntoForeignPlatform) {
+                return false;
+            }
+        }
+    }
 
     return fresh;
 }
@@ -1723,14 +1742,6 @@ inline void TUpdIter::Left(TState& state) {
                 if (!node->Module->IsInputsComplete()) {
                     AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
                     node->ModuleBldr->RecursiveAddInputs();
-                }
-
-                if (YMake.Conf.TransitionSource != ETransition::None && node->Module->Transition != YMake.Conf.TransitionSource) {
-                    if (node->Module->Transition == ETransition::Pic) {
-                        FORCE_UNIQ_CONFIGURE_TRACE(node->Module->GetDir(), T, PossibleForeignPlatformEvent(node->Module->GetDir(), NEvent::TForeignPlatformTarget::PIC));
-                    } else if (node->Module->Transition == ETransition::NoPic) {
-                        FORCE_UNIQ_CONFIGURE_TRACE(node->Module->GetDir(), T, PossibleForeignPlatformEvent(node->Module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC));
-                    }
                 }
             }
 

@@ -34,7 +34,7 @@ namespace NEvlogServer {
         ITargetConfigurator& Configurator_;
         TBuildConfiguration& Conf_;
         TMaybe<EMode> Mode_;
-        TVector<TString> ReachableTargets_;
+        TVector<std::pair<TString, TString>> ReachableTargets_;
         TVector<TString> PossibleTargets_;
     };
 } // namespace NEvlogServer
