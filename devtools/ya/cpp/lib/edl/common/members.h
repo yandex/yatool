@@ -47,7 +47,7 @@ namespace NYa::NEdl {
 
     template <class T>
     concept CHasEdlDefaultMember = requires(T t) {
-        T::template GetDefaultMemberRef(t);
+        T::template GetDefaultMemberRef<T>(t);
     };
 
 }
@@ -87,8 +87,8 @@ namespace NYa::NEdl {
  *    // Define struct:
  *
  *    struct TMyData {
- *        EDL_MEMBERS(
- *            ((int) MemberN1),            // ExportName = member_n1
+ *        Y_EDL_MEMBERS(
+ *            ((int) MemberN1),             // ExportName = member_n1
  *            ((int) MemberN2, "member_2"), // ExportName = member_2
  *            ((int) MemberN3, "", ::NYa::NEdl::EMemberExportPolicy::ALWAYS) // Export zero/empty value
  *        )
@@ -152,8 +152,6 @@ namespace NYa::NEdl {
  * Keep in 'Unknown' all fields which we don't process but must preserve between load and export.
  *
  * Notes:
- *    - Default member loader's methods EnsureMap() and Finish() are never called.
- *    - Default member loader is destroyed just after its AddMapValue() method is called.
  *    - Calling of OpenMap() and CloseMap() methods from default member exporter is ignored because default member items don't create new dictionary but extend existing one.
  */
 

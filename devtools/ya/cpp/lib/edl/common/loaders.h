@@ -12,7 +12,9 @@
 #include <util/system/type_name.h>
 
 #include <array>
-#include <limits>
+#include <tuple>
+#include <variant>
+#include <utility>
 
 namespace NYa::NEdl {
     struct TBaseLoader;
@@ -243,7 +245,7 @@ namespace NYa::NEdl {
         }
 
         TLoaderPtr AddMapValue(TStringBuf key) override {
-            return GetLoader(this->ValueRef_[key]);
+            return GetLoader(this->ValueRef_[K{key}]);
         }
     };
 
@@ -360,6 +362,220 @@ namespace NYa::NEdl {
         }
     };
 
+    #define Y_SET_VALUE_METHOD(...) \
+        void SetValue(__VA_ARGS__ val) override { \
+            DoSetValue(val); \
+        }
+
+    namespace {
+        template <size_t N>
+        class TVariantNestedLoader;
+
+        template <size_t N>
+        struct TVariantLoaderHelper {
+            TVariantLoaderHelper(std::array<TLoaderPtr, N>&& loaders, std::array<TLoaderPtr, N>& variantLoaders)
+                : Loaders{std::move(loaders)}
+                , VariantLoadersRef{variantLoaders}
+            {
+            }
+
+            TVariantLoaderHelper(std::array<TLoaderPtr, N>&& loaders)
+                : Loaders{std::move(loaders)}
+                , VariantLoadersRef{Loaders}
+            {
+            }
+
+            void EnsureMap() {
+                Apply([&](size_t idx) {
+                    Loaders[idx]->EnsureMap();
+                    return true;
+                });
+            }
+
+            void EnsureArray() {
+                Apply([&](size_t idx) {
+                    Loaders[idx]->EnsureArray();
+                    return true;
+                });
+            }
+
+            TLoaderPtr AddMapValue(TStringBuf key) {
+                return MakeHolder<TVariantNestedLoader<N>>(MakeNestedLoaders(&TBaseLoader::AddMapValue, key), VariantLoadersRef);
+            }
+
+            TLoaderPtr AddArrayValue() {
+                return MakeHolder<TVariantNestedLoader<N>>(MakeNestedLoaders(&TBaseLoader::AddArrayValue), VariantLoadersRef);
+            }
+
+            using ApplyFunc = std::function<bool(size_t)>;
+            void Apply(const ApplyFunc& func) {
+                bool success = false;
+                TString lastError{};
+                for (size_t i = 0; i < N; ++i) {
+                    if (auto& variantLoader = VariantLoadersRef[i]) {
+                        try {
+                            if (!func(i)) {
+                                return;
+                            }
+                            success = true;
+                        } catch (const yexception& e) {
+                            lastError = e.what();
+                            variantLoader.Reset();
+                        }
+                    }
+                }
+                if (success) {
+                    return;
+                }
+                ythrow TLoaderError() << "No suitable variant alternative found. Last error: " << lastError;
+            }
+
+            template <class... Args>
+            std::array<TLoaderPtr, N> MakeNestedLoaders(TLoaderPtr (TBaseLoader::*func)(Args...), Args... args) {
+                std::array<TLoaderPtr, N> loaders{};
+                Apply([&](size_t idx) {
+                    loaders[idx] = ((*Loaders[idx]).*func)(args...);
+                    return true;
+                });
+                return loaders;
+            }
+
+            std::array<TLoaderPtr, N> Loaders;
+            std::array<TLoaderPtr, N>& VariantLoadersRef;
+        };
+
+        template <size_t N>
+        class TVariantNestedLoader : public TBaseLoader {
+        public:
+            TVariantNestedLoader(std::array<TLoaderPtr, N>&& loaders, std::array<TLoaderPtr, N>& variantLoaders)
+                : Helper_{std::move(loaders), variantLoaders}
+            {
+            }
+
+            Y_SET_VALUE_METHOD(std::nullptr_t)
+            Y_SET_VALUE_METHOD(bool)
+            Y_SET_VALUE_METHOD(long long)
+            Y_SET_VALUE_METHOD(unsigned long long)
+            Y_SET_VALUE_METHOD(double)
+            Y_SET_VALUE_METHOD(const TStringBuf)
+
+            void EnsureMap() override {
+                Helper_.EnsureMap();
+            }
+
+            TLoaderPtr AddMapValue(TStringBuf key) override {
+                return Helper_.AddMapValue(key);
+            }
+
+            void EnsureArray() override {
+                Helper_.EnsureArray();
+            }
+
+            TLoaderPtr AddArrayValue() override {
+                return Helper_.AddArrayValue();
+            }
+
+            void Finish() override {
+                Helper_.Apply([&](size_t idx) {
+                    Helper_.Loaders[idx]->Finish();
+                    return true;
+                });
+            }
+
+        private:
+            template <class T>
+            void DoSetValue(T val) {
+                Helper_.Apply([&](size_t idx) {
+                    Helper_.Loaders[idx]->SetValue(val);
+                    return true;
+                });
+            }
+
+        private:
+            TVariantLoaderHelper<N> Helper_;
+        };
+    }
+
+    // Universal variant loader.
+    // The loader is relatively SLOW because uses exceptions and `try catch` to find a proper alternative.
+    // Don't use it in a hot path.
+    template <class... V>
+    class TLoader<std::variant<V...>> : public TLoaderForRef<std::variant<V...>> {
+    private:
+        static constexpr size_t N = sizeof...(V);
+
+    public:
+        TLoader(std::variant<V...>& val)
+            : TLoaderForRef<std::variant<V...>>(val)
+            , Helper_{
+                std::apply([&](auto&... items) {
+                    return std::array<TLoaderPtr, N>{GetLoader(items)...};
+                }, Items_)
+            }
+        {
+        }
+
+        Y_SET_VALUE_METHOD(std::nullptr_t)
+        Y_SET_VALUE_METHOD(bool)
+        Y_SET_VALUE_METHOD(long long)
+        Y_SET_VALUE_METHOD(unsigned long long)
+        Y_SET_VALUE_METHOD(double)
+        Y_SET_VALUE_METHOD(const TStringBuf)
+
+        void EnsureMap() override {
+            Helper_.EnsureMap();
+        }
+
+        TLoaderPtr AddMapValue(TStringBuf key) override {
+            return Helper_.AddMapValue(key);
+        }
+
+        void EnsureArray() override {
+            Helper_.EnsureArray();
+        }
+
+        TLoaderPtr AddArrayValue() override {
+            return Helper_.AddArrayValue();
+        }
+
+        void Finish() override {
+            Helper_.Apply([&](size_t idx) {
+                Helper_.Loaders[idx]->Finish();
+                SetAlternative(idx);
+                return false;
+            });
+        }
+
+    private:
+        template <class T>
+        void DoSetValue(T val) {
+            Helper_.Apply([&](size_t idx) {
+                Helper_.Loaders[idx]->SetValue(val);
+                SetAlternative(idx);
+                return false;
+            });
+        }
+
+        template <size_t DestIdx>
+        inline bool SetAlternativeHelper(size_t idx) {
+            if (DestIdx != idx) {
+                return true;
+            }
+            this->ValueRef_ = std::move(std::get<DestIdx>(Items_));
+            return false;
+        }
+
+        void SetAlternative(size_t idx) {
+            [&]<size_t... Is>(std::index_sequence<Is...>) {
+                (SetAlternativeHelper<Is>(idx) && ...);
+            } (std::make_index_sequence<N>{});
+        }
+
+    private:
+        std::tuple<V...> Items_{};
+        TVariantLoaderHelper<N> Helper_;
+    };
+
     template <size_t I, class T>
     TLoaderPtr GetMemberLoader(T& self) {
         return GetLoader(T::template EdlMemberInfo<I>::GetRef(self));
@@ -375,9 +591,17 @@ namespace NYa::NEdl {
     template <CHasEdlMemberInfo T>
     class TLoader<T> : public TLoaderForRef<T> {
     public:
-        using TLoaderForRef<T>::TLoaderForRef;
+        TLoader(T& val) : TLoaderForRef<T>(val)
+        {
+            if constexpr (CHasEdlDefaultMember<T>) {
+                DefaultMemberLoader_ = GetLoader(T::template GetDefaultMemberRef<T>(this->ValueRef_));
+            }
+        }
 
         inline void EnsureMap() override {
+            if constexpr (CHasEdlDefaultMember<T>) {
+                DefaultMemberLoader_->EnsureMap();
+            }
         }
 
         TLoaderPtr AddMapValue(TStringBuf key) override {
@@ -386,8 +610,7 @@ namespace NYa::NEdl {
             }
             // Fallbacks to GetDefaultMemberRef() or GetMemberLoader() if possible
             if constexpr (CHasEdlDefaultMember<T>) {
-                TLoaderPtr defaultMemberLoader = GetLoader(T::template GetDefaultMemberRef(this->ValueRef_));
-                return defaultMemberLoader->AddMapValue(key);
+                return DefaultMemberLoader_->AddMapValue(key);
             }
             if constexpr (CHasGetMemberLoader<T>) {
                 if (TLoaderPtr loader = this->ValueRef_.GetMemberLoader(key)) {
@@ -398,6 +621,9 @@ namespace NYa::NEdl {
         }
 
         void Finish() override {
+            if constexpr (CHasEdlDefaultMember<T>) {
+                DefaultMemberLoader_->Finish();
+            }
             if constexpr (CHasFinishMethod<T>) {
                 this->ValueRef_.Finish();
             }
@@ -405,5 +631,6 @@ namespace NYa::NEdl {
 
     private:
         inline static THashMap<TString, TLoaderPtr(*)(T& self)> Loaders_ = GetMemberLoaders<T>(std::make_index_sequence<T::EdlMemberCount>());
+        TLoaderPtr DefaultMemberLoader_{};
     };
 }

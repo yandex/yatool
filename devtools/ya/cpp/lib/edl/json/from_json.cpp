@@ -5,6 +5,8 @@
 #include <library/cpp/json/common/defs.h>
 #include <library/cpp/json/fast_sax/parser.h>
 
+#include <util/stream/file.h>
+
 namespace NYa::NEdl {
     using ::NJson::TJsonCallbacks;
     namespace {
@@ -247,6 +249,12 @@ namespace NYa::NEdl {
 
     void LoadJson(IInputStream& in, TLoaderPtr&& loader) {
         TParserCallbacks callbacks{std::move(loader)};
+        NYa::NJson::ReadJson(in, &callbacks);
+    }
+
+    void LoadJsonFromFile(TFsPath fileName, TLoaderPtr&& loader) {
+        TParserCallbacks callbacks{std::move(loader)};
+        TFileInput in{fileName};
         NYa::NJson::ReadJson(in, &callbacks);
     }
 }
