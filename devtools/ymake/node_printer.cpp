@@ -27,7 +27,8 @@
 #include <devtools/ymake/vars.h>
 
 #include <library/cpp/containers/top_keeper/top_keeper.h>
-#include <library/cpp/json/writer/json.h>
+#include <library/cpp/json/json_reader.h>
+#include <library/cpp/json/json_writer.h>
 #include <library/cpp/string_utils/levenshtein_diff/levenshtein_diff.h>
 
 #include <util/folder/path.h>
@@ -93,6 +94,17 @@ namespace {
             Y_ASSERT(expr);
             return FormatCmd(varId, varName, commands.PrintCmd(*expr));
         }
+    }
+
+    void PatchStrings(const std::invocable<const TString&> auto f, NJson::TJsonValue& x) {
+        if (x.IsMap())
+            for (auto& [k, v] : x.GetMapSafe())
+                PatchStrings(f, v);
+        else if (x.IsArray())
+            for (auto& v : x.GetArraySafe())
+                PatchStrings(f, v);
+        else if (x.IsString())
+            x = f(x.GetString());
     }
 }
 
@@ -2135,8 +2147,19 @@ TString TDumpDartProc::SubstModuleVars(const TStringBuf& data, const TModule& mo
 
     auto moduleDirsVars = module.ModuleDirsToVars();
     TCommandInfo cmdInfo(RestoreContext.Conf, &RestoreContext.Graph, nullptr);
-    dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, moduleDirsVars);
-    dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, module.Vars);
+
+    NJson::TJsonValue jsonData;
+    if (NJson::ReadJsonTree(dartData, &jsonData)) {
+        PatchStrings([&](TString s) {
+            s = cmdInfo.SubstMacroDeeply(nullptr, s, moduleDirsVars, false, ECF_Unset);
+            s = cmdInfo.SubstMacroDeeply(nullptr, s, module.Vars, false, ECF_Unset);
+            return s;
+        }, jsonData);
+        dartData = NJson::WriteJson(jsonData, false);
+    } else {
+        dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, moduleDirsVars);
+        dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, module.Vars);
+    }
 
     if (Option == EOption::Encoded) {
         dartData = Base64Encode(dartData);
