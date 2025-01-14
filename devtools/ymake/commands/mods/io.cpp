@@ -216,11 +216,17 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get_if<TMacroValues::TOutput>(&args[0]);
-            if (!arg0)
-                throw TConfigurationError() << "Modifier [[bad]]" << ToString(Id) << "[[rst]] must be applied to a valid output";
-            ctx.Sink.Outputs.UpdateCoord(arg0->Coord, [&](auto& var) {Do(var);});
-            return *arg0;
+            if (auto arg0 = std::get_if<TMacroValues::TOutput>(&args[0])) {
+                ctx.Sink.Outputs.UpdateCoord(arg0->Coord, [&](auto& var) {Do(var);});
+                return *arg0;
+            }
+            if (auto arg0 = std::get_if<TMacroValues::TOutputs>(&args[0])) {
+                std::for_each(arg0->Coords.begin(), arg0->Coords.end(), [&](const auto coord) {
+                    ctx.Sink.Outputs.UpdateCoord(coord, [&](auto& var) {Do(var);});
+                });
+                return *arg0;
+            }
+            throw TConfigurationError() << "Modifier [[bad]]" << ToString(Id) << "[[rst]] must be applied to a valid output";
         }
     protected:
         virtual void Do(TCompiledCommand::TOutput& output) const = 0;
