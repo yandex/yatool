@@ -4,7 +4,6 @@
 #include "tinymap.h"
 
 #include "devtools/ya/cpp/lib/edl/common/export_helpers.h"
-#include "devtools/ya/cpp/lib/edl/common/loaders.h"
 #include "devtools/ya/cpp/lib/edl/common/members.h"
 
 #include <library/cpp/json/writer/json_value.h>
@@ -44,7 +43,7 @@ namespace NYa::NGraph {
         )
     };
 
-    using TGlobalResourceInfo = std::variant<std::monostate, TGlobalSingleResource, TGlobalResourceBundle>;
+    using TGlobalResourceInfo = std::variant<TGlobalSingleResource, TGlobalResourceBundle>;
 
     struct TGlobalResource {
         Y_EDL_MEMBERS(
@@ -194,58 +193,6 @@ namespace NYa::NGraph {
 }
 
 namespace NYa::NEdl {
-    template <>
-    class TLoader<NYa::NGraph::TGlobalResourceInfo> : public TLoaderForRef<NYa::NGraph::TGlobalResourceInfo> {
-    public:
-        using TLoaderForRef<NYa::NGraph::TGlobalResourceInfo>::TLoaderForRef;
-
-        void EnsureMap() override {
-        }
-
-        TLoaderPtr AddMapValue(TStringBuf key) override {
-            if (key == "resource") {
-                auto valPtr = InitResourceVariant<NYa::NGraph::TGlobalSingleResource>();
-                if (valPtr) {
-                    return GetLoader(valPtr->Resource);
-                }
-            } else if (key == "name") {
-                auto valPtr = InitResourceVariant<NYa::NGraph::TGlobalSingleResource>();
-                if (valPtr) {
-                    return GetLoader(valPtr->Name);
-                }
-            } else if (key == "strip_prefix") {
-                auto valPtr = InitResourceVariant<NYa::NGraph::TGlobalSingleResource>();
-                if (valPtr) {
-                    return GetLoader(valPtr->StripPrefix);
-                }
-            } else if (key == "resources") {
-                auto valPtr = InitResourceVariant<NYa::NGraph::TGlobalResourceBundle>();
-                if (valPtr) {
-                    return GetLoader(valPtr->Resources);
-                }
-            }
-            ythrow TLoaderError() << "Unexpected map key '" << key << "'";
-        }
-
-        void Finish() override {
-            if (std::holds_alternative<std::monostate>(ValueRef_)) {
-                ythrow TLoaderError() << "neither 'resource' nor 'resources' key is found";
-            }
-        }
-
-    private:
-        template <class T>
-        T* InitResourceVariant() {
-            if (std::holds_alternative<std::monostate>(ValueRef_)) {
-                ValueRef_ = T{};
-            }
-            if (std::holds_alternative<T>(ValueRef_)) {
-                return &std::get<T>(ValueRef_);
-            }
-            return nullptr;
-        }
-    };
-
     template <>
     struct TEmptyChecker<NYa::NGraph::EModuleType> {
         static bool IsEmpty(const NYa::NGraph::EModuleType& val) {
