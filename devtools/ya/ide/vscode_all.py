@@ -225,7 +225,8 @@ class VSCodeProject:
                         "${capture}.pb.cc, ${capture}.grpc.pb.cc, ${capture}.pb.go, "
                         "${capture}_pb2.py, ${capture}_pb2_grpc.py, ${capture}_pb2.pyi, "
                         "${capture}_client.usrv.pb.cpp, ${capture}_client.usrv.pb.hpp, "
-                        "${capture}_service.usrv.pb.cpp, ${capture}_service.usrv.pb.hpp",
+                        "${capture}_service.usrv.pb.cpp, ${capture}_service.usrv.pb.hpp, "
+                        "${capture}.apphost.h",
                         "*.fbs": "${capture}.fbs.h, ${capture}.iter.fbs.h, ${capture}.fbs.cpp, "
                         "${capture}.py3.fbs.pysrc, ${capture}.fbs.gosrc",
                     },
