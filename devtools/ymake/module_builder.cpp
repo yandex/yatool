@@ -434,10 +434,9 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         TStringBuf cmd = Vars.Get1(cmdName);
         if (cmd.empty()) {
             if (cmdKind == EModuleCmdKind::Global) {
-                YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << cmd << Endl;
-            }
-            else {
-                YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << cmd << Endl;
+                YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
+            } else {
+                YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
             }
             cmdKind = EModuleCmdKind::Fail;
         }
@@ -584,7 +583,7 @@ bool TModuleBuilder::ProcessMakeFile() {
     }
 
     // These functions perform some macro substitution inside and it is not guaranteed that
-    // values are known at the time of arrtival. Here we know all the VARs, so reapply forcefully just in case.
+    // values are known at the time of arrival. Here we know all the VARs, so reapply forcefully just in case.
     // Internal de-duplication code ensures that directies are not added twice.
     ApplyVarAsMacro(NMacro::PEERDIR, true);
     ApplyVarAsMacro(NMacro::SRCDIR, true);

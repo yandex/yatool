@@ -242,7 +242,12 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     AllVarsNeedSubst = saveAllVarsNeedSubst;
 
     if (!SplitArgs(prepArgs, tempArgs)) {
-        throw yexception() << "Expected argument list in () brackets, got " << prepArgs;
+        TStringBuilder s;
+        if (modsVar) {
+            s << " ";
+            for (const auto& v: *modsVar) s << v.Name << " ";
+        }
+        throw yexception() << "Expected argument list in () brackets, got [" << prepArgs << "] in [" << s << "]";
     }
 
     TStringBuf macroName = GetCmdName(Get1(macroDefVar));
