@@ -9,24 +9,26 @@ from exts import fs
 def open_file(fname, size):
     fs.create_dirs(os.path.dirname(fname))
     try:
-        return open(fname, "r+b")
-    except IOError as e:
+        # if the size doesn't match we recreate the file
+        if size == fs.get_file_size(fname):
+            return open(fname, "r+b")
+    except (IOError, OSError) as e:
         if e.errno != errno.ENOENT:
             raise
 
-        temp = "{}.{}.tmp".format(fname, os.getpid())
-        with open(temp, 'wb') as f:
-            f.seek(size - 1)
-            f.write(b'\0')
+    temp = "{}.{}.tmp".format(fname, os.getpid())
+    with open(temp, 'wb') as f:
+        f.seek(size - 1)
+        f.write(b'\0')
 
-        try:
-            os.unlink(fname)
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
+    try:
+        os.unlink(fname)
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
 
-        os.rename(temp, fname)
-        return open(fname, "r+b")
+    os.rename(temp, fname)
+    return open(fname, "r+b")
 
 
 class OpenHashMap(object):

@@ -474,9 +474,11 @@ class TaskContext(object):
         if not self.opts.use_distbuild:
             build_time_cache_availability = schedule_strategy.BuildTimeCacheAvailability.YES
             try:
+                cache_size = 20 << 20  # 20MB
                 self.build_time_cache = UsageMap(
-                    os.path.join(self._ctx.garbage_dir, 'cache', 'runner_build_time', 'rbt')
+                    os.path.join(self._ctx.garbage_dir, 'cache', 'runner_build_time', 'rbt'), file_size_b=cache_size
                 )
+                self._exit_stack.enter_context(contextlib.closing(self.build_time_cache))
             except Exception as e:
                 build_time_cache_availability = schedule_strategy.BuildTimeCacheAvailability.NO
                 logger.warning('Could not create build time cache due to error {!r}'.format(e))

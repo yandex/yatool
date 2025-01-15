@@ -8,8 +8,8 @@ from yalibrary.store import hash_map
 class UsageMap(object):
     FILE_SIZE = 12 * 1003001
 
-    def __init__(self, fname):
-        self._f = hash_map.open_file(fname, self.FILE_SIZE)
+    def __init__(self, fname, file_size_b=FILE_SIZE):
+        self._f = hash_map.open_file(fname, file_size_b)
         self._mm = mmap.mmap(self._f.fileno(), 0)
         self._hmap = hash_map.OpenHashMap(self._mm, 'II')
 
