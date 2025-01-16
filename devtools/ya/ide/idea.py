@@ -163,7 +163,7 @@ def do_idea(params):
             if rc != 0:
                 sys.exit(rc)
 
-        for f in idea.up_funcs(ctx, ctx.nodes, od, params.idea_project_root, params.dry_run):
+        for f in idea.up_funcs(ctx, od, params.idea_project_root, params.dry_run):
             f()
 
     if not params.dry_run and jopts.copy_shared_index_config:

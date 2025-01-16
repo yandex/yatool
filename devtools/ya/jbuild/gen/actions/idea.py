@@ -1097,7 +1097,7 @@ def cached_relativize(path, cache):
     return result
 
 
-def process_path(path, ctx, nodes, results_root, project_root, relativize_cache, dry_run):
+def process_path(path, ctx, results_root, project_root, relativize_cache, dry_run):
     target = ctx.by_path[path]
 
     if not target.is_idea_target():
@@ -1137,11 +1137,11 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
     prefixes = []
     gens = []
 
-    ind = {n: i for i, n in enumerate(nodes)}
+    ind = {n: i for i, n in enumerate(ctx.nodes)}
 
     by_o = collections.defaultdict(list)
 
-    for n in nodes:
+    for n in ctx.nodes:
         for o in n.outs:
             by_o[o[0]].append(n)
 
@@ -1202,23 +1202,8 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
 
             proj = srcdir.replace(consts.BUILD_ROOT, project_root)
 
-            if target.is_idea_target():
-                funcz.append(funcs.rm(proj))
-                funcz.append(funcs.cp(srcdir.replace(consts.BUILD_ROOT, results_root), proj))
-            else:
-                to_jarx = []
-
-                for f in os.listdir(srcdir.replace(consts.BUILD_ROOT, results_root)):
-                    o = graph_base.hacked_path_join(srcdir, f)
-
-                    if o in by_o and is_od(o):
-                        to_jarx.append(o)
-
-                funcz.append(funcs.rm(proj))
-                funcz.append(funcs.mkdirp(proj))
-
-                for f in sorted(to_jarx, key=key):
-                    funcz.append(funcs.jarx(f.replace(consts.BUILD_ROOT, results_root), proj))
+            funcz.append(funcs.rm(proj))
+            funcz.append(funcs.cp(srcdir.replace(consts.BUILD_ROOT, results_root), proj))
 
             srcdir = srcdir.replace(consts.BUILD_ROOT, PROJECT_DIR, 1)
 
@@ -1237,15 +1222,13 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
         funcz.append(funcs.rm(proj))
         funcz.append(funcs.mkdirp(proj))
 
-        dll_deps = ctx.dlls(path)
-        if target.is_idea_target():
-            dll_deps = set()
-            for peer in target.plain[consts.NON_NAMAGEABLE_PEERS][0]:
-                peer = ctx.by_path.get(strip_root(peer))
-                if peer and peer.provides_dll():
-                    for dll in peer.output_dll_paths():
-                        dll_deps.add(dll)
-            dll_deps = sorted(dll_deps)
+        dll_deps = set()
+        for peer in target.plain[consts.NON_NAMAGEABLE_PEERS][0]:
+            peer = ctx.by_path.get(strip_root(peer))
+            if peer and peer.provides_dll():
+                for dll in peer.output_dll_paths():
+                    dll_deps.add(dll)
+        dll_deps = sorted(dll_deps)
 
         for dll in dll_deps:
             src = dll.replace(consts.BUILD_ROOT, results_root)
@@ -1308,11 +1291,7 @@ def process_path(path, ctx, nodes, results_root, project_root, relativize_cache,
 
         conts = [Cotent(op.join(ctx.arc_root, path), in_roots)] + [Cotent(r.path, [r]) for r in out_roots]
 
-        cp = ctx.classpath(target.path, consts.CLS)
-        if target.is_idea_target():
-            cp = [
-                ctx.by_path[strip_root(p)].output_jar_path() for p in target.plain.get('MANAGED_PEERS_CLOSURE', [[]])[0]
-            ]
+        cp = [ctx.by_path[strip_root(p)].output_jar_path() for p in target.plain.get('MANAGED_PEERS_CLOSURE', [[]])[0]]
         dep_paths = [cached_relativize(op.dirname(x), relativize_cache) for x in cp if x != target.output_jar_path()]
         dep_paths = list(map(graph_base.hacked_normpath, list(graph_base.uniq_first_case(dep_paths))))
         dep_scopes = ['COMPILE' for __ in dep_paths]
@@ -1629,8 +1608,8 @@ def collect_dlls(ctx, result_nodes, results_root, project_root):
     return funcz
 
 
-def up_funcs(ctx, nodes, results_root, project_root, dry_run):
-    res, paths = idea_results(ctx, nodes)
+def up_funcs(ctx, results_root, project_root, dry_run):
+    res, paths = idea_results(ctx, ctx.nodes)
 
     by_path = {}  # by_path value is None | Module | Library
     copy = []
@@ -1640,7 +1619,7 @@ def up_funcs(ctx, nodes, results_root, project_root, dry_run):
         target = ctx.by_path[p]
         assert target.provides_jar()
 
-        by_path[p], f = process_path(p, ctx, nodes, results_root, project_root, relativize_cache, dry_run)
+        by_path[p], f = process_path(p, ctx, results_root, project_root, relativize_cache, dry_run)
         copy.extend(f)
 
     if not ctx.opts.separate_tests_modules:

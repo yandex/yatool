@@ -63,16 +63,13 @@ def gen_ctx(
 def iter_path_nodes(path, ctx):
     assert path in ctx.by_path
 
-    def fix_io(n):
-        node.resolve_ins(ctx.arc_root, n)
-        node.resolve_outs(n)
-        return n
-
     t = ctx.by_path[path]
     yield graph_node.YmakeGrapNodeWrap(path, t.node, t.graph)
     if t.plain is not None:
         for nod in fetch_test_data.fetch_test_data(path, t, ctx):
-            yield fix_io(nod)
+            node.resolve_ins(ctx.arc_root, nod)
+            node.resolve_outs(nod)
+            yield nod
 
 
 def iter_nodes(ctx):
