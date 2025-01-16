@@ -28,7 +28,6 @@ namespace NYa::NTool::NPrivate {
                                     foundToolChain = &toolChain;
                                 }
                             }
-
                         }
                         else {
                             if (toolChainPriority < OTHER_TOOL_PRIORITY) {
@@ -54,24 +53,24 @@ namespace NYa::NTool::NPrivate {
         const NYaConfJson::TBottle& bottle,
         const TCanonizedPlatform& forPlatform
     ) {
-        const NJson::TJsonValue* formulaJson = &bottle.Formula;
-        if (formulaJson->IsString()) {
-            TFsPath formulaPath = formulaJson->GetString();
+        const NYaConfJson::TFormula* formula = &bottle.Formula;
+        if (std::holds_alternative<TString>(*formula)) {
+            TFsPath formulaPath = std::get<TString>(*formula);
             try {
-                formulaJson = &config.YaConfFormula(formulaPath); // It's safe to use a raw pointer because formulas are stored in the config reader internal cache
+                formula = &config.YaConfFormula(formulaPath); // It's safe to use a raw pointer because formulas are stored in the config reader internal cache
             } catch (const yexception& e) {
                 throw yexception() << "Cannot read formula from '" << formulaPath << "': " << e.what();
             }
         }
         TFsPath toolChainPath;
         for (const auto& getter : toolChainPathGetters) {
-            toolChainPath = getter->GetPath(toolRoot, bottle, *formulaJson, forPlatform);
+            toolChainPath = getter->GetPath(toolRoot, bottle, *formula, forPlatform);
             if (toolChainPath) {
                 break;
             }
         }
         if (!toolChainPath) {
-            throw yexception() << "Unsupported formula: " << NJsonWriter::TBuf().WriteJsonValue(&bottle.Formula).Str();
+            throw yexception() << "Unsupported formula type: " << std::visit([](auto&& arg) { return TypeName(arg); }, *formula);
         }
         if (!toolChainPath.Exists()) {
             throw yexception() << "Tool chain path doesn't exist: " << toolChainPath;
@@ -94,9 +93,14 @@ namespace NYa::NTool::NPrivate {
         }
 
         TFsPath toolPath = toolChainPath;
-        const TVector<TString> pathItems = bottle.Executable->at(toolChainTool.Executable.GetRef());
-        for (const TString& pathItem : pathItems) {
-            toolPath /= pathItem;
+        if (const TString* executable = std::get_if<TString>(&bottle.Executable.GetRef())) {
+            toolPath /= *executable;
+        } else {
+            const auto& executableMap = std::get<NYaConfJson::TBottleExecutableMap>(bottle.Executable.GetRef());
+            const TVector<TString>& pathItems = executableMap.at(toolChainTool.Executable.GetRef());
+            for (const TString& pathItem : pathItems) {
+                toolPath /= pathItem;
+            }
         }
         return toolPath;
     }

@@ -1,85 +1,57 @@
 #pragma once
 
-#include "ya_conf_json_types.h"
-#include "jsonload.h"
+#include <devtools/libs/yaplatform/platform.h>
+#include <devtools/libs/yaplatform/platform_map.h>
+#include <devtools/ya/cpp/lib/edl/common/loaders.h>
 
-namespace NYa::NJsonLoad {
-    using namespace NYa::NYaConfJson;
+namespace NYa::NEdl {
+    template <>
+    class TLoader<TLegacyPlatform> : public TLoaderForRef<TLegacyPlatform> {
+    public:
+        using TLoaderForRef<TLegacyPlatform>::TLoaderForRef;
 
-    template<>
-    inline void FromJson(TPlatformReplacements& replacements, const TWrappedJsonValue& wrappedJson) {
-        for (const auto& [from, jsonTo] : wrappedJson.GetMap()) {
-            TVector<TString> stringTo{};
-            FromJson(stringTo, jsonTo);
-            TVector<TCanonizedPlatform> to{};
-            for (const TString& s : stringTo) {
-                to.push_back(TCanonizedPlatform(s));
+        inline void EnsureMap() override {
+        }
+
+        inline TLoaderPtr AddMapValue(TStringBuf key) override {
+            if (key == "os") {
+                return GetLoader(this->ValueRef_.Os);
             }
-            replacements.emplace(TCanonizedPlatform(from), std::move(to));
-        }
-    }
-
-    template<>
-    inline void FromJson(TFormulaBase& formula, const TWrappedJsonValue& wrappedJson) {
-        FromJson(formula.PlatformReplacements, wrappedJson.GetItem("platform_replacements"));
-    }
-
-    template<>
-    inline void FromJson(NYa::TLegacyPlatform& platform, const TWrappedJsonValue& wrappedJson) {
-        FromJson(platform.Os, wrappedJson.GetItem("os"));
-        FromJson(platform.Arch, wrappedJson.GetItem("arch"), {});
-    }
-
-    template<>
-    inline void FromJson(TToolChainTool& tool, const TWrappedJsonValue& wrappedJson) {
-        FromJson(tool.Bottle, wrappedJson.GetItem("bottle"));
-        FromJson(tool.Executable, wrappedJson.GetItem("executable"));
-    }
-
-    template<>
-    inline void FromJson(TToolChainPlatform& platform, const TWrappedJsonValue& wrappedJson) {
-        FromJson(platform.Host, wrappedJson.GetItem("host"));
-        FromJson(platform.Target, wrappedJson.GetItem("target"));
-        FromJson(platform.Default, wrappedJson.GetItem("default"), false);
-    }
-
-    template<>
-    inline void FromJson(TTool& tool, const TWrappedJsonValue& wrappedJson) {
-        FromJson(tool.Description, wrappedJson.GetItem("description"), TString{"No description"});
-        FromJson(tool.Visible, wrappedJson.GetItem("visible"), true);
-    }
-
-    template<>
-    inline void FromJson(TBottle& bottle, const TWrappedJsonValue& wrappedJson) {
-        bottle.Name = wrappedJson.GetKey();
-        FromJson(bottle.Formula, wrappedJson.GetItem("formula"));
-        if (wrappedJson.Has("executable")) {
-            const auto& executable = wrappedJson.GetItem("executable");
-            if (executable.GetType() == NJson::JSON_STRING) {
-                TString exec = executable.GetString();
-                bottle.Executable = TBottleExecutables::TValueType();
-                (*bottle.Executable)[exec] = {exec};
-            } else {
-                FromJson(bottle.Executable, executable);
+            if (key == "arch") {
+                return GetLoader(this->ValueRef_.Arch);
             }
-        }
-    }
 
-    template<>
-    inline void FromJson(TToolChain& toolChain, const TWrappedJsonValue& wrappedJson) {
-        toolChain.Name = wrappedJson.GetKey();
-        FromJson(toolChain.Tools, wrappedJson.GetItem("tools"));
-        FromJson(toolChain.Platforms, wrappedJson.GetItem("platforms"));
-        if (wrappedJson.Has("params")) {
-            FromJson(toolChain.Params, wrappedJson.GetItem("params"));
+            ythrow TLoaderError() << "Unexpected map key '" << key << "'";
         }
-        FromJson(toolChain.Env, wrappedJson.GetItem("env"));
-    }
+    };
 
-    template<>
-    inline void FromJson(TYaConf& conf, const TWrappedJsonValue& wrappedJson) {
-        FromJson(conf.Tools, wrappedJson.GetItem("tools"));
-        FromJson(conf.Bottles, wrappedJson.GetItem("bottles"));
-        FromJson(conf.ToolChains, wrappedJson.GetItem("toolchain"));
-    }
+    template <>
+    class TLoader<TCanonizedPlatform> : public TLoaderForRef<TCanonizedPlatform> {
+    public:
+        using TLoaderForRef<TCanonizedPlatform>::TLoaderForRef;
+
+        inline void SetValue(const TStringBuf val) override {
+            this->ValueRef_ = TCanonizedPlatform(val);
+        }
+    };
+
+    template <>
+    class TLoader<TResourceDesc> : public TLoaderForRef<TResourceDesc> {
+    public:
+        using TLoaderForRef<TResourceDesc>::TLoaderForRef;
+
+        void EnsureMap() override {
+        }
+
+        TLoaderPtr AddMapValue(TStringBuf key) override {
+            if (key == "uri") {
+                return GetLoader(this->ValueRef_.Uri);
+            }
+            if (key == "strip_prefix") {
+                return GetLoader(this->ValueRef_.StripPrefix);
+            }
+
+            ythrow TLoaderError() << "Unexpected map key '" << key << "'";
+        }
+    };
 }

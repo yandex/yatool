@@ -15,6 +15,8 @@ namespace NYa {
     constexpr TStringBuf ANY_PLATFORM_UC{"ANY"};
 
     struct TResourceDesc {
+        bool operator==(const TResourceDesc&) const = default;
+
         TString Uri;
         ui32 StripPrefix = 0;
     };

@@ -18,7 +18,7 @@ namespace NYa {
         // Get arcadia root from a current working dir and only as a last resort use YA_SOURCE_ROOT.
         virtual TFsPath ArcadiaRoot() const = 0;
         virtual const NYaConfJson::TYaConf& YaConf() const = 0;
-        virtual const NJson::TJsonValue& YaConfFormula(const TFsPath& arcadiaPath) const = 0;
+        virtual const NYaConfJson::TFormula& YaConfFormula(const TFsPath& arcadiaPath) const = 0;
         virtual ~IConfig() = default;
     };
 

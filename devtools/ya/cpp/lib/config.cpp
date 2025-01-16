@@ -3,6 +3,7 @@
 #include "ya_conf_json_loaders.h"
 
 #include <devtools/ya/app_config/lib/config.h>
+#include <devtools/ya/cpp/lib/edl/json/from_json.h>
 
 #include <library/cpp/resource/resource.h>
 
@@ -11,6 +12,7 @@
 #include <util/generic/lazy_value.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/singleton.h>
+#include <util/stream/file.h>
 #include <util/string/cast.h>
 #include <util/string/type.h>
 #include <util/system/env.h>
@@ -99,11 +101,12 @@ namespace NYa {
                 return YaConf_.GetRef();
             }
 
-            const NJson::TJsonValue& YaConfFormula(const TFsPath& arcadiaPath) const override {
-                if (const NJson::TJsonValue* ptr = FormulaCache_.FindPtr(arcadiaPath)) {
+            const NYaConfJson::TFormula& YaConfFormula(const TFsPath& arcadiaPath) const override {
+                if (const NYaConfJson::TFormula* ptr = FormulaCache_.FindPtr(arcadiaPath)) {
                     return *ptr;
                 }
-                FormulaCache_[arcadiaPath] = ConfigImpl<NJson::TJsonValue>(arcadiaPath);
+                FormulaCache_.emplace(arcadiaPath, ConfigImpl<NYaConfJson::TFormula>(arcadiaPath));
+                // FormulaCache_[arcadiaPath] = ConfigImpl<NYaConfJson::TFormula>(arcadiaPath);
                 return FormulaCache_[arcadiaPath];
             }
 
@@ -211,7 +214,7 @@ namespace NYa {
                     const TString resFsPath = RES_FS_ROOT + "/" + resourcePath;
                     DEBUG_LOG << "Load config from resource: " << resourcePath << "\n";
                     TString data = NResource::Find(resourcePath);
-                    NJsonLoad::LoadFromBuffer(value, data);
+                    NYa::NEdl::LoadJson(data, value);
                     return value;
                 }
 
@@ -224,7 +227,7 @@ namespace NYa {
                     }
 
                     DEBUG_LOG << "Load config from: " << path << "\n";
-                    NJsonLoad::LoadFromFile(value, path);
+                    NYa::NEdl::LoadJsonFromFile(path.GetPath(), value);
                     return value;
                 }
 
@@ -244,7 +247,7 @@ namespace NYa {
             TLazyValue<int> ToolCacheVersion_;
             TLazyValue<TFsPath> ArcadiaRoot_;
             TLazyValue<NYaConfJson::TYaConf> YaConf_;
-            mutable THashMap<TFsPath, NJson::TJsonValue> FormulaCache_{};
+            mutable THashMap<TFsPath, NYaConfJson::TFormula> FormulaCache_{};
         };
 
         // For test purpose

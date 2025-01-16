@@ -14,6 +14,7 @@ PEERDIR(
     library/cpp/resource
     devtools/libs/yaplatform
     devtools/ya/app_config/lib
+    devtools/ya/cpp/lib/edl/json
 )
 
 END()

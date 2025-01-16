@@ -17,7 +17,7 @@ namespace NYa::NTool {
 
     class IToolChainPathGetter {
     public:
-        virtual TFsPath GetPath(const TFsPath& toolRoot, const NYaConfJson::TBottle& bottle, const NJson::TJsonValue& formulaJson, const TCanonizedPlatform& forPlatform) const = 0;
+        virtual TFsPath GetPath(const TFsPath& toolRoot, const NYaConfJson::TBottle& bottle, const NYaConfJson::TFormula& formula, const TCanonizedPlatform& forPlatform) const = 0;
         virtual ~IToolChainPathGetter() = default;
     };
 

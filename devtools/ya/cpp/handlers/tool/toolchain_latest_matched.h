@@ -10,6 +10,6 @@
 namespace NYa::NTool {
     class TLatestMatchedToolChainPathGetter : public IToolChainPathGetter {
     public:
-        TFsPath GetPath(const TFsPath& toolRoot, const NYaConfJson::TBottle& bottle, const NJson::TJsonValue& formulaJson, const TCanonizedPlatform& forPlatform) const override;
+        TFsPath GetPath(const TFsPath& toolRoot, const NYaConfJson::TBottle& bottle, const NYaConfJson::TFormula& formula, const TCanonizedPlatform& forPlatform) const override;
     };
 }
