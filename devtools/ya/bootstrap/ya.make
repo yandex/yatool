@@ -8,6 +8,4 @@ PY_SRCS(
     run_bootstrap.py
 )
 
-STYLE_PYTHON()
-
 END()

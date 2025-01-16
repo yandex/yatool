@@ -11,8 +11,6 @@ IF (PYTHON3 AND NOT OS_WINDOWS AND NOT YA_OPENSOURCE)
 ENDIF()
 
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.fetcher.http_client
     __init__.py

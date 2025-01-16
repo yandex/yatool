@@ -27,8 +27,6 @@ PEERDIR(
     devtools/ya/yalibrary/vcs
 )
 
-STYLE_PYTHON()
-
 PY_SRCS(
     clion2016.py
     gdb_wrapper.py

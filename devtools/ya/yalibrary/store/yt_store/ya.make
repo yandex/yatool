@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 IF(PYTHON3)
     SET(XXCLIENT_SRC xx_client.pyx)
     SRCS(xx_client.cpp)

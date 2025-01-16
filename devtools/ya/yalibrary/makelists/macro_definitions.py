@@ -195,10 +195,7 @@ class Node(object):
         return '\n'.join(self._write()) + '\n'
 
     def __repr__(self):
-        return "<{} {} {} with {} children>".format(
-            type(self).__name__, self.name, self.node_type,
-            len(self.children)
-        )
+        return "<{} {} {} with {} children>".format(type(self).__name__, self.name, self.node_type, len(self.children))
 
 
 class Macro(Node):

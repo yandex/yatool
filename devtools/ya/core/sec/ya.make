@@ -9,8 +9,6 @@ PEERDIR(
     devtools/ya/exts
 )
 
-STYLE_PYTHON()
-
 END()
 
 RECURSE_FOR_TESTS(

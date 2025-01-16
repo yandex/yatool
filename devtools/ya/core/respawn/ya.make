@@ -6,8 +6,6 @@ PEERDIR(
     devtools/ya/yalibrary/find_root
 )
 
-STYLE_PYTHON()
-
 PY_SRCS(
     __init__.py
 )

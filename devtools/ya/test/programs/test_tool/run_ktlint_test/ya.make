@@ -16,8 +16,6 @@ PEERDIR(
     devtools/ya/yalibrary/term
 )
 
-STYLE_PYTHON()
-
 END()
 
 RECURSE(

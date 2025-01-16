@@ -17,6 +17,4 @@ PEERDIR(
     devtools/ya/yalibrary/tools
 )
 
-STYLE_PYTHON()
-
 END()

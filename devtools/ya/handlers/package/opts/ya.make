@@ -13,6 +13,4 @@ PEERDIR(
     devtools/ya/test/opts
 )
 
-STYLE_PYTHON()
-
 END()

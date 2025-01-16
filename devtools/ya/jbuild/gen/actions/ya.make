@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     compile.py
     fetch_test_data.py

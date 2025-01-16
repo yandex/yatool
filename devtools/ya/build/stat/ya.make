@@ -21,8 +21,6 @@ PEERDIR(
     devtools/ya/build/graph_description
 )
 
-STYLE_PYTHON()
-
 END()
 
 RECURSE(

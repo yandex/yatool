@@ -10,6 +10,4 @@ PEERDIR(
     devtools/ya/yalibrary/loggers
 )
 
-STYLE_PYTHON()
-
 END()

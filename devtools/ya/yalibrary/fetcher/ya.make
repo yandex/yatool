@@ -27,8 +27,6 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.fetcher
     __init__.py

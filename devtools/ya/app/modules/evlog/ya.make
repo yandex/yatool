@@ -11,6 +11,4 @@ PEERDIR(
     devtools/ya/yalibrary/evlog
 )
 
-STYLE_PYTHON()
-
 END()

@@ -19,6 +19,4 @@ PEERDIR(
     library/python/eq_interval_sampling
 )
 
-STYLE_PYTHON()
-
 END()

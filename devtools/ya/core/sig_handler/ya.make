@@ -9,6 +9,4 @@ PEERDIR(
     devtools/executor/proc_util/python
 )
 
-STYLE_PYTHON()
-
 END()

@@ -1,7 +1,5 @@
 PY3_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     run_coverage_extractor.py
 )

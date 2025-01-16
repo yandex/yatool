@@ -1,7 +1,5 @@
 PY3_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     # TODO refactor this module
     __init__.py

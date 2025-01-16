@@ -9,6 +9,4 @@ PEERDIR(
     devtools/ya/tools/analyze_make/common
 )
 
-STYLE_PYTHON()
-
 END()

@@ -1,7 +1,5 @@
 PY3_PROGRAM(test_tool)
 
-STYLE_PYTHON()
-
 PY_SRCS(
     __main__.py
 )

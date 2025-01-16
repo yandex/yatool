@@ -6,8 +6,6 @@ PEERDIR(
     devtools/ya/yalibrary/runner
 )
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.last_failed
     last_failed.py

@@ -1,7 +1,5 @@
 PY3_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     resolve_go_coverage.py
 )

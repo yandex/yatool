@@ -1,1 +1,1 @@
-from devtools.ya.app_config.python.config import * # noqa
+from devtools.ya.app_config.python.config import *  # noqa

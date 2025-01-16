@@ -61,13 +61,17 @@ class Arc:
         self.source_root = source_root
 
     def _run_arc(self, command, fail_msg_prefix="Unable to execute arc command"):
-        p = subprocess.Popen([self._arc_bin] + command, cwd=self.source_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            [self._arc_bin] + command, cwd=self.source_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         out, err = p.communicate()
         return_code = p.poll()
         if return_code:
-            raise Exception("{} `{}`. Return code: {}.\nOUTPUT: {}\nERROR: {}".format(
-                fail_msg_prefix, " ".join(command), return_code, out, err
-            ))
+            raise Exception(
+                "{} `{}`. Return code: {}.\nOUTPUT: {}\nERROR: {}".format(
+                    fail_msg_prefix, " ".join(command), return_code, out, err
+                )
+            )
         return out.strip()
 
     def info(self, json_out=True):

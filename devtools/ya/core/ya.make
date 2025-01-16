@@ -38,6 +38,4 @@ IF (PYTHON3)
     )
 ENDIF()
 
-STYLE_PYTHON()
-
 END()

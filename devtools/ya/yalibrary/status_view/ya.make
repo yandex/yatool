@@ -14,8 +14,6 @@ IF (PYTHON2)
     )
 ENDIF()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.status_view
     __init__.py

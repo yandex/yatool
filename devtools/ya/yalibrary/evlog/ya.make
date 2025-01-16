@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 PEERDIR(
     contrib/python/zstandard
     devtools/ya/core/config

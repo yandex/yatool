@@ -14,6 +14,4 @@ PEERDIR(
     devtools/ya/yalibrary/formatter
 )
 
-STYLE_PYTHON()
-
 END()

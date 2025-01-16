@@ -16,8 +16,6 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     __init__.py
 )

@@ -9,6 +9,4 @@ PEERDIR(
     devtools/ya/exts
 )
 
-STYLE_PYTHON()
-
 END()

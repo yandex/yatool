@@ -1,7 +1,5 @@
 PY3_LIBRARY()
 
-STYLE_PYTHON()
-
 PEERDIR(
     devtools/ya/test/const
 )

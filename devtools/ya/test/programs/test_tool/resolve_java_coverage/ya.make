@@ -13,8 +13,6 @@ PEERDIR(
     library/python/testing/coverage_utils
 )
 
-STYLE_PYTHON()
-
 END()
 
 RECURSE_FOR_TESTS(

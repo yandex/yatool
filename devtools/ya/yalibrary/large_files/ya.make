@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.large_files
     __init__.py

@@ -4,8 +4,6 @@ PY_SRCS(
     __init__.py
 )
 
-STYLE_PYTHON()
-
 PEERDIR(
     devtools/ya/core/error
     devtools/ya/core/yarg

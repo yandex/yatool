@@ -37,9 +37,7 @@ class BufYaHandler(CompositeHandler):
         ]
 
         self['lint'] = OptsHandler(
-            action=devtools.ya.app.execute(action=do_lint_protos),
-            description='Lint .proto files',
-            opts=common_opts
+            action=devtools.ya.app.execute(action=do_lint_protos), description='Lint .proto files', opts=common_opts
         )
 
         self['build'] = OptsHandler(
@@ -64,21 +62,15 @@ class CommonOptions(Options):
     @staticmethod
     def consumer():
         return [
+            ArgConsumer(['--buf-bin'], help='The location of custom buf binary', hook=SetValueHook('buf_bin_path')),
             ArgConsumer(
-                ['--buf-bin'],
-                help='The location of custom buf binary',
-                hook=SetValueHook('buf_bin_path')
-            ),
-            ArgConsumer(
-                ['--custom-conf-dir'],
-                help='Custom directory for conf files',
-                hook=SetValueHook('custom_conf_dir')
+                ['--custom-conf-dir'], help='Custom directory for conf files', hook=SetValueHook('custom_conf_dir')
             ),
             ArgConsumer(
                 ['--do-not-use-build-graph'],
                 help='Use simple find insted of build graph',
                 hook=SetConstValueHook('use_build_graph', False),
-            )
+            ),
         ]
 
     def postprocess(self):
@@ -88,9 +80,7 @@ class CommonOptions(Options):
         if self.buf_bin_path is None:
             pass
         elif not os.path.exists(self.buf_bin_path):
-            raise ArgsValidatingException(
-                "buf binary path %s does not exists" % self.buf_bin_path
-            )
+            raise ArgsValidatingException("buf binary path %s does not exists" % self.buf_bin_path)
         else:
             self.buf_bin_path = os.path.abspath(self.buf_bin_path)
 
@@ -105,7 +95,7 @@ class OutputImageOptions(Options):
             ArgConsumer(
                 ['-o', '--output'],
                 help='Required. The location to write the image. Must be one of format [bin, json]',
-                hook=SetValueHook('output_image_path')
+                hook=SetValueHook('output_image_path'),
             )
         ]
 
@@ -126,7 +116,7 @@ class InputImageOptions(Options):
             ArgConsumer(
                 ['-a', '--against-input'],
                 help='Required. The source or image to check against. Must be one of format [bin, json]',
-                hook=SetValueHook('input_image_path')
+                hook=SetValueHook('input_image_path'),
             )
         ]
 
@@ -135,9 +125,7 @@ class InputImageOptions(Options):
             raise ArgsValidatingException('--against-input option is required')
 
         if os.path.splitext(self.input_image_path)[1] not in ('.bin', '.json'):
-            raise ArgsValidatingException(
-                'Input image format must be .bin or .json, found %s' % self.input_image_path
-            )
+            raise ArgsValidatingException('Input image format must be .bin or .json, found %s' % self.input_image_path)
 
         self.input_image_path = os.path.abspath(self.input_image_path)
 
@@ -165,10 +153,7 @@ def find_protos_simple(params, ignore_prefixes):
         for dir_, _, files in os.walk(target):
             for filename in files:
                 # add alice/megamind/protos/a.proto
-                file_path = os.path.relpath(
-                    os.path.join(dir_, filename),
-                    params.arc_root
-                )
+                file_path = os.path.relpath(os.path.join(dir_, filename), params.arc_root)
 
                 if not file_path.endswith(suffix):
                     continue
@@ -312,15 +297,12 @@ def call_buf(params, args, subprocess=False):
 
 # handlers
 
+
 def do_lint_protos(params, use_build_graph=None, subprocess=False):
     conf, protos = prepare_conf_and_files(params, use_build_graph)
     files_args = list(gen_file_args(protos))
 
-    args = (
-        ['check', 'lint',
-         '--input-config', json.dumps(conf)] +
-        files_args
-    )
+    args = ['check', 'lint', '--input-config', json.dumps(conf)] + files_args
     call_buf(params, args, subprocess)
 
 
@@ -328,12 +310,7 @@ def do_build_image(params, use_build_graph=None, subprocess=False):
     conf, protos = prepare_conf_and_files(params, use_build_graph)
     files_args = list(gen_file_args(protos))
 
-    args = (
-        ['image', 'build',
-         '--source-config', json.dumps(conf),
-         '-o', params.output_image_path] +
-        files_args
-    )
+    args = ['image', 'build', '--source-config', json.dumps(conf), '-o', params.output_image_path] + files_args
 
     call_buf(params, args, subprocess)
     return params.output_image_path
@@ -347,11 +324,13 @@ def do_breaking(params, use_build_graph=None, subprocess=False, source_image=Non
     else:
         add_args = list(gen_file_args(protos))
 
-    args = (
-        ['check', 'breaking',
-         '--against-input', params.input_image_path,
-         '--input-config', json.dumps(conf)]
-        + add_args
-    )
+    args = [
+        'check',
+        'breaking',
+        '--against-input',
+        params.input_image_path,
+        '--input-config',
+        json.dumps(conf),
+    ] + add_args
 
     call_buf(params, args, subprocess)

@@ -1,7 +1,5 @@
 PY3_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     NAMESPACE yalibrary.worker_threads
     __init__.py

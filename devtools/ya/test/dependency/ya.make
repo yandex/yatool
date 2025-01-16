@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     external_tools.py
     mds_storage.py

@@ -14,6 +14,4 @@ PEERDIR(
     library/python/resource
 )
 
-STYLE_PYTHON()
-
 END()

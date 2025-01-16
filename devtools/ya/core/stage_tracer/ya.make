@@ -10,6 +10,4 @@ PEERDIR(
     devtools/ya/core/stages_profiler
 )
 
-STYLE_PYTHON()
-
 END()

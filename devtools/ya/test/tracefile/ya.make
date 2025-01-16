@@ -13,8 +13,6 @@ PEERDIR(
     library/python/strings
 )
 
-STYLE_PYTHON()
-
 END()
 
 RECURSE_FOR_TESTS(

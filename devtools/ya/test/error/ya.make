@@ -8,6 +8,4 @@ PEERDIR(
     devtools/ya/core/config
 )
 
-STYLE_PYTHON()
-
 END()

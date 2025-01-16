@@ -31,7 +31,8 @@ class PyYaHandler(devtools.ya.core.yarg.OptsHandler):
         super().__init__(
             action=devtools.ya.app.execute(run),
             description='Run IPython shell with python libraries baked in',
-            opts=devtools.ya.build.build_opts.ya_make_options(free_build_targets=True) + [
+            opts=devtools.ya.build.build_opts.ya_make_options(free_build_targets=True)
+            + [
                 PyOptions(),
             ],
         )
@@ -151,9 +152,11 @@ class Project:
 
     def prepare(self):
         if os.path.exists(self.source_path):
-            raise Error('Temporary project path is occupied ({path}), use `--py-tmp-project` option or `py_tmp_project` ya.conf setting to set temporary project location'.format(
-                path=self.project,
-            ))
+            raise Error(
+                'Temporary project path is occupied ({path}), use `--py-tmp-project` option or `py_tmp_project` ya.conf setting to set temporary project location'.format(
+                    path=self.project,
+                )
+            )
 
         py3 = self.params.py3
         targets = set()
@@ -184,7 +187,9 @@ class Project:
             try:
                 self.exe_name = _clone_program(makefile, deps, target.path)
             except WeirdMakefileError as e:
-                e.args = tuple('Weird makefile in {}: {}'.format(target.path, str(e)),)
+                e.args = tuple(
+                    'Weird makefile in {}: {}'.format(target.path, str(e)),
+                )
                 raise
         else:
             makefile = yalibrary.makelists.macro_definitions.MakeList()

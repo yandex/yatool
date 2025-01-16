@@ -51,6 +51,4 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
-STYLE_PYTHON()
-
 END()

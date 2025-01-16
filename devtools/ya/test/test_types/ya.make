@@ -1,7 +1,5 @@
 PY23_LIBRARY()
 
-STYLE_PYTHON()
-
 PY_SRCS(
     benchmark.py
     boost_test.py

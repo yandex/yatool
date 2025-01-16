@@ -2,8 +2,6 @@ PY3_LIBRARY()
 
 SRCDIR(devtools/ya)
 
-STYLE_PYTHON()
-
 PY_SRCS(
     TOP_LEVEL
     entry/entry.py

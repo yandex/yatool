@@ -35,8 +35,6 @@ PEERDIR(
     library/python/testing/yatest_common
 )
 
-STYLE_PYTHON()
-
 IF (OS_LINUX)
     PEERDIR(
         library/python/prctl

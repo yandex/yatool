@@ -46,7 +46,9 @@ class EvlogFileOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook('analyze_distbuild_json_file'),
             ),
             devtools.ya.core.yarg.ArgConsumer(
-                ['--detailed'], help='Draw detailed data', hook=devtools.ya.core.yarg.SetConstValueHook('detailed', True)
+                ['--detailed'],
+                help='Draw detailed data',
+                hook=devtools.ya.core.yarg.SetConstValueHook('detailed', True),
             ),
         ]
 
@@ -65,7 +67,9 @@ class AnalyzeYaMakeOpts(devtools.ya.core.yarg.Options):
                 help='print the path to analyze-make executable',
                 hook=devtools.ya.core.yarg.SetConstValueHook('print_path', True),
             ),
-            devtools.ya.core.yarg.FreeArgConsumer(help='analyze-make args', hook=devtools.ya.core.yarg.ExtendHook('args')),
+            devtools.ya.core.yarg.FreeArgConsumer(
+                help='analyze-make args', hook=devtools.ya.core.yarg.ExtendHook('args')
+            ),
         ]
 
 
