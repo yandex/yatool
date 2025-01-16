@@ -106,7 +106,6 @@ namespace NYa {
                     return *ptr;
                 }
                 FormulaCache_.emplace(arcadiaPath, ConfigImpl<NYaConfJson::TFormula>(arcadiaPath));
-                // FormulaCache_[arcadiaPath] = ConfigImpl<NYaConfJson::TFormula>(arcadiaPath);
                 return FormulaCache_[arcadiaPath];
             }
 
