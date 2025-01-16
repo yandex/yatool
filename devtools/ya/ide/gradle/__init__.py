@@ -351,9 +351,7 @@ class _JavaSemGraph(SemGraph):
             ):
                 foreign_targets.append(event['Dir'])
 
-        super().make(
-            **kwargs, ev_listener=listener  # , foreign_on_nosem=True - TODO enable after support option in ymake
-        )
+        super().make(**kwargs, ev_listener=listener, foreign_on_nosem=True)
         if foreign_targets:
             self.foreign_targets = list(set(foreign_targets))
             self.logger.info("Foreign targets: %s", self.foreign_targets)
