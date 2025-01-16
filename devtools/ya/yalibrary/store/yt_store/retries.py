@@ -5,6 +5,10 @@ import functools
 import yt.wrapper as yt
 import yalibrary.store.yt_store.consts as consts
 
+from yt.wrapper.dynamic_table_commands import (
+    get_dynamic_table_retriable_errors as get_yt_retriable_errors,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +34,7 @@ class RetryPolicy:
     def __init__(self, max_retries=5):
         self.max_retries = max_retries
         self.disabled = False
-        self._retryable_errors = yt.http_helpers.get_retriable_errors()
+        self._retryable_errors = get_yt_retriable_errors()
 
     def execute(self, name, func):
         @functools.wraps(func)
