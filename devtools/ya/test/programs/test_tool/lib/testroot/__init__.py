@@ -78,6 +78,7 @@ def create_environment(
     data_root,
     destination,
     env_data_mode=EnvDataMode.Symlinks,
+    create_root_guidance_file=False,
 ):
     def create_links(root, env_root, paths):
         paths = testdeps.remove_redundant_paths(paths)
@@ -143,6 +144,10 @@ def create_environment(
     except Exception as e:
         logger.debug("Could not create symlink to build root: %s", e)
         env_build_root = build_root
+
+    if create_root_guidance_file:
+        with open(os.path.join(env_build_root, ".root.path"), "w") as afile:
+            afile.write(source_root)
 
     return os.path.abspath(env_arcadia_root), os.path.abspath(env_build_root), os.path.abspath(env_data_root)
 

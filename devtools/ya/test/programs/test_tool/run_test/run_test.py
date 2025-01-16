@@ -516,6 +516,7 @@ def parse_args(args=None):
         action='store_true',
     )
     parser.add_argument("--tests-limit-in-chunk", action='store', type=int, default=0)
+    parser.add_argument("--create-root-guidance-file", action='store_true')
 
     args = parser.parse_args(args)
 
@@ -1392,6 +1393,7 @@ def main():
                 data_root,
                 cwd,
                 options.env_data_mode,
+                options.create_root_guidance_file,
             )
         else:
             new_source_root = source_root

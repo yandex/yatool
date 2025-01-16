@@ -505,6 +505,36 @@ class RebuildOptions(Options):
         ]
 
 
+class PythonBuildOptions(Options):
+    def __init__(self):
+        self.external_py_files = False
+
+    @staticmethod
+    def consumer():
+        return [
+            # Configuration and env.var. consumer are missing intentionally:
+            # this is a local development option.
+            ArgConsumer(
+                ['--ext-py'],
+                help='Build binaries without embedded python files and load them from the filesystem at runtime.'
+                'Only suitable for running tests to avoid linking binaries after every change in py-files.',
+                hook=SetConstValueHook('external_py_files', True),
+                group=ADVANCED_OPT_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+        ]
+
+    def postprocess2(self, params):
+        if self.external_py_files:
+            if not getattr(params, 'run_tests', 0):
+                logger.warning(
+                    "You have requested external-py-files build mode without running tests. [[imp]]Don't use such binaries[[rst]]. Such binaries are only suitable for running tests"
+                )
+            if getattr(params, 'cache_tests', False):
+                raise ArgsValidatingException('--ext-py cannot be used with --cache-tests')
+            params.flags['EXTERNAL_PY_FILES'] = 'yes'
+
+
 class DefaultNodeRequirementsOptions(Options):
     def __init__(self):
         self.default_node_requirements = {'network': 'restricted'}
@@ -3245,6 +3275,7 @@ def ya_make_options(  # compat
             DefaultNodeRequirementsOptions(),
             DumpReportOptions(),
             BuildTargetsOptions(with_free=free_build_targets),
+            PythonBuildOptions(),
             ContinueOnFailOptions(),
             PrintStatisticsOptions(),
             BeVerboseOptions(),

@@ -476,6 +476,10 @@ def create_test_node(
 
     if opts and getattr(opts, "test_stdout"):
         runner_cmd += ["--test-stdout"]
+
+    if opts and getattr(opts, "external_py_files"):
+        runner_cmd += ["--create-root-guidance-file"]
+
     if opts.custom_canondata_path:
         runner_cmd += ["--custom-canondata-path", opts.custom_canondata_path]
 
