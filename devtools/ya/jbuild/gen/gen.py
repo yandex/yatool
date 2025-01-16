@@ -125,12 +125,6 @@ def iter_result(ctx, nodes):
                 yield n
 
 
-def iter_scarab(nodes):
-    for n in nodes:
-        if n.path == 'tools/acceleo':
-            yield n
-
-
 def default_opts():
     import devtools.ya.core.yarg as yarg
     import devtools.ya.jbuild.jbuild_opts as jbuild_opts
@@ -169,7 +163,7 @@ def gen(
     res = list(iter_result(ctx, nodes))
 
     achievable = set()
-    graph_base.traverse(res + list(iter_scarab(nodes)), after=achievable.add)
+    graph_base.traverse(res, after=achievable.add)
 
     ins_unresolved_ = graph_node.calc_uids(arc_root, achievable)
 

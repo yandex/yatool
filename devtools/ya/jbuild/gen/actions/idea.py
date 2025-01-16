@@ -1137,26 +1137,6 @@ def process_path(path, ctx, results_root, project_root, relativize_cache, dry_ru
     prefixes = []
     gens = []
 
-    ind = {n: i for i, n in enumerate(ctx.nodes)}
-
-    by_o = collections.defaultdict(list)
-
-    for n in ctx.nodes:
-        for o in n.outs:
-            by_o[o[0]].append(n)
-
-    for o, ns in six.iteritems(by_o):
-        if len(ns) != 1:
-            logger.warning('%s nodes output to %s', str(len(ns)), o)
-
-    def key(o):
-        return ind[by_o[o][0]]
-
-    def is_od(o):
-        n = by_o[o][0]
-
-        return node.file(n, op.dirname(o)) == o
-
     have_java_srcs = False
 
     for i, words in enumerate(target.plain.get(consts.JAVA_SRCS, [])):
