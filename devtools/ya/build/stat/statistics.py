@@ -812,24 +812,30 @@ def _determine_fs_changes(dump_debug):
 def _get_lang_statistics(graph):
     lang_stat = collections.defaultdict(int)
     graph_results = set(graph.graph_json.get("result", []))
+    agnostic = False
+
     for node in graph.graph_json['graph']:
         if node["uid"] not in graph_results:
             continue
 
-        lang = node.get("target_properties", {}).get("module_lang", None)
-        if not lang:
-            lang = test_const.ModuleLang.UNKNOWN
-        elif lang in ["py2", "py3"]:
+        lang = node.get("target_properties", {}).get("module_lang", test_const.ModuleLang.UNKNOWN)
+        if lang in ["py2", "py3"]:
             lang = test_const.ModuleLang.PY
 
-        lang_stat[lang] += 1
+        if lang == test_const.ModuleLang.LANG_AGNOSTIC:
+            agnostic = True
+        else:
+            lang_stat[lang] += 1
 
     if not lang_stat:
-        main_lang = test_const.ModuleLang.ABSENT
+        if agnostic:
+            main_lang = test_const.ModuleLang.LANG_AGNOSTIC
+        else:
+            main_lang = test_const.AggregateLang.ABSENT
     elif len(lang_stat) == 1:
         main_lang = list(lang_stat).pop()
     else:
-        main_lang = test_const.ModuleLang.NUMEROUS
+        main_lang = test_const.AggregateLang.NUMEROUS
     return lang_stat, main_lang
 
 
