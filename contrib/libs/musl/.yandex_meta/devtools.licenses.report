@@ -1,0 +1,581 @@
+# File format ($ symbol means the beginning of a line):
+#
+# $ # this message
+# $ # =======================
+# $     # comments (all commentaries should starts with some number of spaces and # symbol)
+# $ IGNORE_FILES {file1.ext1} {file2.ext2} - (optional) ignore listed files when generating license macro and credits
+# $ RENAME {original license id} TO {new license id} # user comments - (optional) use {new license id} instead {original license id} in ya.make files
+# $ # user comments
+# $
+# ${action} {license id} {license text hash}
+# $BELONGS ./ya/make/file/relative/path/1/ya.make ./ya/make/2/ya.make
+# ${all_file_action} filename
+# $ # user commentaries (many lines)
+# $ generated description - files with this license, license text... (some number of lines that starts with some number of spaces, do not modify)
+# ${action} {license spdx} {license text hash}
+# $BELONGS ./ya/make/file/relative/path/3/ya.make
+# ${all_file_action} filename
+# $    #    user commentaries
+# $ generated description
+# $ ...
+#
+# You can modify action, all_file_action and add commentaries
+# Available actions:
+# keep - keep license in contrib and use in credits
+# skip - skip license
+# remove - remove all files with this license
+# rename - save license text/links into licenses texts file, but not store SPDX into LINCENSE macro. You should store correct license id into devtools.license.spdx.txt file
+#
+# {all file action} records will be generated when license text contains filename that exists on filesystem (in contrib directory)
+# We suppose that that files can contain some license info
+# Available all file actions:
+# FILE_IGNORE - ignore file (do nothing)
+# FILE_INCLUDE - include all file data into licenses text file
+# =======================
+
+KEEP     MIT                  0775f17ed13c3609fd7c31449f8749d3
+BELONGS ya.make
+FILE_INCLUDE COPYRIGHT found in files: src/stdlib/qsort.c at line 16
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        src/stdlib/qsort.c [3:19]
+
+KEEP     MIT                  0d68d16ea21ac74bb40bb928b752b06c
+BELONGS ya.make
+    License text:
+        Valentin Ochs and is licensed under an MIT-style license.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 99.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [146:146]
+
+KEEP     BSD-2-Clause         29cccf5a210276dacc7f9023f99f1212
+BELONGS ya.make
+FILE_INCLUDE COPYRIGHT found in files: src/string/arm/memcpy.S at line 15, src/string/arm/memcpy.S at line 19
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: BSD-2-Clause
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://opensource.org/licenses/bsd-license.php, http://www.opensource.org/licenses/BSD-2-Clause, https://spdx.org/licenses/BSD-2-Clause
+    Files with this license:
+        src/string/arm/memcpy.S [5:26]
+
+KEEP     Public-Domain AND LicenseRef-scancode-other-permissive 2aab618490150d3157483bcbb52d35bf
+BELONGS ya.make
+    License text:
+        originally written by Solar Designer and placed into the public
+        domain. The code also comes with a fallback permissive license for use
+        in jurisdictions that may not recognize the public domain.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        COPYRIGHT [141:143]
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-other-permissive
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/other-permissive.LICENSE
+    Files with this license:
+        COPYRIGHT [141:143]
+
+KEEP     MIT                  3158a75221c70090b7e127aa7c980dd8
+BELONGS ya.make
+    License text:
+         * SPDX-License-Identifier: MIT
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : TAG
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        src/math/exp.c [5:5]
+        src/math/exp2.c [5:5]
+        src/math/exp2f.c [5:5]
+        src/math/exp2f_data.c [5:5]
+        src/math/exp2f_data.h [3:3]
+        src/math/exp_data.c [5:5]
+        src/math/exp_data.h [3:3]
+        src/math/expf.c [5:5]
+        src/math/log.c [5:5]
+        src/math/log2.c [5:5]
+        src/math/log2_data.c [5:5]
+        src/math/log2_data.h [3:3]
+        src/math/log2f.c [5:5]
+        src/math/log2f_data.c [5:5]
+        src/math/log2f_data.h [3:3]
+        src/math/log_data.c [5:5]
+        src/math/log_data.h [3:3]
+        src/math/logf.c [5:5]
+        src/math/logf_data.c [5:5]
+        src/math/logf_data.h [3:3]
+        src/math/pow.c [5:5]
+        src/math/pow_data.c [5:5]
+        src/math/pow_data.h [3:3]
+        src/math/powf.c [3:3]
+        src/math/powf_data.c [5:5]
+        src/math/powf_data.h [3:3]
+        src/string/aarch64/memcpy.S [5:5]
+        src/string/aarch64/memset.S [5:5]
+
+KEEP     LicenseRef-scancode-other-permissive 3ebccdc40d604fc6de453f973b2dc1fb
+BELONGS ya.make
+    License text:
+        Portions of this software are derived from third-party works licensed
+        under terms compatible with the above MIT license:
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-other-permissive
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/other-permissive.LICENSE
+    Files with this license:
+        COPYRIGHT [111:112]
+
+KEEP     Sunpro               422fbee1034f90a34082783fd34246ec
+BELONGS ya.make
+    License text:
+         * Developed at SunSoft, a Sun Microsystems, Inc. business.
+         * Permission to use, copy, modify, and distribute this
+         * software is freely granted, provided that this notice
+         * is preserved.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-sunpro
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/sunpro.LICENSE
+    Files with this license:
+        src/math/__cos.c [6:9]
+        src/math/__cosl.c [8:11]
+        src/math/__rem_pio2.c [6:9]
+        src/math/__rem_pio2_large.c [6:9]
+        src/math/__rem_pio2l.c [7:10]
+        src/math/__sin.c [6:9]
+        src/math/__sinl.c [8:11]
+        src/math/acos.c [6:9]
+        src/math/acosl.c [6:9]
+        src/math/asin.c [6:9]
+        src/math/asinl.c [6:9]
+        src/math/atan2.c [6:9]
+        src/math/atan2l.c [6:9]
+        src/math/j0.c [6:9]
+        src/math/j1.c [6:9]
+        src/math/jn.c [6:9]
+        src/math/lgamma_r.c [6:9]
+        src/math/log10.c [6:9]
+        src/math/scalb.c [6:9]
+
+KEEP     MIT                  61fbf4333470e10192a3b486d4405fb9
+BELONGS ya.make
+    License text:
+        and later supplemented and integrated by John Spencer. It is licensed
+        under the standard MIT terms.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [160:161]
+
+KEEP     Red-Hat-Attribution  66b3a3ffa338785b1521afa7c44a8d53
+BELONGS ya.make
+    License text:
+         * Permission to use, copy, modify, and distribute this
+         * software is freely granted, provided that this notice
+         * is preserved.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-red-hat-attribution
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/red-hat-attribution.LICENSE
+    Files with this license:
+        src/math/__tan.c [6:8]
+        src/math/__tandf.c [10:12]
+        src/math/__tanl.c [8:10]
+
+KEEP     Public-Domain        678270c6bc063403d5bc2b6bbbd35f7a
+BELONGS ya.make
+    License text:
+         * public domain sha512 crypt implementation
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 70.00
+        Match type      : REFERENCE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_sha512.c [2:2]
+
+KEEP     Public-Domain AND LicenseRef-scancode-other-permissive 6a32db2f4bb617dec13a6f1540a25e5e
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 99.36
+        Match type      : TEXT
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_blowfish.c [15:32]
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-other-permissive
+        Score           : 99.36
+        Match type      : TEXT
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/other-permissive.LICENSE
+    Files with this license:
+        src/crypt/crypt_blowfish.c [15:32]
+
+KEEP     MIT                  6bbeb35a9f8190eaff6c95d103b81b51
+BELONGS ya.make
+    License text:
+        integration. It is licensed under the standard MIT terms.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [154:154]
+
+KEEP     Musl-Exception       72aa9239157ee65b60341516fd59d34a
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-musl-exception
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://www.musl-libc.org/, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/musl-exception.LICENSE
+    Files with this license:
+        COPYRIGHT [171:186]
+
+KEEP     Public-Domain        7da06ba768f9c02d13a09e420998e295
+BELONGS ya.make
+    License text:
+        /* public domain sha512 implementation based on fips180-3 */
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 75.00
+        Match type      : NOTICE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_sha512.c [16:16]
+
+KEEP     BSD-2-Clause         826cf61c5aa1b89f656ffdeed1b36317
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: BSD-2-Clause
+        Score           : 90.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/bsd-license.php, http://www.opensource.org/licenses/BSD-2-Clause, https://spdx.org/licenses/BSD-2-Clause
+    Files with this license:
+        COPYRIGHT [114:116]
+
+KEEP     MIT                  856709dc8d612d2c52a0b98212e647f0
+BELONGS ya.make
+    License text:
+        musl, pronounced like the word "mussel", is an MIT-licensed
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        README [4:4]
+
+KEEP     BSD-2-Clause         8cc69726f4355bc676145572cfc3e548
+BELONGS ya.make
+    License text:
+        The Android Open Source Project and is licensed under a two-clause BSD
+        license. It was taken from Bionic libc, used on Android.
+    Scancode info:
+        Original SPDX id: BSD-2-Clause
+        Score           : 44.00
+        Match type      : REFERENCE
+        Links           : http://opensource.org/licenses/bsd-license.php, http://www.opensource.org/licenses/BSD-2-Clause, https://spdx.org/licenses/BSD-2-Clause
+    Files with this license:
+        COPYRIGHT [131:132]
+
+KEEP     MIT                  8d18be6409468bae48b33b87db85824a
+BELONGS ya.make
+FILE_INCLUDE COPYRIGHT found in files: COPYRIGHT at line 20
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [6:23]
+
+KEEP     MIT                  90f32ab6b71e34b64f903d3e62f43396
+BELONGS ya.make
+    License text:
+        /* Copyright 2011-2012 Nicholas J. Kain, licensed under standard MIT license */
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        src/setjmp/x32/longjmp.s [1:1]
+        src/setjmp/x32/setjmp.s [1:1]
+        src/setjmp/x86_64/longjmp.s [1:1]
+        src/setjmp/x86_64/setjmp.s [1:1]
+        src/thread/x32/__set_thread_area.s [1:1]
+        src/thread/x32/__unmapself.s [1:1]
+        src/thread/x86_64/__set_thread_area.s [1:1]
+        src/thread/x86_64/__unmapself.s [1:1]
+
+KEEP     MIT                  98b043fc10b11075310cf547ee64c7f4
+BELONGS ya.make
+    License text:
+        The x86_64 port was written by Nicholas J. Kain and is licensed under
+        the standard MIT terms.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [148:149]
+
+KEEP     BSD-2-Clause         a380fc8226d63887858450c6a16da4c5
+BELONGS ya.make
+FILE_INCLUDE COPYRIGHT found in files: src/regex/regcomp.c at line 18, src/regex/regcomp.c at line 21, src/regex/regexec.c at line 18, src/regex/regexec.c at line 21, src/regex/tre-mem.c at line 18, src/regex/tre-mem.c at line 21, src/regex/tre.h at line 18, src/regex/tre.h at line 21
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: BSD-2-Clause
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://opensource.org/licenses/bsd-license.php, http://www.opensource.org/licenses/BSD-2-Clause, https://spdx.org/licenses/BSD-2-Clause
+    Files with this license:
+        src/regex/regcomp.c [7:28]
+        src/regex/regexec.c [7:28]
+        src/regex/tre-mem.c [7:28]
+        src/regex/tre.h [7:28]
+
+KEEP     Public-Domain        abb28d101f4822fa073fb5ea4def210a
+BELONGS ya.make
+    License text:
+        /* Public domain fmtmsg()
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 70.00
+        Match type      : REFERENCE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/misc/fmtmsg.c [1:1]
+
+KEEP     Public-Domain        b9bcf976f8af7b7e073c3f2575ea45a7
+BELONGS ya.make
+    License text:
+        /* public domain md5 implementation based on rfc1321 and libtomcrypt */
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_md5.c [12:12]
+
+KEEP     MIT                  bd2f12be24f914decf2312a6cd4d2185
+BELONGS ya.make
+    License text:
+        The mips64 port was contributed by Imagination Technologies and is
+        licensed under the standard MIT terms.
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [156:157]
+
+KEEP     MIT                  c19e434138fbe78836a6686742c6b183
+BELONGS ya.make
+    License text:
+        musl as a whole is licensed under the following standard MIT license:
+    Scancode info:
+        Original SPDX id: MIT
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://opensource.org/licenses/mit-license.php, https://spdx.org/licenses/MIT
+    Files with this license:
+        COPYRIGHT [1:1]
+
+KEEP     Sunpro               c283f7201a1512190a84864860824eb0
+BELONGS ya.make
+    License text:
+         * Developed at SunPro, a Sun Microsystems, Inc. business.
+         * Permission to use, copy, modify, and distribute this
+         * software is freely granted, provided that this notice
+         * is preserved.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-sunpro
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/sunpro.LICENSE
+    Files with this license:
+        src/math/__cosdf.c [10:13]
+        src/math/__rem_pio2f.c [10:13]
+        src/math/__sindf.c [10:13]
+        src/math/acosf.c [9:12]
+        src/math/asinf.c [9:12]
+        src/math/atan.c [6:9]
+        src/math/atan2f.c [9:12]
+        src/math/atanf.c [9:12]
+        src/math/atanl.c [6:9]
+        src/math/cbrt.c [6:9]
+        src/math/cbrtf.c [10:13]
+        src/math/cbrtl.c [7:10]
+        src/math/cos.c [6:9]
+        src/math/cosf.c [10:13]
+        src/math/erf.c [6:9]
+        src/math/erff.c [9:12]
+        src/math/erfl.c [6:9]
+        src/math/expm1.c [6:9]
+        src/math/expm1f.c [9:12]
+        src/math/j0f.c [9:12]
+        src/math/j1f.c [9:12]
+        src/math/jnf.c [9:12]
+        src/math/lgammaf_r.c [9:12]
+        src/math/lgammal.c [6:9]
+        src/math/log10f.c [6:9]
+        src/math/log1p.c [6:9]
+        src/math/log1pf.c [6:9]
+        src/math/scalbf.c [9:12]
+        src/math/sin.c [6:9]
+        src/math/sincos.c [6:9]
+        src/math/sincosf.c [10:13]
+        src/math/sinf.c [10:13]
+        src/math/tan.c [6:9]
+        src/math/tanf.c [10:13]
+
+KEEP     Bsd-Unmodified       d03391141ba79c78809a26eaefe69c59
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-bsd-unmodified
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/bsd-unmodified.LICENSE
+    Files with this license:
+        src/complex/ccosh.c [6:25]
+        src/complex/ccoshf.c [6:25]
+        src/complex/csinh.c [6:25]
+        src/complex/csinhf.c [6:25]
+        src/complex/ctanh.c [6:25]
+        src/complex/ctanhf.c [6:25]
+
+KEEP     LicenseRef-scancode-unknown-license-reference d76ee91ec130f4ab9bdcc968d4d0b8ce
+BELONGS ya.make
+    License text:
+        have been licensed under extremely permissive terms.
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-unknown-license-reference
+        Score           : 11.00
+        Match type      : INTRO
+        Links           : https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/unknown-license-reference.LICENSE
+    Files with this license:
+        COPYRIGHT [128:128]
+
+KEEP     Public-Domain        dfcb92e150b80d6cce6516ba0ddd47af
+BELONGS ya.make
+    License text:
+         * public domain sha256 crypt implementation
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 70.00
+        Match type      : REFERENCE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_sha256.c [2:2]
+
+KEEP     ISC                  e6a382fc7564fdd1a5e46b2d97b3221f
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: ISC
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://fedoraproject.org/wiki/Licensing:MIT#Old_Style_with_legal_disclaimer_2, https://spdx.org/licenses/ISC, https://www.isc.org/software/license
+    Files with this license:
+        src/complex/catan.c [5:15]
+        src/complex/catanf.c [5:15]
+        src/complex/catanl.c [5:15]
+        src/math/__polevll.c [5:15]
+        src/math/erfl.c [15:25]
+        src/math/expl.c [5:15]
+        src/math/expm1l.c [5:15]
+        src/math/lgammal.c [15:25]
+        src/math/log10l.c [5:15]
+        src/math/log1pl.c [5:15]
+        src/math/log2l.c [5:15]
+        src/math/logl.c [5:15]
+        src/math/powl.c [5:15]
+        src/math/tgammal.c [5:15]
+
+KEEP     Public-Domain        f0b017ebdf2eeeeaf3e0a2ca82b667fb
+BELONGS ya.make
+    License text:
+        /* public domain sha256 implementation based on fips180-3 */
+    Scancode info:
+        Original SPDX id: LicenseRef-scancode-public-domain
+        Score           : 100.00
+        Match type      : NOTICE
+        Links           : http://www.linfo.org/publicdomain.html, https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/public-domain.LICENSE
+    Files with this license:
+        src/crypt/crypt_sha256.c [16:16]
+
+KEEP     BSD-2-Clause         f59cebb43ee786218189ac014af76fbb
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: BSD-2-Clause
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://opensource.org/licenses/bsd-license.php, http://www.opensource.org/licenses/BSD-2-Clause, https://spdx.org/licenses/BSD-2-Clause
+    Files with this license:
+        src/complex/__cexp.c [6:25]
+        src/complex/__cexpf.c [6:25]
+        src/complex/cexp.c [6:25]
+        src/complex/cexpf.c [6:25]
+        src/complex/csqrt.c [6:25]
+        src/complex/csqrtf.c [6:25]
+        src/crypt/crypt_md5.c [159:178]
+        src/math/exp2l.c [6:25]
+        src/math/fmaf.c [6:25]
+        src/math/fmal.c [6:25]
+
+KEEP     BSD-3-Clause         fb4d40337d6c3332a0b879df5e0b713d
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: BSD-3-Clause
+        Score           : 100.00
+        Match type      : TEXT
+        Links           : http://www.opensource.org/licenses/BSD-3-Clause, https://spdx.org/licenses/BSD-3-Clause
+    Files with this license:
+        src/crypt/crypt_des.c [25:47]
+
+KEEP     BSD-3-Clause         fc3710d4d44a96ab9561881c4885f7b8
+BELONGS ya.make
+    License text:
+        Copyright © 1994 David Burren. It is licensed under a BSD license.
+    Scancode info:
+        Original SPDX id: BSD-3-Clause
+        Score           : 33.00
+        Match type      : REFERENCE
+        Links           : http://www.opensource.org/licenses/BSD-3-Clause, https://spdx.org/licenses/BSD-3-Clause
+    Files with this license:
+        COPYRIGHT [138:138]

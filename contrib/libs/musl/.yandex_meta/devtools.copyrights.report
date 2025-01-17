@@ -1,0 +1,512 @@
+# File format ($ symbol means the beginning of a line):
+#
+# $ # this message
+# $ # =======================
+# $     # comments (all commentaries should starts with some number of spaces and # symbol)
+# $ IGNORE_FILES {file1.ext1} {file2.ext2} - (optional) ignore listed files when generating license macro and credits
+# $ RENAME {original license id} TO {new license id} # user comments - (optional) use {new license id} instead {original license id} in ya.make files
+# $ # user comments
+# $
+# ${action} {license id} {license text hash}
+# $BELONGS ./ya/make/file/relative/path/1/ya.make ./ya/make/2/ya.make
+# ${all_file_action} filename
+# $ # user commentaries (many lines)
+# $ generated description - files with this license, license text... (some number of lines that starts with some number of spaces, do not modify)
+# ${action} {license spdx} {license text hash}
+# $BELONGS ./ya/make/file/relative/path/3/ya.make
+# ${all_file_action} filename
+# $    #    user commentaries
+# $ generated description
+# $ ...
+#
+# You can modify action, all_file_action and add commentaries
+# Available actions:
+# keep - keep license in contrib and use in credits
+# skip - skip license
+# remove - remove all files with this license
+# rename - save license text/links into licenses texts file, but not store SPDX into LINCENSE macro. You should store correct license id into devtools.license.spdx.txt file
+#
+# {all file action} records will be generated when license text contains filename that exists on filesystem (in contrib directory)
+# We suppose that that files can contain some license info
+# Available all file actions:
+# FILE_IGNORE - ignore file (do nothing)
+# FILE_INCLUDE - include all file data into licenses text file
+# =======================
+
+KEEP     COPYRIGHT_SERVICE_LABEL 09676743cf85a147d4ef65e931e5557b
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 0c494bb9f7291d2a9275452e36060030
+BELONGS ya.make
+    License text:
+         * Copyright (c) 1994 David Burren
+         * Copyright (c) 2000,2002,2010,2012 Solar Designer
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/crypt/crypt_des.c [21:23]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 104bcd2cbaba9c509d4f4c7fa2d64640
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2003 Poul-Henning Kamp
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/crypt/crypt_md5.c [156:157]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 17f674c3a8ff0b3c589a15c7c17bc63c
+BELONGS ya.make
+    License text:
+        Copyright © 1999-2019, Arm Limited.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [135:135]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 25c1ba94d8618533f5086e2e3309d612
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2008 Stephen L. Moshier <steve@moshier.net>
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/complex/catan.c [3:3]
+        src/complex/catanf.c [3:3]
+        src/complex/catanl.c [3:3]
+        src/math/__polevll.c [3:3]
+        src/math/erfl.c [13:13]
+        src/math/expl.c [3:3]
+        src/math/expm1l.c [3:3]
+        src/math/lgammal.c [13:13]
+        src/math/log10l.c [3:3]
+        src/math/log1pl.c [3:3]
+        src/math/log2l.c [3:3]
+        src/math/logl.c [3:3]
+        src/math/powl.c [3:3]
+        src/math/tgammal.c [3:3]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 280c6f35a9a59851305d5734e7bbc3fd
+BELONGS ya.make
+    License text:
+        /* Copyright 2011-2012 Nicholas J. Kain, licensed under standard MIT license */
+        .global _longjmp
+        .global longjmp
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/setjmp/x32/longjmp.s [1:3]
+        src/setjmp/x32/setjmp.s [1:3]
+        src/setjmp/x86_64/longjmp.s [1:3]
+        src/setjmp/x86_64/setjmp.s [1:3]
+        src/thread/x32/__set_thread_area.s [1:3]
+        src/thread/x32/__unmapself.s [1:3]
+        src/thread/x86_64/__set_thread_area.s [1:3]
+        src/thread/x86_64/__unmapself.s [1:3]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 2830734acffbbb6c547e73b590f5cfa5
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 2c683a057f0f7701dae7255b98feb7ee
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 35a5fd2c80d40e062c84f4fca205e5a2
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2007 David Schultz <das@FreeBSD.ORG>
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/complex/csqrt.c [3:4]
+        src/complex/csqrtf.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 39a3b145287249b836eab70736ef8101
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 43239d697626e7d429740c17d6a5efe2
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2005-2011 David Schultz <das@FreeBSD.ORG>
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/fmaf.c [3:4]
+        src/math/fmal.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 4688aeecb0efacea4ad3feed0d3d13c9
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 468ca192c87c06aa62d05a11d6b0c757
+BELONGS ya.make
+    License text:
+         * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/__cos.c [4:4]
+        src/math/__cosdf.c [8:8]
+        src/math/__cosl.c [5:5]
+        src/math/__rem_pio2.c [4:4]
+        src/math/__rem_pio2_large.c [4:4]
+        src/math/__rem_pio2f.c [8:8]
+        src/math/__rem_pio2l.c [4:4]
+        src/math/__sin.c [4:4]
+        src/math/__sindf.c [8:8]
+        src/math/__sinl.c [5:5]
+        src/math/acos.c [4:4]
+        src/math/acosf.c [7:7]
+        src/math/acosl.c [4:4]
+        src/math/asin.c [4:4]
+        src/math/asinf.c [7:7]
+        src/math/asinl.c [4:4]
+        src/math/atan.c [4:4]
+        src/math/atan2.c [4:4]
+        src/math/atan2f.c [7:7]
+        src/math/atan2l.c [4:4]
+        src/math/atanf.c [7:7]
+        src/math/atanl.c [4:4]
+        src/math/cbrt.c [4:4]
+        src/math/cbrtf.c [8:8]
+        src/math/cbrtl.c [4:4]
+        src/math/cos.c [4:4]
+        src/math/cosf.c [8:8]
+        src/math/erf.c [4:4]
+        src/math/erff.c [7:7]
+        src/math/erfl.c [4:4]
+        src/math/expm1.c [4:4]
+        src/math/expm1f.c [7:7]
+        src/math/j0.c [4:4]
+        src/math/j0f.c [7:7]
+        src/math/j1.c [4:4]
+        src/math/j1f.c [7:7]
+        src/math/jn.c [4:4]
+        src/math/jnf.c [7:7]
+        src/math/lgamma_r.c [4:4]
+        src/math/lgammaf_r.c [7:7]
+        src/math/lgammal.c [4:4]
+        src/math/log10.c [4:4]
+        src/math/log10f.c [4:4]
+        src/math/log1p.c [4:4]
+        src/math/log1pf.c [4:4]
+        src/math/scalb.c [4:4]
+        src/math/scalbf.c [7:7]
+        src/math/sin.c [4:4]
+        src/math/sincos.c [4:4]
+        src/math/sincosf.c [8:8]
+        src/math/sinf.c [8:8]
+        src/math/tan.c [4:4]
+        src/math/tanf.c [8:8]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 57bba0fe0f42623ea4485fcd4fbb089d
+BELONGS ya.make
+    License text:
+         * Copyright 2004 Sun Microsystems, Inc.  All Rights Reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/__tan.c [4:4]
+        src/math/__tandf.c [8:8]
+        src/math/__tanl.c [5:5]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 6fd31d0e6e257bf6974e354fe478fa6b
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2005-2008 David Schultz <das@FreeBSD.ORG>
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/exp2l.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 77268c337278ca63e08c4e2c9d8021c4
+BELONGS ya.make
+    License text:
+        The ARM memcpy code (src/string/arm/memcpy.S) is Copyright © 2008
+        The Android Open Source Project and is licensed under a two-clause BSD
+        license. It was taken from Bionic libc, used on Android.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [130:132]
+        src/string/arm/memcpy.S [2:3]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 80770b6b0e950d772589350fbbd29930
+BELONGS ya.make
+    License text:
+        Copyright © 1994 David Burren. It is licensed under a BSD license.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [138:138]
+        src/crypt/crypt_des.c [21:23]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 86748eafcece6232d45148c0bdb0f4d4
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2008 Steven G. Kargl, David Schultz, Bruce D. Evans.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/__cosl.c [6:6]
+        src/math/__rem_pio2l.c [5:5]
+        src/math/__sinl.c [6:6]
+        src/math/__tanl.c [6:6]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 8a0cc24f130999af25d83e711cbf586c
+BELONGS ya.make
+    License text:
+        Copyright © 2005-2020 Rich Felker, et al.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [4:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL 951edb3001664c43bf66c4a885a3271d
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2011 David Schultz <das@FreeBSD.ORG>
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/complex/__cexp.c [3:4]
+        src/complex/__cexpf.c [3:4]
+        src/complex/cexp.c [3:4]
+        src/complex/cexpf.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL bb824713228eedbd79d7e9854568382a
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2005 Bruce D. Evans and Steven G. Kargl
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/complex/ccosh.c [3:4]
+        src/complex/ccoshf.c [3:4]
+        src/complex/csinh.c [3:4]
+        src/complex/csinhf.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL bc2104a895230937e9f2764bbc6372fc
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/crypt/crypt_blowfish.c [14:19]
+
+KEEP     COPYRIGHT_SERVICE_LABEL c35a1893bc812f787d6bbc2a0a062584
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [121:128]
+
+KEEP     COPYRIGHT_SERVICE_LABEL c6560292fd75826339848ff48d2162d5
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2017-2018, Arm Limited.
+         * SPDX-License-Identifier: MIT
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/exp2f.c [4:5]
+        src/math/exp2f_data.c [4:5]
+        src/math/exp2f_data.h [2:3]
+        src/math/expf.c [4:5]
+        src/math/log2f.c [4:5]
+        src/math/log2f_data.c [4:5]
+        src/math/log2f_data.h [2:3]
+        src/math/logf.c [4:5]
+        src/math/logf_data.c [4:5]
+        src/math/logf_data.h [2:3]
+        src/math/powf.c [2:3]
+        src/math/powf_data.c [4:5]
+        src/math/powf_data.h [2:3]
+
+KEEP     COPYRIGHT_SERVICE_LABEL c9e10a102f5d49f13a12bd7be9df9484
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2009-2011, Bruce D. Evans, Steven G. Kargl, David Schultz.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/cbrtl.c [5:5]
+
+KEEP     COPYRIGHT_SERVICE_LABEL cf8bea9e99eec9c10680b266bc9dcb0c
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2018, Arm Limited.
+         * SPDX-License-Identifier: MIT
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/math/exp.c [4:5]
+        src/math/exp2.c [4:5]
+        src/math/exp_data.c [4:5]
+        src/math/exp_data.h [2:3]
+        src/math/log.c [4:5]
+        src/math/log2.c [4:5]
+        src/math/log2_data.c [4:5]
+        src/math/log2_data.h [2:3]
+        src/math/log_data.c [4:5]
+        src/math/log_data.h [2:3]
+        src/math/pow.c [4:5]
+        src/math/pow_data.c [4:5]
+        src/math/pow_data.h [2:3]
+
+KEEP     COPYRIGHT_SERVICE_LABEL d5a68e661eb7ab48dba4450a4c361956
+BELONGS ya.make
+    License text:
+        The smoothsort implementation (src/stdlib/qsort.c) is Copyright © 2011
+        Valentin Ochs and is licensed under an MIT-style license.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [145:146]
+
+KEEP     COPYRIGHT_SERVICE_LABEL d5bcd6e49c0bba4b64d5df1dd18ae5f0
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2011 David Schultz
+         * All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/complex/ctanh.c [3:4]
+        src/complex/ctanhf.c [3:4]
+
+KEEP     COPYRIGHT_SERVICE_LABEL e591717f97b3eece706f547a7b6c674e
+BELONGS ya.make
+    License text:
+        /* Copyright (C) 2011 by Valentin Ochs
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/stdlib/qsort.c [1:1]
+
+KEEP     COPYRIGHT_SERVICE_LABEL eac4f178392fadb3db93e18e1207c567
+BELONGS ya.make
+    License text:
+          Copyright (c) 2001-2009 Ville Laurikari <vl@iki.fi>
+          All rights reserved.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/regex/regcomp.c [4:5]
+        src/regex/regexec.c [4:5]
+        src/regex/tre-mem.c [4:5]
+        src/regex/tre.h [4:5]
+
+KEEP     COPYRIGHT_SERVICE_LABEL fa970416beea67d354b9726846b95efa
+BELONGS ya.make
+    Note: matched license text is too long. Read it in the source files.
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        COPYRIGHT [115:118]
+
+KEEP     COPYRIGHT_SERVICE_LABEL feb845608aa8cf35a354c9490f00504c
+BELONGS ya.make
+    License text:
+         * Copyright (c) 2012-2020, Arm Limited.
+         * SPDX-License-Identifier: MIT
+    Scancode info:
+        Original SPDX id: COPYRIGHT_SERVICE_LABEL
+        Score           : 100.00
+        Match type      : COPYRIGHT
+    Files with this license:
+        src/string/aarch64/memcpy.S [4:5]
+        src/string/aarch64/memset.S [4:5]

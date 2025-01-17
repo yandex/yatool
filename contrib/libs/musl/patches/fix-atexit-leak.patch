@@ -1,0 +1,42 @@
+diff --git a/src/exit/atexit.c b/src/exit/atexit.c
+index 854e9fd..87c4fcb 100644
+--- a/src/exit/atexit.c
++++ b/src/exit/atexit.c
+@@ -7,7 +7,7 @@
+ #define malloc __libc_malloc
+ #define calloc __libc_calloc
+ #define realloc undef
+-#define free undef
++#define free __libc_free
+ 
+ /* Ensure that at least 32 atexit handlers can be registered without malloc */
+ #define COUNT 32
+@@ -25,14 +25,22 @@ volatile int *const __atexit_lockptr = lock;
+ 
+ void __funcs_on_exit()
+ {
++	void *prev = 0;
++
+ 	void (*func)(void *), *arg;
+ 	LOCK(lock);
+-	for (; head; head=head->next, slot=COUNT) while(slot-->0) {
+-		func = head->f[slot];
+-		arg = head->a[slot];
+-		UNLOCK(lock);
+-		func(arg);
+-		LOCK(lock);
++	for (; head; head=head->next, slot=COUNT) {
++		free(prev);
++
++		while(slot-->0) {
++			func = head->f[slot];
++			arg = head->a[slot];
++			UNLOCK(lock);
++			func(arg);
++			LOCK(lock);
++		}
++
++		prev = head;
+ 	}
+ }
+ 

@@ -1,0 +1,10 @@
+diff --git a/src/string/strdup.c b/src/string/strdup.c
+index d4c2744..22ae673 100644
+--- a/src/string/strdup.c
++++ b/src/string/strdup.c
+@@ -8,3 +8,5 @@ char *strdup(const char *s)
+ 	if (!d) return NULL;
+ 	return memcpy(d, s, l+1);
+ }
++
++weak_alias(strdup, __strdup);

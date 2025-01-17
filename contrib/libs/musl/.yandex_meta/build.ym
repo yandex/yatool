@@ -1,0 +1,301 @@
+{% extends '//builtin/bag.ym' %}
+
+{% block current_version %}1.2.3{% endblock %}
+
+{% block current_url %}
+https://www.musl-libc.org/releases/musl-{{self.version().strip()}}.tar.gz
+{% endblock %}
+
+{% set ARCH = ['x86_64', 'aarch64'] %}
+
+{% block patch_source %}
+{{super()}}
+rm -rf compat ldso src/malloc
+rm src/locale/iconv_close.c
+rm src/locale/iconv.c
+rm include/iconv.h
+{% for arch in ARCH %}
+make ARCH={{arch}} obj/include/bits/alltypes.h obj/include/bits/syscall.h
+cp obj/include/bits/alltypes.h arch/{{arch}}/bits/alltypes.h
+cp obj/include/bits/syscall.h arch/{{arch}}/bits/syscall.h
+rm -rf obj
+{% endfor %}
+
+cat << EOF > src/internal/version.h
+#define VERSION "{{self.version().strip()}}"
+EOF
+
+cat << EOF > dso.c
+void* __dso_handle;
+EOF
+
+cat << EOF > reallocarray.c
+#define _BSD_SOURCE
+#include <errno.h>
+#include <stdlib.h>
+
+void *reallocarray(void *ptr, size_t m, size_t n) {
+    if (n && m > -1 / n) {
+        errno = ENOMEM;
+        return 0;
+    }
+
+    return realloc(ptr, m * n);
+}
+EOF
+
+mkdir -p extra/sys
+
+cat << EOF > extra/ctypebit.h
+#pragma once
+
+#include <endian.h>
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+    #define _ISbit(bit)   (1 << (bit))
+#else
+    #define _ISbit(bit)   ((bit) < 8 ? ((1 << (bit)) << 8) : ((1 << (bit)) >> 8))
+#endif
+
+enum {
+    _ISupper = _ISbit (0),    /* UPPERCASE.  */
+    _ISlower = _ISbit (1),    /* lowercase.  */
+    _ISalpha = _ISbit (2),    /* Alphabetic.  */
+    _ISdigit = _ISbit (3),    /* Numeric.  */
+    _ISxdigit = _ISbit (4),   /* Hexadecimal numeric.  */
+    _ISspace = _ISbit (5),    /* Whitespace.  */
+    _ISprint = _ISbit (6),    /* Printing.  */
+    _ISgraph = _ISbit (7),    /* Graphical.  */
+    _ISblank = _ISbit (8),    /* Blank (usually SPC and TAB).  */
+    _IScntrl = _ISbit (9),    /* Control character.  */
+    _ISpunct = _ISbit (10),   /* Punctuation.  */
+    _ISalnum = _ISbit (11)    /* Alphanumeric.  */
+};
+EOF
+
+cat << EOF > extra/xlocale.h
+#include <locale.h>
+EOF
+
+>extra/sys/cdefs.h
+>extra/sys/sysctl.h
+
+mkdir full
+
+cat << EOF > full/dlvsym.cpp
+extern "C" void* dlsym(void* handle, const char* symbol);
+
+extern "C" void* dlvsym(void* handle, char* symbol, char*) {
+    return dlsym(handle, symbol);
+}
+EOF
+
+cat << EOF > full/ya.make
+LIBRARY()
+
+VERSION({{self.version().strip()}})
+
+WITHOUT_LICENSE_TEXTS()
+
+LICENSE(BSD-3-Clause)
+
+SUBSCRIBER(
+    g:contrib
+    g:cpp-contrib
+)
+
+SET(MUSL no)
+
+NO_RUNTIME()
+
+SRCS(
+    dlvsym.cpp
+)
+
+IF (ARCH_X86_64)
+    PEERDIR(
+        contrib/libs/asmlib
+        contrib/libs/asmglibc
+    )
+ENDIF()
+
+PEERDIR(
+    contrib/libs/musl
+)
+
+END()
+EOF
+{% endblock %}
+
+{% block ya_make %}
+IF (ARCH_X86_64)
+ADDINCL(
+    contrib/libs/musl/arch/x86_64
+)
+ENDIF()
+
+IF (ARCH_AARCH64)
+ADDINCL(
+    contrib/libs/musl/arch/aarch64
+)
+ENDIF()
+
+ADDINCL(
+    contrib/libs/musl/arch/generic
+    contrib/libs/musl/src/include
+    contrib/libs/musl/src/internal
+    contrib/libs/musl/include
+    contrib/libs/musl/extra
+)
+
+NO_PLATFORM()
+NO_RUNTIME()
+
+CFLAGS(
+    GLOBAL -D_musl_=1
+    -D_XOPEN_SOURCE=700
+    -U_GNU_SOURCE
+    -nostdinc
+    -ffreestanding
+    -fno-stack-protector
+    -D__libc_calloc=calloc
+    -D__libc_malloc=malloc
+    -D__libc_free=free
+)
+
+EXTRALIBS(
+    -nostdlib
+    -fno-pie
+    -Wl,-no-pie
+)
+
+IF (NOT WITH_VALGRIND)
+    # Disable LD_PRELOAD by default to prevent .so constructors from
+    # running before MUSL is initialized, but enable for Valgrind to
+    # preload it's runtime (vgpreload_core-amd64-linux.so) into the
+    # process and intercept custom malloc/free implemetations.
+    LDFLAGS(-Wl,--no-dynamic-linker)
+ENDIF()
+
+INCLUDE(ya.make.inc)
+
+SRCS(
+    dso.c
+    crt/crt1.c
+    reallocarray.c
+)
+
+IF (NOT USE_EAT_MY_DATA)
+    SRCS(
+        src/linux/sync_file_range.c
+        src/mman/msync.c
+        src/unistd/fdatasync.c
+        src/unistd/fsync.c
+        src/unistd/sync.c
+    )
+ENDIF()
+{% endblock %}
+
+{% block prepare_yamake %}
+{{super()}}
+
+cat << EOF > gen.py
+import os
+import sys
+
+arch = sys.argv[1]
+
+for d in os.listdir('src'):
+    m = {}
+    p = f'src/{d}'
+    def add(f):
+        if '.h' in f:
+            return
+        m[os.path.basename(f)[:-2]] = f
+    for dd in sorted(os.listdir(p)):
+        pp = f'{p}/{dd}'
+        if os.path.isfile(pp):
+            add(pp)
+        ap = f'{p}/{arch}'
+        if os.path.isdir(ap):
+            for x in sorted(os.listdir(ap)):
+                add(f'{ap}/{x}')
+    for v in m.values():
+        print(v)
+EOF
+
+(
+echo 'IF (ARCH_X86_64)'
+echo 'SRCS('
+python3 gen.py x86_64 | sort
+echo ')'
+echo 'ENDIF()'
+
+echo 'IF (ARCH_AARCH64)'
+echo 'SRCS('
+python3 gen.py aarch64 | sort
+echo ')'
+echo 'ENDIF()'
+) | grep -v 'unistd/sync.c' \
+  | grep -v 'unistd/fsync.c' \
+  | grep -v 'unistd/fdatasync.c' \
+  | grep -v 'mman/msync.c' \
+  | grep -v 'sync_file_range.c' \
+   > ya.make.inc
+
+cat << EOF > include/ya.make
+# Generated by devtools/yamaker.
+
+LIBRARY()
+
+VERSION({{self.version().strip()}})
+
+WITHOUT_LICENSE_TEXTS()
+
+SUBSCRIBER(g:cpp-contrib)
+
+LICENSE(MIT)
+
+IF (ARCH_X86_64)
+ADDINCL(
+    GLOBAL contrib/libs/musl/arch/x86_64
+)
+ENDIF()
+
+IF (ARCH_AARCH64)
+ADDINCL(
+    GLOBAL contrib/libs/musl/arch/aarch64
+)
+ENDIF()
+
+ADDINCL(
+    GLOBAL contrib/libs/musl/arch/generic
+    GLOBAL contrib/libs/musl/include
+    GLOBAL contrib/libs/musl/extra
+)
+
+NO_PLATFORM()
+NO_RUNTIME()
+
+END()
+EOF
+{% endblock %}
+
+{% block move_to_output %}
+{{super()}}
+(
+    find . -type f -name '*.c'
+    find . -type f -name '*.h'
+    find . -type f -name '*.s'
+    find . -type f -name '*.S'
+    find . -type f -name '*.cpp'
+) | while read l; do
+    install -v -D -m 0644 ${l} ${OUTPUT}/${l}
+done
+cp ya.make.inc ${OUTPUT}/
+{% endblock %}
+
+{% block run_license_analyzer %}
+{{super()}}
+sed -e 's|.*Musl-Exc.*||' -i ${OUTPUT}/ya.make
+{% endblock %}
