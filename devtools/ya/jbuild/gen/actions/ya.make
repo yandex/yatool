@@ -6,7 +6,6 @@ PY_SRCS(
     funcs.py
     idea.py
     missing_dirs.py
-    move_matches.py
     parse.py
 )
 
