@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
 
 
+class StylingError(Exception):
+    pass
+
+
 class StylerKind(StrEnum):
     PY = auto()
     CPP = auto()
@@ -106,7 +110,7 @@ class Black(config.ConfigMixin):
         )
 
     def _run_black(self, content: str, path: PurePath) -> str:
-        black_args = [self._tool, "-q", "-", "--config", self.lookup(path)]
+        black_args = [self._tool, "-q", "-", "--config", self.lookup_config(path)]
 
         p = subprocess.Popen(
             black_args,
@@ -123,7 +127,7 @@ class Black(config.ConfigMixin):
             state_helper.stop()
 
         if err:
-            raise RuntimeError('error while running black on file "{}": {}'.format(path, err.strip()))
+            raise StylingError('error while running black on file "{}": {}'.format(path, err.strip()))
 
         return out
 
@@ -178,21 +182,21 @@ class Ruff(config.ConfigMixin):
                 fd.write(f"\nRuff err: {err}")
             error_msg = f'Something went wrong while running ruff {" ".join(cmd_args)} on file "{path}"'
             error_msg += "\nCheck file 'ruff.out' for errors"
-            raise RuntimeError(error_msg)
+            raise StylingError(error_msg)
 
         # Abort styling on signal
         if p.returncode < 0:
             state_helper.stop()
 
         if p.returncode != 0 and err:
-            raise RuntimeError(
+            raise StylingError(
                 'error while running ruff {} on file "{}": {}'.format(" ".join(cmd_args), path, err.strip())
             )
 
         return out
 
     def format(self, path: PurePath, content: str) -> str:
-        ruff_config = self.lookup(path)
+        ruff_config = self.lookup_config(path)
 
         stdin_filename = ["--stdin-filename", path]
 
@@ -241,7 +245,7 @@ class ClangFormat(config.ConfigMixin):
             content = self.fix_header(content)
 
         p = subprocess.Popen(
-            [self._tool, "-assume-filename=a.cpp", f"-style=file:{self.lookup(path)}"],
+            [self._tool, "-assume-filename=a.cpp", f"-style=file:{self.lookup_config(path)}"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -256,9 +260,9 @@ class ClangFormat(config.ConfigMixin):
             state_helper.stop()
 
         if err:
-            raise Exception("error while running clang-format: " + err)
+            raise StylingError("error while running clang-format: " + err)
 
-        return out
+        return out + "\n" if out and not out.endswith("\n") else out
 
     @staticmethod
     def fix_header(content: str) -> str:
@@ -305,7 +309,7 @@ class Golang:
             state_helper.stop()
 
         if err:
-            raise Exception('error while running yoimports on file "{}": {}'.format(path, err.strip()))
+            raise StylingError('error while running yoimports on file "{}": {}'.format(path, err.strip()))
 
         return out
 
@@ -351,7 +355,7 @@ class Yql:
             state_helper.stop()
 
         if err:
-            raise RuntimeError('error while running sql_formatter on file "{}": {}'.format(path, err.strip()))
+            raise StylingError('error while running sql_formatter on file "{}": {}'.format(path, err.strip()))
 
         return out
 

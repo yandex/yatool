@@ -69,19 +69,13 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target_: target.Targ
     target_path, loader = target_
     content = loader()
 
-    def run_format() -> str:
-        formatted_content = styler.format(target_path, content)
-        if formatted_content and formatted_content[-1] != "\n":
-            return formatted_content + "\n"
-        return formatted_content
-
     if target_path.name.startswith(target.STDIN_FILENAME_STAMP):
-        print(run_format())
+        print(styler.format(target_path, content))
         return 0
 
     target_path = tp.cast(Path, target_path)
     if style_opts.force or not (reason := rules.get_skip_reason(str(target_path), content)):
-        formatted_content = run_format()
+        formatted_content = styler.format(target_path, content)
         if formatted_content == content:
             return 0
 
@@ -90,7 +84,7 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target_: target.Targ
 
         message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]]"
         if isinstance(styler, config.ConfigMixin):
-            path = styler.lookup(target_path, root_relative=True)
+            path = styler.lookup_config(target_path, root_relative=True)
             message += f" [[unimp]](config: {path})[[rst]]"
 
         if not style_opts.dry_run and not style_opts.check:
@@ -133,6 +127,10 @@ def run_style(args) -> int:
             futures.extend(executor.submit(_style, style_opts, styler_, tl) for tl in target_loaders)
         for future in concurrent.futures.as_completed(futures):
             state_helper.check_cancel_state()
-            rc = future.result() or rc
+            try:
+                rc = future.result() or rc
+            except styler.StylingError as e:
+                logger.error(e, exc_info=True)
+                return 1
 
     return 3 if rc and style_opts.check else 0

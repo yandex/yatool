@@ -30,7 +30,7 @@ class ConfigMixin:
         self._config_loaders = config_loaders
         self._source_root = _find_root()
 
-    def lookup(self, path: PurePath, root_relative: bool = False) -> ConfigPath:
+    def lookup_config(self, path: PurePath, root_relative: bool = False) -> ConfigPath:
         for loader in self._config_loaders:
             if config := loader.lookup(path):
                 if self._source_root and root_relative:
