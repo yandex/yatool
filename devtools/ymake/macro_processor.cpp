@@ -536,6 +536,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         if (input.Context)
             in.Name = TFileConf::ConstructLink(input.Context, NPath::ConstructPath(in.Name)); // lifted from TCommandInfo::ApplyMods
         in.IsGlob = input.IsGlob;
+        in.IsMacro = input.IsLegacyGlob;
         GetInputInternal().Push(in);
     }
 
@@ -1462,13 +1463,21 @@ bool TCommandInfo::IsIncludeVar(const TStringBuf& cur) {
     return cur.StartsWith(TModuleIncDirs::VAR_PREFIX) && cur.EndsWith(TModuleIncDirs::VAR_SUFFIX);
 }
 
+bool TCommandInfo::IsReservedVar(const TStringBuf& cur, const TVars& vars) {
+    return IsInternalReservedVar(cur) || vars.IsReservedName(cur);
+}
+
+bool TCommandInfo::IsGlobalReservedVar(const TStringBuf& cur, const TVars& vars) {
+    return vars.IsReservedName(cur) || NYMake::IsGlobalResource(cur) || IsIncludeVar(cur) ||
+        EqualToOneOf(cur, "MANAGED_PEERS_CLOSURE"sv, "MANAGED_PEERS"sv, "APPLIED_EXCLUDES"sv);
+}
+
 bool TCommandInfo::IsReservedVar(const TStringBuf& cur) const {
-    return IsInternalReservedVar(cur) || Conf->CommandConf.IsReservedName(cur);
+    return IsReservedVar(cur, Conf->CommandConf);
 }
 
 bool TCommandInfo::IsGlobalReservedVar(const TStringBuf& cur) const {
-    return Conf->CommandConf.IsReservedName(cur) || NYMake::IsGlobalResource(cur) || IsIncludeVar(cur) ||
-        EqualToOneOf(cur, "MANAGED_PEERS_CLOSURE"sv, "MANAGED_PEERS"sv, "APPLIED_EXCLUDES"sv);
+    return IsGlobalReservedVar(cur, Conf->CommandConf);
 }
 
 TString TCommandInfo::GetToolValue(const TMacroData& macroData, const TVars& vars) {

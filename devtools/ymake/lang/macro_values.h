@@ -81,7 +81,11 @@ public:
         std::string_view Data;
         bool operator==(const TGlobPattern&) const = default;
     };
-    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TOutputs, TGlobPattern>;
+    struct TLegacyLateGlobPatterns {
+        TVector<TString> Data;
+        bool operator==(const TLegacyLateGlobPatterns&) const = default;
+    };
+    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TOutputs, TGlobPattern, TLegacyLateGlobPatterns>;
 
     enum EStorageType {
         ST_LITERALS,
@@ -91,7 +95,10 @@ public:
         ST_GLOB,
         ST_INPUT_ARRAYS,
         ST_OUTPUT_ARRAYS,
+        ST_LEGACY_LATE_GLOB,
+        ST_COUNT
     };
+    static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));
 
     NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }
     NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }

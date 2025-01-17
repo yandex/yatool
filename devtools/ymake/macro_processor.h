@@ -209,6 +209,10 @@ public:
 
     void WriteRequirements(TStringBuf reqs);
 
+    static bool IsIncludeVar(const TStringBuf& cur);
+    static bool IsReservedVar(const TStringBuf& cur, const TVars& vars);
+    static bool IsGlobalReservedVar(const TStringBuf& cur, const TVars& vars);
+
 private:
     template<typename T>
     void ApplyToOutputIncludes(T&& action) const {
@@ -254,7 +258,6 @@ private:
 
     void FillAddCtx(const TYVar& var, const TVars& parentVars);
 
-    static bool IsIncludeVar(const TStringBuf& cur);
     bool IsReservedVar(const TStringBuf& cur) const;
     bool IsGlobalReservedVar(const TStringBuf& cur) const;
 

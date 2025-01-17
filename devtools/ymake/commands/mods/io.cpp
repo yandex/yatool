@@ -48,29 +48,43 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto processInput = [&ctx](std::string_view arg0, bool isGlob) -> TMacroValues::TValue {
+            auto processCoord = [&ctx](std::string_view name, bool isGlob, bool isLegacyGlob) {
+                auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+                auto coord = ctx.Sink.Inputs.CollectCoord(pooledName);
+                ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) { var.IsGlob = isGlob; var.IsLegacyGlob = isLegacyGlob; });
+                return coord;
+            };
+            auto processInputs = [&processCoord](auto& names, bool isGlob, bool isLegacyGlob) -> TMacroValues::TValue {
+                auto result = TMacroValues::TInputs();
+                for (auto& name : names)
+                    result.Coords.push_back(processCoord(name, isGlob, isLegacyGlob));
+                std::sort(result.Coords.begin(), result.Coords.end());
+                result.Coords.erase(std::unique(result.Coords.begin(), result.Coords.end()), result.Coords.end());
+                return result;
+            };
+            auto processInputOrInputs = [&processCoord, &processInputs](std::string_view arg0, bool isGlob, bool isLegacyGlob) -> TMacroValues::TValue {
                 auto names = SplitArgs(TString(arg0));
                 if (names.size() == 1) {
                     // one does not simply reuse the original argument,
                     // for it might have been transformed (e.g., dequoted)
-                    auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(names.front())));
-                    auto input = TMacroValues::TInput {.Coord = ctx.Sink.Inputs.CollectCoord(pooledName)};
-                    ctx.Sink.Inputs.UpdateCoord(input.Coord, [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                    return input;
+                    return TMacroValues::TInput {.Coord = processCoord(names.front(), isGlob, isLegacyGlob)};
                 }
-                auto result = TMacroValues::TInputs();
-                for (auto& name : names) {
-                    auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
-                    result.Coords.push_back(ctx.Sink.Inputs.CollectCoord(pooledName));
-                    ctx.Sink.Inputs.UpdateCoord(result.Coords.back(), [&isGlob](auto& var) { var.IsGlob = isGlob; });
-                }
-                return result;
+                return processInputs(names, isGlob, isLegacyGlob);
             };
-            if (auto glob = std::get_if<TMacroValues::TGlobPattern>(&args[0])) {
-                return processInput(glob->Data, true);
-            }
-            auto arg0 = std::get<std::string_view>(args[0]);
-            return processInput(arg0, false);
+            return std::visit(TOverloaded{
+                [&](TMacroValues::TGlobPattern glob) {
+                    return processInputOrInputs(glob.Data, true, false);
+                },
+                [&](TMacroValues::TLegacyLateGlobPatterns glob) {
+                    return processInputs(glob.Data, false, true);
+                },
+                [&](std::string_view s) {
+                    return processInputOrInputs(s, false, false);
+                },
+                [](auto&&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                },
+            }, args[0]);
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

@@ -984,7 +984,8 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
         Y_ASSERT(lateExpansionVar);
-        lateExpansionVar->push_back(globCmd);
+        lateExpansionVar->push_back(TVarStr{globCmd});
+        // not setting .HasPrefix even though there is one, because we want to pass it through to input processing as is
         lateExpansionVar->back().IsMacro = true;
     };
     for (auto globStr : globs) {

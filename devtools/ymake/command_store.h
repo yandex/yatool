@@ -200,9 +200,10 @@ private:
     public:
         NCommands::TSyntax Inline(const NCommands::TSyntax& ast);
     private:
+        enum class ELegacyMode {None, Expr, Macro};
         struct TVarDefinition {
             const NCommands::TSyntax* Definition = nullptr;
-            bool Legacy = false;
+            ELegacyMode LegacyMode = ELegacyMode::None;
         };
         struct TScope;
         TVarDefinition GetVariableDefinition(NPolexpr::EVarId id);
@@ -219,7 +220,8 @@ private:
         const NCommands::TSyntax* VarLookup(TStringBuf name);
         const TScope* Scope = nullptr;
         struct TLegacyVars {
-            using TDefinitions = TVector<THolder<NCommands::TSyntax>>; // indexed by recursion depth
+            struct TDefinition {THolder<NCommands::TSyntax> Definition; ELegacyMode LegacyMode;};
+            using TDefinitions = TVector<TDefinition>; // indexed by recursion depth
             using TDefinitionCache = THashMap<TStringBuf, THolder<TDefinitions>>;
             using TRecursionDepth = THashMap<NPolexpr::EVarId, size_t>;
             const TVars& Vars;

@@ -1,5 +1,6 @@
 #include "common.h"
 
+#include <devtools/ymake/command_helpers.h>
 #include <util/generic/overloaded.h>
 #include <util/string/escape.h>
 
@@ -22,16 +23,10 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto result = TString();
-            bool first = true;
-            for (auto& arg : args) {
-                if (!first)
-                    result += " ";
-                result += "\"";
-                EscapeC(std::get<std::string_view>(arg), result);
-                result += "\"";
-                first = false;
+            if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
+                return args.front();
             }
+            auto result = JoinArgs(std::span(args), [](auto& x) {return std::get<std::string_view>(x);});
             return ctx.Values.GetValue(ctx.Values.InsertStr(result));
         }
         TTermValue Evaluate(
@@ -75,6 +70,9 @@ namespace {
         ) const override {
             CheckArgCount(args);
             auto result = TString();
+            if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
+                return args.front();
+            }
             for (auto& arg : args)
                 result += std::get<std::string_view>(arg);
             return ctx.Values.GetValue(ctx.Values.InsertStr(result));

@@ -36,7 +36,7 @@ namespace NPolexpr {
         {
         }
 
-    private:
+    public:
         constexpr static ui32 IDX_BITS = 24;
         constexpr static ui32 STORAGE_BITS = 5;
 

@@ -1,6 +1,7 @@
 #include "macro_values.h"
 
 #include <devtools/ymake/symbols/cmd_store.h>
+#include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/command_store.h>
 #include <devtools/ymake/commands/evaluation.h>
 
@@ -35,6 +36,8 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
             return NPolexpr::TConstId(ST_OUTPUT_ARRAYS, Strings.Add(encoded));
         } else if constexpr (std::is_same_v<T, TGlobPattern>)
             return NPolexpr::TConstId(ST_GLOB, Strings.Add(val.Data));
+        else if constexpr (std::is_same_v<T, TLegacyLateGlobPatterns>)
+            return NPolexpr::TConstId(ST_LEGACY_LATE_GLOB, Strings.Add(JoinArgs(std::span(val.Data), std::identity())));
     }, value);
 }
 
@@ -68,6 +71,8 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
         }
         case ST_GLOB:
             return TGlobPattern {.Data = Strings.GetName<TCmdView>(id.GetIdx()).GetStr()};
+        case ST_LEGACY_LATE_GLOB:
+            return TLegacyLateGlobPatterns {.Data = SplitArgs(Strings.GetName<TCmdView>(id.GetIdx()).GetStr())};
         default:
             throw std::runtime_error{"Unknown storage id"};
     }

@@ -11,6 +11,7 @@ namespace NCommands {
             TStringBuf Name;
             ELinkType Context = ELinkType::ELT_Default;
             bool IsGlob = false;
+            bool IsLegacyGlob = false;
             TInput(TStringBuf name) : Name(name) {}
             operator TStringBuf() const { return Name; }
         };

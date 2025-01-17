@@ -1,7 +1,7 @@
 #include "command_helpers.h"
 
 namespace {
-    TVector<TString> splitString(const TString &str, const TString &delimiter, bool cleanup) {
+    TVector<TString> splitString(TStringBuf str, const TString &delimiter, bool cleanup) {
         TVector<TString> tokens;
         TString token;
 
@@ -63,7 +63,7 @@ namespace {
     }
 }
 
-TVector<TVector<TString>> SplitCommandsAndArgs(const TString& cmd) {
+TVector<TVector<TString>> SplitCommandsAndArgs(TStringBuf cmd) {
     TVector<TVector<TString>> res;
     auto split = splitString(cmd, "&&", false);
     res.reserve(split.size());
@@ -72,7 +72,7 @@ TVector<TVector<TString>> SplitCommandsAndArgs(const TString& cmd) {
     return res;
 }
 
-TVector<TString> SplitCommands(const TString& cmd) {
+TVector<TString> SplitCommands(TStringBuf cmd) {
     TVector<TString> res;
     auto split = splitString(cmd, "&&", false);
     res.reserve(split.size());
@@ -88,6 +88,6 @@ TVector<TString> SplitCommands(const TString& cmd) {
     return res;
 }
 
-TVector<TString> SplitArgs(const TString& cmd) {
+TVector<TString> SplitArgs(TStringBuf cmd) {
     return splitString(cmd, " ", true);
 }

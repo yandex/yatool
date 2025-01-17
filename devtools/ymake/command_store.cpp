@@ -255,7 +255,7 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     auto name = Commands.Values.GetVarName(id);
 
     if (auto var = VarLookup(name))
-        return {var, false};
+        return {var, ELegacyMode::None};
 
     // legacy lookup
 
@@ -290,33 +290,51 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     if (defs == LegacyVars.DefinitionCache.end())
         defs = LegacyVars.DefinitionCache.try_emplace(name, MakeHolder<TLegacyVars::TDefinitions>()).first;
     else
-        if (depth->second < defs->second->size())
-            return {(*defs->second)[depth->second].Get(), true}; // already processed
+        if (depth->second < defs->second->size()) {
+            auto& def = (*defs->second)[depth->second];
+            return {def.Definition.Get(), def.LegacyMode}; // already processed
+        }
     Y_ASSERT(defs->second->size() == depth->second);
 
     // do the thing
 
+    TLegacyVars::TDefinition def;
+    def.LegacyMode = ELegacyMode::Expr;
     if (var->size() == 1 && var->front().HasPrefix) {
         // a conventional variable
         ui64 scopeId;
         TStringBuf cmdName;
-        TStringBuf cmdValue;
+        TStringBuf cmdValue = var->front().Name;
+        NCommands::TSyntax syntax;
         ParseLegacyCommandOrSubst(var->front().Name, scopeId, cmdName, cmdValue);
-        defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue))));
+        def.Definition = MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue)));
     } else {
-        // a macro argument
-        NCommands::TSyntax syn;
-        syn.Script.emplace_back();
+        def.Definition = MakeHolder<NCommands::TSyntax>();
+        auto& dst = def.Definition->Script.emplace_back();
+        TMacroValues::TLegacyLateGlobPatterns late_globs;
         for (auto& val : *var) {
-            auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val.Name);
-            for (auto& cmd : _val.Script)
-                syn.Script.front().insert(syn.Script.front().end(),
-                    std::make_move_iterator(cmd.begin()),
-                    std::make_move_iterator(cmd.end()));
+            if (val.IsMacro) {
+                // a passthrough hack pretending to be "a macro" (used by _LATE_GLOB)
+                late_globs.Data.push_back(val.Name);
+            } else {
+                // a macro argument
+                auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val.Name);
+                for (auto& cmd : _val.Script)
+                    dst.insert(dst.end(),
+                        std::make_move_iterator(cmd.begin()),
+                        std::make_move_iterator(cmd.end()));
+            }
         }
-        defs->second->push_back(MakeHolder<NCommands::TSyntax>(std::move(syn)));
+        if (!late_globs.Data.empty()) {
+            if (!dst.empty())
+                ythrow TError() << "inconsistent variable array items (" << name << ")";
+            dst.push_back({Commands.Values.InsertValue(late_globs)});
+            def.LegacyMode = ELegacyMode::Macro;
+        }
     }
-    return {defs->second->back().Get(), true};
+    defs->second->push_back(std::move(def));
+    auto& result = defs->second->back();
+    return {result.Definition.Get(), result.LegacyMode};
 }
 
 const NCommands::TSyntax*
@@ -351,15 +369,19 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
         defs = LegacyVars.DefinitionCache.try_emplace(name, MakeHolder<TLegacyVars::TDefinitions>()).first;
     else {
         Y_ASSERT(defs->second->size() == 1);
-        return defs->second->back().Get(); // already processed
+        Y_ASSERT(defs->second->back().LegacyMode == ELegacyMode::Macro);
+        return defs->second->back().Definition.Get(); // already processed
     }
     Y_ASSERT(defs->second->empty());
 
     // do the thing
 
     auto defBody = MacroDefBody(subValue);
-    defs->second->push_back(MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(defBody))));
-    return defs->second->back().Get();
+    defs->second->push_back({
+        MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(defBody))),
+        ELegacyMode::Macro
+    });
+    return defs->second->back().Definition.Get();
 }
 
 const NCommands::TSyntax* TCommands::TInliner::VarLookup(TStringBuf name) {
@@ -376,7 +398,7 @@ const TYVar* TCommands::TInliner::TLegacyVars::VarLookup(TStringBuf name, const 
     if (!var || var->DontExpand || var->NoInline)
         return {};
     Y_ASSERT(!var->BaseVal || !var->IsReservedName); // TODO find out is this is so
-    if (conf.CommandConf.IsReservedName(name))
+    if (TCommandInfo::IsGlobalReservedVar(name, conf.CommandConf))
         return {};
 
     return var;
@@ -498,14 +520,14 @@ void TCommands::TInliner::InlineModValueTerm(
             if (def.Definition->Script[0].size() == 0)
                 return;
             if (def.Definition->Script[0].size() != 1) {
-                if (def.Legacy && LegacyVars.RecursionDepth[id] != 0)
+                if (def.LegacyMode != ELegacyMode::None && LegacyVars.RecursionDepth[id] != 0)
                     ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(id);
                 // leave it for the actual evaluation to expand
                 writer.push_back(id);
                 return;
             }
             auto recurse = [&](auto subId) {
-                if (def.Legacy) {
+                if (def.LegacyMode != ELegacyMode::None) {
                     Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
                     ++LegacyVars.RecursionDepth[id];
                     Y_DEFER {--LegacyVars.RecursionDepth[id];};
@@ -579,14 +601,14 @@ void TCommands::TInliner::InlineScalarTerms(
                     return;
                 if (def.Definition->Script[0].size() != 1) {
                     // TODO just disallow this?
-                    if (!def.Legacy || LegacyVars.RecursionDepth[var] != 0)
+                    if (def.LegacyMode == ELegacyMode::None || LegacyVars.RecursionDepth[var] != 0)
                         ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(var);
                     // TODO dev warning?
                     // leave it for the actual evaluation to expand
                     writer.WriteTerm(var);
                     return;
                 }
-                if (def.Legacy) {
+                if (def.LegacyMode != ELegacyMode::None) {
                     Y_ASSERT(LegacyVars.RecursionDepth.contains(var));
                     ++LegacyVars.RecursionDepth[var];
                     Y_DEFER {--LegacyVars.RecursionDepth[var];};
@@ -621,7 +643,7 @@ void TCommands::TInliner::InlineScalarTerms(
                                 ythrow TError() << "unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
                             NCommands::TSyntax newBody;
                             TCmdWriter newWriter(newBody, false);
-                            if (def.Legacy) {
+                            if (def.LegacyMode != ELegacyMode::None) {
                                 Y_ASSERT(LegacyVars.RecursionDepth.contains(*var));
                                 ++LegacyVars.RecursionDepth[*var];
                                 Y_DEFER {--LegacyVars.RecursionDepth[*var];};
@@ -685,7 +707,7 @@ void TCommands::TInliner::InlineArguments(
             return true;
         if (def.Definition->Script.size() != 1)
             ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(id);
-        if (def.Legacy) {
+        if (def.LegacyMode != ELegacyMode::None) {
             Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
             ++LegacyVars.RecursionDepth[id];
             Y_DEFER {--LegacyVars.RecursionDepth[id];};
@@ -745,7 +767,7 @@ void TCommands::TInliner::InlineCommands(
         auto def = GetVariableDefinition(id);
         if (!def.Definition)
             return false;
-        if (def.Legacy) {
+        if (def.LegacyMode != ELegacyMode::None) {
             Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
             ++LegacyVars.RecursionDepth[id];
             Y_DEFER {--LegacyVars.RecursionDepth[id];};
@@ -925,13 +947,14 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
 
 TString TCommands::PrintConst(NPolexpr::TConstId id) const {
     return std::visit(TOverloaded{
-        [](std::string_view             val) { return fmt::format("'{}'", val); },
-        [](TMacroValues::TTool          val) { return fmt::format("Tool{{'{}'}}", val.Data); },
-        [](TMacroValues::TInput         val) { return fmt::format("Input{{{}}}", val.Coord); },
-        [](TMacroValues::TInputs        val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
-        [](TMacroValues::TOutput        val) { return fmt::format("Output{{{}}}", val.Coord); },
-        [](TMacroValues::TOutputs       val) { return fmt::format("Outputs{{{}}}", fmt::join(val.Coords, " ")); },
-        [](TMacroValues::TGlobPattern   val) { return fmt::format("GlobPattern{{{}}}", val.Data); }
+        [](std::string_view                      val) { return fmt::format("'{}'", val); },
+        [](TMacroValues::TTool                   val) { return fmt::format("Tool{{'{}'}}", val.Data); },
+        [](TMacroValues::TInput                  val) { return fmt::format("Input{{{}}}", val.Coord); },
+        [](TMacroValues::TInputs                 val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
+        [](TMacroValues::TOutput                 val) { return fmt::format("Output{{{}}}", val.Coord); },
+        [](TMacroValues::TOutputs                val) { return fmt::format("Outputs{{{}}}", fmt::join(val.Coords, " ")); },
+        [](TMacroValues::TGlobPattern            val) { return fmt::format("GlobPattern{{{}}}", val.Data); },
+        [](TMacroValues::TLegacyLateGlobPatterns val) { return fmt::format("LegacyLateGlobPattern{{{}}}", fmt::join(val.Data, " ")); },
     }, Values.GetValue(id));
 }
 
@@ -1101,12 +1124,13 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             return NCommands::TTermValue(InputToStringArray(input, ctx));
         },
         [&](const TMacroValues::TInputs& inputs) {
-            auto result = TVector<TString>();
+            auto result = TUniqVector<TString>();
             for (auto& coord : inputs.Coords) {
                 auto inputResult = InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
-                result.insert(result.end(), inputResult.begin(), inputResult.end());
+                for (auto& input : inputResult)
+                    result.Push(input);
             }
-            return NCommands::TTermValue(result);
+            return NCommands::TTermValue(result.Take());
         },
         [&](TMacroValues::TOutput val) {
             auto& var = ctx.Vars.at("OUTPUT");
@@ -1122,7 +1146,10 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
         },
         [](TMacroValues::TGlobPattern val) {
             return NCommands::TTermValue(TString(val.Data));
-        }
+        },
+        [](TMacroValues::TLegacyLateGlobPatterns) -> NCommands::TTermValue {
+            ythrow TError() << "unexpected glob evaluation";
+        },
     }, value);
 }
 
@@ -1136,13 +1163,14 @@ TVector<TString> TCommands::InputToStringArray(const TMacroValues::TInput& input
 
 TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
     return std::visit(TOverloaded{
-        [](std::string_view           val) { return TString(val); },
-        [](TMacroValues::TTool        val) { return TString(val.Data); },
-        [](TMacroValues::TInput       val) { return TString(fmt::format("{}", val.Coord)); },
-        [](TMacroValues::TInputs      val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
-        [](TMacroValues::TOutput      val) { return TString(fmt::format("{}", val.Coord)); },
-        [](TMacroValues::TOutputs     val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
-        [](TMacroValues::TGlobPattern val) { return TString(val.Data); }
+        [](std::string_view                      val) { return TString(val); },
+        [](TMacroValues::TTool                   val) { return TString(val.Data); },
+        [](TMacroValues::TInput                  val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TInputs                 val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
+        [](TMacroValues::TOutput                 val) { return TString(fmt::format("{}", val.Coord)); },
+        [](TMacroValues::TOutputs                val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
+        [](TMacroValues::TGlobPattern            val) { return TString(val.Data); },
+        [](TMacroValues::TLegacyLateGlobPatterns val) { return TString(fmt::format("{}", fmt::join(val.Data, " "))); },
     }, Values.GetValue(node));
 }
 
