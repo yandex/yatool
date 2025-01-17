@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/builtin_macro_consts.h>
 #include <devtools/ymake/lang/properties.h>
+#include <devtools/ymake/vardefs.h>
 
 using namespace NYndex;
 
@@ -242,5 +243,9 @@ void NYndex::AddBuiltinDefinitions(TDefinitions& definitions) {
     for (const auto& option : NProperties::ALL_PROPERTIES) {
         NYndex::TSourceRange range = {static_cast<size_t>(option.Link.Line), 0, static_cast<size_t>(option.Link.Line), 0};
         definitions.AddDefinition(TString{option}, TString(option.Link.File), range, TString{option.Description}, NYndex::EDefinitionType::Property);
+    }
+    for (const auto& var : NVariableDefs::ALL_VARIABLES) {
+        NYndex::TSourceRange range = {static_cast<size_t>(var.Link.Line), 0, static_cast<size_t>(var.Link.Line), 0};
+        definitions.AddDefinition(TString{var}, TString(var.Link.File), range, TString{var.Description}, NYndex::EDefinitionType::Variable);
     }
 }

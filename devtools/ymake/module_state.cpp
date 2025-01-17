@@ -16,6 +16,7 @@
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/vardefs.h>
 
 #include <util/folder/path.h>
 #include <util/string/cast.h>
@@ -29,59 +30,46 @@ namespace {
     const TStringBuf PROP_FILENAME = TStringBuf("FILENAME");
     const TStringBuf PROP_BASENAME = TStringBuf("BASENAME");
     const TStringBuf PROP_PROVIDES = TStringBuf("PROVIDES");
-    const TStringBuf VAR_DYNAMIC_LINK = TStringBuf("DYNAMIC_LINK");
-    const TStringBuf VAR_HAS_MANAGEABLE_PEERS = TStringBuf("HAS_MANAGEABLE_PEERS");
-    const TStringBuf VAR_CONSUME_NON_MANAGEABLE_PEERS = TStringBuf("CONSUME_NON_MANAGEABLE_PEERS");
-    const TStringBuf VAR_DONT_RESOLVE_INCLUDES = TStringBuf("DONT_RESOLVE_INCLUDES");
-    const TStringBuf VAR_CHECK_INTERNAL = TStringBuf("CHECK_INTERNAL");
-    const TStringBuf VAR_INTERNAL_EXCEPTIONS = TStringBuf("INTERNAL_EXCEPTIONS");
-    const TStringBuf VAR_USE_GLOBAL_CMD = TStringBuf("USE_GLOBAL_CMD");
-    const TStringBuf VAR_GO_TEST_FOR_DIR = TStringBuf("GO_TEST_FOR_DIR");
-    const TStringBuf VAR_START_TARGET = TStringBuf("START_TARGET");
-    const TStringBuf VAR_GO_HAS_INTERNAL_TESTS = TStringBuf("GO_HAS_INTERNAL_TESTS");
-    const TStringBuf VAR_PASS_PEERS = TStringBuf("PASS_PEERS");
-    const TStringBuf VAR_IGNORE_DUPSRC = TStringBuf("_IGNORE_DUPSRC");
     const TStringBuf CONFIG_VAR_NAMES[] = {
-        VAR_PEERDIR_TAGS,
-        MANGLED_MODULE_TYPE,
-        VAR_MODULE_LANG,
-        VAR_MODULE_TYPE,
-        VAR_PASS_PEERS,
-        VAR_GO_TEST_FOR_DIR,
-        TStringBuf("PROTO_HEADER_EXTS"),
-        TStringBuf("EV_HEADER_EXTS"),
-        TStringBuf("DEPENDENCY_MANAGEMENT_VALUE"),
-        TStringBuf("EXCLUDE_VALUE"),
-        TStringBuf("IGNORE_JAVA_DEPENDENCIES_CONFIGURATION"),
-        TStringBuf("JAVA_DEPENDENCIES_CONFIGURATION_VALUE"),
-        TStringBuf("NON_NAMAGEABLE_PEERS"),
-        TStringBuf("DART_CLASSPATH_DEPS"),
-        TStringBuf("DART_CLASSPATH"),
-        TStringBuf("UNITTEST_DIR"),
-        TStringBuf("TS_CONFIG_ROOT_DIR"),
-        TStringBuf("TS_CONFIG_OUT_DIR"),
-        TStringBuf("TS_CONFIG_SOURCE_MAP"),
-        TStringBuf("TS_CONFIG_DECLARATION"),
-        TStringBuf("TS_CONFIG_DECLARATION_MAP"),
-        TStringBuf("TS_CONFIG_DEDUCE_OUT"),
-        TStringBuf("TS_CONFIG_PRESERVE_JSX"),
+        NVariableDefs::VAR_PEERDIR_TAGS,
+        NVariableDefs::VAR_MANGLED_MODULE_TYPE,
+        NVariableDefs::VAR_MODULE_LANG,
+        NVariableDefs::VAR_MODULE_TYPE,
+        NVariableDefs::VAR_PASS_PEERS,
+        NVariableDefs::VAR_GO_TEST_FOR_DIR,
+        NVariableDefs::VAR_PROTO_HEADER_EXTS,
+        NVariableDefs::VAR_EV_HEADER_EXTS,
+        NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_VALUE,
+        NVariableDefs::VAR_EXCLUDE_VALUE,
+        NVariableDefs::VAR_IGNORE_JAVA_DEPENDENCIES_CONFIGURATION,
+        NVariableDefs::VAR_JAVA_DEPENDENCIES_CONFIGURATION_VALUE,
+        NVariableDefs::VAR_NON_NAMAGEABLE_PEERS,
+        NVariableDefs::VAR_DART_CLASSPATH_DEPS,
+        NVariableDefs::VAR_DART_CLASSPATH,
+        NVariableDefs::VAR_UNITTEST_DIR,
+        NVariableDefs::VAR_TS_CONFIG_ROOT_DIR,
+        NVariableDefs::VAR_TS_CONFIG_OUT_DIR,
+        NVariableDefs::VAR_TS_CONFIG_SOURCE_MAP,
+        NVariableDefs::VAR_TS_CONFIG_DECLARATION,
+        NVariableDefs::VAR_TS_CONFIG_DECLARATION_MAP,
+        NVariableDefs::VAR_TS_CONFIG_DEDUCE_OUT,
+        NVariableDefs::VAR_TS_CONFIG_PRESERVE_JSX,
     };
     const TStringBuf DEFAULT_VAR_NAMES[] = {
-        "CMAKE_CURRENT_SOURCE_DIR"sv,
-        "CMAKE_CURRENT_BINARY_DIR"sv,
-        "ARCADIA_BUILD_ROOT"sv,
-        "ARCADIA_ROOT"sv,
-        "BINDIR"sv,
-        "CURDIR"sv,
-        "PYTHON_BIN"sv,
-        "TEST_CASE_ROOT"sv,
-        "TEST_OUT_ROOT"sv,
-        "TEST_SOURCE_ROOT"sv,
-        "TEST_WORK_ROOT"sv
+        NVariableDefs::VAR_CMAKE_CURRENT_SOURCE_DIR,
+        NVariableDefs::VAR_CMAKE_CURRENT_BINARY_DIR,
+        NVariableDefs::VAR_ARCADIA_BUILD_ROOT,
+        NVariableDefs::VAR_ARCADIA_ROOT,
+        NVariableDefs::VAR_BINDIR,
+        NVariableDefs::VAR_CURDIR,
+        NVariableDefs::VAR_PYTHON_BIN,
+        NVariableDefs::VAR_TEST_CASE_ROOT,
+        NVariableDefs::VAR_TEST_OUT_ROOT,
+        NVariableDefs::VAR_TEST_SOURCE_ROOT,
+        NVariableDefs::VAR_TEST_WORK_ROOT,
     };
 
     const TStringBuf INTERNAL_NAME = TStringBuf("internal");
-    const TStringBuf VAR_USE_ALL_SRCS = TStringBuf("USE_ALL_SRCS");
 
     const char* YesNo(bool val) noexcept {
         return val ? "yes" : "no";
@@ -93,7 +81,7 @@ namespace {
 
         ERenderModuleType moduleType = ERenderModuleType::Bundle;
         if (nodeType == EMNT_Bundle) {
-            const auto moduleTypeVarValue = mod->Get(VAR_MODULE_TYPE);
+            const auto moduleTypeVarValue = mod->Get(NVariableDefs::VAR_MODULE_TYPE);
             if (moduleTypeVarValue == "PROGRAM"sv) {
                 moduleType = ERenderModuleType::Program;
             } else if (moduleTypeVarValue == "DLL"sv) {
@@ -121,17 +109,17 @@ void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView 
     vars.Base = &commandConf;
     vars.Id = makeFileId;
 
-    vars.SetValue("CMAKE_CURRENT_SOURCE_DIR", TString::Join("${ARCADIA_ROOT}", NPath::PATH_SEP_S, moduleDir.CutType()));       // temp
-    vars.SetValue("CMAKE_CURRENT_BINARY_DIR", TString::Join("${ARCADIA_BUILD_ROOT}", NPath::PATH_SEP_S, moduleDir.CutType())); // temp
-    vars["ARCADIA_BUILD_ROOT"].DontExpand = true;
-    vars["ARCADIA_ROOT"].DontExpand = true;
-    vars["BINDIR"].DontExpand = true;
-    vars["CURDIR"].DontExpand = true;
-    vars["PYTHON_BIN"].DontExpand = true;
-    vars["TEST_CASE_ROOT"].DontExpand = true;
-    vars["TEST_OUT_ROOT"].DontExpand = true;
-    vars["TEST_SOURCE_ROOT"].DontExpand = true;
-    vars["TEST_WORK_ROOT"].DontExpand = true;
+    vars.SetValue(NVariableDefs::VAR_CMAKE_CURRENT_SOURCE_DIR, TString::Join("${ARCADIA_ROOT}", NPath::PATH_SEP_S, moduleDir.CutType()));       // temp
+    vars.SetValue(NVariableDefs::VAR_CMAKE_CURRENT_BINARY_DIR, TString::Join("${ARCADIA_BUILD_ROOT}", NPath::PATH_SEP_S, moduleDir.CutType())); // temp
+    vars[NVariableDefs::VAR_ARCADIA_BUILD_ROOT].DontExpand = true;
+    vars[NVariableDefs::VAR_ARCADIA_ROOT].DontExpand = true;
+    vars[NVariableDefs::VAR_BINDIR].DontExpand = true;
+    vars[NVariableDefs::VAR_CURDIR].DontExpand = true;
+    vars[NVariableDefs::VAR_PYTHON_BIN].DontExpand = true;
+    vars[NVariableDefs::VAR_TEST_CASE_ROOT].DontExpand = true;
+    vars[NVariableDefs::VAR_TEST_OUT_ROOT].DontExpand = true;
+    vars[NVariableDefs::VAR_TEST_SOURCE_ROOT].DontExpand = true;
+    vars[NVariableDefs::VAR_TEST_WORK_ROOT].DontExpand = true;
 }
 
 TModuleSavedState::TModuleSavedState(const TModule& mod) {
@@ -327,16 +315,16 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfi
 
     Id = id;
 
-    Attrs.RequireDepManagement = Get(VAR_HAS_MANAGEABLE_PEERS) == "yes";
-    Attrs.ConsumeNonManageablePeers = Get(VAR_CONSUME_NON_MANAGEABLE_PEERS) == "yes";
-    Attrs.DynamicLink = Get(VAR_DYNAMIC_LINK) == "yes";
-    Attrs.DontResolveIncludes = Vars.Contains(VAR_DONT_RESOLVE_INCLUDES) && Get(VAR_DONT_RESOLVE_INCLUDES) != "no";
-    Attrs.UseGlobalCmd = Get(VAR_USE_GLOBAL_CMD) != "no" && !conf.GlobalCmd.empty();
-    Attrs.NeedGoDepsCheck = Vars.Contains(VAR_GO_TEST_FOR_DIR) && Get(VAR_GO_HAS_INTERNAL_TESTS) == "yes";
-    Attrs.IsStartTarget = Get(VAR_START_TARGET) != "no"sv;
-    Attrs.IgnoreDupSrc = Get(VAR_IGNORE_DUPSRC) == "yes"sv;
-    if (Vars.Contains(VAR_PASS_PEERS)) {
-        Attrs.PassPeers = IsTrue(Vars.EvalValue(VAR_PASS_PEERS));
+    Attrs.RequireDepManagement = Get(NVariableDefs::VAR_HAS_MANAGEABLE_PEERS) == "yes";
+    Attrs.ConsumeNonManageablePeers = Get(NVariableDefs::VAR_CONSUME_NON_MANAGEABLE_PEERS) == "yes";
+    Attrs.DynamicLink = Get(NVariableDefs::VAR_DYNAMIC_LINK) == "yes";
+    Attrs.DontResolveIncludes = Vars.Contains(NVariableDefs::VAR_DONT_RESOLVE_INCLUDES) && Get(NVariableDefs::VAR_DONT_RESOLVE_INCLUDES) != "no";
+    Attrs.UseGlobalCmd = Get(NVariableDefs::VAR_USE_GLOBAL_CMD) != "no" && !conf.GlobalCmd.empty();
+    Attrs.NeedGoDepsCheck = Vars.Contains(NVariableDefs::VAR_GO_TEST_FOR_DIR) && Get(NVariableDefs::VAR_GO_HAS_INTERNAL_TESTS) == "yes";
+    Attrs.IsStartTarget = Get(NVariableDefs::VAR_START_TARGET) != "no"sv;
+    Attrs.IgnoreDupSrc = Get(NVariableDefs::VAR__IGNORE_DUPSRC) == "yes"sv;
+    if (Vars.Contains(NVariableDefs::VAR_PASS_PEERS)) {
+        Attrs.PassPeers = IsTrue(Vars.EvalValue(NVariableDefs::VAR_PASS_PEERS));
     } else {
         Attrs.PassPeers = GetNodeType() == EMNT_Bundle || IsStaticLib();
     }
@@ -345,7 +333,7 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfi
     } else {
         AssertEx(!Attrs.FromMultimodule, TString("Variable ") + TString{VAR_MODULE_TAG} + " is not set for sub-module of multimodule");
     }
-    Attrs.UseAllSrcs = Get(VAR_USE_ALL_SRCS) == "yes";
+    Attrs.UseAllSrcs = Get(NVariableDefs::VAR_USE_ALL_SRCS) == "yes";
     SetupPeerdirRestrictions();
 
     if (conf.HasSemantics && !conf.CmdIgnore.empty()) {
@@ -413,7 +401,7 @@ TVars TModule::ModuleDirsToVars() const {
 }
 
 TString TModule::GetUserType() const {
-    TStringBuf type = Get(MANGLED_MODULE_TYPE);
+    TStringBuf type = Get(NVariableDefs::VAR_MANGLED_MODULE_TYPE);
     if (!Attrs.FromMultimodule) {
         return TString{type};
     }
@@ -440,8 +428,8 @@ void TModule::SetupPeerdirRestrictions() {
 void TModule::ImportPeerdirTags() {
     THashSet<TString> peerdirTags;
 
-    if (Vars.Contains(VAR_PEERDIR_TAGS)) {
-        TStringBuf allTags = Get(VAR_PEERDIR_TAGS);
+    if (Vars.Contains(NVariableDefs::VAR_PEERDIR_TAGS)) {
+        TStringBuf allTags = Get(NVariableDefs::VAR_PEERDIR_TAGS);
         StringSplitter(allTags).Split(' ').AddTo(&peerdirTags);
     }
     if (peerdirTags.contains(EMPTY_TAG_NAME)) {
@@ -481,9 +469,9 @@ void TModule::AddInternalRule() {
     bool isInternal = moduleDir.Contains(INTERNAL_NAME);
     Attrs.IsInternal = IsGoModule() && isInternal;
 
-    if (isInternal && !Attrs.IsInternal && Vars.Base != nullptr && Vars.Base->IsTrue(VAR_CHECK_INTERNAL)) {
+    if (isInternal && !Attrs.IsInternal && Vars.Base != nullptr && Vars.Base->IsTrue(NVariableDefs::VAR_CHECK_INTERNAL)) {
         Attrs.IsInternal = true;
-        for (const auto& ex: StringSplitter(GetCmdValue(Vars.Base->Get1(VAR_INTERNAL_EXCEPTIONS))).Split(' ').SkipEmpty()) {
+        for (const auto& ex: StringSplitter(GetCmdValue(Vars.Base->Get1(NVariableDefs::VAR_INTERNAL_EXCEPTIONS))).Split(' ').SkipEmpty()) {
              if (moduleDir.Contains(ex.Token())) {
                   Attrs.IsInternal = false;
                   break;

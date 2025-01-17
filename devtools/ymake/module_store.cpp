@@ -9,12 +9,12 @@
 
 namespace {
     const TStringBuf DM_VAR_NAMES[] = {
-        "NON_NAMAGEABLE_PEERS",
-        "DART_CLASSPATH_DEPS",
-        "MANAGED_PEERS",
-        "MANAGED_PEERS_CLOSURE",
-        "DART_CLASSPATH",
-        "UNITTEST_MOD"
+        NVariableDefs::VAR_NON_NAMAGEABLE_PEERS,
+        NVariableDefs::VAR_DART_CLASSPATH_DEPS,
+        NVariableDefs::VAR_MANAGED_PEERS,
+        NVariableDefs::VAR_MANAGED_PEERS_CLOSURE,
+        NVariableDefs::VAR_DART_CLASSPATH,
+        NVariableDefs::VAR_UNITTEST_MOD,
     };
 }
 

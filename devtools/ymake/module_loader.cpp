@@ -161,13 +161,13 @@ bool TModuleDef::AddStatement(const TStringBuf& name, TArrayRef<const TStringBuf
 void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& vars, TOriginalVars& orig) {
     // set outer namespace to persistent storage
     Vars = vars;
-    Vars.SetValue(MANGLED_MODULE_TYPE, name);
+    Vars.SetValue(NVariableDefs::VAR_MANGLED_MODULE_TYPE, name);
     if (Module.IsFromMultimodule()) {
-        Vars.SetValue("MODULE_KIND"sv, name.SubStr(name.rfind(MODULE_MANGLING_DELIM) + MODULE_MANGLING_DELIM.size()));
+        Vars.SetValue(NVariableDefs::VAR_MODULE_KIND, name.SubStr(name.rfind(MODULE_MANGLING_DELIM) + MODULE_MANGLING_DELIM.size()));
     } else {
-        Vars.SetValue("MODULE_KIND"sv, name);
+        Vars.SetValue(NVariableDefs::VAR_MODULE_KIND, name);
     }
-    Vars.SetValue(TStringBuf("MODDIR"), Module.GetDir().CutType());
+    Vars.SetValue(NVariableDefs::VAR_MODDIR, Module.GetDir().CutType());
     const auto& moduleConf = ModuleConf;
     Vars.AssignFilterGlobalVarsFunc([&moduleConf](const TStringBuf &varName) -> bool { return moduleConf.Globals.contains(varName); });
     OrigVars = orig;
@@ -177,8 +177,8 @@ void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> 
     ProcessModuleMacroCalls(name, args);
     InitFromConf();
     //TODO: set this variable only for DLL and derivatives or add common variable to store FileName
-    Vars.SetValue(TStringBuf("SONAME"), Module.GetFileName());
-    Vars.SetValue(TStringBuf("MODULE_ARGS"), JoinStrings(args.cbegin(), args.cend(), " "));
+    Vars.SetValue(NVariableDefs::VAR_SONAME, Module.GetFileName());
+    Vars.SetValue(NVariableDefs::VAR_MODULE_ARGS, JoinStrings(args.cbegin(), args.cend(), " "));
     YDIAG(DG) << "Module dep: " << Module.GetName() << Endl;
 }
 
@@ -216,9 +216,9 @@ TDepsCacheId TModuleDef::Commit() {
         return TDepsCacheId::None;
     }
 
-    if (Vars.Contains(VAR_PEERDIR_TAGS)) {
-        TString expandedTags = TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(VAR_PEERDIR_TAGS, Vars);
-        Module.Set(VAR_PEERDIR_TAGS, expandedTags);
+    if (Vars.Contains(NVariableDefs::VAR_PEERDIR_TAGS)) {
+        TString expandedTags = TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR_PEERDIR_TAGS, Vars);
+        Module.Set(NVariableDefs::VAR_PEERDIR_TAGS, expandedTags);
     }
 
     Module.FinalizeConfig(modId, ModuleConf, Conf);
@@ -228,14 +228,14 @@ TDepsCacheId TModuleDef::Commit() {
 }
 
 void TModuleDef::InitFromConf() {
-    TStringBuf baseName = GetCmdValue(Vars.Get1("REALPRJNAME"sv));
+    TStringBuf baseName = GetCmdValue(Vars.Get1(NVariableDefs::VAR_REALPRJNAME));
     Y_ASSERT(!baseName.empty());
     if (baseName.Contains('/')) {
         YConfErr(Misconfiguration) << "Invalid module name '" << Module.Get("REALPRJNAME") << "'. Symbol '/' is not allowed" << Endl;
     }
-    TString prefix = Vars.Contains("MODULE_PREFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("MODULE_PREFIX"sv, Vars) : "";
-    TString ext = Vars.Contains("MODULE_SUFFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("MODULE_SUFFIX"sv, Vars) : "";
-    TString globalExt = Vars.Contains("GLOBAL_SUFFIX"sv) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply("GLOBAL_SUFFIX"sv, Vars) : "";
+    TString prefix = Vars.Contains(NVariableDefs::VAR_MODULE_PREFIX) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR_MODULE_PREFIX, Vars) : "";
+    TString ext = Vars.Contains(NVariableDefs::VAR_MODULE_SUFFIX) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR_MODULE_SUFFIX, Vars) : "";
+    TString globalExt = Vars.Contains(NVariableDefs::VAR_GLOBAL_SUFFIX) ? TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR_GLOBAL_SUFFIX, Vars) : "";
 
     TString fileName = TString::Join(prefix, baseName, ext);
     TString globalFileName = TString::Join(prefix, baseName, globalExt);

@@ -11,7 +11,7 @@ struct TProperty {
     TStringBuf Description;
     TSourceLocation Link;
 
-    operator TStringBuf() const {
+    constexpr operator TStringBuf() const noexcept {
         return Name;
     }
 };

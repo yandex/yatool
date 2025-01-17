@@ -42,15 +42,15 @@ public:
 
         CurDir = fileConf.ReplaceRoot(fileConf.Parent(modName), NPath::Source);
 
-        Vars.SetPathResolvedValue("TARGET", conf.RealPath(modName));
-        Vars.SetPathResolvedValue("BINDIR", conf.RealPath(fileConf.ReplaceRoot(CurDir, NPath::Build)));
-        Vars.SetPathResolvedValue("CURDIR", conf.RealPath(CurDir));
-        Vars.SetValue("ARCADIA_BUILD_ROOT", conf.BuildRoot.c_str());
-        Vars.SetValue("ARCADIA_ROOT", conf.SourceRoot.c_str());
+        Vars.SetPathResolvedValue(NVariableDefs::VAR_TARGET, conf.RealPath(modName));
+        Vars.SetPathResolvedValue(NVariableDefs::VAR_BINDIR, conf.RealPath(fileConf.ReplaceRoot(CurDir, NPath::Build)));
+        Vars.SetPathResolvedValue(NVariableDefs::VAR_CURDIR, conf.RealPath(CurDir));
+        Vars.SetValue(NVariableDefs::VAR_ARCADIA_BUILD_ROOT, conf.BuildRoot.c_str());
+        Vars.SetValue(NVariableDefs::VAR_ARCADIA_ROOT, conf.SourceRoot.c_str());
 
-        Vars["SRCS_GLOBAL"];
-        Vars["AUTO_INPUT"];
-        Vars["PEERS"];
+        Vars[NVariableDefs::VAR_SRCS_GLOBAL];
+        Vars[NVariableDefs::VAR_AUTO_INPUT];
+        Vars[NVariableDefs::VAR_PEERS];
 
         for (const auto* names : {&conf.ReservedNames, &conf.ResourceNames})  {
             for (const TString& name : *names) {
@@ -155,7 +155,7 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
     InitModuleEnv(modId);
     RequirePeers = (nodeId == modId) && Modules.Get(Graph[modId]->ElemId)->GetAttrs().UsePeers;
     if (isGlobalNode) {
-        Vars.SetPathResolvedValue("GLOBAL_TARGET", Conf.RealPath(Graph.GetFileName(Graph.Get(nodeId))));
+        Vars.SetPathResolvedValue(NVariableDefs::VAR_GLOBAL_TARGET, Conf.RealPath(Graph.GetFileName(Graph.Get(nodeId))));
     }
     if (nodeId != TNodeId::Invalid) {
         MineInputsAndOutputs(nodeId, modId);
@@ -224,15 +224,15 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
             Y_ASSERT(!isGlobalSrc(node));
 
             inputVarItem.IsAuto = true;
-            Vars["AUTO_INPUT"].push_back(inputVarItem);
+            Vars[NVariableDefs::VAR_AUTO_INPUT].push_back(inputVarItem);
 
         } else {
-            Vars["INPUT"].push_back(inputVarItem);
+            Vars[NVariableDefs::VAR_INPUT].push_back(inputVarItem);
         }
     };
 
     auto addSpanInput = [&](ui32 inputId, ui32 inputSize) {
-        Inputs.push_back({ Vars["INPUT"].begin() + inputId, inputSize });
+        Inputs.push_back({ Vars[NVariableDefs::VAR_INPUT].begin() + inputId, inputSize });
     };
 
     auto addOutput = [&](const TConstDepNodeRef& depNode) {
@@ -254,7 +254,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
 
     // TODO: INPUT, OUTPUT has to be released as internal variables.
     // Module as target shouldn't be in OUTPUT.
-    Vars["OUTPUT"].Assign(output);
+    Vars[NVariableDefs::VAR_OUTPUT].Assign(output);
 }
 
 void TMakeCommand::InitModuleEnv(TNodeId modId) {
@@ -266,7 +266,7 @@ void TMakeCommand::InitModuleEnv(TNodeId modId) {
 }
 
 void TMakeCommand::MineVarsAndExtras(TDumpInfoEx* addInfo, TNodeId nodeId, TNodeId modId) {
-    TYVar& inputVar = Vars["INPUT"];
+    TYVar& inputVar = Vars[NVariableDefs::VAR_INPUT];
 
     for (const auto& input : inputVar) {
         // CanonPath can emit a configure event
@@ -374,7 +374,7 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorSh
         CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
         const auto& cmdInfo = CmdInfo;
 
-        TYVar& toolVar = Vars["TOOLS"];
+        TYVar& toolVar = Vars[NVariableDefs::VAR_TOOLS];
         if (cmdInfo.ToolPaths) {
             for (const auto& tool : *cmdInfo.ToolPaths) {
                 toolVar.push_back(TVarStr(tool.second, true, false));

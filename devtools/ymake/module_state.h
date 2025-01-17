@@ -12,6 +12,7 @@
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/transitive_constraints.h>
+#include <devtools/ymake/vardefs.h>
 
 #include <library/cpp/json/writer/json.h>
 
@@ -29,12 +30,6 @@ class TBuildConfiguration;
 
 enum class EPeerSearchStatus;
 struct TModuleConf;
-
-constexpr TStringBuf VAR_PEERDIR_TAGS = "PEERDIR_TAGS";
-constexpr TStringBuf MANGLED_MODULE_TYPE = "MANGLED_MODULE_TYPE";
-constexpr TStringBuf VAR_MODULE_COMMON_CONFIGS_DIR = "MODULE_COMMON_CONFIGS_DIR";
-constexpr TStringBuf VAR_MODULE_LANG = "MODULE_LANG";
-constexpr TStringBuf VAR_MODULE_TYPE = "MODULE_TYPE";
 
 // Diag reporter for NPath::ConstructYDir
 const auto ConstrYDirDiag = [](NPath::EDirConstructIssue issue, const TStringBuf& path) {
@@ -375,8 +370,8 @@ public:
     const TStringBuf GetLang() const {
         // Currently GetLang is used to determine used python version in the module.
         // This information matches the tag for python2 and Go.
-        if (Vars.Contains(VAR_MODULE_LANG)) {
-            return Vars.EvalValue(VAR_MODULE_LANG);
+        if (Vars.Contains(NVariableDefs::VAR_MODULE_LANG)) {
+            return Vars.EvalValue(NVariableDefs::VAR_MODULE_LANG);
         }
         return GetTag();
     }

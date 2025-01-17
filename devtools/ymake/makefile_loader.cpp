@@ -186,7 +186,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
             if (NextSubModule > 0 && !Reparse) {
                 Y_ASSERT(NextSubModule == 1);
                 if (!DefaultTags.empty()) {
-                    const TStringBuf var = Conf.CommandConf.Get1("EXCLUDE_SUBMODULES");
+                    const TStringBuf var = Conf.CommandConf.Get1(NVariableDefs::VAR_EXCLUDE_SUBMODULES);
                     if (var) {
                         for (const TStringBuf tmp : StringSplitter(GetCmdValue(var)).Split(' ').SkipEmpty()) {
                             DefaultTags.erase(TString(tmp));
@@ -213,7 +213,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                     if (TFsPath(Conf.RealPathEx(LintersMake)).Exists()) {
                         auto includeCtr = OnInclude(LintersMake, Makefile);
                         Y_ASSERT(!includeCtr.Ignored());
-                        Vars().SetStoreOriginals(VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(LintersMake)), OrigVars());
+                        Vars().SetStoreOriginals(NVariableDefs::VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(LintersMake)), OrigVars());
                         ReadMakeFile(LintersMake);
                     } else {
                         TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));

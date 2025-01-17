@@ -888,8 +888,8 @@ int main_real(TBuildConfiguration& conf) {
     }
 
     if (conf.RenderSemantics) {
-        const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_SOURCE_ROOT");
-        const auto* buildRootVar = yMake->Conf.CommandConf.Lookup("EXPORTED_BUILD_SYSTEM_BUILD_ROOT");
+        const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_SOURCE_ROOT);
+        const auto* buildRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_BUILD_ROOT);
         if (!sourceRootVar || !buildRootVar) {
             YConfErr(UndefVar) << "Configure variables EXPORTED_BUILD_SYSTEM_SOURCE_ROOT and EXPORTED_BUILD_SYSTEM_BUILD_ROOT are required for rendering --sem-graph" << Endl;
             return BR_CONFIGURE_FAILED;

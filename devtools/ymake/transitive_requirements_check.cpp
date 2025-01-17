@@ -339,7 +339,7 @@ namespace {
             }
 
             PropNames.push_back(TStringBuf("INVALID"));
-            DefaultLicenseName = GetValueOrEmpty(conf.CommandConf, "DEFAULT_MODULE_LICENSE");
+            DefaultLicenseName = GetValueOrEmpty(conf.CommandConf, NVariableDefs::VAR_DEFAULT_MODULE_LICENSE);
             if (DefaultLicenseName.empty()) {
                 DefaultLicense.push_back(GetInvalidLicenseProps());
                 return;

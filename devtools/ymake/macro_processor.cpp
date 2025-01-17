@@ -184,10 +184,25 @@ void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>
 }
 
 bool IsInternalReservedVar(const TStringBuf& cur) {
-    return EqualToOneOf(cur, "INPUT", "OUTPUT", "AUTO_INPUT", "PEERS", "SRC", "BINDIR", "CURDIR",
-                        "ARCADIA_BUILD_ROOT", "ARCADIA_ROOT", "SRCS_GLOBAL", "YMAKE_BIN",
-                        "TARGET", "MANAGED_PEERS", "MANAGED_PEERS_CLOSURE", "GLOBAL_TARGET", "PEERS_LATE_OUTS",
-                        "ALL_SRCS");
+    using namespace NVariableDefs;
+    return EqualToOneOf(cur,
+        VAR_INPUT,
+        VAR_OUTPUT,
+        VAR_AUTO_INPUT,
+        VAR_PEERS,
+        VAR_SRC,
+        VAR_BINDIR,
+        VAR_CURDIR,
+        VAR_ARCADIA_BUILD_ROOT,
+        VAR_ARCADIA_ROOT,
+        VAR_SRCS_GLOBAL,
+        VAR_YMAKE_BIN,
+        VAR_TARGET,
+        VAR_MANAGED_PEERS,
+        VAR_MANAGED_PEERS_CLOSURE,
+        VAR_GLOBAL_TARGET,
+        VAR_PEERS_LATE_OUTS,
+        VAR_ALL_SRCS);
 }
 
 TCommandInfo::TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module)
@@ -1468,8 +1483,9 @@ bool TCommandInfo::IsReservedVar(const TStringBuf& cur, const TVars& vars) {
 }
 
 bool TCommandInfo::IsGlobalReservedVar(const TStringBuf& cur, const TVars& vars) {
+    using namespace NVariableDefs;
     return vars.IsReservedName(cur) || NYMake::IsGlobalResource(cur) || IsIncludeVar(cur) ||
-        EqualToOneOf(cur, "MANAGED_PEERS_CLOSURE"sv, "MANAGED_PEERS"sv, "APPLIED_EXCLUDES"sv);
+        EqualToOneOf(cur, VAR_MANAGED_PEERS_CLOSURE, VAR_MANAGED_PEERS, VAR_APPLIED_EXCLUDES);
 }
 
 bool TCommandInfo::IsReservedVar(const TStringBuf& cur) const {
