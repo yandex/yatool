@@ -219,17 +219,26 @@ class TestNodeListener:
 
 class SlotListener:
     _logger = logging.getLogger('SlotListener')
+    SLOT_TIME_FILE = 'slot_time.json'  # XXX: need for autocheck branch compatibility, remove after 13.04.2025
+    SLOT_TIME_JSONL = 'slot_data.jsonl'
 
     def __init__(self, statistics_out_dir):
         self._output_file = None
+        self._output_jsonl = None
         if statistics_out_dir:
             if not os.path.exists(statistics_out_dir):
                 exts.fs.create_dirs(statistics_out_dir)
-            self._output_file = os.path.join(statistics_out_dir, 'slot_time.json')
+            self._output_file = os.path.join(statistics_out_dir, SlotListener.SLOT_TIME_FILE)
+            self._output_jsonl = open(os.path.join(statistics_out_dir, SlotListener.SLOT_TIME_JSONL), 'w')
 
         self._slot_time = 0  # milliseconds
 
     def finish(self):
+        if self._output_jsonl:
+            self._output_jsonl.write(json.dumps({'total_slot_time': self._slot_time}))
+            self._output_jsonl.write('\n')
+            self._output_jsonl.close()
+
         if not self._output_file:
             return
 
@@ -243,8 +252,17 @@ class SlotListener:
         if not res:
             return
 
+        uid_slot_time = 0
         for process_result in res.get('process_results', []):
             self._slot_time += process_result.get('slot_time', 0)
+            uid_slot_time += process_result.get('slot_time', 0)
+
+        try:
+            if self._output_jsonl:
+                self._output_jsonl.write(json.dumps({'uid': res['uid'], 'slot_time': uid_slot_time}, sort_keys=True))
+                self._output_jsonl.write('\n')
+        except Exception:
+            self._logger.exception('Fail to save slot time by uid from %s', res)
 
 
 class CompositeResultsListener:
