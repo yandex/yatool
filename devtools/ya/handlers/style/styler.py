@@ -148,12 +148,11 @@ class Ruff(config.ConfigMixin):
             if styler_opts.config_loaders
             else (
                 # XXX: during migration we have the following logic:
-                # - if there is a custom config got from ruff trie, use it
-                # - else if there is a custom config got from autoincludes scheme, use it
+                # - if there is a custom config got from autoincludes scheme, use it
+                # - else if there is a custom config got from ruff trie, use it
                 # - else use default config
-                # note that we used to fallback to default config right after ruff trie search
-                config.RuffConfig(),
                 config.AutoincludeConfig(linter_name=const.PythonLinterName.Ruff),
+                config.RuffConfig(),
                 config.DefaultConfig(
                     linter_name=const.PythonLinterName.Ruff,
                     defaults_file=const.DefaultLinterConfig.Python,
