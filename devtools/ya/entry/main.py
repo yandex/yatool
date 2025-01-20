@@ -14,7 +14,6 @@ def add_stage_start_to_environ(stage_name):
 def main():
     add_stage_start_to_environ("main-processing")
     gc.set_threshold(0)
-    sys.dont_write_bytecode = True
 
     from entry.entry import main
 
