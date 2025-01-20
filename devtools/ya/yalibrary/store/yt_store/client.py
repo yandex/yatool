@@ -242,9 +242,8 @@ class YtStoreClient(object):
         return meta
 
     def get_metadata_status(self):
-        query = '{}, {}, {} from [{}] group by 1'.format(
+        query = '{}, {} from [{}] group by 1'.format(
             'min(access_time) as min_access_time',
-            'sum(data_size) as total_data_size',
             'sum(1) as file_count',
             self._metadata_table,
         )
@@ -260,7 +259,18 @@ class YtStoreClient(object):
         if len(rows) > 1:
             # should never happen
             raise Exception('Query should return single row')
-        return rows[0]
+        stat = rows[0]
+        total_data_size = 0
+        # Get exact data size (slow but precise)
+        rows = self._client.select_rows(
+            'first(data_size) as ds from [{}] group by hash'.format(self._metadata_table),
+            input_row_limit=consts.YT_CACHE_SELECT_INPUT_ROW_LIMIT,
+            output_row_limit=consts.YT_CACHE_SELECT_OUTPUT_ROW_LIMIT,
+        )
+        for row in rows:
+            total_data_size += row['ds']
+        stat['total_data_size'] = total_data_size
+        return stat
 
     def get_metadata_rows(self, self_uids=None, uids=None, where=None, order_by=None, limit=None, content_uids=False):
         if self.is_table_format_v3 and content_uids:
