@@ -135,6 +135,32 @@ namespace {
     //
     //
 
+    class TOutputInclude: public TBasicModImpl {
+    public:
+        TOutputInclude(): TBasicModImpl({.Id = EMacroFunction::OutputInclude, .Name = "output_include", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            auto arg0 = std::get<std::string_view>(args[0]);
+            auto names = SplitArgs(TString(arg0));
+            if (names.size() == 1) {
+                // one does not simply reuse the original argument,
+                // for it might have been transformed (e.g., dequoted)
+                auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(names.front())));
+                ctx.Sink.OutputIncludes.CollectCoord(pooledName);
+                return pooledName;
+            }
+            throw std::runtime_error{"Output arrays are not supported"};
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TGlob: public TBasicModImpl {
     public:
         TGlob(): TBasicModImpl({.Id = EMacroFunction::Glob, .Name = "glob", .Arity = 1, .CanPreevaluate = true}) {

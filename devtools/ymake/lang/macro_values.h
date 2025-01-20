@@ -51,6 +51,7 @@ enum class EMacroFunction: ui32 {
     ResourceUri,
     Requirements,
     Tared,
+    OutputInclude,
     //
     Count
 };

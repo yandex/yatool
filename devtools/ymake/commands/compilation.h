@@ -24,6 +24,11 @@ namespace NCommands {
             TOutput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };
+        struct TOutputInclude {
+            TStringBuf Name;
+            TOutputInclude(TStringBuf name): Name(name) {}
+            operator TStringBuf() const { return Name; }
+        };
         template<typename TLink>
         class TLinks:
             public TUniqContainerImpl<TLink, TStringBuf, 32, TVector<TLink>, true> // basically, TUniqVector<TLink> with IsIndexed=true
@@ -40,10 +45,12 @@ namespace NCommands {
         };
         using TInputs = TLinks<TInput>;
         using TOutputs = TLinks<TOutput>;
+        using TOutputIncludes = TLinks<TOutputInclude>;
 
         NPolexpr::TExpression Expression;
         TInputs Inputs;
         TOutputs Outputs;
+        TOutputIncludes OutputIncludes;
     };
 
 }

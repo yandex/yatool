@@ -405,7 +405,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         cmdInfo->InitFromModule(Module);
 
-        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), Vars);
+        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), compiled.OutputIncludes.Take(), Vars);
 
         if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
             AddGlobalVarDeps(node, true);

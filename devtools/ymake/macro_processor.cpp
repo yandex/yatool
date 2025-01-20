@@ -340,7 +340,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         }
         auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
-        GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), ownVars);
+        GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), compiled.OutputIncludes.Take(), ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
         return TString(res);
     }
@@ -540,6 +540,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
     ui32 cmdElemId,
     const TVector<NCommands::TCompiledCommand::TInput>& cmdInputs,
     const TVector<NCommands::TCompiledCommand::TOutput>& cmdOutputs,
+    const TVector<NCommands::TCompiledCommand::TOutputInclude>& cmdOutputIncludes,
     const TVars& vars
 ) {
 
@@ -563,6 +564,10 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
             var.NoRel |= output.NoRel;
             var.ResolveToBinDir |= output.ResolveToBinDir;
         });
+    }
+
+    for (const auto& outputInclude : cmdOutputIncludes) {
+        GetOutputIncludeInternal().Push(outputInclude.Name);
     }
 
     CollectVarsDeep(commands, cmdElemId, Cmd, vars);

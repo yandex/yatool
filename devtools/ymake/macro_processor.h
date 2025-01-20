@@ -173,6 +173,7 @@ public:
         ui32 cmdElemId,
         const TVector<NCommands::TCompiledCommand::TInput>& cmdInputs,
         const TVector<NCommands::TCompiledCommand::TOutput>& cmdOutputs,
+        const TVector<NCommands::TCompiledCommand::TOutputInclude>& cmdOutputIncludes,
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
