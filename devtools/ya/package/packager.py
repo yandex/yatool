@@ -1,6 +1,5 @@
 import collections
 import copy
-import functools
 import itertools
 import logging
 import os
@@ -10,9 +9,7 @@ import shutil
 import time
 import traceback
 
-import library.python.resource as rs
 import six
-from jsonschema import Draft4Validator, ValidationError
 
 import app_config
 import devtools.ya.build.build_opts
@@ -32,7 +29,6 @@ import exts.func
 import exts.hashing
 import exts.os2
 import exts.path2
-import exts.timer
 import exts.tmp
 import exts.yjson as json
 import package
@@ -49,9 +45,11 @@ import package.source
 import package.tarball
 import package.vcs
 import package.wheel
+from package.package_tree import load_package, get_tree_info
 from devtools.ya.package import const
 from yalibrary import find_root
 from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
+from package.utils import timeit
 
 if app_config.in_house or app_config.have_sandbox_fetcher:
     import package.sandbox_source
@@ -112,7 +110,7 @@ class PackageFileNotFoundException(YaPackageException):
         self.missing_file_path = kwargs["path"]
 
 
-def _get_package_file(arcadia_root, package_file):
+def get_package_file(arcadia_root, package_file):
     if os.path.exists(exts.path2.abspath(package_file)):
         return exts.path2.abspath(package_file)
 
@@ -125,17 +123,6 @@ def _get_package_file(arcadia_root, package_file):
 
 TYPES_FOR_BUILDING = ["program", "package"]
 DEFAULT_BUILD_KEY = None
-
-
-def timeit(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        timer = exts.timer.Timer(__name__)
-        res = func(*args, **kwargs)
-        timer.show_step(func.__name__)
-        return res
-
-    return wrapper
 
 
 def stage_started(stage_name):
@@ -1039,121 +1026,6 @@ def checkout_data(arcadia_root, params):
             fetcher.fetch_dirs(paths, dest_dirs[data_root]["rel_path"], dest_dirs[data_root]["destination"])
 
 
-@timeit
-def merge_package_with_included(
-    this_package, this_package_path, include_package, include_package_path, include_root=None
-):
-    result_package = copy.deepcopy(include_package)
-
-    for key in ["meta", "userdata"]:  # keys that rewrite base package
-        if key not in result_package:
-            result_package[key] = {}
-        result_package[key].update(this_package.get(key, {}))
-
-    merged_builds = {}
-    merged_params = {}
-    # Clear data and postprocess sections as we merge them later
-    result_package["data"] = []
-    result_package["postprocess"] = []
-
-    default_build_key = "build"
-
-    # each layer has its own build_key prefix for build section to avoid conflicts by flags
-    for package_data, package_path, package_targets_root in [
-        (this_package, this_package_path, None),
-        (include_package, include_package_path, include_root),
-    ]:
-        build_key = package_path.lstrip(os.sep)
-        build_section = package_data.get("build", {})
-        builds = [(default_build_key, build_section)] if "targets" in build_section else build_section.items()
-
-        for key, value in builds:
-            merged_builds["{}::{}".format(build_key, key) if '::' not in key else key] = value
-
-        for data in package_data.get("data", []):
-            if data.get("source", {}).get("type") == "BUILD_OUTPUT":
-                current = data["source"].get("build_key", default_build_key)
-                if '::' not in current:
-                    data["source"]["build_key"] = "{}::{}".format(build_key, current)
-            if package_targets_root:
-                package_targets_root = "/" + package_targets_root.lstrip("/")
-                data["destination"]["path"] = os.path.join(
-                    package_targets_root, data["destination"]["path"].lstrip("/")
-                )
-            result_package["data"].append(data)
-
-        for pp in package_data.get("postprocess", []):
-            if pp.get("source", {}).get("type") == "BUILD_OUTPUT":
-                current = pp["source"].get("build_key", default_build_key)
-                if '::' not in current:
-                    pp["source"]["build_key"] = "{}::{}".format(build_key, current)
-            result_package["postprocess"].append(pp)
-
-        for key, val in package_data.get("params", {}).items():
-            # param value from base package description wins over included one
-            merged_params.setdefault(key, val)
-
-    result_package["build"] = merged_builds
-
-    if merged_params:
-        result_package["params"] = merged_params
-
-    return result_package
-
-
-@exts.func.lazy
-def get_validator():
-    schema = json.loads(rs.resfs_read("package.schema.json"))
-    return Draft4Validator(schema)
-
-
-@timeit
-def load_package(arcadia_root, package_file, included=None):
-    included = included or []
-
-    if package_file in included:
-        raise YaPackageException('Include loop detected: {}'.format(' -> '.join(included)))
-    included.append(package_file)
-
-    try:
-        with open(_get_package_file(arcadia_root, package_file)) as afile:
-            parsed_package = json.load(afile)
-    except ValueError as e:
-        raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
-
-    old = is_old_format(parsed_package)
-    logger.debug("Detected package file format: %s", "new" if not old else "old")
-    if old:
-        raise YaPackageException("The old package format is no longer supported.")
-
-    for include_package in parsed_package.get("include", []):
-        if type(include_package) is dict:
-            include_package_path = include_package["package"]
-            include_package_root = include_package.get("targets_root")
-        else:
-            include_package_path, include_package_root = include_package, None
-
-        parsed_package = merge_package_with_included(
-            parsed_package,
-            package_file,
-            load_package(arcadia_root, include_package_path, included=included),
-            include_package_path,
-            include_package_root,
-        )
-
-    try:
-        get_validator().validate(parsed_package)
-    except ValidationError as error:
-        if error.message.startswith('Additional properties are not allowed'):
-            logger.error("Package %s has either invalid or old format: ", package_file)
-            raise error
-        else:
-            # XXX Some tests are not ready for this check, see https://a.yandex-team.ru/review/5823503/details#comment-8692504
-            logger.warning("Package %s has either invalid or old format: %s", package_file, error)
-
-    return parsed_package
-
-
 def update_params(parsed_package, package_params, filename):
     if 'params' not in parsed_package:
         return package_params
@@ -1209,6 +1081,8 @@ class PackageContext:
         self._package_path = None
         self._package_filename = None
 
+        self._tree_info = None
+
         self._build_context(package_file)
 
     def _build_context(self, package_file):
@@ -1218,8 +1092,8 @@ class PackageContext:
             self._package_path = package_file
         self._package_root = os.path.dirname(self._package_path)
 
-        self._spec = load_package(self._arcadia_root, self._package_path)
-        self._spec['meta'] = self._spec.get('meta', {})
+        self._tree_info = get_tree_info(self._arcadia_root, self._package_path, self.params.include_traversal_variant)
+        self._spec = load_package(self._tree_info)
 
         self._params = update_params(self._spec, self._params, self._package_path)
 
@@ -1329,6 +1203,10 @@ class PackageContext:
     def should_use_package_filename(self):
         return self.package_filename is not None
 
+    @property
+    def tree_info(self):
+        return self._tree_info
+
     def resolve_filename(self, extra):
         filename_pattern = extra.get('pattern', self.package_filename)
         if not filename_pattern:
@@ -1346,6 +1224,9 @@ class PackageContext:
         if self.params.raw_package_path:
             return self.params.raw_package_path
         return '.'.join([self.package_name, self.version])
+
+    def get_include_traversal_variant(self):
+        return self.params.include_traversal_variant
 
 
 def _get_arcadia_root(params):
@@ -1458,7 +1339,7 @@ def do_package(params):
 
         else:
             for key, value in tuple(params.publish_to.items()):
-                params.publish_to[_get_package_file(arcadia_root, key)] = value
+                params.publish_to[get_package_file(arcadia_root, key)] = value
 
             def repos_getter(package_file_name):
                 return params.publish_to.get(package_file_name, "")
@@ -1469,7 +1350,7 @@ def do_package(params):
             return ""
 
     # make package files path absolute
-    params.packages = [_get_package_file(arcadia_root, p) for p in params.packages]
+    params.packages = [get_package_file(arcadia_root, p) for p in params.packages]
 
     if params.dump_build_targets:
         targets = []
@@ -1509,7 +1390,7 @@ def do_package(params):
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
-                raise YaPackageException("Failed to load package: {}".format(package_file))
+                raise YaPackageException("Failed to load package: {}".format(package_file)) from e
 
             try:
                 logger.debug("Creating package: %s", locals())
@@ -1591,7 +1472,7 @@ def do_package(params):
                 logger.info("Exception %s while build", e)
                 logger.debug("Traceback: ", exc_info=True)
                 package.display.emit_message(f'[[bad]]{e}[[rst]]')
-                raise YaPackageException(f"Packaging {package_file} failed")
+                raise YaPackageException(f"Packaging {package_file} failed") from e
             finally:
                 if not params.cleanup and os.path.exists(output_root):
                     build_temp = f"build.{package_context.package_name}.{random.random()}"
@@ -1760,6 +1641,7 @@ def do_dump_input(params, arcadia_root, output):
                             safe_format(build_info[1], formatters)
                         )
 
+        # TODO: move this section getters to visitor
         for data in package_context.parsed_package.get("data", []):
             if data.get("source", {}).get("type") == 'BUILD_OUTPUT':
                 item = data.get("source", {})
@@ -1781,7 +1663,7 @@ def do_dump_input(params, arcadia_root, output):
                 if id:
                     sandbox_section.add(sandbox_id)
 
-        include_section = set(_get_all_includes(arcadia_root, package_context.package_path))
+        include_section = package_context.tree_info.get_recursive_includes(arcadia_root)
 
         result[package_context.package_path] = {
             'build': {k: list(sorted(v)) for k, v in build_section.items()},
@@ -1826,26 +1708,3 @@ def _do_dump_input_arcadia(arcadia_root, root, path, files):
         else:
             for f in list_dir(abs_path):
                 yield os.path.normpath(os.path.join(path, f))
-
-
-def _get_all_includes(arcadia_root, package_file, included=None):
-    included = included or []
-
-    if package_file in included:
-        raise YaPackageException('Include loop detected: {}'.format(' -> '.join(included)))
-
-    try:
-        with open(_get_package_file(arcadia_root, package_file)) as afile:
-            parsed_package = json.load(afile)
-    except ValueError as e:
-        raise YaPackageException('JSON loading error: {} in {}'.format(e, package_file))
-    included.append(package_file[len(arcadia_root) + 1 :] if package_file.startswith(arcadia_root) else package_file)
-
-    for include_package in parsed_package.get("include", []):
-        if type(include_package) is dict:
-            include_package_path = include_package["package"]
-        else:
-            include_package_path = include_package
-        included.extend(_get_all_includes(arcadia_root, include_package_path, included))
-
-    return included

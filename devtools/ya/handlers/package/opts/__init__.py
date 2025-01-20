@@ -365,6 +365,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.wheel_limited_api = ""
         self.wheel_python3 = False
         self.package_filename = None
+        self.include_traversal_variant = None
 
     @staticmethod
     def consumer():
@@ -698,6 +699,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--include-traversal-variant'],
+                help="Specify tree traversal algorithm when preparing package after build. (allowed types: postorder (default), preorder)",
+                hook=devtools.ya.core.yarg.SetValueHook('include_traversal_variant'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
         ]
 
     def postprocess(self):
@@ -709,6 +717,10 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         if self.compression_filter not in (None, 'gzip', 'zstd'):
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using unsupported compression filter: {}".format(self.compression_filter)
+            )
+        if self.include_traversal_variant not in (None, 'postorder', 'preorder'):
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "Using unsupported include traversal variant: {}".format(self.include_traversal_variant)
             )
 
 

@@ -18,9 +18,15 @@ PY_SRCS(
     tarball.py
     vcs.py
     wheel.py
+    utils.py
     debian_uploader/__init__.py
     debian_uploader/uploader_curl.py
     debian_uploader/uploader_dist.py
+    package_tree/__init__.py
+    package_tree/consts.py
+    package_tree/tree.py
+    package_tree/visitor.py
+    package_tree/loader.py
 )
 
 RESOURCE_FILES(

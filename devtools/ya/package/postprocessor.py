@@ -1,5 +1,6 @@
 import os
 
+import exts.fs
 import package
 
 
@@ -38,6 +39,7 @@ class Postprocessor(object):
         data_cwd = self.data.get("cwd")
         if data_cwd:
             cwd = os.path.join(self.result_dir, data_cwd.format(**self.formatters))
+            exts.fs.ensure_dir(cwd)
 
         real_env = None
         data_env = self.data.get("env")
@@ -47,6 +49,7 @@ class Postprocessor(object):
                 real_env[k] = v.format(**self.formatters)
 
         out, err = package.process.run_process(self.get_binary(), real_arguments, cwd=cwd, env=real_env)
+
         if self.opts.be_verbose:
             package.display.emit_message('{}[[good]]POSTPROCESS OUTPUT[[rst]]: {}'.format(package.PADDING, out))
             package.display.emit_message('{}[[good]]POSTPROCESS ERROR[[rst]]: {}'.format(package.PADDING, err))

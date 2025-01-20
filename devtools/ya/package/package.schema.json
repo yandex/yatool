@@ -763,6 +763,12 @@
                 "wheel_python3": {
                     "description": "Use python3 when building wheel package",
                     "type": "boolean"
+                },
+                "include_traversal_variant": {
+                    "description": "Specify tree traversal algorithm when preparing package after build (preorder/postorder)",
+                    "type": "string",
+                    "enum": ["preorder", "postorder"],
+                    "default": "postorder"
                 }
             },
             "uniqueItems": true,
