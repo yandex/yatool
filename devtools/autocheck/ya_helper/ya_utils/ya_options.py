@@ -375,6 +375,7 @@ class YaMakeOptions(YaBaseOptions):
 
         self.ymake_tool_servermode = self._pop('ymake_tool_servermode')
         self.store_links_in_memory = self._pop('store_links_in_memory')
+        self.use_universal_fetcher_for_dist_results = self._pop('use_universal_fetcher_for_dist_results')
 
     def _generate_post_handler(self):
         result = []
@@ -795,6 +796,9 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.store_links_in_memory is not None:
             env['YA_STORE_LINKS_IN_MEMORY'] = self._bool_to_env(self.store_links_in_memory)
+
+        if self.use_universal_fetcher_for_dist_results:
+            env['YA_USE_UNIVERSAL_FETCHER_FOR_DIST_RESULTS'] = '1'
 
         return env
 
