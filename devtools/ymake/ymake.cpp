@@ -164,10 +164,15 @@ void TYMake::ReportMakeCommandStats() {
     TMakeCommand::ReportStats();
 }
 
-void TYMake::AddStartTarget(const TString& dir, const TString& tag) {
+void TYMake::AddStartTarget(const TString& dir, const TString& tag, bool followRecurses) {
     TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
     auto elemId = Names.AddName(EMNT_Directory, dirPath);
-    auto nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, elemId, &Modules.GetRootModule());
+    TNodeId nodeId = TNodeId::Invalid;
+    if (followRecurses) {
+        nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, elemId, &Modules.GetRootModule());
+    } else {
+        nodeId = UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+    }
     if (nodeId != TNodeId::Invalid) {
         StartTargets.push_back({nodeId, 0, tag});
     }

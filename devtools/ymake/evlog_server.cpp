@@ -29,7 +29,7 @@ namespace NEvlogServer {
             Conf_.AddTarget(targetEvent->GetDir());
             if (Mode_.Defined()) {
                 if (Mode_ == EMode::Configure) {
-                    Configurator_.AddStartTarget(targetEvent->GetDir(), targetEvent->GetModuleTag());
+                    Configurator_.AddStartTarget(targetEvent->GetDir(), targetEvent->GetModuleTag(), false);
                 }
             } else {
                 ReachableTargets_.push_back({targetEvent->GetDir(), targetEvent->GetModuleTag()});
@@ -73,7 +73,7 @@ namespace NEvlogServer {
             // configure all memoized targets and continue configuring on the fly
             Mode_ = EMode::Configure;
             for (auto& [dir, tag] : ReachableTargets_) {
-                Configurator_.AddStartTarget(dir, tag);
+                Configurator_.AddStartTarget(dir, tag, false);
             }
             for (auto dir : PossibleTargets_) {
                 Configurator_.AddTarget(dir);

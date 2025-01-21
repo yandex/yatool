@@ -39,7 +39,7 @@ public:
 
 class ITargetConfigurator {
 public:
-    virtual void AddStartTarget(const TString& dir, const TString& tag = "") = 0;
+    virtual void AddStartTarget(const TString& dir, const TString& tag = "", bool followRecurses = true) = 0;
     virtual void AddTarget(const TString& dir) = 0;
 };
 
@@ -110,7 +110,7 @@ public:
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void ComputeDependsToModulesClosure();
-    void AddStartTarget(const TString& dir, const TString& tag = "") override;
+    void AddStartTarget(const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     void AddTarget(const TString& dir) override;
     void SortAllEdges();
     void CheckBlacklist();
