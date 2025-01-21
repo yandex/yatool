@@ -212,9 +212,7 @@ class ClangFormat(config.ConfigMixin):
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
-        # XXX: temporary logic for migration, we rely on the config file name to choose which version of clang-format to use
-        tool, resource = self._get_version()
-        self._tool: str = yalibrary.tools.tool(tool)  # type: ignore
+        self._tool: str = yalibrary.tools.tool("clang-format-18")  # type: ignore
         super().__init__(
             styler_opts.config_loaders
             if styler_opts.config_loaders
@@ -223,21 +221,10 @@ class ClangFormat(config.ConfigMixin):
                 config.DefaultConfig(
                     linter_name=const.CppLinterName.ClangFormat,
                     defaults_file=const.DefaultLinterConfig.Cpp,
-                    resource_name=resource,
+                    resource_name="config.clang-format",
                 ),
             )
         )
-
-    def _get_version(self) -> tuple[str, str]:
-        default = config.DefaultConfig(
-            linter_name=const.CppLinterName.ClangFormat,
-            defaults_file=const.DefaultLinterConfig.Cpp,
-        )
-        if default._default_config and 'config18' in str(default._default_config):
-            # Actually we don't "config18.clang-format" resource in ya-bin if we already have config from the file
-            return "clang-format-18", "config18.clang-format"
-        else:
-            return "clang-format", "config.clang-format"
 
     def format(self, path: PurePath, content: str) -> str:
         if path.suffix == ".h":
