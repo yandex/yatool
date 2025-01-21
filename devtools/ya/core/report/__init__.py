@@ -129,8 +129,8 @@ class CompositeTelemetry:
             logger.debug('Report_disabled %s: %s', key, svalue)  # log record for using in tests
             return
 
-        logger.debug('Report %s: %s', key, svalue)
-        for _, telemetry in self.iter_backends():
+        logger.debug('Report%s %s: %s', ' urgent' if urgent else '', key, svalue)
+        for telemetry_name, telemetry in self.iter_backends():
             telemetry.push(
                 {
                     '_id': uuid.uuid4().hex,
@@ -168,7 +168,10 @@ class CompositeTelemetry:
         )
 
         for telemetry_name, telemetry in self.iter_backends():
+            logger.debug("Initialize telemetry backend `%s`", telemetry_name)
             telemetry.init(os.path.join(config.misc_root(), telemetry_name), shard)
+            logger.debug("Telemetry backend `%s` initialized", telemetry_name)
+
         global SUPPRESSIONS
         SUPPRESSIONS = suppressions
 

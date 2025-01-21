@@ -4,6 +4,7 @@ import os
 import time
 import logging
 import threading
+
 from pytz import UTC
 import datetime as dt
 import exts.yjson as json
@@ -65,7 +66,8 @@ class FileChunk(object):
             self._stream.write(json.dumps(dct) + '\n')
             self._stream.flush()
 
-            assert self._count is not None
+            if self._count is None:
+                self._count = 0
 
             self._count += 1
 
@@ -141,7 +143,7 @@ class BaseQueue(object):
         # type: (ConsumerType) -> bool
         raise NotImplementedError()
 
-    def continuous_consume(self, consumer, stop_event):
+    def continuous_consume(self, consumer):
         # type: (ConsumerType, threading.Event) -> None
         raise NotImplementedError()
 
@@ -154,27 +156,30 @@ class UrgentQueue(BaseQueue):
 
     def __init__(self, backup_queue):
         # type: (BaseQueue) -> None
+        self.logger = logging.getLogger("UrgentQueue")
+
         self._chunk_lock = threading.Lock()
         self._chunk = []  # protected by self._lock
-        self._messages = threading.Event()
+        self._condition = threading.Condition()
+        self._work = None
 
         self.backup_queue = backup_queue
 
     def cleanup(self):
         with self._chunk_lock:
             self._chunk = []
-            self._messages.clear()
 
     def add(self, dct):
         with self._chunk_lock:
             self._chunk.append(dct)
-            self._messages.set()
+
+        with self._condition:
+            self._condition.notify_all()
 
     def release(self):
         with self._chunk_lock:
             chunk = self._chunk
             self._chunk = []
-            self._messages.clear()
         return chunk
 
     def consume(self, consumer):
@@ -185,38 +190,58 @@ class UrgentQueue(BaseQueue):
             if urgent_chunk:
                 consumer(urgent_chunk)
         except (Exception, StopConsume) as e:
-            logger.debug("While consume urgent chunk", exc_info=True)
+            if not isinstance(e, StopConsume):
+                self.logger.debug("While consume urgent chunk", exc_info=True)
 
             # return events to main queue
             self.backup_queue.add(urgent_chunk)
 
             if isinstance(e, StopConsume):
-                logger.debug("Consumer asks to stop")
+                self.logger.debug("Consumer asks to stop")
                 return False
 
         return True
 
-    def continuous_consume(self, consumer, stop_event, first_check=True):
+    def continuous_consume(self, consumer, first_check=True):
         # type: (ConsumerType, threading.Event, bool) -> None
+        with self._condition:
+            if self._work is False:
+                self.logger.debug("Queue was stopped, will be rerun")
+
+            if self._work is False:
+                self.logger.debug("Queue already works")
+                return
+
+            self._work = True
+
         if first_check:
             if not self.consume(consumer):
                 return
 
-        while not stop_event.is_set():
-            found_data = False
-            with self._chunk_lock:
-                found_data = bool(self._chunk)
-
-            if not found_data:
-                # wait for event
-                if not self._messages.wait(self._STEP_S):
-                    continue
+        while True:
+            with self._condition:
+                self._condition.wait(timeout=self._STEP_S)
 
             if not self.consume(consumer):
                 break
 
+            with self._condition:
+                if self._work is False:
+                    return
+
     def stop(self):
-        self._messages.set()
+        with self._condition:
+            if self._work is None:
+                self.logger.debug("Queue not running")
+                return
+
+            if self._work is False:
+                self.logger.debug("Queue was already stopped")
+                return
+
+            if self._work is True:
+                self._work = False
+                self._condition.notify_all()
 
     def __repr__(self):
         return "<{} with {} items>".format(type(self).__name__, len(self._chunk))
@@ -225,6 +250,8 @@ class UrgentQueue(BaseQueue):
 class ChunkedQueue(BaseQueue):
     def __init__(self, store_dir):
         # type: (Path) -> None
+
+        self.logger = logging.getLogger("ChunkedQueue")
 
         store_dir = Path(store_dir)
 
@@ -238,6 +265,9 @@ class ChunkedQueue(BaseQueue):
 
         with self._active_chunk_value_lock:
             self._active_chunk = self._generate_new_chunk()  # type: FileChunk
+
+        self._condition = threading.Condition()
+        self._work = None
 
     @property
     def _active_chunk_items(self):
@@ -270,6 +300,9 @@ class ChunkedQueue(BaseQueue):
         with self._active_chunk_value_lock:
             self._active_chunk.add(dct)
 
+        with self._condition:
+            self._condition.notify_all()
+
     def consume(self, consumer):
         # type: (ConsumerType) -> bool
         logger.debug("Check for new messages...")
@@ -277,7 +310,7 @@ class ChunkedQueue(BaseQueue):
         with self._active_chunk_value_lock:
             if self._active_chunk:
                 if not self._active_chunk.exists():
-                    logger.warning("Somebody stole my data chunk %s", self._active_chunk)
+                    logger.debug("Somebody stole my data chunk %s", self._active_chunk)
                     self._active_chunk = self._generate_new_chunk()
 
         for name in [x for x in os.listdir(str(self._data_dir))]:
@@ -307,7 +340,9 @@ class ChunkedQueue(BaseQueue):
 
                 if items:
                     logger.debug("Consume %d items from %s", len(items), chunk)
-                    consumer(items)
+                    # vvvvvvvvvvvvv Usefull work here
+                    consumer(items)  # <<<<<<<
+                    # ^^^^^^^^^^^^^
                     logger.debug("Consumed %d items from %s", len(items), chunk)
                 else:
                     logger.debug("No items found in %s, skip", chunk)
@@ -327,21 +362,53 @@ class ChunkedQueue(BaseQueue):
 
         return True
 
-    def continuous_consume(self, consumer, stop_event, chunk_size=5, send_time_s=60, check_time_s=1, first_check=True):
+    def continuous_consume(self, consumer, chunk_size=5, send_time_s=60, check_time_s=1, first_check=True):
         # type: (ConsumerType, threading.Event, int, float, float, bool) -> None
+        with self._condition:
+            if self._work is False:
+                self.logger.debug("Queue was stopped, will be rerun")
+
+            if self._work is False:
+                self.logger.debug("Queue already works")
+                return
+
+            self._work = True
+
         last_send_time = time.time()
 
         if first_check:
             if not self.consume(consumer):
                 return
 
-        while not stop_event.wait(timeout=check_time_s):
+        while True:
+            with self._condition:
+                self._condition.wait(timeout=check_time_s)
+                if self._work is False:
+                    return
+
             if chunk_size <= self._active_chunk_items or last_send_time + send_time_s < time.time():
                 last_send_time = time.time()
                 if not self.consume(consumer):
                     break
 
     def stop(self):
+        try:
+            with self._condition:
+                if self._work is None:
+                    self.logger.debug("Queue not running")
+                    return
+
+                if self._work is False:
+                    self.logger.debug("Queue was already stopped")
+                    return
+
+                if self._work is True:
+                    self._work = False
+                    self._condition.notify_all()
+        finally:
+            self._release_chunk()
+
+    def _release_chunk(self):
         with self._active_chunk_value_lock:
             if self._active_chunk:
                 self._active_chunk.release()
