@@ -255,7 +255,6 @@ class YaMakeOptions(YaBaseOptions):
         self.strip_idle_build_results = self._pop('strip_idle_build_results')
 
         self.do_not_download_tests_results = self._pop('do_not_download_tests_results')
-        self.use_links_in_report = self._pop('use_links_in_report')
         self.backup_tests_results = self._pop('backup_tests_results')
 
         self.json_prefix = self._pop('json_prefix')
@@ -376,7 +375,6 @@ class YaMakeOptions(YaBaseOptions):
 
         self.ymake_tool_servermode = self._pop('ymake_tool_servermode')
         self.store_links_in_memory = self._pop('store_links_in_memory')
-        self.set_upload_nodes_to_remote_store = self._pop('set_upload_nodes_to_remote_store')
 
     def _generate_post_handler(self):
         result = []
@@ -497,7 +495,6 @@ class YaMakeOptions(YaBaseOptions):
                 'yt_run_test.tar',
             ]:
                 result += ['--save-links-for', fn]
-        if self.use_links_in_report:
             result += ['--use-links-in-report']
         if self.backup_tests_results:
             result += ['--backup-test-results']
@@ -798,9 +795,6 @@ class YaMakeOptions(YaBaseOptions):
 
         if self.store_links_in_memory is not None:
             env['YA_STORE_LINKS_IN_MEMORY'] = self._bool_to_env(self.store_links_in_memory)
-
-        if self.set_upload_nodes_to_remote_store:
-            env['YA_SET_UPLOAD_NODES_TO_REMOTE_STORE'] = '1'
 
         return env
 
