@@ -2168,7 +2168,6 @@ class BuildRootOptions(Options):
         self.random_build_root = random_build_root
         self.custom_build_root = None
         self.limit_build_root_size = False
-        self.strict_output_checks = True
 
     @staticmethod
     def consumer():
@@ -2194,12 +2193,6 @@ class BuildRootOptions(Options):
                 help='Set local limit of output node size',
                 hook=SetConstValueHook('limit_build_root_size', True),
             ),
-            # XXX will be removed soon
-            EnvConsumer(
-                'YA_STRICT_OUTPUT_CHECKS',
-                hook=SetValueHook('strict_output_checks', return_true_if_enabled),
-            ),
-            ConfigConsumer('strict_output_checks'),
         ]
 
 
