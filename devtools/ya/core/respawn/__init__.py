@@ -64,7 +64,6 @@ def _src_root_respawn(arc_dir):
     cmd = [target] + ya_script_prefix + sys.argv[1:]
 
     env = _create_respawn_env(os.environ.copy(), _get_current_respawns() + new_respawns)
-    env['PY_IGNORE_ENVIRONMENT'] = 'x'
     env['YA_SOURCE_ROOT'] = arc_dir
     env['Y_PYTHON_ENTRY_POINT'] = ':main'
 

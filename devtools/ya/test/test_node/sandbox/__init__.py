@@ -76,7 +76,7 @@ def inject_download_sandbox_resource_node(graph, resource, opts, global_resource
             "cwd": "$(BUILD_ROOT)",
             "priority": 0,
             "deps": [],
-            "env": sysenv.get_common_py_env().dump(),
+            "env": sysenv.get_common_env().dump(),
             "target_properties": {},
             "outputs": output_paths,
             "dir_outputs": dir_output_paths,

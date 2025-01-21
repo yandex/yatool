@@ -121,7 +121,7 @@ def inject_download_docker_image_node(graph, image, opts):
             "cwd": "$(BUILD_ROOT)",
             "priority": 0,
             "deps": [],
-            "env": sysenv.get_common_py_env().dump(),
+            "env": sysenv.get_common_env().dump(),
             "target_properties": {},
             "outputs": [output_image_path, output_info_path],
             'kv': {
@@ -183,7 +183,7 @@ def inject_mds_resource_to_graph(graph, resource, opts):
             "cwd": "$(BUILD_ROOT)",
             "priority": 0,
             "deps": [],
-            "env": sysenv.get_common_py_env().dump(),
+            "env": sysenv.get_common_env().dump(),
             "target_properties": {},
             "outputs": [
                 output_file,
@@ -679,7 +679,7 @@ def create_test_node(
     if is_for_distbuild:
         runner_cmd += ["--node-timeout", str(node_timeout or devtools.ya.test.const.DEFAULT_TEST_NODE_TIMEOUT)]
 
-    env = sysenv.get_common_py_env()
+    env = sysenv.get_common_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
     if platform_descriptor and 'llvm-symbolizer' in platform_descriptor.get("params", {}):
@@ -1502,7 +1502,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         "uid": uid,
         "priority": _get_suite_priority(suite),
         "deps": testdeps.unique(test_uids),
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "outputs": testdeps.unique(outputs) + [node_log_path],
         "tared_outputs": testdeps.unique(tared_outputs),
         "dir_outputs": testdeps.unique(dir_outputs),
@@ -1609,7 +1609,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_t
         "cwd": "$(BUILD_ROOT)",
         "priority": _get_suite_priority(suite),
         "deps": testdeps.unique(test_uids),
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "outputs": testdeps.unique(outputs),
         "tared_outputs": testdeps.unique(tared_outputs),
         "dir_outputs": testdeps.unique(dir_outputs),
@@ -2083,7 +2083,7 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
         "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "uid": uid_gen.get_random_uid(),
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,
@@ -2164,7 +2164,7 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,
         "deps": testdeps.unique(deps),
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "target_properties": {},
         "outputs": [node_log_path],
         'kv': {
@@ -2252,7 +2252,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,
         "deps": testdeps.unique(suite.output_uids) + list(get_test_build_deps_or_throw(suite)),
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "cache": True,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
@@ -2316,7 +2316,7 @@ def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
             "cwd": "$(BUILD_ROOT)",
             "priority": 0,
             "deps": testdeps.unique(copy.copy(checout_uids)),
-            "env": sysenv.get_common_py_env().dump(),
+            "env": sysenv.get_common_env().dump(),
             "target_properties": {},
             "outputs": [log_path],
             'kv': {
@@ -2396,7 +2396,7 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         suite._output_uids = []
     else:
         uid = suite.uid
-    env = sysenv.get_common_py_env()
+    env = sysenv.get_common_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
     log_path = os.path.join("$(BUILD_ROOT)", suite.project_path, devtools.ya.test.const.LIST_NODE_LOG_FILE)
@@ -2599,7 +2599,7 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
         "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
-        "env": sysenv.get_common_py_env().dump(),
+        "env": sysenv.get_common_env().dump(),
         "uid": uid_gen.get_random_uid("test-list-result"),
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,

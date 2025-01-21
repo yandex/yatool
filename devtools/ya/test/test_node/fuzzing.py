@@ -188,7 +188,7 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
         node_cmd += ["--test-run-cwd", suite.test_run_cwd]
 
     node_cmd += cmdline.get_environment_relative_options(suite, opts)
-    env = sysenv.get_common_py_env()
+    env = sysenv.get_common_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
     node = {

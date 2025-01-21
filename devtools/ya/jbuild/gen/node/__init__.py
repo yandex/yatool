@@ -99,8 +99,6 @@ class JNode(graph_node.Node):
                 'priority': 0,
                 'env': {
                     'YA_CACHE_DIR': consts.BUILD_ROOT,
-                    'PY_IGNORE_ENVIRONMENT': '',
-                    'PYTHONPATH': graph_base.hacked_path_join(consts.SOURCE_ROOT, 'devtools', 'ya'),
                 },
             }
         )

@@ -27,7 +27,8 @@ class Environ(object):
         names = [_f for _f in self._env.get(const.MANDATORY_ENV_VAR_NAME, '').split(self.PATHSEP) if _f]
         for name in names:
             self._mandatory.add(name)
-            self._env[name] = env[name]
+            if name in env:
+                self._env[name] = env[name]
 
     def __setitem__(self, key, value):
         self.set(key, value)
@@ -108,7 +109,7 @@ class Environ(object):
 
 
 @library.python.func.lazy
-def get_common_env():
+def get_common_env_names():
     env_vars = [name for name in ["SVN_SSH"] if name in os.environ]
     # Work in progress, see YA-365
     skip = (
@@ -117,21 +118,11 @@ def get_common_env():
         "YA_TOKEN",
     )
     env_vars += [name for name in os.environ if name.startswith("YA_") and not name.startswith(skip)]
-    return {name: os.environ.get(name) for name in env_vars}
+    return env_vars
 
 
-def get_common_py_env():
-    env = Environ(
-        {
-            "PY_IGNORE_ENVIRONMENT": "",
-            # pytest installs own import hook to overwrite asserts - AssertionRewritingHook
-            # Tests can import modules specified in the DATA which will generate patched pyc-files.
-            # We are setting PYTHONDONTWRITEBYTECODE=1 to prevent this behaviour.
-            "PYTHONDONTWRITEBYTECODE": "1",
-        }
-    )
-    env.update(get_common_env())
-    return env
+def get_common_env():
+    return Environ({name: os.environ.get(name) for name in get_common_env_names()})
 
 
 def update_test_initial_env_vars(env, suite, opts):

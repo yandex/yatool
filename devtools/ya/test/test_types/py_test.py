@@ -316,6 +316,12 @@ class PyTestBinSuite(PyTestSuite):
                 if original_opts:
                     env[envvar + "_ORIGINAL"] = original_opts
 
+        if not opts.external_py_files:
+            # pytest installs own import hook to overwrite asserts - AssertionRewritingHook
+            # Tests can import modules specified in the DATA which will generate patched pyc-files.
+            # We are setting PYTHONDONTWRITEBYTECODE=1 to prevent this behaviour by default.
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+
     @property
     def supports_fork_test_files(self):
         return True
