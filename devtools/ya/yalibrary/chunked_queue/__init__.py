@@ -208,7 +208,7 @@ class UrgentQueue(BaseQueue):
             if self._work is False:
                 self.logger.debug("Queue was stopped, will be rerun")
 
-            if self._work is False:
+            if self._work is True:
                 self.logger.debug("Queue already works")
                 return
 
@@ -227,7 +227,7 @@ class UrgentQueue(BaseQueue):
 
             with self._condition:
                 if self._work is False:
-                    return
+                    break
 
     def stop(self):
         with self._condition:
@@ -368,7 +368,7 @@ class ChunkedQueue(BaseQueue):
             if self._work is False:
                 self.logger.debug("Queue was stopped, will be rerun")
 
-            if self._work is False:
+            if self._work is True:
                 self.logger.debug("Queue already works")
                 return
 
@@ -384,7 +384,7 @@ class ChunkedQueue(BaseQueue):
             with self._condition:
                 self._condition.wait(timeout=check_time_s)
                 if self._work is False:
-                    return
+                    break
 
             if chunk_size <= self._active_chunk_items or last_send_time + send_time_s < time.time():
                 last_send_time = time.time()
