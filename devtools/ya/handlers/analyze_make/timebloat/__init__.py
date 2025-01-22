@@ -2,6 +2,7 @@ import os
 import sys
 import enum
 import json
+import logging
 import pathlib
 import collections
 
@@ -34,6 +35,8 @@ JSON_PLACEHOLDER = '<!--JSON-->'
 HTML_LEGEND_TEMPLATE = '<div class="webtreemap-node webtreemap-type-{entry}" style="filter: hue-rotate(-{hue_rotate}deg); z-index: 100;">{entry}<span class="tooltip">{hint}</span></div>'
 
 Color = collections.namedtuple('Color', ['type', 'color'])
+
+logger = logging.getLogger(__name__)
 
 
 def unify_paths(paths: list[str]) -> str:
@@ -115,7 +118,11 @@ class TreeNode:
         if self.node is not None:
             if "/" in self.node.name:
                 res.append(self.node.tag)
-                res.append(self.get_node_path(self.node)[-1])
+                node_path = self.get_node_path(self.node)
+                if len(node_path) > 0:
+                    res.append(node_path[-1])
+                else:
+                    logger.debug("Failed to get node path for node %s", self.node.name)
             else:
                 res.append(self.node.name)
 
