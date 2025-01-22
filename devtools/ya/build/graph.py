@@ -1152,34 +1152,37 @@ def create_tool_event_queue(opts):
         return _ToolTargetsQueue()
 
 
+def should_use_servermode_for_pic(opts):
+    return opts.ymake_pic_servermode
+
+
 class _GraphKind(Enum):
     TARGET = 0
     TOOLS = 1
     GLOBAL_TOOLS = 2
 
 
-class _ToolEventListener:
+class _ForeignEventListener:
     TOOL_PLATFORM = 0
+    PIC_PLATFORM = 1
 
     def __init__(self, ev_listener, queue_putter):
         self.__prev_ev_listener = ev_listener
         self._queue_putter = queue_putter
-        self.__tool_targets = set()
         self.__done = False
 
-    def _process_target_event(self, event):
-        if event["Reachable"] == 1:
-            self.__tool_targets.add(event["Dir"])
+    def _process_target_event(self, _):
+        pass
 
     def _process_final_event(self, _):
-        self._queue_putter(self.__tool_targets)
+        pass
 
     def __call__(self, event):
         typename = event["_typename"]
         if typename == "NEvent.TForeignPlatformTarget":
             if self.__done:
                 logger.warning("NEvent.TForeignPlatformTarget event comes after NEvent.TAllForeignPlatformsReported")
-            elif event["Platform"] == self.TOOL_PLATFORM:
+            else:
                 self._process_target_event(event)
         elif typename == "NEvent.TAllForeignPlatformsReported":
             if self.__done:
@@ -1187,11 +1190,23 @@ class _ToolEventListener:
             else:
                 self._process_final_event(event)
                 self.__done = True
-        else:
-            self.__prev_ev_listener(event)
+        self.__prev_ev_listener(event)
 
 
-class _ToolEventListenerServerMode(_ToolEventListener):
+class _ToolEventListener(_ForeignEventListener):
+    def __init__(self, ev_listener, queue_putter):
+        super().__init__(ev_listener, queue_putter)
+        self.__tool_targets = set()
+
+    def _process_target_event(self, event):
+        if event["Reachable"] == 1 and event["Platform"] == self.TOOL_PLATFORM:
+            self.__tool_targets.add(event["Dir"])
+
+    def _process_final_event(self, _):
+        self._queue_putter(self.__tool_targets)
+
+
+class _ForeignEventListenerServerMode(_ForeignEventListener):
     def __init__(self, ev_listener, queue_putter):
         super().__init__(ev_listener, queue_putter)
 
@@ -1210,11 +1225,29 @@ class _ToolEventListenerServerMode(_ToolEventListener):
             self._process_bypass_event(event)
 
 
+class _ToolEventListenerServerMode(_ForeignEventListenerServerMode):
+    def __init__(self, ev_listener, queue_putter):
+        super().__init__(ev_listener, queue_putter)
+
+    def _process_target_event(self, event):
+        if event["Platform"] == self.TOOL_PLATFORM:
+            super()._process_target_event(event)
+
+
 def create_tool_event_listener(opts, *args):
     if should_use_servermode_for_tools(opts):
         return _ToolEventListenerServerMode(*args)
     else:
         return _ToolEventListener(*args)
+
+
+class _PicEventListenerServerMode(_ForeignEventListenerServerMode):
+    def __init__(self, ev_listener, queue_putter):
+        super().__init__(ev_listener, queue_putter)
+
+    def _process_target_event(self, event):
+        if event["Platform"] == self.PIC_PLATFORM:
+            super()._process_target_event(event)
 
 
 def build_graph_and_tests(opts, check, event_queue=None, display=None):
@@ -1387,12 +1420,78 @@ class _GraphMaker:
 
         pic = None
         no_pic = None
+        pic_queue = None
+        # The order of async tasks here is crucial when pic runs in servermode:
+        # nopic MUST be scheduled before pic in case when both are presented.
+        # This guarantees no deadlocks when there are more tasks than threads.
+        if to_build_no_pic:
+            no_pic_func = self._build_no_pic
+            no_pic_tool_queue_putter = None
+            no_pic_queue_putter = None
+            if tool_targets_queue:
+                no_pic_func, no_pic_tool_queue_putter = tool_targets_queue.add_source(
+                    no_pic_func, self._make_debug_id(debug_id, 'nopic')
+                )
+            if to_build_pic and should_use_servermode_for_pic(self._opts):
+                pic_queue = _ToolEventsQueueServerMode()
+                no_pic_func, no_pic_queue_putter = pic_queue.add_source(
+                    no_pic_func, self._make_debug_id(debug_id, 'nopic')
+                )
+
+                ymake_opts = dict(
+                    ymake_opts or {},
+                    transition_source='nopic',
+                    report_pic_nopic=True,
+                )
+
+            def gen_no_pic():
+                return no_pic_func(
+                    flags,
+                    target_tc,
+                    abs_targets,
+                    debug_id=debug_id,
+                    enabled_events=enabled_events,
+                    extra_conf=extra_conf,
+                    cache_dir=cache_dir,
+                    change_list=self._opts.build_graph_cache_cl,
+                    no_caches_on_retry=self._opts.no_caches_on_retry,
+                    no_ymake_retry=self._opts.no_ymake_retry,
+                    tool_targets_queue_putter=no_pic_tool_queue_putter,
+                    pic_queue_putter=no_pic_queue_putter,
+                    ymake_opts=ymake_opts,
+                )
+
+            no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
+
+        # The order of async tasks here is crucial when pic runs in servermode:
+        # nopic MUST be scheduled before pic in case when both are presented.
+        # This guarantees no deadlocks when there are more tasks than threads.
         if to_build_pic:
             pic_func = self._build_pic
             pic_queue_putter = None
             if tool_targets_queue:
                 pic_func, pic_queue_putter = tool_targets_queue.add_source(
                     pic_func, self._make_debug_id(debug_id, 'pic')
+                )
+
+            if pic_queue is not None:
+
+                def stdin_line_provider():
+                    # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.
+                    # So we must not block here if we know there wont be any new events in the queue.
+                    # Returning an empty string effectively closes the stream.
+                    # TODO: we should throw an exception here instead to make the user responsible of closing the stream.
+                    if pic_queue.done():
+                        return ''
+                    return json.dumps(pic_queue.get()) + '\n'
+
+                ymake_opts = dict(
+                    ymake_opts or {},
+                    targets_from_evlog=True,
+                    source_root=self._opts.arc_root,
+                    stdin_line_provider=stdin_line_provider,
+                    transition_source='pic',
+                    drop_foreign_start_modules=True,
                 )
 
             def gen_pic():
@@ -1412,32 +1511,6 @@ class _GraphMaker:
                 )
 
             pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
-
-        if to_build_no_pic:
-            no_pic_func = self._build_no_pic
-            no_pic_queue_putter = None
-            if tool_targets_queue:
-                no_pic_func, no_pic_queue_putter = tool_targets_queue.add_source(
-                    no_pic_func, self._make_debug_id(debug_id, 'nopic')
-                )
-
-            def gen_no_pic():
-                return no_pic_func(
-                    flags,
-                    target_tc,
-                    abs_targets,
-                    debug_id=debug_id,
-                    enabled_events=enabled_events,
-                    extra_conf=extra_conf,
-                    cache_dir=cache_dir,
-                    change_list=self._opts.build_graph_cache_cl,
-                    no_caches_on_retry=self._opts.no_caches_on_retry,
-                    no_ymake_retry=self._opts.no_ymake_retry,
-                    tool_targets_queue_putter=no_pic_queue_putter,
-                    ymake_opts=ymake_opts,
-                )
-
-            no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
 
         # For compatibility with merge_graph() and all other similar code
         # Will be removed somewhen
@@ -1539,6 +1612,7 @@ class _GraphMaker:
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        pic_queue_putter=None,
         ymake_opts=None,
     ):
         flags = copy.deepcopy(flags)
@@ -1556,7 +1630,8 @@ class _GraphMaker:
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry,
             tool_targets_queue_putter=tool_targets_queue_putter,
-            ymake_opts=dict(ymake_opts or {}, transition_source='nopic'),
+            pic_queue_putter=pic_queue_putter,
+            ymake_opts=ymake_opts,
         )
 
     def _prepare_graph(
@@ -1573,6 +1648,7 @@ class _GraphMaker:
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        pic_queue_putter=None,
         ymake_opts=None,
     ):
         cache_subdir = None
@@ -1593,6 +1669,7 @@ class _GraphMaker:
                 no_caches_on_retry=no_caches_on_retry,
                 no_ymake_retry=no_ymake_retry,
                 tool_targets_queue_putter=tool_targets_queue_putter,
+                pic_queue_putter=pic_queue_putter,
                 ymake_opts=ymake_opts,
             )
         result.graph.set_tags(tags + ([extra_tag] if extra_tag else []))
@@ -1612,6 +1689,7 @@ class _GraphMaker:
         no_caches_on_retry=False,
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
+        pic_queue_putter=None,
         ymake_opts=None,
     ) -> _GenGraphResult:
         flags = copy.deepcopy(flags)
@@ -1634,6 +1712,8 @@ class _GraphMaker:
         if tool_targets_queue_putter is not None:
             current_ev_listener = create_tool_event_listener(self._opts, self._event_queue, tool_targets_queue_putter)
             enabled_events += YmakeEvents.TOOLS.value
+        if pic_queue_putter is not None:
+            current_ev_listener = _PicEventListenerServerMode(current_ev_listener, pic_queue_putter)
 
         with stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
             ymake_opts = dict(

@@ -124,6 +124,9 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('stdin_line_provider', default_value=None),
         yarg.Param('targets_from_evlog', default_value=False),
         yarg.Param('transition_source', default_value=None),
+        yarg.Param('report_pic_nopic', default_value=None),
+        yarg.Param('descend_into_foreign', default_value=None),
+        yarg.Param('drop_foreign_start_modules', default_value=None),
     ]
 
 
@@ -287,6 +290,18 @@ def _cons_ymake_args(**kwargs):
     transition_source = kwargs.pop('transition_source', None)
     if transition_source:
         ret += ['--transition-source', transition_source]
+
+    report_pic_nopic = kwargs.pop('report_pic_nopic', None)
+    if report_pic_nopic is not None:
+        ret += ['--report-pic-nopic', report_pic_nopic]
+
+    descend_into_foreign = kwargs.pop('descend_into_foreign', None)
+    if descend_into_foreign is not None:
+        ret += ['--descend-into-foreign', descend_into_foreign]
+
+    drop_foreign_start_modules = kwargs.pop('drop_foreign_start_modules', None)
+    if drop_foreign_start_modules is not None:
+        ret += ['--drop-foreign-start-modules', drop_foreign_start_modules]
 
     continue_on_fail = kwargs.pop('continue_on_fail', False)
     if continue_on_fail:

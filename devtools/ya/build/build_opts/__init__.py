@@ -1468,6 +1468,7 @@ class ArcPrefetchOptions(Options):
 class YMakeModeOptions(Options):
     def __init__(self):
         self.ymake_tool_servermode = False
+        self.ymake_pic_servermode = False
 
     @staticmethod
     def consumer():
@@ -1491,6 +1492,25 @@ class YMakeModeOptions(Options):
                 hook=SetValueHook('ymake_tool_servermode', return_true_if_enabled),
             ),
             ConfigConsumer('ymake_tool_servermode'),
+            ArgConsumer(
+                ['--ymake-pic-servermode'],
+                help='Pass targets to pic ymake via evlog',
+                hook=SetConstValueHook('ymake_pic_servermode', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--no-ymake-pic-servermode'],
+                help='Pass targets to pic ymake via command line',
+                hook=SetConstValueHook('ymake_pic_servermode', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_YMAKE_PIC_SERVERMODE',
+                hook=SetValueHook('ymake_pic_servermode', return_true_if_enabled),
+            ),
+            ConfigConsumer('ymake_pic_servermode'),
         ]
 
 
