@@ -340,9 +340,7 @@ class ChunkedQueue(BaseQueue):
 
                 if items:
                     logger.debug("Consume %d items from %s", len(items), chunk)
-                    # vvvvvvvvvvvvv Usefull work here
-                    consumer(items)  # <<<<<<<
-                    # ^^^^^^^^^^^^^
+                    consumer(items)
                     logger.debug("Consumed %d items from %s", len(items), chunk)
                 else:
                     logger.debug("No items found in %s, skip", chunk)
@@ -357,7 +355,7 @@ class ChunkedQueue(BaseQueue):
                 try:
                     chunk.release()  # Free flock in any case; specifically when StopConsume comes
                 except Exception:
-                    # We do not need to raise exception after failed to release removed file lock
+                    # We do not need to raise exception after failed when trying releasing removed file lock
                     pass
 
         return True
