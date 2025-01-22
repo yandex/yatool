@@ -17,6 +17,7 @@ PEERDIR(
     devtools/ya/core/logger
     devtools/ya/core/monitoring
     devtools/ya/core/report
+    devtools/ya/core/report/parse_events_filter
     devtools/ya/core/respawn
     devtools/ya/core/stage_aggregator
     devtools/ya/core/stage_tracer
@@ -40,7 +41,6 @@ PEERDIR(
     devtools/ya/yalibrary/profiler
     devtools/ya/yalibrary/showstack
     devtools/ya/yalibrary/vcs
-    devtools/autocheck/ya_helper/ya_utils
 )
 
 IF (NOT YA_OPENSOURCE)

@@ -27,7 +27,6 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
-from devtools.autocheck.ya_helper.ya_utils import ya_options
 
 from .modules import evlog
 from .modules import params
@@ -724,13 +723,13 @@ def _resources_report():
 
 def configure_report_interceptor(ctx, report_events):
     # we can only do that after respawn with valid python
-    from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args
+    from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
 
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
 
     telemetry.init_reporter(
         suppressions=sec.mine_suppression_filter(params_dict),
-        report_events=ya_options.YaBaseOptions.parse_events_filter(report_events),
+        report_events=parse_events_filter.parse_events_filter(report_events),
     )
 
     telemetry.report(

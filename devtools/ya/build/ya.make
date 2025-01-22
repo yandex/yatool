@@ -23,6 +23,7 @@ PEERDIR(
     devtools/ya/build/build_opts
     devtools/ya/build/build_plan
     devtools/ya/build/build_result
+    devtools/ya/build/cache_kind
     devtools/ya/build/ccgraph
     devtools/ya/build/evlog
     devtools/ya/build/gen_plan
@@ -71,7 +72,6 @@ PEERDIR(
     devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/vcs/vcsversion
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
-    devtools/autocheck/ya_helper/ya_utils
     library/python/cityhash
     library/python/compress
 )
@@ -98,6 +98,7 @@ RECURSE(
     build_opts
     build_plan
     build_result
+    cache_kind
     ccgraph
     evlog
     gen_plan

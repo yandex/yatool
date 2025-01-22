@@ -21,3 +21,7 @@ PY_SRCS(
 )
 
 END()
+
+RECURSE(
+    parse_events_filter
+)

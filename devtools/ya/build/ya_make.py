@@ -67,7 +67,7 @@ from yalibrary.toolscache import (
     post_local_cache_report,
     tc_force_gc,
 )
-from devtools.autocheck.ya_helper.ya_utils import CacheKind
+from devtools.ya.build.cache_kind import CacheKind
 from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
 try:
