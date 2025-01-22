@@ -978,7 +978,7 @@ def checkout_data(arcadia_root, params):
         not_found_paths = []
         while True:
             try:
-                packages.append(load_package(arcadia_root, package_file))
+                packages.append(load_package(get_tree_info(arcadia_root, package_file)))
                 break
             except PackageFileNotFoundException as pfnfe:
                 if pfnfe.missing_file_path in not_found_paths:  # looping over not existing path
@@ -1355,7 +1355,7 @@ def do_package(params):
     if params.dump_build_targets:
         targets = []
         for package_file in params.packages:
-            package_data = load_package(arcadia_root, package_file)
+            package_data = load_package(get_tree_info(arcadia_root, package_file))
             package_build = package_data.get("build", {})
             if "targets" in package_build:
                 targets.extend(package_build["targets"])
