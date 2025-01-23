@@ -20,11 +20,11 @@ def _get_ufetcher():
     logger = logging.getLogger(__name__)
 
     retry_policy = universal_fetcher.RetryPolicy(
-        max_retry_count=5,
-        initial_delay_ms=30,
+        max_retry_count=7,
+        initial_delay_ms=5000,
         use_fixed_delay=False,
-        max_delay_ms=5000,
-        backoff_multiplier=1.25,
+        max_delay_ms=60000,
+        backoff_multiplier=1.5,
     )
     http_config = universal_fetcher.HttpConfig(
         universal_fetcher.HttpParams(user_agent=exts.http_client.make_user_agent()), retry_policy
