@@ -99,6 +99,11 @@ def tmp_path():
     return os.path.join(misc_root(), 'tmp')
 
 
+@func.lazy
+def pycache_path():
+    return os.path.join(misc_root(), 'py', 'pycache')
+
+
 def user_junk_dir(username=None):
     username = username or get_user()
     try:

@@ -517,6 +517,7 @@ def parse_args(args=None):
     )
     parser.add_argument("--tests-limit-in-chunk", action='store', type=int, default=0)
     parser.add_argument("--create-root-guidance-file", action='store_true')
+    parser.add_argument("--pycache-prefix")
 
     args = parser.parse_args(args)
 
@@ -1394,6 +1395,7 @@ def main():
                 cwd,
                 options.env_data_mode,
                 options.create_root_guidance_file,
+                options.pycache_prefix,
             )
         else:
             new_source_root = source_root

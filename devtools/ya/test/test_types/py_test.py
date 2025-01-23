@@ -13,6 +13,7 @@ import exts.yjson as json
 from devtools.ya.test.system import process
 from devtools.ya.test import common as test_common
 from devtools.ya.test.test_types import common
+import devtools.ya.core.config
 import devtools.ya.test.const
 import devtools.ya.test.util.shared
 import devtools.ya.test.util.tools
@@ -316,7 +317,13 @@ class PyTestBinSuite(PyTestSuite):
                 if original_opts:
                     env[envvar + "_ORIGINAL"] = original_opts
 
-        if not opts.external_py_files:
+        if opts.external_py_files:
+            # Explicitly specify PYTHONPYCACHEPREFIX for tests.
+            # This is the only way to set the correct path to the pycache directory in the case
+            # where the executable is run with the current working directory inside arcadia
+            # (e.g. the ya:dirty case or the direct cwd=arcadia case).
+            env["PYTHONPYCACHEPREFIX"] = devtools.ya.core.config.pycache_path()
+        else:
             # pytest installs own import hook to overwrite asserts - AssertionRewritingHook
             # Tests can import modules specified in the DATA which will generate patched pyc-files.
             # We are setting PYTHONDONTWRITEBYTECODE=1 to prevent this behaviour by default.

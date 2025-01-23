@@ -79,6 +79,7 @@ def create_environment(
     destination,
     env_data_mode=EnvDataMode.Symlinks,
     create_root_guidance_file=False,
+    pycache_prefix=None,
 ):
     def create_links(root, env_root, paths):
         paths = testdeps.remove_redundant_paths(paths)
@@ -148,6 +149,10 @@ def create_environment(
     if create_root_guidance_file:
         with open(os.path.join(env_build_root, ".root.path"), "w") as afile:
             afile.write(source_root)
+
+    if pycache_prefix:
+        with open(os.path.join(env_build_root, ".pycache.path"), "w") as afile:
+            afile.write(pycache_prefix)
 
     return os.path.abspath(env_arcadia_root), os.path.abspath(env_build_root), os.path.abspath(env_data_root)
 

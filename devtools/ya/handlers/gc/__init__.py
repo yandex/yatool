@@ -254,6 +254,9 @@ def _do_collect_cache(cache, build_root, opts):
     logger.debug('Cleaning tmp root')
     fs.remove_tree_safe(cc.tmp_path())
 
+    logger.debug('Cleaning pycache root')
+    fs.remove_tree_safe(cc.pycache_path())
+
     logger.debug('Cleaning snowden root')
     fs.remove_tree_safe(os.path.join(cc.misc_root(), 'snowden'))
 

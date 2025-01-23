@@ -11,10 +11,11 @@ import time
 
 import app_config
 import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.imprint.imprint as imprint
-import devtools.ya.core.yarg
 import devtools.ya.core.profiler
+import devtools.ya.core.yarg
 
 import devtools.ya.test.dependency.mds_storage as mds_storage
 import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
@@ -478,7 +479,10 @@ def create_test_node(
         runner_cmd += ["--test-stdout"]
 
     if opts and getattr(opts, "external_py_files"):
-        runner_cmd += ["--create-root-guidance-file"]
+        runner_cmd += [
+            "--create-root-guidance-file",
+            f"--pycache-prefix={devtools.ya.core.config.pycache_path()}",
+        ]
 
     if opts.custom_canondata_path:
         runner_cmd += ["--custom-canondata-path", opts.custom_canondata_path]
