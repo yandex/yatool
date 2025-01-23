@@ -276,21 +276,18 @@ public:
         GlobVarsComplete = true;
     }
 
-    bool IsInputsComplete() const {
+    bool IsInputsComplete() const noexcept {
         return InputsComplete;
     }
 
-    void SetInputsComplete() {
-        Y_ASSERT(!IsInputsComplete());
-        InputsComplete = true;
-    }
+    void SetInputsComplete() noexcept;
 
-    bool IsDirsComplete() const {
+    bool IsDirsComplete() const noexcept {
         return IncludesComplete;
     }
 
     /// Marks that Dirs are now trustworthy
-    void SetDirsComplete();
+    void SetDirsComplete() noexcept;
 
     void ResetIncDirs() {
         IncDirs.ResetPropagatedDirs();
@@ -305,7 +302,7 @@ public:
     }
 
     /// Marks that Vars are collected
-    void SetPeersComplete();
+    void SetPeersComplete() noexcept;
 
     bool IsToolsComplete() const noexcept {
         return ToolsComplete;

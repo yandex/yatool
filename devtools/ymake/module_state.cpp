@@ -293,12 +293,17 @@ void TModule::Init(TString fileName, TString globalFileName, TString baseName, c
     Attrs.RenderModuleType = static_cast<ui32>(ComputeRenderModuleType(this, NodeType, conf.SymlinkType));
 }
 
-void TModule::SetDirsComplete() {
+void TModule::SetInputsComplete() noexcept {
+    Y_ASSERT(!IsInputsComplete());
+    InputsComplete = true;
+}
+
+void TModule::SetDirsComplete() noexcept {
     Y_ASSERT(!IsDirsComplete());
     IncludesComplete = true;
 }
 
-void TModule::SetPeersComplete() {
+void TModule::SetPeersComplete() noexcept {
     Y_ASSERT(!IsPeersComplete());
     PeersComplete = true;
 }
