@@ -10,24 +10,8 @@ from devtools.ya.jbuild.gen import configure
 logger = logging.getLogger(__name__)
 
 
-def dirname_unix_path(unix_path):
-    return '/'.join(unix_path.split('/')[:-1])
-
-
 def basename_unix_path(unix_path):
     return unix_path.split('/')[-1]
-
-
-def is_contrib(path, ctx):
-    return any(path.startswith(root) for root in ctx.contrib_roots)
-
-
-def is_proxy_library(path, ctx):
-    return is_contrib(path, ctx) and any(dirname_unix_path(dep.path) == path for dep in ctx.by_path[path].deps)
-
-
-def strip_root(s):
-    return s[3:]
 
 
 class Context(object):
@@ -54,29 +38,6 @@ class Context(object):
         self.target_platform = target_platform
 
         self.global_resources = global_resources
-
-    def _choose_in_classpath(self, path, accept_target, extract_artifact, direct=False):
-        chosen = []
-
-        target = self.by_path[path]
-        if not is_proxy_library(target.path, self) and accept_target(target):
-            chosen.append(extract_artifact(target))
-        return chosen
-
-    def classpath(self, path, type=consts.CLS, direct=False):
-        return self._choose_in_classpath(
-            path,
-            accept_target=lambda t: t.provides_jar_of_type(type),
-            extract_artifact=lambda t: t.output_jar_of_type_path(type),
-            direct=direct,
-        )
-
-    def dlls(self, path):
-        return self._choose_in_classpath(
-            path,
-            accept_target=lambda t: t.provides_dll(),
-            extract_artifact=lambda t: t.output_dll_path(),
-        )
 
 
 def remove_prefixes(paths):

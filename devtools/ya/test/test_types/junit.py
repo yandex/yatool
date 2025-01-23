@@ -10,7 +10,6 @@ import six
 import devtools.ya.test.test_types.common as test_types
 from library.python import func
 
-import exts.func
 from devtools.ya.jbuild.gen import base
 from devtools.ya.test.common import ytest_common_tools as yct
 from devtools.ya.test.common import ytest_common_tools as yc
@@ -95,10 +94,6 @@ class JavaTestSuite(test_types.AbstractTestSuite):
 
     def get_direct_deps(self, deps):
         return [os.path.relpath(jar_file, graph_consts.BUILD_ROOT) for jar_file in deps]
-
-    def get_classpath_deps(self, java_ctx, classpath_origins):
-        # get all deps without dependency management procedure
-        return exts.func.stable_uniq([e for path in classpath_origins for e in java_ctx.classpath(path)])
 
     def get_classpath_package_files(self, deps):
         return [os.path.splitext(jar_file)[0] + ".cpsf" for jar_file in deps]
