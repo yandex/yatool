@@ -263,7 +263,7 @@ class YtStoreClient(object):
         total_data_size = 0
         # Get exact data size (slow but precise)
         rows = self._client.select_rows(
-            'first(data_size) as ds from [{}] group by hash'.format(self._metadata_table),
+            'first(data_size) as ds from [{}] where data_size is not null group by hash'.format(self._metadata_table),
             input_row_limit=consts.YT_CACHE_SELECT_INPUT_ROW_LIMIT,
             output_row_limit=consts.YT_CACHE_SELECT_OUTPUT_ROW_LIMIT,
         )
