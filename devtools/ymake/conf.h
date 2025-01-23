@@ -233,13 +233,3 @@ private:
 
 TBuildConfiguration* GlobalConf();
 void SetGlobalConf(TBuildConfiguration* conf);
-
-struct TDummyBuildConfiguration: public TBuildConfiguration {
-    TDummyBuildConfiguration() {
-        SetGlobalConf(this);
-    }
-
-    ~TDummyBuildConfiguration() {
-        SetGlobalConf(nullptr);
-    }
-};
