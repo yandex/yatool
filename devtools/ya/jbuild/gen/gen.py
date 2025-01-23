@@ -36,8 +36,6 @@ def gen_ctx(
 
     assert all(p in by_path for p in paths)
 
-    rsrcs = base.resolve_possible_srcdirs(arc_root, by_path.values())
-
     target_platform = None
     if target_tc and 'platform_name' in target_tc:
         try:
@@ -54,7 +52,6 @@ def gen_ctx(
         set(paths),
         set(rc),
         by_path,
-        rsrcs,
         target_platform,
         global_resources,
     )

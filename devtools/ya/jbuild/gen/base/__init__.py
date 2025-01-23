@@ -39,7 +39,6 @@ class Context(object):
         paths,
         rclosure,
         by_path,
-        resolved_sources,
         target_platform,
         global_resources,
     ):
@@ -50,7 +49,6 @@ class Context(object):
         self.contrib_roots = contrib_roots
         self.by_path = by_path
 
-        self.resolved_sources = resolved_sources
         self.errs = collections.defaultdict(configure.PathConfigureError)
 
         self.target_platform = target_platform
@@ -112,10 +110,6 @@ def relativize(path, root=(consts.BUILD_ROOT, consts.SOURCE_ROOT)):
             return os.path.relpath(path, r)
 
     return path
-
-
-def resolve_possible_srcdirs(arc_root, targets):
-    return collections.defaultdict(lambda: collections.defaultdict(lambda: ([], [], [], [])))
 
 
 def resolve_jdk(
