@@ -298,6 +298,7 @@ void TModuleConf::Inherit(const TModuleConf& parent, bool renderSemantics) {
         if (Cmd == INHERITED) {
             if (!parent.HasSemantics) {
                 YConfErr(NoSem) << "Semantics in the parent module of " << Name << " doesn't exists" << Endl;
+                HasSemantics = false;
                 noSem = true;
             } else {
                 Cmd = parent.Cmd;
@@ -306,6 +307,7 @@ void TModuleConf::Inherit(const TModuleConf& parent, bool renderSemantics) {
         if (GlobalCmd == INHERITED) {
             if (!parent.HasSemanticsForGlobals) {
                 YConfErr(NoSem) << "Semantics of GLOBAL SRCS in the parent module of " << Name << " doesn't exists" << Endl;
+                HasSemanticsForGlobals = false;
                 noSem = true;
             } else {
                 Cmd = parent.GlobalCmd;
