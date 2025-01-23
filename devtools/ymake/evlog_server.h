@@ -5,6 +5,28 @@
 #include <util/stream/input.h>
 
 namespace NEvlogServer {
+    struct TTarget {
+        TString Dir;
+        TString Tag;
+        bool FollowRecurses;
+
+        bool operator==(const TTarget& other) const {
+            return Dir == other.Dir && Tag == other.Tag && FollowRecurses == other.FollowRecurses;
+        }
+    };
+} // namespace NEvlogServer
+
+template<>
+struct THash<NEvlogServer::TTarget> {
+    size_t operator()(const NEvlogServer::TTarget& t) {
+        return CombineHashes(
+            CombineHashes(THash<TString>{}(t.Dir), THash<TString>{}(t.Tag)),
+            static_cast<size_t>(t.FollowRecurses)
+        );
+    }
+};
+
+namespace NEvlogServer {
     enum class EHandlerResult {
         Continue,
         AllDone,
@@ -17,7 +39,11 @@ namespace NEvlogServer {
 
     class TServer {
     public:
-        TServer(ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf) {};
+        TServer(ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf) {
+            for (auto& dir : Conf.StartDirs) {
+                ReachableTargets_.insert({dir, "", true});
+            }
+        };
         void ProcessStreamBlocking(IInputStream& input);
 
     private:
@@ -34,7 +60,7 @@ namespace NEvlogServer {
         ITargetConfigurator& Configurator_;
         TBuildConfiguration& Conf_;
         TMaybe<EMode> Mode_;
-        TVector<std::pair<TString, TString>> ReachableTargets_;
-        TVector<TString> PossibleTargets_;
+        THashSet<TTarget> ReachableTargets_;
+        THashSet<TString> PossibleTargets_;
     };
 } // namespace NEvlogServer

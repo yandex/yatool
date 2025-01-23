@@ -94,10 +94,6 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
     }
 
     if (ReadStartTargetsFromEvlog) {
-        if (!targets.empty()) {
-            throw TConfigurationError() << "--targets-from-evlog is not compatible with commandline targets";
-        }
-
         if (!SourceRoot) {
             throw TConfigurationError() << "explicit --source-root is required for --targets-from-evlog";
         }
@@ -107,17 +103,14 @@ void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<TString>& optPos) {
         // Here we follow these symlinks instead of disabling servermode in all current and future cases that use this technique.
         // TODO(YMAKE-1505): remove this when ymake could work with symlinked source tree w/o issues.
         SourceRoot = SourceRoot.RealLocation();
-        // TODO: check SourceRoot.Exists() && SourceRoot.IsDirectory() && SourceRoot.IsAbsolute()
+    } else {
+        if (targets.empty()) {
+            targets.push_back(TFsPath::Cwd().RealPath());
+        }
 
-        return;
-    }
-
-    if (targets.empty()) {
-        targets.push_back(TFsPath::Cwd().RealPath());
-    }
-
-    if (!SourceRoot) {
-        SourceRoot = FindSourceRootByTarget(targets[0]);
+        if (!SourceRoot) {
+            SourceRoot = FindSourceRootByTarget(targets[0]);
+        }
     }
 
     // TODO: check SourceRoot.IsAbsolute()

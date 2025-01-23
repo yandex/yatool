@@ -32,7 +32,7 @@ namespace NEvlogServer {
                     Configurator_.AddStartTarget(targetEvent->GetDir(), targetEvent->GetModuleTag(), false);
                 }
             } else {
-                ReachableTargets_.push_back({targetEvent->GetDir(), targetEvent->GetModuleTag()});
+                ReachableTargets_.insert({targetEvent->GetDir(), targetEvent->GetModuleTag(), false});
             }
         } else {
             YDebug() << "EvlogServer: Possible target found " << targetEvent->GetDir() << ", platform " << TForeignPlatformTarget_EPlatform_Name(targetEvent->GetPlatform()) << Endl;
@@ -41,7 +41,7 @@ namespace NEvlogServer {
                     Configurator_.AddTarget(targetEvent->GetDir());
                 }
             } else {
-                PossibleTargets_.push_back(targetEvent->GetDir());
+                PossibleTargets_.insert(targetEvent->GetDir());
             }
         }
 
@@ -72,8 +72,8 @@ namespace NEvlogServer {
         } else {
             // configure all memoized targets and continue configuring on the fly
             Mode_ = EMode::Configure;
-            for (auto& [dir, tag] : ReachableTargets_) {
-                Configurator_.AddStartTarget(dir, tag, false);
+            for (auto& [dir, tag, followRecurses] : ReachableTargets_) {
+                Configurator_.AddStartTarget(dir, tag, followRecurses);
             }
             for (auto dir : PossibleTargets_) {
                 Configurator_.AddTarget(dir);
