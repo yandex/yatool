@@ -279,25 +279,41 @@ bool TModuleConf::IsProperty(const TStringBuf name) {
     return properties.contains(name);
 }
 
-void TModuleConf::Inherit(const TModuleConf& parent) {
-    if (Cmd.empty() && !parent.Cmd.empty()) {
-        Cmd = parent.Cmd;
-    } else if (Cmd == INHERITED) {
-        if (!parent.HasSemantics) {
-            YConfErr(NoSem) << "Semantics in the parent module of " << Name << " doesn't exists" << Endl;
+void TModuleConf::Inherit(const TModuleConf& parent, bool renderSemantics) {
+    if (!renderSemantics) { // commands
+        if (Cmd == INHERITED) {
+            YConfWarn(Syntax) << INHERITED << " in commands not supported" << Endl;
+        }
+        if (Cmd.empty() && !parent.Cmd.empty()) {
+            Cmd = parent.Cmd;
+        }
+        if (GlobalCmd == INHERITED) {
+            YConfWarn(Syntax) << INHERITED << " in GLOBAL commands not supported" << Endl;
+        }
+        if (GlobalCmd.empty() && !parent.GlobalCmd.empty()) {
+            GlobalCmd = parent.GlobalCmd;
+        }
+    } else { // semantics
+        bool noSem = false; // for report both NoSem errors before return
+        if (Cmd == INHERITED) {
+            if (!parent.HasSemantics) {
+                YConfErr(NoSem) << "Semantics in the parent module of " << Name << " doesn't exists" << Endl;
+                noSem = true;
+            } else {
+                Cmd = parent.Cmd;
+            }
+        }
+        if (GlobalCmd == INHERITED) {
+            if (!parent.HasSemanticsForGlobals) {
+                YConfErr(NoSem) << "Semantics of GLOBAL SRCS in the parent module of " << Name << " doesn't exists" << Endl;
+                noSem = true;
+            } else {
+                Cmd = parent.GlobalCmd;
+            }
+        }
+        if (noSem) {
             return;
         }
-        Cmd = parent.Cmd;
-    }
-
-    if (GlobalCmd.empty() && !parent.GlobalCmd.empty()) {
-        GlobalCmd = parent.GlobalCmd;
-    } else if (GlobalCmd == INHERITED) {
-        if (!parent.HasSemanticsForGlobals) {
-            YConfErr(NoSem) << "Semantics of GLOBAL SRCS in the parent module of " << Name << " doesn't exists" << Endl;
-            return;
-        }
-        GlobalCmd = parent.GlobalCmd;
     }
 
     if (!StructCmdSet) {
@@ -367,7 +383,6 @@ void TModuleConf::Inherit(const TModuleConf& parent) {
 
     CopyParent(parent.Globals, Globals);
     SpecServiceVars.insert(SpecServiceVars.end(), parent.SpecServiceVars.begin(), parent.SpecServiceVars.end());
-
 }
 
 void TModuleConf::ApplyOwnerConf(const TModuleConf& owner) {
@@ -678,10 +693,10 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, ModuleNameFunctionToString(SetModuleBasename));
 }
 
-void TBlockData::Inherit(const TString& name, const TBlockData& parent) {
+void TBlockData::Inherit(const TString& name, const TBlockData& parent, bool renderSemantics) {
     if (parent.ModuleConf) {
         GetOrInit(ModuleConf).Name = name;
-        ModuleConf->Inherit(*parent.ModuleConf);
+        ModuleConf->Inherit(*parent.ModuleConf, renderSemantics);
     }
     if (parent.CmdProps) {
         GetOrInit(CmdProps).Inherit(*parent.CmdProps);
@@ -714,39 +729,49 @@ void TYmakeConfig::ClearYmakeConfig() {
 }
 
 void TYmakeConfig::FillInheritedData(TBlockData& data, const TString& name) {
-
     if (data.IsMultiModule && !data.Completed) {
         GetOrInit(data.ModuleConf).Name = name;
         data.Completed = true;
         return;
     }
 
+    auto& moduleConf = data.ModuleConf;
     if (const auto& parentName = data.ParentName) {
         if (auto it = BlockData.find(parentName)) {
             auto& [_, parent] = *it;
             if (!parent.Completed) {
                 FillInheritedData(parent, parentName);
             }
-            data.Inherit(name, parent);
+            data.Inherit(name, parent, RenderSemantics);
         }
-    } else if (data.ModuleConf) {
-        if (data.ModuleConf->HasSemantics && data.ModuleConf->Cmd == INHERITED) {
-            YConfErr(NoSem) << "Module " << name << " doesn't have a parent module to inherit the semantics" << Endl;
-        }
-        if (data.ModuleConf->HasSemanticsForGlobals && data.ModuleConf->GlobalCmd == INHERITED) {
-            YConfErr(NoSem) << "Module " << name << " doesn't have a parent module to inherit the semantics for GLOBAL SRCS" << Endl;
+    } else if (moduleConf) {
+        if (!RenderSemantics) { // commands
+            if (moduleConf->Cmd == INHERITED) {
+                YConfWarn(Syntax) << INHERITED << " in commands not supported and doesn't have a parent module here" << Endl;
+            }
+        } else { // semantics
+            if (moduleConf->HasSemantics && moduleConf->Cmd == INHERITED) {
+                moduleConf->HasSemantics = false; // really has no semantic
+                if (!ForeignOnNoSem) {
+                    YConfErr(NoSem) << "Module " << name << " doesn't have a parent module to inherit the semantics" << Endl;
+                }
+            }
+            if (moduleConf->HasSemanticsForGlobals && moduleConf->GlobalCmd == INHERITED) {
+                moduleConf->HasSemantics = false; // really has no semantic
+                if (!ForeignOnNoSem) {
+                    YConfErr(NoSem) << "Module " << name << " doesn't have a parent module to inherit the semantics for GLOBAL SRCS" << Endl;
+                }
+            }
         }
     }
 
-    if (data.ModuleConf) {
-        data.ModuleConf->SpecServiceVars.push_back(name);
-
-        if (!GetOrInit(data.ModuleConf).SetModuleBasename) {
-            GetOrInit(data.ModuleConf).SetModuleBasename = SetThreeDirNamesBasename;
+    if (moduleConf) {
+        moduleConf->SpecServiceVars.push_back(name);
+        if (!moduleConf->SetModuleBasename) {
+            moduleConf->SetModuleBasename = SetThreeDirNamesBasename;
         }
-
-        if (!GetOrInit(data.ModuleConf).ParseModuleArgs) {
-            GetOrInit(data.ModuleConf).ParseModuleArgs = ParseBaseModuleArgs;
+        if (!moduleConf->ParseModuleArgs) {
+            moduleConf->ParseModuleArgs = ParseBaseModuleArgs;
         }
     }
 

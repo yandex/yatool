@@ -165,7 +165,7 @@ struct TModuleConf {
 
     static bool IsProperty(const TStringBuf name);
 
-    void Inherit(const TModuleConf& parent);
+    void Inherit(const TModuleConf& parent, bool renderSemantics);
 
     void ApplyOwnerConf(const TModuleConf& owner);
 
@@ -202,7 +202,7 @@ struct TBlockData {
     TSimpleSharedPtr<TModuleConf> ModuleConf;
     TSimpleSharedPtr<TSectionPatterns> SectionPatterns; // <file ext> -> <var name> or <spec param> -> <var name> (for generic macro)
 
-    void Inherit(const TString& name, const TBlockData& parent);
+    void Inherit(const TString& name, const TBlockData& parent, bool renderSemantics);
 
     bool SetOption(TStringBuf blockName, TStringBuf name, TStringBuf value, TVars& commandConf, bool renderSemantics) {
         YDIAG(DG) << "SetOption: " << blockName << "->" << name << "=" << value << Endl;
