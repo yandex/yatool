@@ -20,7 +20,7 @@ struct TTransitiveCheckRegistryItem {
     TArrayRef<const TStringBuf> ConfVars;
     TRequirementLoaderFactory* RequirementLoaderFactory = nullptr;
 };
-extern TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY;
+extern const TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY;
 
 // TODO(svidyuk) Some generic code to add arbitrary queries related to transitive checks?
 void DoDumpLicenseInfo(const TBuildConfiguration& conf, const TVars& globals, NSPDX::EPeerType peerType, bool humanReadable, TArrayRef<TString> tagVars);

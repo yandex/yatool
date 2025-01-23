@@ -838,7 +838,7 @@ namespace {
         };
     };
 
-    TTransitiveCheckRegistryItem TRANSITIVE_CHECK_REGISTRY_ARRAY[] = {
+    const TTransitiveCheckRegistryItem TRANSITIVE_CHECK_REGISTRY_ARRAY[] = {
         {TRestrictLicensesLoader::CONF_VARS, TRestrictLicensesLoader::Create},
         {TCheckDependentDirsLoader::CONF_VARS, TCheckDependentDirsLoader::Create},
         {TRequiresLoader::CONF_VARS, TRequiresLoader::Create},
@@ -920,7 +920,7 @@ void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TV
     FORCE_TRACE(U, NEvent::TStageFinished("Check Transitive Requirements"));
 }
 
-TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY{TRANSITIVE_CHECK_REGISTRY_ARRAY};
+const TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY{TRANSITIVE_CHECK_REGISTRY_ARRAY};
 
 void DoDumpLicenseInfo(const TBuildConfiguration& conf, const TVars& globals, NSPDX::EPeerType peerType, bool humanReadable, TArrayRef<TString> tagVars) {
     TRestrictLicensesLoader loader{globals};
