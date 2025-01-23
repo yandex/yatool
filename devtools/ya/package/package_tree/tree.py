@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
 import os
 import logging
+
+import exts.yjson as json
 
 from package.utils import timeit
 from package.package_tree.consts import TraversalType

@@ -1,7 +1,7 @@
-import json
 import logging
 import functools
 
+import exts.yjson as json
 import library.python.resource as rs
 from jsonschema import Draft4Validator, ValidationError
 
