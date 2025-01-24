@@ -26,13 +26,11 @@ def gen_ctx(arc_root, opts, cpp_graph=None, dart=None, extern_global_resources=N
         if '_GLOBAL_RESOURCES_' in info:
             global_resources.update(graph_base.parse_resources(info['_GLOBAL_RESOURCES_']))
 
-    rc = []
     by_path = mp.obtain_targets_graph2(dart, cpp_graph)
 
     return base.Context(
         opts,
         arc_root,
-        set(rc),
         by_path,
         global_resources,
     )

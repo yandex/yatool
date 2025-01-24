@@ -14,11 +14,10 @@ class Context(object):
         self,
         opts,
         arc_root,
-        rclosure,
         by_path,
         global_resources,
     ):
-        self.rclosure = rclosure
+        self.rclosure = set()
         self.opts = opts
         self.arc_root = arc_root
         self.by_path = by_path
