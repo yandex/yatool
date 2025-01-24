@@ -9,7 +9,6 @@ from devtools.ya.build.build_facade import gen_managed_dep_tree, gen_targets_cla
 from exts.tmp import temp_dir
 import yalibrary.formatter as yaformatter
 
-from devtools.ya.jbuild.gen import base
 from devtools.ya.jbuild.gen import consts
 
 
@@ -42,18 +41,6 @@ def get_java_ctx(opts):
     return ctx
 
 
-NORMAL = '[[imp]]{path}[[rst]]'
-EXCLUDED = '[[unimp]]{path} (omitted because of [[c:red]]EXCLUDE[[unimp]])[[rst]]'
-CONFLICT = '[[unimp]]{path} (omitted because of [[c:yellow]]conflict with {conflict_resolution}[[unimp]])[[rst]]'
-MANAGED = '[[imp]]{path}[[unimp]] (replaced from [[c:blue]]{orig}[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]'
-IGNORED = '[[unimp]]{path} (omitted as contrib proxy library)[[rst]]'
-DUPLICATE = '[[unimp]]{path} (*)[[rst]]'
-DIRECT_MANAGED = '[[imp]]{path}[[unimp]] (replaced from [[c:blue]]unversioned[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]'
-DIRECT_DEFAULT = (
-    '[[imp]]{path}[[unimp]] (replaced from [[c:magenta]]unversioned[[unimp]] to [[c:magenta]]default[[unimp]])[[rst]]'
-)
-
-
 def arrow_str(length):
     s = ''
 
@@ -61,33 +48,6 @@ def arrow_str(length):
         s += '|   ' * (length - 1) + '|-->'
 
     return '[[unimp]]' + s + '[[rst]]'
-
-
-def node_str(dep, excluded=False, expanded_above=False):
-    if expanded_above:
-        return DUPLICATE.format(path=dep.path)
-
-    elif excluded:
-        return EXCLUDED.format(path=dep.path)
-
-    elif dep.omitted_for_conflict:
-        return CONFLICT.format(path=dep.path, conflict_resolution=base.basename_unix_path(dep.conflict_resolution_path))
-
-    elif dep.replaced_for_dependency_management:
-        return MANAGED.format(path=dep.path, orig=base.basename_unix_path(dep.old_path_for_dependency_management))
-
-    elif dep.is_managed:
-        return DIRECT_MANAGED.format(path=dep.path)
-
-    elif dep.is_default:
-        return DIRECT_DEFAULT.format(path=dep.path)
-
-    else:
-        return NORMAL.format(path=dep.path)
-
-
-def graph_line(depth, dep, excluded=False, expanded_above=False):
-    return arrow_str(depth) + node_str(dep, excluded=excluded, expanded_above=expanded_above)
 
 
 def raise_not_a_java_path(path):

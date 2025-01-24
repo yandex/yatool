@@ -9,10 +9,6 @@ from devtools.ya.jbuild.gen import configure
 logger = logging.getLogger(__name__)
 
 
-def basename_unix_path(unix_path):
-    return unix_path.split('/')[-1]
-
-
 class Context(object):
     def __init__(
         self,
