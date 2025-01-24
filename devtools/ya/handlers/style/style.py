@@ -9,7 +9,6 @@ from pathlib import Path
 
 import exts.os2
 import yalibrary.display
-from . import config
 from . import state_helper
 from . import styler
 from . import target
@@ -70,29 +69,28 @@ def _style(style_opts: StyleOptions, styler: styler.Styler, target_: target.Targ
     content = loader()
 
     if target_path.name.startswith(target.STDIN_FILENAME_STAMP):
-        print(styler.format(target_path, content))
+        print(styler.format(target_path, content).content)
         return 0
 
     target_path = tp.cast(Path, target_path)
     if style_opts.force or not (reason := rules.get_skip_reason(str(target_path), content)):
-        formatted_content = styler.format(target_path, content)
-        if formatted_content == content:
+        styler_output = styler.format(target_path, content)
+        if styler_output.content == content:
             return 0
 
         if not style_opts.dry_run and style_opts.check:
             return 1
 
         message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]]"
-        if isinstance(styler, config.ConfigMixin):
-            path = styler.lookup_config(target_path, root_relative=True)
-            message += f" [[unimp]](config: {path})[[rst]]"
+        if styler_output.config:
+            message += f" [[unimp]](config: {styler_output.config.pretty})[[rst]]"
 
         if not style_opts.dry_run and not style_opts.check:
             display.emit_message(message)
-            _flush_to_file(str(target_path), formatted_content)
+            _flush_to_file(str(target_path), styler_output.content)
         elif style_opts.dry_run:
             display.emit_message(message)
-            _flush_to_terminal(content, formatted_content, style_opts.full_output)
+            _flush_to_terminal(content, styler_output.content, style_opts.full_output)
         return 1
     else:
         logger.warning("skip by rule: %s", reason)

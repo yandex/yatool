@@ -17,7 +17,12 @@ import devtools.ya.test.const as const
 logger = logging.getLogger(__name__)
 
 type ConfigPath = Path
-type MaybeConfigPath = ConfigPath | tp.Literal[""]
+type MaybeConfig = Config | None
+
+
+class Config(tp.NamedTuple):
+    path: ConfigPath
+    pretty: str
 
 
 @functools.cache
@@ -28,31 +33,32 @@ def _find_root() -> str:
 class ConfigMixin:
     def __init__(self, config_loaders: tuple[ConfigLoader, ...]):
         self._config_loaders = config_loaders
-        self._source_root = _find_root()
 
-    def lookup_config(self, path: PurePath, root_relative: bool = False) -> ConfigPath:
+    def lookup_config(self, path: PurePath) -> Config:
         for loader in self._config_loaders:
             if config := loader.lookup(path):
-                if self._source_root and root_relative:
-                    return config.relative_to(self._source_root)
                 return config
         raise FileNotFoundError(f"Couldn't find config for target {path}")
 
 
 class ConfigLoader(tp.Protocol):
-    def lookup(self, path: PurePath) -> MaybeConfigPath:
-        """Given target path return config path"""
+    def lookup(self, path: PurePath) -> MaybeConfig:
+        """Given target path return config path if found"""
         ...
 
 
 class DefaultConfig:
     def __init__(self, linter_name: str, *, defaults_file: str = "", resource_name: str = ""):
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
-        self._default_config: MaybeConfigPath = self._from_file(linter_name, defaults_file) or self._from_resource(
-            resource_name
-        )
 
-    def _from_file(self, linter_name: str, defaults_file) -> MaybeConfigPath:
+        if config := self._from_file(linter_name, defaults_file):
+            self._default_config = Config(config, str(config.relative_to(_find_root())))
+        elif config := self._from_resource(resource_name):
+            self._default_config = Config(config, f'{resource_name} (from resource)')
+        else:
+            self._default_config = None
+
+    def _from_file(self, linter_name: str, defaults_file) -> Path | None:
         if defaults_file:
             try:
                 config_map = devtools.ya.core.config.config_from_arc_rel_path(defaults_file)
@@ -60,9 +66,8 @@ class DefaultConfig:
                 logger.warning("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
             else:
                 return Path(os.path.join(_find_root(), config_map[linter_name]))
-        return ""
 
-    def _from_resource(self, resource_name: str) -> MaybeConfigPath:
+    def _from_resource(self, resource_name: str) -> Path | None:
         if resource_name:
             try:
                 content: bytes = devtools.ya.core.resource.try_get_resource(resource_name)  # type: ignore
@@ -73,9 +78,8 @@ class DefaultConfig:
                 temp.write(content)
                 temp.flush()  # will be read from other subprocesses
                 return Path(temp.name)
-        return ""
 
-    def lookup(self, path: PurePath) -> MaybeConfigPath:
+    def lookup(self, path: PurePath) -> MaybeConfig:
         return self._default_config
 
 
@@ -84,20 +88,20 @@ class AutoincludeConfig:
         self._linter_name = linter_name
         self._autoinclude_files = autoinclude_files
 
+        self._root = _find_root()
         self._trie = self._load_trie()
         # for a given autoinclude path we can provide the same config for the same linter
         self._autoinc_to_conf = self._build_autoinc_to_conf()
 
     def _load_trie(self) -> marisa_trie.Trie:
         paths = []
-        root = _find_root()
-        if not root:
+        if not self._root:
             logger.warning("Couldn't detect arcadia root. Autoincludes won't be used for configs lookup")
             return marisa_trie.Trie([])
         for afile in self._autoinclude_files:
             try:
                 paths.extend(
-                    os.path.join(root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
+                    os.path.join(self._root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
                 )
             except Exception as e:
                 logger.warning(
@@ -107,7 +111,7 @@ class AutoincludeConfig:
                 paths = []
         return marisa_trie.Trie(paths)
 
-    def _build_autoinc_to_conf(self) -> dict[str, Path]:
+    def _build_autoinc_to_conf(self) -> dict[str, ConfigPath]:
         # there may be a linter-specific logic to lookup the config
         # for now stick to sequential search and the config file existence
         map_ = {}
@@ -119,12 +123,12 @@ class AutoincludeConfig:
                     map_[path] = Path(config)
         return map_
 
-    def lookup(self, path: PurePath) -> MaybeConfigPath:
+    def lookup(self, path: PurePath) -> MaybeConfig:
         keys: list[str] = self._trie.prefixes(str(path))
         if keys:
             autoinc_path = sorted(keys, key=len)[-1]
-            return self._autoinc_to_conf.get(autoinc_path, "")
-        return ""
+            if config := self._autoinc_to_conf.get(autoinc_path):
+                return Config(config, str(config.relative_to(self._root)))
 
 
 # TODO: delete after migration to autoincludes
@@ -158,11 +162,11 @@ class RuffConfig:
         for prefix, idx in self._ruff_trie.items():  # type: ignore
             self._config_paths[idx] = os.path.join(self._root, config_map[prefix])
 
-    def lookup(self, path: PurePath) -> MaybeConfigPath:
+    def lookup(self, path: PurePath) -> MaybeConfig:
         if self._ruff_trie and (keys := self._ruff_trie.prefixes(str(path))):
             # even though there is `'': <default config>` in ruff_config_paths.json
             # keys can be empty if stdin is used
             key = sorted(keys, key=len)[-1]
             if key != self._root:
-                return Path(self._config_paths[self._ruff_trie[key]])
-        return ""
+                config = Path(self._config_paths[self._ruff_trie[key]])
+                return Config(config, str(config.relative_to(self._root)))

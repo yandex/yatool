@@ -15,7 +15,7 @@ import yalibrary.display
 import yalibrary.makelists
 import yalibrary.tools
 
-from . import config
+from . import config as cfg
 from . import state_helper
 
 
@@ -38,12 +38,17 @@ class StylerKind(StrEnum):
 
 class StylerOptions(tp.NamedTuple):
     py2: bool = False
-    config_loaders: tuple[config.ConfigLoader, ...] | None = None
+    config_loaders: tuple[cfg.ConfigLoader, ...] | None = None
 
 
 class Spec(tp.NamedTuple):
     kind: StylerKind
     ruff: bool = False
+
+
+class StylerOutput(tp.NamedTuple):
+    content: str
+    config: cfg.MaybeConfig = None
 
 
 _REGISTRY: dict[Spec, type[Styler]] = {}
@@ -83,13 +88,13 @@ class Styler(tp.Protocol):
 
     def __init__(self, styler_opts: StylerOptions) -> None: ...
 
-    def format(self, path: PurePath, content: str) -> str:
-        """Format and return formatted file content"""
+    def format(self, path: PurePath, content: str) -> StylerOutput:
+        """Format and return output"""
         ...
 
 
 @_register
-class Black(config.ConfigMixin):
+class Black(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
     spec: tp.ClassVar[Spec] = Spec(StylerKind.PY)
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
@@ -100,8 +105,8 @@ class Black(config.ConfigMixin):
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
-                config.AutoincludeConfig(linter_name=const.PythonLinterName.Black),
-                config.DefaultConfig(
+                cfg.AutoincludeConfig(linter_name=const.PythonLinterName.Black),
+                cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Black,
                     defaults_file=const.DefaultLinterConfig.Python,
                     resource_name="config.toml",
@@ -109,8 +114,9 @@ class Black(config.ConfigMixin):
             )
         )
 
-    def _run_black(self, content: str, path: PurePath) -> str:
-        black_args = [self._tool, "-q", "-", "--config", self.lookup_config(path)]
+    def _run_black(self, content: str, path: PurePath) -> StylerOutput:
+        config = self.lookup_config(path)
+        black_args = [self._tool, "-q", "-", "--config", config.path]
 
         p = subprocess.Popen(
             black_args,
@@ -129,14 +135,14 @@ class Black(config.ConfigMixin):
         if err:
             raise StylingError('error while running black on file "{}": {}'.format(path, err.strip()))
 
-        return out
+        return StylerOutput(out, config)
 
-    def format(self, path: PurePath, content: str) -> str:
+    def format(self, path: PurePath, content: str) -> StylerOutput:
         return self._run_black(content, path)
 
 
 @_register
-class Ruff(config.ConfigMixin):
+class Ruff(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
     spec: tp.ClassVar[Spec] = Spec(StylerKind.PY, ruff=True)
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
@@ -151,9 +157,9 @@ class Ruff(config.ConfigMixin):
                 # - if there is a custom config got from autoincludes scheme, use it
                 # - else if there is a custom config got from ruff trie, use it
                 # - else use default config
-                config.AutoincludeConfig(linter_name=const.PythonLinterName.Ruff),
-                config.RuffConfig(),
-                config.DefaultConfig(
+                cfg.AutoincludeConfig(linter_name=const.PythonLinterName.Ruff),
+                cfg.RuffConfig(),
+                cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Ruff,
                     defaults_file=const.DefaultLinterConfig.Python,
                     resource_name="ruff.toml",
@@ -161,7 +167,7 @@ class Ruff(config.ConfigMixin):
             )
         )
 
-    def _run_ruff(self, content: str, path: PurePath, config_path: config.ConfigPath, cmd_args: list[str]) -> str:
+    def _run_ruff(self, content: str, path: PurePath, config_path: cfg.ConfigPath, cmd_args: list[str]) -> str:
         ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-s", "-"]
 
         p = subprocess.Popen(
@@ -194,19 +200,19 @@ class Ruff(config.ConfigMixin):
 
         return out
 
-    def format(self, path: PurePath, content: str) -> str:
+    def format(self, path: PurePath, content: str) -> StylerOutput:
         ruff_config = self.lookup_config(path)
 
         stdin_filename = ["--stdin-filename", path]
 
-        out = self._run_ruff(content, path, ruff_config, ["format"] + stdin_filename)
+        out = self._run_ruff(content, path, ruff_config.path, ["format"] + stdin_filename)
         # launch check fix to sort imports
-        out = self._run_ruff(out, path, ruff_config, ["check", "--fix"] + stdin_filename)
-        return out
+        out = self._run_ruff(out, path, ruff_config.path, ["check", "--fix"] + stdin_filename)
+        return StylerOutput(out, ruff_config)
 
 
 @_register
-class ClangFormat(config.ConfigMixin):
+class ClangFormat(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
     spec: tp.ClassVar[Spec] = Spec(StylerKind.CPP)
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
@@ -217,8 +223,8 @@ class ClangFormat(config.ConfigMixin):
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
-                config.AutoincludeConfig(linter_name=const.CppLinterName.ClangFormat),
-                config.DefaultConfig(
+                cfg.AutoincludeConfig(linter_name=const.CppLinterName.ClangFormat),
+                cfg.DefaultConfig(
                     linter_name=const.CppLinterName.ClangFormat,
                     defaults_file=const.DefaultLinterConfig.Cpp,
                     resource_name="config.clang-format",
@@ -226,12 +232,13 @@ class ClangFormat(config.ConfigMixin):
             )
         )
 
-    def format(self, path: PurePath, content: str) -> str:
+    def format(self, path: PurePath, content: str) -> StylerOutput:
         if path.suffix == ".h":
             content = self.fix_header(content)
 
+        config = self.lookup_config(path)
         p = subprocess.Popen(
-            [self._tool, "-assume-filename=a.cpp", f"-style=file:{self.lookup_config(path)}"],
+            [self._tool, "-assume-filename=a.cpp", f"-style=file:{config.path}"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -248,7 +255,7 @@ class ClangFormat(config.ConfigMixin):
         if err:
             raise StylingError("error while running clang-format: " + err)
 
-        return out + "\n" if out and not out.endswith("\n") else out
+        return StylerOutput(out + "\n" if out and not out.endswith("\n") else out, config)
 
     @staticmethod
     def fix_header(content: str) -> str:
@@ -279,7 +286,7 @@ class Golang:
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
 
-    def format(self, path: PurePath, content: str) -> str:
+    def format(self, path: PurePath, content: str) -> StylerOutput:
         p = subprocess.Popen(
             [self._tool, "-"],
             stdin=subprocess.PIPE,
@@ -297,7 +304,7 @@ class Golang:
         if err:
             raise StylingError('error while running yoimports on file "{}": {}'.format(path, err.strip()))
 
-        return out
+        return StylerOutput(out)
 
 
 @_register
@@ -309,9 +316,9 @@ class YaMake:
     def __init__(self, styler_opts: StylerOptions) -> None:
         pass
 
-    def format(self, path: PurePath, content: str) -> str:
+    def format(self, path: PurePath, content: str) -> StylerOutput:
         yamake = yalibrary.makelists.from_str(content)
-        return yamake.dump()
+        return StylerOutput(yamake.dump())
 
 
 @_register
@@ -345,5 +352,5 @@ class Yql:
 
         return out
 
-    def format(self, path: PurePath, content: str) -> str:
-        return self._run_format(path, content)
+    def format(self, path: PurePath, content: str) -> StylerOutput:
+        return StylerOutput(self._run_format(path, content))
