@@ -19,7 +19,6 @@ class Context(object):
         self,
         opts,
         arc_root,
-        contrib_roots,
         paths,
         rclosure,
         by_path,
@@ -30,7 +29,6 @@ class Context(object):
         self.rclosure = rclosure
         self.opts = opts
         self.arc_root = arc_root
-        self.contrib_roots = contrib_roots
         self.by_path = by_path
 
         self.errs = collections.defaultdict(configure.PathConfigureError)

@@ -3347,11 +3347,6 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
         set(),
         java_darts,
         opts,
-        contrib_roots=(
-            opts.flags['MANAGEABLE_PEERS_ROOTS'].split(' ')
-            if 'MANAGEABLE_PEERS_ROOTS' in opts.flags
-            else ['contrib/java']
-        ),
         cpp_graph=graph,
         ev_listener=ev_listener,
         target_tc=target_tc,

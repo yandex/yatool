@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("jbuild")
 
 
-def gen_ctx(
-    arc_root, paths, opts, contrib_roots, cpp_graph=None, dart=None, target_tc=None, extern_global_resources=None
-):
+def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, target_tc=None, extern_global_resources=None):
     paths = list(map(graph_base.hacked_normpath, paths))  # TODO: Maybe tuple?
 
     assert cpp_graph is not None
@@ -48,7 +46,6 @@ def gen_ctx(
     return base.Context(
         opts,
         arc_root,
-        contrib_roots,
         set(paths),
         set(rc),
         by_path,
@@ -133,7 +130,6 @@ def gen(
     arc_root,
     paths,
     opts,
-    contrib_roots,
     cpp_graph=None,
     ev_listener=None,
     dart=None,
@@ -145,7 +141,6 @@ def gen(
             arc_root,
             paths,
             opts,
-            contrib_roots,
             cpp_graph=cpp_graph,
             dart=dart,
             target_tc=target_tc,
@@ -227,7 +222,6 @@ def gen_build_graph(
     paths,
     dart,
     make_opts,
-    contrib_roots,
     cpp_graph=None,
     ev_listener=None,
     target_tc=None,
@@ -239,7 +233,6 @@ def gen_build_graph(
         arc_root,
         paths,
         opts,
-        contrib_roots,
         cpp_graph=cpp_graph,
         ev_listener=ev_listener,
         dart=dart,
