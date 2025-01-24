@@ -420,13 +420,14 @@ void TGraphLoops::RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTarget
     startTargets = std::move(newStartTargets);
 
     // 2. Remove bad nodes with connected edges and print error messages
+    constexpr static const char errorMessageTemplate[] = "the module {} will not be built due to deprecated loop";
     for (const auto& target : nodesForRemove) {
         const TDepGraph::TConstNodeRef node = graph.Get(target);
         if (node.IsValid() && IsModuleType(node.Value().NodeType)) {
             if (Diag()->ShowBuildLoops) {
-                YConfErr(ShowBuildLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
+                YConfErr(ShowBuildLoops) << fmt::format(errorMessageTemplate, graph.ToString(graph.Get(target))) << Endl;
             } else {
-                YConfErr(ShowDirLoops) << fmt::format("the module {} not be built due to deprecated loop", graph.ToString(graph.Get(target))) << Endl;
+                YConfErr(ShowDirLoops) << fmt::format(errorMessageTemplate, graph.ToString(graph.Get(target))) << Endl;
             }
         }
         graph.DeleteNode(target);
