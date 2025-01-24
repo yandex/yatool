@@ -22,7 +22,6 @@ class Context(object):
         paths,
         rclosure,
         by_path,
-        target_platform,
         global_resources,
     ):
         self.paths = paths
@@ -30,11 +29,7 @@ class Context(object):
         self.opts = opts
         self.arc_root = arc_root
         self.by_path = by_path
-
         self.errs = collections.defaultdict(configure.PathConfigureError)
-
-        self.target_platform = target_platform
-
         self.global_resources = global_resources
 
 

@@ -5,7 +5,6 @@ import yalibrary.graph.base as graph_base
 import yalibrary.graph.node as graph_node
 from devtools.ya.core import stage_tracer
 from exts.strtobool import strtobool
-from yalibrary import platform_matcher
 
 from . import base
 from . import configure
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("jbuild")
 
 
-def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, target_tc=None, extern_global_resources=None):
+def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, extern_global_resources=None):
     paths = list(map(graph_base.hacked_normpath, paths))  # TODO: Maybe tuple?
 
     assert cpp_graph is not None
@@ -34,22 +33,12 @@ def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, target_tc=None, ex
 
     assert all(p in by_path for p in paths)
 
-    target_platform = None
-    if target_tc and 'platform_name' in target_tc:
-        try:
-            target_platform = platform_matcher.canonize_platform(
-                platform_matcher.parse_platform(target_tc['platform_name'])['os']
-            )
-        except platform_matcher.PlatformNotSupportedException:
-            target_platform = ''
-
     return base.Context(
         opts,
         arc_root,
         set(paths),
         set(rc),
         by_path,
-        target_platform,
         global_resources,
     )
 
@@ -133,7 +122,6 @@ def gen(
     cpp_graph=None,
     ev_listener=None,
     dart=None,
-    target_tc=None,
     extern_global_resources=None,
 ):
     with stager.scope('insert_java-gen_ctx'):
@@ -143,7 +131,6 @@ def gen(
             opts,
             cpp_graph=cpp_graph,
             dart=dart,
-            target_tc=target_tc,
             extern_global_resources=extern_global_resources,
         )
 
@@ -224,7 +211,6 @@ def gen_build_graph(
     make_opts,
     cpp_graph=None,
     ev_listener=None,
-    target_tc=None,
     extern_global_resources=None,
 ):
     opts = default_opts()
@@ -236,7 +222,6 @@ def gen_build_graph(
         cpp_graph=cpp_graph,
         ev_listener=ev_listener,
         dart=dart,
-        target_tc=target_tc,
         extern_global_resources=extern_global_resources,
     )
 

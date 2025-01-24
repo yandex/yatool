@@ -3349,7 +3349,6 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
         opts,
         cpp_graph=graph,
         ev_listener=ev_listener,
-        target_tc=target_tc,
         extern_global_resources=extern_resources,
     )
     if jgraph["graph"]:
