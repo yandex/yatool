@@ -16,7 +16,6 @@
 #include "vars.h"
 #include "ymake.h"
 
-#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/compact_graph/query.h>
@@ -229,8 +228,6 @@ void TCommandInfo::SetCommandSource(const TCommands* commands) {
     CommandSource = commands;
 }
 
-TAutoPtr<IMemoryPool> TCommandInfo::StrPool = IMemoryPool::Construct();
-
 // macroDef is "(X Y Z)zzz"
 inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBuf& macroDef, const TYVar* modsVar, const TStringBuf& args, ESubstMode substMode, const TVars& vars, ECmdFormat cmdFormat, bool convertNamedArgs) {
     TVars ownVars(&vars);
@@ -272,7 +269,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         ? &blockDataIt->second
         : nullptr;
     if (convertNamedArgs && HasNamedArgs(blockData)) {
-        ConvertArgsToPositionalArrays(*blockData->CmdProps, tempArgs, *StrPool);
+        ConvertArgsToPositionalArrays(*blockData->CmdProps, tempArgs, *Conf->GetStringPool());
     }
     argsp.insert(argsp.end(), tempArgs.begin(), tempArgs.end());
 
@@ -2214,7 +2211,7 @@ void ConvertSpecFiles(const TBuildConfiguration& conf, TSpecFileArr& flist, TYVa
 void TCommandInfo::GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst) {
     auto dirs = MakeHolder<TVector<TStringBuf>>();
     if (!opt.empty()) {
-        TStringBuf optsSubst = StrPool->Append(SubstMacroDeeply(nullptr, opt, vars, false));
+        TStringBuf optsSubst = Conf->GetStringPool()->Append(SubstMacroDeeply(nullptr, opt, vars, false));
         Split(optsSubst, " ", *dirs);
     }
     if (dst)

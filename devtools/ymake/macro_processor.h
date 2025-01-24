@@ -27,8 +27,6 @@ class TUpdIter;
 class TAddDepAdaptor;
 class TCommands;
 
-struct IMemoryPool;
-
 bool IsInternalReservedVar(const TStringBuf& cur);
 
 enum ESubstMode {
@@ -95,8 +93,6 @@ private:
     TString InputDirStr; // dir part for Input[0]
     TFileView BuildDir;
     TString BuildDirStr;
-
-    static TAutoPtr<IMemoryPool> StrPool;
 
     const TBuildConfiguration* Conf;
     TDepGraph* Graph;

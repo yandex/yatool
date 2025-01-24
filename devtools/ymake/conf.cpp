@@ -4,6 +4,7 @@
 #include "licenses_conf.h"
 #include "autoincludes_conf.h"
 
+#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/lang/confreader_cache.h>
 #include <devtools/ymake/macro.h>
 #include <devtools/ymake/macro_processor.h>
@@ -75,6 +76,10 @@ namespace {
             var->DontExpand = false;
         }
     }
+}
+
+TBuildConfiguration::TBuildConfiguration() {
+    StrPool = IMemoryPool::Construct();
 }
 
 void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {

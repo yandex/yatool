@@ -28,6 +28,7 @@
 #include <util/folder/path.h>
 #include <util/generic/hash.h>
 #include <util/generic/hash_set.h>
+#include <util/generic/ptr.h>
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -35,6 +36,7 @@
 constexpr TStringBuf MODULE_MANGLING_DELIM = "__from__";
 
 class TFileConf;
+struct IMemoryPool;
 
 /// required directories - source, build, svn and path operations only
 // build configuration operates local-formatted paths
@@ -65,6 +67,9 @@ public:
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
 
 public:
+    TBuildConfiguration();
+    ~TBuildConfiguration() = default;
+
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
     void PrepareConfiguration(TMd5Sig& confMd5);
@@ -191,6 +196,7 @@ public:
 
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
+    IMemoryPool* GetStringPool() const { return StrPool.Get(); }
 
 private:
     void PrepareBuildDir() const;
@@ -229,6 +235,7 @@ private:
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;
     THashMap<TString, TString> DefaultRequirements;
+    THolder<IMemoryPool> StrPool;
 };
 
 TBuildConfiguration* GlobalConf();
