@@ -3,7 +3,6 @@ PY3_LIBRARY()
 PY_SRCS(
     execute.py
     jbuild_opts.py
-    java_build2.py
     maven/fetcher.py
     maven/license.py
     maven/pom_parser.py
