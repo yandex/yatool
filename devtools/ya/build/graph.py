@@ -3344,7 +3344,6 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
     )
     jgraph, _, ctx = jb.gen_build_graph(
         opts.arc_root,
-        set(),
         java_darts,
         opts,
         cpp_graph=graph,

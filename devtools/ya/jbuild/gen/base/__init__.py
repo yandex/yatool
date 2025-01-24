@@ -4,7 +4,6 @@ import collections
 
 import exts.path2 as path2
 import devtools.ya.jbuild.gen.consts as consts
-import yalibrary.graph.base as base
 from devtools.ya.jbuild.gen import configure
 
 logger = logging.getLogger(__name__)
@@ -19,34 +18,16 @@ class Context(object):
         self,
         opts,
         arc_root,
-        paths,
         rclosure,
         by_path,
         global_resources,
     ):
-        self.paths = paths
         self.rclosure = rclosure
         self.opts = opts
         self.arc_root = arc_root
         self.by_path = by_path
         self.errs = collections.defaultdict(configure.PathConfigureError)
         self.global_resources = global_resources
-
-
-def remove_prefixes(paths):
-    import devtools.ya.yalibrary.checkout as checkout
-
-    correct_paths = []
-
-    def _pre_action(path, is_native):
-        if is_native:
-            correct_paths.append(path)
-
-    checkout.PathsTree(paths).traverse(pre_action=_pre_action, skip_non_leaves=True)
-
-    correct_paths = frozenset([base.hacked_normpath(p) for p in correct_paths])
-
-    return [p for p in paths if p in correct_paths]
 
 
 def group_by(iterable, by):

@@ -17,9 +17,7 @@ logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("jbuild")
 
 
-def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, extern_global_resources=None):
-    paths = list(map(graph_base.hacked_normpath, paths))  # TODO: Maybe tuple?
-
+def gen_ctx(arc_root, opts, cpp_graph=None, dart=None, extern_global_resources=None):
     assert cpp_graph is not None
     assert dart is not None
 
@@ -28,15 +26,12 @@ def gen_ctx(arc_root, paths, opts, cpp_graph=None, dart=None, extern_global_reso
         if '_GLOBAL_RESOURCES_' in info:
             global_resources.update(graph_base.parse_resources(info['_GLOBAL_RESOURCES_']))
 
-    rc = paths[:]
+    rc = []
     by_path = mp.obtain_targets_graph2(dart, cpp_graph)
-
-    assert all(p in by_path for p in paths)
 
     return base.Context(
         opts,
         arc_root,
-        set(paths),
         set(rc),
         by_path,
         global_resources,
@@ -117,7 +112,6 @@ def default_opts():
 
 def gen(
     arc_root,
-    paths,
     opts,
     cpp_graph=None,
     ev_listener=None,
@@ -127,7 +121,6 @@ def gen(
     with stager.scope('insert_java-gen_ctx'):
         ctx = gen_ctx(
             arc_root,
-            paths,
             opts,
             cpp_graph=cpp_graph,
             dart=dart,
@@ -206,7 +199,6 @@ def gen(
 
 def gen_build_graph(
     arc_root,
-    paths,
     dart,
     make_opts,
     cpp_graph=None,
@@ -217,7 +209,6 @@ def gen_build_graph(
     opts.__dict__.update(make_opts.__dict__)  # XXX
     task, ctx, errs = gen(
         arc_root,
-        paths,
         opts,
         cpp_graph=cpp_graph,
         ev_listener=ev_listener,
