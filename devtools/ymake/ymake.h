@@ -88,6 +88,7 @@ private:
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
     bool HasErrorsOnPrevLaunch_{false};
+    TStringBuf ExportLang_{"?"};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
@@ -185,4 +186,11 @@ public:
     TRestoreContext GetRestoreContext();
     TTraverseStartsContext GetTraverseStartsContext() const noexcept;
     TFileProcessContext GetFileProcessContext(TModule* module, TAddDepAdaptor& node);
+
+    const TStringBuf& GetExportLang() {
+        if (ExportLang_ == "?") {
+            ExportLang_ = Conf.CommandConf.Get1("EXPORT_LANG");
+        }
+        return ExportLang_;
+    }
 };
