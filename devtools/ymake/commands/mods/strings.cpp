@@ -1,6 +1,8 @@
 #include "common.h"
 
 #include <devtools/ymake/command_helpers.h>
+
+#include <library/cpp/digest/md5/md5.h>
 #include <util/generic/overloaded.h>
 
 using namespace NCommands;
@@ -314,6 +316,72 @@ namespace {
             CheckArgCount(args);
             return args[0]; // NOP for the same reason as "quo"
         }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
+    class THash: public TBasicModImpl {
+    public:
+        THash(): TBasicModImpl({.Id = EMacroFunction::Hash, .Name = "hash", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            auto arg0 = std::get<std::string_view>(args[0]);
+            auto md5 = Md5Beg(arg0);
+            auto id = ctx.Values.InsertStr(Md5End(md5));
+            return ctx.Values.GetValue(id);
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [](TTermNothing) -> TTermValue {
+                    return TTermNothing();
+                },
+                [&](const TString& body) -> TTermValue {
+                    auto md5 = Md5Beg(body);
+                    return TString{Md5End(md5)};
+                },
+                [&](const TVector<TString>& bodies) -> TTermValue {
+                    static const TStringBuf separator = "|";
+                    // Init and complete by separator for make different digests of empty string and empty array
+                    auto md5 = Md5Beg(separator);
+                    for (const auto& body: bodies) {
+                        md5.Update(body);
+                        md5.Update(separator);
+                    }
+                    return TString{Md5End(md5)};
+                },
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, args[0]);
+        }
+
+    private:
+        static MD5 Md5Beg(const TStringBuf& arg) {
+            MD5 md5;
+            md5.Update(arg);
+            return md5;
+        }
+
+        static std::string Md5End(MD5& md5) {
+            char buffer[33]; // MD5 class require 33 bytes buffer
+            md5.End(buffer);
+            return std::string{buffer};
+        }
+
     } Y_GENERATE_UNIQUE_ID(Mod);
 
 }
