@@ -609,7 +609,7 @@ class TaskContext(object):
                 # We need to download test's output (testing_output_stuff.tar, etc) from distbuild - use output_uids instead of result_uids
                 res_set = set(sum([t.output_uids for t in self._ctx.tests], []))
                 res_nodes = [x for x in res_nodes if x.uid in res_set]
-            download_test_results = bool(self.opts.run_tests)
+            download_test_results = _is_test_requested(self.opts)
             if not self.opts.download_artifacts and download_test_results:
                 save_links_for += _get_link_outputs(res_nodes)
                 save_links_for = list(set(save_links_for))
@@ -839,3 +839,15 @@ def _get_link_outputs(res_nodes: list["Node"]):
             if not o.endswith(devtools.ya.test.const.TRACE_FILE_NAME):
                 link_outputs.add(os.path.basename(o))
     return list(link_outputs)
+
+
+def _is_test_requested(opts):
+    return bool(opts.run_tests) or _run_tests_set_in_target_platforms(opts)
+
+
+def _run_tests_set_in_target_platforms(opts):
+    for platform in getattr(opts, "target_platforms", []):
+        if platform.get("run_tests", False):
+            return True
+
+    return False
