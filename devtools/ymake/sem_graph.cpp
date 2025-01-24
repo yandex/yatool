@@ -208,6 +208,9 @@ namespace {
 
             if (UseFileId(topNode->NodeType)) {
                 auto node = JsonWriter.AddNode(topNode);
+                if (topNode->NodeType == EMNT_Directory && StartDirs.contains(topNode.Id())) {
+                    node.AddProp("Tag", "StartDir");
+                }
                 if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})) {
                     Y_ASSERT(!ModulesStack.empty());
                     const auto& modinfo = ModulesStack.top();
@@ -215,20 +218,22 @@ namespace {
                         RestoreContext,
                         modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNode] : topNode
                     };
-                    const auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider);
+                    static const TSingleCmd::TCmdStr CMD_IGNORED = "[\"IGNORED\"]";
+                    auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider);
+                    bool ignored = AnyOf(sem, [](const TSingleCmd& cmd) {
+                        return cmd.CmdStr == CMD_IGNORED;
+                    });
+                    if (!ignored) {
+                        auto mod = RestoreContext.Modules.Get(topNode->ElemId);
+                        if (mod && mod->IsSemIgnore()) {
+                            ignored = true;
+                            sem.emplace_back(CMD_IGNORED); // generate IGNORED in semantic by module SemIgnore flag
+                        }
+                    }
                     node.AddProp("semantics", sem);
-                    auto mod = RestoreContext.Modules.Get(topNode->ElemId);
-                    if (mod && mod->IsSemIgnore()) {
+                    if (ignored) {
                         return false;
                     }
-
-                    if (AnyOf(sem, [](const TSingleCmd& cmd) {
-                        static const TSingleCmd::TCmdStr ignored = "[\"IGNORED\"]";
-                        return cmd.CmdStr == ignored;
-                    })) {
-                        return false;
-                    }
-
                     const auto tools = ToolMiner.MineTools(topNode);
                     if (!tools.empty()) {
                         node.AddProp("Tools", tools);
@@ -237,11 +242,7 @@ namespace {
                         node.AddProp("Tests", tests);
                     }
                 }
-                if (topNode->NodeType == EMNT_Directory && StartDirs.contains(topNode.Id())) {
-                    node.AddProp("Tag", "StartDir");
-                }
             }
-
             return true;
         }
 
