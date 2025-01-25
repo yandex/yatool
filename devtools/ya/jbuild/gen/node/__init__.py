@@ -105,11 +105,6 @@ class JNode(graph_node.Node):
 
         return n
 
-    def calc_node_uids(self, arc_root):
-        ins_unresolved = super(JNode, self).calc_node_uids(arc_root)
-        self.uids['jdk_generation'] = jdk_hash() if self.use_ya_hash else 'unused'
-        return ins_unresolved
-
 
 def files(lst):
     return [(graph_base.hacked_normpath(f), FILE) for f in lst]
@@ -235,7 +230,3 @@ def resolve_ins(arc_root, node):
 
     node.cmds = [graph_base.fix_cmd(cmd, m) for cmd in node.cmds]
     node.ins = ins
-
-
-def jdk_hash():
-    return ''
