@@ -13,35 +13,20 @@ class ConfigureError(Exception):
 
 
 class PathConfigureError(object):
-    def __init__(
-        self,
-        is_missing=False,
-        missing_peerdirs=None,
-        missing_recurses=None,
-        missing_tools=None,
-        missing_inputs=None,
-        parse_error=None,
-        dm_recent_versions_peerdirs=None,
-        dm_different_versions_peerdirs=None,
-        conflicted_versions_peerdirs=None,
-        default_versions_peerdirs=None,
-        direct_peerdirs=None,
-        forbidden_deps=None,
-        without_dm=None,
-    ):
-        self.is_missing = is_missing
-        self.missing_peerdirs = missing_peerdirs or []
-        self.missing_recurses = missing_recurses or []
-        self.missing_tools = missing_tools or []
-        self.missing_inputs = missing_inputs or []
-        self.parse_error = parse_error
-        self.dm_recent_versions_peerdirs = dm_recent_versions_peerdirs or collections.defaultdict(list)
-        self.dm_different_versions_peerdirs = dm_different_versions_peerdirs or collections.defaultdict(list)
-        self.conflicted_versions_peerdirs = conflicted_versions_peerdirs or collections.defaultdict(list)
-        self.default_versions_peerdirs = default_versions_peerdirs or []
-        self.direct_peerdirs = direct_peerdirs or []
-        self.forbidden_deps = forbidden_deps or []
-        self.without_dm = without_dm or []
+    def __init__(self):
+        self.is_missing = False
+        self.missing_peerdirs = []
+        self.missing_recurses = []
+        self.missing_tools = []
+        self.missing_inputs = []
+        self.parse_error = None
+        self.dm_recent_versions_peerdirs = collections.defaultdict(list)
+        self.dm_different_versions_peerdirs = collections.defaultdict(list)
+        self.conflicted_versions_peerdirs = collections.defaultdict(list)
+        self.default_versions_peerdirs = []
+        self.direct_peerdirs = []
+        self.forbidden_deps = []
+        self.without_dm = []
 
     def __str__(self):
         if self.is_missing:
