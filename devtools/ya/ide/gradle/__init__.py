@@ -351,12 +351,12 @@ class _JavaSemGraph(SemGraph):
             ):
                 foreign_targets.append(event['Dir'])
 
-        super().make(**kwargs, ev_listener=listener, foreign_on_nosem=True)
+        super().make(
+            **kwargs, ev_listener=listener, dump_raw_graph=self.config.ymake_root / "raw_graph", foreign_on_nosem=True
+        )
         if foreign_targets:
             self.foreign_targets = list(set(foreign_targets))
             self.logger.info("Foreign targets: %s", self.foreign_targets)
-
-        super().make(**kwargs, ev_listener=listener, dump_raw_graph=self.config.ymake_root / "raw_graph")
         self._patch_graph()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
