@@ -235,8 +235,7 @@ class SlotListener:
 
     def finish(self):
         if self._output_jsonl:
-            self._output_jsonl.write(json.dumps({'total_slot_time': self._slot_time}))
-            self._output_jsonl.write('\n')
+            self._output_jsonl.write(json.dumps({'total_slot_time': self._slot_time}) + '\n')
             self._output_jsonl.close()
 
         if not self._output_file:
@@ -259,8 +258,9 @@ class SlotListener:
 
         try:
             if self._output_jsonl:
-                self._output_jsonl.write(json.dumps({'uid': res['uid'], 'slot_time': uid_slot_time}, sort_keys=True))
-                self._output_jsonl.write('\n')
+                self._output_jsonl.write(
+                    json.dumps({'uid': res['uid'], 'slot_time': uid_slot_time}, sort_keys=True) + '\n'
+                )
         except Exception:
             self._logger.exception('Fail to save slot time by uid from %s', res)
 
