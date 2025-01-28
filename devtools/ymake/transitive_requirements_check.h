@@ -14,8 +14,8 @@ struct TVars;
 void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets);
 
 struct TTransitiveCheckRegistryItem {
-    using TRequrementsLoader = std::function<TTransitiveRequirement(TDepGraph&, const TBuildConfiguration&, const TModule&)>;
-    using TRequirementLoaderFactory = TRequrementsLoader(const TVars&);
+    using TRequirementsLoader = std::function<TTransitiveRequirement(TDepGraph&, const TBuildConfiguration&, const TModule&)>;
+    using TRequirementLoaderFactory = TRequirementsLoader(const TVars&);
 
     TArrayRef<const TStringBuf> ConfVars;
     TRequirementLoaderFactory* RequirementLoaderFactory = nullptr;

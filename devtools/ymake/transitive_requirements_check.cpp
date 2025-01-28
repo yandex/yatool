@@ -214,7 +214,7 @@ namespace {
     private:
         TRestoreContext RestoreContext;
         THashSet<TNodeId> CheckedModules;
-        TVector<TTransitiveCheckRegistryItem::TRequrementsLoader> RequirementLoaders;
+        TVector<TTransitiveCheckRegistryItem::TRequirementsLoader> RequirementLoaders;
     };
 
     // Check implementations
@@ -273,7 +273,7 @@ namespace {
         TRestrictLicensesLoader(const TVars&) {
         }
 
-        static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars& globals) {
+        static TTransitiveCheckRegistryItem::TRequirementsLoader Create(const TVars& globals) {
             return [self = TRestrictLicensesLoader(globals)](TDepGraph& graph, const TBuildConfiguration& conf, const TModule& module) mutable {
                 return self.Load(graph, conf, module);
             };
@@ -494,7 +494,7 @@ namespace {
             TStringBuf("CHECK_DEPENDENT_DIRS_TYPES"),
             TStringBuf("CHECK_DEPENDENT_DIRS_RESTRICTIONS")};
 
-        static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars&) {
+        static TTransitiveCheckRegistryItem::TRequirementsLoader Create(const TVars&) {
             return Load;
         }
 
@@ -618,7 +618,7 @@ namespace {
         constexpr static const TStringBuf CONF_VARS[] = {
             TStringBuf("REQUIRED_TRANSITIVE_PEERS")};
 
-        static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars&) {
+        static TTransitiveCheckRegistryItem::TRequirementsLoader Create(const TVars&) {
             return Load;
         }
 
@@ -668,7 +668,7 @@ namespace {
             TStringBuf(FEATURE_VERSIONS),
         };
 
-        static TTransitiveCheckRegistryItem::TRequrementsLoader Create(const TVars&) {
+        static TTransitiveCheckRegistryItem::TRequirementsLoader Create(const TVars&) {
             return Load;
         }
 
