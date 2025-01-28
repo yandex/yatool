@@ -843,8 +843,13 @@ void TYmakeConfig::VerifyModuleConfs() {
         }
         bool moduleNotDefined = false;
         if (mod->Cmd.empty()) {
-            YErr() << data.first << " ." << NProperties::CMD << " not defined" << Endl;
-            moduleNotDefined = true;
+            if (RenderSemantics) {
+                YWarn() << data.first << " ." << NProperties::SEM << " not defined, set to " << TModuleConf::SEM_IGNORED << Endl;
+                mod->Cmd = TModuleConf::SEM_IGNORED; // Cmd filled, but HasSemantics == false
+            } else {
+                YErr() << data.first << " ." << NProperties::CMD << " not defined" << Endl;
+                moduleNotDefined = true;
+            }
         }
         if (!mod->NodeType) {
             YErr() << data.first << " ." << NProperties::NODE_TYPE << " not defined" << Endl;
@@ -855,7 +860,7 @@ void TYmakeConfig::VerifyModuleConfs() {
             moduleNotDefined = true;
         }
         if (!mod->GlobalCmd.empty() && mod->InputExts.empty() && !mod->AllGlobalExtsAreInputs) {
-            YErr() << data.first << " ." << NProperties::GLOBAL_CMD << " is defined but " << NProperties::GLOBAL_EXTS << " not defined" << Endl;
+            YErr() << data.first << " ." << (RenderSemantics ? NProperties::GLOBAL_SEM : NProperties::GLOBAL_CMD) << " is defined but " << NProperties::GLOBAL_EXTS << " not defined" << Endl;
             moduleNotDefined = true;
         }
         for (auto i : mod->Restricted) {

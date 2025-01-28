@@ -89,6 +89,8 @@ struct TModuleConf {
     using TParseModuleArgsFunction = void (*)(TModule* mod, TArrayRef<const TStringBuf> args);
     using TModuleNameFunction = void (*)(TModule* mod);
 
+    inline static const TStringBuf SEM_IGNORED = "\"IGNORED\""sv;
+
     TString Cmd;
     TString CmdIgnore; // TODO this should be part of Cmd metadata
     TString GlobalCmd;
