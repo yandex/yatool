@@ -185,7 +185,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
                 base_virtual_dir = os.path.join(module_virtual_dir, *name_parts)
                 fs.ensure_dir(base_virtual_dir)
                 link_path = os.path.join(base_virtual_dir, name_part)
-                if os.path.exists(link_path):
+                if os.path.lexists(link_path):
                     os.unlink(link_path)
                 os.symlink(os.path.join(arc_root, path, path_part), link_path)
                 return module_virtual_dir
