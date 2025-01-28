@@ -36,12 +36,16 @@ def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generato
         targets = (Path.cwd(),)
 
     for target in targets:
+        if target.is_symlink():
+            continue
         if target.is_file():
             yield target.absolute(), target.read_text
         elif target.is_dir():
             for dirpath, _, filenames in target.walk():
                 for filename in filenames:
                     file = dirpath / filename
+                    if file.is_symlink():
+                        continue
                     yield file.absolute(), file.read_text
         else:
             logger.warning('skip %s (no such file or directory)', target)
