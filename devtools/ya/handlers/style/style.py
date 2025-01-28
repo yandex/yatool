@@ -31,6 +31,7 @@ def _setup_logging(quiet: bool = False) -> None:
     console_log = logging.StreamHandler()
 
     while logging.root.hasHandlers():
+        logging.root.handlers[0].close()
         logging.root.removeHandler(logging.root.handlers[0])
 
     console_log.setLevel(logging.ERROR if quiet else logging.INFO)
