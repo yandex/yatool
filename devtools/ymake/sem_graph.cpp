@@ -218,7 +218,7 @@ namespace {
                         RestoreContext,
                         modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNode] : topNode
                     };
-                    static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[" << TModuleConf::SEM_IGNORED << "]";
+                    static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[\"" << TModuleConf::SEM_IGNORED << "\"]";
                     auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider);
                     bool ignored = AnyOf(sem, [](const TSingleCmd& cmd) {
                         return cmd.CmdStr == CMD_IGNORED;
