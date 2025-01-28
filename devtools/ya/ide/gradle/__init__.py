@@ -357,7 +357,8 @@ class _JavaSemGraph(SemGraph):
         if foreign_targets:
             self.foreign_targets = list(set(foreign_targets))
             self.logger.info("Foreign targets: %s", self.foreign_targets)
-        self._patch_graph()
+        if 'dont_patch_graph' not in kwargs:
+            self._patch_graph()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
