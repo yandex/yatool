@@ -313,7 +313,7 @@ void TModule::SetToolsComplete() noexcept {
     ToolsComplete = true;
 }
 
-void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfiguration& buildConf) {
+void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
     AssertEx(!HasId(), "Module already has ID");
     AssertEx(id != 0 && id != BAD_MODULE, "Invalid ID for module");
     Y_ASSERT(!Committed);
@@ -333,6 +333,7 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfi
     } else {
         Attrs.PassPeers = GetNodeType() == EMNT_Bundle || IsStaticLib();
     }
+    Attrs.SemIgnore = Get(NVariableDefs::VAR_MODULE_SEM_IGNORE) == "yes";
     if (Vars.Contains(VAR_MODULE_TAG)) {
         Tag = Get(VAR_MODULE_TAG);
     } else {
@@ -340,18 +341,6 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf, const TBuildConfi
     }
     Attrs.UseAllSrcs = Get(NVariableDefs::VAR_USE_ALL_SRCS) == "yes";
     SetupPeerdirRestrictions();
-
-    if (conf.HasSemantics && !conf.CmdIgnore.empty()) {
-        auto dummyCommandStore = TCommands();
-        auto dummyCmdInfo = TCommandInfo(buildConf, nullptr, nullptr);
-        auto compiled = dummyCommandStore.Compile(conf.CmdIgnore, buildConf, Vars, false, {EOutputAccountingMode::Module});
-        auto ignore = TCommands::SimpleCommandSequenceWriter()
-            .Write(dummyCommandStore, compiled.Expression, Vars, {}, dummyCmdInfo, nullptr, buildConf)
-            .Extract();
-        if (ignore.size() == 1 && ignore[0].size() == 1 && IsTrue(ignore[0][0]))
-            SetSemIgnore();
-    }
-
     NotifyInitComplete();
 }
 

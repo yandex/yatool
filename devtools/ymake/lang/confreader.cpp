@@ -947,7 +947,6 @@ namespace {
                 name == NProperties::DEFAULT_NAME_GENERATOR ||
                 name == NProperties::ARGS_PARSER ||
                 name == NProperties::SEM ||
-                name == NProperties::SEM_IGNORE ||
                 name == NProperties::EXTS ||
                 name == NProperties::GLOBAL ||
                 name == NProperties::IGNORED ||

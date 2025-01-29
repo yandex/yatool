@@ -266,7 +266,7 @@ public:
         return Id;
     }
 
-    void FinalizeConfig(ui32 id, const TModuleConf&, const TBuildConfiguration&);
+    void FinalizeConfig(ui32 id, const TModuleConf&);
 
     bool IsGlobVarsComplete() const noexcept {
         return GlobVarsComplete;

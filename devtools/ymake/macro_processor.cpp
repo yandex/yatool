@@ -1343,11 +1343,6 @@ void TCommandInfo::FillCoords(
     SBDIAG << "FM " << Get1(&Cmd) << "\n";
     // fill more inputs
     for (auto& macroData : macros) {
-        if (macroData.Flags.Get(EMF_SemIgnore) && Module != nullptr && UpdIter != nullptr) {
-            SBDIAG << "FM: SemIgnore for module " << Module->GetName() << Endl;
-            Module->SetSemIgnore();
-        }
-
         SBDIAG << "FM: " << macroData.Name << "(o=" << macroData.Flags.Get(EMF_Output) << ",t=" << macroData.Flags.Get(EMF_Tmp)
                << ",i=" << macroData.Flags.Get(EMF_Input) << ",t=" << macroData.Flags.Get(EMF_Tool) << ",oi="
                << macroData.Flags.Get(EMF_OutputInclude) << ",a=" << macroData.HasArgs << ",A=" << macroData.HasOwnArgs

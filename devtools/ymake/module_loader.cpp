@@ -221,7 +221,7 @@ TDepsCacheId TModuleDef::Commit() {
         Module.Set(NVariableDefs::VAR_PEERDIR_TAGS, expandedTags);
     }
 
-    Module.FinalizeConfig(modId, ModuleConf, Conf);
+    Module.FinalizeConfig(modId, ModuleConf);
     Modules.Commit(Module);
     YMake.UpdIter->SaveModule(modId, this);
     return MakeDepFileCacheId(modId);

@@ -85,7 +85,6 @@ namespace {
         { TStringBuf("to_namespace"), EMF_Namespace },
         { TStringBuf("skip_by_ext"), EMF_SkipByExt },
         { TStringBuf("from_input"), EMF_OutInclsFromInput },
-        { TStringBuf("sem_ignore"), EMF_SemIgnore },
 
         { TStringBuf("<error>"), EMF_ModifierFlagsSize }
     };

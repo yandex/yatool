@@ -269,7 +269,6 @@ bool TModuleConf::IsProperty(const TStringBuf name) {
         NProperties::PROXY,
         NProperties::RESTRICTED,
         NProperties::SEM,
-        NProperties::SEM_IGNORE,
         NProperties::SYMLINK_POLICY,
         NProperties::USE_INJECTED_DATA,
         NProperties::USE_PEERS_LATE_OUTS,
@@ -471,11 +470,6 @@ bool TModuleConf::SetProperty(TStringBuf key, TStringBuf name, TStringBuf value,
             Cmd = value;
             HasSemantics = true;
         }
-    } else if (name == NProperties::SEM_IGNORE) {
-        if (renderSemantics) {
-            CmdIgnore = value;
-            HasSemantics = true;
-        }
     } else if (bool global = name == NProperties::GLOBAL_EXTS; name == NProperties::EXTS || global) {
         for (const auto ext : StringSplitter(value).Split(' ').SkipEmpty()) {
             AddExt(ext, global);
@@ -598,7 +592,6 @@ bool TModuleConf::SetProperty(TStringBuf key, TStringBuf name, TStringBuf value,
 
 void TModuleConf::Load(IInputStream* input) {
     ::Load(input, Cmd);
-    ::Load(input, CmdIgnore);
     ::Load(input, GlobalCmd);
     ::Load(input, Name);
     ::Load(input, Tag);
@@ -652,7 +645,6 @@ void TModuleConf::Load(IInputStream* input) {
 
 void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, Cmd);
-    ::Save(output, CmdIgnore);
     ::Save(output, GlobalCmd);
     ::Save(output, Name);
     ::Save(output, Tag);

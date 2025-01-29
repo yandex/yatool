@@ -92,7 +92,6 @@ struct TModuleConf {
     inline static const TStringBuf SEM_IGNORED = "IGNORED"sv;
 
     TString Cmd;
-    TString CmdIgnore; // TODO this should be part of Cmd metadata
     TString GlobalCmd;
     TString Name;
     TString Tag;

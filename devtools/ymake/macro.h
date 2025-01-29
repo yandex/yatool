@@ -86,7 +86,6 @@ enum EModifierFlag {
     EMF_Namespace,                      // Set output to namespace: $B/path -> $B/namespace/path (used for package cmd)
     EMF_SkipByExt,
     EMF_OutInclsFromInput,              // Resolve output includes as inputs rather than includes
-    EMF_SemIgnore,                      // Mark module to be ignored in sem graph
     // This element must be the last one
     EMF_ModifierFlagsSize
 };
