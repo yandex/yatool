@@ -156,7 +156,7 @@ class UrgentQueue(BaseQueue):
 
     def __init__(self, backup_queue):
         # type: (BaseQueue) -> None
-        self.logger = logging.getLogger("UrgentQueue")
+        self.logger = logging.getLogger("{}.{}".format(__name__, type(self).__name__))
 
         self._chunk_lock = threading.Lock()
         self._chunk = []  # protected by self._lock
@@ -220,14 +220,14 @@ class UrgentQueue(BaseQueue):
 
         while True:
             with self._condition:
+                if self._work is False:
+                    break
                 self._condition.wait(timeout=self._STEP_S)
+                if self._work is False:
+                    break
 
             if not self.consume(consumer):
                 break
-
-            with self._condition:
-                if self._work is False:
-                    break
 
     def stop(self):
         with self._condition:
@@ -251,7 +251,7 @@ class ChunkedQueue(BaseQueue):
     def __init__(self, store_dir):
         # type: (Path) -> None
 
-        self.logger = logging.getLogger("ChunkedQueue")
+        self.logger = logging.getLogger("{}.{}".format(__name__, type(self).__name__))
 
         store_dir = Path(store_dir)
 
@@ -280,7 +280,7 @@ class ChunkedQueue(BaseQueue):
         chunk = FileChunk(self._data_dir, self._locks_dir, name)
         chunk.acquire()
         chunk.touch()
-        logger.debug("New active chunk: %s", chunk)
+        self.logger.debug("New active chunk: %s", chunk)
         return chunk
 
     def cleanup(self, max_items=None):
@@ -305,18 +305,18 @@ class ChunkedQueue(BaseQueue):
 
     def consume(self, consumer):
         # type: (ConsumerType) -> bool
-        logger.debug("Check for new messages...")
+        self.logger.debug("Check for new messages...")
 
         with self._active_chunk_value_lock:
             if self._active_chunk:
                 if not self._active_chunk.exists():
-                    logger.debug("Somebody stole my data chunk %s", self._active_chunk)
+                    self.logger.debug("Somebody stole my data chunk %s", self._active_chunk)
                     self._active_chunk = self._generate_new_chunk()
 
         for name in [x for x in os.listdir(str(self._data_dir))]:
             chunk = FileChunk(self._data_dir, self._locks_dir, name)
             if not chunk.exists():
-                logger.debug("Chunk %s doesn't exists", chunk)
+                self.logger.debug("Chunk %s doesn't exists", chunk)
                 continue
 
             # Aquire lock for found chunk
@@ -324,14 +324,14 @@ class ChunkedQueue(BaseQueue):
                 with self._active_chunk_value_lock:
                     self._active_chunk.close()
                     # No need to free this chunk; we hold it and can work with it as needed.
-                    logger.debug("Do not take lock for (previously) active chunk %s", chunk)
+                    self.logger.debug("Do not take lock for (previously) active chunk %s", chunk)
                     self._active_chunk = self._generate_new_chunk()
             else:
                 if chunk.acquire(blocking=False):
                     # We can work with this chunk, nobody hold it
                     pass
                 else:
-                    logger.debug("Chunk %s not free, skip", chunk)
+                    self.logger.debug("Chunk %s not free, skip", chunk)
                     continue
 
             # Read data from chunk and process it
@@ -339,16 +339,16 @@ class ChunkedQueue(BaseQueue):
                 items = chunk.read()
 
                 if items:
-                    logger.debug("Consume %d items from %s", len(items), chunk)
+                    self.logger.debug("Consume %d items from %s", len(items), chunk)
                     consumer(items)
-                    logger.debug("Consumed %d items from %s", len(items), chunk)
+                    self.logger.debug("Consumed %d items from %s", len(items), chunk)
                 else:
-                    logger.debug("No items found in %s, skip", chunk)
+                    self.logger.debug("No items found in %s, skip", chunk)
             except StopConsume:
-                logger.debug("Consumer asks to stop")
+                self.logger.debug("Consumer asks to stop")
                 return False
             except Exception:
-                logger.debug("While consume chunk %s", chunk, exc_info=True)
+                self.logger.debug("While consume chunk %s", chunk, exc_info=True)
             else:
                 chunk.clear_and_release()  # will free flock here
             finally:
@@ -380,6 +380,8 @@ class ChunkedQueue(BaseQueue):
 
         while True:
             with self._condition:
+                if self._work is False:
+                    break
                 self._condition.wait(timeout=check_time_s)
                 if self._work is False:
                     break
