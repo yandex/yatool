@@ -536,7 +536,7 @@ class PythonFrame(FrameBase):
         offset = len(error_line) - len(self._error_line)
         if "^" in error_column_selector:
             self._error_col_start = error_column_selector.index("^") - offset
-            self._error_col_end = error_column_selector.rindex("^") - offset
+            self._error_col_end = error_column_selector.rindex("^") + 1 - offset
         else:
             self._error_col_start = 0
             self._error_col_end = len(self._error_line)
@@ -570,8 +570,8 @@ class PythonFrame(FrameBase):
     def error_line_html(self):
         return '{prefix}<span class="python-error-area">{error}</span>{suffix}'.format(
             prefix=self._error_line[:self._error_col_start],
-            error=self._error_line[self._error_col_start:self._error_col_end+1],
-            suffix=self._error_line[self._error_col_end+2:]
+            error=self._error_line[self._error_col_start:self._error_col_end],
+            suffix=self._error_line[self._error_col_end:]
         ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
 
     def raw(self):
