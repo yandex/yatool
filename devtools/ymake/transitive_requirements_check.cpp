@@ -660,6 +660,8 @@ namespace {
 
     class TFeatureVersionsLoader {
     public:
+        class TCache;
+
         static constexpr TStringBuf CHECK_FEATURE_VERSION_CONFLICTS = "CHECK_FEATURE_VERSION_CONFLICTS";
         static constexpr TStringBuf FEATURE_VERSIONS = "FEATURE_VERSIONS";
 
@@ -669,16 +671,18 @@ namespace {
         };
 
         static TTransitiveCheckRegistryItem::TRequirementsLoader Create(const TVars&) {
-            return Load;
+            return [cache = MakeSimpleShared<TCache>()](TDepGraph& graph, const TBuildConfiguration& conf, const TModule& module) {
+                return Load(graph, conf, module, cache.Get());
+            };
         }
 
-        static TTransitiveRequirement Load(TDepGraph&, const TBuildConfiguration& conf, const TModule& module) {
+        static TTransitiveRequirement Load(TDepGraph&, const TBuildConfiguration& conf, const TModule& module, TCache* cache) {
             TTransitiveRequirement result;
             const auto checkFeatureVersions = EvalVariable(CHECK_FEATURE_VERSION_CONFLICTS, module.Vars, conf);
             if (checkFeatureVersions.empty()) {
                 return result;
             }
-            const auto& moduleFeature2Versions = GetModuleFeature2Versions(module, conf);
+            const auto& moduleFeature2Versions = GetModuleFeature2Versions(module, conf, *cache);
             if (moduleFeature2Versions.empty()) { // no feature versions in peer, nothing to check, skip it
                 YConfErr(Misconfiguration)
                     << "Usage " << CHECK_FEATURE_VERSION_CONFLICTS << " without FEATURE_VERSION" << Endl;
@@ -686,13 +690,13 @@ namespace {
             }
 
             result.Scopes |= ERequirementsScope::Peers;
-            result.Check = [moduleFeature2Versions, &conf](TRestoreContext restoreContext, const TModule&, TNodeId, TScopeClosureRef closure) {
+            result.Check = [moduleFeature2Versions, cache, &conf](TRestoreContext restoreContext, const TModule&, TNodeId, TScopeClosureRef closure) {
                 for (TNodeId peerId : closure.Closure) {
                     TModule* peer = restoreContext.Modules.Get(restoreContext.Graph[peerId]->ElemId);
                     Y_ASSERT(peer);
 
                     // Check feature versions exists in peer
-                    const auto& peerFeature2Versions = GetModuleFeature2Versions(*peer, conf);
+                    const auto& peerFeature2Versions = GetModuleFeature2Versions(*peer, conf, *cache);
                     if (peerFeature2Versions.empty()) {
                         continue; // no feature versions in peer, skip it
                     }
@@ -719,6 +723,7 @@ namespace {
         using TFeature2Version = THashMap<TStringBuf, TStringBuf>;
         using TModuleId = ui32;
 
+    public:
         class TCache {
         public:
             TCache()
@@ -770,21 +775,8 @@ namespace {
             const TFeature2Version ConstEmptyFeature2Version;
         };
 
-        // Holder of cache of feature2version by modules
-        static THolder<TCache>& CacheHolder() {
-            return *Singleton<THolder<TCache>>();
-        }
-
-        // Get cache of feature2version by modules from holder
-        static TCache& Cache() {
-            auto& cacheHolder = CacheHolder();
-            auto* cache = cacheHolder.Get();
-            Y_ASSERT(cache != nullptr); // must exists at this place
-            return *cache;
-        }
-
-        static const TFeature2Version& GetModuleFeature2Versions(const TModule& module, const TBuildConfiguration& conf) {
-            auto& cache = Cache();
+    private:
+        static const TFeature2Version& GetModuleFeature2Versions(const TModule& module, const TBuildConfiguration& conf, TCache& cache) {
             const TFeature2Version* inCache = cache.Get(module.GetId());
             if (inCache) {
                 return *inCache;
@@ -821,21 +813,6 @@ namespace {
             }
             return *cache.Set(module.GetId(), std::move(feature2version));
         }
-
-    public:
-
-        class TCacheOnStack {
-        public:
-            TCacheOnStack() {
-                auto& cacheHolder = TFeatureVersionsLoader::CacheHolder();
-                cacheHolder.Reset(MakeHolder<TCache>());
-            }
-
-            ~TCacheOnStack() {
-                auto& cacheHolder = TFeatureVersionsLoader::CacheHolder();
-                cacheHolder.Destroy();
-            }
-        };
     };
 
     const TTransitiveCheckRegistryItem TRANSITIVE_CHECK_REGISTRY_ARRAY[] = {
@@ -890,7 +867,6 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
 void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) {
     FORCE_TRACE(U, NEvent::TStageStarted("Check Transitive Requirements"));
     TConstraintsChecker checker{restoreContext};
-    auto cacheOnStack = MakeHolder<TFeatureVersionsLoader::TCacheOnStack>(); // Cache for feature versions in stack
     for (TTarget target : startTargets) {
         if (!target.IsModuleTarget) {
             continue;
