@@ -160,7 +160,9 @@ class YtStore(DistStore):
             except Exception as e:
                 raise YtInitException('Can\'t read metadata at {}: {}'.format(self._proxy, str(e)))
 
-            self._cache_hit = {'requested': len(uids), 'found': len(self._meta)}
+            # v3 meta table can return more rows than uids were requested, since self_uids can be used as a row filter
+            found_uids = set(uids).intersection(self._meta.keys())
+            self._cache_hit = {'requested': len(uids), 'found': len(found_uids)}
 
             if self._max_cache_size and not self.readonly():
                 size = self.get_used_size()
