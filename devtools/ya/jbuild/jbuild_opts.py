@@ -6,57 +6,6 @@ import devtools.ya.core.common_opts as common_opts
 import devtools.ya.test.opts as test_opts
 
 
-class MavenExportOptions(devtools.ya.core.yarg.Options):
-    def __init__(self):
-        self.export_to_maven = False
-        self.version = None
-        self.deploy = False
-        self.repository_id = None
-        self.repository_url = None
-        self.maven_settings = None
-
-    @staticmethod
-    def consumer():
-        return [
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--maven-export'],
-                help='Export to maven',
-                hook=devtools.ya.core.yarg.SetConstValueHook('export_to_maven', True),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--version'],
-                help="Version of artifacts for exporting to maven",
-                hook=devtools.ya.core.yarg.SetValueHook('version'),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--deploy'],
-                help='Deploy artifact to repository',
-                hook=devtools.ya.core.yarg.SetConstValueHook('deploy', True),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--repository-id'],
-                help="Maven repository id",
-                hook=devtools.ya.core.yarg.SetValueHook('repository_id'),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--repository-url'],
-                help="Maven repository url",
-                hook=devtools.ya.core.yarg.SetValueHook('repository_url'),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ['--settings'],
-                help="Maven settings.xml file path",
-                hook=devtools.ya.core.yarg.SetValueHook('maven_settings'),
-                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
-            ),
-        ]
-
-
 class JavaBuildOptions(devtools.ya.core.yarg.Options):
     def __init__(self, use_distbuild=False):
         self.get_deps = None
@@ -146,10 +95,8 @@ def jbuild_opts(use_distbuild=False):
             common_opts.ShowHelpOptions(),
             common_opts.BeVerboseOptions(),
             common_opts.KeepTempsOptions(),
-            MavenExportOptions(),
             IdeaProjectOptions(),
             build_opts.RebuildOptions(),
             build_opts.ContinueOnFailOptions(),
         ]
-        + build_opts.checkout_options()
     )
