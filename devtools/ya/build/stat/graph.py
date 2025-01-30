@@ -192,6 +192,7 @@ class PrepareTask(BaseTask):
         'failures',
         'total_time',
         'count',
+        'download_time_ms',
     )
 
     def __init__(self, prepare_type: _PrepareType, host: _Hostname) -> None:
@@ -202,6 +203,7 @@ class PrepareTask(BaseTask):
         self.failures = None
         self.total_time = False
         self.count: int | None = None
+        self.download_time_ms: float | None = None
 
     def as_json(self):
         return {
@@ -665,26 +667,31 @@ def create_graph_with_local_log(
 
             task = run_task
 
-        if task and info and info.get('timing'):
-            task.start_time = int(info['timing'][0] * 1000)
-            task.end_time = int(info['timing'][1] * 1000)
+        if task and info:
 
-        if task and info and info.get('detailed_timings'):
-            task.detailed_timings = info['detailed_timings']
+            if info.get('timing'):
+                task.start_time = int(info['timing'][0] * 1000)
+                task.end_time = int(info['timing'][1] * 1000)
 
-        if task and info and info.get('total_time'):
-            task.total_time = True
+            if info.get('detailed_timings'):
+                task.detailed_timings = info['detailed_timings']
 
-        if task and info and info.get('count'):
-            task.count = info['count']
+            if info.get('total_time'):
+                task.total_time = True
 
-        if task and info and info.get('failures'):
-            task.failures = info['failures']
+            if info.get('count'):
+                task.count = info['count']
 
-        if task and info and info.get('cached'):
-            task.from_cache = True
-            task.start_time = None
-            task.end_time = None
+            if info.get('failures'):
+                task.failures = info['failures']
+
+            if info.get('cached'):
+                task.from_cache = True
+                task.start_time = None
+                task.end_time = None
+
+            if info.get('download_time_ms'):
+                task.download_time_ms = info['download_time_ms']
 
     dependency_count = 0
     for run_task in graph.run_tasks.values():

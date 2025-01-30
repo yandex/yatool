@@ -146,18 +146,22 @@ def _task_details(task):
         return '[started: {}, finished: {}]'.format(task.start_time, task.end_time)
     if not task.get_time_elapsed() or not getattr(task, 'count', None):
         return ''
-    if getattr(task, 'failures', None):
-        return '[count: {:d}, cps: {:.02f}, ave time {:.02f} msec, failures {:d}]'.format(
-            task.count,
-            1000.0 * task.count / task.get_time_elapsed(),
-            1.0 * task.get_time_elapsed() / task.count,
-            task.failures,
-        )
-    return '[count: {:d}, cps: {:.02f}, ave time {:.02f} msec]'.format(
+
+    msg = '[count: {:d}, cps: {:.02f}, ave time {:.02f} msec'.format(
         task.count,
         1000.0 * task.count / task.get_time_elapsed(),
         1.0 * task.get_time_elapsed() / task.count,
     )
+
+    if getattr(task, 'failures', None):
+        msg += f", failures {task.failures:d}"
+
+    if getattr(task, 'download_time_ms', None):
+        msg += f", download time {task.download_time_ms:.02f} msec"
+
+    msg += "]"
+
+    return msg
 
 
 def print_all_tasks(graph, filename, display):
@@ -578,14 +582,38 @@ def get_int_length(x: float) -> int:
 
 
 def print_summary_times(graph, tasks, display):
-    time_by_type = dict()
-    task_by_type = dict()
+    task_by_type = {}
+    time_by_type = collections.defaultdict(int)
+    download_time_by_type = collections.defaultdict(float)
     count_by_type = collections.Counter()
 
-    def setup_time(type, time, task):
-        time_by_type[type] = time_by_type.get(type, 0) + time
-        task_by_type[type] = task
-        count_by_type[type] += 1
+    def setup_time(task):
+        type_ = task.get_type()
+        time = task.get_time_elapsed()
+        download_time_ms = getattr(task, "download_time_ms", None) or 0
+
+        time_by_type[type_] += time
+        task_by_type[type_] = task
+        count_by_type[type_] += 1
+        download_time_by_type[type_] += download_time_ms
+
+    def get_display_msg_for_task_type(type_):
+        msg = '[{:{tw}d} ms] [[[c:{}]]{}[[rst]]] [count: {:d}, ave time {:.02f} msec'.format(
+            time_by_type[type_],
+            task_by_type[type_].get_type_color(),
+            type_,
+            count_by_type[type_],
+            time_by_type[type_] / count_by_type[type_],
+            tw=max_elapsed_len,
+        )
+
+        if type_ == "prepare:download from DistBuild":
+            avg_download_time = download_time_by_type[type_] / count_by_type[type_]
+            msg += f", ave download time {avg_download_time:.02f} msec"
+
+        msg += "]"
+
+        return msg
 
     # Introducing small lang here:
     # +<Type> means that node with type <Type> began executing
@@ -601,7 +629,7 @@ def print_summary_times(graph, tasks, display):
     execution_end_time = 0
     for task in tasks:
         if task.get_time_elapsed() is not None and task.get_time_elapsed() > 0:
-            setup_time(task.get_type(), task.get_time_elapsed(), task)
+            setup_time(task)
             if not getattr(task, 'total_time', False):
                 if execution_start_time == 0:
                     execution_start_time = task.start_time
@@ -621,16 +649,7 @@ def print_summary_times(graph, tasks, display):
             max_elapsed_len = max(max_elapsed_len, get_int_length(time_by_type[task_type]))
 
         for task_type in sorted(time_by_type, key=time_by_type.get, reverse=True):
-            display.emit_message(
-                '[{:{tw}d} ms] [[[c:{}]]{}[[rst]]] [count: {:d}, ave time {:.02f} msec]'.format(
-                    time_by_type[task_type],
-                    task_by_type[task_type].get_type_color(),
-                    task_type,
-                    count_by_type[task_type],
-                    time_by_type[task_type] / count_by_type[task_type],
-                    tw=max_elapsed_len,
-                )
-            )
+            display.emit_message(get_display_msg_for_task_type(task_type))
 
     total_run_task_time = 0
     total_tests_task_time = 0

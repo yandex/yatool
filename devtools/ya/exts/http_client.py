@@ -78,12 +78,12 @@ def download_file(url, path, mode=0, expected_md5=None, headers=None):
     if expected_md5:
         integrity += expected_md5
 
-    download_file_with_integrity(url, path, integrity, 'hex', mode, headers)
+    return download_file_with_integrity(url, path, integrity, 'hex', mode, headers)
 
 
 @exts.retry.retrying(max_times=7, retry_sleep=lambda i, t: i * 5)
 def download_file_with_integrity(url, path, integrity, integrity_encoding='base64', mode=0, headers=None):
-    # type: (str, str, str, str, int, dict[str, str] | None) -> None
+    # type: (str, str, str, str, int, dict[str, str] | None) -> float
     alg, expected_integrity = integrity.split("-")
 
     if alg not in hasher_map:
@@ -91,6 +91,8 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
 
     if integrity_encoding not in integrity_encoding:
         raise BadIntegrityEncodingException(integrity_encoding)
+
+    download_start_time = time.perf_counter()
 
     temp_path = "{}.{}.part".format(path, library.python.unique_id.gen8())
     exts.fs.ensure_removed(path)
@@ -125,6 +127,8 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
     with open(temp_path, 'wb') as dest_file:
         exts.io2.copy_stream(res.read, dest_file.write, checksum.update, lambda d: chunks_sizes.append(len(d)))
 
+    download_end_time = time.perf_counter()
+
     checksum_str = integrity_encodings.get(integrity_encoding)(checksum)
 
     if expected_integrity and expected_integrity != checksum_str:
@@ -144,6 +148,8 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
         str(sum(chunks_sizes)),
         time.time() - start_time,
     )
+
+    return (download_end_time - download_start_time) * 1000
 
 
 def _http_call(url, method, data=None, headers=None, timeout=30):

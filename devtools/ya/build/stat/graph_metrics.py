@@ -7,11 +7,6 @@ from collections import defaultdict
 from devtools.ya.build.node_checks import is_module, is_binary
 from devtools.ya.build.graph_description import GraphNodeUid, GraphNode
 
-try:
-    RecursionError
-except NameError:
-    # python3.4
-    RecursionError = RuntimeError
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
 import os
 import stat
 import logging
+import collections
 
 import exts
 import exts.http_client
@@ -10,6 +11,8 @@ try:
     import devtools.libs.universal_fetcher.py as universal_fetcher
 except ImportError:
     universal_fetcher = None
+
+FetchResponse = collections.namedtuple("FetchResponse", ("result", "download_time_ms"))
 
 
 @exts.func.memoize(thread_safe=False)
@@ -67,5 +70,10 @@ def download_file(
     url, path, additional_file_perms=0, expected_md5=None, headers=None, use_universal_fetcher=False, raise_err=False
 ):
     if use_universal_fetcher and universal_fetcher is not None:
-        return _download_file_by_ufetcher(url, path, additional_file_perms, expected_md5, headers, raise_err)
-    return exts.http_client.download_file(url, path, additional_file_perms, expected_md5, headers)
+        result = _download_file_by_ufetcher(url, path, additional_file_perms, expected_md5, headers, raise_err)
+        last_attempt = result.get("last_attempt", {})
+        download_time_ms = last_attempt.get("duration_us", 0) / 1000
+        return FetchResponse(result, download_time_ms)
+
+    download_time_ms = exts.http_client.download_file(url, path, additional_file_perms, expected_md5, headers)
+    return FetchResponse(None, download_time_ms)
