@@ -9,14 +9,16 @@ namespace NYMake {
         class TPluginResourceHandler: public TMacroImpl {
         private:
             bool IsSemanticsRendering = false;
+
         public:
             TPluginResourceHandler(bool isSemanticsRendering)
-            : IsSemanticsRendering(isSemanticsRendering)
-            {}
+                : IsSemanticsRendering(isSemanticsRendering)
+            {
+            }
 
             void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) override;
 
             static void RegisterMacro();
         };
-    }
-}
+    } // namespace NPlugins
+} // namespace NYMake

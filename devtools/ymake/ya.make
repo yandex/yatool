@@ -158,7 +158,7 @@ SRCS(
     plugins/init.cpp
     plugins/plugin_go_fake_output_handler.cpp
     plugins/plugin_macro_impl.cpp
-    plugins/plugin_resource_handler.cpp
+    plugins/resource_handler/impl.cpp
     plugins/ymake_module_adapter.cpp
     plugins/ymake.pyx
     propagate_change_flags.cpp
