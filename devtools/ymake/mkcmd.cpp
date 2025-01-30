@@ -33,87 +33,48 @@
 #include <util/system/types.h>
 #include <util/system/yassert.h>
 
-class TMakeModuleState : public TSimpleRefCount<TMakeModuleState> {
-public:
-    TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules, TNodeId moduleId) {
-        const auto modNode = graph[moduleId];
-        auto& fileConf = graph.Names().FileConf;
-        TFileView modName = graph.GetFileName(modNode);
+TMakeModuleState::TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules, TNodeId moduleId) {
+    const auto modNode = graph[moduleId];
+    auto& fileConf = graph.Names().FileConf;
+    TFileView modName = graph.GetFileName(modNode);
 
-        CurDir = fileConf.ReplaceRoot(fileConf.Parent(modName), NPath::Source);
+    CurDir = fileConf.ReplaceRoot(fileConf.Parent(modName), NPath::Source);
 
-        Vars.SetPathResolvedValue(NVariableDefs::VAR_TARGET, conf.RealPath(modName));
-        Vars.SetPathResolvedValue(NVariableDefs::VAR_BINDIR, conf.RealPath(fileConf.ReplaceRoot(CurDir, NPath::Build)));
-        Vars.SetPathResolvedValue(NVariableDefs::VAR_CURDIR, conf.RealPath(CurDir));
-        Vars.SetValue(NVariableDefs::VAR_ARCADIA_BUILD_ROOT, conf.BuildRoot.c_str());
-        Vars.SetValue(NVariableDefs::VAR_ARCADIA_ROOT, conf.SourceRoot.c_str());
+    Vars.SetPathResolvedValue(NVariableDefs::VAR_TARGET, conf.RealPath(modName));
+    Vars.SetPathResolvedValue(NVariableDefs::VAR_BINDIR, conf.RealPath(fileConf.ReplaceRoot(CurDir, NPath::Build)));
+    Vars.SetPathResolvedValue(NVariableDefs::VAR_CURDIR, conf.RealPath(CurDir));
+    Vars.SetValue(NVariableDefs::VAR_ARCADIA_BUILD_ROOT, conf.BuildRoot.c_str());
+    Vars.SetValue(NVariableDefs::VAR_ARCADIA_ROOT, conf.SourceRoot.c_str());
 
-        Vars[NVariableDefs::VAR_SRCS_GLOBAL];
-        Vars[NVariableDefs::VAR_AUTO_INPUT];
-        Vars[NVariableDefs::VAR_PEERS];
+    Vars[NVariableDefs::VAR_SRCS_GLOBAL];
+    Vars[NVariableDefs::VAR_AUTO_INPUT];
+    Vars[NVariableDefs::VAR_PEERS];
 
-        for (const auto* names : {&conf.ReservedNames, &conf.ResourceNames})  {
-            for (const TString& name : *names) {
-                Vars[name];
-            }
+    for (const auto* names : {&conf.ReservedNames, &conf.ResourceNames})  {
+        for (const TString& name : *names) {
+            Vars[name];
         }
-
-        bool moduleUsesPeers = modules.Get(modNode->ElemId)->GetAttrs().UsePeers;
-
-        TModuleRestorer restorer({conf, graph, modules}, modNode);
-        restorer.RestoreModule();
-        restorer.UpdateLocalVarsFromModule(Vars, conf, moduleUsesPeers);
-        restorer.UpdateGlobalVarsFromModule(Vars);
-        restorer.GetModuleDepIds(PeerIds);
-        GlobalSrcs = &restorer.GetGlobalSrcsIds();
     }
 
-public:
-    TFileView CurDir;
+    bool moduleUsesPeers = modules.Get(modNode->ElemId)->GetAttrs().UsePeers;
 
-    TVars Vars;
+    TModuleRestorer restorer({conf, graph, modules}, modNode);
+    restorer.RestoreModule();
+    restorer.UpdateLocalVarsFromModule(Vars, conf, moduleUsesPeers);
+    restorer.UpdateGlobalVarsFromModule(Vars);
+    restorer.GetModuleDepIds(PeerIds);
+    GlobalSrcs = &restorer.GetGlobalSrcsIds();
+}
 
-    THashSet<TNodeId> PeerIds;
-    const TUniqVector<TNodeId>* GlobalSrcs;
-};
+TMakeModuleStatePtr TMakeModuleStates::GetState(TNodeId moduleId) {
+    GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnvCalls);
+    if (LastStateId_ != moduleId) {
+        LastStateId_ = moduleId;
+        LastState_.Reset(new TMakeModuleState{Conf_, Graph_, Modules_, moduleId});
+        GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnv);
 
-class TMakeModuleStates {
-private:
-    const TBuildConfiguration& Conf;
-    TDepGraph& Graph;
-    TModules& Modules;
-
-    TNodeId LastStateId_ = TNodeId::Invalid;
-    TMakeModuleStatePtr LastState_;
-
-    friend TMakeModuleStates& GetMakeModulesStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules);
-
-public:
-    TMakeModuleStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
-        : Conf(conf), Graph(graph), Modules(modules)
-    {
     }
-
-    TMakeModuleStatePtr GetState(TNodeId moduleId) {
-        GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnvCalls);
-        if (LastStateId_ != moduleId) {
-            LastStateId_ = moduleId;
-            LastState_.Reset(new TMakeModuleState{Conf, Graph, Modules, moduleId});
-            GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnv);
-
-        }
-        return LastState_;
-    }
-
-    static inline NStats::TMakeCommandStats& GetStats();
-};
-
-TMakeModuleStates& GetMakeModulesStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules) {
-    TMakeModuleStates& states = *Singleton<TMakeModuleStates>(conf, graph, modules);
-    Y_ASSERT(&states.Conf == &conf);
-    Y_ASSERT(&states.Graph == &graph);
-    Y_ASSERT(&states.Modules == &modules);
-    return states;
+    return LastState_;
 }
 
 inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
@@ -121,17 +82,17 @@ inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
     return stats;
 }
 
-TMakeCommand::TMakeCommand(TYMake& yMake)
-    : TMakeCommand(yMake, nullptr)
+TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake)
+    : TMakeCommand(modulesStatesCache, yMake, nullptr)
 {
 }
 
-TMakeCommand::TMakeCommand(TYMake& yMake, const TVars* base0)
-    : TMakeCommand{yMake.GetRestoreContext(), yMake.Commands, yMake.UpdIter, base0}
+TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake, const TVars* base0)
+    : TMakeCommand{modulesStatesCache, yMake.GetRestoreContext(), yMake.Commands, yMake.UpdIter, base0}
 {
 }
 
-TMakeCommand::TMakeCommand(const TRestoreContext& restoreContext, const TCommands& commands, TUpdIter* updIter, const TVars* base0)
+TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, const TRestoreContext& restoreContext, const TCommands& commands, TUpdIter* updIter, const TVars* base0)
     : Vars(&BaseVars) // hack for SET_APPEND
     , CmdInfo(restoreContext.Conf, &restoreContext.Graph, updIter)
     , BaseVars(base0)
@@ -139,6 +100,7 @@ TMakeCommand::TMakeCommand(const TRestoreContext& restoreContext, const TCommand
     , Conf(restoreContext.Conf)
     , Modules(restoreContext.Modules)
     , Graph(restoreContext.Graph)
+    , ModulesStatesCache(modulesStatesCache)
 {
 }
 
@@ -258,7 +220,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
 }
 
 void TMakeCommand::InitModuleEnv(TNodeId modId) {
-    ModuleState = GetMakeModulesStates(Conf, Graph, Modules).GetState(modId);
+    ModuleState = ModulesStatesCache.GetState(modId);
 
     for (auto& [name, var] : ModuleState->Vars) {
         Vars[name] = var;

@@ -87,7 +87,7 @@ namespace {
         bool IsGlobalNode = false;
 
     public:
-        TJSONRenderer(TYMake& ymake, TJSONVisitor& cmdBuilder, const TNodeId& nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* resultNode)
+        TJSONRenderer(TYMake& ymake, TJSONVisitor& cmdBuilder, const TNodeId& nodeId, const TJSONEntryStats& nodeInfo, TMakeNode* resultNode, TMakeModuleStates& modulesStatesCache)
                 : Graph(ymake.Graph)
                 , Modules(ymake.Modules)
                 , Conf(ymake.Conf)
@@ -98,7 +98,7 @@ namespace {
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
                 , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
-                , Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(ymake)
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(modulesStatesCache, ymake)
         {
             PrepareDeps();
 
@@ -315,9 +315,9 @@ namespace {
         }
     };
 
-    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter) {
+    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter, TMakeModuleStates& modulesStatesCache) {
         TMakeNode node;
-        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node);
+        TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node, modulesStatesCache);
 
         if (!yMake.Conf.ReadJsonCache && !yMake.Conf.WriteJsonCache) {
             renderer.RenderNodeDelayed();
@@ -488,6 +488,7 @@ namespace {
             {
                 YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
+                TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
                 TMakePlanCache cache(yMake.Conf);
                 yMake.JSONCacheLoaded(cache.LoadFromFile());
                 plan.WriteConf();
@@ -496,7 +497,7 @@ namespace {
                     UpdateUids(yMake.Graph, cmdbuilder, nodeId);
 
                     const auto& node = cmdbuilder.Nodes.at(nodeId);
-                    RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer);
+                    RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer, modulesStatesCache);
                     if (IsModuleType(graph[nodeId]->NodeType)) {
                         TProgressManager::Instance()->IncRenderModulesDone();
                     }

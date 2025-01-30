@@ -129,10 +129,11 @@ namespace {
         const TCommands& commands,
         TNodeId nodeId,
         TNodeId modId,
-        TDumpInfoSem& semInfoProvider
+        TDumpInfoSem& semInfoProvider,
+        TMakeModuleStates& modulesStatesCache
     ) {
         TSemFormatter formatter{};
-        TMakeCommand mkcmd{restoreContext, commands, nullptr, &restoreContext.Conf.CommandConf};
+        TMakeCommand mkcmd{modulesStatesCache, restoreContext, commands, nullptr, &restoreContext.Conf.CommandConf};
         mkcmd.CmdInfo.MkCmdAcceptor = formatter.GetAcceptor();
         mkcmd.GetFromGraph(nodeId, modId, ECmdFormat::ECF_Json, &semInfoProvider);
         return std::move(formatter).TakeCommands();
@@ -161,6 +162,7 @@ namespace {
             , JsonWriter{out}
             , StartDirs{std::move(startDirs)}
             , ModStartTargets{modStartTargets}
+            , ModulesStatesCache{restoreContext.Conf, restoreContext.Graph, restoreContext.Modules}
         {}
 
         bool AcceptDep(TState& state) {
@@ -219,7 +221,7 @@ namespace {
                         modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNode] : topNode
                     };
                     static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[\"" << TModuleConf::SEM_IGNORED << "\"]";
-                    auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider);
+                    auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider, ModulesStatesCache);
                     bool ignored = AnyOf(sem, [](const TSingleCmd& cmd) {
                         return cmd.CmdStr == CMD_IGNORED;
                     });
@@ -358,6 +360,7 @@ namespace {
         THashSet<TNodeId> StartDirs;
         const THashSet<TTarget>& ModStartTargets;
         TToolMiner ToolMiner;
+        TMakeModuleStates ModulesStatesCache;
     };
 
 }

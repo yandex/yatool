@@ -19,6 +19,7 @@ class TModules;
 struct TDumpInfoEx;
 
 class TMakeModuleState;
+class TMakeModuleStates;
 
 using TMakeModuleStatePtr = TSimpleIntrusivePtr<TMakeModuleState>;
 
@@ -38,6 +39,7 @@ private:
     const TBuildConfiguration& Conf;
     TModules& Modules;
     TDepGraph& Graph;
+    TMakeModuleStates& ModulesStatesCache;
 
     // set by MineInputsAndOutputs
     TString MainFileName;
@@ -48,10 +50,11 @@ private:
     bool RequirePeers = false;
 
 public:
-    explicit TMakeCommand(TYMake& yMake);
-    TMakeCommand(TYMake& yMake, const TVars* base0);
+    explicit TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake);
+    TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake, const TVars* base0);
 
     explicit TMakeCommand(
+        TMakeModuleStates& modulesStatesCache,
         const TRestoreContext& restoreContext,
         const TCommands& commands,
         TUpdIter* updIter = nullptr,
@@ -71,6 +74,36 @@ private:
 
     TString RealPath(const TConstDepNodeRef& node) const;
     TString RealPathEx(const TConstDepNodeRef& node) const;
+
+    static inline NStats::TMakeCommandStats& GetStats();
+};
+
+class TMakeModuleState : public TSimpleRefCount<TMakeModuleState> {
+public:
+    TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules, TNodeId moduleId);
+
+    TFileView CurDir;
+    TVars Vars;
+    THashSet<TNodeId> PeerIds;
+    const TUniqVector<TNodeId>* GlobalSrcs;
+};
+
+class TMakeModuleStates {
+private:
+    const TBuildConfiguration& Conf_;
+    TDepGraph& Graph_;
+    TModules& Modules_;
+
+    TNodeId LastStateId_ = TNodeId::Invalid;
+    TMakeModuleStatePtr LastState_;
+
+public:
+    TMakeModuleStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
+        : Conf_(conf), Graph_(graph), Modules_(modules)
+    {
+    }
+
+    TMakeModuleStatePtr GetState(TNodeId moduleId);
 
     static inline NStats::TMakeCommandStats& GetStats();
 };

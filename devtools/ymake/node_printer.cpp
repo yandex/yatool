@@ -747,10 +747,11 @@ static void DumpGraphInternal(TYMake& yMake) {
         NodesByDepth.push_back(std::make_pair(i.second.Depth, i.first));
     }
     std::sort(NodesByDepth.begin(), NodesByDepth.end());
+    TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
     for (auto&& i : NodesByDepth) {
         if (renderCmd) {
             TSubst2Shell cmdImage;
-            TMakeCommand mkCmd(yMake);
+            TMakeCommand mkCmd(modulesStatesCache, yMake);
             mkCmd.CmdInfo.MkCmdAcceptor = &cmdImage;
             try {
                 mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second], ECF_Make);
