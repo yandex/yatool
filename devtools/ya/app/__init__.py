@@ -799,6 +799,7 @@ def configure_report_interceptor(ctx, report_events):
                 "prefix": " ".join(prefix),
                 "exc_info": sys.exc_info()[0].__name__,
                 "exit_code": exit_code,
+                "mute": getattr(e, "mute", False),
             },
             urgent=True,
         )
