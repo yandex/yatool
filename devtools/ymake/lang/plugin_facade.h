@@ -105,22 +105,6 @@ public:
     void RegisterParser(const TString& ext, TSimpleSharedPtr<TParser> parser);
 };
 
-class TPluginConfig {
-private:
-    TStringBuf SourceRoot_;
-    TStringBuf BuildRoot_;
-
-public:
-    void Init(TStringBuf sourceRoot, TStringBuf buildRoot);
-
-    TString SubstPaths(const TString& arg);
-
-    TStringBuf SourceRoot() const;
-    TStringBuf BuildRoot() const;
-};
-
-TPluginConfig* PluginConfig();
-
 TMacroFacade* MacroFacade();
 
 // functions below implemented outside

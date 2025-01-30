@@ -14,10 +14,6 @@ cdef extern from "util/generic/string.h":
 
 
 cdef extern from "devtools/ymake/lang/plugin_facade.h":
-    cdef cppclass TPluginConfig:
-        TString SubstPaths(const TString& arg)
-
-    TPluginConfig* PluginConfig()
     void OnPluginLoadFail(const char*, const char*)
     void OnConfigureError(const char*)
     void OnBadDirError(const char*, const char*)
@@ -41,14 +37,6 @@ def addparser(ext, parser, induced=None, pass_induced_includes=False):
     AddParser(six.ensure_binary(ext), <PyObject*>parser, induced, pass_induced_includes)
 
 
-def subst(s):
-    return PluginConfig().SubstPaths(s)
-
-
-def engine_version():
-    return 0
-
-
 def report_configure_error(error, missing_dir=None):
     if missing_dir is not None:
         OnBadDirError(six.ensure_binary(error.format(missing_dir)), six.ensure_binary(missing_dir))
@@ -60,10 +48,3 @@ def parse_cython_includes(data):
     cdef TVector[TString] includes;
     ParseCythonIncludes(data, includes)
     return list(includes)
-
-def macro(func):
-    def _macro_wrapper(unit, *args):
-        func(unit, *args)
-    ptr = <PyObject *>_macro_wrapper
-    RegisterMacro(six.ensure_binary(func.__name__.upper()), ptr)
-    return _macro_wrapper

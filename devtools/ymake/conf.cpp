@@ -224,7 +224,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DontUsePlugins) {
         if (!PluginsRoots.empty()) {
             TTraceStage stage("Load plugins");
-            PluginConfig()->Init(SourceRoot.GetPath().c_str(), BuildRoot.GetPath().c_str());
             LoadPlugins(PluginsRoots, this);
             for (const auto& it : Plugins) {
                 TBlob pluginContent = TBlob::FromFile(it);

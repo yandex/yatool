@@ -120,34 +120,8 @@ void TMacroFacade::RegisterParser(const TString& ext, TSimpleSharedPtr<TParser> 
     }
 }
 
-TPluginConfig* PluginConfig() {
-    return Singleton<TPluginConfig>();
-}
-
 TMacroFacade* MacroFacade() {
     return Singleton<TMacroFacade>();
-}
-
-void TPluginConfig::Init(TStringBuf sourceRoot, TStringBuf buildRoot) {
-    SourceRoot_ = sourceRoot;
-    BuildRoot_ = buildRoot;
-}
-
-TString TPluginConfig::SubstPaths(const TString& arg) {
-    TString res = arg;
-    SubstGlobal(res, "$S", TString{SourceRoot_});
-    SubstGlobal(res, "$B", TString{BuildRoot_});
-    SubstGlobal(res, "$(S)", TString{SourceRoot_});
-    SubstGlobal(res, "$(B)", TString{BuildRoot_});
-    return res;
-}
-
-TStringBuf TPluginConfig::SourceRoot() const {
-    return SourceRoot_;
-}
-
-TStringBuf TPluginConfig::BuildRoot() const {
-    return BuildRoot_;
 }
 
 void RegisterPluginFilename(const char* fileName) {
