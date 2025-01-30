@@ -3342,7 +3342,7 @@ def _prepare_for_ya_ide_idea(graph_maker, opts, ev_listener, first_target_graph,
     extern_resources, test_tool_resources = _resolve_test_tool_only(
         graph_maker, target_tc, 'test_tool_only-{ispic}', opts
     )
-    jgraph, _, ctx = jb.gen_build_graph(
+    jgraph, _, ctx = jb.gen_jbuild_graph(
         opts.arc_root,
         java_darts,
         opts,

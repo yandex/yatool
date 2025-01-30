@@ -195,7 +195,7 @@ def gen(
     return task, ctx, ctx.errs
 
 
-def gen_build_graph(
+def gen_jbuild_graph(
     arc_root,
     dart,
     make_opts,
