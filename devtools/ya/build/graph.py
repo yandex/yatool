@@ -1491,8 +1491,8 @@ class _GraphMaker:
                     source_root=self._opts.arc_root,
                     stdin_line_provider=stdin_line_provider,
                     transition_source='pic',
-                    drop_foreign_start_modules=True,
                 )
+                abs_targets = []
 
             def gen_pic():
                 return pic_func(
