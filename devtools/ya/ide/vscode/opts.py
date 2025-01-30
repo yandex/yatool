@@ -31,6 +31,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.allow_project_inside_arc = False
         self.languages = []
         self.add_codegen_folder = False
+        self.vscodium = False
 
     @classmethod
     def consumer(cls):
@@ -236,6 +237,13 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('tests_enabled', True),
                 group=cls.GROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.NONE,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--vscodium"],
+                help="Generate workspace for VSCodium",
+                hook=devtools.ya.core.yarg.SetConstValueHook("vscodium", True),
+                group=cls.GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
         ]
 

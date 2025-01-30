@@ -236,12 +236,13 @@ class VSCodeProject:
                 ("go.testExplorer.enable", False),
                 ("go.toolsManagement.autoUpdate", False),
                 ("go.toolsManagement.checkForUpdates", "off"),
+                ("go.useLanguageServer", False),
                 ("npm.autoDetect", "off"),
                 ("python.analysis.autoSearchPaths", False),
                 ("python.analysis.diagnosticMode", "openFilesOnly"),
                 ("python.analysis.enablePytestSupport", False),
                 ("python.analysis.indexing", False),
-                ("python.languageServer", "Pylance"),
+                ("python.languageServer", "None"),
                 ("python.testing.autoTestDiscoverOnSaveEnabled", False),
                 ("search.followSymlinks", False),
                 ("task.autoDetect", "off"),
@@ -267,10 +268,13 @@ class VSCodeProject:
         if self.is_py3:
             settings["python.analysis.indexing"] = self.params.python_index_enabled
             settings["python.analysis.persistAllIndices"] = True
+            if not self.params.vscodium:
+                settings["python.languageServer"] = "Pylance"
 
         if self.is_go:
             settings.update(
                 (
+                    ("go.useLanguageServer", True),
                     (
                         "go.toolsEnvVars",
                         {
@@ -479,13 +483,10 @@ class VSCodeProject:
             ide_common.emit_message("Generating debug configurations")
             workspace["launch"]["configurations"] = vscode.configurations.gen_debug_configurations(
                 run_modules,
-                self.params.arc_root,
-                self.params.output_root or self.params.arc_root,
+                self.params,
                 self.codegen_cpp_dir,
-                self.params.languages,
                 tool_fetcher,
                 self.python_wrappers_dir,
-                self.params.goroot,
             )
 
         if self.is_cpp:
@@ -539,14 +540,12 @@ class VSCodeProject:
         with open(workspace_path, "w") as f:
             json.dump(workspace, f, indent=4, ensure_ascii=True)
 
+        # TODO: print finish help
+
         if os.getenv("SSH_CONNECTION"):
             ide_common.emit_message(
-                "[[good]]vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank[[rst]]".format(
-                    hostname=platform.node(), workspace_path=workspace_path
-                ),
+                f"[[good]]{"vscodium" if self.params.vscodium else "vscode"}://vscode-remote/ssh-remote+{platform.node()}{workspace_path}?windowId=_blank[[rst]]"
             )
-
-        # TODO: print finish help
 
 
 def gen_vscode_workspace(params):

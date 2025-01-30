@@ -19,14 +19,14 @@ def create_python_wrapper(wrapper_dir, template, arguments):
     return wrapper_path
 
 
-def gen_debug_configurations(
-    run_modules, arc_root, output_dir, codegen_cpp_dir, languages, tool_fetcher, python_wrappers_dir, goroot
-):
-    is_mac = pm.my_platform().startswith("darwin")
+def gen_debug_configurations(run_modules, params, codegen_cpp_dir, tool_fetcher, python_wrappers_dir):
+    arc_root = params.arc_root
+    use_lldb = pm.my_platform().startswith("darwin") or params.vscodium
     is_win = pm.my_platform().startswith("win")
+    output_dir = params.output_root or arc_root
     cpp_debug_params = None
-    if "CPP" in languages:
-        if is_mac:
+    if "CPP" in params.languages:
+        if use_lldb:
             cpp_debug_params = OrderedDict(
                 (
                     ("type", "lldb"),
@@ -108,7 +108,7 @@ def gen_debug_configurations(
         module_type = module.get("MANGLED_MODULE_TYPE")
         module_lang = module.get("MODULE_LANG")
 
-        if not module_type or not module_lang or module_lang not in languages:
+        if not module_type or not module_lang or module_lang not in params.languages:
             ide_common.emit_message("Skipped creating configuration for module \"%s\"" % name)
             continue
 
@@ -223,7 +223,7 @@ def gen_debug_configurations(
                 configuration["preLaunchTask"] = tasks.prepare_task_name(name, module_lang)
                 configuration["presentation"] = {"group": "Tests"}
                 environment = {"YA_TEST_CONTEXT_FILE": os.path.join(test_results_path, "test.context")}
-                if is_mac:
+                if use_lldb:
                     configuration["env"] = environment
                 else:
                     configuration["environment"] = [{"name": n, "value": m} for n, m in environment.items()]
@@ -231,7 +231,7 @@ def gen_debug_configurations(
                 ide_common.emit_message(f"Did not create run configuration for unknown module {module_type}({name})")
                 continue
         elif module_lang == "GO":
-            if not goroot:
+            if not params.goroot:
                 continue
             configuration = OrderedDict(
                 (

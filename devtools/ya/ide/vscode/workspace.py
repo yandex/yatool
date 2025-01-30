@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import shutil
+import sys
 from collections import OrderedDict
 from pathlib import Path, PurePath
 
@@ -279,6 +280,9 @@ def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
 
     pyrightconfig = {
         "typeCheckingMode": "off",
+        "pythonVersion": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "reportMissingImports": "warning",
+        "reportUndefinedVariable": "error",
         "extraPaths": extraPaths,
     }
 
@@ -299,7 +303,7 @@ def get_recommended_extensions(params):
     extensions = ["forbeslindesay.forbeslindesay-taskrunner"]
     if "CPP" in params.languages:
         extensions.append("llvm-vs-code-extensions.vscode-clangd")
-        if is_mac:
+        if is_mac or params.vscodium:
             extensions.append("vadimcn.vscode-lldb")
         else:
             extensions.append("ms-vscode.cpptools")
@@ -309,9 +313,13 @@ def get_recommended_extensions(params):
         extensions.extend(
             [
                 "ms-python.python",
-                "ms-python.vscode-pylance",
+                "ms-python.debugpy",
             ]
         )
+        if params.vscodium:
+            extensions.append("detachhead.basedpyright")
+        else:
+            extensions.append("ms-python.vscode-pylance")
         if params.black_formatter_enabled:
             extensions.append("ms-python.black-formatter")
     if "GO" in params.languages:
