@@ -282,7 +282,9 @@ class SemGraph:
         ymake_conf = self.config.ymake_root / 'ymake.conf'
         shutil.copy(conf, ymake_conf)
 
+        dump_ymake_stderr = kwargs.pop('dump_ymake_stderr', None)
         r, _ = ymake_sem_graph(
+            **kwargs,
             source_root=self.config.arcadia_root,
             custom_build_directory=self.config.ymake_root,
             custom_conf=ymake_conf,
@@ -290,8 +292,17 @@ class SemGraph:
             dump_sem_graph=True,
             ymake_bin=self.config.ymake_bin,
             abs_targets=self.config.params.abs_targets,
-            **kwargs,
         )
+        if dump_ymake_stderr:
+            if dump_ymake_stderr == "log":
+                self.logger.info("YMake call stderr:\n%s\n\n", r.stderr)
+            else:
+                try:
+                    with open(dump_ymake_stderr, "w") as f:
+                        f.write(r.stderr)
+                    self.logger.info("YMake call stderr dumped to %s", dump_ymake_stderr)
+                except Exception as e:
+                    self.logger.error("Can't dump YMake call stderr to %s: %s", dump_ymake_stderr, e)
         if r.exit_code != 0:
             self.logger.error('Fail generate sem-graph by ymake with exit_code=%d:\n%s', r.exit_code, r.stderr)
             raise SemException(f'Fail generate sem-graph by ymake with exit_code={r.exit_code}')

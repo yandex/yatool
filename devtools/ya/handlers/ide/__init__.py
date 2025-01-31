@@ -385,6 +385,7 @@ class GradleOptions(yarg.Options):
         self.login = None
         self.bucket_token = None
         self.remove = None
+        self.dump_ymake_stderr = None
 
     @staticmethod
     def consumer():
@@ -424,6 +425,13 @@ class GradleOptions(yarg.Options):
                 help='Remove gradle project files and all symlinks',
                 hook=yarg.SetConstValueHook('remove', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                ['--dump-ymake-stderr'],
+                help='Dump stderr of YMake call to file (or to console if set to "log")',
+                hook=yarg.SetValueHook('dump_ymake_stderr'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
             yarg.ArgConsumer(
                 ['--yexport-debug-mode'],
@@ -560,8 +568,9 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.ToolsOptions(),
                 build_opts.BuildTypeOptions('release'),
                 build_opts.JavaSpecificOptions(),
+                build_opts.YMakeDebugOptions(),
+                build_opts.YWarnModeOptions(),
             ],
-            visible=False,
         )
         self['qt'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(self._choose_qt_handler),
