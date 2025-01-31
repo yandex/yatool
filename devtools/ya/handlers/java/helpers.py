@@ -9,7 +9,7 @@ from devtools.ya.build.build_facade import gen_managed_dep_tree, gen_targets_cla
 from exts.tmp import temp_dir
 import yalibrary.formatter as yaformatter
 
-from devtools.ya.jbuild.gen import consts
+import yalibrary.graph.const as consts
 
 
 def _get_subscribers(opts, app_ctx):
@@ -107,7 +107,7 @@ def print_classpath(opts):
 def print_test_classpath(opts):
     opts.flags['IGNORE_JAVA_DEPENDENCIES_CONFIGURATION'] = 'yes'
     opts.run_tests = 3
-    ctx, tests = get_java_ctx_with_tests(opts)
+    _, tests = get_java_ctx_with_tests(opts)
     remaining_roots = set(map(fix_windows, opts.rel_targets))
 
     formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
