@@ -11,7 +11,7 @@ import yalibrary.platform_matcher as pm
 DEFAULT_JAVA_PATTERN_TOOL_MAP = {'JDK': 'java', 'YMAKE': 'ymake', 'PYTHON': 'python'}
 
 
-def conf(platform, pattern_tool_map):
+def _conf(platform, pattern_tool_map):
     rev = 11111111
 
     return {
@@ -30,31 +30,18 @@ def conf(platform, pattern_tool_map):
     }
 
 
-def execute(graph, result, opts, app_ctx, host_platform=None, pattern_tool_map=None, graph_conf=None):
+def execute(graph, result, opts, app_ctx):
     make_opts = devtools.ya.core.yarg.merge_opts(devtools.ya.build.build_opts.ya_make_options()).params()
     make_opts.__dict__.update(opts.__dict__)
     make_opts.checkout = False
     make_opts.get_deps = None
 
-    if pattern_tool_map is None:
-        pattern_tool_map = DEFAULT_JAVA_PATTERN_TOOL_MAP
-
-    if graph_conf:
-        result_conf = graph_conf
-        for k, v in pattern_tool_map.items():
-            result_conf['resources'].append(
-                {
-                    'pattern': k,
-                    'resource': tools.resource_id(v, None, pm.canonize_full_platform(result_conf['platform'])),
-                }
-            )
-    else:
-        result_conf = conf(host_platform or pm.my_platform(), pattern_tool_map)
+    pattern_tool_map = DEFAULT_JAVA_PATTERN_TOOL_MAP
 
     task = {
         'graph': graph,
         'result': result,
-        'conf': result_conf,
+        'conf': _conf(pm.my_platform(), pattern_tool_map),
     }
 
     builder = devtools.ya.build.ya_make.YaMake(make_opts, app_ctx, graph=task, tests=[])
