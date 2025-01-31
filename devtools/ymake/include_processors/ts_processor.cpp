@@ -165,13 +165,13 @@ void TTsImportProcessor::ProcessImports(TAddDepAdaptor& node,
             continue;
         }
 
-        if (include.StartsWith(TTsImportParser::PARSE_ERROR_PREFIX)) {
-            if (ignoreNextImport) {
-                ignoreNextImport = false;
-            } else {
-                YConfErr(UserErr) << "Failed to parse import in " << importer << ": " << include.substr(TTsImportParser::PARSE_ERROR_PREFIX.size());
-            }
+        if (ignoreNextImport) {
+            ignoreNextImport = false;
+            continue;
+        }
 
+        if (include.StartsWith(TTsImportParser::PARSE_ERROR_PREFIX)) {
+            YConfErr(UserErr) << "Failed to parse import in " << importer << ": " << include.substr(TTsImportParser::PARSE_ERROR_PREFIX.size());
             continue;
         }
 
