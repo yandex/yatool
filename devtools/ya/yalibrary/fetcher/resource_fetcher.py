@@ -16,7 +16,6 @@ from yalibrary.fetcher.uri_parser import parse_resource_uri, get_mapped_parsed_u
 from .common import RENAME, UNTAR, ProgressPrinter, clean_dir, deploy_tool
 
 from .cache_helper import install_resource
-import app_config
 
 
 class MissingResourceError(Exception):
@@ -24,7 +23,7 @@ class MissingResourceError(Exception):
 
 
 IS_PY3 = sys.version_info[0] >= 3
-CAN_USE_UNIVERSAL_FETCHER = IS_PY3 and os.name != "nt" and app_config.in_house
+CAN_USE_UNIVERSAL_FETCHER = IS_PY3 and os.name != "nt"
 FALLBACK_MSG_LOGGED = False
 
 

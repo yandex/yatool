@@ -15,7 +15,7 @@ PEERDIR(
     devtools/libs/yaplatform/python
 )
 
-IF (PYTHON3 AND NOT OS_WINDOWS AND NOT YA_OPENSOURCE)
+IF (PYTHON3 AND NOT OS_WINDOWS)
     PEERDIR(
         devtools/ya/yalibrary/fetcher/ufetcher
     )
