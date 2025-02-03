@@ -836,23 +836,22 @@ void TYmakeConfig::VerifyModuleConfs() {
         bool moduleNotDefined = false;
         if (mod->Cmd.empty()) {
             if (RenderSemantics) {
-                YWarn() << data.first << " ." << NProperties::SEM << " not defined, set to " << TModuleConf::SEM_IGNORED << Endl;
-                mod->Cmd = TModuleConf::SEM_IGNORED; // Cmd filled, but HasSemantics == false
+                YWarn() << data.first << " [[alt1]]." << NProperties::SEM << "[[rst]] is not defined" << Endl;
             } else {
-                YErr() << data.first << " ." << NProperties::CMD << " not defined" << Endl;
+                YErr() << data.first << " [[alt1]]." << NProperties::CMD << "[[rst]] is not defined" << Endl;
                 moduleNotDefined = true;
             }
         }
         if (!mod->NodeType) {
-            YErr() << data.first << " ." << NProperties::NODE_TYPE << " not defined" << Endl;
+            YErr() << data.first << " [[alt1]]." << NProperties::NODE_TYPE << "[[rst]] is not defined" << Endl;
             moduleNotDefined = true;
         }
         if (mod->InputExts.empty() && !mod->AllExtsAreInputs) {
-            YErr() << data.first << " ." << NProperties::EXTS << " not defined" << Endl;
+            YErr() << data.first << " [[alt1]]." << NProperties::EXTS << "[[rst]] is not defined" << Endl;
             moduleNotDefined = true;
         }
         if (!mod->GlobalCmd.empty() && mod->InputExts.empty() && !mod->AllGlobalExtsAreInputs) {
-            YErr() << data.first << " ." << (RenderSemantics ? NProperties::GLOBAL_SEM : NProperties::GLOBAL_CMD) << " is defined but " << NProperties::GLOBAL_EXTS << " not defined" << Endl;
+            YErr() << data.first << " [[alt1]]." << (RenderSemantics ? NProperties::GLOBAL_SEM : NProperties::GLOBAL_CMD) << "[[rst]] is defined but [[alt1]]." << NProperties::GLOBAL_EXTS << "[[rst]] is not defined" << Endl;
             moduleNotDefined = true;
         }
         for (auto i : mod->Restricted) {
@@ -865,11 +864,11 @@ void TYmakeConfig::VerifyModuleConfs() {
         if (!mod->Epilogue.empty()) {
             const auto it = BlockData.find(mod->Epilogue);
             if (it == BlockData.end()) {
-                YErr() << mod->Epilogue << " macro set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " does not exist." << Endl;
+                YErr() << mod->Epilogue << " macro set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " does not exist." << Endl;
             } else if (it->second.ModuleConf) {
-                YErr() << "The value " << mod->Epilogue << " set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " should define a macro name." << Endl;
+                YErr() << "The value " << mod->Epilogue << " set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " should define a macro name." << Endl;
             } else if (it->second.CmdProps && !it->second.CmdProps->ArgNames.empty()) {
-                YErr() << "Macro set in ." << NProperties::EPILOGUE << " property of module " << mod->Name << " should be a macro without arguments." << Endl;
+                YErr() << "Macro set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " should be a macro without arguments." << Endl;
             }
         }
 
