@@ -114,7 +114,7 @@ def main():
             pm_const.BUNDLE_DIRNAME,
             pm_const.NODE_MODULES_DIRNAME,
             pm_const.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
-            pm_const.OUTPUT_TAR_FILENAME,
+            pm_const.OUTPUT_TAR_UUID_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
             pnpm_const.PNPM_LOCKFILE_FILENAME,
             nots_typescript.DEFAULT_TS_CONFIG_FILE,
