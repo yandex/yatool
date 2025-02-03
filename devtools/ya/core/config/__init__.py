@@ -335,8 +335,11 @@ def get_ya_token_path():
 
 
 @func.lazy
-def get_docker_config_path():
-    return os.path.join(home_dir(), '.docker', 'config.json')
+def get_docker_config_paths():
+    return [
+        os.path.join(home_dir(), '.docker', 'config.json'),
+        os.path.join(home_dir(), '.config', 'containers', 'auth.json'),
+    ]
 
 
 @func.lazy

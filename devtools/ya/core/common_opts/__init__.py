@@ -1048,9 +1048,11 @@ class AuthOptions(Options):
     def _find_docker_config(self):
         if self.docker_config_path:
             return
-        docker_config_path = cc.get_docker_config_path()
-        if os.path.exists(docker_config_path):
-            self.docker_config_path = docker_config_path
+        docker_config_paths = cc.get_docker_config_paths()
+        for docker_config_path in docker_config_paths:
+            if os.path.exists(docker_config_path):
+                self.docker_config_path = docker_config_path
+                return
 
     # TODO: Use devtools/libs/ya_token here
     def _read_token_file(self):
