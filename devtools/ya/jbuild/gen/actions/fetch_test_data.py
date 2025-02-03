@@ -54,5 +54,4 @@ def fetch_test_data(path, target, ctx):
             node.files([os.path.join(data_dir, resource_name), os.path.join(data_dir, resource_info)]),
             res=False,
             kv={consts.IDEA_NODE: True, consts.TEST_DATA_SANDBOX: data_dir},
-            fake_id=target.fake_id(),
         )

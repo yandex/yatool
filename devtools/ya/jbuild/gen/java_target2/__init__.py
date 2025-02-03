@@ -1,6 +1,7 @@
 from devtools.ya.jbuild.gen import consts
 
 import yalibrary.graph.base as graph_base
+import yalibrary.graph.const as graph_consts
 
 
 class Target(object):
@@ -17,7 +18,7 @@ class Target(object):
 
     def output_jar_path(self):
         if self.provides_jar():
-            return graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, self.output_jar_name())
+            return graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, self.output_jar_name())
 
         return None
 
@@ -30,7 +31,7 @@ class Target(object):
 
     def output_sources_jar_path(self):
         if self.provides_sources_jar():
-            return graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, self.output_sources_jar_name())
+            return graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, self.output_sources_jar_name())
 
         return None
 
@@ -56,7 +57,7 @@ class Target(object):
 
     def output_war_path(self):
         if self.provides_war():
-            return graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, self.output_war_name())
+            return graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, self.output_war_name())
 
         return None
 
@@ -69,7 +70,7 @@ class Target(object):
 
     def output_aar_path(self):
         if self.provides_aar():
-            return graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, self.output_aar_name())
+            return graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, self.output_aar_name())
 
         return None
 
@@ -82,7 +83,7 @@ class Target(object):
 
     def output_dll_path(self):
         if self.provides_dll():
-            return graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, self.output_dll_name())
+            return graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, self.output_dll_name())
 
         return None
 
@@ -137,14 +138,6 @@ class Target(object):
 
         else:
             raise Exception()
-
-    def fake_id(self):
-        return None
-
-    def output_vcs_mf_path(self):
-        for t in [consts.CLS, consts.SRC, consts.WAR, consts.AAR]:
-            if self.provides_jar_of_type(t):
-                return self.output_jar_of_type_path(t) + '.__vcs_version__.mf'
 
 
 class YmakeGraphTarget(Target):  # TODO: memoize
@@ -226,7 +219,7 @@ class YmakeGraphTarget(Target):  # TODO: memoize
         return res
 
     def output_dll_paths(self):
-        return [graph_base.hacked_path_join(consts.BUILD_ROOT, self.path, x) for x in self.output_dll_names()]
+        return [graph_base.hacked_path_join(graph_consts.BUILD_ROOT, self.path, x) for x in self.output_dll_names()]
 
     def provides_dll(self):
         return self.output_dll_name() is not None
