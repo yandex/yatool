@@ -81,7 +81,7 @@ def main():
                 sys.stderr.write("[[bad]]Import test failed with [[imp]]{}[[bad]] return code.".format(p.returncode))
 
             sys.stderr.write(
-                "To reproduce run 'ya make -t --test-type import_test' or 'ya make' and [[rst]]'Y_PYTHON_ENTRY_POINT={} {}'\n".format(
+                "To reproduce run 'ya test --test-type import_test' or 'ya make' and [[rst]]'Y_PYTHON_ENTRY_POINT={} {}'\n".format(
                     entry_point,
                     os.path.basename(program),
                 )
