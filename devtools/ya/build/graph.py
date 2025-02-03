@@ -1733,7 +1733,7 @@ class _GraphMaker:
                     no_caches_on_retry=no_caches_on_retry,
                     no_ymake_retry=no_ymake_retry,
                 ),
-                **(ymake_opts or {})
+                **(ymake_opts or {}),
             )
 
         # return res, tc_tests, java_darts, make_files_map
@@ -2008,7 +2008,7 @@ class _GraphMaker:
             check=self._check,
             _purpose=purpose,
             cpp=True,
-            **ymake_opts
+            **ymake_opts,
         )
         if app_config.in_house:
             import yalibrary.diagnostics as diag
@@ -2711,6 +2711,11 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
         val = opts.flags.get(f)
         if val is not None:
             conf_flags += ['-D', '{}={}'.format(f, val)]
+
+    ymakeyndexer_cmd = '$(YMAKEYNDEXER)/ymakeyndexer'
+    if ymakeyndexer_override := opts.flags.get('TOOL_YMAKEYNDEXER'):
+        ymakeyndexer_cmd = ymakeyndexer_override
+
     cmds = [
         {
             'cmd_args': [
@@ -2743,7 +2748,7 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
         },
         {
             'cmd_args': [
-                '$(YMAKEYNDEXER)/ymakeyndexer',
+                ymakeyndexer_cmd,
                 '-i',
                 '$(BUILD_ROOT)/ymake.ydx.json',
                 '-o',
@@ -2912,7 +2917,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             debug_id='tools-{ispic}',
             enabled_events=EVENTS_WITH_PROGRESS,
             extra_conf=opts.extra_conf,
-            **kwargs
+            **kwargs,
         )
         graph_tools = tg.pic().graph
 
