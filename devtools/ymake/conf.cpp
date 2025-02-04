@@ -11,6 +11,7 @@
 #include <devtools/ymake/macro_string.h>
 #include <devtools/ymake/plugins/cpp_plugins.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/vardefs.h>
 #include <devtools/ymake/yndex/builtin.h>
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/stats.h>
@@ -74,6 +75,19 @@ namespace {
 
         for (auto var : tempDontExpandVars) {
             var->DontExpand = false;
+        }
+    }
+
+    void FillModuleScopeOnlyFlag(TBuildConfiguration& conf) {
+        TTraceStage stage("Fill ModuleScopeOnly flag");
+        auto& vars = conf.CommandConf;
+
+        auto moduleScopeOnlyVarList = TCommandInfo(conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR__MODULE_SCOPE_ONLY_VARS, vars);
+
+        for (const auto name : StringSplitter(moduleScopeOnlyVarList).Split(' ').SkipEmpty()) {
+            if (auto iter = vars.find(name); iter != vars.end()) {
+                iter->second.ModuleScopeOnly = true;
+            }
         }
     }
 }
@@ -216,6 +230,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     confData.Update(&confMd5, sizeof(confMd5));
     CompileAndRecalcAllConditions();
     FoldGlobalCommands(*this);
+    FillModuleScopeOnlyFlag(*this);
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
 

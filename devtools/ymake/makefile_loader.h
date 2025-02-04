@@ -48,6 +48,9 @@ public:
 
     bool ShouldSkip(TStringBuf command) const override;
 
+    void EnterModuleScope();
+    void LeaveModuleScope();
+
 protected:
     bool UserStatement(const TStringBuf& name, const TVector<TStringBuf>& args) override;
     TIncludeController OnInclude(TStringBuf incFile, TStringBuf fromFile) override;

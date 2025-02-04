@@ -197,6 +197,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 HasBlockData : 1;
             mutable ui32 AddCtxFilled : 1;
             ui32 NoInline : 1;
+            ui32 ModuleScopeOnly : 1;
         };
     };
     ui32 Id; // tmp hack! only used to return id from Lookup commands
@@ -335,17 +336,23 @@ public:
 
 private:
     TFilterGlobalVarsFunc AcceptGlobalVarWithName;
+    std::function<void(const TYVar&, const TStringBuf&)> VarLookupHook;
 
 public:
     explicit TVars(const TVars* base = nullptr)
         : Base(base)
         , Id(0)
         , AcceptGlobalVarWithName([](const TStringBuf&) -> bool { return true; })
+        , VarLookupHook([](const TYVar&, const TStringBuf&) {})
     {
     }
 
     void AssignFilterGlobalVarsFunc(const TFilterGlobalVarsFunc& filter) {
         AcceptGlobalVarWithName = filter;
+    }
+
+    void AssignVarLookupHook(const std::function<void(const TYVar&, const TStringBuf&)>& hook) {
+        VarLookupHook = hook;
     }
 
     void Clear() {
@@ -443,11 +450,16 @@ public:
         if (varIt != end()) {
             TYVar* var = (TYVar*)&varIt->second;
             var->Id = Id; // tmp
+            VarLookupHook(*var, name);
             return var;
         }
 
         if (Base) {
-            return Base->Lookup(name);
+            auto var = Base->Lookup(name);
+            if (var) {
+                VarLookupHook(*var, name);
+            }
+            return var;
         }
 
         return nullptr;

@@ -18,6 +18,7 @@ struct TVariableDefiniton {
 #define VARIABLE(name, description) constexpr TVariableDefiniton VAR_##name{#name, description, __LOCATION__};
 
 VARIABLE(_IGNORE_DUPSRC, "")
+VARIABLE(_MODULE_SCOPE_ONLY_VARS, "list of variables that are allowed in module scope only")
 VARIABLE(ALL_SRCS, "")
 VARIABLE(APPLIED_EXCLUDES, "")
 VARIABLE(ARCADIA_BUILD_ROOT, "build output root directory")
@@ -99,6 +100,7 @@ VARIABLE(YMAKE_BIN, "")
 
 constexpr TVariableDefiniton ALL_VARIABLES[]{
     VAR__IGNORE_DUPSRC,
+    VAR__MODULE_SCOPE_ONLY_VARS,
     VAR_ALL_SRCS,
     VAR_APPLIED_EXCLUDES,
     VAR_ARCADIA_BUILD_ROOT,

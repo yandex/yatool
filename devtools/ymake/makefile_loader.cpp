@@ -63,6 +63,19 @@ TDirParser::TDirParser(TYMake& yMake, TFileView dir, TStringBuf makefile, TPropV
     InitModuleVars(Vars(), Conf.CommandConf, GetMakefileId(), dir);
     auto [it, _] = UniqIncludes.insert({Makefile, {}});
     IncludeStack.emplace_back(it->first);
+    LeaveModuleScope();
+}
+
+void TDirParser::EnterModuleScope() {
+    Vars().AssignVarLookupHook([](const TYVar&, const TStringBuf&) {});
+}
+
+void TDirParser::LeaveModuleScope() {
+    Vars().AssignVarLookupHook([](const TYVar& var, const TStringBuf& name) {
+        if (var.ModuleScopeOnly) {
+            YConfErr(UserErr) << "Cannot use variable " << name << " outside of a module";
+        }
+    });
 }
 
 void TDirParser::Load() {
@@ -265,6 +278,7 @@ void TDirParser::NukeModule() {
     ModulesInDir.pop_back();
     RestoreDirNamespace();
     TModule& toDestroy = Module->GetModule();
+    LeaveModuleScope();
     delete Module;
     Module = nullptr;
     YMake.Modules.Destroy(toDestroy);
@@ -284,6 +298,7 @@ void TDirParser::SaveModule(TModuleDef* module) {
 
 void TDirParser::ClearModule() {
     RestoreDirNamespace();
+    LeaveModuleScope();
     SaveModule(Module);
     Module = nullptr;
 }
@@ -516,6 +531,7 @@ bool TDirParser::DeclStatement(const TStringBuf& name, TArrayRef<const TStringBu
         CheckEx(!Module, "module inside module");
         TModuleConf& conf = *(i->second.ModuleConf.Get());
         Module = new TModuleDef(YMake, YMake.Modules.Create(Dir, Makefile, conf.Tag), conf);
+        EnterModuleScope();
         if (NextSubModule > 0) {
             Module->GetModule().SetFromMultimodule();
         }
