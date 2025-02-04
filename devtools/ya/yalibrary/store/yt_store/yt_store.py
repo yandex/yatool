@@ -116,7 +116,7 @@ class YtStore(DistStore):
 
     def wait_until_tables_ready(self):
         if self._prepare_tables_future:
-            self._prepare_tables_future(wrapped=True)
+            self._prepare_tables_future()
             self._prepare_tables_future = None
 
     def _get_meta_to_delete(self, data_size_to_delete, min_access_time_threshold, limit):
