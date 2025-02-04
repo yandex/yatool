@@ -326,7 +326,7 @@ def get_workspace_template(params, YA_PATH):
                                         ('type', 'shell'),
                                         (
                                             'command',
-                                            YA_PATH + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
+                                            YA_PATH + ' ' + ' '.join(exts.shlex2.quote(arg) for arg in sys.argv[1:]),
                                         ),
                                         ('options', OrderedDict((('cwd', os.path.abspath(os.curdir)),))),
                                     )
