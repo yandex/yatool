@@ -12,7 +12,14 @@ try:
 except ImportError:
     universal_fetcher = None
 
-FetchResponse = collections.namedtuple("FetchResponse", ("result", "download_time_ms"))
+FetchResponse = collections.namedtuple(
+    "FetchResponse",
+    (
+        "result",
+        "download_time_ms",
+        "size",
+    ),
+)
 
 
 @exts.func.memoize(thread_safe=False)
@@ -72,8 +79,9 @@ def download_file(
     if use_universal_fetcher and universal_fetcher is not None:
         result = _download_file_by_ufetcher(url, path, additional_file_perms, expected_md5, headers, raise_err)
         last_attempt = result.get("last_attempt", {})
+        size = last_attempt.get("result", {}).get("resource_info", {}).get("size", 0)
         download_time_ms = last_attempt.get("duration_us", 0) / 1000
-        return FetchResponse(result, download_time_ms)
+        return FetchResponse(result, download_time_ms, size)
 
-    download_time_ms = exts.http_client.download_file(url, path, additional_file_perms, expected_md5, headers)
-    return FetchResponse(None, download_time_ms)
+    download_time_ms, size = exts.http_client.download_file(url, path, additional_file_perms, expected_md5, headers)
+    return FetchResponse(None, download_time_ms, size)

@@ -544,6 +544,57 @@ def print_dist_cache_statistics(graph, filename, display):
     return stats
 
 
+def print_distbuild_download_statistics(graph, filename, display):
+    try:
+        total_download_size = 0
+        total_time_spent_on_download = 0
+        true_time_spent_on_download = 0
+        cnt = 0
+        for task in graph.prepare_tasks.values():
+            if task.get_type() != 'prepare:download from DistBuild':
+                continue
+
+            cnt += 1
+
+            total_time_spent_on_download += task.get_time_elapsed() or 0
+            true_time_spent_on_download += task.download_time_ms or 0
+            total_download_size += task.size or 0
+
+        if total_download_size == 0:
+            return
+
+        speed = total_download_size / total_time_spent_on_download
+        true_speed = total_download_size / true_time_spent_on_download
+    except Exception as e:  # just in case of memory and zerodivision errors
+        logger.debug("Coudn't calculate disbuild download statistics due to: %s", e)
+    else:
+        display.emit_message(
+            'DistBuild download: count={}, size={}, speed={}/s, true speed={}/s'.format(
+                cnt,
+                format_size(total_download_size, binary=True),
+                format_size(speed),
+                format_size(true_speed),
+            )
+        )
+
+        stats = {
+            'total_download_size': total_download_size,
+            'total_time_spent_on_download': total_time_spent_on_download,
+            'true_time_spent_on_download': true_time_spent_on_download,
+            'speed': speed,
+            'true_speed': true_speed,
+        }
+
+        if filename is not None:
+            with open(filename, 'w') as output_file:
+                json.dump(stats, output_file, indent=4, sort_keys=True)
+            display.emit_message(f'DistBuild download stats are saved to {filename}')
+
+        display.emit_message()
+
+        return stats
+
+
 def print_disk_usage(task_stats, filename, display):
     if not task_stats:
         return
@@ -780,6 +831,9 @@ def print_graph_statistics(
     stats['cache_hit'] = print_cache_statistics(graph, _make_file_path('cache-hit.json'), display)
     stats['dist_cache_stat'] = print_dist_cache_statistics(graph, _make_file_path('yt-store-stat.json'), display)
     stats['disk_usage'] = print_disk_usage(task_stats, _make_file_path('disk-usage.json'), display)
+    stats['distbuild_download_stat'] = print_distbuild_download_statistics(
+        graph, _make_file_path('distbuild-download-stat.json'), display
+    )
     tasks, critical_data = print_all_tasks(graph, _make_file_path('task-list'), display)
     stats['critical_path'] = print_critical_path(
         critical_data, graph, _make_file_path('critical-path'), display, ymake_stats

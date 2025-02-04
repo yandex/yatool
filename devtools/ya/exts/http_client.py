@@ -139,17 +139,19 @@ def download_file_with_integrity(url, path, integrity, integrity_encoding='base6
     # Create finale file only after successful download, checksum verification and installation of all required attributes
     os.rename(temp_path, path)
 
+    size = sum(chunks_sizes)
+
     logger.debug(
         'Downloading finished %s to %s, %s=%s, size=%s, elapsed=%f',
         url,
         path,
         alg,
         checksum_str,
-        str(sum(chunks_sizes)),
+        str(size),
         time.time() - start_time,
     )
 
-    return (download_end_time - download_start_time) * 1000
+    return (download_end_time - download_start_time) * 1000, size
 
 
 def _http_call(url, method, data=None, headers=None, timeout=30):
