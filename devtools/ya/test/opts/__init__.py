@@ -1863,7 +1863,7 @@ class InterimOptions(devtools.ya.core.yarg.Options):
         self.use_throttling = False
         self.remove_implicit_data_path = False
         self.no_tests_is_error = False
-        self.tests_limit_in_suite = 0
+        self.tests_limit_in_suite = 100000
 
     def consumer(self):
         return [
