@@ -175,22 +175,33 @@ def get_tree_info(arcadia_root: str, package_file: str, traversal_variant_param:
     if traversal_variant_param is not None:
         traversal_variant = TraversalType(traversal_variant_param)
 
-    build_section_visitor = BuildSectionVisitor(traversal_variant)
-    data_section_visitor = DataSectionVisitor(traversal_variant)
-    postprocesses_section_visitor = PostprocessesSectionVisitor(traversal_variant)
+    # DEVTOOLSSUPPORT-57244
+    # XXX: it's adhoc fix, better to remove it and fix errors behind this hack for java but it'll take some time to debug
+    if len(tree.includes) == 0:
+        build_section = tree.parsed_json.get("build", {})
+        data_section = tree.parsed_json.get("data", [])
+        postprocess_section = tree.parsed_json.get("postprocess", [])
+    else:
+        build_section_visitor = BuildSectionVisitor(traversal_variant)
+        data_section_visitor = DataSectionVisitor(traversal_variant)
+        postprocesses_section_visitor = PostprocessesSectionVisitor(traversal_variant)
 
-    tree.visit(build_section_visitor)
-    tree.visit(data_section_visitor)
-    tree.visit(postprocesses_section_visitor)
+        tree.visit(build_section_visitor)
+        tree.visit(data_section_visitor)
+        tree.visit(postprocesses_section_visitor)
+
+        build_section = build_section_visitor.build
+        data_section = data_section_visitor.data
+        postprocess_section = postprocesses_section_visitor.postprocess
 
     tree_info = TreeInfo(
         root=tree,
         meta=up_to_bottom_visitor.meta,
-        data=data_section_visitor.data,
+        data=data_section,
         userdata=up_to_bottom_visitor.userdata,
         params=up_to_bottom_visitor.params,
-        build=build_section_visitor.build,
-        postprocess=postprocesses_section_visitor.postprocess,
+        build=build_section,
+        postprocess=postprocess_section,
         includes=up_to_bottom_visitor.includes,
     )
 
