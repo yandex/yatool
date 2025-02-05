@@ -558,6 +558,7 @@ class IdeYaHandler(yarg.CompositeHandler):
             description='Generate gradle for project with yexport',
             opts=devtools.ya.ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
+                devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 GradleOptions(),
                 build_opts.YMakeBinOptions(),
@@ -570,6 +571,8 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.JavaSpecificOptions(),
                 build_opts.YMakeDebugOptions(),
                 build_opts.YWarnModeOptions(),
+                build_opts.BuildThreadsOptions(build_threads=None),
+                build_opts.DistCacheOptions(),
             ],
         )
         self['qt'] = yarg.OptsHandler(
