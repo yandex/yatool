@@ -82,6 +82,7 @@ private:
     void NukeModule();
     void ApplyDiscard();
 
+    void CheckModuleSemantics();
     void CheckModuleEnd();
     void ReadMakeFile(const TString& makefile);
     void ReadMakeFile();

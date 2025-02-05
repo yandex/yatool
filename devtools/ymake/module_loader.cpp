@@ -208,6 +208,11 @@ TDepsCacheId TModuleDef::Commit() {
 
     ConfMsgManager()->Erase(modId);
 
+    if (LateConfErrNoSem_) {
+        TScopedContext scopedContext{modName};
+        YConfErr(NoSem) << "No semantics set for " << Module.GetUserType() << ". Module is not intended to be exported." << Endl;
+    }
+
     const TModule* other = Modules.Get(modId);
     if (Y_UNLIKELY(other != nullptr && other != &Module && !other->IsLoaded())) {
         YConfErr(UserErr) << "module name [[alt1]]" << modName << "[[rst]] already used, use .SUFFIX/.PREFIX properties to disambiguate" << Endl;

@@ -8,6 +8,7 @@
 #include "add_dep_adaptor_inline.h"
 #include "parser_manager.h"
 #include "prop_names.h"
+#include "diag_reporter.h"
 
 #include <devtools/ymake/lang/plugin_facade.h>
 #include <devtools/ymake/lang/eval_context.h>
@@ -381,16 +382,6 @@ void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd) {
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
-    Y_ASSERT(ModuleDef);
-    if (ModuleDef->GetBuildConf().RenderSemantics) {
-        if (cmdKind == EModuleCmdKind::Default && !GetModuleConf().HasSemantics) {
-            YConfErr(NoSem) << "No semantics set for " << Module.GetUserType() << ". Module is not intended to be exported." << Endl;
-        }
-        if (cmdKind == EModuleCmdKind::Global && !GetModuleConf().HasSemanticsForGlobals) {
-            YConfErr(NoSem) << "No semantics set for GLOBAL sources. Module " << Module.GetUserType() << " is not intended to be exportd when GLOBAL sources are used." << Endl;
-        }
-    }
-
     if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
         auto compiled = [&]() {
             try {
@@ -469,8 +460,17 @@ void TModuleBuilder::AddGlobalDep() {
         return;
     }
     Node.AddUniqueDep(EDT_Search2, EMNT_NonParsedFile, Module.GetGlobalFileName().GetElemId());
-    if (GetModuleConf().GlobalCmd.empty()) {
+    const auto& moduleConf = GetModuleConf();
+    if (moduleConf.GlobalCmd.empty()) {
         YConfErr(Misconfiguration) << "Global cmd is empty for " << Module.GetName() << " module but USE_GLOBAL_CMD is enabled" << Endl;
+    }
+    if (Conf.RenderSemantics && !moduleConf.HasSemanticsForGlobals && !Module.IsSemIgnore()) {
+        if (!Conf.ForeignOnNoSem) {
+            YConfErr(NoSem) << "No semantics set for GLOBAL sources. Module " << Module.GetUserType() << " is not intended to be exported when GLOBAL sources are used." << Endl;
+        } else if (Module.IsFinalTarget()) {
+            IDEDependEvent(Module);
+        }
+        Module.SetSemIgnore();
     }
 
     AddLinkDep(Module.GetGlobalFileName(), GetModuleConf().GlobalCmd, *GlobalNode, EModuleCmdKind::Global);

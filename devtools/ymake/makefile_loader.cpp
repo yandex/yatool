@@ -5,6 +5,7 @@
 #include "module_loader.h"
 #include "prop_names.h"
 #include "ymake.h"
+#include "diag_reporter.h"
 
 #include <devtools/ymake/lang/makefile_reader.h>
 #include <devtools/ymake/lang/resolve_include.h>
@@ -148,6 +149,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
         ModulesInDir.push_back(Module);
         SetCurrentNamespace(&Module->GetVars());
         SetOriginalVars(&Module->GetOrigVars());
+        CheckModuleSemantics();
     } else if (IsBlockDataModule(data)) {
         TString what = TString::Join("module [[alt1]]", name, "[[rst]] inside module ", Module->GetModuleConf().Name, ". Maybe you need to place ", name, " after END()?");
         TRACE(S, NEvent::TMakeSyntaxError(what, Makefile));
@@ -855,6 +857,31 @@ TIncludeController TDirParser::OnInclude(TStringBuf incFile, TStringBuf fromFile
         }
     }
     return TIncludeController(IncludeStack, it->first);
+}
+
+void TDirParser::CheckModuleSemantics() {
+    if (!Module->GetBuildConf().RenderSemantics) {
+        return;
+    }
+    bool noSem = !Module->GetModuleConf().HasSemantics;
+    auto& module = Module->GetModule();
+    if (!Conf.ForeignOnNoSem) {
+        if (noSem && !module.IsSemIgnore()) {
+            Module->SetLateConfErrNoSem();
+        }
+    } else {
+        if (!noSem) {
+            const auto& exportLang = YMake.GetExportLang();
+            const auto& moduleLang = module.GetLang();
+            noSem = !exportLang.empty() && !moduleLang.empty() && exportLang != moduleLang;
+        }
+        if (noSem) {
+            if (module.IsFinalTarget()) {
+                IDEDependEvent(module);
+            }
+            module.SetSemIgnore();
+        }
+    }
 }
 
 void TDirParser::CheckModuleEnd() {

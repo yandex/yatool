@@ -79,6 +79,7 @@ private:
     TUniqVector<TString> MakelistPeers;  // References to some Module.Peers
     bool NeverCache = false;
     bool HasVersion = false;
+    bool LateConfErrNoSem_ = false;
 
     bool IsMacroAllowed(const TStringBuf& name) {
         return ModuleConf.Allowed.contains(name) || !ModuleConf.Restricted.contains(name);
@@ -168,6 +169,7 @@ public:
     bool IsNeverCache() const noexcept {return NeverCache;}
     bool IsVersionSet() const noexcept {return HasVersion;}
     void VersionSet(bool val) noexcept {HasVersion = val;}
+    void SetLateConfErrNoSem() { LateConfErrNoSem_ = true; }
 
     template <typename TMacroHandler>
     void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler handler, bool lintersMake = false) {
