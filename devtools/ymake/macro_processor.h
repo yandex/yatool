@@ -167,9 +167,9 @@ public:
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
         ui32 cmdElemId,
-        const TVector<NCommands::TCompiledCommand::TInput>& cmdInputs,
-        const TVector<NCommands::TCompiledCommand::TOutput>& cmdOutputs,
-        const TVector<NCommands::TCompiledCommand::TOutputInclude>& cmdOutputIncludes,
+        std::span<const NCommands::TCompiledCommand::TInput> cmdInputs,
+        std::span<const NCommands::TCompiledCommand::TOutput> cmdOutputs,
+        std::span<const NCommands::TCompiledCommand::TOutputInclude> cmdOutputIncludes,
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);

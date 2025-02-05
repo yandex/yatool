@@ -34,13 +34,12 @@ namespace NCommands {
             public TUniqContainerImpl<TLink, TStringBuf, 32, TVector<TLink>, true> // basically, TUniqVector<TLink> with IsIndexed=true
         {
         public:
-            ui32 Base = 0;
             ui32 CollectCoord(TStringBuf s) {
-                return this->Push(TLink(s)).first + Base;
+                return this->Push(TLink(s)).first;
             }
             template<typename FUpdater>
             void UpdateCoord(ui32 coord, FUpdater upd) {
-                this->Update(coord - Base, upd);
+                this->Update(coord, upd);
             }
         };
         using TInputs = TLinks<TInput>;

@@ -535,9 +535,9 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
 bool TCommandInfo::GetCommandInfoFromStructCmd(
     TCommands& commands,
     ui32 cmdElemId,
-    const TVector<NCommands::TCompiledCommand::TInput>& cmdInputs,
-    const TVector<NCommands::TCompiledCommand::TOutput>& cmdOutputs,
-    const TVector<NCommands::TCompiledCommand::TOutputInclude>& cmdOutputIncludes,
+    std::span<const NCommands::TCompiledCommand::TInput> cmdInputs,
+    std::span<const NCommands::TCompiledCommand::TOutput> cmdOutputs,
+    std::span<const NCommands::TCompiledCommand::TOutputInclude> cmdOutputIncludes,
     const TVars& vars
 ) {
 

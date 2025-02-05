@@ -26,15 +26,16 @@ enum class ECmdId: ui32 {
     Invalid = ~0u
 };
 
-enum class EOutputAccountingMode {
-    Default, // full enumeration, e.g., in nodes originating from the SRCS macro
-    Module // implicit main output
-};
-
 struct TCompilationIODesc {
-    EOutputAccountingMode OutputAccountingMode = EOutputAccountingMode::Default;
+
+    // non-empty for modules, empty for macros in general;
+    // if present, this will be registered as the 0th output;
+    // explicit module-name outputs in commands should end up referencing this one
+    std::string_view MainOutput;
+
     TSpecFileList* KnownInputs = nullptr;
     TSpecFileList* KnownOutputs = nullptr;
+
 };
 
 struct TErrorShowerState {

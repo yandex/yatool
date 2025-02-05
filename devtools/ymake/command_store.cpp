@@ -195,18 +195,6 @@ namespace {
 
     private:
 
-        template<typename TLinks>
-        ui32 CollectCoord(TStringBuf s, TLinks& links) {
-            return links.Push(s).first + links.Base;
-        }
-
-        template<typename TLinks, typename FUpdater>
-        void UpdateCoord(TLinks& links, ui32 coord, FUpdater upd) {
-            links.Update(coord - links.Base, upd);
-        }
-
-    private:
-
         const NCommands::TModRegistry& Mods;
         TMacroValues& Values;
         const TVars& Vars;
@@ -991,14 +979,8 @@ void TCommands::StreamCmdRepr(
 
 NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, TCompilationIODesc io) {
     NCommands::TCompiledCommand result;
-    switch (io.OutputAccountingMode) {
-        case EOutputAccountingMode::Default:
-            break;
-        case EOutputAccountingMode::Module:
-            // the zeroth entry is the main output, see TMakeCommand::MineInputsAndOutputs
-            result.Outputs.Base = 1;
-            break;
-    }
+    if (!io.MainOutput.empty())
+        result.Outputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(io.MainOutput))));
     if (io.KnownInputs)
         for (auto& x : *io.KnownInputs)
             result.Inputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));

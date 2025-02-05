@@ -383,12 +383,14 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
     if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
+        auto mainOutputFile = Graph.GetFileName(node.ElemId);
+        auto mainOutputName = mainOutputFile.Basename();
         auto compiled = [&]() {
             try {
-                return Commands.Compile(command, Conf, Vars, true, {EOutputAccountingMode::Module});
+                return Commands.Compile(command, Conf, Vars, true, {.MainOutput = mainOutputName});
             } catch (const std::exception& e) {
                 YConfErr(Details) << "Command processing error (module " << Module.GetUserType() << "): " << e.what() << Endl;
-                return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {EOutputAccountingMode::Module});
+                return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
             }
         }();
         const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
@@ -396,7 +398,10 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         cmdInfo->InitFromModule(Module);
 
-        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), compiled.OutputIncludes.Take(), Vars);
+        auto outputs = compiled.Outputs.Take();
+        auto output_view = std::span(outputs);
+        output_view = output_view.subspan(1); // drop the main output, it's processed elsewhere
+        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), output_view, compiled.OutputIncludes.Take(), Vars);
 
         if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
             AddGlobalVarDeps(node, true);
