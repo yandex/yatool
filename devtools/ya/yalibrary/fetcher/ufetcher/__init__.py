@@ -99,9 +99,13 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         backoff_multiplier=1.25,
     )
 
-    http_config = universal_fetcher.HttpConfig(
-        universal_fetcher.HttpParams(user_agent=exts.http_client.make_user_agent()), default_retry_policy
+    http_params = universal_fetcher.HttpParams(
+        user_agent=exts.http_client.make_user_agent(),
+        socket_timeout_ms=30_000,
+        connect_timeout_ms=30_000,
     )
+
+    http_config = universal_fetcher.HttpConfig(http_params)
 
     sandbox_config = None
     docker_config = None
@@ -128,13 +132,13 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         }
 
         if universal_fetcher.SandboxTransportType.HTTP in transports_order:
-            kwargs["http_params"] = universal_fetcher.HttpParams(user_agent=exts.http_client.make_user_agent())
+            kwargs["http_params"] = http_params
 
         if universal_fetcher.SandboxTransportType.SKYNET in transports_order:
             kwargs["skynet_params"] = universal_fetcher.SkynetParams()
 
         if universal_fetcher.SandboxTransportType.MDS in transports_order:
-            kwargs["mds_params"] = universal_fetcher.MdsParams()
+            kwargs["mds_params"] = universal_fetcher.MdsParams(socket_timeout_ms=30_000, connect_timeout_ms=30_000)
 
         if universal_fetcher.SandboxTransportType.EXTERNAL_PROGRAM_FETCHER in transports_order:
             if cmd := _get_external_program_fetcher_cmd():

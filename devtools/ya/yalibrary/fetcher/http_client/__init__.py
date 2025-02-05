@@ -36,9 +36,14 @@ def _get_ufetcher():
         max_delay_ms=60000,
         backoff_multiplier=1.5,
     )
-    http_config = universal_fetcher.HttpConfig(
-        universal_fetcher.HttpParams(user_agent=exts.http_client.make_user_agent()), retry_policy
+
+    http_params = universal_fetcher.HttpParams(
+        user_agent=exts.http_client.make_user_agent(),
+        socket_timeout_ms=30000,
+        connect_timeout_ms=30000,
     )
+
+    http_config = universal_fetcher.HttpConfig(http_params, retry_policy)
 
     cfg = universal_fetcher.FetchersConfig(http_config)
 
