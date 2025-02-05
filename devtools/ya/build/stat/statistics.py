@@ -545,44 +545,45 @@ def print_dist_cache_statistics(graph, filename, display):
 
 
 def print_distbuild_download_statistics(graph, filename, display):
+    total_download_size = 0
+    total_time_by_run = 0
+    total_time_by_dl = 0
+    cnt = 0
+
     try:
-        total_download_size = 0
-        total_time_spent_on_download = 0
-        true_time_spent_on_download = 0
-        cnt = 0
         for task in graph.prepare_tasks.values():
             if task.get_type() != 'prepare:download from DistBuild':
                 continue
 
             cnt += 1
 
-            total_time_spent_on_download += task.get_time_elapsed() or 0
-            true_time_spent_on_download += task.download_time_ms or 0
+            total_time_by_run += task.get_time_elapsed() or 0
+            total_time_by_dl += task.download_time_ms or 0
             total_download_size += task.size or 0
 
         if total_download_size == 0:
             return
 
-        speed = total_download_size / total_time_spent_on_download
-        true_speed = total_download_size / true_time_spent_on_download
+        speed_by_run_time = total_download_size / total_time_by_run
+        speed_by_dl_time = total_download_size / total_time_by_dl
     except Exception as e:  # just in case of memory and zerodivision errors
         logger.debug("Coudn't calculate disbuild download statistics due to: %s", e)
     else:
         display.emit_message(
-            'DistBuild download: count={}, size={}, speed={}/s, true speed={}/s'.format(
+            'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms'.format(
                 cnt,
                 format_size(total_download_size, binary=True),
-                format_size(speed),
-                format_size(true_speed),
+                format_size(speed_by_run_time),
+                format_size(speed_by_dl_time),
+                total_time_by_run,
+                total_time_by_dl,
             )
         )
 
         stats = {
             'total_download_size': total_download_size,
-            'total_time_spent_on_download': total_time_spent_on_download,
-            'true_time_spent_on_download': true_time_spent_on_download,
-            'speed': speed,
-            'true_speed': true_speed,
+            'total_time_by_run': total_time_by_run,
+            'total_time_by_dl': total_time_by_dl,
         }
 
         if filename is not None:
