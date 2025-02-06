@@ -93,7 +93,7 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
 def get_ufetcher() -> universal_fetcher.UniversalFetcher:
     default_retry_policy = universal_fetcher.RetryPolicy(
         max_retry_count=5,
-        initial_delay_ms=100,
+        initial_delay_ms=750,
         use_fixed_delay=False,
         max_delay_ms=5_000,
         backoff_multiplier=1.25,
