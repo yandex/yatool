@@ -53,7 +53,7 @@ def execve(exec_path, args=[], env=None, cwd=None):
 
 
 def run_process(exec_path, args=[], env=None, cwd=None, check=False, pipe_stdout=True, return_stderr=False):
-    logger.debug("run {0} with args {1} and {2} env".format(exec_path, args, env))
+    logger.debug("run %s with args %s and %s env", exec_path, args, env)
     process = popen(
         [exec_path] + args, stdout=subprocess.PIPE if pipe_stdout else None, stderr=subprocess.PIPE, env=env, cwd=cwd
     )
