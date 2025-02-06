@@ -570,7 +570,7 @@ def print_distbuild_download_statistics(graph, filename, display):
         logger.debug("Coudn't calculate disbuild download statistics due to: %s", e)
     else:
         display.emit_message(
-            'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms'.format(
+            'DistBuild download: count={}, size={}, speed_by_run_time={:.02f}/s, speed_by_dl_time={:.02f}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms'.format(
                 cnt,
                 format_size(total_download_size, binary=True),
                 format_size(speed_by_run_time),
