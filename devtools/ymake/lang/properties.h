@@ -36,7 +36,7 @@ PROPERTY(STRUCT_CMD, "Enables or disables new command template interpreter for t
 PROPERTY(STRUCT_SEM, "")
 PROPERTY(DEFAULT_NAME_GENERATOR, "")
 PROPERTY(EPILOGUE, "")
-PROPERTY(EXTS, "")
+PROPERTY(EXTS, "@usage: `.EXTS=.o .obj` specify a list of extensions which are automatically captured as module AUTO_INPUT for all `output`s generated in the current module without the `noauto` modifier.")
 PROPERTY(FINAL_TARGET, "")
 PROPERTY(GEN_FROM_FILE, "")
 PROPERTY(GLOBAL, "")
