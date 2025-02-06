@@ -16,7 +16,7 @@
 #include <util/generic/singleton.h>
 #include <util/generic/yexception.h>
 
-void TMacroFacade::InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out) {
+void TMacroFacade::InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out) const {
     THashMap<TString, TSimpleSharedPtr<TMacroImpl>>::const_iterator it = Name2Macro_.find(name);
     if (it == Name2Macro_.end()) {
         ythrow yexception() << "undefined macro with name: " << name;
@@ -24,15 +24,22 @@ void TMacroFacade::InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const 
     it->second->Execute(unit, params, out);
 }
 
-bool TMacroFacade::ContainsMacro(const TStringBuf& name) {
+bool TMacroFacade::ContainsMacro(const TStringBuf& name) const {
     return Name2Macro_.find(name) != Name2Macro_.end();
 }
 
 TMacroImpl::~TMacroImpl() {
 }
 
-void TMacroFacade::RegisterMacro(const TString& name, TSimpleSharedPtr<TMacroImpl> action) {
+void TMacroFacade::RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action) {
     Name2Macro_.try_emplace(name, action);
+    const auto& def = action->Definition;
+    conf.CommandDefinitions.AddDefinition(
+        name,
+        def.FilePath,
+        {def.LineBegin, def.ColumnBegin, def.LineEnd, def.ColumnEnd},
+        def.DocText,
+        NYndex::EDefinitionType::Macro);
 }
 
 class TParserAdapter: public TParserBase {
@@ -112,20 +119,14 @@ public:
     }
 };
 
-void TMacroFacade::RegisterParser(const TString& ext, TSimpleSharedPtr<TParser> parser) {
+void TMacroFacade::RegisterParser(TBuildConfiguration& conf, const TString& ext, TSimpleSharedPtr<TParser> parser) {
     TVector<TString> exts;
     exts.push_back(ext);
-    if (Conf) {
-        Conf->ParserPlugins.push_back(std::make_pair(new TParserAdapter(parser), exts));
-    }
+    conf.ParserPlugins.push_back(std::make_pair(new TParserAdapter(parser), exts));
 }
 
-TMacroFacade* MacroFacade() {
-    return Singleton<TMacroFacade>();
-}
-
-void RegisterPluginFilename(const char* fileName) {
-    MacroFacade()->Conf->Plugins.push_back(fileName);
+void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName) {
+    conf.Plugins.push_back(fileName);
 }
 
 void OnPluginLoadFail(const char* fileName, const char* msg) {

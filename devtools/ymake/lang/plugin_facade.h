@@ -79,6 +79,16 @@ public:
     virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) = 0;
 
     virtual ~TMacroImpl();
+
+    struct TDefinition {
+        TString DocText;
+        TString FilePath;
+        size_t LineBegin = 0;
+        size_t ColumnBegin = 0;
+        size_t LineEnd = 0;
+        size_t ColumnEnd = 0;
+    } Definition;
+
 };
 
 class TParser {
@@ -96,22 +106,18 @@ private:
     THashMap<TString, TSimpleSharedPtr<TMacroImpl>> Name2Macro_;
 
 public:
-    TBuildConfiguration* Conf = nullptr;
+    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const;
+    bool ContainsMacro(const TStringBuf& name) const;
 
-    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr);
-    void RegisterMacro(const TString& name, TSimpleSharedPtr<TMacroImpl> action);
-    bool ContainsMacro(const TStringBuf& name);
-
-    void RegisterParser(const TString& ext, TSimpleSharedPtr<TParser> parser);
+    void RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action);
+    void RegisterParser(TBuildConfiguration& conf, const TString& ext, TSimpleSharedPtr<TParser> parser);
 };
-
-TMacroFacade* MacroFacade();
 
 // functions below implemented outside
 
 void LoadPlugins(const TVector<TFsPath> &sourceRoot, TBuildConfiguration *conf);
 
-void RegisterPluginFilename(const char* fileName);
+void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 
 void OnPluginLoadFail(const char* fileName, const char* msg);
 

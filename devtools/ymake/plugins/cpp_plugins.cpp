@@ -6,9 +6,9 @@
 
 namespace NYMake {
     namespace NPlugins {
-        void RegisterCppPlugins() {
-            TPluginResourceHandler::RegisterMacro();
-            TPluginGoFakeOutputHandler::RegisterMacro();
+        void RegisterCppPlugins(TBuildConfiguration& conf) {
+            TPluginResourceHandler::RegisterMacro(conf);
+            TPluginGoFakeOutputHandler::RegisterMacro(conf);
         }
     } // end of namespace NPlugins
 } // end of namespace NYMake

@@ -4,6 +4,8 @@
 
 #include <Python.h>
 
+class TBuildConfiguration;
+
 namespace NYMake {
     namespace NPlugins {
         class TPluginMacroImpl: public TMacroImpl, private TNonCopyable {
@@ -17,6 +19,6 @@ namespace NYMake {
 
             ~TPluginMacroImpl() override;
         };
-        void RegisterMacro(const char* name, PyObject* func);
+        void RegisterMacro(TBuildConfiguration& conf, const char* name, PyObject* func);
     }
 }

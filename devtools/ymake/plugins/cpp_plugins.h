@@ -1,8 +1,9 @@
 #pragma once
 
+class TBuildConfiguration;
+
 namespace NYMake {
     namespace NPlugins {
-        void RegisterCppPlugins();
+        void RegisterCppPlugins(TBuildConfiguration& conf);
     }
 }
-

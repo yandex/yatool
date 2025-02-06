@@ -20,6 +20,7 @@
 
 #include <devtools/ymake/config/config.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/lang/plugin_facade.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
 #include <library/cpp/digest/md5/md5.h>
@@ -69,6 +70,19 @@ public:
 public:
     TBuildConfiguration();
     ~TBuildConfiguration() = default;
+
+    void InvokePluginMacro(TPluginUnit& unit, TStringBuf name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const {
+        MacroFacade.InvokeMacro(unit, name, params, out);
+    }
+    bool ContainsPluginMacro(TStringBuf name) const {
+        return MacroFacade.ContainsMacro(name);
+    }
+    void RegisterPluginMacro(const TString& name, TSimpleSharedPtr<TMacroImpl> action) {
+        MacroFacade.RegisterMacro(*this, name, action);
+    }
+    void RegisterPluginParser(const TString& ext, TSimpleSharedPtr<TParser> parser) {
+        MacroFacade.RegisterParser(*this, ext, parser);
+    }
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
@@ -236,6 +250,7 @@ private:
     TStringBuf ExportSourceRoot;
     THashMap<TString, TString> DefaultRequirements;
     THolder<IMemoryPool> StrPool;
+    TMacroFacade MacroFacade;
 };
 
 TBuildConfiguration* GlobalConf();

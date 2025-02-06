@@ -111,13 +111,18 @@ namespace NYMake {
             ExecuteGoFakeOutput(unit, params, result);
         }
 
-        void TPluginGoFakeOutputHandler::RegisterMacro() {
+        void TPluginGoFakeOutputHandler::RegisterMacro(TBuildConfiguration& conf) {
             TString docText = TString::Join("@usage: ", FakeMacroName, "(go-src-files...)");
-            NYndex::TSourceRange range = {static_cast<size_t>(docLink.Line) + 1, 0, static_cast<size_t>(docLink.Line) + 1, 0};
-            NYndex::TSourceLocation link(TString(docLink.File), range);
-            NYndex::TDefinition definition(FakeMacroName, docText, link, NYndex::EDefinitionType::Macro);
-            GlobalConf()->CommandDefinitions.AddDefinition(definition);
-            MacroFacade()->RegisterMacro(FakeMacroName, TSimpleSharedPtr<TPluginGoFakeOutputHandler>(new TPluginGoFakeOutputHandler()));
+            auto macro = MakeSimpleShared<TPluginGoFakeOutputHandler>();
+            macro->Definition = {
+                std::move(docText),
+                TString{docLink.File},
+                static_cast<size_t>(docLink.Line) + 1,
+                0,
+                static_cast<size_t>(docLink.Line) + 1,
+                0
+            };
+            conf.RegisterPluginMacro(FakeMacroName, macro);
         }
     } // end of namespace NPlugins
 } // end of namespace NYMake

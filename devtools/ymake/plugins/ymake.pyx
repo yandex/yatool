@@ -1,5 +1,3 @@
-import six
-
 from libcpp.string cimport string
 from libcpp.map cimport map
 from libcpp cimport bool
@@ -24,24 +22,24 @@ cdef extern from "devtools/ymake/plugins/plugin_macro_impl.h" namespace "NYMake:
 
 
 cdef extern from "devtools/ymake/plugins/ymake_module_adapter.h":
-    void AddParser(const TString& ext, PyObject* callable, map[TString, TString] inducedDeps, bool passInducedIncludes)
+    void AddParser(PyObject* confPtr, const TString& ext, PyObject* callable, map[TString, TString] inducedDeps, bool passInducedIncludes)
 
 
 cdef extern from "devtools/ymake/include_parsers/cython_parser.h":
     void ParseCythonIncludes(const TString& data, TVector[TString]& includes)
 
 
-def addparser(ext, parser, induced=None, pass_induced_includes=False):
+def add_parser(conf, ext, parser, induced=None, pass_induced_includes=False):
     if induced is None:
         induced = {}
-    AddParser(six.ensure_binary(ext), <PyObject*>parser, induced, pass_induced_includes)
+    AddParser(<PyObject*>conf, ext.encode("utf-8"), <PyObject*>parser, induced, pass_induced_includes)
 
 
 def report_configure_error(error, missing_dir=None):
     if missing_dir is not None:
-        OnBadDirError(six.ensure_binary(error.format(missing_dir)), six.ensure_binary(missing_dir))
+        OnBadDirError(error.format(missing_dir).encode("utf-8"), missing_dir.encode("utf-8"))
     else:
-        OnConfigureError(six.ensure_binary(error))
+        OnConfigureError(error.encode("utf-8"))
 
 
 def parse_cython_includes(data):

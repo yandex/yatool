@@ -4,6 +4,8 @@
 
 #include <util/system/src_location.h>
 
+class TBuildConfiguration;
+
 namespace NYMake {
     namespace NPlugins {
         class TPluginResourceHandler: public TMacroImpl {
@@ -18,7 +20,7 @@ namespace NYMake {
 
             void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) override;
 
-            static void RegisterMacro();
+            static void RegisterMacro(TBuildConfiguration& conf);
         };
     } // namespace NPlugins
 } // namespace NYMake

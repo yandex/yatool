@@ -77,7 +77,7 @@ namespace NYMake {
             yasmPacker->Finalize(true /*force*/);
         }
 
-        void TPluginResourceHandler::RegisterMacro() {
+        void TPluginResourceHandler::RegisterMacro(TBuildConfiguration& conf) {
             TString docText = "@usage: RESOURCE([DONT_PARSE ][Src Key]* [- Key=Value]*)\n"
                               "Add data (resources, random files, strings) to the program)\n"
                               "The common usage is to place Src file into binary. The Key is used to access it using library/cpp/resource or library/cpp/resource/python.\n"
@@ -100,11 +100,16 @@ namespace NYMake {
                               "\t)\n"
                               "\n"
                               "\tEND()\n";
-            NYndex::TSourceRange range = {static_cast<size_t>(docLink.Line) + 1, 0, static_cast<size_t>(docLink.Line) + 1, 0};
-            NYndex::TSourceLocation link(TString(docLink.File), range);
-            NYndex::TDefinition definition("RESOURCE", docText, link, NYndex::EDefinitionType::Macro);
-            GlobalConf()->CommandDefinitions.AddDefinition(definition);
-            MacroFacade()->RegisterMacro("RESOURCE", new TPluginResourceHandler(GlobalConf()->RenderSemantics));
+            auto macro = MakeSimpleShared<TPluginResourceHandler>(conf.RenderSemantics);
+            macro->Definition = {
+                std::move(docText),
+                TString{docLink.File},
+                static_cast<size_t>(docLink.Line) + 1,
+                0,
+                static_cast<size_t>(docLink.Line) + 1,
+                0
+            };
+            conf.RegisterPluginMacro("RESOURCE", macro);
         }
     } // namespace NPlugins
 } // namespace NYMake

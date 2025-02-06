@@ -4,6 +4,7 @@
 #include "context_class.h"
 #include "convert.h"
 
+#include <devtools/ymake/conf.h>
 #include <devtools/ymake/lang/plugin_facade.h>
 
 namespace {
@@ -71,6 +72,10 @@ namespace {
     };
 }
 
-void AddParser(const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes) {
-    MacroFacade()->RegisterParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes));
+void AddParser(PyObject* confPtr, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes) {
+    if (PyCapsule_CheckExact(confPtr)) {
+        if (TBuildConfiguration* conf = reinterpret_cast<TBuildConfiguration*>(PyCapsule_GetPointer(confPtr, "BuildConfiguration")); conf != nullptr) {
+            conf->RegisterPluginParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes));
+        }
+    }
 }

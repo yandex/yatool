@@ -16,6 +16,8 @@
 using namespace NYMake::NPlugins;
 
 namespace {
+    const static char BuildConfigurationName[] = "BuildConfiguration";
+
     class TScopedPyObjectPtr {
     public:
         TScopedPyObjectPtr(PyObject* ptr = nullptr)
@@ -58,7 +60,7 @@ namespace {
         PyObject* Ptr_{nullptr};
     };
 
-    void LoadPluginsFromDirRecursively(const TFsPath path, bool firstLevel) {
+    void LoadPluginsFromDirRecursively(TBuildConfiguration& conf, const TFsPath path, bool firstLevel) {
         TVector<TFsPath> dirs;
         TVector<TFsPath> files;
 
@@ -84,7 +86,7 @@ namespace {
 
         Sort(files, [](const auto& lhs, const auto& rhs) { return lhs.Basename() < rhs.Basename(); });
         for (const auto& file : files) {
-            RegisterPluginFilename(file.GetPath().c_str());
+            RegisterPluginFilename(conf, file.GetPath().c_str());
 
             const auto& baseName = file.Basename();
             if (!firstLevel || baseName[0] == '_') {
@@ -93,13 +95,19 @@ namespace {
 
             TString modName = baseName.substr(0, baseName.size() - 3);
             TScopedPyObjectPtr mod = PyImport_ImportModule(modName.data());
-            if (mod == nullptr) {
+            if (PyErr_Occurred()) {
+                PyErr_Print();
                 continue;
             }
 
-            if (PyObject_HasAttrString(mod, "init")) {
-                if (TScopedPyObjectPtr initFunc = PyObject_GetAttrString(mod, "init"); PyCallable_Check(initFunc)) {
-                    PyObject_CallNoArgs(initFunc);
+            if (PyObject_HasAttrString(mod, "register_parsers")) {
+                if (TScopedPyObjectPtr initFunc = PyObject_GetAttrString(mod, "register_parsers"); PyCallable_Check(initFunc)) {
+                    TScopedPyObjectPtr confPtr = PyCapsule_New(&conf, BuildConfigurationName, NULL);
+                    PyObject_CallOneArg(initFunc, confPtr);
+                    if (PyErr_Occurred()) {
+                        PyErr_Print();
+                        continue;
+                    }
                 }
             }
 
@@ -125,24 +133,24 @@ namespace {
                         continue;
                     }
                     auto macroName = ToUpperUTF8(attrName.SubStr(2));
-                    RegisterMacro(macroName.c_str(), func);
+                    RegisterMacro(conf, macroName.c_str(), func);
                 }
             }
         }
 
         Sort(dirs, [](const auto& lhs, const auto& rhs) { return lhs.Basename() < rhs.Basename(); });
         for (const auto& dir: dirs) {
-            LoadPluginsFromDirRecursively(dir, /* firstLevel */ false);
+            LoadPluginsFromDirRecursively(conf, dir, /* firstLevel */ false);
         }
     }
 
-    void LoadPluginsFromDir(const TFsPath& path) {
+    void LoadPluginsFromDir(TBuildConfiguration& conf, const TFsPath& path) {
         TScopedPyObjectPtr sys = PyImport_ImportModule("sys");
         TScopedPyObjectPtr sysPath = PyObject_GetAttrString(sys, "path");
         TScopedPyObjectPtr pluginsPath = PyUnicode_FromString(path.c_str());
         PyList_Insert(sysPath, 0, pluginsPath);
 
-        LoadPluginsFromDirRecursively(path, /* firstLevel */ true);
+        LoadPluginsFromDirRecursively(conf, path, /* firstLevel */ true);
     }
 }
 
@@ -150,8 +158,6 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf
     if (pluginsRoots.empty()) {
         return;
     }
-
-    MacroFacade()->Conf = conf;
 
     Py_Initialize();
 
@@ -166,7 +172,7 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {
         if (pluginsPath.Exists()) {
-            LoadPluginsFromDir(pluginsPath);
+            LoadPluginsFromDir(*conf, pluginsPath);
         }
     }
 

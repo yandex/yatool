@@ -941,9 +941,9 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
 }
 
 bool TModuleBuilder::PluginStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (MacroFacade()->ContainsMacro(name)) {
+    if (Conf.ContainsPluginMacro(name)) {
         TVector<TSimpleSharedPtr<TMacroCmd>> cmds;
-        MacroFacade()->InvokeMacro(*this, name, args, &cmds);
+        Conf.InvokePluginMacro(*this, name, args, &cmds);
         for (size_t i = 0; i < cmds.size(); ++i) {
             AddPluginCustomCmd(*cmds[i]);
         }

@@ -247,7 +247,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         }
 
         // All cpp plugins should be registered in RegisterCppPlugins()
-        NYMake::NPlugins::RegisterCppPlugins();
+        NYMake::NPlugins::RegisterCppPlugins(*this);
     }
 
     CommandConf.SetValue("ARCADIA_BUILD_ROOT", BuildRoot.c_str());

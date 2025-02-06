@@ -38,7 +38,7 @@ namespace NYMake {
             Py_XDECREF(Obj_);
         }
 
-        void RegisterMacro(const char* name, PyObject* func) {
+        void RegisterMacro(TBuildConfiguration& conf, const char* name, PyObject* func) {
             if (PyFunction_Check(func)) {
                 PyCodeObject* code = (PyCodeObject*) PyFunction_GetCode(func);
                 TFsPath path = TFsPath(PyUnicode_AsUTF8(code->co_filename));
@@ -49,15 +49,17 @@ namespace NYMake {
                     docText = PyUnicode_AsUTF8(doc);
                 }
 
-                GlobalConf()->CommandDefinitions.AddDefinition(
-                    name,
-                    path.RelativePath(GlobalConf()->SourceRoot),
-                    {(size_t)code->co_firstlineno, 1, (size_t)code->co_firstlineno, 1},
-                    docText,
-                    NYndex::EDefinitionType::Macro
-                );
+                auto macro = MakeSimpleShared<TPluginMacroImpl>(func);
+                macro->Definition = {
+                    std::move(docText),
+                    path.RelativePath(conf.SourceRoot),
+                    (size_t)code->co_firstlineno,
+                    1,
+                    (size_t)code->co_firstlineno,
+                    1
+                };
+                conf.RegisterPluginMacro(name, macro);
             }
-            MacroFacade()->RegisterMacro(name, TSimpleSharedPtr<TPluginMacroImpl>(new TPluginMacroImpl(func)));
         }
     }
 }
