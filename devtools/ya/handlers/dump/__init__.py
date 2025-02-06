@@ -139,6 +139,9 @@ class DumpYaHandler(CompositeHandler):
                 DumpSrcDepsOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
+                DepTraverseOptions(),
+                DepFilterOptions(),
+                DataOptions(),
             ],
         )
         self['dir-graph'] = OptsHandler(
