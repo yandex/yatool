@@ -156,11 +156,12 @@ SRCS(
     plugins/cpp_plugins.cpp
     plugins/error.cpp
     plugins/init.cpp
+    plugins/ymake_module.cpp
     plugins/plugin_go_fake_output_handler.cpp
     plugins/plugin_macro_impl.cpp
     plugins/resource_handler/impl.cpp
+    plugins/scoped_py_object_ptr.cpp
     plugins/ymake_module_adapter.cpp
-    plugins/ymake.pyx
     propagate_change_flags.cpp
     recurse_graph.cpp
     run_main.cpp

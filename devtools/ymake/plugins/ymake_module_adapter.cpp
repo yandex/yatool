@@ -72,10 +72,6 @@ namespace {
     };
 }
 
-void AddParser(PyObject* confPtr, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes) {
-    if (PyCapsule_CheckExact(confPtr)) {
-        if (TBuildConfiguration* conf = reinterpret_cast<TBuildConfiguration*>(PyCapsule_GetPointer(confPtr, "BuildConfiguration")); conf != nullptr) {
-            conf->RegisterPluginParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes));
-        }
-    }
+void AddParser(TBuildConfiguration* conf, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes) {
+    conf->RegisterPluginParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes));
 }

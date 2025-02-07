@@ -7,4 +7,4 @@
 
 class TBuildConfiguration;
 
-void AddParser(PyObject* confPtr, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes);
+void AddParser(TBuildConfiguration* conf, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes);

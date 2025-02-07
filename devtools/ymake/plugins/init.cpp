@@ -2,8 +2,9 @@
 #include "context_class.h"
 #include "cmd_context_class.h"
 #include "plugin_macro_impl.h"
+#include "scoped_py_object_ptr.h"
+#include "ymake_module.h"
 
-#include <util/stream/output.h>
 #include <util/folder/path.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -11,54 +12,10 @@
 
 #include <Python.h>
 
-#include <utility>
-
 using namespace NYMake::NPlugins;
 
 namespace {
     const static char BuildConfigurationName[] = "BuildConfiguration";
-
-    class TScopedPyObjectPtr {
-    public:
-        TScopedPyObjectPtr(PyObject* ptr = nullptr)
-            : Ptr_(ptr)
-        {
-        }
-
-        TScopedPyObjectPtr(const TScopedPyObjectPtr& other)
-            : Ptr_(other.Ptr_)
-        {
-            Py_XINCREF(Ptr_);
-        }
-
-        ~TScopedPyObjectPtr() {
-            Py_XDECREF(Ptr_);
-        }
-
-        explicit operator bool() const {
-            return Ptr_ != nullptr;
-        }
-
-        operator PyObject* () const {
-            return Get();
-        }
-
-        PyObject* Get() const {
-            return Ptr_;
-        }
-
-        void Reset(PyObject* ptr) {
-            Py_XDECREF(Ptr_);
-            Ptr_ = ptr;
-        }
-
-        PyObject* Release() {
-            return std::exchange(Ptr_, nullptr);
-        }
-
-    private:
-        PyObject* Ptr_{nullptr};
-    };
 
     void LoadPluginsFromDirRecursively(TBuildConfiguration& conf, const TFsPath path, bool firstLevel) {
         TVector<TFsPath> dirs;
@@ -160,6 +117,10 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf
     }
 
     Py_Initialize();
+
+    PyInit_ymake();
+
+    CheckForError();
 
     // do not generate *.pyc files in source tree
     PyRun_SimpleString("import sys; sys.dont_write_bytecode = True");
