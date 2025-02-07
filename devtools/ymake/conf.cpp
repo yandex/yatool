@@ -219,8 +219,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     MD5 confData, confWoRulesData, rulesData, blacklistHash, isolatedProjectsHash, extraData;
 
-    SetGlobalConf(this);
-
     if (WriteYdx.empty()) {
         CommandDefinitions.Disable();
     }
@@ -455,30 +453,4 @@ bool TBuildConfiguration::IsIncludeOnly(const TStringBuf& name) const {
 
 bool TBuildConfiguration::IsRequiredBuildAndSrcRoots(const TStringBuf& lang) const {
     return Find(LangsRequireBuildAndSrcRoots, lang) != LangsRequireBuildAndSrcRoots.end();
-}
-
-namespace {
-    //temp
-    struct TBuildConfHandler {
-        inline TBuildConfHandler()
-            : Conf(nullptr)
-        {
-        }
-
-        inline TBuildConfiguration* Get() noexcept {
-            Y_ASSERT(Conf);
-
-            return Conf;
-        }
-
-        TBuildConfiguration* Conf;
-    };
-}
-
-TBuildConfiguration* GlobalConf() {
-    return Singleton<TBuildConfHandler>()->Get();
-}
-
-void SetGlobalConf(TBuildConfiguration* conf) {
-    Singleton<TBuildConfHandler>()->Conf = conf;
 }

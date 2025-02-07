@@ -252,6 +252,3 @@ private:
     THolder<IMemoryPool> StrPool;
     TMacroFacade MacroFacade;
 };
-
-TBuildConfiguration* GlobalConf();
-void SetGlobalConf(TBuildConfiguration* conf);
