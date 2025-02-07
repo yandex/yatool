@@ -3,6 +3,7 @@
 #include "generator_spec.h"
 
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
+#include <contrib/libs/toml11/include/toml11/types.hpp>
 
 #include <util/stream/output.h>
 

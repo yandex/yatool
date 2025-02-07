@@ -8,7 +8,6 @@
 #include <util/generic/hash_set.h>
 #include <util/generic/serialized_enum.h>
 #include <util/string/cast.h>
-#include <contrib/libs/toml11/toml/value.hpp>
 #include <contrib/libs/jinja2cpp/include/jinja2cpp/value.h>
 #include "generator_spec_enum.h"
 

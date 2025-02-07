@@ -1,9 +1,10 @@
 #include "yexport_spec.h"
 #include "target_replacements.h"
 
-#include <contrib/libs/toml11/toml/get.hpp>
-#include <contrib/libs/toml11/toml/parser.hpp>
-#include <contrib/libs/toml11/toml/value.hpp>
+#include <contrib/libs/toml11/include/toml11/types.hpp>
+#include <contrib/libs/toml11/include/toml11/get.hpp>
+#include <contrib/libs/toml11/include/toml11/parser.hpp>
+#include <contrib/libs/toml11/include/toml11/find.hpp>
 
 #include <util/string/builder.h>
 
@@ -68,8 +69,7 @@ namespace {
     }
 
     /// Extract array of sanitized paths from toml value
-    std::vector<TPathStr> ParsePathsArray(const toml::value& value) {
-        auto tomlArray = toml::get<toml::array>(value);
+    std::vector<TPathStr> ParsePathsArray(const toml::array& tomlArray) {
         if (tomlArray.empty()) {
             return {};
         }
@@ -82,8 +82,7 @@ namespace {
     }
 
     /// Extract path prefix spec from toml value
-    TPathPrefixSpecs ParsePathPrefixes(const toml::value& value) {
-        auto tomlArray = toml::get<toml::array>(value);
+    TPathPrefixSpecs ParsePathPrefixes(const toml::array& tomlArray) {
         if (tomlArray.empty()) {
             return {};
         }
@@ -93,12 +92,14 @@ namespace {
             TPathStr path;
             std::vector<TPathStr> excepts;
             if (item.is_table()) {
-                path = ParsePath(toml::find<toml::value>(item, NKeys::PathPrefix));
-                auto tomlExcepts = toml::find_or<toml::value>(item, NKeys::Excepts, toml::array{});
-                if (tomlExcepts.is_array()) {
-                    excepts = ParsePathsArray(tomlExcepts);
-                } else {
-                    excepts.emplace_back(ParsePath(tomlExcepts));
+                path = ParsePath(item.at(NKeys::PathPrefix));
+                if (item.contains(NKeys::Excepts)) {
+                    auto& tomlExcepts = item.at(NKeys::Excepts);
+                    if (tomlExcepts.is_array()) {
+                        excepts = ParsePathsArray(tomlExcepts.as_array());
+                    } else if (tomlExcepts.is_string()) {
+                        excepts.emplace_back(ParsePath(tomlExcepts));
+                    }
                 }
             } else {
                 path = ParsePath(item);
@@ -128,12 +129,16 @@ namespace {
         if (value.is_string()) {
             sem.emplace_back(toml::get<std::string>(value));
         } else {
-            std::string name = toml::get<std::string>(toml::find<toml::value>(value, NKeys::Name));
-            const auto& tomlArgs = toml::get<toml::array>(toml::find_or<toml::value>(value, NKeys::Args, toml::array{}));
+            auto name = toml::find<std::string>(value, NKeys::Name);
+            const auto& tomlArgs = value.contains(NKeys::Args)
+                ? toml::find<toml::array>(value, NKeys::Args)
+                : toml::array{};
             sem.reserve(1 /*name*/ + tomlArgs.size());
             sem.emplace_back(std::move(name));
-            for (const auto& tomlArg : tomlArgs) {
-                sem.emplace_back(toml::get<std::string>(tomlArg));
+            if (!tomlArgs.empty()) {
+                for (const auto& tomlArg : tomlArgs) {
+                    sem.emplace_back(toml::get<std::string>(tomlArg));
+                }
             }
         }
         if (sem[0].empty()) {
@@ -149,8 +154,7 @@ namespace {
     }
 
     /// Extract array of node semantics from toml value
-    TNodeSemantics ParseNodeSemantics(const toml::value& value) {
-        const auto& tomlSems = toml::get<toml::array>(value);
+    TNodeSemantics ParseNodeSemantics(const toml::array& tomlSems) {
         if (tomlSems.empty()) {
             return {};
         }
@@ -165,8 +169,12 @@ namespace {
     /// Extract one target replacement from toml value
     TTargetReplacementSpec ParseTargetReplacementSpec(const toml::value& value, const char* name) {
         TTargetReplacementSpec spec;
-        spec.ReplacePathPrefixes = ParsePathPrefixes(toml::find_or<toml::value>(value, NKeys::ReplacePathPrefixes, toml::array{}));
-        spec.SkipPathPrefixes = ParsePathPrefixes(toml::find_or<toml::value>(value, NKeys::SkipPathPrefixes, toml::array{}));
+        if (value.contains(NKeys::ReplacePathPrefixes)) {
+            spec.ReplacePathPrefixes = ParsePathPrefixes(toml::find<toml::array>(value, NKeys::ReplacePathPrefixes));
+        }
+        if (value.contains(NKeys::SkipPathPrefixes)) {
+            spec.SkipPathPrefixes = ParsePathPrefixes(toml::find<toml::array>(value, NKeys::SkipPathPrefixes));
+        }
         if ((spec.ReplacePathPrefixes.empty() && spec.SkipPathPrefixes.empty())
             || (!spec.ReplacePathPrefixes.empty() && !spec.SkipPathPrefixes.empty()))
         {
@@ -178,8 +186,12 @@ namespace {
                 )
             });
         }
-        spec.Replacement = ParseNodeSemantics(toml::find_or<toml::value>(value, NKeys::Replacement, toml::array{}));
-        spec.Addition = ParseNodeSemantics(toml::find_or<toml::value>(value, NKeys::Addition, toml::array{}));
+        if (value.contains(NKeys::Replacement)) {
+            spec.Replacement = ParseNodeSemantics(toml::find<toml::array>(value, NKeys::Replacement));
+        }
+        if (value.contains(NKeys::Addition)) {
+            spec.Addition = ParseNodeSemantics(toml::find<toml::array>(value, NKeys::Addition));
+        }
         if ((spec.Replacement.empty() && spec.Addition.empty())
             || (!spec.Replacement.empty() && !spec.Addition.empty())) {
             throw TBadYexportSpec({
@@ -205,19 +217,21 @@ void LoadTargetReplacements(const fs::path& yexportTomlPath, TTargetReplacements
 void LoadTargetReplacements(std::istream& input, const fs::path& yexportTomlPath, TTargetReplacements& targetReplacements) {
     try {
         const auto doc = toml::parse(input, yexportTomlPath.string());
-        const auto& value = toml::get<toml::array>(find_or<toml::value>(doc, NKeys::TargetReplacements, toml::array{}));
-        for (const auto& item : value) {
-            auto spec = ParseTargetReplacementSpec(item, NKeys::TargetReplacements);
-            if (targetReplacements.ValidateSpec(spec, [&](TStringBuf errors) {
-                throw TBadYexportSpec({
-                    toml::format_error(
-                        "[error] Invalid replacement: " + std::string(errors),
-                        item,
-                        "Replace and skip path prefixes must be unique and only one global replacement (without replace path prefixes) allowed."
-                    )
-                });
-            })) {
-                targetReplacements.AddSpec(spec);
+        if (doc.contains(NKeys::TargetReplacements)) {
+            const auto& value = find<toml::array>(doc, NKeys::TargetReplacements);
+            for (const auto& item : value) {
+                auto spec = ParseTargetReplacementSpec(item, NKeys::TargetReplacements);
+                if (targetReplacements.ValidateSpec(spec, [&](TStringBuf errors) {
+                    throw TBadYexportSpec({
+                        toml::format_error(
+                            "[error] Invalid replacement: " + std::string(errors),
+                            item,
+                            "Replace and skip path prefixes must be unique and only one global replacement (without replace path prefixes) allowed."
+                        )
+                    });
+                })) {
+                    targetReplacements.AddSpec(spec);
+                }
             }
         }
     } catch (const toml::exception& err) {
@@ -238,22 +252,27 @@ TYexportSpec ReadYexportSpec(std::istream& input, const std::filesystem::path& y
     try {
         const auto doc = toml::parse(input, yexportTomlPath.string());
         TYexportSpec spec;
-        const auto& addattrsSection = find_or<toml::value>(doc, YEXPORT_ADD_ATTRS, toml::table{});
-        if (!addattrsSection.is_table()) {
-            throw TBadYexportSpec({
-                toml::format_error(
-                    "[error] Invalid format of " + std::string(YEXPORT_ADD_ATTRS),
-                    addattrsSection,
-                    std::string(YEXPORT_ADD_ATTRS) + " must be table with optional " + std::string(YEXPORT_ADDATTRS_ROOT) + ", " + std::string(YEXPORT_ADDATTRS_DIR) + " or " + std::string(YEXPORT_ADDATTRS_TARGET) + " values"
-                )
-            });
+        if (doc.contains(YEXPORT_ADD_ATTRS)) {
+            const auto& addattrsSection = doc.at(YEXPORT_ADD_ATTRS);
+            if (!addattrsSection.is_table()) {
+                throw TBadYexportSpec({
+                    toml::format_error(
+                        "[error] Invalid format of " + std::string(YEXPORT_ADD_ATTRS),
+                        addattrsSection,
+                        std::string(YEXPORT_ADD_ATTRS) + " must be table with optional " + std::string(YEXPORT_ADDATTRS_ROOT) + ", " + std::string(YEXPORT_ADDATTRS_DIR) + " or " + std::string(YEXPORT_ADDATTRS_TARGET) + " values"
+                    )
+                });
+            }
+            if (addattrsSection.contains(YEXPORT_ADDATTRS_ROOT)) {
+                spec.AddAttrsRoot = ParseTable(toml::find<toml::table>(addattrsSection, YEXPORT_ADDATTRS_ROOT));
+            }
+            if (addattrsSection.contains(YEXPORT_ADDATTRS_DIR)) {
+                spec.AddAttrsDir = ParseTable(toml::find<toml::table>(addattrsSection, YEXPORT_ADDATTRS_DIR));
+            }
+            if (addattrsSection.contains(YEXPORT_ADDATTRS_TARGET)) {
+                spec.AddAttrsTarget = ParseTable(toml::find<toml::table>(addattrsSection, YEXPORT_ADDATTRS_TARGET));
+            }
         }
-        const auto& addattrsRoot = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_ROOT, toml::table{});
-        spec.AddAttrsRoot = ParseTable(addattrsRoot.as_table());
-        const auto& addattrsDir = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_DIR, toml::table{});
-        spec.AddAttrsDir = ParseTable(addattrsDir.as_table());
-        const auto& addattrsTarget = find_or<toml::value>(addattrsSection, YEXPORT_ADDATTRS_TARGET, toml::table{});
-        spec.AddAttrsTarget = ParseTable(addattrsTarget.as_table());
         return spec;
     } catch (const toml::exception& err) {
         throw TBadYexportSpec{err.what()};
