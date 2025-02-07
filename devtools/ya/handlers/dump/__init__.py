@@ -675,18 +675,30 @@ class DepTraverseOptions(Options):
 
 class DataOptions(Options):
     def __init__(self):
-        self.with_data = False
+        self.with_data = None
 
     @staticmethod
     def consumer():
         return [
             ArgConsumer(
                 ['--with-data'],
-                help='Include DATA files and dirs',
+                help='Include DATA files and dirs: default with -t',
                 hook=SetConstValueHook('with_data', True),
+                group=DUMP_OPTS_GROUP,
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--no-data'],
+                help='Exclude DATA files and dirs',
+                hook=SetConstValueHook('with_data', False),
                 group=DUMP_OPTS_GROUP,
             ),
         ]
+
+    def postprocess2(self, params):
+        if self.with_data is None:
+            self.with_data = strtobool(params.flags.get('TRAVERSE_DEPENDS', 'no'))
 
 
 class DumpTestListOptions(Options):
