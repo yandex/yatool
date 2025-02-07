@@ -41,6 +41,7 @@ namespace NYMake::NResourcePacker {
             if (force) {
                 JoinSources();
             }
+            EstimatedCmdLen_ = 0;
         }
 
     private:
