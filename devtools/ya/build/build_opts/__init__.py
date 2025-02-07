@@ -1,8 +1,9 @@
 import os
 import six
 import logging
-from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimespan
 import multiprocessing
+
+from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimespan
 
 import app_config
 import exts.path2
@@ -93,7 +94,7 @@ def parse_timespan_arg(span):
     try:
         return int(span)
     except ValueError:
-        pass
+        logger.debug('Failed to make int directly from span: %s. Will fallback to parse_timespan', span)
 
     return parse_timespan(span)
 
@@ -102,7 +103,7 @@ def parse_size_arg(size):
     try:
         return int(size)
     except ValueError:
-        pass
+        logger.debug('Failed to make int from size: %s. Will fallback to parse_size', size)
 
     return parse_size(size, binary=True)
 
@@ -2566,7 +2567,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             ArgConsumer(
                 ['--yt-max-store-size'],
                 help='YT storage max size',
-                hook=SetValueHook('yt_max_cache_size', transform=int),
+                hook=SetValueHook('yt_max_cache_size'),
                 group=YT_CACHE_PUT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
@@ -2605,7 +2606,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             EnvConsumer(
                 'YA_YT_MAX_STORAGE_SIZE',
                 help='YT storage max size',
-                hook=SetValueHook('yt_max_cache_size', transform=int),
+                hook=SetValueHook('yt_max_cache_size'),
             ),
             EnvConsumer(
                 'YA_YT_STORE_TTL',
@@ -2625,6 +2626,21 @@ class DistCacheSetupOptions(LocalCacheOptions):
         if self.yt_token_path:
             self.yt_token_path = os.path.expanduser(self.yt_token_path)
         self._read_token_file()
+        self.yt_max_cache_size = self._parse_yt_max_cache_size()
+
+    def _parse_yt_max_cache_size(self) -> str | int | None:
+        if self.yt_max_cache_size is None:
+            return None
+        s = self.yt_max_cache_size.strip()
+        try:
+            if s.endswith("%"):
+                v = float(s[:-1])
+                if v < 0 or v > 100:
+                    raise ArgsValidatingException("yt_max_cache_size is out of range 0..100")
+                return s[:-1]
+            return parse_size_arg(self.yt_max_cache_size)
+        except Exception as e:
+            raise ArgsValidatingException(f"Wrong yt_max_cache_size value {s}: {e!s}")
 
     def _read_token_file(self):
         if self.yt_token:

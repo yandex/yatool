@@ -55,7 +55,6 @@ class YtStore(DistStore):
         )
         self._proxy = proxy
         self._ttl = ttl
-        self._max_cache_size = max_cache_size
         self._cache_filter = cache_filter
 
         data_dir = data_dir.rstrip('/')
@@ -81,6 +80,11 @@ class YtStore(DistStore):
                 lambda: self._prepare_tables(create_tables, readonly, proxy, ttl, with_self_uid)
             )
 
+        if isinstance(max_cache_size, str):  # it's percentage
+            self._max_cache_size = self._get_cache_size_from_percent(int(max_cache_size))
+        else:
+            self._max_cache_size = max_cache_size
+
         self._stager = kwargs.get("stager", utils.DummyStager())
         self._xx_client = None
         if kwargs.get('new_client'):
@@ -99,6 +103,19 @@ class YtStore(DistStore):
     @property
     def is_disabled(self):
         return self._client.is_disabled
+
+    def _get_cache_size_from_percent(self, percentage):
+        total = self._client.account_size_limit
+        limit = total * percentage // 100
+        logger.debug(
+            'Account size total_bytes=%s, calculated_limit_bytes=%s, percentage=%s, total_human=%s, calculated_human=%s',
+            total,
+            limit,
+            percentage,
+            utils.human_size(total),
+            utils.human_size(limit),
+        )
+        return limit
 
     def _prepare_tables(self, create_tables, readonly, proxy, ttl, with_self_uid):
         if create_tables and not readonly:

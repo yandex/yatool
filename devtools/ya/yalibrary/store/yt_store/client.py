@@ -89,6 +89,16 @@ class YtStoreClient(object):
         return attr_presents
 
     @property
+    @memoize()
+    def account_size_limit(self):
+        table_attrs = self._client.get('{}/@'.format(self._data_table))
+        account_name = table_attrs['account']
+        primary_medium = table_attrs['primary_medium']
+        limits = self._client.get('//sys/accounts/{}/@resource_limits/disk_space_per_medium'.format(account_name))
+        size_limit = limits[primary_medium]
+        return size_limit
+
+    @property
     def is_disabled(self):
         return self.retry_policy.disabled
 
