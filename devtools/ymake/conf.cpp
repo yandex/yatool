@@ -390,7 +390,6 @@ void TBuildConfiguration::FillMiscValues() {
     JsonDepsFromMainOutputEnabled_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_JSON_DEPS_FROM_MAIN_OUTPUT"));
     UseGraphChangesPredictor = NYMake::IsTrue(CommandConf.EvalValue("USE_GRAPH_CHANGES_PREDICTOR"));
     UseGrandBypass = !TDebugOptions::DisableGrandBypass && NYMake::IsTrue(CommandConf.EvalValue("USE_GRAND_BYPASS"));
-    UseReachabilityToReportConfErrors = NYMake::IsTrue(CommandConf.EvalValue("USE_REACHABILITY_TO_REPORT_CONF_ERRORS"));
     YmakeSaveAllCachesWhenBadLoops_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_SAVE_ALL_CACHES_WHEN_BAD_LOOPS"));
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {

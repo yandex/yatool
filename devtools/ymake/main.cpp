@@ -873,11 +873,7 @@ int main_real(TBuildConfiguration& conf) {
     // after reporting configuration errors from the cache, all other errors must be reported immediately,
     // so we disable the delay here
     ConfMsgManager()->DisableDelay();
-    if (conf.ShouldUseReachabilityToReportConfErrors()) {
-        yMake->ReportConfigureEventsUsingReachableNodes();
-    } else {
-        yMake->ReportConfigureEvents();
-    }
+    yMake->ReportConfigureEvents();
 
     if (conf.WriteFsCache || conf.WriteDepsCache) {
         yMake->Save(conf.YmakeCache, true);

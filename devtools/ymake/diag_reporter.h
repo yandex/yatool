@@ -55,31 +55,6 @@ struct TConfigureEventsReporterEntryStats: public TEntryStats {
     }
 };
 
-class TConfigureEventsReporter: public TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats> {
-public:
-    using TBase = TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats>;
-    using TState = typename TBase::TState;
-
-    const TSymbols& Names;
-    const TModules& Modules;
-    const bool RenderSemantics;
-
-public:
-    TConfigureEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics)
-        : Names(names)
-        , Modules(modules)
-        , RenderSemantics(renderSemantics)
-    {}
-
-    bool Enter(TState& state);
-    bool AcceptDep(TState& state);
-    void Leave(TState& state);
-
-private:
-    void PushModule(TConstDepNodeRef modNode);
-    void PopModule();
-};
-
 class TDupSrcReporter: public TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats> {
 public:
     using TBase = TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats>;
@@ -97,22 +72,6 @@ public:
     bool Enter(TState& state);
     bool AcceptDep(TState& state);
     void Leave(TState& state);
-};
-
-class TRecurseConfigureErrorReporter: public TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats> {
-public:
-    using TBase = TNoReentryStatsConstVisitor<TConfigureEventsReporterEntryStats>;
-    using TState = typename TBase::TState;
-
-    const TSymbols& Names;
-
-public:
-    TRecurseConfigureErrorReporter(const TSymbols& names)
-        : Names(names)
-    {}
-
-    bool Enter(TState& state);
-    bool AcceptDep(TState& state);
 };
 
 class TErrorsGuard {

@@ -151,11 +151,6 @@ public:
         return UseGrandBypass;
     }
 
-    bool ShouldUseReachabilityToReportConfErrors() const noexcept {
-        return UseReachabilityToReportConfErrors;
-    }
-
-
     void DisableGrandBypass() noexcept {
         UseGrandBypass = false;
     }
@@ -241,7 +236,6 @@ private:
     bool CheckForIncorrectLoops_ = false;
     bool UseGraphChangesPredictor = false;
     bool UseGrandBypass = false;
-    bool UseReachabilityToReportConfErrors = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
     bool YmakeSaveAllCachesWhenBadLoops_ = false;

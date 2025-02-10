@@ -93,76 +93,6 @@ bool TForeignPlatformEventsReporter::AcceptDep(TState& state) {
     return TBase::AcceptDep(state);
 }
 
-void TConfigureEventsReporter::PushModule(TConstDepNodeRef modNode) {
-    ui32 elemId = modNode->ElemId;
-    CurEnt->WasFresh = true;
-
-    TStringBuf moduleName = TDepGraph::Graph(modNode).GetFileName(elemId).GetTargetStr();
-    Diag()->Where.push_back(elemId, moduleName);
-
-    ConfMsgManager()->Flush(elemId);
-    ConfMsgManager()->AddVisitedModule(elemId);
-}
-
-void TConfigureEventsReporter::PopModule() {
-    CurEnt->WasFresh = false;
-    Diag()->Where.pop_back();
-}
-
-bool TConfigureEventsReporter::Enter(TState& state) {
-    bool fresh = TBase::Enter(state);
-    const auto& node = state.TopNode();
-
-    if (fresh) {
-        if (IsModule(state.Top())) {
-            if (RenderSemantics) {
-                auto module = Modules.Get(node->ElemId);
-                if (module->IsSemIgnore()) {
-                    return false;
-                }
-            }
-            PushModule(node);
-        }
-
-        if (IsMakeFile(state.Top())) {
-            const auto view = Names.FileConf.GetName(node->ElemId);
-            const auto targetView = Names.FileConf.ResolveLink(view);
-            TScopedContext context(targetView);
-            ConfMsgManager()->Flush(view.GetElemId());
-            ConfMsgManager()->Flush(targetView.GetElemId());
-            return false;
-        }
-
-        if (state.HasIncomingDep()) {
-            if (const auto incDep = state.IncomingDep(); IsModuleOwnNodeDep(incDep)) {
-                ConfMsgManager()->AddDupSrcLink(node->ElemId, Diag()->Where.back().first, false);
-            }
-        }
-    }
-
-    return fresh || state.Top().IsStart;
-}
-
-bool TConfigureEventsReporter::AcceptDep(TState& state) {
-    const auto& dep = state.NextDep();
-    const EDepType depType = dep.Value();
-
-    if (depType == EDT_Search || (depType == EDT_Search2 && !IsGlobalSrcDep(dep)) ||
-        depType == EDT_Property || depType == EDT_OutTogetherBack || IsRecurseDep(dep) || IsDirToModuleDep(dep)) { // Don't follow. Use direct Peerdirs/Tooldirs for walking
-        return false;
-    }
-
-    return TBase::AcceptDep(state);
-}
-
-void TConfigureEventsReporter::Leave(TState& state) {
-    TBase::Leave(state);
-
-    if (CurEnt->WasFresh && IsModule(state.Top())) {
-        PopModule();
-    }
-}
-
 bool TDupSrcReporter::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     const auto& node = state.TopNode();
@@ -215,29 +145,6 @@ void TDupSrcReporter::Leave(TState& state) {
     }
 }
 
-bool TRecurseConfigureErrorReporter::AcceptDep(TState& state) {
-    bool result = TBase::AcceptDep(state);
-    return result && !IsModuleType(state.NextDep().To()->NodeType);
-}
-
-bool TRecurseConfigureErrorReporter::Enter(TState& state) {
-    bool fresh = TBase::Enter(state);
-    if (!fresh || IsModuleType(state.TopNode()->NodeType)) {
-        return false;
-    }
-    ui32 elemId = state.TopNode()->ElemId;
-    TFileView fileView = Names.FileNameById(elemId);
-    TString makefile = NPath::SmartJoin(fileView.GetTargetStr(), "ya.make");
-    ui32 targetId = Names.FileConf.GetIdNx(makefile);
-    if (targetId != 0) {
-        TFileView target = Names.FileConf.GetName(targetId);
-        TScopedContext context(target);
-        ConfMsgManager()->Flush(target.GetElemId());
-        ConfMsgManager()->Flush(TFileConf::ConstructLink(ELT_MKF, target).GetElemId());
-    }
-    return true;
-}
-
 void TYMake::ReportForeignPlatformEvents() {
     NYMake::TTraceStage scopeTracer{"Report Foreign Platform Events"};
     TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource, Conf.ReportPicNoPic);
@@ -245,22 +152,6 @@ void TYMake::ReportForeignPlatformEvents() {
         return t.IsModuleTarget;
     });
     FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
-}
-
-void TYMake::ReportConfigureEvents() {
-    NYMake::TTraceStage scopeTracer{"Report Configure Events"};
-
-    ConfMsgManager()->FlushTopLevel();
-
-    TConfigureEventsReporter errorReporter(Names, Modules, Conf.RenderSemantics);
-    IterateAll(Graph, StartTargets, errorReporter, [](const TTarget& t) -> bool {
-        return t.IsModuleTarget;
-    });
-
-    ConfMsgManager()->ReportDupSrcConfigureErrors([this](ui32 id) { return Names.FileConf.GetName(id).GetTargetStr(); });
-
-    TRecurseConfigureErrorReporter recurseErrorsReporter(Names);
-    IterateAll(RecurseGraph, RecurseStartTargets, recurseErrorsReporter);
 }
 
 void FlushModuleNode(TConstDepNodeRef modNode) {
@@ -278,7 +169,7 @@ void FlushMakeFileNode(TConstDepNodeRef makeFileNode, const TSymbols& names) {
     ConfMsgManager()->Flush(targetView.GetElemId());
 }
 
-void TYMake::ReportConfigureEventsUsingReachableNodes() {
+void TYMake::ReportConfigureEvents() {
     NYMake::TTraceStage scopeTracer{"Report Configure Events"};
 
     ConfMsgManager()->FlushTopLevel();
