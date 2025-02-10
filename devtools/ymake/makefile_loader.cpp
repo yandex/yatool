@@ -690,7 +690,6 @@ bool TDirParser::MiscStatement(const TStringBuf& name, const TVector<TStringBuf>
         TString dir_for = NPath::ConstructYDir(args[0], TStringBuf(), ConstrYDirDiag);
         CheckEx(!dir_for.empty() && dir_for != Dir, name << ": the current directory (" << dir_for << ") can not be used as an argument");
         Vars().SetStoreOriginals(name, "yes", OrigVars());
-        Conf.Conditions.RecalcVars(TString::Join("$", name), Vars(), OrigVars()); // Need only for PY_PROTOS_FOR variable
         Vars().SetStoreOriginals(TString::Join(name, "_DIR"), dir_for, OrigVars());
         Vars().SetStoreOriginals(TString::Join(name, "_ARGS"), EvalExpr(Vars(), JoinStrings(margs.begin() + 1, margs.end(), " ")), OrigVars());
         bool saveReadModuleContentOnly = ReadModuleContentOnly;
