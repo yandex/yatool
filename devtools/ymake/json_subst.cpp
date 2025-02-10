@@ -245,23 +245,25 @@ TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeN
 void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, const TModule* mod, bool isGlobalNode) {
     const auto nodeType = node->NodeType;
 
-    auto renderModuleType = ERenderModuleType::Bundle;
-    if (IsModuleType(nodeType)) {
+    if (IsModuleType(nodeType) || isGlobalNode) {
         Y_ASSERT(mod != nullptr);
-        renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
-        TargetProperties["module_type"] = ToString(renderModuleType);
-
-        TStringBuf tag = mod->GetTag();
-        if (mod->IsFromMultimodule() && !tag.empty()) {
-            TargetProperties["module_tag"] = to_lower(TString{tag});
-        }
-
         TStringBuf lang = mod->GetLang();
         if (!lang.empty()) {
             TargetProperties["module_lang"] = to_lower(TString{lang});
         }
 
         TargetProperties["module_dir"] = TString(mod->GetDir().CutType());
+    }
+
+    if (IsModuleType(nodeType)) {
+        Y_ASSERT(mod != nullptr);
+        auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
+        TargetProperties["module_type"] = ToString(renderModuleType);
+
+        TStringBuf tag = mod->GetTag();
+        if (mod->IsFromMultimodule() && !tag.empty()) {
+            TargetProperties["module_tag"] = to_lower(TString{tag});
+        }
     } else if (isGlobalNode) {
         Y_ASSERT(mod != nullptr);
         TargetProperties["module_type"] = ToString(ERenderModuleType::Library);
@@ -271,7 +273,6 @@ void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, con
         else {
             TargetProperties["module_tag"] = "global";
         }
-        TargetProperties["module_dir"] = TString(mod->GetDir().CutType());
     }
 }
 
