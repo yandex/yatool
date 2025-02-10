@@ -93,6 +93,11 @@ class AutoincludeConfig:
         # for a given autoinclude path we can provide the same config for the same linter
         self._autoinc_to_conf = self._build_autoinc_to_conf()
 
+    @classmethod
+    @functools.cache
+    def make(cls, linter_name: str, *, autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS) -> tp.Self:
+        return cls(linter_name, autoinclude_files=autoinclude_files)
+
     def _load_trie(self) -> marisa_trie.Trie:
         paths = []
         if not self._root:
@@ -111,24 +116,23 @@ class AutoincludeConfig:
                 paths = []
         return marisa_trie.Trie(paths)
 
-    def _build_autoinc_to_conf(self) -> dict[str, ConfigPath]:
+    def _build_autoinc_to_conf(self) -> dict[str, Config]:
         # there may be a linter-specific logic to lookup the config
         # for now stick to sequential search and the config file existence
         map_ = {}
         for path in self._trie.keys():
             for config_name in const.LINTER_CONFIG_TYPES[self._linter_name]:
-                config = os.path.join(path, config_name)
+                config: Path = Path(path) / config_name
 
-                if os.path.exists(config):
-                    map_[path] = Path(config)
+                if config.exists():
+                    map_[path] = Config(config, str(config.relative_to(self._root)))
         return map_
 
     def lookup(self, path: PurePath) -> MaybeConfig:
         keys: list[str] = self._trie.prefixes(str(path))
         if keys:
             autoinc_path = sorted(keys, key=len)[-1]
-            if config := self._autoinc_to_conf.get(autoinc_path):
-                return Config(config, str(config.relative_to(self._root)))
+            return self._autoinc_to_conf.get(autoinc_path)
 
 
 # TODO: delete after migration to autoincludes

@@ -16,7 +16,11 @@ import yalibrary.makelists
 import yalibrary.tools
 
 from . import config as cfg
+from . import disambiguate
 from . import state_helper
+
+if tp.TYPE_CHECKING:
+    from . import target
 
 
 logger = logging.getLogger(__name__)
@@ -41,29 +45,22 @@ class StylerOptions(tp.NamedTuple):
     config_loaders: tuple[cfg.ConfigLoader, ...] | None = None
 
 
-class Spec(tp.NamedTuple):
-    kind: StylerKind
-    ruff: bool = False
-
-
 class StylerOutput(tp.NamedTuple):
     content: str
     config: cfg.MaybeConfig = None
 
 
-_REGISTRY: dict[Spec, type[Styler]] = {}
-_SUFFIX_MAPPING: dict[str, list[Spec]] = {}
+_SUFFIX_MAPPING: dict[str, set[type[Styler]]] = {}
 
 
 def _register[T: Styler](cls: type[T]) -> type[T]:
-    _REGISTRY[cls.spec] = cls
     for suffix in cls.suffixes:
-        _SUFFIX_MAPPING.setdefault(suffix, []).append(cls.spec)
+        _SUFFIX_MAPPING.setdefault(suffix, set()).add(cls)
     return cls
 
 
-def select_styler(target: PurePath, ruff: bool) -> type[Styler] | None:
-    """Find matching spec and return respective styler class"""
+def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Styler] | None:
+    """Find and return matching styler class"""
 
     if target.suffix in _SUFFIX_MAPPING:
         key = target.suffix
@@ -72,17 +69,26 @@ def select_styler(target: PurePath, ruff: bool) -> type[Styler] | None:
     else:
         return
 
-    # find the first full match
-    for spec in _SUFFIX_MAPPING[key]:
-        if (s := Spec(spec.kind, ruff)) in _REGISTRY:
-            return _REGISTRY[s]
+    # get Stylers that can handle the target
+    matches = _SUFFIX_MAPPING[key]
+
+    assert matches
+
+    if len(matches) == 1:
+        return next(iter(matches))
+
+    # disambiguation procedure
+    if matches == {Black, Ruff}:
+        return disambiguate.black_vs_ruff(target, black_cls=Black, ruff_cls=Ruff, mine_opts=mine_opts)
+    else:
+        raise disambiguate.AmbiguityError(f"Can't choose between {' and '.join(m.__name__ for m in matches)}.")
 
 
 class Styler(tp.Protocol):
     # Whether a styler should run if not selected explicitly
     default_enabled: tp.ClassVar[bool]
     # Unique description of a styler
-    spec: tp.ClassVar[Spec]
+    kind: tp.ClassVar[StylerKind]
     # Series of strings upon which the proper styler is selected
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
@@ -96,7 +102,7 @@ class Styler(tp.Protocol):
 @_register
 class Black(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.PY)
+    kind: tp.ClassVar[StylerKind] = StylerKind.PY
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -105,7 +111,7 @@ class Black(cfg.ConfigMixin):
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
-                cfg.AutoincludeConfig(linter_name=const.PythonLinterName.Black),
+                cfg.AutoincludeConfig.make(const.PythonLinterName.Black),
                 cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Black,
                     defaults_file=const.DefaultLinterConfig.Python,
@@ -144,7 +150,7 @@ class Black(cfg.ConfigMixin):
 @_register
 class Ruff(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.PY, ruff=True)
+    kind: tp.ClassVar[StylerKind] = StylerKind.PY
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -157,7 +163,7 @@ class Ruff(cfg.ConfigMixin):
                 # - if there is a custom config got from autoincludes scheme, use it
                 # - else if there is a custom config got from ruff trie, use it
                 # - else use default config
-                cfg.AutoincludeConfig(linter_name=const.PythonLinterName.Ruff),
+                cfg.AutoincludeConfig.make(const.PythonLinterName.Ruff),
                 cfg.RuffConfig(),
                 cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Ruff,
@@ -214,7 +220,7 @@ class Ruff(cfg.ConfigMixin):
 @_register
 class ClangFormat(cfg.ConfigMixin):
     default_enabled: tp.ClassVar[bool] = True
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.CPP)
+    kind: tp.ClassVar[StylerKind] = StylerKind.CPP
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -223,7 +229,7 @@ class ClangFormat(cfg.ConfigMixin):
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
-                cfg.AutoincludeConfig(linter_name=const.CppLinterName.ClangFormat),
+                cfg.AutoincludeConfig.make(const.CppLinterName.ClangFormat),
                 cfg.DefaultConfig(
                     linter_name=const.CppLinterName.ClangFormat,
                     defaults_file=const.DefaultLinterConfig.Cpp,
@@ -273,14 +279,14 @@ class ClangFormat(cfg.ConfigMixin):
 @_register
 class Cuda(ClangFormat):
     default_enabled: tp.ClassVar[bool] = False
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.CUDA)
+    kind: tp.ClassVar[StylerKind] = StylerKind.CUDA
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
 
 
 @_register
 class Golang:
     default_enabled: tp.ClassVar[bool] = True
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.GO)
+    kind: tp.ClassVar[StylerKind] = StylerKind.GO
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -310,7 +316,7 @@ class Golang:
 @_register
 class YaMake:
     default_enabled: tp.ClassVar[bool] = False
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.YAMAKE)
+    kind: tp.ClassVar[StylerKind] = StylerKind.YAMAKE
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -324,7 +330,7 @@ class YaMake:
 @_register
 class Yql:
     default_enabled: tp.ClassVar[bool] = False
-    spec: tp.ClassVar[Spec] = Spec(StylerKind.YQL)
+    kind: tp.ClassVar[StylerKind] = StylerKind.YQL
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:

@@ -26,6 +26,7 @@ PEERDIR(
 PY_SRCS(
     __init__.py
     config.py
+    disambiguate.py
     state_helper.py
     style.py
     styler.py

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import exts.os2
 import yalibrary.display
+from . import disambiguate
 from . import state_helper
 from . import styler
 from . import target
@@ -128,7 +129,7 @@ def run_style(args) -> int:
             state_helper.check_cancel_state()
             try:
                 rc = future.result() or rc
-            except styler.StylingError as e:
+            except (styler.StylingError, disambiguate.AmbiguityError) as e:
                 logger.error(e, exc_info=True)
                 return 1
 
