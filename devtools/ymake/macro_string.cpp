@@ -41,7 +41,7 @@ TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value) {
 void ParseCmd(const TStringBuf& source, ui64& id, TStringBuf& name, TStringBuf& value) {
     TStringBuf temp = source;
     size_t afterId = temp.find(CmdDelimC);
-    size_t afterCmdName = temp.find(CmdNameDelimC);
+    size_t afterCmdName = temp.find(CmdNameDelimC, afterId);
     AssertEx(afterId != TStringBuf::npos, TString::Join("ParseCmd: CmdDelim \"", CmdDelimS, "\" not found in ", source));
     AssertEx(afterCmdName != TStringBuf::npos, TString::Join("ParseCmd: CmdNameDelim \"", CmdNameDelimS, "\" not found in ", source));
 
@@ -64,7 +64,7 @@ TStringBuf SkipId(const TStringBuf& cmd) {
 
 TStringBuf GetCmdName(const TStringBuf& cmd) {
     size_t afterId = cmd.find(CmdDelimC);
-    size_t afterCmdName = cmd.find(CmdNameDelimC);
+    size_t afterCmdName = cmd.find(CmdNameDelimC, afterId);
     AssertEx(afterId != TStringBuf::npos, TString::Join("ParseCmd: CmdDelim \"", CmdDelimS, "\" not found in ", cmd));
     AssertEx(afterCmdName != TStringBuf::npos, TString::Join("ParseCmd: CmdNameDelim \"", CmdNameDelimS, "\" not found in ", cmd));
     return cmd.SubStr(afterId + 1, afterCmdName - afterId - 1);
@@ -72,7 +72,7 @@ TStringBuf GetCmdName(const TStringBuf& cmd) {
 
 TStringBuf CheckAndGetCmdName(const TStringBuf& cmd) {
     size_t afterId = cmd.find(CmdDelimC);
-    size_t afterCmdName = cmd.find(CmdNameDelimC);
+    size_t afterCmdName = cmd.find(CmdNameDelimC, afterId);
     if (afterId == TStringBuf::npos || afterCmdName == TStringBuf::npos) {
         return TStringBuf();
     }
