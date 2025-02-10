@@ -221,10 +221,16 @@ def filter_chunks(opts):
 
 
 def filter_unsupported_cross_compiled_tests(target_platform, skip):
+    host_os = target_platform['platform']['host']['os']
+    host_arch = target_platform['platform']['host']['arch']
+
+    target_os = target_platform['platform']['target']['os']
+    target_arch = target_platform['platform']['target']['arch']
+
     if (
         skip
-        and target_platform['platform']['host']['os'] == "LINUX"
-        and target_platform['platform']['target']['os'] in ("DARWIN", "IOS")
+        and host_os == "LINUX"
+        and (target_os in ("DARWIN", "IOS") or (target_os == "LINUX" and host_arch != target_arch == "aarch64"))
     ):
         return lambda s: False
     return lambda s: True
