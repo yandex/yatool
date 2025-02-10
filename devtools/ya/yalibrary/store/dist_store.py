@@ -29,11 +29,12 @@ class Status(enum.Enum):
 class DistStore(object):
     def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None, heater_mode=False):
         self._readonly = readonly
-        self._timers = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._time_intervals = {'has': [], 'put': [], 'get': [], 'get-meta': []}
-        self._counters = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._failures = {'has': 0, 'put': 0, 'get': 0, 'get-meta': 0}
-        self._data_size = {'put': 0, 'get': 0}
+        metrics = ['has', 'put', 'get', 'get-meta', 'probe-meta-before-put']
+        self._timers = {m: 0 for m in metrics}
+        self._time_intervals = {m: [] for m in metrics}
+        self._counters = {m: 0 for m in metrics + ['skip-put']}
+        self._failures = {m: 0 for m in metrics}
+        self._data_size = {'put': 0, 'get': 0, 'skip-put': 0}
         self._cache_hit = {'requested': 0, 'found': 0}
         self._meta = {}
         self._name = name
@@ -157,12 +158,20 @@ class DistStore(object):
                 'put': {
                     'count': self._counters['put'],
                     'data_size': self._data_size['put'],
+                    'time': self._timers['put'],
                 },
                 'get': {
                     'count': self._counters['get'],
                     'data_size': self._data_size['get'],
+                    'time': self._timers['get'],
                 },
             }
+            if self._timers['probe-meta-before-put']:
+                stats['probe_before_put'] = {
+                    'skip_count': self._counters['skip-put'],
+                    'skip_data_size': self._data_size['skip-put'],
+                    'time': self._timers['probe-meta-before-put'],
+                }
             evlog_writer('stats', **stats)
 
     def tag(self):

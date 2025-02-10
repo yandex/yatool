@@ -2688,6 +2688,8 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_wt = True
         self.yt_store_refresh_on_read = False
         self.yt_store_cpp_client = True
+        self.yt_store_probe_before_put = False
+        self.yt_store_probe_before_put_min_size = 0
         self.bazel_remote_store = False
         self.bazel_remote_baseuri = 'http://[::1]:8080/'
         self.bazel_remote_username = None
@@ -2956,6 +2958,30 @@ class DistCacheOptions(DistCacheSetupOptions):
             + make_opt_consumers(
                 'yt_replace_result_yt_upload_only',
                 help='Tune yt-replace-result option: put only yt upload nodes into results. Useless without --yt-replace-result',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                ),
+            )
+            + make_opt_consumers(
+                'yt_store_probe_before_put',
+                help='Probe uid in a YT store before put results into it. Useless without --yt-put',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                ),
+            )
+            + make_opt_consumers(
+                'yt_store_probe_before_put_min_size',
+                help='Don\'t probe a YT store if size of data less than specified. Useless without --yt-store-probe-before-put',
                 arg_opts=dict(
                     hook=lambda n: SetConstValueHook(n, True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,

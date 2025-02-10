@@ -42,6 +42,8 @@ class YtStore(DistStore):
         fits_filter=None,
         heater_mode=False,
         with_self_uid=False,
+        probe_before_put=False,
+        probe_before_put_min_size=0,
         **kwargs
     ):
         super(YtStore, self).__init__(
@@ -56,6 +58,8 @@ class YtStore(DistStore):
         self._proxy = proxy
         self._ttl = ttl
         self._cache_filter = cache_filter
+        self._probe_before_put = probe_before_put
+        self._probe_before_put_min_size = probe_before_put_min_size
 
         data_dir = data_dir.rstrip('/')
         data_table = data_dir + "/" + data_table_name
@@ -217,6 +221,23 @@ class YtStore(DistStore):
             data_path = tar_path
         return data_path
 
+    def _probe_meta(self, self_uid, uid, files):
+        if not self._probe_before_put:
+            return False
+        if self._probe_before_put_min_size:
+            files_size = sum(os.lstat(f).st_size for f in files)
+            if files_size < self._probe_before_put_min_size:
+                return False
+
+        with AccumulateTime(lambda x: self._inc_time(x, 'probe-meta-before-put')):
+            meta = self._client.get_metadata(self_uids=[self_uid], uids=[uid])
+        if not meta:
+            return False
+        self._counters['skip-put'] += 1
+        # Report packed data size from YT store to be consistent with the put data_size
+        self._inc_data_size(meta.get('data_size', 0), 'skip-put')
+        return True
+
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         if self.is_disabled:
             return False
@@ -228,6 +249,13 @@ class YtStore(DistStore):
             # should never happen
             logger.debug('Put %s(%s) to YT completed(no-op)', name, uid)
             return True
+
+        try:
+            if self._probe_meta(self_uid, uid, files):
+                logger.debug('Put %s(%s) to YT completed(no-op): uid already exists', name, uid)
+                return True
+        except Exception as e:
+            logger.debug("meta probing failed with error: %s", e)
 
         data_size = 0
         try:
