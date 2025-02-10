@@ -119,12 +119,27 @@ def get_mapped_parsed_uri_and_info(parsed_uri, mapping, resource_info):
         resource_type=parsed_uri.resource_type,
         resource_uri=parsed_uri.resource_uri,
         resource_id=parsed_uri.resource_id,
-        resource_url=new_url,
+        resource_url=replace_server_root(new_url, mapping.get("servers", {})),
         fetcher_meta=parsed_uri.fetcher_meta,
     )
 
     return new_parsed_uri, resource_info
 
+def replace_server_root(new_url, servers):
+    start_idx = new_url.find('{')
+    if start_idx == -1:
+        return new_url
+
+    end_idx = new_url.find('}')
+    if end_idx == -1:
+        raise Exception("Can't find closing bracked: {}".format(new_url))
+
+    root_name = new_url[start_idx+1:end_idx]
+    if root_name not in servers:
+        raise Exception("Can't find server root url: {}".format(root_name))
+
+    root_url = servers[root_name]
+    return new_url.replace("{" + root_name + "}", root_url)
 
 def get_docker_resource_id(resource_uri):
     res = re.match(test_const.DOCKER_LINK_RE, resource_uri)
