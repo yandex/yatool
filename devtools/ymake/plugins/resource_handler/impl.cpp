@@ -8,6 +8,7 @@
 
 #include "yasm.h"
 #include "compiler.h"
+#include "objcopy.h"
 
 namespace NYMake {
     namespace NPlugins {
@@ -17,6 +18,7 @@ namespace NYMake {
             TVector<TStringBuf>::const_iterator bucketStart = params.cbegin();
             bool useTextContext = false;
             bool dontYasm = false;
+            bool objCopy = unit.Enabled("YMAKE_USE_OBJCOPY");
             {
                 auto end = params.cbegin() + std::min<size_t>(params.size(), 2ULL);
                 useTextContext = std::find(params.cbegin(), end, "DONT_PARSE"sv) != end;
@@ -61,10 +63,16 @@ namespace NYMake {
 
             using namespace NYMake::NResourcePacker;
 
+            std::unique_ptr<IResourcePacker> objCopyPacker = std::make_unique<TObjCopyResourcePacker>(unit, useTextContext);
             std::unique_ptr<IResourcePacker> rawPacker = std::make_unique<TRawResourcePacker>(unit, useTextContext);
             std::unique_ptr<IResourcePacker> yasmPacker = std::make_unique<TYASMResourcePacker>(unit, useTextContext);
 
             bool err = IterateOverResources([&](auto path, auto name) {
+                if (objCopy && TObjCopyResourcePacker::CanHandle(*path, *name)) {
+                    objCopyPacker->HandleResource(*path, *name);
+                    return;
+                }
+
                 IResourcePacker* packer = dontYasm ? rawPacker.get() : yasmPacker.get();
                 packer->HandleResource(*path, *name);
             });
@@ -73,6 +81,7 @@ namespace NYMake {
                 ythrow yexception() << "Error in RESOURCE plugin";
             }
 
+            objCopyPacker->Finalize(true /*force*/);
             rawPacker->Finalize(true /*force*/);
             yasmPacker->Finalize(true /*force*/);
         }
