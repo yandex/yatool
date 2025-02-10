@@ -12,6 +12,10 @@ class MissingResourceError(Exception):
     mute = True
 
 
+class InvalidMappingError(Exception):
+    mute = True
+
+
 class InvalidHttpUriException(Exception):
     def __init__(self, reason, uri):  # type: (str, str) -> None
         msg = 'Wrong uri. {0}: {1}'.format(reason, uri)
@@ -102,6 +106,13 @@ def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str
         raise InvalidUriSchemaException(accepted_schemas, resource_uri)
 
 
+def resolve_url(url, extensions):
+    try:
+        return url.format(**extensions)
+    except Exception as e:
+        raise InvalidMappingError("Failed to resolve url '{}' using extensions {}: {!r}".format(url, extensions, e))
+
+
 def get_mapped_parsed_uri_and_info(parsed_uri, mapping, resource_info):
     # type: (ParsedResourceUri, dict, dict) -> tuple[ParsedResourceUri, dict]
 
@@ -114,6 +125,7 @@ def get_mapped_parsed_uri_and_info(parsed_uri, mapping, resource_info):
         resource_info = mapping["resources_info"][resource_id]
 
     new_url = mapping["resources"][resource_id]
+    new_url = resolve_url(new_url, mapping.get("extensions", {}))
 
     new_parsed_uri = ParsedResourceUri(
         resource_type=parsed_uri.resource_type,
