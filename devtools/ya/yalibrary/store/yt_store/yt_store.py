@@ -254,8 +254,8 @@ class YtStore(DistStore):
             if self._probe_meta(self_uid, uid, files):
                 logger.debug('Put %s(%s) to YT completed(no-op): uid already exists', name, uid)
                 return True
-        except Exception as e:
-            logger.debug("meta probing failed with error: %s", e)
+        except Exception:
+            logger.debug("meta probing failed with error", exc_info=True)
 
         data_size = 0
         try:
