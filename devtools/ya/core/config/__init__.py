@@ -313,6 +313,7 @@ def mapping():
 
         return merge_mappings(mappings)
 
+
 @func.lazy
 def is_dev_mode():
     return os.getenv("YMAKE_DEV")
