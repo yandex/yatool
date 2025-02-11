@@ -221,7 +221,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         flags_list = []
         if target_platforms:
             for tp in target_platforms:
-                flags_list.append(tp["flags"])
+                if 'flags' in tp:
+                    flags_list.append(tp['flags'])
         else:
             flags_list.append(build_options.flags)
 
