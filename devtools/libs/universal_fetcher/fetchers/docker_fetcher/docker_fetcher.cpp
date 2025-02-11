@@ -98,6 +98,52 @@ namespace NUniversalFetcher {
             }
 
             ui64 GetImageSize(const TString& uri, TCancellationToken cancellation) {
+                auto resJson = GetImageInfo(uri, cancellation);
+
+                if (resJson.Has("manifests")) {
+                    Log() << TLOG_INFO << "Manifests found, trying to find amd64 digest to get size";
+                    auto newUri = ChooseManifest(uri, resJson);
+                    Y_ENSURE(newUri);
+                    resJson = GetImageInfo(newUri, cancellation);
+                }
+                return CalcImageSize(resJson);
+            }
+
+            TLog& Log() {
+                return *Log_;
+            }
+
+            void SetLogger(TLog& log) override final {
+                Log_ = &log;
+            }
+
+        private:
+            ui64 CalcImageSize(const NJson::TJsonValue& jsonManifest) {
+                ui64 size = 0;
+                size += jsonManifest["config"]["size"].GetUIntegerSafe();
+                for (auto& layer : jsonManifest["layers"].GetArraySafe()) {
+                    size += layer["size"].GetUIntegerSafe();
+                }
+                return size;
+            }
+
+            TString ChooseManifest(const TString uri, const NJson::TJsonValue& jsonManifest) {
+                NJson::TJsonValue::TArray manifests = jsonManifest["manifests"].GetArraySafe();
+                Y_ENSURE(manifests.size() > 0);
+                auto urlWithImageName = TString(TStringBuf(uri).NextTok('@'));
+                for (auto& manifest : manifests) {
+                    if (manifest["platform"]["architecture"].GetStringSafe() == "amd64") {
+                        TString digest = manifest["digest"].GetStringSafe();
+                        auto newUri = TStringBuilder() << urlWithImageName << "@" << digest;
+                        return newUri;
+                    }
+                }
+                Log() << TLOG_INFO << "No amd64 manifest found, trying to find any digest to get size";
+                auto newUri = TStringBuilder() << urlWithImageName << "@" << manifests[0]["digest"].GetStringSafe();
+                return newUri;
+            }
+
+            NJson::TJsonValue GetImageInfo(const TString& uri, TCancellationToken cancellation) {
                 TVector<TString> args{Params_.SkopeoBinaryPath, "inspect", "--raw"};
                 if (Params_.AuthJsonFile) {
                     args.push_back("--authfile");
@@ -126,21 +172,7 @@ namespace NUniversalFetcher {
                     ythrow yexception() << "Can't parse skopeo inspect output";
                 }
 
-                ui64 totalSize = 0;
-                totalSize += resJson["config"]["size"].GetUIntegerSafe();
-                for (auto& layer : resJson["layers"].GetArraySafe()) {
-                    totalSize += layer["size"].GetUIntegerSafe();
-                }
-
-                return totalSize;
-            }
-
-            TLog& Log() {
-                return *Log_;
-            }
-
-            void SetLogger(TLog& log) override final {
-                Log_ = &log;
+                return resJson;
             }
 
         private:
