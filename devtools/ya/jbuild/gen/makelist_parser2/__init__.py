@@ -152,15 +152,12 @@ def obtain_targets_graph2(dart, cpp_graph):
 
         sbr_resources = []
         arcadia_resources = []
-        arcadia_test_data_resources = []
         if 'TEST_DATA' in entry:
             for td in sum(entry['TEST_DATA'], []):
                 if td.startswith('sbr://'):
                     sbr_resources.append(td[len('sbr://') :])
                 if td.startswith('arcadia/'):
                     arcadia_resources.append(td[len('arcadia/') :])
-                if td.startswith('arcadia_tests_data/'):
-                    arcadia_test_data_resources.append(td[len('arcadia_tests_data/') :])
 
         all_java_peerdirs |= set(map(strip_root, non_manageable_peers)) | set(map(strip_root, managed_peers_closure))
 
@@ -183,8 +180,6 @@ def obtain_targets_graph2(dart, cpp_graph):
             plain[consts.TEST_DATA_SANDBOX] = [sbr_resources]
         if arcadia_resources:
             plain[consts.TEST_DATA_ARCADIA] = [arcadia_resources]
-        if arcadia_test_data_resources:
-            plain[consts.TEST_DATA_ARCADIA_TEST_DATA] = [arcadia_test_data_resources]
 
         plain.pop('BUNDLE_NAME', None)
         plain.pop('PATH', None)

@@ -1297,11 +1297,7 @@ def process_path(path, ctx, results_root, project_root, relativize_cache, dry_ru
                 processors,
                 javac_flags,
                 [(i, consts.TEST_DATA_SANDBOX) for i in sum(target.plain.get(consts.TEST_DATA_SANDBOX, []), [])]
-                + [(i, consts.TEST_DATA_ARCADIA) for i in sum(target.plain.get(consts.TEST_DATA_ARCADIA, []), [])]
-                + [
-                    (i, consts.TEST_DATA_ARCADIA_TEST_DATA)
-                    for i in sum(target.plain.get(consts.TEST_DATA_ARCADIA_TEST_DATA, []), [])
-                ],
+                + [(i, consts.TEST_DATA_ARCADIA) for i in sum(target.plain.get(consts.TEST_DATA_ARCADIA, []), [])],
                 jvm_args=jvm_args,
                 kotlinc_args=kotlinc_args,
                 jdk_version=target.plain.get('JDK_VERSION_INT', None),
@@ -1680,19 +1676,6 @@ def up_funcs(ctx, results_root, project_root, dry_run):
                             shutil.move(os.path.join(results_root, res_id, 'resource'), dest)
                 elif td[1] == consts.TEST_DATA_ARCADIA:
                     src = os.path.join(ctx.opts.arc_root, td[0])
-                    dst = os.path.join(test_data_dir, os.path.basename(td[0]))
-                    try:
-                        os.symlink(src, dst)
-                    except Exception:
-                        logging.warning("Cant create symlink for {} DATA ({} -> {})".format(p, src, dst))
-                elif td[1] == consts.TEST_DATA_ARCADIA_TEST_DATA:
-                    atd_root = os.path.join(os.path.dirname(ctx.opts.arc_root), 'arcadia_tests_data')
-                    if not os.path.exists(atd_root):
-                        logging.warning(
-                            "ARCADIA_TESTS_DATA root is not exists, can't create symlink for {} DATA".format(p)
-                        )
-                        continue
-                    src = os.path.join(atd_root, td[0])
                     dst = os.path.join(test_data_dir, os.path.basename(td[0]))
                     try:
                         os.symlink(src, dst)
