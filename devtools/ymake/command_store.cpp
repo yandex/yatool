@@ -831,9 +831,16 @@ NCommands::TCompiledCommand TCommands::Compile(
     auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
     auto ast = inliner.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
-    if (preevaluate)
-        return Preevaluate(ast, vars, io);
-    else
+    if (preevaluate) {
+#if 0
+        YDebug() << "preevaluating " << PrintExpr(ast) << Endl;
+#endif
+        auto result = Preevaluate(ast, vars, io);
+#if 0
+        YDebug() << "           -> " << PrintCmd(result.Expression) << Endl;
+#endif
+        return result;
+    } else
         return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast)};
 }
 
@@ -934,14 +941,17 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
 }
 
 TString TCommands::PrintConst(NPolexpr::TConstId id) const {
+    // TODO strings here would be better with the {:?s} formatting, but the current fmt is too old for that
     return std::visit(TOverloaded{
+        [](std::monostate                           ) { return fmt::format("{{}}"); },
         [](std::string_view                      val) { return fmt::format("'{}'", val); },
+        [](std::vector<std::string_view>         val) { return fmt::format("'{}'", fmt::join(val, "', '")); },
         [](TMacroValues::TTool                   val) { return fmt::format("Tool{{'{}'}}", val.Data); },
         [](TMacroValues::TInput                  val) { return fmt::format("Input{{{}}}", val.Coord); },
         [](TMacroValues::TInputs                 val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TOutput                 val) { return fmt::format("Output{{{}}}", val.Coord); },
         [](TMacroValues::TOutputs                val) { return fmt::format("Outputs{{{}}}", fmt::join(val.Coords, " ")); },
-        [](TMacroValues::TGlobPattern            val) { return fmt::format("GlobPattern{{{}}}", val.Data); },
+        [](TMacroValues::TGlobPattern            val) { return fmt::format("GlobPattern{{{}}}", fmt::join(val.Data, " ")); },
         [](TMacroValues::TLegacyLateGlobPatterns val) { return fmt::format("LegacyLateGlobPattern{{{}}}", fmt::join(val.Data, " ")); },
     }, Values.GetValue(id));
 }
@@ -1092,8 +1102,18 @@ TVector<TStringBuf> TCommands::GetCommandTools(ui32 elemId) const {
 
 NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const {
     return std::visit(TOverloaded{
+        [](std::monostate) {
+            return NCommands::TTermValue(NCommands::TTermNothing());
+        },
         [](std::string_view val) {
-             return NCommands::TTermValue(TString(val));
+            return NCommands::TTermValue(TString(val));
+        },
+        [](std::vector<std::string_view> val) {
+            TVector<TString> result;
+            result.reserve(val.size());
+            for (auto& x : val)
+                result.push_back(TString(x));
+            return NCommands::TTermValue(result);
         },
         [&](TMacroValues::TTool val) {
             if (val.Data.empty())
@@ -1127,7 +1147,7 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             return NCommands::TTermValue(result);
         },
         [](TMacroValues::TGlobPattern val) {
-            return NCommands::TTermValue(TString(val.Data));
+            return NCommands::TTermValue(val.Data);
         },
         [](TMacroValues::TLegacyLateGlobPatterns) -> NCommands::TTermValue {
             ythrow TError() << "unexpected glob evaluation";
@@ -1145,14 +1165,16 @@ TVector<TString> TCommands::InputToStringArray(const TMacroValues::TInput& input
 
 TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
     return std::visit(TOverloaded{
+        [](std::monostate                           ) { return TString(); },
         [](std::string_view                      val) { return TString(val); },
+        [](std::vector<std::string_view>         val) { return JoinArgs(std::span(val), std::identity()); },
         [](TMacroValues::TTool                   val) { return TString(val.Data); },
         [](TMacroValues::TInput                  val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TInputs                 val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TOutput                 val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TOutputs                val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
-        [](TMacroValues::TGlobPattern            val) { return TString(val.Data); },
-        [](TMacroValues::TLegacyLateGlobPatterns val) { return TString(fmt::format("{}", fmt::join(val.Data, " "))); },
+        [](TMacroValues::TGlobPattern            val) { return JoinArgs(std::span(val.Data), std::identity()); },
+        [](TMacroValues::TLegacyLateGlobPatterns val) { return JoinArgs(std::span(val.Data), std::identity()); },
     }, Values.GetValue(node));
 }
 

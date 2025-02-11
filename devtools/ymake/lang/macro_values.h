@@ -80,14 +80,23 @@ public:
         bool operator==(const TOutputs&) const = default;
     };
     struct TGlobPattern {
-        std::string_view Data;
+        TVector<TString> Data;
         bool operator==(const TGlobPattern&) const = default;
     };
     struct TLegacyLateGlobPatterns {
         TVector<TString> Data;
         bool operator==(const TLegacyLateGlobPatterns&) const = default;
     };
-    using TValue = std::variant<std::string_view, TTool, TInput, TInputs, TOutput, TOutputs, TGlobPattern, TLegacyLateGlobPatterns>;
+    using TValue = std::variant<
+        std::monostate,
+        std::string_view,
+        std::vector<std::string_view>,
+        TTool,
+        TInput, TInputs,
+        TOutput, TOutputs,
+        TGlobPattern,
+        TLegacyLateGlobPatterns
+    >;
 
     enum EStorageType {
         ST_LITERALS,
@@ -98,6 +107,7 @@ public:
         ST_INPUT_ARRAYS,
         ST_OUTPUT_ARRAYS,
         ST_LEGACY_LATE_GLOB,
+        ST_STRING_ARRAYS,
         ST_COUNT
     };
     static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));

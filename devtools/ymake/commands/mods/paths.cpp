@@ -65,20 +65,22 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto names = SplitArgs(TString(arg0));
-            if (names.size() != 1) {
-                throw std::runtime_error{"nopath modifier requires a single argument"};
-            }
-            // one does not simply reuse the original argument,
-            // for it might have been transformed (e.g., dequoted)
-            arg0 = names.front();
-            // cf. EMF_CutPath processing
-            size_t slash = arg0.rfind(NPath::PATH_SEP);
-            if (slash != TString::npos)
-                arg0 = arg0.substr(slash + 1);
-            auto id = ctx.Values.InsertStr(arg0);
-            return ctx.Values.GetValue(id);
+            return std::visit(TOverloaded{
+                [&](std::string_view path) -> TMacroValues::TValue {
+                    auto names = SplitArgs(TString(path)); // TODO get rid of this
+                    if (names.size() != 1)
+                        throw std::runtime_error{"nopath modifier requires a single argument"};
+                    return ProcessOne(ctx, names.front());
+                },
+                [&](const std::vector<std::string_view>& paths) -> TMacroValues::TValue {
+                    if (paths.size() != 1)
+                        throw std::runtime_error{"nopath modifier requires a single argument"};
+                    return ProcessOne(ctx, paths.front());
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[0]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -86,13 +88,6 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            auto apply = [](TString s) {
-                // lifted from EMF_CutPath processing:
-                size_t slash = s.rfind(NPath::PATH_SEP);
-                if (slash != TString::npos)
-                    s = s.substr(slash + 1);
-                return s;
-            };
             return std::visit(TOverloaded{
                 [](TTermError) -> TTermValue {
                     Y_ABORT();
@@ -101,17 +96,28 @@ namespace {
                     throw TBadArgType(Name, x);
                 },
                 [&](TString s) -> TTermValue {
-                    return apply(std::move(s));
+                    return TString(Cut(s));
                 },
                 [&](TVector<TString> v) -> TTermValue {
                     for (auto& s : v)
-                        s = apply(std::move(s));
+                        s = TString(Cut(s));
                     return std::move(v);
                 },
                 [&](TTaggedStrings x) -> TTermValue {
                     throw TBadArgType(Name, x);
                 }
             }, args[0]);
+        }
+    private:
+        static TStringBuf Cut(TStringBuf path) {
+            // lifted from EMF_CutPath processing:
+            size_t slash = path.rfind(NPath::PATH_SEP);
+            if (slash != TString::npos)
+                path = path.substr(slash + 1);
+            return path;
+        }
+        static TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) {
+            return ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)));
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -128,23 +134,22 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto names = SplitArgs(TString(arg0));
-            if (names.size() != 1) {
-                throw std::runtime_error{"noext modifier requires a single argument"};
-            }
-            // one does not simply reuse the original argument,
-            // for it might have been transformed (e.g., dequoted)
-            arg0 = names.front();
-            // cf. RenderCutExt()
-            size_t slash = arg0.rfind(NPath::PATH_SEP); //todo: windows slash!
-            if (slash == TString::npos)
-                slash = 0;
-            size_t dot = arg0.rfind('.');
-            if (dot != TString::npos && dot >= slash)
-                arg0 = arg0.substr(0, dot);
-            auto id = ctx.Values.InsertStr(arg0);
-            return ctx.Values.GetValue(id);
+            return std::visit(TOverloaded{
+                [&](std::string_view path) -> TMacroValues::TValue {
+                    auto names = SplitArgs(TString(path)); // TODO get rid of this
+                    if (names.size() != 1)
+                        throw std::runtime_error{"noext modifier requires a single argument"};
+                    return ProcessOne(ctx, names.front());
+                },
+                [&](const std::vector<std::string_view>& paths) -> TMacroValues::TValue {
+                    if (paths.size() != 1)
+                        throw std::runtime_error{"noext modifier requires a single argument"};
+                    return ProcessOne(ctx, paths.front());
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[0]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -152,16 +157,6 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            auto apply = [](TString s) {
-                // lifted from EMF_CutExt processing:
-                size_t slash = s.rfind(NPath::PATH_SEP); //todo: windows slash!
-                if (slash == TString::npos)
-                    slash = 0;
-                size_t dot = s.rfind('.');
-                if (dot != TString::npos && dot >= slash)
-                    s = s.substr(0, dot);
-                return s;
-            };
             return std::visit(TOverloaded{
                 [](TTermError) -> TTermValue {
                     Y_ABORT();
@@ -170,17 +165,31 @@ namespace {
                     throw TBadArgType(Name, x);
                 },
                 [&](TString s) -> TTermValue {
-                    return apply(std::move(s));
+                    return TString(Cut(s));
                 },
                 [&](TVector<TString> v) -> TTermValue {
                     for (auto& s : v)
-                        s = apply(std::move(s));
+                        s = TString(Cut(s));
                     return std::move(v);
                 },
                 [&](const TTaggedStrings& x) -> TTermValue {
                     throw TBadArgType(Name, x);
                 }
             }, args[0]);
+        }
+    private:
+        static TStringBuf Cut(TStringBuf path) {
+            // lifted from EMF_CutExt processing:
+            size_t slash = path.rfind(NPath::PATH_SEP); //todo: windows slash!
+            if (slash == TString::npos)
+                slash = 0;
+            size_t dot = path.rfind('.');
+            if (dot != TString::npos && dot >= slash)
+                path = path.substr(0, dot);
+            return path;
+        }
+        static TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) {
+            return ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)));
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

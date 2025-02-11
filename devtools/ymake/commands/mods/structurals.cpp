@@ -26,8 +26,11 @@ namespace {
             if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
                 return args.front();
             }
-            auto result = JoinArgs(std::span(args), [](auto& x) {return std::get<std::string_view>(x);});
-            return ctx.Values.GetValue(ctx.Values.InsertStr(result));
+            std::vector<std::string_view> result;
+            result.reserve(args.size());
+            for (auto& arg : args)
+                result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(std::get<std::string_view>(arg)))));
+            return result;
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -73,8 +76,14 @@ namespace {
             if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
                 return args.front();
             }
-            for (auto& arg : args)
-                result += std::get<std::string_view>(arg);
+            for (auto& arg : args) {
+                if (auto piece = std::get_if<std::string_view>(&arg)) {
+                    result += *piece;
+                } else if (auto pieces = std::get_if<std::vector<std::string_view>>(&arg)) {
+                    for (auto& piece : *pieces)
+                        result += piece;
+                }
+            }
             return ctx.Values.GetValue(ctx.Values.InsertStr(result));
         }
         TTermValue Evaluate(

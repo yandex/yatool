@@ -22,10 +22,22 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto arg1 = std::get<std::string_view>(args[1]);
-            auto id = ctx.Values.InsertStr(TString::Join(arg0, arg1));
-            return ctx.Values.GetValue(id);
+            auto prefix = std::get<std::string_view>(args[0]);
+            return std::visit(TOverloaded{
+                [&](std::string_view body) -> TMacroValues::TValue {
+                    return ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(prefix, body)));
+                },
+                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
+                    auto result = std::vector<std::string_view>();
+                    result.reserve(bodies.size());
+                    for (auto& body : bodies)
+                        result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(prefix, body)))));
+                    return result;
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[1]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -126,10 +138,22 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto arg1 = std::get<std::string_view>(args[1]);
-            auto id = ctx.Values.InsertStr(TString::Join(arg1, arg0));
-            return ctx.Values.GetValue(id);
+            auto suf = std::get<std::string_view>(args[0]);
+            return std::visit(TOverloaded{
+                [&](std::string_view body) -> TMacroValues::TValue {
+                    return ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(body, suf)));
+                },
+                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
+                    auto result = std::vector<std::string_view>();
+                    result.reserve(bodies.size());
+                    for (auto& body : bodies)
+                        result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(body, suf)))));
+                    return result;
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[1]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
