@@ -383,7 +383,6 @@ class GradleOptions(yarg.Options):
         self.disable_errorprone = False
         self.yexport_debug_mode = None
         self.login = None
-        self.bucket_token = None
         self.remove = None
         self.dump_ymake_stderr = None
 

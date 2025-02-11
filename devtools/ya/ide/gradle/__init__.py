@@ -191,6 +191,17 @@ class _SymlinkCollector:
     def mkdir(path: Path) -> None:
         path.mkdir(0o755, parents=True, exist_ok=True)
 
+    @staticmethod
+    def resolve(path: Path) -> tuple[bool, Path]:
+        """If symlink, resolve path, else return path as is"""
+        if not path.is_symlink():
+            return True, path
+        try:
+            return True, path.resolve(True)
+        except Exception:
+            path.unlink()  # remove invalid symlink
+            return False, path
+
 
 class _ExistsSymlinkCollector(_SymlinkCollector):
     """Collect exists symlinks for remove later"""
@@ -214,7 +225,7 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
             self.logger.error("Can't load symlinks from file %s: %s", self._symlinks_path, e)
 
         for export_file, arcadia_file in self.collect_symlinks():
-            if arcadia_file.is_symlink() and arcadia_file.resolve() == export_file:
+            if self._check_symlink(arcadia_file, export_file):
                 self.add_symlink(arcadia_file, export_file)
 
     def add_symlink(self, arcadia_file: Path, export_file: Path) -> None:
@@ -239,8 +250,18 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
             return False
         with symlinks_path.open('rb') as f:
             symlinks: dict[str, str] = sjson.load(f)
-        self.symlinks = {Path(arcadia_file): Path(export_file) for arcadia_file, export_file in symlinks.items()}
+        self.symlinks = {}
+        for arcadia_file, export_file in symlinks.items():
+            arcadia_file = Path(arcadia_file)
+            export_file = Path(export_file)
+            if self._check_symlink(arcadia_file, export_file):
+                self.add_symlink(arcadia_file, export_file)
         return True
+
+    def _check_symlink(self, arcadia_file: Path, export_file: Path) -> bool:
+        """Check symlink exists, remove invalid symlinks"""
+        is_valid, to_path = _SymlinkCollector.resolve(arcadia_file)
+        return is_valid and to_path == export_file.absolute()
 
     @property
     def _symlinks_path(self) -> Path:
@@ -274,6 +295,18 @@ class _RemoveSymlinkCollector(_SymlinkCollector):
     def del_symlink(self, arcadia_file: Path) -> None:
         del self.symlinks[arcadia_file]
 
+    def remove_invalid_symlinks(self):
+        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root)
+        for rel_target in self.config.params.rel_targets:
+            _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.arcadia_root / rel_target)
+
+    @staticmethod
+    def _remove_invalid_symlinks(dirtree: Path) -> None:
+        """Remove all invalid symlinks"""
+        for walk_root, dirs, files in dirtree.walk():
+            for item in dirs + files:
+                _SymlinkCollector.resolve(walk_root / item)
+
 
 class _NewSymlinkCollector(_SymlinkCollector):
     """Collect new symlinks for create later, exclude already exists"""
@@ -294,9 +327,19 @@ class _NewSymlinkCollector(_SymlinkCollector):
                 self.remove_symlinks.del_symlink(arcadia_file)
             elif not arcadia_file.exists():
                 self.symlinks[arcadia_file] = export_file
-            elif arcadia_file.is_symlink() and arcadia_file.resolve().is_relative_to(_JavaSemConfig.EXPORT_ROOT_BASE):
-                self.logger.error("Already symlink to another project %s -> %s", arcadia_file, arcadia_file.resolve())
-                self.has_errors = True
+            elif arcadia_file.is_symlink():
+                is_valid, to_path = _SymlinkCollector.resolve(arcadia_file)
+                if is_valid:
+                    if (to_path != export_file.absolute()) and to_path.is_relative_to(_JavaSemConfig.EXPORT_ROOT_BASE):
+                        self.logger.error(
+                            "Can't create symlink %s -> %s, already symlink to another Gradle project -> %s",
+                            arcadia_file,
+                            export_file,
+                            to_path,
+                        )
+                        self.has_errors = True
+                else:
+                    self.symlinks[arcadia_file] = export_file  # require create new symlink
 
     def create(self) -> None:
         """Create symlinks from arcadia files to export files"""
@@ -806,6 +849,7 @@ def do_gradle(params):
         exists_symlinks = _ExistsSymlinkCollector(config)
         exists_symlinks.collect()
         remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
+        remove_symlinks.remove_invalid_symlinks()
 
         if config.params.remove:
             remover = _Remover(config, remove_symlinks)
