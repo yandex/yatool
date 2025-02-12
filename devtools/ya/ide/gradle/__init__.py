@@ -57,11 +57,13 @@ class _JavaSemConfig(SemConfig):
             raise YaIdeGradleException(
                 '\n'.join(
                     [
-                        f'Invalid Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE}:',
-                        *errors,
-                        '',
-                        'Please, read more about work with Bucket https://docs.yandex-team.ru/bucket/gradle#autentifikaciya'
+                        'For use [ya ide gradle] REQUIRED access from Gradle to Bucket [http://bucket.yandex-team.ru/]',
+                        'Please, read more about work with Bucket https://docs.yandex-team.ru/bucket',
+                        'and authentication for Gradle https://docs.yandex-team.ru/bucket/gradle#autentifikaciya',
                         'Token can be taken from here https://oauth.yandex-team.ru/authorize?response_type=token&client_id=bf8b6a8a109242daaf62bce9d6609b3b',
+                        '',
+                        f'Now Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE} is invalid:',
+                        *errors,
                     ]
                 )
             )
