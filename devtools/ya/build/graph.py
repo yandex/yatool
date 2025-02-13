@@ -1432,13 +1432,14 @@ class _GraphMaker:
                 no_pic_func, no_pic_tool_queue_putter = tool_targets_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
+            ymake_opts_nopic = ymake_opts
             if to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode()
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
 
-                ymake_opts = dict(
+                ymake_opts_nopic = dict(
                     ymake_opts or {},
                     transition_source='nopic',
                     report_pic_nopic=True,
@@ -1458,7 +1459,7 @@ class _GraphMaker:
                     no_ymake_retry=self._opts.no_ymake_retry,
                     tool_targets_queue_putter=no_pic_tool_queue_putter,
                     pic_queue_putter=no_pic_queue_putter,
-                    ymake_opts=ymake_opts,
+                    ymake_opts=ymake_opts_nopic,
                 )
 
             no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
@@ -1474,6 +1475,8 @@ class _GraphMaker:
                     pic_func, self._make_debug_id(debug_id, 'pic')
                 )
 
+            ymake_opts_pic = ymake_opts
+            abs_targets_pic = abs_targets
             if pic_queue is not None:
 
                 def stdin_line_provider():
@@ -1485,20 +1488,20 @@ class _GraphMaker:
                         return ''
                     return json.dumps(pic_queue.get()) + '\n'
 
-                ymake_opts = dict(
+                ymake_opts_pic = dict(
                     ymake_opts or {},
                     targets_from_evlog=True,
                     source_root=self._opts.arc_root,
                     stdin_line_provider=stdin_line_provider,
                     transition_source='pic',
                 )
-                abs_targets = []
+                abs_targets_pic = []
 
             def gen_pic():
                 return pic_func(
                     flags,
                     target_tc,
-                    abs_targets,
+                    abs_targets_pic,
                     debug_id=debug_id,
                     enabled_events=enabled_events,
                     extra_conf=extra_conf,
@@ -1507,7 +1510,7 @@ class _GraphMaker:
                     no_caches_on_retry=self._opts.no_caches_on_retry,
                     no_ymake_retry=self._opts.no_ymake_retry,
                     tool_targets_queue_putter=pic_queue_putter,
-                    ymake_opts=ymake_opts,
+                    ymake_opts=ymake_opts_pic,
                 )
 
             pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
