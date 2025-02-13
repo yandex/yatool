@@ -101,6 +101,19 @@ def _make_repositories_config(
             }
         ]
 
+    # It's intentionally made dirty to encourage delete it all ASAP )
+    if root and need_tests_data:
+        settings_conf = "build/conf/settings.conf"
+        with open(os.path.join(root, settings_conf)) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("DISABLE_ATD"):
+                    val = line.split("=", 1)[1].strip()
+                    if strtobool(val):
+                        need_tests_data = False
+                        logger.debug("disable arcadia_test_data because of 'DISABLE_ATD=yes' in %s", settings_conf)
+                    break
+
     if need_tests_data and (arc_url or not _is_branch(arcadia_svn_path)):
         arcadia_tests_data_svn_path = os.path.join(os.path.dirname(arcadia_svn_path), 'arcadia_tests_data')
         ret.append(
