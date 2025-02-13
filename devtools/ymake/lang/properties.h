@@ -30,8 +30,15 @@ PROPERTY(ALLOWED, "@usage: .ALLOWED=MACRO1 [MACRO2] ...\n\n"
 "Restricts macros list allowed within the module.")
 PROPERTY(ALLOWED_IN_LINTERS_MAKE, "")
 PROPERTY(ALL_INS_TO_OUT, "")
-PROPERTY(ARGS_PARSER, "")
-PROPERTY(CMD, "")
+PROPERTY(ARGS_PARSER, "Choose argument parser for macro opening curent module declaration. Must be one of: `Base`, `DLL` or `Raw`\n\n"
+""
+" * `Base` - Effective signature: `(Realprjname, PREFIX="")`. Value of the only positional parameter is stored in the REALPRJNAME variable.\n"
+"            Value of the optional named parameter `PREFIX` is used to set MODULE_PREFIX variable.\n"
+"            **Default** arg parser for module macros.\n"
+" * `DLL` - Effective signature: `(Realprjname, PREFIX="", Ver...)`. First positional parameter and the only named parameter PREFIX are treated in the same way as in Base\n"
+"           argument parser. Remaining positional parameters are treated as components of DLL so-version and are stored in a `MODULE_VERSION` variable in a joined by `.` string\n"
+" * `Raw` - Do not perform any parsing or validation. Stores all arguments in a variable `MODULE_ARGS_RAW` which can be analyzed by macros invoked in the module body.\n")
+PROPERTY(CMD, "Macro or module build command")
 PROPERTY(STRUCT_CMD, "Enables or disables new command template interpreter for this macro or module")
 PROPERTY(STRUCT_SEM, "Enables or disables new semantics template interpreter for this macro or module")
 PROPERTY(DEFAULT_NAME_GENERATOR, "Name of embedded output filename generator, one of: UseDirNameOrSetGoPackage, TwoDirNames, ThreeDirNames, FullPath")
