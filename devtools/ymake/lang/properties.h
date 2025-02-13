@@ -51,7 +51,9 @@ PROPERTY(PEERDIR, "")
 PROPERTY(PEERDIR_POLICY, "")
 PROPERTY(PEERDIRSELF, "")
 PROPERTY(PROXY, "")
-PROPERTY(VERSION_PROXY, "")
+PROPERTY(VERSION_PROXY, "@usage: `.VERSION_PROXY=yes` mark module as empty intermediate proxy for library with multiple versions.\n\n"
+""
+"Such module is always replaced by exact version of the library in dependency management phase of build configuration. It can only be used with dependency management aware modules.")
 PROPERTY(RESTRICTED, "")
 PROPERTY(SEM, "Semantics (instead of commands) for export to other build systems in --sem-graph mode")
 PROPERTY(SYMLINK_POLICY, "")
