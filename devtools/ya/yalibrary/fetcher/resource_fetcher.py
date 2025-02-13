@@ -84,7 +84,7 @@ def fetch_resource_if_need(
     if use_universal_fetcher and not CAN_USE_UNIVERSAL_FETCHER:
         if not FALLBACK_MSG_LOGGED:
             FALLBACK_MSG_LOGGED = True
-            logger.info("Can't use universal fetcher. Fallback to default mode.")
+            logger.debug("Can't use universal fetcher. Fallback to default mode.")
 
         use_universal_fetcher = False
 
