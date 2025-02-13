@@ -235,7 +235,7 @@ class YtStore(DistStore):
             return False
         self._counters['skip-put'] += 1
         # Report packed data size from YT store to be consistent with the put data_size
-        self._inc_data_size(meta.get('data_size', 0), 'skip-put')
+        self._inc_data_size(meta[uid].get('data_size', 0), 'skip-put')
         return True
 
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
