@@ -28,7 +28,7 @@ PROPERTY(ALIASES, "")
 PROPERTY(ALLOWED, "@usage: .ALLOWED=MACRO1 [MACRO2] ...\n\n"
 ""
 "Restricts macros list allowed within the module.")
-PROPERTY(ALLOWED_IN_LINTERS_MAKE, "")
+PROPERTY(ALLOWED_IN_LINTERS_MAKE, "@usage `.ALLOWED_IN_LINTERS_MAKE=yes` marks current macro as allowed for use in `linters.make.inc` files.")
 PROPERTY(ALL_INS_TO_OUT, "")
 PROPERTY(ARGS_PARSER, "Choose argument parser for macro opening curent module declaration. Must be one of: `Base`, `DLL` or `Raw`\n\n"
 ""
