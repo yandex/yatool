@@ -29,7 +29,6 @@ PROPERTY(ALLOWED, "@usage: .ALLOWED=MACRO1 [MACRO2] ...\n\n"
 ""
 "Restricts macros list allowed within the module.")
 PROPERTY(ALLOWED_IN_LINTERS_MAKE, "@usage `.ALLOWED_IN_LINTERS_MAKE=yes` marks current macro as allowed for use in `linters.make.inc` files.")
-PROPERTY(ALL_INS_TO_OUT, "")
 PROPERTY(ARGS_PARSER, "Choose argument parser for macro opening curent module declaration. Must be one of: `Base`, `DLL` or `Raw`\n\n"
 ""
 " * `Base` - Effective signature: `(Realprjname, PREFIX="")`. Value of the only positional parameter is stored in the REALPRJNAME variable.\n"
@@ -76,7 +75,6 @@ constexpr TProperty _PROPERTIES[]{
     ALIASES,
     ALLOWED,
     ALLOWED_IN_LINTERS_MAKE,
-    ALL_INS_TO_OUT,
     ARGS_PARSER,
     CMD,
     STRUCT_CMD,
