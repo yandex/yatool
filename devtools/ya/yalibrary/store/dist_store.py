@@ -138,8 +138,9 @@ class DistStore(object):
             execution_log['$({}-{}-data-size)'.format(self._name, k)] = stat_dict
         execution_log['$({}-cache-hit)'.format(self._name)] = self._cache_hit
 
+        real_times = {}
         for k, v in six.iteritems(self._timers):
-            real_time = self._get_real_time(k)
+            real_times[k] = real_time = self._get_real_time(k)
 
             stat_dict = {
                 'count': self._counters[k],
@@ -158,19 +159,19 @@ class DistStore(object):
                 'put': {
                     'count': self._counters['put'],
                     'data_size': self._data_size['put'],
-                    'time': self._timers['put'],
+                    'time': real_times['put'],
                 },
                 'get': {
                     'count': self._counters['get'],
                     'data_size': self._data_size['get'],
-                    'time': self._timers['get'],
+                    'time': real_times['get'],
                 },
             }
-            if self._timers['probe-meta-before-put']:
+            if real_times['probe-meta-before-put']:
                 stats['probe_before_put'] = {
                     'skip_count': self._counters['skip-put'],
                     'skip_data_size': self._data_size['skip-put'],
-                    'time': self._timers['probe-meta-before-put'],
+                    'time': real_times['probe-meta-before-put'],
                 }
             evlog_writer('stats', **stats)
 
