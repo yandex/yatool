@@ -116,9 +116,7 @@ class _Markdown:
         res += '{markup} ya.make {all}commands\n\n'.format(
             markup=_Markdown.header, all='and core.conf ' if self.dump_all_descs else ''
         )
-        res += (
-            'General info: [How to write ya.make files](https://wiki.yandex-team.ru/yatool/HowToWriteYaMakeFiles)\n\n'
-        )
+        res += 'General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/manual/)\n\n'
         res += '{markup} Table of contents\n\n'.format(markup=_Markdown.header * 2)
 
         for type in ['multimodules', 'modules', 'macros', 'properties', 'variables', 'unknowns']:
