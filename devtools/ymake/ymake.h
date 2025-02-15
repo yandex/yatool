@@ -188,7 +188,7 @@ public:
 
     const TStringBuf& GetExportLang() {
         if (ExportLang_ == "?") {
-            ExportLang_ = Conf.CommandConf.Get1("EXPORT_LANG");
+            ExportLang_ = Conf.CommandConf.EvalValue("EXPORT_LANG");
         }
         return ExportLang_;
     }
