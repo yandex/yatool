@@ -165,7 +165,6 @@ SRCS(
     propagate_change_flags.cpp
     recurse_graph.cpp
     run_main.cpp
-    run_python.cpp
     saveload.cpp
     sem_graph.cpp
     shell_subst.cpp

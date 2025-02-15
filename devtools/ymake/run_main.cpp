@@ -3,7 +3,6 @@
 #include "build_result.h"
 #include "conf.h"
 #include "main.h"
-#include "run_python.h"
 #include "trace_start.h"
 
 #include <devtools/ymake/diag/trace.h>
@@ -42,14 +41,6 @@ int YMakeMain(int argc, char** argv) {
     // please.
     _set_abort_behavior(0u, ~0u);
 #endif // !_MSC_VER
-
-    if (argc > 1) {
-        const TStringBuf mode(argv[1]);
-
-        if (mode == TStringBuf("--python")) {
-            return NYMake::RunPython(argc - 2, argv + 2, argv[0]);
-        }
-    }
 
     SetAsyncSignalHandler(SIGINT, SigInt);
 
