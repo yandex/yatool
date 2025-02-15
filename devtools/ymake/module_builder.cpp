@@ -429,10 +429,12 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         isMacroCall = ParseMacroCall(command, cmdName, modArgs);
         TStringBuf cmd = Vars.Get1(cmdName);
         if (cmd.empty()) {
-            if (cmdKind == EModuleCmdKind::Global) {
-                YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
-            } else {
-                YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
+            if (!Conf.RenderSemantics || !Module.IsSemIgnore()) {
+                if (cmdKind == EModuleCmdKind::Global) {
+                    YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
+                } else {
+                    YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
+                }
             }
             cmdKind = EModuleCmdKind::Fail;
         }

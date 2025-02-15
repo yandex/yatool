@@ -618,7 +618,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
 
     if (Conf->RenderSemantics && src.IsMacro) {
         const auto fres = Conf->BlockData.find(macroName);
-        if (fres != Conf->BlockData.end() && !fres->second.HasSemantics && !mod.IsSemIgnore()) {
+        if (fres != Conf->BlockData.end() && !fres->second.HasSemantics) {
             YConfErr(NoSem) << "No semantics specified for macro " << macroName << " in module " << mod.GetUserType() << ". It is not intended for export." << Endl;
         }
     }
@@ -1506,7 +1506,7 @@ const TYVar* TCommandInfo::GetSpecMacroVar(const TYVar* origin, const TStringBuf
     const auto it = Conf->BlockData.find(genericMacroName);
     if (it != Conf->BlockData.end()) {
         const auto& data = it->second;
-        if (Conf->RenderSemantics && UpdIter && !data.HasSemantics && !Module->IsSemIgnore()) {
+        if (Conf->RenderSemantics && UpdIter && !data.HasSemantics) {
             YConfErr(NoSem) << "No semantics specified for macro " << it->first << " in module " << Module->GetUserType() << ". It is not intended for export." << Endl;
         }
         if (data.IsGenericMacro) {

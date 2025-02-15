@@ -333,7 +333,7 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
     } else {
         Attrs.PassPeers = GetNodeType() == EMNT_Bundle || IsStaticLib();
     }
-    Attrs.SemIgnore = Get(NVariableDefs::VAR_MODULE_SEM_IGNORE) == "yes";
+    Attrs.SemIgnore |= Get(NVariableDefs::VAR_MODULE_SEM_IGNORE) == "yes";
     if (Vars.Contains(VAR_MODULE_TAG)) {
         Tag = Get(VAR_MODULE_TAG);
     } else {

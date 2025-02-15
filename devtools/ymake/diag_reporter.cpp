@@ -180,6 +180,13 @@ void TYMake::ReportConfigureEvents() {
         }
 
         if (IsModuleType(node->NodeType)) {
+            if (Conf.RenderSemantics && Conf.ForeignOnNoSem) {
+                const auto elemId = node->ElemId;
+                const auto& module = Modules.Get(elemId);
+                if (module->IsSemIgnore()) {
+                    YConfEraseByOwner(NoSem, elemId);
+                }
+            }
             FlushModuleNode(node);
         }
 
