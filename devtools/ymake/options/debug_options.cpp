@@ -250,7 +250,7 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xdirect-dm", "dump direct managed peers only").SetFlag(&DumpDirectDM).NoArgument();
     opts.AddLongOption("xsrc-deps", "dump minimized source-level deps. This includes top-most directories and orphaned files.").SetFlag(&DumpSrcDeps).NoArgument();
     opts.AddLongOption("xmkf", "include ya.make files, that are only used as a build configuration (for src-deps)").SetFlag(&WithYaMake).NoArgument();
-    opts.AddLongOption("xdump-data", "dump minimized source-level deps. This includes top-most directories and orphaned files.").SetFlag(&DumpData).NoArgument();
+    opts.AddLongOption("xdump-data", "dump files and directories (w/o expansion) listed in DATA.").SetFlag(&DumpData).NoArgument();
     opts.AddLongOption("xfdm", "dump information forced dependency management").SetFlag(&DumpForcedDependencyManagements).NoArgument();
     opts.AddLongOption("xfdm-json", "dump information forced dependency management as json").SetFlag(&DumpForcedDependencyManagementsAsJson).NoArgument();
     opts.AddLongOption(
