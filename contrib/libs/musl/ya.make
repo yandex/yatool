@@ -60,7 +60,7 @@ CFLAGS(
     -D__libc_free=free
 )
 
-LD_PLUGIN(musl)
+LD_PLUGIN_V2(musl.py)
 
 EXTRALIBS(
     -nostdlib
