@@ -55,19 +55,8 @@ def discover_style_targets(mine_opts: MineOptions) -> dict[type[styler.Styler], 
     style_targets = {}
     for target, loader in _mine_targets(mine_opts.targets, mine_opts):
         state_helper.check_cancel_state()
-        styler_class = styler.select_styler(target=target, mine_opts=mine_opts)
 
-        if not styler_class:
-            logger.warning('skip %s (sufficient styler not found)', target)
-            continue
+        if styler_class := styler.select_styler(target=target, mine_opts=mine_opts):
+            style_targets.setdefault(styler_class, []).append((target, loader))
 
-        if mine_opts.file_types and styler_class.kind not in mine_opts.file_types:
-            logger.warning('skip %s (filtered by extensions)', target)
-            continue
-
-        if not mine_opts.file_types and not styler_class.default_enabled:
-            logger.warning('skip %s (require explicit --%s or --all)', target, styler_class.kind)
-            continue
-
-        style_targets.setdefault(styler_class, []).append((target, loader))
     return style_targets

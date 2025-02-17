@@ -79,7 +79,7 @@ class FilterOptions(devtools.ya.core.yarg.Options):
 
     @staticmethod
     def consumer():
-        checks = [kind for kind in StylerKind]
+        checks = list(StylerKind)
 
         return [
             devtools.ya.core.yarg.ArgConsumer(

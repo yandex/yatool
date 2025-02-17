@@ -32,12 +32,19 @@ class StylingError(Exception):
 
 
 class StylerKind(StrEnum):
+    """Corresponds to a file type"""
+
     PY = auto()
     CPP = auto()
     CUDA = auto()
     YAMAKE = auto()
     GO = auto()
     YQL = auto()
+
+    @property
+    def default_enabled(self) -> bool:
+        """Whether styling is enabled by default"""
+        return self in (self.PY, self.CPP, self.GO)
 
 
 class StylerOptions(tp.NamedTuple):
@@ -67,12 +74,24 @@ def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Style
     elif target.name in _SUFFIX_MAPPING:
         key = target.name
     else:
+        logger.warning('skip %s (sufficient styler not found)', target)
         return
 
-    # get Stylers that can handle the target
-    matches = _SUFFIX_MAPPING[key]
+    suffix_matches = _SUFFIX_MAPPING[key]
+    if not suffix_matches:
+        raise AssertionError(f'No styler found for target {target}, suffix {key}')
 
-    assert matches
+    if mine_opts.file_types:
+        matches = {m for m in suffix_matches if m.kind in mine_opts.file_types}
+        if not matches:
+            logger.warning('skip %s (filtered by file type)', target)
+            return
+    else:
+        matches = {m for m in suffix_matches if m.kind.default_enabled}
+        if not matches:
+            options = ' or '.join(f'--{m.kind}' for m in suffix_matches)
+            logger.warning('skip %s (require explicit %s or --all)', target, options)
+            return
 
     if len(matches) == 1:
         return next(iter(matches))
@@ -85,8 +104,6 @@ def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Style
 
 
 class Styler(tp.Protocol):
-    # Whether a styler should run if not selected explicitly
-    default_enabled: tp.ClassVar[bool]
     # Unique description of a styler
     kind: tp.ClassVar[StylerKind]
     # Series of strings upon which the proper styler is selected
@@ -101,8 +118,7 @@ class Styler(tp.Protocol):
 
 @_register
 class Black(cfg.ConfigMixin):
-    default_enabled: tp.ClassVar[bool] = True
-    kind: tp.ClassVar[StylerKind] = StylerKind.PY
+    kind: tp.ClassVar = StylerKind.PY
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -149,8 +165,7 @@ class Black(cfg.ConfigMixin):
 
 @_register
 class Ruff(cfg.ConfigMixin):
-    default_enabled: tp.ClassVar[bool] = True
-    kind: tp.ClassVar[StylerKind] = StylerKind.PY
+    kind: tp.ClassVar = StylerKind.PY
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -219,8 +234,7 @@ class Ruff(cfg.ConfigMixin):
 
 @_register
 class ClangFormat(cfg.ConfigMixin):
-    default_enabled: tp.ClassVar[bool] = True
-    kind: tp.ClassVar[StylerKind] = StylerKind.CPP
+    kind: tp.ClassVar = StylerKind.CPP
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -278,15 +292,13 @@ class ClangFormat(cfg.ConfigMixin):
 
 @_register
 class Cuda(ClangFormat):
-    default_enabled: tp.ClassVar[bool] = False
-    kind: tp.ClassVar[StylerKind] = StylerKind.CUDA
+    kind: tp.ClassVar = StylerKind.CUDA
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
 
 
 @_register
 class Golang:
-    default_enabled: tp.ClassVar[bool] = True
-    kind: tp.ClassVar[StylerKind] = StylerKind.GO
+    kind: tp.ClassVar = StylerKind.GO
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -315,8 +327,7 @@ class Golang:
 
 @_register
 class YaMake:
-    default_enabled: tp.ClassVar[bool] = False
-    kind: tp.ClassVar[StylerKind] = StylerKind.YAMAKE
+    kind: tp.ClassVar = StylerKind.YAMAKE
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -329,8 +340,7 @@ class YaMake:
 
 @_register
 class Yql:
-    default_enabled: tp.ClassVar[bool] = False
-    kind: tp.ClassVar[StylerKind] = StylerKind.YQL
+    kind: tp.ClassVar = StylerKind.YQL
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:

@@ -1,5 +1,6 @@
 import functools
 import typing as tp
+from collections.abc import Callable
 from pathlib import PurePath
 
 import devtools.ya.test.const as const
@@ -11,15 +12,18 @@ if tp.TYPE_CHECKING:
     from . import styler
 
 
+type ConfigCache = dict[cfg.Config, "type[styler.Styler]"]
+
+
 class AmbiguityError(Exception):
     pass
 
 
-def _with_config_to_styler_cache(func):
-    cache: dict[cfg.Config, "type[styler.Styler]"] = {}
+def _with_config_to_styler_cache[**P, R](func: Callable[tp.Concatenate[ConfigCache, P], R]) -> Callable[P, R]:
+    cache: ConfigCache = {}
 
     @functools.wraps(func)
-    def inner(*args, **kwargs):
+    def inner(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(cache, *args, **kwargs)
 
     return inner
@@ -27,14 +31,14 @@ def _with_config_to_styler_cache(func):
 
 @_with_config_to_styler_cache
 def black_vs_ruff(
-    cache: dict[cfg.Config, "type[styler.Styler]"],
+    cache: ConfigCache,
     target: PurePath,
     *,
     black_cls: "type[styler.Black]",
     ruff_cls: "type[styler.Ruff]",
     mine_opts: "target.MineOptions",
     autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS,
-):
+) -> "type[styler.Styler]":
     if mine_opts.use_ruff:
         return ruff_cls
 
