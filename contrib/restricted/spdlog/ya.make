@@ -6,9 +6,9 @@ LICENSE(MIT)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(1.15.0)
+VERSION(1.15.1)
 
-ORIGINAL_SOURCE(https://github.com/gabime/spdlog/archive/v1.15.0.tar.gz)
+ORIGINAL_SOURCE(https://github.com/gabime/spdlog/archive/v1.15.1.tar.gz)
 
 PEERDIR(
     contrib/libs/fmt
@@ -30,6 +30,15 @@ CFLAGS(
     -DSPDLOG_PREVENT_CHILD_FD
     -DSPDLOG_SHARED_LIB
 )
+
+IF (OS_LINUX OR OS_WINDOWS)
+    # NB: 
+    # On Windows _fwrite_nolock() will be used
+    # On Android these are available since API_LEVEL 28 (Android P)
+    CFLAGS(
+        -DSPDLOG_FWRITE_UNLOCKED
+    )
+ENDIF()
 
 SRCS(
     src/async.cpp

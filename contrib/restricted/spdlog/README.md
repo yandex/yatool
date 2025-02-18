@@ -303,7 +303,7 @@ struct fmt::formatter<my_type> : fmt::formatter<std::string>
 {
     auto format(my_type my, format_context &ctx) const -> decltype(ctx.out())
     {
-        return format_to(ctx.out(), "[my_type i={}]", my.i);
+        return fmt::format_to(ctx.out(), "[my_type i={}]", my.i);
     }
 };
 
@@ -387,6 +387,9 @@ void android_example()
 int main (int argc, char *argv[])
 {
     spdlog::cfg::load_env_levels();
+    // or specify the env variable name:
+    // MYAPP_LEVEL=info,mylogger=trace && ./example
+    // spdlog::cfg::load_env_levels("MYAPP_LEVEL");
     // or from the command line:
     // ./example SPDLOG_LEVEL=info,mylogger=trace
     // #include "spdlog/cfg/argv.h" // for loading levels from argv
