@@ -641,7 +641,6 @@ class PyProject:
                                 [
                                     "ms-python.python",
                                     "ms-python.vscode-pylance",
-                                    "forbeslindesay.forbeslindesay-taskrunner",
                                 ],
                             ),
                             ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
@@ -659,7 +658,6 @@ class PyProject:
                             ("npm.autoDetect", "off"),
                             ("task.autoDetect", "off"),
                             ("typescript.tsc.autoDetect", "off"),
-                            ("forbeslindesay-taskrunner.separator", ": "),
                             ("python.languageServer", "Pylance"),
                             ("python.analysis.autoSearchPaths", False),
                             ("python.analysis.diagnosticMode", "openFilesOnly"),

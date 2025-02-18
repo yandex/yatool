@@ -307,7 +307,6 @@ def gen_vscode_workspace(params):
                             "recommendations",
                             [
                                 "golang.go",
-                                "forbeslindesay.forbeslindesay-taskrunner",
                             ],
                         ),
                         ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
@@ -328,7 +327,6 @@ def gen_vscode_workspace(params):
                         ("npm.autoDetect", "off"),
                         ("task.autoDetect", "off"),
                         ("typescript.tsc.autoDetect", "off"),
-                        ("forbeslindesay-taskrunner.separator", ": "),
                         ("go.goroot", goroot),
                         ("go.testExplorer.enable", False),
                         ("go.toolsManagement.autoUpdate", False),

@@ -471,7 +471,6 @@ def gen_vscode_workspace(params):
                             "recommendations",
                             [
                                 "llvm-vs-code-extensions.vscode-clangd",
-                                "forbeslindesay.forbeslindesay-taskrunner",
                             ],
                         ),
                         ("unwantedRecommendations", ["ms-vscode.cmake-tools"]),
@@ -503,7 +502,6 @@ def gen_vscode_workspace(params):
                         ("npm.autoDetect", "off"),
                         ("task.autoDetect", "off"),
                         ("typescript.tsc.autoDetect", "off"),
-                        ("forbeslindesay-taskrunner.separator", ": "),
                     )
                 ),
             ),

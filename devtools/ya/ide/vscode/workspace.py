@@ -300,7 +300,7 @@ def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
 
 def get_recommended_extensions(params):
     is_mac = pm.my_platform().startswith("darwin")
-    extensions = ["forbeslindesay.forbeslindesay-taskrunner"]
+    extensions = []
     if "CPP" in params.languages:
         extensions.append("llvm-vs-code-extensions.vscode-clangd")
         if is_mac or params.vscodium:

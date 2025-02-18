@@ -231,7 +231,6 @@ class VSCodeProject:
                         "${capture}.py3.fbs.pysrc, ${capture}.fbs.gosrc",
                     },
                 ),
-                ("forbeslindesay-taskrunner.separator", ": "),
                 ("git.mergeEditor", False),
                 ("go.testExplorer.enable", False),
                 ("go.toolsManagement.autoUpdate", False),
