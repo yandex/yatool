@@ -1228,15 +1228,14 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
 }
 
 void TJSONVisitor::AddGlobalSrcs() {
-    if(!CurrData->UsedReservedVars) {
+    if(!IsModuleType(CurrType) || !CurrData->UsedReservedVars) {
         return;
     }
 
     if (CurrData->UsedReservedVars->contains("SRCS_GLOBAL")) {
-        ui32 moduleElemId = CurrNode->ElemId;
-        const auto& modules = RestoreContext.Modules;
-        const auto& globalSrcsIds = modules.GetModuleNodeIds(moduleElemId).GlobalSrcsIds;
-        for (TNodeId globalSrcNodeId : modules.GetNodeListStore().GetList(globalSrcsIds)) {
+        TModuleRestorer restorer(RestoreContext, CurrNode);
+        restorer.RestoreModule();
+        for (TNodeId globalSrcNodeId : restorer.GetGlobalSrcsIds()) {
             TNodeData* data = Nodes.FindPtr(globalSrcNodeId);
             Y_ASSERT(data);
             if (!data)
