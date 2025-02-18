@@ -77,90 +77,90 @@ YtStore::~YtStore() {
 }
 
 struct ChunkFetcher: public IWalkInput {
-    YtStore& parent;
-    const YtStoreClientRequest& req;
-    YtStoreClientResponse& rsp;
-    int chunk_no;
-    std::unordered_map<int, NYT::TNode> chunks;
-    std::optional<TStreamingCityHash64> sch;
+    YtStore& Parent;
+    const YtStoreClientRequest& Req;
+    YtStoreClientResponse& Rsp;
+    int ChunkNo;
+    std::unordered_map<int, NYT::TNode> Chunks;
+    std::optional<TStreamingCityHash64> Sch;
 
-    void fetch(uint64_t chunk_i, uint64_t chunk_j = ~0) {
+    void Fetch(uint64_t chunk_i, uint64_t chunk_j = ~0) {
         TVector<NYT::TNode> keys;
-        keys.push_back(NYT::TNode()("hash", req.Hash)("chunk_i", chunk_i));
+        keys.push_back(NYT::TNode()("hash", Req.Hash)("chunk_i", chunk_i));
         if (~chunk_j && chunk_j != chunk_i) {
-            keys.push_back(NYT::TNode()("hash", req.Hash)("chunk_i", chunk_j));
+            keys.push_back(NYT::TNode()("hash", Req.Hash)("chunk_i", chunk_j));
         }
         TNode::TListType rows;
         try {
-            rows = parent.Client->LookupRows(parent.YtDir + "/data", keys, TLookupRowsOptions().Timeout(TDuration::Seconds(60)));
+            rows = Parent.Client->LookupRows(Parent.YtDir + "/data", keys, TLookupRowsOptions().Timeout(TDuration::Seconds(60)));
         } catch (std::exception& e) {
-            rsp.NetworkErrors = true;
+            Rsp.NetworkErrors = true;
             throw;
         }
         for (auto& row : rows) {
-            chunks[row.ChildAsUint64("chunk_i")] = std::move(row);
+            Chunks[row.ChildAsUint64("chunk_i")] = std::move(row);
         }
         for (const auto& key : keys) {
             auto chunk = key.ChildAsUint64("chunk_i");
-            if (!chunks.contains(chunk)) {
-                ythrow yexception() << "Failed to fetch chunk #" << chunk << " for hash " << req.Hash;
+            if (!Chunks.contains(chunk)) {
+                ythrow yexception() << "Failed to fetch chunk #" << chunk << " for hash " << Req.Hash;
             }
         }
     }
 
     ChunkFetcher(YtStore& parent, const YtStoreClientRequest& req, YtStoreClientResponse& rsp)
-        : parent(parent)
-        , req(req)
-        , rsp(rsp)
-        , chunk_no(0)
+        : Parent(parent)
+        , Req(req)
+        , Rsp(rsp)
+        , ChunkNo(0)
     {
-        fetch(0, req.Chunks - 1);
+        Fetch(0, req.Chunks - 1);
         if (req.Chunks == 1) {
-            auto real_hash = CityHash64(chunks[0].ChildAsString("data"));
+            auto real_hash = CityHash64(Chunks[0].ChildAsString("data"));
             if (stoull(std::string(req.Hash)) != real_hash) {
                 ythrow yexception() << "Hash mismatch: " << req.Hash << " != " << real_hash;
             }
         } else {
-            const auto& last = chunks[req.Chunks - 1].ChildAsString("data");
+            const auto& last = Chunks[req.Chunks - 1].ChildAsString("data");
             if (last.size() >= 64) {
-                sch.emplace(
+                Sch.emplace(
                     req.DataSize,
-                    chunks[0].ChildAsString("data").c_str(),
+                    Chunks[0].ChildAsString("data").c_str(),
                     last.c_str() + last.size() - 64);
             } else {
                 if (req.Chunks > 2) {
-                    fetch(req.Chunks - 2);
+                    Fetch(req.Chunks - 2);
                 }
-                const auto& pre_last = chunks[req.Chunks - 2].ChildAsString("data");
+                const auto& pre_last = Chunks[req.Chunks - 2].ChildAsString("data");
                 char tail[64];
                 memcpy(tail, pre_last.c_str() + pre_last.size() - 64 + last.size(), 64 - last.size());
                 memcpy(tail + 64 - last.size(), last.c_str(), last.size());
-                sch.emplace(
+                Sch.emplace(
                     req.DataSize,
-                    chunks[0].ChildAsString("data").c_str(),
+                    Chunks[0].ChildAsString("data").c_str(),
                     tail);
             }
         }
     }
     size_t DoUnboundedNext(const void** ptr) override {
-        if (chunk_no == req.Chunks) {
+        if (ChunkNo == Req.Chunks) {
             *ptr = nullptr;
             return 0;
         } else {
-            chunks.erase(chunk_no - 1);
-            const auto& cur = chunks[chunk_no].ChildAsString("data");
-            if (sch.has_value()) {
-                sch->Process(cur.c_str(), cur.size());
+            Chunks.erase(ChunkNo - 1);
+            const auto& cur = Chunks[ChunkNo].ChildAsString("data");
+            if (Sch.has_value()) {
+                Sch->Process(cur.c_str(), cur.size());
             }
-            if (++chunk_no == req.Chunks) {
-                if (sch.has_value()) {
-                    auto real_hash = (*sch)();
-                    if (stoull(std::string(req.Hash)) != real_hash) {
-                        ythrow yexception() << "Hash mismatch: " << req.Hash << " != " << real_hash;
+            if (++ChunkNo == Req.Chunks) {
+                if (Sch.has_value()) {
+                    auto real_hash = (*Sch)();
+                    if (stoull(std::string(Req.Hash)) != real_hash) {
+                        ythrow yexception() << "Hash mismatch: " << Req.Hash << " != " << real_hash;
                     }
                 }
-            } else if (!chunks.contains(chunk_no)) {
-                fetch(chunk_no);
+            } else if (!Chunks.contains(ChunkNo)) {
+                Fetch(ChunkNo);
             }
             *ptr = cur.c_str();
             return cur.size();
@@ -169,71 +169,71 @@ struct ChunkFetcher: public IWalkInput {
 };
 
 struct YtStoreGetter {
-    YtStore& parent;
-    const YtStoreClientRequest& req;
-    ChunkFetcher fetcher;
-    std::optional<NUCompress::TDecodedInput> decoder;
-    TTempBuf buf;
-    size_t decoded_size;
+    YtStore& Parent;
+    const YtStoreClientRequest& Req;
+    ChunkFetcher Fetcher;
+    std::optional<NUCompress::TDecodedInput> Decoder;
+    TTempBuf Buf;
+    size_t DecodedSize;
 
     YtStoreGetter(YtStore& parent, const YtStoreClientRequest& req, YtStoreClientResponse& rsp)
-        : parent(parent)
-        , req(req)
-        , fetcher(parent, req, rsp)
-        , decoded_size(0)
+        : Parent(parent)
+        , Req(req)
+        , Fetcher(parent, req, rsp)
+        , DecodedSize(0)
     {
         if (req.Codec != nullptr && strcmp(req.Codec, "")) {
-            decoder.emplace(&fetcher);
-            buf = TTempBuf(64 << 10);
+            Decoder.emplace(&Fetcher);
+            Buf = TTempBuf(64 << 10);
         }
     }
 
-    la_ssize_t read(const void** buffer) {
-        if (Y_LIKELY(decoder.has_value())) {
-            *buffer = buf.Data();
-            auto len_decoded = decoder->Read(buf.Data(), buf.Size());
-            decoded_size += len_decoded;
+    la_ssize_t Read(const void** buffer) {
+        if (Y_LIKELY(Decoder.has_value())) {
+            *buffer = Buf.Data();
+            auto len_decoded = Decoder->Read(Buf.Data(), Buf.Size());
+            DecodedSize += len_decoded;
             return len_decoded;
         }
-        return fetcher.DoUnboundedNext(buffer);
+        return Fetcher.DoUnboundedNext(buffer);
     }
 
-    static la_ssize_t callback(struct archive* a, void* client_data, const void** buffer) {
+    static la_ssize_t Callback(struct archive* a, void* client_data, const void** buffer) {
         Y_UNUSED(a);
-        return reinterpret_cast<YtStoreGetter*>(client_data)->read(buffer);
+        return reinterpret_cast<YtStoreGetter*>(client_data)->Read(buffer);
     }
 };
 
 struct ArchiveWriter {
-    TFileOutput output;
-    std::optional<NUCompress::TCodedOutput> encoder;
-    size_t raw_written;
+    TFileOutput Output;
+    std::optional<NUCompress::TCodedOutput> Encoder;
+    size_t RawWritten;
 
-    ArchiveWriter(const char *path, const char *codec): output(path), raw_written(0) {
+    ArchiveWriter(const char *path, const char *codec): Output(path), RawWritten(0) {
         if (codec != nullptr && strcmp(codec, "")) {
-            encoder.emplace(&output, NBlockCodecs::Codec(codec));
+            Encoder.emplace(&Output, NBlockCodecs::Codec(codec));
         }
     }
 
-    la_ssize_t write(const void *buffer, size_t length) {
-        raw_written += length;
-        if (encoder.has_value()) {
-            encoder->Write(buffer, length);
+    la_ssize_t Write(const void *buffer, size_t length) {
+        RawWritten += length;
+        if (Encoder.has_value()) {
+            Encoder->Write(buffer, length);
         } else {
-            output.Write(buffer, length);
+            Output.Write(buffer, length);
         }
         return length;
     }
 
-    static la_ssize_t callback(struct archive *a, void *client_data, const void *buffer, size_t length) {
+    static la_ssize_t Callback(struct archive *a, void *client_data, const void *buffer, size_t length) {
         Y_UNUSED(a);
-        return reinterpret_cast<ArchiveWriter*>(client_data)->write(buffer, length);
+        return reinterpret_cast<ArchiveWriter*>(client_data)->Write(buffer, length);
     }
 };
 
 namespace {
 
-static inline void check(int code, struct archive *a, const char *msg) {
+static inline void Check(int code, struct archive *a, const char *msg) {
     if (code != ARCHIVE_OK) {
         ythrow yexception() << msg << ": " << archive_error_string(a);
     }
@@ -261,7 +261,7 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
     try {
         YtStoreGetter getter(*this, req, rsp);
         TFsPath root_dir = req.IntoDir;
-        check(archive_read_open(a, &getter, nullptr, YtStoreGetter::callback, nullptr), a, MSG_OPEN);
+        Check(archive_read_open(a, &getter, nullptr, YtStoreGetter::Callback, nullptr), a, MSG_OPEN);
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
             size_t size;
             la_int64_t offset;
@@ -270,21 +270,21 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
             if (const char* src = archive_entry_hardlink(entry); src) {
                 archive_entry_set_hardlink(entry, (root_dir / src).c_str());
             }
-            check(archive_write_header(writer, entry), writer, MSG_EXTRACT);
+            Check(archive_write_header(writer, entry), writer, MSG_EXTRACT);
             while ((r = archive_read_data_block(a, &buf, &size, &offset)) == ARCHIVE_OK) {
-                check(archive_write_data_block(writer, buf, size, offset), writer, MSG_EXTRACT);
+                Check(archive_write_data_block(writer, buf, size, offset), writer, MSG_EXTRACT);
             }
             if (r != ARCHIVE_EOF) {
                 ythrow yexception() << "Failed to read archive: " << archive_error_string(a);
             }
-            check(archive_write_finish_entry(writer), writer, MSG_EXTRACT);
+            Check(archive_write_finish_entry(writer), writer, MSG_EXTRACT);
         }
         // Ensure we readed all from cache (and checked hash thus)
         // Possibly will never happen IRL but useful for testing
-        while (Y_UNLIKELY(getter.fetcher.DoUnboundedNext(&buf) != 0)) {
+        while (Y_UNLIKELY(getter.Fetcher.DoUnboundedNext(&buf) != 0)) {
         };
         rsp.Success = true;
-        rsp.DecodedSize = getter.decoded_size;
+        rsp.DecodedSize = getter.DecodedSize;
     } catch (yexception exc) {
         rsp.Success = false;
         snprintf(rsp.ErrorMsg, sizeof(rsp.ErrorMsg), "%s", exc.what());
@@ -301,7 +301,7 @@ void YtStore::PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDa
         Y_DEFER {
             archive_write_free(a);
         };
-        check(archive_write_open2(a, &writer, nullptr, ArchiveWriter::callback, nullptr, nullptr), a, MSG_CREATE);
+        Check(archive_write_open2(a, &writer, nullptr, ArchiveWriter::Callback, nullptr, nullptr), a, MSG_CREATE);
         TFsPath root_dir = req.RootDir;
         struct archive_entry* entry = nullptr;
         for(const auto &path: req.Files) {
@@ -309,20 +309,20 @@ void YtStore::PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDa
             Y_DEFER {
                 archive_read_free(disk);
             };
-            check(archive_read_disk_open(disk, path), disk, "Failed to read file");
+            Check(archive_read_disk_open(disk, path), disk, "Failed to read file");
 
             entry = archive_entry_new();
             Y_DEFER {
                 archive_entry_free(entry);
             };
-            check(archive_read_next_header2(disk, entry), disk, "Failed to read file");
+            Check(archive_read_next_header2(disk, entry), disk, "Failed to read file");
 
             archive_entry_set_pathname(entry, TFsPath(archive_entry_pathname(entry)).RelativePath(root_dir).c_str());
             archive_entry_set_mtime(entry, 0, 0);
             archive_entry_set_uid(entry, 0);
             archive_entry_set_gid(entry, 0);
 
-            check(archive_write_header(a, entry), a, "Failed to write tar");
+            Check(archive_write_header(a, entry), a, "Failed to write tar");
             if (!archive_entry_hardlink(entry) && !archive_entry_symlink(entry)) {
                 TMappedFileInput file_input(path);
                 if (file_input.Avail()) {
@@ -333,7 +333,7 @@ void YtStore::PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDa
                 }
             }
         }
-        rsp.RawSize = writer.raw_written;
+        rsp.RawSize = writer.RawWritten;
         rsp.Success = true;
     } catch (yexception exc) {
         rsp.Success = false;
