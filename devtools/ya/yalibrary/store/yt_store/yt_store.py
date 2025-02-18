@@ -91,6 +91,7 @@ class YtStore(DistStore):
 
         self._stager = kwargs.get("stager", utils.DummyStager())
         self._xx_client = None
+        self._xx_prepare_data = False
         if kwargs.get('new_client'):
             try:
                 import yalibrary.store.yt_store.xx_client as xx_client
@@ -101,8 +102,11 @@ class YtStore(DistStore):
                     token,
                 )
                 logger.debug('Will use new YT store client')
+                self._xx_prepare_data = bool(kwargs.get('cpp_prepare_data'))
             except Exception:  # ModuleNotFoundError is py3-only :(
                 logger.warning('Failed to init new yt store client', exc_info=True)
+            if self._xx_prepare_data:
+                logger.debug('Will use C++ reimplementation of prepare_data')
 
     @property
     def is_disabled(self):
@@ -208,6 +212,15 @@ class YtStore(DistStore):
 
     def _prepare_data(self, stack, files, codec, root_dir):
         tar_path = stack.enter_context(tmp.temp_file())
+
+        if self._xx_prepare_data:
+            if codec == consts.YT_CACHE_NO_DATA_CODEC:
+                codec = None
+            raw_size = self._xx_client.prepare_data(tar_path, files, codec, root_dir)
+            if codec:
+                self._update_compression_ratio(raw_size, fs.get_file_size(tar_path))
+            return tar_path
+
         tarfile_content = []
         for f in sorted(files):
             tarfile_content.append((os.path.abspath(f), os.path.relpath(f, root_dir)))

@@ -2,7 +2,9 @@
 #include "util/stream/printf.h"
 #include <contrib/libs/libarchive/libarchive/archive.h>
 #include <contrib/libs/libarchive/libarchive/archive_entry.h>
+#include <library/cpp/blockcodecs/core/codecs.h>
 #include <library/cpp/ucompress/reader.h>
+#include <library/cpp/ucompress/writer.h>
 #include <util/digest/city_streaming.h>
 #include <util/folder/path.h>
 #include <util/generic/scope.h>
@@ -196,11 +198,52 @@ struct YtStoreGetter {
         return fetcher.DoUnboundedNext(buffer);
     }
 
-    static la_ssize_t archive_read_callback(struct archive* a, void* client_data, const void** buffer) {
+    static la_ssize_t callback(struct archive* a, void* client_data, const void** buffer) {
         Y_UNUSED(a);
         return reinterpret_cast<YtStoreGetter*>(client_data)->read(buffer);
     }
 };
+
+struct ArchiveWriter {
+    TFileOutput output;
+    std::optional<NUCompress::TCodedOutput> encoder;
+    size_t raw_written;
+
+    ArchiveWriter(const char *path, const char *codec): output(path), raw_written(0) {
+        if (codec != nullptr && strcmp(codec, "")) {
+            encoder.emplace(&output, NBlockCodecs::Codec(codec));
+        }
+    }
+
+    la_ssize_t write(const void *buffer, size_t length) {
+        raw_written += length;
+        if (encoder.has_value()) {
+            encoder->Write(buffer, length);
+        } else {
+            output.Write(buffer, length);
+        }
+        return length;
+    }
+
+    static la_ssize_t callback(struct archive *a, void *client_data, const void *buffer, size_t length) {
+        Y_UNUSED(a);
+        return reinterpret_cast<ArchiveWriter*>(client_data)->write(buffer, length);
+    }
+};
+
+namespace {
+
+static inline void check(int code, struct archive *a, const char *msg) {
+    if (code != ARCHIVE_OK) {
+        ythrow yexception() << msg << ": " << archive_error_string(a);
+    }
+}
+
+const char *MSG_CREATE = "Failed to create tar";
+const char *MSG_OPEN = "Failed to open tar";
+const char *MSG_EXTRACT = "Failed to extract tar";
+
+}
 
 void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientResponse& rsp) {
     struct archive* a = archive_read_new();
@@ -218,9 +261,7 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
     try {
         YtStoreGetter getter(*this, req, rsp);
         TFsPath root_dir = req.IntoDir;
-        if (archive_read_open(a, &getter, nullptr, YtStoreGetter::archive_read_callback, nullptr) != ARCHIVE_OK) {
-            ythrow yexception() << "Failed to open tar: " << archive_error_string(a);
-        }
+        check(archive_read_open(a, &getter, nullptr, YtStoreGetter::callback, nullptr), a, MSG_OPEN);
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
             size_t size;
             la_int64_t offset;
@@ -229,20 +270,14 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
             if (const char* src = archive_entry_hardlink(entry); src) {
                 archive_entry_set_hardlink(entry, (root_dir / src).c_str());
             }
-            if (archive_write_header(writer, entry) != ARCHIVE_OK) {
-                ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
-            }
+            check(archive_write_header(writer, entry), writer, MSG_EXTRACT);
             while ((r = archive_read_data_block(a, &buf, &size, &offset)) == ARCHIVE_OK) {
-                if (archive_write_data_block(writer, buf, size, offset) != ARCHIVE_OK) {
-                    ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
-                }
+                check(archive_write_data_block(writer, buf, size, offset), writer, MSG_EXTRACT);
             }
             if (r != ARCHIVE_EOF) {
                 ythrow yexception() << "Failed to read archive: " << archive_error_string(a);
             }
-            if (archive_write_finish_entry(writer) != ARCHIVE_OK) {
-                ythrow yexception() << "Failed to extract tar: " << archive_error_string(writer);
-            }
+            check(archive_write_finish_entry(writer), writer, MSG_EXTRACT);
         }
         // Ensure we readed all from cache (and checked hash thus)
         // Possibly will never happen IRL but useful for testing
@@ -250,6 +285,56 @@ void YtStore::DoTryRestore(const YtStoreClientRequest& req, YtStoreClientRespons
         };
         rsp.Success = true;
         rsp.DecodedSize = getter.decoded_size;
+    } catch (yexception exc) {
+        rsp.Success = false;
+        snprintf(rsp.ErrorMsg, sizeof(rsp.ErrorMsg), "%s", exc.what());
+    }
+}
+
+void YtStore::PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDataResponse& rsp) {
+    try {
+        struct archive* a = archive_write_new();
+        archive_write_add_filter_none(a);
+        archive_write_set_format_gnutar(a);
+        archive_write_set_bytes_in_last_block(a, 1);
+        ArchiveWriter writer(req.OutPath, req.Codec);
+        Y_DEFER {
+            archive_write_free(a);
+        };
+        check(archive_write_open2(a, &writer, nullptr, ArchiveWriter::callback, nullptr, nullptr), a, MSG_CREATE);
+        TFsPath root_dir = req.RootDir;
+        struct archive_entry* entry = nullptr;
+        for(const auto &path: req.Files) {
+            struct archive *disk = archive_read_disk_new();
+            Y_DEFER {
+                archive_read_free(disk);
+            };
+            check(archive_read_disk_open(disk, path), disk, "Failed to read file");
+
+            entry = archive_entry_new();
+            Y_DEFER {
+                archive_entry_free(entry);
+            };
+            check(archive_read_next_header2(disk, entry), disk, "Failed to read file");
+
+            archive_entry_set_pathname(entry, TFsPath(archive_entry_pathname(entry)).RelativePath(root_dir).c_str());
+            archive_entry_set_mtime(entry, 0, 0);
+            archive_entry_set_uid(entry, 0);
+            archive_entry_set_gid(entry, 0);
+
+            check(archive_write_header(a, entry), a, "Failed to write tar");
+            if (!archive_entry_hardlink(entry) && !archive_entry_symlink(entry)) {
+                TMappedFileInput file_input(path);
+                if (file_input.Avail()) {
+                    auto write = archive_write_data(a, file_input.Buf(), file_input.Avail());
+                    if (write == ARCHIVE_FATAL || write <=0) {
+                        ythrow yexception() << "Failed to write tar: " << path << " " << write << archive_error_string(a);
+                    }
+                }
+            }
+        }
+        rsp.RawSize = writer.raw_written;
+        rsp.Success = true;
     } catch (yexception exc) {
         rsp.Success = false;
         snprintf(rsp.ErrorMsg, sizeof(rsp.ErrorMsg), "%s", exc.what());

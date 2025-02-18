@@ -442,6 +442,7 @@ class CacheFactory:
             new_client=self._opts.yt_store_cpp_client,
             probe_before_put=self._opts.yt_store_probe_before_put,
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
+            cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
         )
 
     def _can_use_bazel_remote_cache(self):

@@ -2688,6 +2688,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_wt = True
         self.yt_store_refresh_on_read = False
         self.yt_store_cpp_client = True
+        self.yt_store_cpp_prepare_data = False
         self.yt_store_probe_before_put = False
         self.yt_store_probe_before_put_min_size = 0
         self.bazel_remote_store = False
@@ -2903,6 +2904,11 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ConfigConsumer('yt_store_refresh_on_read'),
                 EnvConsumer('YA_YT_STORE_CPP_CLIENT', hook=SetValueHook('yt_store_cpp_client', return_true_if_enabled)),
                 ConfigConsumer('yt_store_cpp_client'),
+                EnvConsumer(
+                    'YA_YT_STORE_CPP_PREPARE_DATA',
+                    hook=SetValueHook('yt_store_cpp_prepare_data', return_true_if_enabled),
+                ),
+                ConfigConsumer('yt_store_cpp_prepare_data'),
                 EnvConsumer(
                     'YA_YT_STORE_REFRESH_ON_READ', hook=SetValueHook('yt_store_refresh_on_read', return_true_if_enabled)
                 ),
