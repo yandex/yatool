@@ -316,18 +316,14 @@ namespace NYa::NGraph {
 
         TToolNodeDiscoveringResult discoveringResult = DiscoverAndPrepareToolNodes(extraNodes, tools->Graph, targetNodes);
 
-        THashSet<TUid> allResults;
-        InsertTo(allResults, pic->Result, noPic->Result);
-        TNodeList picResultNodes;
+        THashSet<TUid> noPicResults;
+        InsertTo(noPicResults, noPic->Result);
         TNodeList noPicResultNodes;
         TUidMapping targetMapping;
 
         TModuleMapping picLibraries;
         TModuleMapping picBinaries;
         for (TNodePtr picNode : pic->Graph) {
-            if (allResults.contains(picNode->Uid)) {
-                picResultNodes.push_back(picNode);
-            }
             if (picNode->IsDynLibrary()) {
                 picLibraries.emplace(GetModuleKey(picNode), picNode);
             } else if (picNode->IsBinary()) {
@@ -336,7 +332,7 @@ namespace NYa::NGraph {
         }
 
         for (TNodePtr noPicNode : noPic->Graph) {
-            if (allResults.contains(noPicNode->Uid)) {
+            if (noPicResults.contains(noPicNode->Uid)) {
                 noPicResultNodes.push_back(noPicNode);
             }
             if (noPicNode->IsDynLibrary()) {
@@ -358,15 +354,12 @@ namespace NYa::NGraph {
         ApplyUidMapping(targetNodes, discoveringResult.ToolMapping, targetMapping);
 
         THashSet<TUid> newResult;
-        for (TNodePtr picNode : picResultNodes) {
-            if (picNode->IsDynLibrary()) {
-                newResult.insert(picNode->Uid);
-            }
-        }
 
         for (TNodePtr noPicNode : noPicResultNodes) {
             if (!noPicNode->IsDynLibrary()) {
                 newResult.insert(noPicNode->Uid);
+            } else if (const auto uid = targetMapping.FindPtr(noPicNode->Uid)) {
+                newResult.insert(*uid);
             }
         }
 
