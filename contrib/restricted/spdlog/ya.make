@@ -32,7 +32,7 @@ CFLAGS(
 )
 
 IF (OS_LINUX OR OS_WINDOWS)
-    # NB: 
+    # NB:
     # On Windows _fwrite_nolock() will be used
     # On Android these are available since API_LEVEL 28 (Android P)
     CFLAGS(
