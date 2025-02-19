@@ -14,6 +14,9 @@ HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
 PLAYWRIGHT_LARGE_TEST_TYPE = "playwright_large"
 
+TS_MODULE_TAGS = ("ts", "ts_proto")
+TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
+
 
 def get_nodejs_res(meta):
     if not meta.nodejs_root_var_name:
@@ -90,6 +93,46 @@ class BaseTestSuite(common_types.AbstractTestSuite):
             opts += ["--test-data-dirs-rename", test_data_dirs_rename]
 
         return opts
+
+    def setup_dependencies(self, graph):
+        super(BaseTestSuite, self).setup_dependencies(graph)
+        seen = set()
+
+        for uid in self.get_build_dep_uids():
+            self._propagate_ts_transient_deps(graph, uid, seen)
+
+    def _propagate_ts_transient_deps(self, graph, uid, seen):
+        """
+        Ymake propagates deps for TS modules because they are configured as
+            .PEERDIR_POLICY=as_build_from
+            .NODE_TYPE=Bundle
+        We need same logic for test node too.
+
+        If test node has TS node in deps, then it also should include TS deps of that TS node.
+        We need to add deps from one level only, because ymake set all
+        """
+        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
+        node = graph.get_node_by_uid(uid)
+        module_tag = graph.get_module_tag(node)
+
+        if module_tag not in TS_MODULE_TAGS:
+            # Ignore non-TS modules
+            return
+
+        for dep_uid in node.get("deps", []):
+            if dep_uid in self._build_deps or dep_uid in seen:
+                # Do not process same dep several times
+                continue
+
+            seen.add(dep_uid)
+            project = graph.get_projects_by_uids(dep_uid)
+            if not project:
+                # Ignore non-module deps, only modules should be propagated
+                continue
+            project_path, toolchain, _, dep_module_tag, tags = project
+            if dep_module_tag in TS_TRANSIENT_MODULE_TAGS:
+                # Only add TS modules
+                self.add_build_dep(project_path, toolchain, dep_uid, tags)
 
 
 class JestTestSuite(BaseTestSuite):
@@ -290,9 +333,6 @@ class PlaywrightTestSuite(BaseTestSuite):
 
 
 class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
-    TS_MODULE_TAGS = ("ts", "ts_proto")
-    TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
-
     @classmethod
     def get_ci_type_name(cls):
         return "style"
@@ -356,46 +396,6 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
             for f in inputs
             if f.startswith(yalibrary.graph.const.SOURCE_ROOT)
         ]
-
-    def setup_dependencies(self, graph):
-        super(AbstractFrontendStyleSuite, self).setup_dependencies(graph)
-        seen = set()
-
-        for uid in self.get_build_dep_uids():
-            self._propagate_ts_transient_deps(graph, uid, seen)
-
-    def _propagate_ts_transient_deps(self, graph, uid, seen):
-        """
-        Ymake propagates deps for TS modules because they are configured as
-            .PEERDIR_POLICY=as_build_from
-            .NODE_TYPE=Bundle
-        We need same logic for test node too.
-
-        If test node has TS node in deps, then it also should include TS deps of that TS node.
-        We need to add deps from one level only, because ymake set all
-        """
-        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
-        node = graph.get_node_by_uid(uid)
-        module_tag = graph.get_module_tag(node)
-
-        if module_tag not in self.TS_MODULE_TAGS:
-            # Ignore non-TS modules
-            return
-
-        for dep_uid in node.get("deps", []):
-            if dep_uid in self._build_deps or dep_uid in seen:
-                # Do not process same dep several times
-                continue
-
-            seen.add(dep_uid)
-            project = graph.get_projects_by_uids(dep_uid)
-            if not project:
-                # Ignore non-module deps, only modules should be propagated
-                continue
-            project_path, toolchain, _, dep_module_tag, tags = project
-            if dep_module_tag in self.TS_TRANSIENT_MODULE_TAGS:
-                # Only add TS modules
-                self.add_build_dep(project_path, toolchain, dep_uid, tags)
 
     @property
     def test_run_cwd(self):
