@@ -1049,7 +1049,6 @@ class AuthOptions(Options):
         else:
             self.oauth_token_path = self.oauth_token_path or cc.get_ya_token_path()
             if self.oauth_token_path:
-                self.oauth_token = self._read_token_file(self.oauth_token_path)
                 token = self._read_token_file(self.oauth_token_path)
                 if token:
                     self.oauth_token = token
