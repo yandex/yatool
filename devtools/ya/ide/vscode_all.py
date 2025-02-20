@@ -119,7 +119,7 @@ class VSCodeProject:
             if self.params.debug_enabled and not pm.my_platform().startswith("darwin"):
                 tools_list.append("gdbnew")
             if self.params.clang_format_enabled:
-                tools_list.append("clang-format")
+                tools_list.append("clang-format-18")
         if self.is_go:
             if not self.params.goroot:
                 tools_list.append("go")

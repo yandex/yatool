@@ -188,9 +188,9 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
 
 def gen_clang_format_settings(arc_root, tool_fetcher):
     try:
-        clang_format_binary_path = tool_fetcher("clang-format")["executable"]
+        clang_format_binary_path = tool_fetcher("clang-format-18")["executable"]
     except Exception as e:
-        ide_common.emit_message(f"[[warn]]Could not get \"ya tool clang-format\"[[rst]]: {e!r}")
+        ide_common.emit_message(f"[[warn]]Could not get \"ya tool clang-format-18\"[[rst]]: {e!r}")
         return {}
 
     arc_root = Path(arc_root)
