@@ -311,7 +311,12 @@ def mapping():
         except MissingConfigError:
             pass
 
-        return merge_mappings(mappings)
+        res = merge_mappings(mappings)
+
+        if os.environ.get('YA_REGISTRY_ENDPOINT'):
+            res['extensions'].update({'registry_endpoint': os.environ['YA_REGISTRY_ENDPOINT']})
+
+        return res
 
 
 @func.lazy
