@@ -7,7 +7,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.junit.platform.engine.TestTag;
 import org.junit.platform.engine.discovery.ClassNameFilter;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.Launcher;
@@ -84,6 +86,7 @@ public class Runner extends AbstractRunner {
                 if (testName.isTest(test)) {
                     subtestInfo.put("test", testName.getClassName(test));
                     subtestInfo.put("subtest", testName.getMethodName(test));
+                    subtestInfo.put("tags", test.getTags().stream().map(TestTag::getName).collect(Collectors.toSet()));
                     writer.write(GSON.toJson(subtestInfo));
                     writer.write(System.lineSeparator());
                 }
