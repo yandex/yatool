@@ -32,14 +32,56 @@ def get_nodejs_res(meta):
     return meta.nodejs_resource
 
 
-class BaseTestSuite(common_types.AbstractTestSuite):
-    @property
-    def smooth_shutdown_signals(self):
-        return ["SIGUSR2"]
-
+class BaseFrontendSuite(common_types.AbstractTestSuite):
     @property
     def supports_clean_environment(self):
         return False
+
+    def setup_dependencies(self, graph):
+        super(BaseFrontendSuite, self).setup_dependencies(graph)
+        seen = set()
+
+        for uid in self.get_build_dep_uids():
+            self._propagate_ts_transient_deps(graph, uid, seen)
+
+    def _propagate_ts_transient_deps(self, graph, uid, seen):
+        """
+        Ymake propagates deps for TS modules because they are configured as
+            .PEERDIR_POLICY=as_build_from
+            .NODE_TYPE=Bundle
+        We need same logic for test node too.
+
+        If test node has TS node in deps, then it also should include TS deps of that TS node.
+        We need to add deps from one level only, because ymake set all
+        """
+        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
+        node = graph.get_node_by_uid(uid)
+        module_tag = graph.get_module_tag(node)
+
+        if module_tag not in TS_MODULE_TAGS:
+            # Ignore non-TS modules
+            return
+
+        for dep_uid in node.get("deps", []):
+            if dep_uid in self._build_deps or dep_uid in seen:
+                # Do not process same dep several times
+                continue
+
+            seen.add(dep_uid)
+            project = graph.get_projects_by_uids(dep_uid)
+            if not project:
+                # Ignore non-module deps, only modules should be propagated
+                continue
+            project_path, toolchain, _, dep_module_tag, tags = project
+            if dep_module_tag in TS_TRANSIENT_MODULE_TAGS:
+                # Only add TS modules
+                self.add_build_dep(project_path, toolchain, dep_uid, tags)
+
+
+class BaseFrontendRegularSuite(BaseFrontendSuite):
+    @property
+    def smooth_shutdown_signals(self):
+        return ["SIGUSR2"]
 
     def support_retries(self):
         return True
@@ -94,48 +136,8 @@ class BaseTestSuite(common_types.AbstractTestSuite):
 
         return opts
 
-    def setup_dependencies(self, graph):
-        super(BaseTestSuite, self).setup_dependencies(graph)
-        seen = set()
 
-        for uid in self.get_build_dep_uids():
-            self._propagate_ts_transient_deps(graph, uid, seen)
-
-    def _propagate_ts_transient_deps(self, graph, uid, seen):
-        """
-        Ymake propagates deps for TS modules because they are configured as
-            .PEERDIR_POLICY=as_build_from
-            .NODE_TYPE=Bundle
-        We need same logic for test node too.
-
-        If test node has TS node in deps, then it also should include TS deps of that TS node.
-        We need to add deps from one level only, because ymake set all
-        """
-        # Graph is a BuildPlan instance from devtools/ya/build/build_plan/build_plan.pyx
-        node = graph.get_node_by_uid(uid)
-        module_tag = graph.get_module_tag(node)
-
-        if module_tag not in TS_MODULE_TAGS:
-            # Ignore non-TS modules
-            return
-
-        for dep_uid in node.get("deps", []):
-            if dep_uid in self._build_deps or dep_uid in seen:
-                # Do not process same dep several times
-                continue
-
-            seen.add(dep_uid)
-            project = graph.get_projects_by_uids(dep_uid)
-            if not project:
-                # Ignore non-module deps, only modules should be propagated
-                continue
-            project_path, toolchain, _, dep_module_tag, tags = project
-            if dep_module_tag in TS_TRANSIENT_MODULE_TAGS:
-                # Only add TS modules
-                self.add_build_dep(project_path, toolchain, dep_uid, tags)
-
-
-class JestTestSuite(BaseTestSuite):
+class JestTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
         return JEST_TEST_TYPE
 
@@ -176,7 +178,7 @@ class JestTestSuite(BaseTestSuite):
         return True
 
 
-class HermioneTestSuite(BaseTestSuite):
+class HermioneTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
         return HERMIONE_TEST_TYPE
 
@@ -234,7 +236,7 @@ class HermioneTestSuite(BaseTestSuite):
         return cmd
 
 
-class PlaywrightLargeTestSuite(BaseTestSuite):
+class PlaywrightLargeTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
         return PLAYWRIGHT_LARGE_TEST_TYPE
 
@@ -292,7 +294,7 @@ class PlaywrightLargeTestSuite(BaseTestSuite):
         return cmd
 
 
-class PlaywrightTestSuite(BaseTestSuite):
+class PlaywrightTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
         return PLAYWRIGHT_TEST_TYPE
 
@@ -332,7 +334,7 @@ class PlaywrightTestSuite(BaseTestSuite):
         return False
 
 
-class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
+class AbstractFrontendStyleSuite(BaseFrontendSuite):
     @classmethod
     def get_ci_type_name(cls):
         return "style"
@@ -353,10 +355,6 @@ class AbstractFrontendStyleSuite(common_types.AbstractTestSuite):
 
     @property
     def supports_canonization(self):
-        return False
-
-    @property
-    def supports_clean_environment(self):
         return False
 
     def _abs_source_path(self, path):
