@@ -25,7 +25,12 @@ namespace NYMake {
                 dontYasm = std::find(params.cbegin(), end, "DONT_COMPRESS"sv) != end;
                 bucketStart += int(useTextContext) + int(dontYasm);
             }
-            dontYasm = dontYasm || unit.Enabled("ARCH_AARCH64"sv) || unit.Enabled("ARCH_ARM"sv) || unit.Enabled("ARCH_PPC64LE"sv);
+            dontYasm = dontYasm ||
+                       unit.Enabled("ARCH_AARCH64"sv) ||
+                       unit.Enabled("ARCH_ARM"sv) ||
+                       unit.Enabled("ARCH_PPC64LE"sv) ||
+                       unit.Enabled("ARCH_WASM32"sv) ||
+                       unit.Enabled("ARCH_WASM64"sv);
 
             auto IterateOverResources = [&](auto handle) {
                 auto it = bucketStart;
