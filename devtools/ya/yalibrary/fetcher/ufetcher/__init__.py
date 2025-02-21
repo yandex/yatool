@@ -91,12 +91,13 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
 
 @exts.func.memoize(thread_safe=False)
 def get_ufetcher() -> universal_fetcher.UniversalFetcher:
+    # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
-        max_retry_count=5,
-        initial_delay_ms=750,
+        max_retry_count=8,
+        initial_delay_ms=1_000,
         use_fixed_delay=False,
-        max_delay_ms=5_000,
-        backoff_multiplier=1.25,
+        max_delay_ms=360_000,
+        backoff_multiplier=2.3,
     )
 
     http_params = universal_fetcher.HttpParams(
