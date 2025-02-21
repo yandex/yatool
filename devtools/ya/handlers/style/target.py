@@ -22,11 +22,10 @@ class MineOptions(tp.NamedTuple):
     targets: tuple[Path, ...]
     file_types: tuple[styler.StylerKind, ...] = ()
     stdin_filename: str = STDIN_FILENAME
-    use_ruff: bool = False
     tty: bool = os.isatty(sys.stdin.fileno())
 
 
-def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generator[Target, None, None]:
+def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
         yield PurePath(STDIN_FILENAME_STAMP + mine_opts.stdin_filename), sys.stdin.read
@@ -51,12 +50,9 @@ def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generato
             logger.warning('skip %s (no such file or directory)', target)
 
 
-def discover_style_targets(mine_opts: MineOptions) -> dict[type[styler.Styler], list[Target]]:
-    style_targets = {}
-    for target, loader in _mine_targets(mine_opts.targets, mine_opts):
+def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[styler.Styler]]]]:
+    for target in _mine_targets(mine_opts.targets, mine_opts):
         state_helper.check_cancel_state()
 
-        if styler_class := styler.select_styler(target=target, mine_opts=mine_opts):
-            style_targets.setdefault(styler_class, []).append((target, loader))
-
-    return style_targets
+        if styler_classes := styler.select_suitable_stylers(target=target[0], file_types=mine_opts.file_types):
+            yield target, styler_classes

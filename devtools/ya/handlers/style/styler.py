@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import typing as tp
+from collections.abc import Sequence
 from enum import StrEnum, auto
 from pathlib import PurePath
 
@@ -16,11 +17,7 @@ import yalibrary.makelists
 import yalibrary.tools
 
 from . import config as cfg
-from . import disambiguate
 from . import state_helper
-
-if tp.TYPE_CHECKING:
-    from . import target
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +63,7 @@ def _register[T: Styler](cls: type[T]) -> type[T]:
     return cls
 
 
-def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Styler] | None:
+def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) -> set[type[Styler]] | None:
     """Find and return matching styler class"""
 
     if target.suffix in _SUFFIX_MAPPING:
@@ -81,8 +78,8 @@ def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Style
     if not suffix_matches:
         raise AssertionError(f'No styler found for target {target}, suffix {key}')
 
-    if mine_opts.file_types:
-        matches = {m for m in suffix_matches if m.kind in mine_opts.file_types}
+    if file_types:
+        matches = {m for m in suffix_matches if m.kind in file_types}
         if not matches:
             logger.warning('skip %s (filtered by file type)', target)
             return
@@ -93,14 +90,7 @@ def select_styler(target: PurePath, mine_opts: target.MineOptions) -> type[Style
             logger.warning('skip %s (require explicit %s or --all)', target, options)
             return
 
-    if len(matches) == 1:
-        return next(iter(matches))
-
-    # disambiguation procedure
-    if matches == {Black, Ruff}:
-        return disambiguate.black_vs_ruff(target, black_cls=Black, ruff_cls=Ruff, mine_opts=mine_opts)
-    else:
-        raise disambiguate.AmbiguityError(f"Can't choose between {' and '.join(m.__name__ for m in matches)}.")
+    return matches
 
 
 class Styler(tp.Protocol):

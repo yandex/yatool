@@ -107,10 +107,20 @@ def run_style(args) -> int:
         targets=tuple(Path(t) for t in args.targets),
         file_types=tuple(styler.StylerKind(t) for t in args.file_types),
         stdin_filename=args.stdin_filename,
+    )
+
+    disambiguation_opts = disambiguate.DisambiguationOptions(
         use_ruff=args.use_ruff,
     )
 
-    style_targets = target.discover_style_targets(mine_opts)
+    style_targets: dict[type[styler.Styler], list[target.Target]] = {}
+    disamb_errors: list[str] = []
+    for target_, styler_classes in target.discover_style_targets(mine_opts):
+        res = disambiguate.disambiguate_targets(target_[0], styler_classes, disambiguation_opts)
+        if isinstance(res, str):
+            disamb_errors.append(res)
+        else:
+            style_targets.setdefault(res, []).append(target_)
 
     rc = 0
     style_opts = StyleOptions(
@@ -120,6 +130,9 @@ def run_style(args) -> int:
         full_output=args.full_output,
     )
     styler_opts = styler.StylerOptions(py2=args.py2)
+
+    # TODO: add style_class initialization and validate config for every target (with caching)
+    # Move some of the validator selection code from pr_checks to ya style
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.build_threads) as executor:
         futures = []
         for styler_class, target_loaders in style_targets.items():
@@ -132,5 +145,12 @@ def run_style(args) -> int:
             except (styler.StylingError, disambiguate.AmbiguityError) as e:
                 logger.error(e, exc_info=True)
                 return 1
+
+    if disamb_errors:
+        logger.warning(
+            f"The following targets were not styled due to styler selection ambiguity. "
+            f"Provide style option to disambiguate.\n"
+            f"{'\n'.join(disamb_errors)}"
+        )
 
     return 3 if rc and style_opts.check else 0

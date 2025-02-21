@@ -5,18 +5,19 @@ from pathlib import PurePath
 
 import devtools.ya.test.const as const
 from . import config as cfg
+from . import styler
 
 
-if tp.TYPE_CHECKING:
-    from . import target
-    from . import styler
-
-
-type ConfigCache = dict[cfg.Config, "type[styler.Styler]"]
+type ConfigCache = dict[cfg.Config, type[styler.Styler]]
 
 
 class AmbiguityError(Exception):
     pass
+
+
+class DisambiguationOptions(tp.NamedTuple):
+    use_ruff: bool = False
+    autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS
 
 
 def _with_config_to_styler_cache[**P, R](func: Callable[tp.Concatenate[ConfigCache, P], R]) -> Callable[P, R]:
@@ -30,40 +31,35 @@ def _with_config_to_styler_cache[**P, R](func: Callable[tp.Concatenate[ConfigCac
 
 
 @_with_config_to_styler_cache
-def black_vs_ruff(
+def _black_vs_ruff(
     cache: ConfigCache,
     target: PurePath,
-    *,
-    black_cls: "type[styler.Black]",
-    ruff_cls: "type[styler.Ruff]",
-    mine_opts: "target.MineOptions",
-    autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS,
-) -> "type[styler.Styler]":
-    if mine_opts.use_ruff:
-        return ruff_cls
+    disambiguation_opts: DisambiguationOptions,
+) -> type[styler.Styler] | str:
+    if disambiguation_opts.use_ruff:
+        return styler.Ruff
 
-    ruff_config = cfg.AutoincludeConfig.make(const.PythonLinterName.Ruff, autoinclude_files=autoinclude_files).lookup(
-        target
-    )
-    black_config = cfg.AutoincludeConfig.make(const.PythonLinterName.Black, autoinclude_files=autoinclude_files).lookup(
-        target
-    )
+    ruff_config = cfg.AutoincludeConfig.make(
+        const.PythonLinterName.Ruff, autoinclude_files=disambiguation_opts.autoinclude_files
+    ).lookup(target)
+    black_config = cfg.AutoincludeConfig.make(
+        const.PythonLinterName.Black, autoinclude_files=disambiguation_opts.autoinclude_files
+    ).lookup(target)
 
     # by presence of the config
     if not ruff_config and not black_config:
-        return black_cls
+        return styler.Black
     if ruff_config and not black_config:
-        return ruff_cls
+        return styler.Ruff
     if black_config and not ruff_config:
-        return black_cls
+        return styler.Black
 
     assert ruff_config and black_config  # static checker is not happy without this line
 
     if ruff_config.path != black_config.path:
-        raise AmbiguityError(
-            f"Can't choose between Black and Ruff, configs are present for both. "
-            f"Ruff config: {ruff_config.path}, Black config: {black_config.path}. "
-            "Provide style option to disambiguate."
+        return (
+            f"[{target}] Can't choose between Black and Ruff, configs are present for both. "
+            f"Ruff config: {ruff_config.path}, Black config: {black_config.path}."
         )
 
     # from here ruff_config == black_config
@@ -81,13 +77,26 @@ def black_vs_ruff(
         black_section = config.get("tool", {}).get("black")
 
         if ruff_section and not black_section:
-            cache[ruff_config] = ruff_cls
+            cache[ruff_config] = styler.Ruff
             return cache[ruff_config]
         else:
-            cache[ruff_config] = black_cls
+            cache[ruff_config] = styler.Black
             return cache[ruff_config]
     else:
-        raise AmbiguityError(
-            f"Can't choose between Black and Ruff. "
+        return (
+            f"[{target}] Can't choose between Black and Ruff. "
             f"Don't know how to disambiguate using config: {ruff_config.path}. "
         )
+
+
+def disambiguate_targets(
+    target: PurePath,
+    styler_classes: set[type[styler.Styler]],
+    disambiguation_opts: DisambiguationOptions,
+) -> type[styler.Styler] | str:
+    if len(styler_classes) == 1:
+        return next(iter(styler_classes))
+    elif styler_classes == {styler.Black, styler.Ruff}:
+        return _black_vs_ruff(target, disambiguation_opts)
+
+    return f"[{target}] Can't choose between {' and '.join(m.__name__ for m in styler_classes)}."
