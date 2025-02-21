@@ -700,30 +700,18 @@ class SandboxAuthOptions(AuthOptions):
     def __init__(self, ssh_key_option_name="--key", ssh_user_option_name="--user", visible=None):
         super().__init__(ssh_key_option_name=ssh_key_option_name, visible=visible)
         self.ssh_user_option_name = ssh_user_option_name
-        self.sandbox_oauth_token = None
-        self.sandbox_oauth_token_path = None
-        self.sandbox_oauth_token_path_depr = None
-        self.internal_use_sb_token_as_oauth_token = True
 
     def consumer(self):
         return super().consumer() + [
             ArgConsumer(
                 ['--token'],
                 help='oAuth token',
-                hook=SetValueHook('sandbox_oauth_token', default_value=lambda _: '[HIDDEN]'),
+                hook=SetValueHook('oauth_token', default_value=lambda _: '[HIDDEN]'),
                 group=AUTH_OPT_GROUP,
             ),
-            ConfigConsumer('sandbox_token', hook=SetValueHook('sandbox_oauth_token')),
-            EnvConsumer('SANDBOX_TOKEN', help='oAuth token', hook=SetValueHook('sandbox_oauth_token')),
-            EnvConsumer(
-                'SB_TOKEN',
-                help='Deprecated, use SANDBOX_TOKEN_PATH',
-                hook=SetValueHook('sandbox_oauth_token_path_depr'),
-            ),
-            EnvConsumer('SANDBOX_TOKEN_PATH', help='oAuth token path', hook=SetValueHook('sandbox_oauth_token_path')),
-            ConfigConsumer(
-                'internal_use_sb_token_as_oauth_token', hook=SetValueHook('internal_use_sb_token_as_oauth_token')
-            ),
+            ConfigConsumer('sandbox_token', hook=SetValueHook('oauth_token')),
+            EnvConsumer('SANDBOX_TOKEN', help='oAuth token', hook=SetValueHook('oauth_token')),
+            EnvConsumer('SB_TOKEN', help='oAuth token path', hook=SetValueHook('oauth_token_path')),
             ArgConsumer(
                 [self.ssh_user_option_name],
                 help='Custom user name for authorization',
@@ -731,53 +719,6 @@ class SandboxAuthOptions(AuthOptions):
                 group=AUTH_OPT_GROUP,
             ),
         ]
-
-    def postprocess(self):
-        super().postprocess()
-
-        if self.sandbox_oauth_token:
-            # Ignore token path
-            self.sandbox_oauth_token_path = None
-            self.sandbox_oauth_token_path_depr = None
-
-        if self.sandbox_oauth_token_path_depr:
-            logger.warning('SB_TOKEN env variable is deprecated, use SANDBOX_TOKEN_PATH instead')
-            self.sandbox_oauth_token_path = self.sandbox_oauth_token_path_depr
-            self.sandbox_oauth_token_path_depr = None
-
-        if self.sandbox_oauth_token_path:
-            token = self._read_sandbox_token_file(self.sandbox_oauth_token_path)
-            if token:
-                self.sandbox_oauth_token = token
-            else:
-                self.sandbox_oauth_token_path = None
-
-        if self.internal_use_sb_token_as_oauth_token and self.sandbox_oauth_token:
-            # TODO(YA-1851): remove when every usage of auth_token is replaced with sandbox_oauth_token where needed
-            self.oauth_token = self.sandbox_oauth_token
-            self.oauth_token_path = self.sandbox_oauth_token_path
-
-        if not self.sandbox_oauth_token:
-            # fall back to common oauth token if sandbox options are not set.
-            # oauth_token and oauth_token_path are expected to be set in the superclass.
-            # We should use sandbox_oauth_token instead of oauth_token for every interaction with Sandbox.
-            self.sandbox_oauth_token = self.oauth_token
-            self.sandbox_oauth_token_path = self.oauth_token_path
-
-    @staticmethod
-    def _read_sandbox_token_file(path):
-        try:
-            with open(path) as afile:
-                token = afile.read().strip()
-        except Exception as e:
-            logger.debug('Could not read token file at %s: %s', path, e)
-            return
-
-        if not token:
-            logger.debug('Attempted to read a token from %s, but the file is empty', path)
-            return
-
-        return token
 
 
 class SandboxUploadOptions(SandboxAuthOptions):
@@ -3438,8 +3379,7 @@ def ya_make_options(  # compat
         )
         + [
             CommonUploadOptions(),
-            AuthOptions(),
-            SandboxUploadOptions(),  # must go after AuthOptions because it inherits from it
+            SandboxUploadOptions(),
             MDSUploadOptions(),
             SonarOptions(),
             OutputOptions(),
@@ -3467,6 +3407,7 @@ def ya_make_options(  # compat
             YaThreadsOptions(),
             DumpDebugCommonOptions(),
             DumpDebugOptions(),
+            AuthOptions(),
             CompressYmakeOutputOptions(),
             YaBin3Options(),
         ]

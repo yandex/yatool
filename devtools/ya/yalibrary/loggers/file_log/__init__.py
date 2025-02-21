@@ -21,7 +21,7 @@ class TokenFilterFormatter(logging.Formatter):
         if not replacements:
             import devtools.ya.core.sec as sec
 
-            self._replacements = sec.mine_suppression_filter()
+            self._replacements = sorted(sec.mine_suppression_filter())
 
     def _filter(self, s):
         for r in self._replacements:
