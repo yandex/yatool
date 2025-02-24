@@ -10,7 +10,7 @@ using namespace std::literals;
 
 namespace {
 
-size_t CountOwnArgs(TStringBuf cmd) {
+size_t CountOwnArgs(TStringBuf cmd) noexcept {
     size_t varEnd = 0;
     if (cmd.at(0) == '(' && (varEnd = FindMatchingBrace(cmd)) != TString::npos) { //has own args
         cmd = cmd.substr(0, varEnd);
