@@ -226,6 +226,8 @@ class Source(object):
 
         if self.keep_symlinks() and os.path.islink(source):
             self._copy_link(source, destination)
+        elif self.opts and self.opts.hardlink_package_outputs:
+            exts.fs.hardlink(source, destination)
         else:
             shutil.copy(source, destination)
 
@@ -238,6 +240,8 @@ class Source(object):
 
         if self.keep_symlinks() and os.path.islink(source):
             self._copy_link(source, destination)
+        elif self.opts and self.opts.hardlink_package_outputs:
+            exts.fs.hardlink_tree(source, destination)
         else:
             package.fs_util.copy_tree(source, destination, symlinks=self.keep_symlinks())
 
