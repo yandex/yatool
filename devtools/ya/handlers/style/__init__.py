@@ -20,8 +20,9 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.stdin_filename = STDIN_FILENAME
         self.py2 = False
         self.force = False
-        self.use_ruff = False
         self.validate = False
+        self.use_ruff = False
+        self.use_clang_format_yt = False
 
     @staticmethod
     def consumer():
@@ -66,15 +67,21 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
+                ['--validate'],
+                help="Validate configs used to style targets",
+                hook=devtools.ya.core.yarg.SetConstValueHook('validate', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
                 ['--ruff'],
-                help="Use ruff format, instead black for python files",
+                help="Use ruff format, instead of black for python files",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_ruff', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
-                ['--validate'],
-                help="Validate configs used to style targets",
-                hook=devtools.ya.core.yarg.SetConstValueHook('validate', True),
+                ['--cpp-yt'],
+                help="Use custom YT clang-format for cpp files",
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_yt', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
@@ -102,7 +109,7 @@ class FilterOptions(devtools.ya.core.yarg.Options):
                 help='Run all checks: {}'.format(', '.join(checks)),
                 hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks),
                 group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
-            )
+            ),
         ]
 
 

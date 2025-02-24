@@ -13,6 +13,7 @@ type ConfigCache = dict[cfg.Config, type[styler.Styler]]
 
 class DisambiguationOptions(tp.NamedTuple):
     use_ruff: bool = False
+    use_clang_format_yt: bool = False
     autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS
 
 
@@ -85,6 +86,12 @@ def _black_vs_ruff(
         )
 
 
+def _clang_format_vs_clang_format_yt(
+    disambiguation_opts: DisambiguationOptions,
+) -> type[styler.Styler]:
+    return styler.ClangFormatYT if disambiguation_opts.use_clang_format_yt else styler.ClangFormat
+
+
 def disambiguate_targets(
     target: PurePath,
     styler_classes: set[type[styler.Styler]],
@@ -94,5 +101,7 @@ def disambiguate_targets(
         return next(iter(styler_classes))
     elif styler_classes == {styler.Black, styler.Ruff}:
         return _black_vs_ruff(target, disambiguation_opts)
+    elif styler_classes == {styler.ClangFormat, styler.ClangFormatYT}:
+        return _clang_format_vs_clang_format_yt(disambiguation_opts)
 
     return f"[{target}] Can't choose between {' and '.join(m.__name__ for m in styler_classes)}."

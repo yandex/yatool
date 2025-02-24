@@ -118,6 +118,7 @@ def run_style(args) -> int:
 
     disambiguation_opts = disambiguate.DisambiguationOptions(
         use_ruff=args.use_ruff,
+        use_clang_format_yt=args.use_clang_format_yt,
     )
 
     style_targets: dict[type[stlr.Styler], list[trgt.Target]] = {}

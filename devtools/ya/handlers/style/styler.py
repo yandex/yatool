@@ -96,7 +96,7 @@ def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) 
 class Styler(tp.Protocol):
     kind: tp.ClassVar[StylerKind]
     name: tp.ClassVar[str]
-    # Series of strings upon which the proper styler is selected
+    # Sequence of strings upon which the proper styler is selected
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
     def __init__(self, styler_opts: StylerOptions) -> None: ...
@@ -295,6 +295,22 @@ class Cuda(ClangFormat):
     kind: tp.ClassVar = StylerKind.CUDA
     name: tp.ClassVar = const.CppLinterName.ClangFormat
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
+
+
+@_register
+class ClangFormatYT(ClangFormat):
+    name: tp.ClassVar = const.CppLinterName.ClangFormatYT
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("ads-clang-format")  # type: ignore
+        cfg.ConfigMixin.__init__(
+            self,
+            (
+                styler_opts.config_loaders
+                if styler_opts.config_loaders
+                else (cfg.AutoincludeConfig.make(const.CppLinterName.ClangFormatYT),)
+            ),
+        )
 
 
 @_register
