@@ -64,7 +64,7 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
 
 // Takes source line starting with opening brace and finds position of
 // matching closing brace of the same kind (skips inner matching pairs)
-size_t FindMatchingBrace(const TStringBuf& source, size_t leftPos = 0);
+size_t FindMatchingBrace(const TStringBuf& source, size_t leftPos = 0) noexcept;
 
 inline EMacroType GetMacroType(const TStringBuf& cmdText) {
     // tmp hack

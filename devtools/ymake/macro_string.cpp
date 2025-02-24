@@ -474,7 +474,7 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
     return true;
 }
 
-size_t FindMatchingBrace(const TStringBuf& source, size_t leftPos) {
+size_t FindMatchingBrace(const TStringBuf& source, size_t leftPos) noexcept {
     char left = source[leftPos];
     char right = 0;
     switch (left) {

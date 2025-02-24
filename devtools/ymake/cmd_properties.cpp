@@ -5,22 +5,30 @@
 #include <util/generic/hide_ptr.h>
 #include <util/string/split.h>
 
-TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) {
-    TString res;
+#include <ranges>
+using namespace std::literals;
+
+namespace {
+
+size_t CountOwnArgs(TStringBuf cmd) {
     size_t varEnd = 0;
     if (cmd.at(0) == '(' && (varEnd = FindMatchingBrace(cmd)) != TString::npos) { //has own args
-        TVector<TStringBuf> args;
-        Split(cmd.SubStr(0, varEnd), ", ", args);
-        NumUsrArgs = args.size();
+        cmd = cmd.substr(0, varEnd);
+        return std::ranges::distance(cmd | std::views::split(", "sv));
     }
-    res = "(";
+    return 0;
+}
 
+}
+
+TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) {
+    NumUsrArgs = CountOwnArgs(cmd);
     DesignateKeysPos();
-    TVector<TStringBuf> keyargs;
-    keyargs.resize(GetKeyArgsNum());
 
-    for (TMap<size_t, TString>::iterator key = Position2Key.begin(); key != Position2Key.end(); key++)
-        res += key->second + "..." + (key != Position2Key.end() || NumUsrArgs ? ", " : "");
+    TString res;
+    res = "(";
+    for (const auto& [_, key]: Position2Key)
+        res += key + "..., ";
     return TString::Join(res, NumUsrArgs ? "" : ")", NumUsrArgs ? cmd.SubStr(1) : cmd);
 }
 
@@ -30,9 +38,9 @@ void TCmdProperty::AddKeyword(const TString& keyword, size_t from, size_t to, co
 
 void TCmdProperty::DesignateKeysPos() {
     size_t cnt = 0;
-    for (TMap<TString, TKeyword>::iterator key = Keywords.begin(); key != Keywords.end(); key++) {
-        key->second.Pos = cnt;
-        Position2Key[cnt++] = key->first;
+    for (auto& [name, keyword]: Keywords) {
+        keyword.Pos = cnt;
+        Position2Key[cnt++] = name;
     }
 }
 
