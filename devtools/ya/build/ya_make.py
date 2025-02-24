@@ -457,7 +457,7 @@ class CacheFactory:
     def _can_use_yt_dist_cache(self):
         return all(
             (
-                getattr(self._opts, 'build_threads') > 0,
+                getattr(self._opts, 'build_threads') > 0 or getattr(self._opts, 'yt_replace_result'),
                 getattr(self._opts, 'yt_store', False),
                 not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'yt_readonly', False)),
             )
