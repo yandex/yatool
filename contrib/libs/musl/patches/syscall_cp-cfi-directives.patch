@@ -1,0 +1,16 @@
+diff --git a/src/thread/x86_64/syscall_cp.s b/src/thread/x86_64/syscall_cp.s
+--- a/src/thread/x86_64/syscall_cp.s
++++ b/src/thread/x86_64/syscall_cp.s
+@@ -10,6 +10,7 @@
+ .hidden __syscall_cp_asm
+ .type   __syscall_cp_asm,@function
+ __syscall_cp_asm:
++.cfi_startproc
+ 
+ __cp_begin:
+ 	mov (%rdi),%eax
+@@ -29,3 +30,4 @@ __cp_end:
+ 	ret
+ __cp_cancel:
+ 	jmp __cancel
++.cfi_endproc
