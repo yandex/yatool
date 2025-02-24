@@ -94,8 +94,8 @@ def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) 
 
 
 class Styler(tp.Protocol):
-    # Unique description of a styler
     kind: tp.ClassVar[StylerKind]
+    name: tp.ClassVar[str]
     # Series of strings upon which the proper styler is selected
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
@@ -106,9 +106,17 @@ class Styler(tp.Protocol):
         ...
 
 
+class ConfigurableStyler(Styler, cfg.SupportsConfigLookup, tp.Protocol): ...
+
+
+def is_configurable(styler: Styler) -> tp.TypeGuard[ConfigurableStyler]:
+    return isinstance(styler, cfg.SupportsConfigLookup)
+
+
 @_register
 class Black(cfg.ConfigMixin):
     kind: tp.ClassVar = StylerKind.PY
+    name: tp.ClassVar = const.PythonLinterName.Black
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -156,6 +164,7 @@ class Black(cfg.ConfigMixin):
 @_register
 class Ruff(cfg.ConfigMixin):
     kind: tp.ClassVar = StylerKind.PY
+    name: tp.ClassVar = const.PythonLinterName.Ruff
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -225,6 +234,7 @@ class Ruff(cfg.ConfigMixin):
 @_register
 class ClangFormat(cfg.ConfigMixin):
     kind: tp.ClassVar = StylerKind.CPP
+    name: tp.ClassVar = const.CppLinterName.ClangFormat
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -283,12 +293,14 @@ class ClangFormat(cfg.ConfigMixin):
 @_register
 class Cuda(ClangFormat):
     kind: tp.ClassVar = StylerKind.CUDA
+    name: tp.ClassVar = const.CppLinterName.ClangFormat
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
 
 
 @_register
 class Golang:
     kind: tp.ClassVar = StylerKind.GO
+    name: tp.ClassVar = 'yoimports'
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -318,6 +330,7 @@ class Golang:
 @_register
 class YaMake:
     kind: tp.ClassVar = StylerKind.YAMAKE
+    name: tp.ClassVar = 'yamake'
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
@@ -331,6 +344,7 @@ class YaMake:
 @_register
 class Yql:
     kind: tp.ClassVar = StylerKind.YQL
+    name: tp.ClassVar = 'yql'
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:

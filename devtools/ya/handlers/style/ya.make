@@ -13,6 +13,7 @@ PEERDIR(
     devtools/ya/core/resource
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/handlers/style/config_validator
     devtools/ya/test/const
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/makelists
@@ -36,6 +37,7 @@ PY_SRCS(
 END()
 
 RECURSE(
+    config_validator
     tests
 )
 

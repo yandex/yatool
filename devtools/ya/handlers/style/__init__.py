@@ -21,6 +21,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.py2 = False
         self.force = False
         self.use_ruff = False
+        self.validate = False
 
     @staticmethod
     def consumer():
@@ -68,6 +69,12 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 ['--ruff'],
                 help="Use ruff format, instead black for python files",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_ruff', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--validate'],
+                help="Validate configs used to style targets",
+                hook=devtools.ya.core.yarg.SetConstValueHook('validate', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]

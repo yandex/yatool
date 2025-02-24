@@ -11,10 +11,6 @@ from . import styler
 type ConfigCache = dict[cfg.Config, type[styler.Styler]]
 
 
-class AmbiguityError(Exception):
-    pass
-
-
 class DisambiguationOptions(tp.NamedTuple):
     use_ruff: bool = False
     autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS

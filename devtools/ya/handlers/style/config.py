@@ -5,6 +5,7 @@ import logging
 import os
 import tempfile
 import typing as tp
+from collections.abc import Generator
 from pathlib import PurePath, Path
 
 import marisa_trie
@@ -12,6 +13,10 @@ import marisa_trie
 import devtools.ya.core.config
 import devtools.ya.core.resource
 import devtools.ya.test.const as const
+import devtools.ya.handlers.style.config_validator as cfgval
+
+if tp.TYPE_CHECKING:
+    from . import styler as stlr
 
 
 logger = logging.getLogger(__name__)
@@ -23,11 +28,47 @@ type MaybeConfig = Config | None
 class Config(tp.NamedTuple):
     path: ConfigPath
     pretty: str
+    user_defined: bool
 
 
 @functools.cache
 def _find_root() -> str:
     return devtools.ya.core.config.find_root(fail_on_error=False)
+
+
+@functools.cache
+def _read_file(path: Path) -> str:
+    return path.read_text()
+
+
+def validate(
+    user_config: ConfigPath,
+    stylers: set[stlr.ConfigurableStyler],
+    *,
+    validation_configs: dict[str, str] = const.LINTER_TO_VALIDATION_CONFIG,
+) -> Generator[tuple[stlr.ConfigurableStyler, Path, list[str]]]:
+    raw_user = cfgval.RawConfig(user_config.read_text(), user_config.name)
+
+    for styler in stylers:
+        if styler.name not in validation_configs:
+            continue
+
+        rules_config = Path(_find_root()) / validation_configs[styler.name]
+        raw_rules = cfgval.RawConfig(_read_file(rules_config), rules_config.name)
+
+        base_config = styler.lookup_default_config()
+        raw_base = cfgval.RawConfig(_read_file(base_config.path), base_config.path.name) if base_config else None
+
+        errors = cfgval.validate(raw_rules, raw_user, raw_base)
+        if errors:
+            yield styler, rules_config, errors
+
+
+@tp.runtime_checkable
+class SupportsConfigLookup(tp.Protocol):
+    def lookup_config(self, path: PurePath) -> Config: ...
+
+    def lookup_default_config(self) -> MaybeConfig: ...
 
 
 class ConfigMixin:
@@ -39,6 +80,12 @@ class ConfigMixin:
             if config := loader.lookup(path):
                 return config
         raise FileNotFoundError(f"Couldn't find config for target {path}")
+
+    def lookup_default_config(self) -> MaybeConfig:
+        for loader in self._config_loaders:
+            if isinstance(loader, DefaultConfig) and (config := loader.lookup()):
+                return config
+        return
 
 
 class ConfigLoader(tp.Protocol):
@@ -52,9 +99,9 @@ class DefaultConfig:
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
 
         if config := self._from_file(linter_name, defaults_file):
-            self._default_config = Config(config, str(config.relative_to(_find_root())))
+            self._default_config = Config(config, str(config.relative_to(_find_root())), user_defined=False)
         elif config := self._from_resource(resource_name):
-            self._default_config = Config(config, f'{resource_name} (from resource)')
+            self._default_config = Config(config, f'{resource_name} (from resource)', user_defined=False)
         else:
             self._default_config = None
 
@@ -79,7 +126,7 @@ class DefaultConfig:
                 temp.flush()  # will be read from other subprocesses
                 return Path(temp.name)
 
-    def lookup(self, path: PurePath) -> MaybeConfig:
+    def lookup(self, *args, **kwargs) -> MaybeConfig:
         return self._default_config
 
 
@@ -125,7 +172,7 @@ class AutoincludeConfig:
                 config: Path = Path(path) / config_name
 
                 if config.exists():
-                    map_[path] = Config(config, str(config.relative_to(self._root)))
+                    map_[path] = Config(config, str(config.relative_to(self._root)), user_defined=True)
         return map_
 
     def lookup(self, path: PurePath) -> MaybeConfig:
@@ -169,8 +216,8 @@ class RuffConfig:
     def lookup(self, path: PurePath) -> MaybeConfig:
         if self._ruff_trie and (keys := self._ruff_trie.prefixes(str(path))):
             # even though there is `'': <default config>` in ruff_config_paths.json
-            # keys can be empty if stdin is used
+            # keys can be empty if stdin is used, thus checking above
             key = sorted(keys, key=len)[-1]
             if key != self._root:
                 config = Path(self._config_paths[self._ruff_trie[key]])
-                return Config(config, str(config.relative_to(self._root)))
+                return Config(config, str(config.relative_to(self._root)), user_defined=True)
