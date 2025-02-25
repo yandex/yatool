@@ -553,13 +553,8 @@ void TModuleBuilder::ApplyVarAsMacro(const TStringBuf& name, bool force) {
         TVector<TStringBuf> args;
         TString value = TCommandInfo(Conf, &Graph, &UpdIter).SubstVarDeeply(name, Vars);
         Split(GetCmdValue(value), " ", args);
-        if (args.size()) {
-            //YConfWarn(Dev) << "ApplyVarAsMacro: " << name << ": " << value << Endl;
-            if (name == "OBJADDE") {
-                YConfErr(Misconfiguration) << "Using OBJADDE var" << Endl;
-            } else {
-                DirStatement(name, args);
-            }
+        if (!args.empty()) {
+            DirStatement(name, args);
         }
     }
 }
