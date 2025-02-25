@@ -258,7 +258,7 @@ class ClangFormat(cfg.ConfigMixin):
 
         config = self.lookup_config(path)
         p = subprocess.Popen(
-            [self._tool, "-assume-filename=a.cpp", f"-style=file:{config.path}"],
+            [self._tool, f"-assume-filename={path.name}", f"-style=file:{config.path}"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
