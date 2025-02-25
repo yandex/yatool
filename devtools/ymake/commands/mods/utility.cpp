@@ -30,6 +30,44 @@ namespace {
     //
     //
 
+    class THideEmpty: public TBasicModImpl {
+    public:
+        THideEmpty(): TBasicModImpl({.Id = EMacroFunction::HideEmpty, .Name = "hideempty", .Arity = 1, .CanEvaluate = true}) {
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [](TTermNothing) -> TTermValue {
+                    return TTermNothing();
+                },
+                [&](const TString& x) -> TTermValue {
+                    if (x.empty())
+                        return TTermNothing();
+                    return x;
+                },
+                [&](const TVector<TString>& x) -> TTermValue {
+                    if (x.empty())
+                        return TTermNothing();
+                    return x;
+                },
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, args[0]);
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TClear: public TBasicModImpl {
     public:
         TClear(): TBasicModImpl({.Id = EMacroFunction::Clear, .Name = "clear", .Arity = 1, .CanEvaluate = true}) {

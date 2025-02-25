@@ -53,6 +53,7 @@ enum class EMacroFunction: ui32 {
     Tared,
     OutputInclude,
     Hash,
+    HideEmpty,
     //
     Count
 };
