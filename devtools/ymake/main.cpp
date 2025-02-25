@@ -876,6 +876,7 @@ int main_real(TBuildConfiguration& conf) {
     yMake->ReportConfigureEvents();
 
     if (conf.WriteFsCache || conf.WriteDepsCache) {
+        yMake->UpdateUnreachableExternalFileChanges();
         yMake->Save(conf.YmakeCache, true);
     }
 

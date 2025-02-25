@@ -180,6 +180,7 @@ public:
         return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_ && !HasErrorsOnPrevLaunch_;
     }
     void UpdateExternalFilesChanges();
+    void UpdateUnreachableExternalFileChanges();
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);
     TRestoreContext GetRestoreContext();

@@ -215,3 +215,26 @@ void TYMake::UpdateExternalFilesChanges() {
         }
     }
 }
+
+void TYMake::UpdateUnreachableExternalFileChanges() {
+    NYMake::TTraceStage scopeTracer{"Update Unreachable file from External changes"};
+
+    auto& fileConf = Names.FileConf;
+    auto externalChanges = fileConf.GetExternalChanges();
+    for (auto id : externalChanges) {
+        for (ui8 i = 0; i < static_cast<ui8>(ELinkType::ELT_COUNT); ++i) {
+            auto linkType = static_cast<ELinkType>(i);
+            auto elemId = TFileId::CreateElemId(linkType, id);
+            auto node = Graph.GetFileNodeById(elemId);
+            if (node.IsValid()) {
+                if (!node->State.GetReachable() && node->NodeType == EMNT_File) {
+                    auto& fileData = fileConf.GetFileDataById(elemId);
+                    fileData.HashSum = {};
+                    fileData.Size = 0;
+                    fileData.LastCheckedStamp = TTimeStamps::Never;
+                    fileData.RealModStamp = 0;
+                }
+            }
+        }
+    }
+}
