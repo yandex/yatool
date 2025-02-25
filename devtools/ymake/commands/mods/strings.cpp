@@ -34,8 +34,8 @@ namespace {
                         result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(prefix, body)))));
                     return result;
                 },
-                [](auto&) -> TMacroValues::TValue {
-                    throw std::bad_variant_access();
+                [&](auto& x) -> TMacroValues::TValue {
+                    throw TBadArgType(Name, x);
                 }
             }, args[1]);
         }
@@ -150,8 +150,8 @@ namespace {
                         result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(body, suf)))));
                     return result;
                 },
-                [](auto&) -> TMacroValues::TValue {
-                    throw std::bad_variant_access();
+                [&](auto& x) -> TMacroValues::TValue {
+                    throw TBadArgType(Name, x);
                 }
             }, args[1]);
         }
@@ -192,7 +192,30 @@ namespace {
 
     class TJoin: public TBasicModImpl {
     public:
-        TJoin(): TBasicModImpl({.Id = EMacroFunction::Join, .Name = "join", .Arity = 2, .CanEvaluate = true}) {
+        TJoin(): TBasicModImpl({.Id = EMacroFunction::Join, .Name = "join", .Arity = 2, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            auto glue = std::get<std::string_view>(args[0]);
+            return std::visit(TOverloaded{
+                [](std::monostate) -> TMacroValues::TValue {
+                    return std::monostate();
+                },
+                [&](const std::string_view& body) -> TMacroValues::TValue {
+                    return body;
+                },
+                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
+                    if (bodies.empty())
+                        return std::monostate();
+                    return JoinSeq(glue, bodies);
+                },
+                [&](auto& x) -> TMacroValues::TValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, args[1]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
