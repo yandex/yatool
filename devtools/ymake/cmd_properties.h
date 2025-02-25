@@ -77,39 +77,46 @@ struct TUnitProperty {
     );
 };
 
-struct TCmdProperty: public TUnitProperty {
-    TMap<TString, TKeyword> Keywords;
-    TMap<size_t, TString> Position2Key;
-    size_t NumUsrArgs = 0;
-
+class TCmdProperty: public TUnitProperty {
+public:
     TString ConvertCmdArgs(const TStringBuf& cmd);
     size_t Key2ArrayIndex(const TString& arg) const;
     void AddKeyword(const TString& word, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
-    void DesignateKeysPos();
 
     bool HasKeyword(const TString& arg) const {
-        return Keywords.find(arg) != Keywords.end();
+        return Keywords_.find(arg) != Keywords_.end();
     }
     bool IsNonPositional() const {
-        return !Keywords.empty();
+        return !Keywords_.empty();
     }
     size_t GetKeyArgsNum() const {
-        return Keywords.size();
+        return Keywords_.size();
     }
     TString GetDeepReplaceTo(size_t arrNum) const {
-        if (const auto pit = Position2Key.find(arrNum); pit != Position2Key.end()) {
-            const auto kit = Keywords.find(pit->second);
-            Y_ASSERT(kit != Keywords.end());
+        if (const auto pit = Position2Key_.find(arrNum); pit != Position2Key_.end()) {
+            const auto kit = Keywords_.find(pit->second);
+            Y_ASSERT(kit != Keywords_.end());
             return kit->second.DeepReplaceTo;
         }
         return "";
     }
+    const TMap<TString, TKeyword>& GetKeywords() const noexcept {
+        return Keywords_;
+    }
     const TString& GetKeyword(size_t arrNum) const {
-        Y_ASSERT(Position2Key.contains(arrNum));
-        return Position2Key.find(arrNum)->second;
+        Y_ASSERT(Position2Key_.contains(arrNum));
+        return Position2Key_.find(arrNum)->second;
     }
     const TKeyword& GetKeywordData(size_t arrNum) const {
-        return Keywords.find(GetKeyword(arrNum))->second;
+        return Keywords_.find(GetKeyword(arrNum))->second;
+    }
+
+    bool HasUsrArgs() const noexcept {
+        return NumUsrArgs_ != 0;
+    }
+
+    size_t GetNumUsrArgs() const noexcept {
+        return NumUsrArgs_;
     }
 
     TUnitProperty& GetBaseReference() {
@@ -122,8 +129,16 @@ struct TCmdProperty: public TUnitProperty {
 
     Y_SAVELOAD_DEFINE(
         GetBaseReference(),
-        Keywords,
-        Position2Key,
-        NumUsrArgs
+        Keywords_,
+        Position2Key_,
+        NumUsrArgs_
     );
+
+private:
+    void DesignateKeysPos();
+
+private:
+    TMap<TString, TKeyword> Keywords_;
+    TMap<size_t, TString> Position2Key_;
+    size_t NumUsrArgs_ = 0;
 };

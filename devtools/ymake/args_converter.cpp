@@ -77,7 +77,7 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
     for (size_t i = 0; i < args.size(); ++i) {
         TString argStr = TString{args[i]};
         if (cmdProp.HasKeyword(argStr)) { //if it is a keyword, designate argLimit and array to put
-            const TKeyword& kw = cmdProp.Keywords.find(argStr)->second;
+            const TKeyword& kw = cmdProp.GetKeywords().find(argStr)->second;
             bool useKeyItself = kw.To == 0 && kw.From == 0;
 
             argLimit = useKeyItself ? -1 : kw.To;
@@ -103,7 +103,7 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
                 scriptArgs.push_back(TScriptArg(args[i], argId));
             }
             if (argId == typedArgs.OrigArgId) {
-                if (cmdProp.NumUsrArgs) {
+                if (cmdProp.HasUsrArgs()) {
                     auto& origTypedArgs = typedArgs[typedArgs.OrigArgId].Args;
                     origTypedArgs.push_back(args[i]);
                     origArgsPos.emplace_back(i, origTypedArgs.size() - 1);
@@ -174,7 +174,7 @@ static size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStrin
         }
     }
 
-    if (cmdProp.NumUsrArgs && typedArgs.CntUserArgs < cmdProp.NumUsrArgs) {
+    if (cmdProp.HasUsrArgs() && typedArgs.CntUserArgs < cmdProp.GetNumUsrArgs()) {
         res.push_back(NStaticConf::ARRAY_START);
         res.push_back(NStaticConf::ARRAY_END);
     }

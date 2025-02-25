@@ -210,8 +210,8 @@ namespace {
             auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size());
             const TKeyword* kwDesc = nullptr;
 
-            auto kwArgCnt = blockData->CmdProps->Keywords.size();
-            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->Keywords.size();
+            auto kwArgCnt = blockData->CmdProps->GetKeywords().size();
+            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->GetKeywords().size();
             auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
@@ -247,8 +247,8 @@ namespace {
 
                 if (rawArg->size() == 1)
                     if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front())) {
-                        auto kwDescIt = blockData->CmdProps->Keywords.find(kw->Value);
-                        if (kwDescIt != blockData->CmdProps->Keywords.end()) {
+                        auto kwDescIt = blockData->CmdProps->GetKeywords().find(kw->Value);
+                        if (kwDescIt != blockData->CmdProps->GetKeywords().end()) {
                             kwDesc = &kwDescIt->second;
                             maybeStartNamedArg();
                             continue;
@@ -283,7 +283,7 @@ namespace {
                     << " called with too few positional arguments"
                     << " (" << posArgCnt << (hasVarArg ? " or more" : "") << " expected)";
 
-            for (auto& kw : blockData->CmdProps->Keywords) {
+            for (auto& kw : blockData->CmdProps->GetKeywords()) {
                 auto namedArg = &args[kw.second.Pos];
                 if (!namedArg->Script.empty()) {
                     Y_ASSERT(namedArg->Script.size() == 1);

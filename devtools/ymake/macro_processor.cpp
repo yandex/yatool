@@ -300,9 +300,9 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         // whereas the preevaluator currently cannot (see TBD/`Eval1` in `TRefReducer::Evaluate(NPolexpr::EVarId)`)
 
         auto hasDeepReplacement = false;
-        for (auto& kw : blockData->CmdProps->Keywords) {
-            if (kw.second.DeepReplaceTo.size() != 0) {
-                ownVars[kw.first].NoInline = false;
+        for (const auto& [name, kw] : blockData->CmdProps->GetKeywords()) {
+            if (kw.DeepReplaceTo.size() != 0) {
+                ownVars[name].NoInline = false;
                 hasDeepReplacement = true;
             }
         }
