@@ -129,7 +129,7 @@ class Black(cfg.ConfigMixin):
                 cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Black,
                     defaults_file=const.DefaultLinterConfig.Python,
-                    resource_name="config.toml",
+                    resource_name="pyproject.toml",
                 ),
             )
         )
@@ -247,7 +247,7 @@ class ClangFormat(cfg.ConfigMixin):
                 cfg.DefaultConfig(
                     linter_name=const.CppLinterName.ClangFormat,
                     defaults_file=const.DefaultLinterConfig.Cpp,
-                    resource_name="config.clang-format",
+                    resource_name=".clang-format",
                 ),
             )
         )
