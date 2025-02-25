@@ -95,11 +95,9 @@ def execute_early(action):
                 # Configure `revision` before `report` module to be able to report ya version
                 ('revision', configure_vcs_info()),
                 ('vcs_type', configure_vcs_type()),
+                ('exit', configure_exit_interceptor(error_file)),
+                ('handler_info', configure_handler_info()),
             ]
-        )
-
-        modules.append(
-            ('exit', configure_exit_interceptor(error_file)),
         )
 
         if not is_sensitive(args):
@@ -383,6 +381,11 @@ def configure_debug(app_ctx):
             dump_store_obj['finish_time'] = time.time()
         except Exception as e:
             AppEvLogStore.logger.debug("While store finish_time: %s", e)
+
+        try:
+            dump_store_obj['handler'] = app_ctx.handler_info["handler"]
+        except Exception as e:
+            AppEvLogStore.logger.debug("While store handler: %s", e)
 
     except SystemExit as e:
         try:
@@ -968,3 +971,7 @@ def configure_exit_code_definition():
 
         e.ya_exit_code = error_code
         raise
+
+
+def configure_handler_info():
+    yield {}

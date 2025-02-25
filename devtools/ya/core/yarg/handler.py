@@ -395,13 +395,23 @@ class OptsHandler(BaseHandler):
     def handle(self, root_handler, args, prefix):
         try:
             OptsHandler._latest_handled_prefix = prefix
+            handler = {
+                'args': [exts.strings.to_unicode(arg, exts.strings.guess_default_encoding()) for arg in args],
+                'prefix': prefix,
+            }
+
             devtools.ya.core.report.telemetry.report(
                 devtools.ya.core.report.ReportTypes.HANDLER,
-                {
-                    'args': [exts.strings.to_unicode(arg, exts.strings.guess_default_encoding()) for arg in args],
-                    'prefix': prefix,
-                },
+                handler,
             )
+
+            try:
+                import app_ctx
+
+                app_ctx.handler_info['handler'] = handler
+            except Exception:
+                logger.debug("While storing handler_info", exc_info=True)
+                pass
 
             params = self._opt.initialize(
                 args,

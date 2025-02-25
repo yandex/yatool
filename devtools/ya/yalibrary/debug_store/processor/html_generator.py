@@ -16,13 +16,23 @@ def _sort_files_info(files):
 
 
 class HTMLGenerator:
-    def __init__(self, debug_bundle, files, debug_bundle_file, is_last=True):
+    def __init__(
+        self,
+        debug_bundle,
+        files,
+        debug_bundle_file,
+        is_last=True,
+        path_to_repro=None,
+        fully_restored_repo=False,
+    ):
         self.logger = logging.getLogger("{}.{}".format(__name__, self.__class__.__name__))
 
         self.debug_bundle = debug_bundle
         self.files = files  # type: dict[str, dict[str, tp.Any]]
         self.debug_bundle_file = debug_bundle_file
         self.is_last = is_last
+        self.path_to_repro = path_to_repro
+        self.fully_restored_repo = fully_restored_repo
 
         self.env = Environment(autoescape=select_autoescape())
         self.env.filters['pretty_date'] = pretty_date
@@ -96,6 +106,8 @@ class HTMLGenerator:
         finish_time = self.debug_bundle.get('finish_time')
         data = {
             'is_last': self.is_last,
+            'path_to_repro': self.path_to_repro,
+            'fully_restored_repo': self.fully_restored_repo,
             'cmd': ' '.join(self.debug_bundle.get('argv', [])),
             'cwd': self.debug_bundle.get('cwd'),
             'debug_bundle_file': self.debug_bundle_file,
@@ -113,6 +125,7 @@ class HTMLGenerator:
             'platforms': self.debug_bundle.get('platforms'),
             'system_info': self.debug_bundle.get('system_info'),
             'session_id': self.debug_bundle.get('session_id'),
+            'handler': self.debug_bundle.get('handler'),
             'finish_time': finish_time,
             'duration': (finish_time - init_time) if finish_time else None,
             'resources': self.debug_bundle.get('resources', {}),

@@ -131,10 +131,17 @@ class BaseDumpItem:
     def load(self):
         self.debug_bundle_data = dict(self._filter())
 
-    def process(self, additional_paths=None, is_last=True):
-        # type: (tp.Optional[list[tuple[str, Path]]], bool) -> Path
+    def process(
+        self,
+        additional_paths: list[tuple[str, Path]] | None = None,
+        move_paths: list[tuple[Path, Path]] | None = None,
+        is_last: bool = True,
+        path_to_repro: str | None = None,
+        fully_restored_repo: bool = False,
+    ) -> Path:
         assert self.workdir is not None
         additional_paths = additional_paths or []
+        move_paths = move_paths or []
 
         exts.fs.ensure_removed(str(self.workdir))
         self.workdir.mkdir(parents=True, exist_ok=True)
@@ -183,9 +190,24 @@ class BaseDumpItem:
                 _file_info['status'] = "ERROR"
                 _file_info['exception'] = str(e)
 
+        for src, dst in move_paths:
+            rel_src = self.workdir / src.relative_to(src.parts[0])
+            rel_dst = self.workdir / dst.relative_to(dst.parts[0])
+            try:
+                shutil.move(rel_src, rel_dst)
+                if str(rel_src) in processed_files:
+                    processed_files[str(rel_dst)] = processed_files.pop(str(rel_src))
+            except Exception:
+                self.logger.exception("Failed to move file from %s to %s", rel_src, rel_dst)
+
         try:
             HTMLGenerator(
-                debug_bundle_data, processed_files, debug_bundle_file.relative_to(self.workdir), is_last=is_last
+                debug_bundle_data,
+                processed_files,
+                debug_bundle_file.relative_to(self.workdir),
+                is_last=is_last,
+                path_to_repro=path_to_repro,
+                fully_restored_repo=fully_restored_repo,
             ).generate(self.workdir / self.HTML_FILE_NAME)
         except Exception:
             self.logger.exception("While creating HTML file")
@@ -331,7 +353,7 @@ class DumpProcessor(BaseDumpProcessor):
 
         super().__init__(path)
 
-    def _generate_items_list(self):
+    def _generate_items_list(self) -> tp.Generator[DumpItem, None, None]:
         for evlog_path in self._file_list:
             try:
                 item = DumpItem(evlog_path, workdir=self.path)
@@ -343,8 +365,7 @@ class DumpProcessor(BaseDumpProcessor):
             except Exception:
                 self.logger.exception("While processing %s", evlog_path)
 
-    def _check_dump_debug(self, item):
-        # type: (DumpItem) -> bool
+    def _check_dump_debug(self, item: DumpItem) -> bool:
         argv = item.meta.get('argv', [])
         if len(argv) < 3:
             return False

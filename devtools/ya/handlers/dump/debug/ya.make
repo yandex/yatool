@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/core/yarg
     devtools/ya/exts
+    devtools/ya/handlers/dump/reproducer
     devtools/ya/yalibrary/debug_store/processor
     devtools/ya/yalibrary/yandex/sandbox/misc
     devtools/ya/yalibrary/evlog

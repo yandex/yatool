@@ -26,6 +26,7 @@ from devtools.ya.core.common_opts import DumpDebugCommonOptions, EventLogFileOpt
 import devtools.ya.core.config
 import devtools.ya.core.logger
 import devtools.ya.core.yarg.help_level
+import devtools.ya.handlers.dump.reproducer as reproducer
 
 import yalibrary.evlog as evlog_lib
 
@@ -168,7 +169,24 @@ def do_dump_debug(params):
     if changelist_store:
         additional_paths.append(("changelist_store", Path(changelist_store)))
 
-    item.process(additional_paths, is_last=params.dump_debug_choose == 1)
+    try:
+        repro_manager = reproducer.Reproducer(item)
+        fully_restored_repo, path, makefile_path = repro_manager.prepare_reproducer()
+        additional_paths.append(("reproducer", path))
+        move_paths = [(makefile_path, Path("/Makefile"))]
+    except Exception as exc:
+        logging.debug("Failed to gather reproducer due to exception", exc_info=exc)
+        path = None
+        fully_restored_repo = False
+        move_paths = None
+
+    item.process(
+        additional_paths,
+        is_last=params.dump_debug_choose == 1,
+        move_paths=move_paths,
+        path_to_repro=path,
+        fully_restored_repo=fully_restored_repo,
+    )
 
     # In OPENSOURCE version we do not upload anything and just create archive file
     if dump_upload is None or not params.upload:

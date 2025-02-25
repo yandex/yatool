@@ -63,6 +63,12 @@
     <div class=warning>Snowden session id not found!</div>
 {% endif %}
 
+{% if handler %}
+    <div>Handler info: <code>{{ handler }}</code></div>
+{% else %}
+    <div class=warning>Handler info not found!</div>
+{% endif %}
+
 {% if ya_version_info %}
     <div>Ya version:</div>
     <div><code class="traceback">{{ ya_version_info }}</code></div>
@@ -158,6 +164,22 @@
     <div>{{ key }}: {{ value }}</div>
 {% endfor %}
 
+{% if path_to_repro %}
+<h3>Reproducer</h3>
+    {% if not fully_restored_repo %}
+    <div class="warning">This reproducer DOES NOT fully restore the repository state.</div>
+    {% endif %}
+    <div>To reproduce this launch, go to root of this bundle and run</div>
+    <div><code class="traceback">make -s run_last_command</code></div>
+
+    <div>If you do not want to make temporary Arcadia, set <code class="traceback">REPRO_ARCADIA_ROOT</code> environment variable with your Arcadia path.</div>
+    <div class="warning">All uncommited data in this Arcadia will be lost!</div>
+
+    <div>If you do not want to set Arcadia to target state, set <code class="traceback">PREPARE_ARCADIA=0</code>.</div>
+
+    <div>You can also set <code class="traceback">UNMOUNT_ARCADIA=0</code> to prevent repo from being unmounted.</div>
+{% endif %}
+
 <h3>Tracebacks</h3>
 
 {% for tb_info in tracebacks %}
@@ -202,6 +224,8 @@
     </div>
     {% endif %}
 {% endif %}
+
+
 
 </body>
 </html>
