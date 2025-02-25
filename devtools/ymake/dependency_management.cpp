@@ -1404,7 +1404,10 @@ namespace {
             if (
                 ApplyExcludesProp != 0 &&
                 (state.TopNode()->NodeType == EMNT_Property && state.TopNode()->ElemId == ApplyExcludesProp) ||
-                (state.TopNode()->NodeType == EMNT_BuildCommand && CmdsWithApplyExcludes.contains(state.TopNode()->ElemId))
+                ((
+                    state.TopNode()->NodeType == EMNT_BuildCommand ||
+                    state.TopNode()->NodeType == EMNT_BuildVariable
+                ) && CmdsWithApplyExcludes.contains(state.TopNode()->ElemId))
             ) {
                 const auto curentModule = state.FindRecent([](auto& item) { return IsModule(item); });
                 Y_ASSERT(curentModule != state.end());
@@ -1417,7 +1420,10 @@ namespace {
             TBase::Left(state);
             if (
                 ApplyExcludesProp == 0 ||
-                state.Top().CurDep().From()->NodeType != EMNT_BuildCommand ||
+                !(
+                    state.Top().CurDep().From()->NodeType == EMNT_BuildCommand ||
+                    state.Top().CurDep().From()->NodeType == EMNT_BuildVariable
+                ) ||
                 !(IsInnerCommandDep(state.Top().CurDep()) || IsPropertyDep(state.Top().CurDep()))
             ) {
                 return;
@@ -1425,8 +1431,13 @@ namespace {
 
             const ui32 destId = state.Top().CurDep().To()->ElemId;
             if (destId == ApplyExcludesProp || CmdsWithApplyExcludes.contains(destId)) {
-                if (GetId(TDepGraph::GetCmdName(state.Top().CurDep().From()).GetStr()) == 0) {
-                    CmdsWithApplyExcludes.insert(state.Top().CurDep().From()->ElemId);
+                auto cmdId = TVersionedCmdId(state.Top().CurDep().From()->ElemId);
+                if (cmdId.IsNewFormat()) {
+                    CmdsWithApplyExcludes.insert(cmdId.ElemId());
+                } else {
+                    if (GetId(TDepGraph::GetCmdName(state.Top().CurDep().From()).GetStr()) == 0) {
+                        CmdsWithApplyExcludes.insert(cmdId.ElemId());
+                    }
                 }
             }
         }
