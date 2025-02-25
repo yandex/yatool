@@ -6,6 +6,17 @@
 #include <string_view>
 #include <variant>
 
+//
+// mod list evolution policy:
+// * id-value to functionality mapping must not change, except for occasional "garbage collection"
+// * in particular, in the normal course of action:
+//   * do not alter existing id-values (altering names is fine)
+//   * add new entries at the end, right before Count
+//   * do not delete entries, mark them as deprecated instead
+//   * treat altering semanics of existing mods as adding new (versions of) mods and deprecating the old ones
+// * "garbage collection" may freely rearrange the list, must flush caches via FAKEID
+//
+
 enum class EMacroFunction: ui32 {
     // constructors
     Cmds,
