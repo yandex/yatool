@@ -152,6 +152,7 @@ class Reproducer:
         trunk_commit = self._mine_trunk_arc_revision()
 
         data = {
+            'command': str(self.debug_item),
             'trunk_revision': trunk_commit,
             'patch_file': patch_path,
             'configure': configure_generated,

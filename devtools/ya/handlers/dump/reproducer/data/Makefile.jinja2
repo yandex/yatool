@@ -1,8 +1,10 @@
 run_last_command:
+	echo 'Executing {{ command }}' >&2
 	cd {{ repro_sources_path }} && \
 	python3 execute_ya.py inputs/last_command.json --trunk-revision {{ trunk_revision }} {% if patch_file %} --patch-path revisions/diff.patch {% endif %}
 {% if configure %}
 run_last_command_configure:
+	echo 'Generate graph for {{ command }}' >&2
 	cd {{ repro_sources_path }} && \
 	python3 execute_ya.py inputs/last_command_configure.json --trunk-revision {{ trunk_revision }} {% if patch_file %} --patch-path revisions/diff.patch {% endif %}
 {% endif %}

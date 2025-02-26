@@ -172,12 +172,26 @@
     <div>To reproduce this launch, go to root of this bundle and run</div>
     <div><code class="traceback">make -s run_last_command</code></div>
 
-    <div>If you do not want to make temporary Arcadia, set <code class="traceback">REPRO_ARCADIA_ROOT</code> environment variable with your Arcadia path.</div>
-    <div class="warning">All uncommited data in this Arcadia will be lost!</div>
-
-    <div>If you do not want to set Arcadia to target state, set <code class="traceback">PREPARE_ARCADIA=0</code>.</div>
-
-    <div>You can also set <code class="traceback">UNMOUNT_ARCADIA=0</code> to prevent repo from being unmounted.</div>
+    <div>Available environment variables, that alter script behaviour:</div>
+    <ul>
+        <li>
+            <code class="traceback">REPRO_ARCADIA_ROOT=/path/to/arcadia</code>.
+            Prevents temporary Arcadia from being made.
+            <div class="warning">All uncommited data in this repo will be lost!</div>
+        </li>
+        <li>
+            <code class="traceback">PREPARE_ARCADIA=0</code>.
+            Do not prepare Arcadia, use initial state or last state available.
+        </li>
+        <li>
+            <code class="traceback">UNMOUNT_ARCADIA=0</code>.
+            Do not unmount Arcadia after ya execution.
+        </li>
+        <li>
+            <code class="traceback">REMOVE_YA_ROOT=0</code>.
+            Do not remove ya root after execution
+        </li>
+    </ul>
 {% endif %}
 
 <h3>Tracebacks</h3>

@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import tempfile
+import shutil
 import subprocess
 import sys
 
@@ -220,6 +221,20 @@ def main(args):
 
     if 'REPRO_ARCADIA_ROOT' not in os.environ and os.environ.get('UNMOUNT_ARCADIA', '1') == '1':
         unmount_arcadia(new_arcadia_root)
+    else:
+        print(
+            f"Will not unmount {new_arcadia_root} due to set REPRO_ARCADIA_ROOT or UNMOUNT_ARCADIA_ROOT",
+            file=sys.stderr,
+        )
+
+    if os.environ.get('REMOVE_YA_ROOT', '1') == '1':
+        print(f"Removing {new_dot_ya}", file=sys.stderr)
+        shutil.rmtree(str(new_dot_ya))
+    else:
+        print(
+            f"Ya execution results are stored in {new_dot_ya}",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":
