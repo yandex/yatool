@@ -764,17 +764,7 @@ void TDirParser::DataStatement(const TStringBuf& name, const TVector<TStringBuf>
             continue;
         }
 
-        if (data.StartsWith(DATA_ATD_PREFIX)) {
-            TString path = TString(data.SubStr(DATA_ATD_PREFIX.length()));
-            if (Vars().IsTrue("DISABLE_ATD"))
-                YConfErrPrecise(Misconfiguration, GetStatementRow(name), GetStatementColumn(name)) << "ATD path [[imp]]" << path << "[[rst]] is not allowed due to ATD EOL." << Endl;
-            if (Conf.CheckDataPaths && !(Conf.ArcadiaTestsDataRoot / path).Exists()) {
-                TRACE(P, NEvent::TInvalidDataDir(TString{data}));
-                YConfErrPrecise(Misconfiguration, GetStatementRow(name), GetStatementColumn(name)) << "ATD path [[imp]]" << path << "[[rst]] inside [[alt1]]" << name << "[[rst]] section is missing." << Endl;
-            }
-            reportMissingAutoUpConfig(data);
-            autoUp = TAutoUp::No;
-        } else if (data.StartsWith(DATA_ARC_PREFIX)) {
+        if (data.StartsWith(DATA_ARC_PREFIX)) {
             dataFilesPathes.push_back(data.SubStr(DATA_ARC_PREFIX.length()));
             reportMissingAutoUpConfig(data);
             autoUp = TAutoUp::No;
@@ -791,7 +781,7 @@ void TDirParser::DataStatement(const TStringBuf& name, const TVector<TStringBuf>
         } else {
             YConfErrPrecise(Misconfiguration, GetStatementRow(name), GetStatementColumn(name))
                 << "Path [[imp]]" << data << "[[rst]] in [[alt1]]" << name << "[[rst]] section should start with one of the following prefixes: [[imp]]"
-                << DATA_ARC_PREFIX << ", " << DATA_ATD_PREFIX << ", " << DATA_SBR_PREFIX << ", " << DATA_EXT_PREFIX << "[[rst]]" << Endl;
+                << DATA_ARC_PREFIX << ", " << DATA_SBR_PREFIX << ", " << DATA_EXT_PREFIX << "[[rst]]" << Endl;
             autoUp = TAutoUp::No;
         }
     }

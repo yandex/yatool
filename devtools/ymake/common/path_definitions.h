@@ -9,7 +9,6 @@ constexpr TStringBuf BLD_DIR = "$B"sv;
 constexpr TStringBuf UNK_DIR = "$U"sv;
 constexpr TStringBuf DUMMY_FILE = "$B/build/__dummy__"sv;
 
-constexpr TStringBuf DATA_ATD_PREFIX = "arcadia_tests_data/"sv;
 constexpr TStringBuf DATA_ARC_PREFIX = "arcadia/"sv;
 constexpr TStringBuf DATA_SBR_PREFIX = "sbr://"sv;
 constexpr TStringBuf DATA_EXT_PREFIX = "ext:"sv;
