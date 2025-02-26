@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: flatbuffers
-Version: 25.1.24
+Version: 25.2.10
 Summary: The FlatBuffers serialization format for Python
 Home-page: https://google.github.io/flatbuffers/
 Author: Derek Bailey
