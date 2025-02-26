@@ -58,7 +58,6 @@ def _make_repositories_config(
     repository_type,
     source_root_pattern,
     arc_url,
-    do_not_use_arc,
 ):
     if repository_type == distbs_consts.DistbuildRepoType.TARED:
         return make_tared_repositories_config(True)
@@ -75,7 +74,6 @@ def _make_repositories_config(
 
     # prepare arc repo
     if arc_url:
-        assert not do_not_use_arc, 'Cannot use arc_url and ask to not to use arc'
         return [
             {
                 "pattern": "$({})".format(None if for_uid else source_root_pattern),
@@ -95,7 +93,6 @@ def _make_repositories_config(
                 "patch_filters": pf,
                 "patch": p,
                 "use_arcc": repository_type == distbs_consts.DistbuildRepoType.ARCC,
-                "do_not_use_arc": do_not_use_arc,
             }
         ]
 
@@ -137,7 +134,6 @@ def _gen_extra_dict(
     source_root_pattern,
     distbuild_pool,
     arc_url,
-    do_not_use_arc,
     default_node_requirements,
 ):
     repos = _make_repositories_config(
@@ -149,7 +145,6 @@ def _gen_extra_dict(
         repository_type,
         source_root_pattern,
         arc_url,
-        do_not_use_arc,
     )
     conf = {
         'repos': repos,
@@ -184,7 +179,6 @@ def gen_extra_dict_by_opts(
     cluster=None,
     coordinators_filter=None,
     distbuild_pool=None,
-    do_not_use_arc=False,
 ):
     return _gen_extra_dict(
         for_uid,
@@ -202,7 +196,6 @@ def gen_extra_dict_by_opts(
         getattr(opts, 'build_graph_source_root_pattern', 'SOURCE_ROOT'),
         distbuild_pool or getattr(opts, 'distbuild_pool', None),
         getattr(opts, 'arc_url_as_working_copy_in_distbuild', None),
-        do_not_use_arc,
         getattr(opts, 'default_node_requirements', None),
     )
 
@@ -337,7 +330,6 @@ def gen_conf(
     for_uid=False,
     repository_type=None,
     distbuild_pool=None,
-    do_not_use_arc=False,
 ):
     conf = {'platform': platform, 'graph_size': 1}
     conf.update(_meta_by_platform(params, platform, add_compilers=False))
@@ -350,7 +342,6 @@ def gen_conf(
             cluster=cluster,
             coordinators_filter=coordinators_filter,
             distbuild_pool=distbuild_pool,
-            do_not_use_arc=do_not_use_arc,
         )
     )
     return conf
@@ -418,7 +409,6 @@ def gen_dummy_graph(
     tags=None,
     repository_type=None,
     distbuild_pool=None,
-    do_not_use_arc=False,
 ):
     node_type = 'GG_GRAPH'
     dep, dep_no_uid = deps or ([], [])
@@ -482,7 +472,6 @@ def gen_dummy_graph(
         for_uid=True,
         repository_type=repository_type,
         distbuild_pool=distbuild_pool,
-        do_not_use_arc=do_not_use_arc,
     )
     graph_str = json.dumps(
         {'conf': conf_for_hash, 'graph': [node_for_uid]}, sort_keys=True, indent=2, separators=(',', ': ')
@@ -500,7 +489,6 @@ def gen_dummy_graph(
         for_uid=False,
         repository_type=repository_type,
         distbuild_pool=distbuild_pool,
-        do_not_use_arc=do_not_use_arc,
     )
     node = get_node(for_uid=False)
     node['uid'] = uid
