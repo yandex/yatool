@@ -29,15 +29,15 @@ def validate(
 ) -> list[str]:
     # Our use case is to load rules and base configs many times, user config only once.
     # For this reason we use caching where appropriate.
-    rconfig = config.parse_yaml_cached(raw_rules)
+    rules_config = config.parse_yaml_cached(raw_rules)
 
-    config_settings = rconfig['config_settings']
+    config_settings = rules_config['config_settings']
 
-    uconfig = config.make(raw_user, config_settings)
+    user_config = config.make_validator_config(raw_user, config_settings)
 
-    if not uconfig.requires_validation:
+    if not user_config.requires_validation:
         return []
 
-    bconfig = config.make(raw_base, config_settings, cache=True)
+    base_config = config.make_validator_config(raw_base, config_settings, cache=True)
 
-    return _validate(rconfig, uconfig, bconfig)
+    return _validate(rules_config, user_config, base_config)

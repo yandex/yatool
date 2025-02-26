@@ -105,7 +105,7 @@ class _DictConfig:
         return self.deepget(self._config, path, default=rules.NO_VALUE)
 
 
-def make(config: RawConfig | None, settings: Mapping, *, cache: bool = False) -> SupportsLookup:
+def make_validator_config(config: RawConfig | None, settings: Mapping, *, cache: bool = False) -> SupportsLookup:
     if config is None:
         return _NullConfig()
 
