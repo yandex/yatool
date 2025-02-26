@@ -3170,7 +3170,7 @@ def _build_merged_graph(
                 n['sandboxing'] = True
 
     if opts.use_distbuild:
-        conf = gen_plan.gen_extra_dict_by_opts(opts, need_tests_data=any_tests, repository_type=opts.repository_type)
+        conf = gen_plan.gen_extra_dict_by_opts(opts, repository_type=opts.repository_type)
         merged_graph['conf'].update(conf)
 
     return merged_graph, list(injected_tests), list(stripped_tests), united_make_files

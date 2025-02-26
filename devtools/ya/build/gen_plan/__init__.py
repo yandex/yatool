@@ -22,7 +22,6 @@ from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 import yalibrary.tools as tools
 import devtools.ya.core.config as config
 import devtools.ya.core.patch_tools as patch_tools
-from devtools.ya.test.dependency.uid import TestUidGenerator
 
 logger = logging.getLogger(__name__)
 TRUNK_PATH = '/arc/trunk/arcadia'
@@ -56,7 +55,6 @@ def _make_repositories_config(
     revision,
     arcadia_svn_path,
     patch,
-    need_tests_data,
     repository_type,
     source_root_pattern,
     arc_url,
@@ -78,7 +76,7 @@ def _make_repositories_config(
     # prepare arc repo
     if arc_url:
         assert not do_not_use_arc, 'Cannot use arc_url and ask to not to use arc'
-        ret = [
+        return [
             {
                 "pattern": "$({})".format(None if for_uid else source_root_pattern),
                 "patch_filters": pf,
@@ -89,7 +87,7 @@ def _make_repositories_config(
         ]
     else:
         # prepare svn repo
-        ret = [
+        return [
             {
                 "repository": _get_repo_prefix(repository_type) + arcadia_svn_path,
                 "pattern": "$({})".format(None if for_uid else source_root_pattern),
@@ -100,35 +98,6 @@ def _make_repositories_config(
                 "do_not_use_arc": do_not_use_arc,
             }
         ]
-
-    # It's intentionally made dirty to encourage delete it all ASAP )
-    if root and need_tests_data:
-        settings_conf = "build/conf/settings.conf"
-        with open(os.path.join(root, settings_conf)) as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("DISABLE_ATD"):
-                    val = line.split("=", 1)[1].strip()
-                    if strtobool(val):
-                        need_tests_data = False
-                        logger.debug("disable arcadia_test_data because of 'DISABLE_ATD=yes' in %s", settings_conf)
-                    break
-
-    if need_tests_data and (arc_url or not _is_branch(arcadia_svn_path)):
-        arcadia_tests_data_svn_path = os.path.join(os.path.dirname(arcadia_svn_path), 'arcadia_tests_data')
-        ret.append(
-            {
-                "repository": _get_repo_prefix(repository_type) + arcadia_tests_data_svn_path,
-                "pattern": "$(TESTS_DATA_ROOT)",
-                "revision": TestUidGenerator._get_atd_revisions(root, base_rev_only=True)[0] or revision,
-                "patch_filters": "",
-                "patch": "",
-                "use_arcc": repository_type == distbs_consts.DistbuildRepoType.ARCC,
-                "do_not_use_arc": do_not_use_arc,
-            }
-        )
-
-    return ret
 
 
 # Don't do slow libc version discovering for Linux
@@ -164,7 +133,6 @@ def _gen_extra_dict(
     force_coordinators_filter,
     cache_namespace,
     build_execution_time,
-    need_tests_data,
     repository_type,
     source_root_pattern,
     distbuild_pool,
@@ -178,7 +146,6 @@ def _gen_extra_dict(
         revision,
         arcadia_svn_path,
         patch,
-        need_tests_data,
         repository_type,
         source_root_pattern,
         arc_url,
@@ -212,7 +179,6 @@ def _gen_extra_dict(
 def gen_extra_dict_by_opts(
     opts,
     for_uid=False,
-    need_tests_data=True,
     repository_type=None,
     priority=None,
     cluster=None,
@@ -232,7 +198,6 @@ def gen_extra_dict_by_opts(
         getattr(opts, 'force_coordinators_filter', False),
         getattr(opts, 'cache_namespace', None),
         getattr(opts, 'build_execution_time', None),
-        need_tests_data,
         repository_type,
         getattr(opts, 'build_graph_source_root_pattern', 'SOURCE_ROOT'),
         distbuild_pool or getattr(opts, 'distbuild_pool', None),
@@ -380,7 +345,6 @@ def gen_conf(
         gen_extra_dict_by_opts(
             params,
             for_uid=for_uid,
-            need_tests_data=False,
             repository_type=repository_type,
             priority=priority,
             cluster=cluster,
