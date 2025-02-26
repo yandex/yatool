@@ -61,6 +61,7 @@ CFLAGS(
 )
 
 LD_PLUGIN(musl.py)
+LDFLAGS(-static)
 
 EXTRALIBS(
     -nostdlib
