@@ -110,6 +110,9 @@ public:
     const TKeyword& GetKeywordData(size_t arrNum) const {
         return Keywords_.find(GetKeyword(arrNum))->second;
     }
+    const TKeyword* GetKeywordData(const TString& name) const {
+        return Keywords_.FindPtr(name);
+    }
 
     bool HasUsrArgs() const noexcept {
         return NumUsrArgs_ != 0;

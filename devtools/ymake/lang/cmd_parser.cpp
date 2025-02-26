@@ -210,8 +210,8 @@ namespace {
             auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size());
             const TKeyword* kwDesc = nullptr;
 
-            auto kwArgCnt = blockData->CmdProps->GetKeywords().size();
-            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->GetKeywords().size();
+            auto kwArgCnt = blockData->CmdProps->GetKeyArgsNum();
+            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->GetKeyArgsNum();
             auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
@@ -247,9 +247,8 @@ namespace {
 
                 if (rawArg->size() == 1)
                     if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front())) {
-                        auto kwDescIt = blockData->CmdProps->GetKeywords().find(kw->Value);
-                        if (kwDescIt != blockData->CmdProps->GetKeywords().end()) {
-                            kwDesc = &kwDescIt->second;
+                        if (auto *keywordData = blockData->CmdProps->GetKeywordData(kw->Value)) {
+                            kwDesc = keywordData;
                             maybeStartNamedArg();
                             continue;
                         }
@@ -283,17 +282,17 @@ namespace {
                     << " called with too few positional arguments"
                     << " (" << posArgCnt << (hasVarArg ? " or more" : "") << " expected)";
 
-            for (auto& kw : blockData->CmdProps->GetKeywords()) {
-                auto namedArg = &args[kw.second.Pos];
+            for (const auto& [name, kw] : blockData->CmdProps->GetKeywords()) {
+                auto namedArg = &args[kw.Pos];
                 if (!namedArg->Script.empty()) {
                     Y_ASSERT(namedArg->Script.size() == 1);
-                    if (namedArg->Script.back().size() < kw.second.From)
+                    if (namedArg->Script.back().size() < kw.From)
                         throw TError()
                             << "Macro " << macroName
-                            << " did not get enough data for the named argument " << kw.first;
+                            << " did not get enough data for the named argument " << name;
                 }
                 if (namedArg->Script.empty())
-                    AssignPreset(namedArg->Script, kw.second.OnKwMissing);
+                    AssignPreset(namedArg->Script, kw.OnKwMissing);
             }
 
             return args;
