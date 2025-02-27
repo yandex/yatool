@@ -4,7 +4,7 @@ import platform
 import shutil
 import sys
 from collections import OrderedDict
-from pathlib import Path, PurePath
+from pathlib import Path
 
 import devtools.ya.test.const as const
 import yalibrary.platform_matcher as pm
@@ -149,20 +149,15 @@ def gen_exclude_settings(params, modules):
     return settings
 
 
-def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
+def gen_black_settings(arc_root, tool_fetcher):
     try:
         black_binary_path = tool_fetcher("black")["executable"]
     except Exception as e:
         ide_common.emit_message(f"[[warn]]Could not get \"ya tool black\"[[rst]]: {e!r}")
         return {}
 
-    arc_root = PurePath(arc_root)
-
-    try:
-        with open(arc_root / const.DefaultLinterConfig.Python) as afile:
-            black_config_file: str = json.load(afile)[const.PythonLinterName.Black]
-    except Exception as e:
-        ide_common.emit_message(f"[[warn]]Could not get black config path [[rst]]: {e!r}")
+    success = setup_linter_config(arc_root, const.DefaultLinterConfig.Python, const.PythonLinterName.Black)
+    if not success:
         return {}
 
     return OrderedDict(
@@ -173,13 +168,6 @@ def gen_black_settings(arc_root, rel_targets, srcdirs, tool_fetcher):
                     "editor.defaultFormatter": "ms-python.black-formatter",
                     "editor.formatOnSaveMode": "file",
                 },
-            ),
-            (
-                "black-formatter.args",
-                [
-                    "--config",
-                    str(arc_root / black_config_file),
-                ],
             ),
             ("black-formatter.path", [black_binary_path]),
         )
@@ -193,62 +181,9 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
         ide_common.emit_message(f"[[warn]]Could not get \"ya tool clang-format-18\"[[rst]]: {e!r}")
         return {}
 
-    arc_root = Path(arc_root)
-
-    try:
-        with open(arc_root / const.DefaultLinterConfig.Cpp) as afile:
-            config_file: str = json.load(afile)[const.CppLinterName.ClangFormat]
-    except Exception as e:
-        ide_common.emit_message(f"[[warn]]Could not get clang-format config path [[rst]]: {e!r}")
+    success = setup_linter_config(arc_root, const.DefaultLinterConfig.Cpp, const.CppLinterName.ClangFormat)
+    if not success:
         return {}
-
-    config_path = arc_root / config_file
-
-    if not config_path.exists():
-        ide_common.emit_message(f"[[warn]]Failed to find clang-format config[[rst]]: '{config_path}' doesn't exist")
-        return {}
-
-    target_path = arc_root / ".clang-format"
-
-    if pm.my_platform() == "win32":
-        if target_path.exists(follow_symlinks=False):
-            ide_common.emit_message(
-                "[[warn]]clang-format config exists at '{}' and will be replaced by '{}'[[rst]]".format(
-                    target_path,
-                    config_path,
-                )
-            )
-        try:
-            shutil.copyfile(config_path, target_path, follow_symlinks=False)
-        except OSError as e:
-            ide_common.emit_message(f"[[warn]]Failed to setup clang-format config[[rst]]: '{e.strerror}'")
-            return {}
-    else:
-        create_symlink = False
-        if not target_path.exists(follow_symlinks=False):
-            create_symlink = True
-        elif target_path.is_symlink():
-            link_path = target_path.readlink()
-            if link_path != config_path:
-                ide_common.emit_message(
-                    f"[[warn]]clang-format config was updated[[rst]]: '{target_path}' "
-                    f"was linked to the '{link_path}', new path: '{config_path}'",
-                )
-                target_path.unlink()
-                create_symlink = True
-        else:
-            ide_common.emit_message(
-                f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{target_path}' is not a link"
-            )
-
-        if create_symlink:
-            try:
-                target_path.symlink_to(config_path)
-            except OSError as e:
-                ide_common.emit_message(
-                    f"[[warn]]Failed to create link to the clang-format config[[rst]]: '{e.strerror}'"
-                )
-                return {}
 
     return OrderedDict(
         (
@@ -262,6 +197,74 @@ def gen_clang_format_settings(arc_root, tool_fetcher):
             ("clang-format.executable", clang_format_binary_path),
         )
     )
+
+
+def setup_linter_config(arc_root: str, default_configs_path: str, linter_name: str) -> bool:
+    root = Path(arc_root)
+
+    try:
+        with open(root / default_configs_path) as afile:
+            config_file: str = json.load(afile)[linter_name]
+    except Exception as e:
+        ide_common.emit_message(f"[[warn]]Could not get {linter_name} config path [[rst]]: {e!r}")
+        return False
+
+    config_path = root / config_file
+    if not config_path.exists():
+        ide_common.emit_message(f"[[warn]]Failed to find {linter_name} config[[rst]]: '{config_path}' doesn't exist")
+        return False
+
+    target_path = root / config_path.name
+    ide_common.emit_message(f"Placing config {config_path} at: {target_path}")
+    success = _place_linter_config_symlink(config_path, target_path)
+
+    if not success:
+        ide_common.emit_message(f"[[warn]]{linter_name} can't be set up[[rst]]")
+        return False
+
+    return True
+
+
+def _place_linter_config_symlink(config_path: Path, target_path: Path) -> bool:
+    if pm.my_platform() == "win32":
+        if target_path.exists(follow_symlinks=False):
+            ide_common.emit_message(
+                "[[warn]]config exists at '{}' and will be replaced by '{}'[[rst]]".format(
+                    target_path,
+                    config_path,
+                )
+            )
+        try:
+            shutil.copyfile(config_path, target_path, follow_symlinks=False)
+        except OSError as e:
+            ide_common.emit_message(f"[[warn]]Failed to setup config[[rst]]: '{e.strerror}'")
+            return False
+    else:
+        create_symlink = False
+        if not target_path.exists(follow_symlinks=False):
+            create_symlink = True
+        elif target_path.is_symlink():
+            link_path = target_path.readlink()
+            if link_path != config_path:
+                ide_common.emit_message(
+                    f"[[warn]]config was updated[[rst]]: '{target_path}' "
+                    f"was linked to the '{link_path}', new path: '{config_path}'",
+                )
+                target_path.unlink()
+                create_symlink = True
+        else:
+            ide_common.emit_message(
+                f"[[warn]]Failed to create link to the config[[rst]]: '{target_path}' is not a link"
+            )
+
+        if create_symlink:
+            try:
+                target_path.symlink_to(config_path)
+            except OSError as e:
+                ide_common.emit_message(f"[[warn]]Failed to create link to the config[[rst]]: '{e.strerror}'")
+                return False
+
+    return True
 
 
 def gen_pyrights_excludes(arc_root, srcdirs):

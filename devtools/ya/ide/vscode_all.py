@@ -512,11 +512,7 @@ class VSCodeProject:
                     os.remove(os.path.join(self.codegen_cpp_dir, ".clangd"))
 
         if self.is_py3 and self.params.black_formatter_enabled:
-            workspace["settings"].update(
-                vscode.workspace.gen_black_settings(
-                    self.params.arc_root, self.params.rel_targets, python_srcdirs, tool_fetcher
-                )
-            )
+            workspace["settings"].update(vscode.workspace.gen_black_settings(self.params.arc_root, tool_fetcher))
         if self.is_go:
             alt_tools = {}
             if self.params.patch_gopls:
