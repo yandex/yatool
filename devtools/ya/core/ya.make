@@ -4,7 +4,6 @@ PEERDIR(
     contrib/python/pylev
     contrib/python/toml
     devtools/ya/conf
-    devtools/ya/core/common_opts
     devtools/ya/core/config
     devtools/ya/core/error
     devtools/ya/core/event_handling
@@ -20,7 +19,6 @@ PEERDIR(
     devtools/ya/core/stage_aggregator
     devtools/ya/core/stage_tracer
     devtools/ya/core/stages_profiler
-    devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/const
     devtools/ya/yalibrary/app_ctx
@@ -35,6 +33,8 @@ IF (PYTHON3)
     PEERDIR(
         devtools/ya/core/monitoring
         devtools/ya/core/user
+        devtools/ya/core/yarg
+        devtools/ya/core/common_opts
     )
 ENDIF()
 
