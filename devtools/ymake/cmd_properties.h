@@ -79,9 +79,35 @@ struct TUnitProperty {
 
 class TCmdProperty: public TUnitProperty {
 public:
-    TString ConvertCmdArgs(const TStringBuf& cmd);
+    class TKeywords {
+    public:
+        TKeywords() noexcept = default;
+        ~TKeywords() noexcept = default;
+
+        TKeywords(const TKeywords&) = delete;
+        TKeywords& operator=(const TKeywords&) = delete;
+        TKeywords(TKeywords&&) noexcept = default;
+        TKeywords& operator=(TKeywords&&) noexcept = default;
+
+
+        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
+
+        bool Empty() const noexcept {
+            return Collected_.empty();
+        }
+
+        TMap<TString, TKeyword> Take() && noexcept {
+            return std::move(Collected_);
+        }
+    private:
+        TMap<TString, TKeyword> Collected_;
+    };
+
+    TCmdProperty() noexcept = default;
+    TCmdProperty(TStringBuf cmd, TKeywords&& kw);
+
+    TString ConvertCmdArgs(const TStringBuf& cmd) const;
     size_t Key2ArrayIndex(const TString& arg) const;
-    void AddKeyword(const TString& word, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
 
     bool HasKeyword(const TString& arg) const {
         return Keywords_.find(arg) != Keywords_.end();
@@ -136,9 +162,6 @@ public:
         Position2Key_,
         NumUsrArgs_
     );
-
-private:
-    void DesignateKeysPos();
 
 private:
     TMap<TString, TKeyword> Keywords_;

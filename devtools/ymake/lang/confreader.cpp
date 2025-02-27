@@ -499,11 +499,11 @@ namespace {
             );
 
             auto& blockData = Conf.BlockData[specName];
-            auto& props = GetOrInit(blockData.CmdProps);
             BlockStack.emplace_back(blockData, specName, TBlockDesc::EBlockType::Macro);
             auto& block = BlockStack.back();
 
             // Now we are ready to process named arguments since the BlockData is already created
+            TCmdProperty::TKeywords keywords;
             for (const auto& arg : arguments) {
                 bool isNamedArrayOrScalar = IsNamedArray(arg.Type) || IsNamedScalar(arg.Type);
                 if (!arg.DeepReplace.empty() && !isNamedArrayOrScalar) {
@@ -520,7 +520,7 @@ namespace {
                         if (!arg.InitFalse.empty()) {
                             kwMissing = arg.InitFalse;
                         }
-                        props.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
+                        keywords.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
                         break;
                     case EArgType::NamedScalar:
                         YDIAG(Conf) << "Keyword = for [" << name << "] is [" << arg.Name << "] := ["
@@ -528,11 +528,11 @@ namespace {
                         if (!arg.InitFalse.empty()) {
                             kwMissing = arg.InitFalse;
                         }
-                        props.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
+                        keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
                         break;
                     case EArgType::NamedArray:
                         YDIAG(Conf) << "Keyword [] for [" << name << "] is [" << arg.Name << "]" << Endl;
-                        props.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
+                        keywords.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
                         break;
                     default:
                         break;
@@ -553,17 +553,21 @@ namespace {
             const auto argNames = CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second);
             auto plainArgs = JoinStrings(argNames, ", ");
 
-            if (HasNamedArgs(&blockData)) {
-                plainArgs = props.ConvertCmdArgs(TString::Join("(", plainArgs, ")"));
+            if (!keywords.Empty()) {
+                const auto cmdArgs = TString::Join("(", plainArgs, ")");
+                blockData.CmdProps.Reset(new TCmdProperty{cmdArgs, std::move(keywords)});
+                plainArgs = blockData.CmdProps->ConvertCmdArgs(cmdArgs);
                 Y_ASSERT(plainArgs.length() > 1 && plainArgs[0] == '(' && plainArgs.back() == ')');
                 // plainArgs = plainArgs.substr(1, plainArgs.length() - 2);
                 plainArgs[0] = ' ';
                 plainArgs.pop_back();
+            } else {
+                blockData.CmdProps.Reset(new TCmdProperty{});
             }
 
             if (!plainArgs.empty()) {
                 block.SetArgs(plainArgs);
-                props.AddArgNames(plainArgs);
+                blockData.CmdProps->AddArgNames(plainArgs);
             }
 
             // Add "guard" for conditions. All conditions defined inside the macro are prepended

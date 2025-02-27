@@ -21,10 +21,18 @@ size_t CountOwnArgs(TStringBuf cmd) noexcept {
 
 }
 
-TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) {
-    NumUsrArgs_ = CountOwnArgs(cmd);
-    DesignateKeysPos();
+TCmdProperty::TCmdProperty(TStringBuf cmd, TKeywords&& kw)
+    : Keywords_{std::move(kw).Take()}
+    , NumUsrArgs_{CountOwnArgs(cmd)}
+{
+    size_t cnt = 0;
+    for (auto& [name, keyword]: Keywords_) {
+        keyword.Pos = cnt;
+        Position2Key_[cnt++] = name;
+    }
+}
 
+TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) const {
     TString res;
     res = "(";
     for (const auto& [_, key]: Position2Key_)
@@ -32,16 +40,8 @@ TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) {
     return TString::Join(res, NumUsrArgs_ ? "" : ")", NumUsrArgs_ ? cmd.SubStr(1) : cmd);
 }
 
-void TCmdProperty::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Keywords_[keyword] = TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing);
-}
-
-void TCmdProperty::DesignateKeysPos() {
-    size_t cnt = 0;
-    for (auto& [name, keyword]: Keywords_) {
-        keyword.Pos = cnt;
-        Position2Key_[cnt++] = name;
-    }
+void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
+    Collected_[keyword] = TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing);
 }
 
 size_t TCmdProperty::Key2ArrayIndex(const TString& arg) const {
