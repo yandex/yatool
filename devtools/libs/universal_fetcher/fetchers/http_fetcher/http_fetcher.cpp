@@ -5,6 +5,7 @@
 #include <devtools/libs/universal_fetcher/utils/checksum/checksum.h>
 #include <devtools/libs/universal_fetcher/utils/progress/progress.h>
 #include <devtools/libs/universal_fetcher/utils/file_output/file_output.h>
+#include <devtools/libs/universal_fetcher/utils/checksum/checksum.h>
 
 #include <library/cpp/string_utils/base64/base64.h>
 #include <library/cpp/json/json_value.h>
@@ -47,7 +48,7 @@ namespace NUniversalFetcher {
                 headers["X-Request-ID"] = requestId;
 
                 {
-                    THolder<TCancellableFileOutput> fileOutput = MakeHolder<TCancellableFileOutput>(cancellation, dstPath.FilePath());
+                    THolder<TCancellableFileOutput> fileOutput = MakeHolder<TCancellableFileOutput>(cancellation, nullptr, dstPath.FilePath());
                     THolder<IOutputStream> out = MakeProgressOutputStreamIfNeeded(params.ProgressReporting, 0, std::move(fileOutput));
                     try {
                         DoHttpGetRequest(url, out.Get(), opts, headers, cancellation);

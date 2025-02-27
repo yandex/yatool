@@ -2,6 +2,7 @@
 
 #include <util/generic/maybe.h>
 #include <library/cpp/json/json_value.h>
+#include <library/cpp/digest/md5/md5.h>
 
 namespace NUniversalFetcher {
     enum class EHashAlgorithm {
@@ -17,6 +18,8 @@ namespace NUniversalFetcher {
         void ToJson(NJson::TJsonValue&) const;
         TString ToJsonString() const;
     };
+
+    TString GetMd5Hash(MD5& md5);
 
     bool IsDigestOk(EHashAlgorithm algo, const TString& data);
 

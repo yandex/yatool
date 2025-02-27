@@ -35,6 +35,13 @@ namespace NUniversalFetcher {
         }
     }
 
+    TString GetMd5Hash(MD5& md5) {
+        TString result = TString::TUninitialized(33);
+        md5.End(result.begin());
+        result.erase(32);
+        return result;
+    }
+
     TString CalcContentDigest(EHashAlgorithm algo, const TString& filepath) {
         const TFile file(filepath, OpenExisting | RdOnly | CloseOnExec);
         TString data = TFileInput(file).ReadAll();
