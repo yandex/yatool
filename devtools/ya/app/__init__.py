@@ -387,6 +387,11 @@ def configure_debug(app_ctx):
         except Exception as e:
             AppEvLogStore.logger.debug("While store handler: %s", e)
 
+        try:
+            dump_store_obj['cache_dir'] = devtools.ya.core.config.misc_root()
+        except Exception as e:
+            AppEvLogStore.logger.debug("While store cache_dir: %s", e)
+
     except SystemExit as e:
         try:
             dump_store_obj['exit_code'] = e.code

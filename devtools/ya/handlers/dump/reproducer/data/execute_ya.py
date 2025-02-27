@@ -81,14 +81,14 @@ def process_file(file: pathlib.Path, debug_bundle_root: pathlib.Path, new_arcadi
     with file.open('r') as launch:
         launch_deserialized = json.load(launch)
 
-    arc_root = find_value_by_key(launch_deserialized, 'arc_root')
+    arc_root = find_value_by_key(launch_deserialized, 'reproducer_arc_root')
 
     launch_deserialized['args'] = traverse_and_work_with_values(
         launch_deserialized['args'],
         lambda x: x.replace(arc_root, str(new_arcadia_root)),
     )
 
-    old_dot_ya = find_value_by_key(launch_deserialized, 'bld_dir')
+    old_dot_ya = find_value_by_key(launch_deserialized, 'reproducer_cache_dir')
 
     temp_dir = pathlib.Path(tempfile.mkdtemp('_reproducer'))
     new_dot_ya = temp_dir / old_dot_ya[1:]
@@ -155,7 +155,7 @@ def unmount_arcadia(arc_root: pathlib.Path):
     proc = subprocess.run(args=cmd, stdout=sys.stderr)
 
     if proc.returncode != 0:
-        raise Exception("Failed during arc unmount")
+        print("Failed during arc unmount", file=sys.stderr)
 
 
 def prepare_arcadia(arc_root: pathlib.Path, revision: str, patch_path: pathlib.Path):

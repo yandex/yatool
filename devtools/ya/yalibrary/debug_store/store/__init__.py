@@ -42,6 +42,10 @@ class Store:
             self.logger.debug("Key (%s): `%s` -> `%s`", key, self.data[key], value)
         self.data[key] = value
 
+    def __getitem__(self, key):
+        assert isinstance(key, str), "Key must be string, not {}".format(type(key))
+        return self.data[key]
+
     def __contains__(self, item):
         return item in self.data
 

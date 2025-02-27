@@ -342,6 +342,11 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         build_options.use_new_distbuild_client = params.use_new_distbuild_client
     build_options.username = params.username
 
+    if 'package_builds' not in app_ctx.dump_debug:
+        app_ctx.dump_debug['package_builds'] = []
+
+    app_ctx.dump_debug['package_builds'] += [(build_key, build_options.__dict__)]
+
     logger.debug("Build options %s", json.dumps(build_options.__dict__, sort_keys=True, indent=2))
 
     builder = devtools.ya.build.targets_deref.intercept(
