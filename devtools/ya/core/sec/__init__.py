@@ -26,6 +26,8 @@ ENDSWITH_CHECKS = (
 
 SupressedInfo = namedtuple("SupressedInfo", ["suppressed", "need_to_be_supressed", "original_value"])
 
+_SUPPRESSIONS = []
+
 
 class DoNotSearch(object):
     pass
@@ -193,6 +195,12 @@ def mine_suppression_filter(obj=None, argv=None, env=None):
 
     secrets.update(iter_deep(obj))
 
+    for s in secrets:
+        # YA-1248, in logs we see \\n if there was \n in token value
+        secrets.add(s.replace("\\n", "\\\\n"))
+
+    _SUPPRESSIONS.extend(secrets - set(_SUPPRESSIONS))
+
     logger.debug("Found %d secrets", len(secrets))
 
-    return sorted(list(secrets))
+    return _SUPPRESSIONS

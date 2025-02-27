@@ -13,9 +13,10 @@ import app_config
 
 import devtools.ya.core.error
 import devtools.ya.core.respawn
+import devtools.ya.core.sec as sec
 import devtools.ya.core.sig_handler
-import devtools.ya.core.yarg
 import devtools.ya.core.stage_tracer as stage_tracer
+import devtools.ya.core.yarg
 
 from devtools.ya.core.yarg import LazyCommand, try_load_handler
 from devtools.ya.core.logger import init_logger
@@ -204,6 +205,8 @@ def main(args):
     if a.precise:
         start = time.time()
 
+        replacements = sec.mine_suppression_filter(argv=args)
+
         class Handler(logging.StreamHandler):
             def emit(self, record):
                 ts, msg = 0, None
@@ -218,7 +221,8 @@ def main(args):
                 if msg is None:
                     ts, msg = time.time(), record.getMessage()
 
-                sys.stderr.write("{}: {}\n".format(str(ts - start)[:10], six.ensure_str(msg).strip()))
+                msg = six.ensure_str(msg).strip()
+                sys.stderr.write("{}: {}\n".format(str(ts - start)[:10], sec.cleanup(msg, replacements)))
 
         logging.root.addHandler(Handler())
 
