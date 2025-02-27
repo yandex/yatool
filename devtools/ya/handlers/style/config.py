@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import os
 import tempfile
@@ -41,19 +42,30 @@ def _read_file(path: Path) -> str:
     return path.read_text()
 
 
+@functools.cache
+def _read_validation_configs(paths: tuple[str, ...]) -> dict[str, str]:
+    joined: dict[str, str] = {}
+    root = Path(_find_root())
+    for path in paths:
+        with (root / path).open() as afile:
+            joined.update(json.load(afile))
+    return joined
+
+
 def validate(
     user_config: ConfigPath,
     stylers: set[stlr.ConfigurableStyler],
     *,
-    validation_configs: dict[str, str] = const.LINTER_TO_VALIDATION_CONFIG,
+    validation_configs: tuple[str, ...] = tuple(const.LinterConfigsValidationRules.enumerate()),
 ) -> Generator[tuple[stlr.ConfigurableStyler, Path, list[str]]]:
     raw_user = cfgval.RawConfig(user_config.read_text(), user_config.name)
+    rules_config_map = _read_validation_configs(validation_configs)
 
     for styler in stylers:
-        if styler.name not in validation_configs:
+        if styler.name not in rules_config_map:
             continue
 
-        rules_config = Path(_find_root()) / validation_configs[styler.name]
+        rules_config = Path(_find_root()) / rules_config_map[styler.name]
         raw_rules = cfgval.RawConfig(_read_file(rules_config), rules_config.name)
 
         base_config = styler.lookup_default_config()
