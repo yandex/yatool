@@ -45,10 +45,6 @@ def _is_branch(path):
     return TRUNK_PATH not in path
 
 
-def _get_repo_prefix(repository_type):
-    return 'aapi:/' if repository_type == distbs_consts.DistbuildRepoType.AAPI else 'svn:/'
-
-
 def _make_repositories_config(
     for_uid,
     root,
@@ -87,7 +83,7 @@ def _make_repositories_config(
         # prepare svn repo
         return [
             {
-                "repository": _get_repo_prefix(repository_type) + arcadia_svn_path,
+                "repository": "svn:/" + arcadia_svn_path,
                 "pattern": "$({})".format(None if for_uid else source_root_pattern),
                 "revision": revision,
                 "patch_filters": pf,

@@ -14,7 +14,7 @@ class DistbuildClusterType(object):
 
 
 class DistbuildRepoType(object):
-    TARED, SVN, AAPI, ARCC = range(4)
+    TARED, SVN, ARCC = range(3)
 
 
 def calc_dist_priority(priority_factor, revision, priority_delta=0):
