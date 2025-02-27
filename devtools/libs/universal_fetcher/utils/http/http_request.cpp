@@ -5,7 +5,7 @@
 
 namespace NUniversalFetcher {
 
-    void DoHttpGetRequest(const TString& url, IOutputStream* output, TRedirectableHttpClient::TOptions options, const THashMap<TString, TString>& headers) {
+    void DoHttpGetRequest(const TString& url, IOutputStream* output, TRedirectableHttpClient::TOptions options, const THashMap<TString, TString>& headers, NThreading::TCancellationToken cancellation) {
         TStringBuf schemeHostPort = GetSchemeHostAndPort(url);
         TStringBuf scheme("");
         TStringBuf host("unknown");
@@ -27,7 +27,7 @@ namespace NUniversalFetcher {
         options.Port(port);
 
         TRedirectableHttpClient client(options);
-        client.DoGet(relUrl, output, headers);
+        client.DoGet(relUrl, output, headers, std::move(cancellation));
     }
 
 }

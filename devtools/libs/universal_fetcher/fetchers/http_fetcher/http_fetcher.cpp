@@ -50,7 +50,7 @@ namespace NUniversalFetcher {
                     THolder<TCancellableFileOutput> fileOutput = MakeHolder<TCancellableFileOutput>(cancellation, dstPath.FilePath());
                     THolder<IOutputStream> out = MakeProgressOutputStreamIfNeeded(params.ProgressReporting, 0, std::move(fileOutput));
                     try {
-                        DoHttpGetRequest(url, out.Get(), opts, headers);
+                        DoHttpGetRequest(url, out.Get(), opts, headers, cancellation);
                     } catch (const THttpRequestException& e) {
                         Log() << ELogPriority::TLOG_WARNING << "Failed to fetch resource, status_code=" << e.GetStatusCode() << ", error=" << e.what() << ", request_id=" << requestId;
 

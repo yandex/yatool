@@ -10,6 +10,7 @@ PEERDIR(
     library/cpp/string_utils/base64
     library/cpp/digest/md5
     library/cpp/json
+    library/cpp/threading/cancellation
     devtools/libs/universal_fetcher/utils/checksum
 )
 
