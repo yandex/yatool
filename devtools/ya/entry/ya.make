@@ -16,7 +16,6 @@ PEERDIR(
     devtools/ya/core/logger
     devtools/ya/core/plugin_loader
     devtools/ya/core/respawn
-    devtools/ya/core/sec
     devtools/ya/core/sig_handler
     devtools/ya/core/stage_tracer
     devtools/ya/core/yarg
