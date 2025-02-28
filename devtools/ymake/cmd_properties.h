@@ -96,11 +96,11 @@ public:
             return Collected_.empty();
         }
 
-        TMap<TString, TKeyword> Take() && noexcept {
+        TVector<std::pair<TString, TKeyword>> Take() && noexcept {
             return std::move(Collected_);
         }
     private:
-        TMap<TString, TKeyword> Collected_;
+        TVector<std::pair<TString, TKeyword>> Collected_;
     };
 
     TCmdProperty() noexcept = default;
@@ -110,7 +110,7 @@ public:
     size_t Key2ArrayIndex(const TString& arg) const;
 
     bool HasKeyword(const TString& arg) const {
-        return Keywords_.find(arg) != Keywords_.end();
+        return std::ranges::binary_search(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     }
     bool IsNonPositional() const {
         return !Keywords_.empty();
@@ -119,25 +119,25 @@ public:
         return Keywords_.size();
     }
     TString GetDeepReplaceTo(size_t arrNum) const {
-        if (const auto pit = Position2Key_.find(arrNum); pit != Position2Key_.end()) {
-            const auto kit = Keywords_.find(pit->second);
-            Y_ASSERT(kit != Keywords_.end());
-            return kit->second.DeepReplaceTo;
+        if (arrNum < Keywords_.size()) {
+            return Keywords_[arrNum].second.DeepReplaceTo;
         }
-        return "";
+        return {};
     }
-    const TMap<TString, TKeyword>& GetKeywords() const noexcept {
+    const TVector<std::pair<TString, TKeyword>>& GetKeywords() const noexcept {
         return Keywords_;
     }
     const TString& GetKeyword(size_t arrNum) const {
-        Y_ASSERT(Position2Key_.contains(arrNum));
-        return Position2Key_.find(arrNum)->second;
+        Y_ASSERT(arrNum < Keywords_.size());
+        return Keywords_[arrNum].first;
     }
     const TKeyword& GetKeywordData(size_t arrNum) const {
-        return Keywords_.find(GetKeyword(arrNum))->second;
+        Y_ASSERT(arrNum < Keywords_.size());
+        return Keywords_[arrNum].second;
     }
     const TKeyword* GetKeywordData(const TString& name) const {
-        return Keywords_.FindPtr(name);
+        const auto [first, last] = std::ranges::equal_range(Keywords_, name, std::less<>{}, &std::pair<TString, TKeyword>::first);
+        return first != last ? &first->second : nullptr;
     }
 
     bool HasUsrArgs() const noexcept {
@@ -159,12 +159,12 @@ public:
     Y_SAVELOAD_DEFINE(
         GetBaseReference(),
         Keywords_,
-        Position2Key_,
         NumUsrArgs_
     );
 
 private:
-    TMap<TString, TKeyword> Keywords_;
-    TMap<size_t, TString> Position2Key_;
+    // /me cries loudly because of absence of std::flat_map right here and right now.
+    // Do not hesitate to remove this coment once proper time will come.
+    TVector<std::pair<TString, TKeyword>> Keywords_;
     size_t NumUsrArgs_ = 0;
 };

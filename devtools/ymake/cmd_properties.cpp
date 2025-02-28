@@ -25,28 +25,29 @@ TCmdProperty::TCmdProperty(TStringBuf cmd, TKeywords&& kw)
     : Keywords_{std::move(kw).Take()}
     , NumUsrArgs_{CountOwnArgs(cmd)}
 {
+    std::ranges::sort(Keywords_, std::less<>{}, &std::pair<TString, TKeyword>::first);
     size_t cnt = 0;
-    for (auto& [name, keyword]: Keywords_) {
-        keyword.Pos = cnt;
-        Position2Key_[cnt++] = name;
+    for (auto& [_, kw]: Keywords_) {
+        kw.Pos = cnt++;
     }
 }
 
 TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) const {
     TString res;
     res = "(";
-    for (const auto& [_, key]: Position2Key_)
+    for (const auto& [key, _]: Keywords_)
         res += key + "..., ";
     return TString::Join(res, NumUsrArgs_ ? "" : ")", NumUsrArgs_ ? cmd.SubStr(1) : cmd);
 }
 
 void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Collected_[keyword] = TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing);
+    Collected_.push_back({keyword, TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing)});
 }
 
 size_t TCmdProperty::Key2ArrayIndex(const TString& arg) const {
-    AssertEx(Keywords_.find(arg) != Keywords_.end(), "Arg was defined as keyword and must be in map.");
-    return Keywords_.find(arg)->second.Pos;
+    const auto [first, last] = std::ranges::equal_range(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
+    AssertEx(first != last, "Arg was defined as keyword and must be in map.");
+    return first->second.Pos;
 }
 
 bool TUnitProperty::AddMacroCall(const TStringBuf& name, const TStringBuf& argList) {
