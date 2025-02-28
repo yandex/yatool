@@ -52,7 +52,6 @@ IF (PYTHON2)
 ENDIF()
 
 PEERDIR(
-    contrib/deprecated/python/ujson
     contrib/python/portalocker
     contrib/python/simplejson
     contrib/python/six

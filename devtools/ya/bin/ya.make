@@ -13,6 +13,7 @@ ENDIF()
 PY_MAIN(entry.main)
 
 PEERDIR(
+    contrib/deprecated/python/ujson
     devtools/ya/cpp/entry
     devtools/ya/cpp/lib/start_stager
     devtools/ya/entry
