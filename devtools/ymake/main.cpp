@@ -83,7 +83,7 @@ TYMake::TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch)
     , Names(Conf, Conf, TimeStamps)
     , TimeStamps(Names)
     , IncParserManager(conf, Names)
-    , Yndex(Conf.CommandDefinitions)
+    , Yndex(Conf.CommandDefinitions, Conf.CommandReferences)
     , Modules(Names, conf.PeersRules, Conf)
     , HasErrorsOnPrevLaunch_(hasErrorsOnPrevLaunch)
 {

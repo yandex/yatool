@@ -718,6 +718,7 @@ void TYmakeConfig::ClearYmakeConfig() {
     YmakeConfMD5 = TMd5Sig{};
     YmakeConfWoRulesMD5 = TMd5Sig{};
     CommandDefinitions.Clear();
+    CommandReferences.Clear();
     ImportedFiles.clear();
     FromCache_ = false;
 }

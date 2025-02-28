@@ -67,6 +67,13 @@ const std::pair<TString, TString> TYndexRecord::ExtractUsage(TStringBuf docText)
     }
 }
 
+void TReferences::AddReference(const TString& name, const TString& file, const TSourceRange& range) {
+    if (!AreEnabled()) {
+        return;
+    }
+    References.emplace_back(name, TSourceLocation{file, range});
+}
+
 TYndexRecord::TYndexRecord(ERecordType type, const NYndex::TSourceRange& range, const TDefinition& def)
     : Type(type)
     , Range(range)
@@ -85,13 +92,19 @@ TYndexRecord::TYndexRecord(ERecordType type, const NYndex::TSourceRange& range, 
     }
 }
 
-TYndex::TYndex(const TDefinitions& definitions)
+TYndex::TYndex(const TDefinitions& definitions, const TReferences& references)
     : Definitions(definitions)
 {
     for (auto it : definitions.GetDefinitions()) {
         const TDefinition& def = it.second;
         TFileYndex& fileYndex = Files[def.Link.File];
         fileYndex.emplace_back(ERecordType::Node, def.Link.Range, def);
+    }
+    for (const auto& ref : references.GetReferences()) {
+        TFileYndex& fileYndex = Files[ref.Link.File];
+        if (const auto* def = definitions.GetDefinition(ref.Name)) {
+            fileYndex.emplace_back(ERecordType::Use, ref.Link.Range, *def);
+        }
     }
 }
 

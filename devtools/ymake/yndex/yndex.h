@@ -19,6 +19,10 @@ namespace NYndex {
             EndLine,
             EndColumn
         );
+
+        bool IsValid() const {
+            return Line <= EndLine && Column <= EndColumn;
+        }
     };
 
     struct TSourceLocation {
@@ -106,6 +110,51 @@ namespace NYndex {
         bool Enabled = true;
     };
 
+    struct TReference {
+        TReference() = default;
+        TReference(const TString& name, const TSourceLocation& link)
+            : Name(name)
+            , Link(link)
+        {
+        }
+
+        Y_SAVELOAD_DEFINE(
+            Name,
+            Link
+        );
+
+        TString Name;
+        TSourceLocation Link;
+    };
+
+    class TReferences {
+    public:
+        void AddReference(const TString& name, const TString& file, const TSourceRange& range);
+
+        const TVector<TReference>& GetReferences() const {
+            return References;
+        };
+
+        void Disable() {
+            Enabled = false;
+        }
+
+        bool AreEnabled() const {
+            return Enabled;
+        }
+
+        void Clear() {
+            References.clear();
+            Enabled = true;
+        }
+
+        Y_SAVELOAD_DEFINE(References, Enabled);
+
+    private:
+        TVector<TReference> References;
+        bool Enabled = true;
+    };
+
     enum class ERecordType {
         Node,
         Use
@@ -124,7 +173,7 @@ namespace NYndex {
 
     class TYndex {
     public:
-        TYndex(const TDefinitions& Definitions);
+        TYndex(const TDefinitions& Definitions, const TReferences& References);
 
         bool AddReference(const TString& name, const TString& file, const TSourceRange& range);
 

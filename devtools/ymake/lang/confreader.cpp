@@ -347,6 +347,19 @@ namespace {
             Conf.CommandDefinitions.AddDefinition(name, file, range, docText, type);
         }
 
+        void YndexerAddReference(
+            const TString& name,
+            const TString& file,
+            const TSourceRange& range)
+        {
+            if (name.empty() || file.empty() || !range.IsValid()) {
+                // nothing to do
+                return;
+            }
+
+            Conf.CommandReferences.AddReference(name, file, range);
+        }
+
         TString GetConfFileName() const {
             Y_ASSERT(!ImportsStack.empty());
             return ImportsStack.back().GetPath();
@@ -655,7 +668,7 @@ namespace {
                                 varNames.begin(), varNames.end(),
                                 std::back_inserter(usedArgs));
                 for (const auto& argName : usedArgs) {
-                    AddMacroCall(NMacro::SET, TString::Join(argName, " $", argName));
+                    AddMacroCall(NMacro::SET, TString::Join(argName, " $", argName), {});
                 }
             }
             BlockStack.pop_back();
@@ -731,7 +744,7 @@ namespace {
             AppendCondition(TString::Join("$", envVar, "==\"yes\""));
             if (inMultiModule) {
                 // Set default value of MODULE_TAG in submodule to name of the submodule
-                AddMacroCall(NMacro::SET, TString::Join(VAR_MODULE_TAG, " ", name));
+                AddMacroCall(NMacro::SET, TString::Join(VAR_MODULE_TAG, " ", name), {});
             }
         }
 
@@ -791,8 +804,9 @@ namespace {
             }
         }
 
-        void AddMacroCall(TStringBuf macroName, const TString& args) {
+        void AddMacroCall(TStringBuf macroName, const TString& args, const TSourceRange& range) {
             Y_ASSERT(!BlockStack.empty());
+            YndexerAddReference(TString{macroName}, GetRootRelativeConfFileName(), range);
             auto& block = BlockStack.back();
             if (block.IsForeach()) {
                 Y_ASSERT(BlockStack.size() > 1);
@@ -994,8 +1008,9 @@ namespace {
             SetOption(name, value);
         }
 
-        void SetProperty(const TString& name, const TString& value) {
+        void SetProperty(const TString& name, const TString& value, const TSourceRange& range) {
             Y_ASSERT(!BlockStack.empty());
+            YndexerAddReference(name, GetRootRelativeConfFileName(), range);
             auto& block = BlockStack.back();
             switch (block.Type()) {
                 case TBlockDesc::EBlockType::Macro:
@@ -1219,7 +1234,15 @@ namespace {
                 args = actualArgs->getText();
             }
 
-            Builder.AddMacroCall(macroName, args);
+            antlr4::Token* token = ctx->macroName()->getStart();
+            TSourceRange range {
+                token->getLine(),
+                token->getCharPositionInLine() + 1,
+                token->getLine(),
+                token->getCharPositionInLine() + macroName.length()
+            };
+
+            Builder.AddMacroCall(macroName, args, range);
 
             return nullptr;
         }
@@ -1510,7 +1533,14 @@ namespace {
         antlrcpp::Any visitPropStmt(TConfParser::PropStmtContext *ctx) override {
             TString propName(ctx->propName()->getText());
             TString propValue(ctx->propValue()->getText());
-            Builder.SetProperty(propName, propValue);
+            antlr4::Token* token = ctx->propName()->getStart();
+            TSourceRange range {
+                token->getLine(),
+                token->getCharPositionInLine() + 1,
+                token->getLine(),
+                token->getCharPositionInLine() + propName.length()
+            };
+            Builder.SetProperty(propName, propValue, range);
             return nullptr;
         }
 

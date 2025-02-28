@@ -221,6 +221,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     if (WriteYdx.empty()) {
         CommandDefinitions.Disable();
+        CommandReferences.Disable();
     }
 
     TMd5Sig confMd5;

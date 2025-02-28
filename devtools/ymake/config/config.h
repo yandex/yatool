@@ -322,6 +322,7 @@ struct TYmakeConfig {
     THashSet<TString> ResourceNames; // Strictly speaking these are not part of Ymake config hence arriving late
 
     NYndex::TDefinitions CommandDefinitions;
+    NYndex::TReferences CommandReferences;
 
     TVector<TImportedFileDescription> ImportedFiles;
 
@@ -347,7 +348,8 @@ struct TYmakeConfig {
         CommandConf,
         Conditions,
         BlockData,
-        CommandDefinitions
+        CommandDefinitions,
+        CommandReferences
     );
 
     bool GetFromCache() const {
