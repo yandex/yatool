@@ -22,6 +22,7 @@ PEERDIR(
     contrib/libs/blake2
     contrib/libs/libbz2
     contrib/libs/lz4
+    contrib/libs/lzma
     contrib/libs/openssl
     contrib/libs/zlib
     contrib/libs/zstd
