@@ -106,10 +106,10 @@ public:
     TCmdProperty() noexcept = default;
     TCmdProperty(TStringBuf cmd, TKeywords&& kw);
 
-    TString ConvertCmdArgs(const TStringBuf& cmd) const;
-    size_t Key2ArrayIndex(const TString& arg) const;
+    TString ConvertCmdArgs(TStringBuf cmd) const;
+    size_t Key2ArrayIndex(TStringBuf arg) const;
 
-    bool HasKeyword(const TString& arg) const {
+    bool HasKeyword(TStringBuf arg) const {
         return std::ranges::binary_search(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     }
     bool IsNonPositional() const {
@@ -135,7 +135,7 @@ public:
         Y_ASSERT(arrNum < Keywords_.size());
         return Keywords_[arrNum].second;
     }
-    const TKeyword* GetKeywordData(const TString& name) const {
+    const TKeyword* GetKeywordData(TStringBuf name) const {
         const auto [first, last] = std::ranges::equal_range(Keywords_, name, std::less<>{}, &std::pair<TString, TKeyword>::first);
         return first != last ? &first->second : nullptr;
     }

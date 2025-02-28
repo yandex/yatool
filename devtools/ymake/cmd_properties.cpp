@@ -32,7 +32,7 @@ TCmdProperty::TCmdProperty(TStringBuf cmd, TKeywords&& kw)
     }
 }
 
-TString TCmdProperty::ConvertCmdArgs(const TStringBuf& cmd) const {
+TString TCmdProperty::ConvertCmdArgs(TStringBuf cmd) const {
     TString res;
     res = "(";
     for (const auto& [key, _]: Keywords_)
@@ -44,7 +44,7 @@ void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, si
     Collected_.push_back({keyword, TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing)});
 }
 
-size_t TCmdProperty::Key2ArrayIndex(const TString& arg) const {
+size_t TCmdProperty::Key2ArrayIndex(TStringBuf arg) const {
     const auto [first, last] = std::ranges::equal_range(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     AssertEx(first != last, "Arg was defined as keyword and must be in map.");
     return first->second.Pos;

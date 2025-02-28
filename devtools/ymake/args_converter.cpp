@@ -75,13 +75,12 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
     bool needDeepReplace = false;
     bool inArgArray = false; //array is one argument
     for (size_t i = 0; i < args.size(); ++i) {
-        TString argStr = TString{args[i]};
-        if (const TKeyword* kw = cmdProp.GetKeywordData(argStr)) { //if it is a keyword, designate argLimit and array to put
+        if (const TKeyword* kw = cmdProp.GetKeywordData(args[i])) { //if it is a keyword, designate argLimit and array to put
             bool useKeyItself = kw->To == 0 && kw->From == 0;
 
             argLimit = useKeyItself ? -1 : kw->To;
             needDeepReplace = kw->DeepReplaceTo.size();
-            argId = cmdProp.Key2ArrayIndex(argStr);
+            argId = cmdProp.Key2ArrayIndex(args[i]);
             TTypedArgArray& outArg = typedArgs[argId];
 
             if (!outArg.GotKeyword && !kw->OnKwPresent.empty()) { // add only once
