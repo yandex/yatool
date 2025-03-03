@@ -7,6 +7,6 @@
 
 namespace NUniversalFetcher {
 
-    void DoHttpGetRequest(const TString& url, IOutputStream* output, TRedirectableHttpClient::TOptions options = {}, const THashMap<TString, TString>& headers = {}, NThreading::TCancellationToken cancellation = NThreading::TCancellationToken::Default());
+    void DoHttpGetRequest(const TString& url, IOutputStream* output, TRedirectableHttpClient::TOptions options = {}, const THashMap<TString, TString>& headers = {}, THttpHeaders* outHeaders = nullptr, NThreading::TCancellationToken cancellation = NThreading::TCancellationToken::Default());
 
 }

@@ -47,11 +47,13 @@ namespace NUniversalFetcher {
                 headers["User-Agent"] = Params_.UserAgent;
                 headers["X-Request-ID"] = requestId;
 
+                THttpHeaders outHeaders;
+
                 {
                     THolder<TCancellableFileOutput> fileOutput = MakeHolder<TCancellableFileOutput>(cancellation, nullptr, dstPath.FilePath());
                     THolder<IOutputStream> out = MakeProgressOutputStreamIfNeeded(params.ProgressReporting, 0, std::move(fileOutput));
                     try {
-                        DoHttpGetRequest(url, out.Get(), opts, headers, cancellation);
+                        DoHttpGetRequest(url, out.Get(), opts, headers, &outHeaders, cancellation);
                     } catch (const THttpRequestException& e) {
                         Log() << ELogPriority::TLOG_WARNING << "Failed to fetch resource, status_code=" << e.GetStatusCode() << ", error=" << e.what() << ", request_id=" << requestId;
 
