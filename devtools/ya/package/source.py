@@ -226,7 +226,7 @@ class Source(object):
 
         if self.keep_symlinks() and os.path.islink(source):
             self._copy_link(source, destination)
-        elif self.opts and self.opts.hardlink_package_outputs:
+        elif self._use_hardlinks():
             exts.fs.hardlink(source, destination)
         else:
             shutil.copy(source, destination)
@@ -240,7 +240,7 @@ class Source(object):
 
         if self.keep_symlinks() and os.path.islink(source):
             self._copy_link(source, destination)
-        elif self.opts and self.opts.hardlink_package_outputs:
+        elif self._use_hardlinks():
             exts.fs.hardlink_tree(source, destination)
         else:
             package.fs_util.copy_tree(source, destination, symlinks=self.keep_symlinks())
@@ -444,6 +444,9 @@ class Source(object):
                         if attr in actions:
                             actions[attr](p, value)
 
+    def _use_hardlinks(self):
+        return self.opts and self.opts.hardlink_package_outputs
+
     def __str__(self):
         return str(self.data)
 
@@ -509,6 +512,10 @@ It will cause to scan full arcadia repo, so it will be very slow. \
 Please consider defining your data paths more explicitly"
             )
         self.copy(source, destination)
+
+    def _use_hardlinks(self):
+        # Avoid "[Errno 18] Cross-device link" error
+        return False
 
 
 class TestDataSource(Source):
