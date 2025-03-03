@@ -68,8 +68,8 @@ def _make_repositories_config(
         trs, data = patch_tools.convert_patch_spec(patch)
         pf, p = patch_tools.combine_transformations(trs), data
 
-    # prepare arc repo
     if arc_url:
+        # prepare arc repo
         return [
             {
                 "pattern": "$({})".format(None if for_uid else source_root_pattern),
@@ -80,17 +80,33 @@ def _make_repositories_config(
             }
         ]
     else:
-        # prepare svn repo
-        return [
-            {
-                "repository": "svn:/" + arcadia_svn_path,
-                "pattern": "$({})".format(None if for_uid else source_root_pattern),
-                "revision": revision,
-                "patch_filters": pf,
-                "patch": p,
-                "use_arcc": repository_type == distbs_consts.DistbuildRepoType.ARCC,
-            }
-        ]
+        import app_ctx
+
+        if getattr(app_ctx.params, 'arc_arcadia_instead_of_arc_full', False):
+            # prepare arc repo as an experiment
+            arc_info = vcsversion._get_raw_data("arc", root)
+            arc_hash = json.loads(arc_info[0])["hash"]
+            return [
+                {
+                    "pattern": "$({})".format(None if for_uid else source_root_pattern),
+                    "patch_filters": pf,
+                    "patch": p,
+                    "use_arcc": True,
+                    "arc_url": f"arc://arcadia#{arc_hash}",
+                }
+            ]
+        else:
+            # prepare svn repo
+            return [
+                {
+                    "repository": "svn:/" + arcadia_svn_path,
+                    "pattern": "$({})".format(None if for_uid else source_root_pattern),
+                    "revision": revision,
+                    "patch_filters": pf,
+                    "patch": p,
+                    "use_arcc": repository_type == distbs_consts.DistbuildRepoType.ARCC,
+                }
+            ]
 
 
 # Don't do slow libc version discovering for Linux
