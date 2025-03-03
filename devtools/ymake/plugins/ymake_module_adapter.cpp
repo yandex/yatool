@@ -30,9 +30,7 @@ namespace {
 
         void Execute(const TString &path, TPluginUnit &unit, TVector<TString> &includes,
                      TPyDictReflection &inducedDeps) override {
-            PyObject *emptyArgs = Py_BuildValue("()");
-            CheckForError();
-            PyObject *context = ContextCall(&unit, emptyArgs);
+            PyObject *context = CreateContextObject(&unit);
             CheckForError();
 
             PyObject *argList2 = Py_BuildValue("(sO)", path.data(), context);
@@ -43,6 +41,8 @@ namespace {
             Py_DecRef(argList2);
 
             PyObject *includesMethod = PyObject_GetAttrString(parserObj, "includes");
+            CheckForError();
+            PyObject *emptyArgs = Py_BuildValue("()");
             CheckForError();
             PyObject *pyIncludes = PyObject_CallObject(includesMethod, emptyArgs);
             CheckForError();

@@ -96,83 +96,44 @@ namespace NYMake {
             return nullptr;
         }
 
-        static PyTypeObject CmdContextType = {
-            .ob_base=PyVarObject_HEAD_INIT(nullptr, 0)
-            .tp_name="ymake.CmdContext",
-            .tp_basicsize=sizeof(CmdContext),
-            .tp_itemsize=0,
-            .tp_dealloc=nullptr,
-            .tp_vectorcall_offset=0,
-            .tp_getattr=nullptr,
-            .tp_setattr=nullptr,
-            .tp_as_async=nullptr,
-            .tp_repr=nullptr,
-            .tp_as_number=nullptr,
-            .tp_as_sequence=nullptr,
-            .tp_as_mapping=nullptr,
-            .tp_hash=nullptr,
-            .tp_call=CmdContextCall,
-            .tp_str=nullptr,
-            .tp_getattro=nullptr,
-            .tp_setattro=nullptr,
-            .tp_as_buffer=nullptr,
-            .tp_flags=Py_TPFLAGS_DEFAULT,
-            .tp_doc="CmdContext objects",
-            .tp_traverse=nullptr,
-            .tp_clear=nullptr,
-            .tp_richcompare=nullptr,
-            .tp_weaklistoffset=0,
-            .tp_iter=nullptr,
-            .tp_iternext=nullptr,
-            .tp_methods=nullptr,
-            .tp_members=nullptr,
-            .tp_getset=nullptr,
-            .tp_base=nullptr,
-            .tp_dict=nullptr,
-            .tp_descr_get=nullptr,
-            .tp_descr_set=nullptr,
-            .tp_dictoffset=0,
-            .tp_init=nullptr,
-            .tp_alloc=nullptr,
-            .tp_new=nullptr,
-            .tp_free=nullptr,
-            .tp_is_gc=nullptr,
-            .tp_bases=nullptr,
-            .tp_mro=nullptr,
-            .tp_cache=nullptr,
-            .tp_subclasses=nullptr,
-            .tp_weaklist=nullptr,
-            .tp_del=nullptr,
-            .tp_version_tag=0,
-            .tp_finalize=nullptr,
-            .tp_vectorcall=nullptr,
-        };
-
         static int CmdContextInit(CmdContext* self, PyObject* args, PyObject* kwds) {
             const char* str;
 
             static char* kwlist[] = {const_cast<char*>("name"), nullptr};
-            if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &str))
+            if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &str)) {
                 return -1;
+            }
             self->Name = str;
 
             return 0;
         }
 
-        PyObject* CmdContextCall(TPluginUnit* unit, PyObject* argList) {
-            PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(&CmdContextType), argList);
+        static PyTypeObject CmdContextType = {
+            .ob_base=PyVarObject_HEAD_INIT(nullptr, 0)
+            .tp_name="ymake.CmdContext",
+            .tp_basicsize=sizeof(CmdContext),
+            .tp_call=CmdContextCall,
+            .tp_flags=Py_TPFLAGS_DEFAULT,
+            .tp_doc="CmdContext objects",
+            .tp_init=reinterpret_cast<initproc>(CmdContextInit),
+            .tp_new=PyType_GenericNew,
+        };
+
+        PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName) {
+            PyObject* args = Py_BuildValue("(s)", attrName);
+            PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(&CmdContextType), args);
             if (obj) {
                 CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj);
                 cmdContext->Unit = unit;
             }
+            Py_DECREF(args);
             return obj;
         }
 
         bool CmdContextTypeInit(PyObject* ymakeModule) {
-            CmdContextType.tp_new = PyType_GenericNew;
-            CmdContextType.tp_init = reinterpret_cast<initproc>(CmdContextInit);
-            if (PyType_Ready(&CmdContextType) < 0)
+            if (PyType_Ready(&CmdContextType) < 0) {
                 return false;
+            }
             Py_INCREF(reinterpret_cast<PyObject*>(&CmdContextType));
 
             PyModule_AddObject(ymakeModule, "CmdContext", reinterpret_cast<PyObject*>(&CmdContextType));

@@ -13,10 +13,7 @@ namespace NYMake {
         void TPluginMacroImpl::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>*) {
             PyObject* tupleArgs = PyTuple_New(params.size() + 1);
 
-            PyObject* argList = Py_BuildValue("()");
-            CheckForError();
-            PyTuple_SetItem(tupleArgs, 0, ContextCall(&unit, argList));
-            Py_DecRef(argList);
+            PyTuple_SetItem(tupleArgs, 0, CreateContextObject(&unit));
             CheckForError();
 
             for (size_t i = 0; i < params.size(); ++i) {

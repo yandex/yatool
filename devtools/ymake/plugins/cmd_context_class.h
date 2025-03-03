@@ -6,7 +6,7 @@
 
 namespace NYMake {
     namespace NPlugins {
-        PyObject* CmdContextCall(TPluginUnit* unit, PyObject* argList);
+        PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName);
 
         bool CmdContextTypeInit(PyObject* ymakeModule);
     }
