@@ -23,6 +23,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.validate = False
         self.use_ruff = False
         self.use_clang_format_yt = False
+        self.use_clang_format_15 = False
 
     @staticmethod
     def consumer():
@@ -80,8 +81,14 @@ class StyleOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ['--cpp-yt'],
-                help="Use custom YT clang-format for cpp files",
+                help="Use custom YT clang-format for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_yt', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--clang-format-15'],
+                help="Use clang-format-15 for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_15', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]

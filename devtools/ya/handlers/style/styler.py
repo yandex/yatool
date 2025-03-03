@@ -314,6 +314,22 @@ class ClangFormatYT(ClangFormat):
 
 
 @_register
+class ClangFormat15(ClangFormat):
+    name: tp.ClassVar = const.CppLinterName.ClangFormat15
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("clang-format-15")  # type: ignore
+        cfg.ConfigMixin.__init__(
+            self,
+            (
+                styler_opts.config_loaders
+                if styler_opts.config_loaders
+                else (cfg.AutoincludeConfig.make(const.CppLinterName.ClangFormat15),)
+            ),
+        )
+
+
+@_register
 class Golang:
     kind: tp.ClassVar = StylerKind.GO
     name: tp.ClassVar = 'yoimports'
