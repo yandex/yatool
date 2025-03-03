@@ -64,8 +64,8 @@ PROPERTY(RESTRICTED, "")
 PROPERTY(SEM, "Semantics (instead of commands) for export to other build systems in --sem-graph mode")
 PROPERTY(SYMLINK_POLICY, "")
 PROPERTY(USE_INJECTED_DATA, "")
-PROPERTY(USE_PEERS_LATE_OUTS, "")
-PROPERTY(FILE_GROUP, "")
+PROPERTY(USE_PEERS_LATE_OUTS, "@usage `.USE_PEERS_LATE_OUTS=yes` enables propagation of dependencies `late_out`s from direct and transitive peers. Gathered late outs can be used by module command through late variable `PEERS_LATE_OUTS`.")
+PROPERTY(FILE_GROUP, "__EXPERIMENTAL FEATUE__ allows to create complex group of files with graph representation similar to GLOB or ALL_SRCS. Not yet ready for production.")
 PROPERTY(TRANSITION, "@usage: .TRANSITION=platform\n\n"
 ""
 "Marks the module to be configured in foreign platform. Supported platforms now are pic, nopic.")
