@@ -164,8 +164,11 @@ class AutoincludeConfig:
             return marisa_trie.Trie([])
         for afile in self._autoinclude_files:
             try:
+                # Adding '/' because paths in autoincludes.json don't have it and we need to
+                # correctly search by prefix in the trie
                 paths.extend(
-                    os.path.join(self._root, path) for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
+                    os.path.join(self._root, path + '/')
+                    for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
                 )
             except Exception as e:
                 logger.warning(
@@ -190,8 +193,9 @@ class AutoincludeConfig:
     def lookup(self, path: PurePath) -> MaybeConfig:
         keys: list[str] = self._trie.prefixes(str(path))
         if keys:
-            autoinc_path = sorted(keys, key=len)[-1]
-            return self._autoinc_to_conf.get(autoinc_path)
+            for autoinc_path in sorted(keys, key=len, reverse=True):
+                if autoinc_path in self._autoinc_to_conf:
+                    return self._autoinc_to_conf[autoinc_path]
 
 
 # TODO: delete after migration to autoincludes

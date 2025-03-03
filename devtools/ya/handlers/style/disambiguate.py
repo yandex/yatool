@@ -54,6 +54,15 @@ def _black_vs_ruff(
 
     assert ruff_config and black_config  # static checker is not happy without this line
 
+    # longest path wins
+    if ruff_config.path.parent == black_config.path.parent:
+        # directory is relative to itself, skip this scenario
+        pass
+    elif ruff_config.path.parent.is_relative_to(black_config.path.parent):
+        return styler.Ruff
+    elif black_config.path.parent.is_relative_to(ruff_config.path.parent):
+        return styler.Black
+
     if ruff_config.path != black_config.path:
         return (
             f"[{target}] Can't choose between Black and Ruff, configs are present for both. "
