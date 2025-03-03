@@ -861,6 +861,7 @@ class AbstractTestSuite(facility.Suite):
             elif name_lower in (
                 devtools.ya.test.const.TestRequirements.SbVault,
                 devtools.ya.test.const.TestRequirements.YavSecret,
+                devtools.ya.test.const.TestRequirements.PortoLayers,
             ):
                 req_value = val_original
             elif name_lower in (
