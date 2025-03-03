@@ -6,9 +6,9 @@ LICENSE(MIT)
 
 LICENSE_TEXTS(.yandex_meta/licenses.list.txt)
 
-VERSION(4.3.0)
+VERSION(4.4.0)
 
-ORIGINAL_SOURCE(https://github.com/ToruNiina/toml11/archive/v4.3.0.tar.gz)
+ORIGINAL_SOURCE(https://github.com/ToruNiina/toml11/archive/v4.4.0.tar.gz)
 
 NO_RUNTIME()
 
