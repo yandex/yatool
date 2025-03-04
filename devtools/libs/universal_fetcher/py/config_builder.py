@@ -37,7 +37,7 @@ class RetryPolicy:
             "max_retry_count": self.max_retry_count,
             "initial_delay": _to_ms(self.initial_delay_ms),
             "backoff_multiplier": self.backoff_multiplier,
-            "max_delay": _to_ms(self.initial_delay_ms),
+            "max_delay": _to_ms(self.max_delay_ms),
             "jitter": self.jitter,
             "use_fixed_delay": self.use_fixed_delay,
         }
