@@ -63,7 +63,6 @@ void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView 
 union TModuleAttrs {
     ui32 AllBits = 0;
     struct { // 22 bits used
-        ui32 UseInjectedData     : 1;
         ui32 DontResolveIncludes : 1;  // Avoid includes resolution in any form
         ui32 FromMultimodule     : 1;  // This module is created from multimodule
         ui32 UsePeers            : 1;

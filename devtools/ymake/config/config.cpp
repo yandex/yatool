@@ -270,7 +270,6 @@ bool TModuleConf::IsProperty(const TStringBuf name) {
         NProperties::RESTRICTED,
         NProperties::SEM,
         NProperties::SYMLINK_POLICY,
-        NProperties::USE_INJECTED_DATA,
         NProperties::USE_PEERS_LATE_OUTS,
         NProperties::FILE_GROUP,
         NProperties::TRANSITION
@@ -340,9 +339,6 @@ void TModuleConf::Inherit(const TModuleConf& parent, bool renderSemantics) {
     }
     if (UsePeersLateOuts.IsDefaultValue()) {
         UsePeersLateOuts = parent.UsePeersLateOuts;
-    }
-    if (UseInjectedData.IsDefaultValue()) {
-        UseInjectedData = parent.UseInjectedData;
     }
     if (FinalTarget.IsDefaultValue()) {
         FinalTarget = parent.FinalTarget;
@@ -544,11 +540,6 @@ bool TModuleConf::SetProperty(TStringBuf key, TStringBuf name, TStringBuf value,
         } else {
             ReportUnexpectedValueForProperty(key, name, value);
         }
-    } else if (name == NProperties::USE_INJECTED_DATA) {
-        ApplyBoolProperty(UseInjectedData, key, name, value);
-        if (UseInjectedData) {
-            YDebug() << "Use injected data for " << name << Endl;
-        }
     } else if (name == NProperties::USE_PEERS_LATE_OUTS) {
         ApplyBoolProperty(UsePeersLateOuts, key, name, value);
     } else if (name == NProperties::STRUCT_CMD) {
@@ -600,7 +591,6 @@ void TModuleConf::Load(IInputStream* input) {
     ::Load(input, GlobalInputExts);
     ::Load(input, AllExtsAreInputs);
     ::Load(input, AllGlobalExtsAreInputs);
-    ::Load(input, UseInjectedData);
     ::Load(input, UsePeersLateOuts);
     ::Load(input, IsPackageBundle);
     ::Load(input, IncludeTag);
@@ -653,7 +643,6 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, GlobalInputExts);
     ::Save(output, AllExtsAreInputs);
     ::Save(output, AllGlobalExtsAreInputs);
-    ::Save(output, UseInjectedData);
     ::Save(output, UsePeersLateOuts);
     ::Save(output, IsPackageBundle);
     ::Save(output, IncludeTag);

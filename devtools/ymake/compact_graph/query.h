@@ -74,17 +74,6 @@ inline TConstDepNodeRef GetOutTogetherDependency(const TConstDepNodeRef& node) {
     return TDepGraph::GetInvalidNode(node);
 }
 
-template <class TDep, class TModule>
-bool IsDevModuleDep(const TDep& dep, const TModule& mod) {
-    if (dep.From()->NodeType == EMNT_Directory && *dep == EDT_Include) {
-        const auto& toNode = dep.To();
-        if (IsModuleType(toNode->NodeType)) {
-            return mod.GetAttrs().UseInjectedData;
-        }
-    }
-    return false;
-}
-
 inline bool IsDirectPeerdirDep(EMakeNodeType nodeFrom, EDepType dep, EMakeNodeType nodeTo) {
     return IsModuleType(nodeFrom) && IsModuleType(nodeTo) && (dep == EDT_Include || dep == EDT_BuildFrom);
 }

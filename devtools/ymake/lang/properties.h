@@ -63,7 +63,6 @@ PROPERTY(VERSION_PROXY, "@usage: `.VERSION_PROXY=yes` mark module as empty inter
 PROPERTY(RESTRICTED, "")
 PROPERTY(SEM, "Semantics (instead of commands) for export to other build systems in --sem-graph mode")
 PROPERTY(SYMLINK_POLICY, "")
-PROPERTY(USE_INJECTED_DATA, "")
 PROPERTY(USE_PEERS_LATE_OUTS, "@usage `.USE_PEERS_LATE_OUTS=yes` enables propagation of dependencies `late_out`s from direct and transitive peers. Gathered late outs can be used by module command through late variable `PEERS_LATE_OUTS`.")
 PROPERTY(FILE_GROUP, "__EXPERIMENTAL FEATUE__ allows to create complex group of files with graph representation similar to GLOB or ALL_SRCS. Not yet ready for production.")
 PROPERTY(TRANSITION, "@usage: .TRANSITION=platform\n\n"
@@ -100,7 +99,6 @@ constexpr TProperty _PROPERTIES[]{
     RESTRICTED,
     SEM,
     SYMLINK_POLICY,
-    USE_INJECTED_DATA,
     USE_PEERS_LATE_OUTS,
     FILE_GROUP,
     TRANSITION,

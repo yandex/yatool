@@ -141,10 +141,6 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
         }
 
         AssertEx(Module != nullptr, "Defined module left unassigned");
-        if (Module->GetModuleConf().UseInjectedData) {
-            TString what = TString::Join("module ", name, " in dev. Use injected data for ", Module->GetModuleConf().Name);
-            TRACE(S, NEvent::TMakeSyntaxError(what, Makefile));
-        }
 
         ModulesInDir.push_back(Module);
         SetCurrentNamespace(&Module->GetVars());

@@ -100,7 +100,6 @@ struct TModuleConf {
     THashSet<TString> GlobalInputExts;
     bool AllExtsAreInputs = false;
     bool AllGlobalExtsAreInputs = false;
-    TDefaultValue<bool> UseInjectedData = TDefaultValue<bool>(false);
     TDefaultValue<bool> UsePeersLateOuts = TDefaultValue<bool>(false);
     bool IsPackageBundle = false;
     bool IncludeTag = true;

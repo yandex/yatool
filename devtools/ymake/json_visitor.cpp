@@ -378,11 +378,6 @@ bool TJSONVisitor::AcceptDep(TState& state) {
         }
     }
 
-    const TModule* depModule = RestoreContext.Modules.Get(chldNode->ElemId);
-    if (depModule && IsDevModuleDep(dep, *depModule)) {
-        return false;
-    }
-
     if (IsTooldirDep(currState.CurDep())) {
         return false;
     }

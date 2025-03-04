@@ -990,7 +990,6 @@ namespace {
                        name == NProperties::VERSION_PROXY ||
                        name == NProperties::STRUCT_CMD ||
                        name == NProperties::STRUCT_SEM ||
-                       name == NProperties::USE_INJECTED_DATA ||
                        name == NProperties::USE_PEERS_LATE_OUTS)
             {
                 if (value == "yes") {

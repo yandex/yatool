@@ -462,10 +462,6 @@ namespace {
 
                     for (TNodeId moduleId : moduleIds) {
                         const TModule* mod = yMake.Modules.Get(graph[moduleId]->ElemId);
-                        if (mod != nullptr && mod->GetAttrs().UseInjectedData) {
-                            YDebug() << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " will be injected in graph later. Noop here." << Endl;
-                            continue;
-                        }
                         if (mod != nullptr && mod->IsFakeModule()) {
                             YDIAG(V) << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " is fake, excluded" << Endl;
                             continue;

@@ -284,7 +284,6 @@ void TModule::Init(TString fileName, TString globalFileName, TString baseName, c
     PeerdirType = conf.PeerdirType;
     Transition = conf.Transition;
 
-    Attrs.UseInjectedData = conf.UseInjectedData;
     Attrs.UsePeers = PeerdirType == EPT_BuildFrom;
     Attrs.UsePeersLateOuts = conf.UsePeersLateOuts;
     Attrs.FinalTarget = conf.FinalTarget;
