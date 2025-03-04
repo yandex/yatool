@@ -803,7 +803,7 @@ def configure_report_interceptor(ctx, report_events):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FAILED,
             labels={
-                "handler": prefix[-1] if len(prefix) > 0 else "undefined",
+                "handler": prefix[1] if len(prefix) > 2 else "undefined",
                 "prefix": " ".join(prefix),
                 "exc_info": sys.exc_info()[0].__name__,
                 "exit_code": exit_code,
@@ -818,6 +818,7 @@ def configure_report_interceptor(ctx, report_events):
         additional_fields = _resources_report()
         additional_fields.update(_ya_downloads_report())
 
+        prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
         telemetry.report(
             ReportTypes.TIMEIT,
             dict(
@@ -827,11 +828,20 @@ def configure_report_interceptor(ctx, report_events):
                 cmd_args=mine_cmd_args(),
                 success=success,
                 exit_code=exit_code,
-                prefix=devtools.ya.core.yarg.OptsHandler.latest_handled_prefix(),
+                prefix=prefix,
                 version=ctx.revision,
                 total_walltimes=aggregate_stages(),
                 **additional_fields,
             ),
+        )
+
+        ctx.metrics_reporter.report_metric(
+            monitoring.MetricNames.YA_FINISHED,
+            labels={
+                "handler": prefix[1] if len(prefix) > 2 else "undefined",
+                "prefix": " ".join(prefix),
+            },
+            urgent=True,
         )
         telemetry.stop_reporter()  # flush urgent reports
 
