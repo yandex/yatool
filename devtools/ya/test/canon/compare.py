@@ -228,7 +228,7 @@ class ResultsComparer(object):
                         ", ".join(
                             [
                                 self._get_diff_message("extra value {}".format(preview(given[i])), crumbs + i)
-                                for i in range(len(expected) - 1, len(given) - 1)
+                                for i in range(len(expected), len(given))
                             ]
                         )
                     )
