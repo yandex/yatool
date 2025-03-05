@@ -763,6 +763,8 @@ def configure_report_interceptor(ctx, report_events):
 
     success = False
     exit_code = 0
+    exception_name = ""
+    exception_muted = False
     try:
         yield
     except BaseException as e:
@@ -785,6 +787,8 @@ def configure_report_interceptor(ctx, report_events):
         e.ya_exit_code = exit_code
 
         prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
+        exception_name = e.__class__.__name__
+        exception_muted = getattr(e, 'mute', False)
         telemetry.report(
             ReportTypes.FAILURE,
             {
@@ -793,9 +797,9 @@ def configure_report_interceptor(ctx, report_events):
                 'cwd': os.getcwd(),
                 '__file__': __file__,
                 'traceback': traceback.format_exc(),
-                'type': e.__class__.__name__,
+                'type': exception_name,
                 'prefix': prefix,
-                'mute': getattr(e, 'mute', None),
+                'mute': exception_muted,
                 'retriable': getattr(e, 'retriable', None),
                 'version': ctx.revision,
             },
@@ -803,11 +807,11 @@ def configure_report_interceptor(ctx, report_events):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FAILED,
             labels={
-                "handler": prefix[1] if len(prefix) > 2 else "undefined",
+                "handler": prefix[1] if len(prefix) > 1 else "undefined",
                 "prefix": " ".join(prefix),
-                "exc_info": sys.exc_info()[0].__name__,
+                "exc_info": exception_name,
                 "exit_code": exit_code,
-                "mute": getattr(e, "mute", False),
+                "mute": exception_muted,
             },
             urgent=True,
         )
@@ -838,8 +842,11 @@ def configure_report_interceptor(ctx, report_events):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FINISHED,
             labels={
-                "handler": prefix[1] if len(prefix) > 2 else "undefined",
+                "handler": prefix[1] if len(prefix) > 1 else "undefined",
                 "prefix": " ".join(prefix),
+                "exit_code": exit_code,
+                "exc_info": exception_name,
+                "mute": exception_muted,
             },
             urgent=True,
         )
