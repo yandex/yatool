@@ -468,36 +468,33 @@ void TYMake::CreateRecurseGraph() {
 
 void TYMake::AddModulesToStartTargets() {
     TVector<TStringBuf> buildLanguages;
-    const char* filterLangs = "BUILD_LANGUAGES";
-    auto langCmd = Conf.CommandConf.Get1(filterLangs);
-    if (langCmd) {
-        auto languagesStr = GetCmdValue(langCmd);
-        Split(languagesStr, " ", buildLanguages);
-    }
-    auto langFilter = [&buildLanguages](const TModule& mod) {
-        if (!mod.IsStartTarget()) {
-            return false;
+    // When in servermode, we shouldn't filter root nodes by language since
+    // they aren't "start targets" in full sense but just transitions within a multiplatform graph.
+    bool shouldCheckLanguages = !Conf.ReadStartTargetsFromEvlog;
+    if (shouldCheckLanguages) {
+        const char* filterLangs = "BUILD_LANGUAGES";
+        auto langCmd = Conf.CommandConf.Get1(filterLangs);
+        if (langCmd) {
+            auto languagesStr = GetCmdValue(langCmd);
+            Split(languagesStr, " ", buildLanguages);
         }
-        if (buildLanguages.empty()) {
+        shouldCheckLanguages = !buildLanguages.empty();
+    }
+    auto langFilter = [&buildLanguages, shouldCheckLanguages](const TModule& mod) {
+        if (!shouldCheckLanguages) {
             return true;
         }
         auto langIt = std::find(buildLanguages.begin(), buildLanguages.end(), mod.GetLang());
         return langIt != buildLanguages.end();
     };
     auto tagFilter = [](const TModule& mod, const TTarget& target) {
-        if (!mod.IsStartTarget()) {
-            return false;
-        }
-        if (target.Tag.empty()) {
-            return true;
-        }
-        return target.Tag == mod.GetTag();
+        return target.Tag.empty() || target.Tag == mod.GetTag();
     };
     auto startTargetsModules = GetStartTargetsModules(Graph, StartTargets);
     for (const auto& target : startTargetsModules) {
         auto mod = Modules.Get(Graph.GetFileName(Graph.Get(target.Id)).GetElemId());
         Y_ASSERT(mod);
-        if (target.IsDependsTarget || langFilter(*mod) && tagFilter(*mod, target)) {
+        if (target.IsDependsTarget || mod->IsStartTarget() && langFilter(*mod) && tagFilter(*mod, target)) {
             StartTargets.push_back(target);
             ModuleStartTargets.insert(target);
         }
