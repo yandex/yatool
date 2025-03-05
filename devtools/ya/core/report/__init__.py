@@ -149,6 +149,9 @@ class CompositeTelemetry:
         logger.debug('Reporting done')
 
     def init_reporter(self, shard='report', suppressions=None, report_events=None):
+        global SUPPRESSIONS
+        SUPPRESSIONS = suppressions
+
         if self.no_backends:
             return
 
@@ -172,9 +175,6 @@ class CompositeTelemetry:
             logger.debug("Initialize telemetry backend `%s`", telemetry_name)
             telemetry.init(os.path.join(config.misc_root(), telemetry_name), shard)
             logger.debug("Telemetry backend `%s` initialized", telemetry_name)
-
-        global SUPPRESSIONS
-        SUPPRESSIONS = suppressions
 
     def stop_reporter(self):
         if self.no_backends or not self._report_events:
