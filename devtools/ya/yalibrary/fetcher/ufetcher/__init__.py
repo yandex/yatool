@@ -61,12 +61,17 @@ def _get_external_program_fetcher_cmd() -> list[str]:
     try:
         import app_ctx
 
-        cmd_as_str = app_ctx.app_ctx.fetcher_params[0]
-        cmd = cmd_as_str.split(" ")
-        if cmd[0] == "":
+        cmd = app_ctx.fetcher_params[0]
+        if not cmd:
             return []
-        return cmd
+
+        if not os.path.exists(cmd):
+            logger.debug(f"External program fetcher does not exist: {cmd}")
+            return []
+
+        return [cmd]
     except (ImportError, AttributeError, IndexError):
+        logger.debug("External program fetcher command: empty")
         return []
 
 
@@ -144,7 +149,7 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
 
         if universal_fetcher.SandboxTransportType.EXTERNAL_PROGRAM_FETCHER in transports_order:
             if cmd := _get_external_program_fetcher_cmd():
-                kwargs["external_program_fetcher"] = universal_fetcher.ExternalProgramFetcherParams(cmd=cmd)
+                kwargs["external_program_fetcher_params"] = universal_fetcher.ExternalProgramFetcherParams(cmd=cmd)
 
         sandbox_config = universal_fetcher.SandboxConfig(**kwargs)
 

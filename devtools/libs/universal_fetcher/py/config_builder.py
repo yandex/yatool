@@ -109,9 +109,10 @@ class ExternalProgramFetcherParams:
 class SkynetParams:
     sky_run_timeout_ms: int | None = None
     network_type: NetworkType = NetworkType.BACKBONE
+    path: str = "/skynet/tools/sky"
 
     def to_dict(self) -> dict:
-        res = {"network_type": self.network_type}
+        res = {"network_type": self.network_type, "path": self.path}
         if self.sky_run_timeout_ms is not None:
             res["sky_run_timeout"] = _to_ms(self.sky_run_timeout_ms)
         return res
