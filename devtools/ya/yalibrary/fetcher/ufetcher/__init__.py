@@ -5,6 +5,7 @@ import typing as tp
 
 
 import devtools.libs.universal_fetcher.py as universal_fetcher
+import devtools.ya.core.report
 import exts.func
 import exts.archive
 import exts.deepget as deepget
@@ -182,6 +183,7 @@ class UFetcherDownloader:
 
     def __call__(self, download_to: str) -> dict:
         res_info = self._download(download_to)
+        self._send_result_to_telemetry_if_needed(res_info)
         self._handle_error(res_info)
         self._post_process(res_info, download_to)
         return res_info
@@ -301,3 +303,15 @@ class UFetcherDownloader:
             perms |= stat.S_IXUSR | stat.S_IXGRP
 
         return perms
+
+    @staticmethod
+    def _send_result_to_telemetry_if_needed(res_info: dict) -> None:
+        history_len = len(res_info["history"]) if "history" in res_info else 0
+        transport_history = deepget.deepget(res_info, ("last_attempt", "result", "transport_history"))
+        transport_history_len = len(transport_history) if transport_history else 0
+
+        more_then_one_attempt_was_made = history_len > 0 or transport_history_len > 1
+        if more_then_one_attempt_was_made:
+            devtools.ya.core.report.telemetry.report(
+                devtools.ya.core.report.ReportTypes.UNIVERSAL_FETCHER, {"universal_fetcher_result": res_info}
+            )

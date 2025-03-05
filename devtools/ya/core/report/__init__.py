@@ -39,6 +39,7 @@ class ReportTypes(object):
     GRAPH_STATISTICS = 'graph_statistics'
     DISTBUILD = 'distbuild'
     YA_METRICS = 'ya_metrics'
+    UNIVERSAL_FETCHER = 'universal_fetcher'
 
 
 @func.lazy
