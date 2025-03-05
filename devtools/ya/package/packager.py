@@ -180,9 +180,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.create_symlinks = False
     build_options.keep_temps = params.keep_temps
     build_options.clear_build = params.clear_build
-    build_options.clear_ymake_cache = True
     build_options.vcs_file = params.vcs_file
-    build_options.debug_options += ["x", "x"]
     build_options.be_verbose = params.be_verbose
     build_options.custom_build_directory = params.custom_build_directory
     if app_config.in_house:
