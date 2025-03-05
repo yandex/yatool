@@ -84,7 +84,8 @@ def fill_suite(build_dir, report_json, trace):
         file = os.path.relpath(case['source'], build_dir)
 
         warnings_ = case['warnings']
-        has_errors = len(warnings_) > 0
+        errors = [w for w in warnings_ if w['severity'] == 'error']
+        has_errors = len(errors) > 0
         status = devtools.ya.test.const.Status.FAIL if has_errors else devtools.ya.test.const.Status.GOOD
 
         test_case = devtools.ya.test.facility.TestCase(
