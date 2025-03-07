@@ -68,6 +68,14 @@ enum class EMacroFunction: ui32 {
     //
     Count
 };
+static_assert(std::underlying_type_t<EMacroFunction>(EMacroFunction::Count) <= (1 << NPolexpr::TFuncId::IDX_BITS));
+
+template <>
+struct std::formatter<EMacroFunction>: std::formatter<std::string_view> {
+    auto format(EMacroFunction x, format_context& ctx) const {
+        return formatter<string_view>::format(std::format("{}", static_cast<string_view>(ToString(x))), ctx);
+    }
+};
 
 class TMacroValues {
 public:

@@ -2,6 +2,7 @@
 
 #include <util/system/types.h>
 #include <util/system/yassert.h>
+#include <format>
 
 namespace NPolexpr {
 
@@ -46,11 +47,14 @@ namespace NPolexpr {
 
     class TFuncId {
     public:
-        constexpr TFuncId(ui16 arity, ui32 idx) noexcept
-            : Val{(ui32(arity) << IDX_BITS) | idx}
+
+        constexpr TFuncId(auto arity, auto idx)
+            : Val{(ui32(arity) << IDX_BITS) | ui32(idx)}
         {
-            Y_ASSERT(idx < (1 << IDX_BITS));
-            Y_ASSERT(arity < (1 << ARITY_BITS));
+            if (!(static_cast<ui32>(idx) < (1 << IDX_BITS))) [[unlikely]]
+                throw std::runtime_error(std::format("Bad function id {}", idx));
+            if (!(static_cast<ui32>(arity) < (1 << ARITY_BITS))) [[unlikely]]
+                throw std::runtime_error(std::format("Too many arguments for function {}: {}/{}", idx, arity, (1 << ARITY_BITS) - 1));
         }
 
         constexpr ui16 GetArity() const noexcept {
@@ -73,7 +77,7 @@ namespace NPolexpr {
         {
         }
 
-    private:
+    public:
         constexpr static ui32 IDX_BITS = 19;
         constexpr static ui32 ARITY_BITS = 10;
 

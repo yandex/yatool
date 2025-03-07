@@ -465,7 +465,7 @@ namespace {
                                             }
                                         }, t);
                                     }
-                                    catBuilder.Build();
+                                    catBuilder.Build<EMacroFunction>();
                                 }
                             }
                         }
@@ -499,9 +499,9 @@ namespace {
                     },
                 }, cmd[arg][term]);
             }
-            termsBuilder.Build();
+            termsBuilder.Build<EMacroFunction>();
         }
-        argsBuilder.Build();
+        argsBuilder.Build<EMacroFunction>();
     }
 }
 
@@ -510,6 +510,6 @@ NPolexpr::TExpression NCommands::Compile(const TModRegistry& mods, const TSyntax
     NPolexpr::TVariadicCallBuilder cmdsBuilder(result, mods.Func2Id(EMacroFunction::Cmds));
     for (size_t cmd = 0; cmd != s.Script.size(); ++cmd)
         CompileArgs(mods, s.Script[cmd], cmdsBuilder);
-    cmdsBuilder.Build();
+    cmdsBuilder.Build<EMacroFunction>();
     return result;
 }

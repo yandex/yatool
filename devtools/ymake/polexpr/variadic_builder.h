@@ -50,9 +50,10 @@ namespace NPolexpr {
 
         /// Finalises variadic function call construction and releases expression
         /// or another bulder assed to this object constructor.
+        template<typename TFuncName>
         void Build() {
             TExpression::TNode& callNode = Expr.Expr[CallNodeIdx];
-            callNode = TExpression::TNode::Function(TFuncId{ArgsAdded, callNode.GetIdx()});
+            callNode = TExpression::TNode::Function(TFuncId{ArgsAdded, static_cast<TFuncName>(callNode.GetIdx())});
             if (OuterBuilder) {
                 OuterBuilder->OnSubexpr(0);
             }
@@ -62,8 +63,9 @@ namespace NPolexpr {
         /// or another bulder assed to this object constructor.
         /// Returns reference to the constructed variadic call result which ca be
         /// reused in the same expression later.
+        template<typename TFuncName>
         TExpression::ERef Build(TExpression::TRefsRegistry& registry) {
-            Build();
+            Build<TFuncName>();
             Expr.Expr[CallNodeIdx].SetReferenced();
             return registry.MakeRef();
         }
