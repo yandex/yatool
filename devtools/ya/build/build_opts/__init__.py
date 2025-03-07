@@ -3497,7 +3497,7 @@ def build_graph_cache_config_opts():
                 self.build_graph_source_root_pattern = 'SOURCE_ROOT'
                 self.build_graph_result_dir = None
                 self.build_graph_arc_server = 'arc-vcs.yandex-team.ru:5623'
-                self.build_graph_public_arc_server = 'api.arc-vcs.yandex-team.ru:6734'
+                self.build_graph_public_arc_server = 'arc-devtools.arc-vcs.yandex-team.ru:6734'
                 self.build_graph_use_ymake_cache_params = None
                 self.build_graph_use_ymake_cache_params_str = None
 
