@@ -15,6 +15,7 @@ class DisambiguationOptions(tp.NamedTuple):
     use_ruff: bool = False
     use_clang_format_yt: bool = False
     use_clang_format_15: bool = False
+    use_clang_format_18_vanilla: bool = False
     autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS
 
 
@@ -103,6 +104,8 @@ def _clang_formats(
         return styler.ClangFormatYT
     elif disambiguation_opts.use_clang_format_15:
         return styler.ClangFormat15
+    elif disambiguation_opts.use_clang_format_18_vanilla:
+        return styler.ClangFormat18Vanilla
     return styler.ClangFormat
 
 
@@ -115,7 +118,12 @@ def disambiguate_targets(
         return next(iter(styler_classes))
     elif styler_classes == {styler.Black, styler.Ruff}:
         return _black_vs_ruff(target, disambiguation_opts)
-    elif styler_classes == {styler.ClangFormat, styler.ClangFormatYT, styler.ClangFormat15}:
+    elif styler_classes == {
+        styler.ClangFormat,
+        styler.ClangFormatYT,
+        styler.ClangFormat15,
+        styler.ClangFormat18Vanilla,
+    }:
         return _clang_formats(disambiguation_opts)
 
     return f"[{target}] Can't choose between {' and '.join(m.__name__ for m in styler_classes)}."

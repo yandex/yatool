@@ -24,6 +24,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_ruff = False
         self.use_clang_format_yt = False
         self.use_clang_format_15 = False
+        self.use_clang_format_18_vanilla = False
 
     @staticmethod
     def consumer():
@@ -89,6 +90,12 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 ['--clang-format-15'],
                 help="Use clang-format-15 for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_15', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--vanilla-cf18'],
+                help="Use vanilla clang-format-18 for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_18_vanilla', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
         ]
