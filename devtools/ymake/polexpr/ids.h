@@ -78,8 +78,8 @@ namespace NPolexpr {
         }
 
     public:
-        constexpr static ui32 IDX_BITS = 19;
-        constexpr static ui32 ARITY_BITS = 10;
+        constexpr static ui32 IDX_BITS = 13;
+        constexpr static ui32 ARITY_BITS = 16;
 
     private:
         ui32 Val;

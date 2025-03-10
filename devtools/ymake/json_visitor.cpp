@@ -856,10 +856,15 @@ void TJSONVisitor::FinishCurrent(TState& state) {
                     }
                 }
             }
-            if (expr)
+            if (expr) {
+                auto tagGlobal = Commands.EngineTag();
+                auto tagLocal = expr->Tag();
+                CurrState->Hash->StructureMd5Update({&tagGlobal, sizeof tagGlobal}, "new_cmd tag_global");
+                CurrState->Hash->StructureMd5Update({&tagLocal, sizeof tagLocal}, "new_cmd tag_local");
                 Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
                     CurrState->Hash->StructureMd5Update({data, size}, "new_cmd");
                 });
+            }
         }
         CurrState->Hash->StructureMd5Update(RestoreContext.Conf.GetUidsSalt(), "FAKEID");
     }
@@ -1170,6 +1175,10 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
                         auto expr = Commands.Get(varItem.Name, &CmdConf);
                         Y_ASSERT(expr);
                         UpdateCurrent(state, varName, "new_cmd_name");
+                        auto tagGlobal = Commands.EngineTag();
+                        auto tagLocal = expr->Tag();
+                        CurrState->Hash->StructureMd5Update({&tagGlobal, sizeof tagGlobal}, "new_cmd tag_global");
+                        CurrState->Hash->StructureMd5Update({&tagLocal, sizeof tagLocal}, "new_cmd tag_local");
                         Commands.StreamCmdRepr(*expr, [&](auto data, auto size) {
                             CurrState->Hash->StructureMd5Update({data, size}, "new_cmd");
                         });

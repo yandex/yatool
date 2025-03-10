@@ -102,6 +102,10 @@ public:
     };
 
 public:
+    ui32 EngineTag() const {
+        return 0;
+    }
+
     const NPolexpr::TExpression* Get(ECmdId id) const {
         const auto uId = static_cast<ui32>(id);
         if (Y_UNLIKELY(Commands.size() <= uId)) {

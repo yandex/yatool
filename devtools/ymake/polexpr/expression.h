@@ -104,6 +104,10 @@ namespace NPolexpr {
         Y_SAVELOAD_DEFINE(Expr);
 
     public:
+        ui32 Tag() const {
+            return 0;
+        }
+
         void Append(TNode node) {
             Expr.push_back(node);
         }
