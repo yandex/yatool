@@ -45,16 +45,11 @@ struct TKeyword {
     );
 };
 
-struct TUnitProperty {
-    bool HasConditions = false;
-    //for macrocalls
-    TVector<TString> ArgNames;
-    bool HasMacroCalls = false;
-
+class TUnitProperty {
+public:
     using TMacroCall = std::pair<TString, TString>;
     using TMacroCalls = TVector<TMacroCall>;
-    TMacroCalls MacroCalls;
-    TVars SpecVars; //use only for inner scope
+
     bool AddMacroCall(const TStringBuf& name, const TStringBuf& argList);
     void AddArgNames(const TString& argNamesList);
 
@@ -62,19 +57,50 @@ struct TUnitProperty {
 
     void Inherit(const TUnitProperty& parent) {
         //TODO: fix bad and slow insertion
-        if (parent.MacroCalls.size()) {
-            MacroCalls.insert(MacroCalls.begin(), parent.MacroCalls.begin(), parent.MacroCalls.end());
-            HasMacroCalls = true;
+        if (parent.MacroCalls_.size()) {
+            MacroCalls_.insert(MacroCalls_.begin(), parent.MacroCalls_.begin(), parent.MacroCalls_.end());
         }
     }
 
+    void SetSpecVar(const TString& name, const TString& value) {
+        SpecVars_.SetValue(name, value);
+    }
+    bool IsAllowedInLintersMake() const {
+        return SpecVars_.Has(NProperties::ALLOWED_IN_LINTERS_MAKE);
+    }
+
+    const TVector<TString>& ArgNames() const noexcept {
+        return ArgNames_;
+    }
+
+    const TMacroCalls& GetMacroCalls() const noexcept {
+        return MacroCalls_;
+    }
+
+    bool HasMacroCalls() const noexcept {
+        return !MacroCalls_.empty();
+    }
+
+    void SetHasConditions(bool value) noexcept {
+        HasConditions_ = value;
+    }
+    bool HasConditions() const noexcept {
+        return HasConditions_;
+    }
+
     Y_SAVELOAD_DEFINE(
-        HasConditions,
-        ArgNames,
-        HasMacroCalls,
-        MacroCalls,
-        SpecVars
+        HasConditions_,
+        ArgNames_,
+        MacroCalls_,
+        SpecVars_
     );
+
+private:
+    bool HasConditions_ = false;
+    //for macrocalls
+    TVector<TString> ArgNames_;
+    TMacroCalls MacroCalls_;
+    TVars SpecVars_; //use only for inner scope
 };
 
 class TCmdProperty: public TUnitProperty {

@@ -67,7 +67,7 @@ public:
     bool KeepTargetPlatform = false;
 
 private:
-    friend struct TUnitProperty;
+    friend class TUnitProperty;
     explicit TCommandInfo();
     struct TSpecFileLists {
         TSpecFileList Input;         // deps for the main output

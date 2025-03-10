@@ -90,7 +90,7 @@ private:
     }
 
     bool IsMacroAllowedInLintersMake(const TStringBuf& name) {
-        return Conf.BlockData.find(name)->second.CmdProps->SpecVars.Has(NProperties::ALLOWED_IN_LINTERS_MAKE);
+        return Conf.BlockData.find(name)->second.CmdProps->IsAllowedInLintersMake();
     }
 
     size_t StatementPriority(const TStringBuf& s);
@@ -106,7 +106,7 @@ private:
     /// @param args values of macro arguments produced by parser
     /// @param locals Vars where argument values associated with parameter names
     /// @return pointer to vector of macro calls or null if macro is unknown or doesn't have calls
-    TMacroCalls* PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals);
+    const TMacroCalls* PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals);
 
     /// Substitutes macro arguments and computes macro name via specialization
     /// @param macroCall is single macro call as recoded in CmdProps
@@ -133,7 +133,7 @@ private:
 
         TVars localVars(&Vars);
         localVars.Id = Vars.Id;
-        TMacroCalls* macroCalls = PrepareMacroBody(name, args, localVars);
+        const TMacroCalls* macroCalls = PrepareMacroBody(name, args, localVars);
         if (!macroCalls) {
             return;
         }

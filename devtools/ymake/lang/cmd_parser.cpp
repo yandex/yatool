@@ -207,12 +207,12 @@ namespace {
             auto blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
             Y_ASSERT(blockData); // TODO handle unknown macros
 
-            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames.size());
+            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames().size());
             const TKeyword* kwDesc = nullptr;
 
             auto kwArgCnt = blockData->CmdProps->GetKeyArgsNum();
-            auto posArgCnt = blockData->CmdProps->ArgNames.size() - blockData->CmdProps->GetKeyArgsNum();
-            auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+            auto posArgCnt = blockData->CmdProps->ArgNames().size() - blockData->CmdProps->GetKeyArgsNum();
+            auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
                 args[kwArgCnt + i].Script.emplace_back();

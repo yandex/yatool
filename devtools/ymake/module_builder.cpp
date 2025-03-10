@@ -894,7 +894,7 @@ bool TModuleBuilder::RememberStatement(const TStringBuf& name, const TVector<TSt
 
 bool TModuleBuilder::MacroToVarStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     auto i = Conf.BlockData.find(name);
-    if (i && i->second.CmdProps && i->second.CmdProps->HasConditions) {
+    if (i && i->second.CmdProps && i->second.CmdProps->HasConditions()) {
         ModuleDef->SetSpecServiceVars(TString::Join("env", name));
         return args.empty();
     }
@@ -1037,7 +1037,7 @@ void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args)
 
 bool TModuleBuilder::SkipStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     auto i = Conf.BlockData.find(name);
-    if (i && i->second.CmdProps && i->second.CmdProps->HasMacroCalls) {
+    if (i && i->second.CmdProps && i->second.CmdProps->HasMacroCalls()) {
         YDIAG(DG) << "Use composed only from macro calls: " << name << " statement\n";
         return true;
     }

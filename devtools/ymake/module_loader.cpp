@@ -77,14 +77,13 @@ bool TModuleDef::IsGlobalInput(const TStringBuf& name) const {
 }
 
 
-TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals) {
+const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals) {
     auto pi = Conf.BlockData.find(name);
-    if (!pi || !pi->second.CmdProps || !pi->second.CmdProps->HasMacroCalls) {
+    if (!pi || !pi->second.CmdProps || !pi->second.CmdProps->HasMacroCalls()) {
         return nullptr;
     }
 
-    TVector<TStringBuf> argNames;
-    argNames.insert(argNames.end(), pi->second.CmdProps->ArgNames.begin(), pi->second.CmdProps->ArgNames.end());
+    const TVector<TStringBuf> argNames{pi->second.CmdProps->ArgNames().begin(), pi->second.CmdProps->ArgNames().end()};
     TVector<TMacro> mcrargs;
     auto pArgs = args;
     TVector<TStringBuf> tempArgs;
@@ -97,7 +96,7 @@ TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TA
     if (argNames.size()) {
         MapMacroVars(mcrargs, argNames, locals, JoinStrings(args.begin(), args.end(), ", ")); //last arg is just for debug output
     }
-    return &pi->second.CmdProps->MacroCalls;
+    return &pi->second.CmdProps->GetMacroCalls();
 }
 
 TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name) {

@@ -467,10 +467,10 @@ void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TS
     const TBlockData* blockData = blockDataIt != Conf.BlockData.end() ? &blockDataIt->second : nullptr;
     Y_ASSERT(blockData); // TODO handle unknown macros
 
-    Y_ASSERT(blockData->CmdProps->ArgNames.size() == src.Arguments.size());
+    Y_ASSERT(blockData->CmdProps->ArgNames().size() == src.Arguments.size());
     auto argCnt = src.Arguments.size();
     for (size_t i = 0; i != argCnt; ++i) {
-        auto argName = TStringBuf(blockData->CmdProps->ArgNames[i]);
+        auto argName = TStringBuf(blockData->CmdProps->ArgNames()[i]);
         if (argName.EndsWith(NStaticConf::ARRAY_SUFFIX))
             argName.Chop(strlen(NStaticConf::ARRAY_SUFFIX));
         auto writer = TCmdWriter(dst.VarDefinitions[argName], true);

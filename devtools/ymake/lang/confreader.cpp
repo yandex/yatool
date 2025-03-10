@@ -724,7 +724,7 @@ namespace {
             }
 
             auto& blockData = Conf.BlockData[fullName];
-            GetOrInit(blockData.CmdProps).HasConditions = true;
+            GetOrInit(blockData.CmdProps).SetHasConditions(true);
             blockData.ParentName = ancestor;
             if (inMultiModule) {
                 blockData.OwnerName = ownerName;
@@ -817,7 +817,6 @@ namespace {
                 YDIAG(Conf) << "Add macro call for [" << block.Name() << "] -> "
                       << macroName << "(" << args << ")" << Endl;
                 TCmdProperty& prop = GetOrInit(block.BlockData().CmdProps);
-                prop.HasMacroCalls = true;
                 prop.AddMacroCall(macroName, args);
             }
         }
@@ -834,7 +833,7 @@ namespace {
                     auto& block = BlockStack.back();
                     if (block.IsMacro() || block.IsModule()) {
                         auto& blockData = block.BlockData();
-                        GetOrInit(blockData.CmdProps).HasConditions = true;
+                        GetOrInit(blockData.CmdProps).SetHasConditions(true);
                     }
                 }
                 YDIAG(Conf) << "Condition action: [" << varName << "] -> [" << rvalue << "]" << Endl;
@@ -880,7 +879,7 @@ namespace {
             YDIAG(Conf) << "Property for [" << block.Name() << "]: [" << name << "] -> [" << value << "]" << Endl;
             if (!blockData.SetOption(block.Name(), name, value, Conf.CommandConf, Conf.RenderSemantics)) {
                 YDIAG(Conf) << "Local macro variable: [" << name << "] -> [" << value << "]" << Endl;
-                GetOrInit(blockData.CmdProps).SpecVars.SetValue(name, value);
+                GetOrInit(blockData.CmdProps).SetSpecVar(name, value);
             }
         }
 
@@ -1065,7 +1064,7 @@ namespace {
             auto& blockData = parentBlock.BlockData();
             YDIAG(Conf) << "Local var [" << loopVar << "] set to [" << loopSet << "] in [" << parentBlock.Name() << "]" << Endl;
             auto& prop = GetOrInit(blockData.CmdProps);
-            prop.SpecVars.SetValue(loopVar, loopSet);
+            prop.SetSpecVar(loopVar, loopSet);
             BlockStack.emplace_back(blockData, name, TBlockDesc::EBlockType::Foreach);
             BlockStack.back().SetLoopVar(loopVar);
         }
