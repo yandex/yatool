@@ -339,3 +339,17 @@ class NoValueDummyHook(BaseHook):
     @staticmethod
     def need_value():
         return False
+
+
+class SwallowValueDummyHook(BaseHook):
+    """
+    Same as NoValueDummyHook, but mandates parameter value to be swallowed
+    """
+
+    def __call__(self, to, *args):
+        # type: ("Options", tp.Optional[tp.Any]) -> None
+        pass
+
+    @staticmethod
+    def need_value():
+        return True

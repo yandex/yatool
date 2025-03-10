@@ -5,6 +5,7 @@ import six
 import logging
 from devtools.ya.core.yarg.excs import ArgsBindingException
 from devtools.ya.core.yarg.help_level import HelpLevel
+from devtools.ya.core.yarg import hooks
 from devtools.ya.core.yarg.hooks import BaseHook  # noqa: F401
 from devtools.ya.core.yarg.hooks import SetValueHook
 from exts.strtobool import strtobool
@@ -222,6 +223,21 @@ class ArgConsumer(BaseArgConsumer):
             res += ' ' + available_options
 
         return res
+
+
+class NullArgConsumer(ArgConsumer):
+    def __init__(self, name, *, need_value):
+        if need_value:
+            hook = hooks.SwallowValueDummyHook()
+        else:
+            hook = hooks.NoValueDummyHook()
+        super().__init__(
+            name,
+            group=None,
+            help="Does nothing. DO NOT USE",
+            visible=False,
+            hook=hook,
+        )
 
 
 class EnvConsumer(Consumer):

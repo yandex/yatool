@@ -7,6 +7,7 @@ from devtools.ya.core.yarg.consumers import (  # noqa: F401
     FreeArgConsumer,
     SingleFreeArgConsumer,  # noqa: F401
     ArgConsumer,
+    NullArgConsumer,
     EnvConsumer,
     ConfigConsumer,
 )
