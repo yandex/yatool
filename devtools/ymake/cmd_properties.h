@@ -20,11 +20,11 @@ struct TKeyword {
         , Pos(0)
     {
     }
-    TKeyword(const TString& myName, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr)
+    TKeyword(const TString& myName, size_t from, size_t to, const TString& deepReplaceTo, TStringBuf onKwPresent = {}, TStringBuf onKwMissing = {})
         : From(from)
         , To(to)
         , Pos(0)
-        , DeepReplaceTo(deep_replace_to)
+        , DeepReplaceTo(deepReplaceTo)
     {
         if (onKwPresent.data() != nullptr) // "" from file is not NULL
             OnKwPresent.push_back(TString{onKwPresent});
@@ -90,7 +90,7 @@ public:
         TKeywords& operator=(TKeywords&&) noexcept = default;
 
 
-        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
+        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
 
         bool Empty() const noexcept {
             return Collected_.empty();

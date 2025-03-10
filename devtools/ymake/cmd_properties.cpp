@@ -40,8 +40,8 @@ TString TCmdProperty::ConvertCmdArgs(TStringBuf cmd) const {
     return TString::Join(res, NumUsrArgs_ ? "" : ")", NumUsrArgs_ ? cmd.SubStr(1) : cmd);
 }
 
-void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deep_replace_to, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Collected_.push_back({keyword, TKeyword(keyword, from, to, deep_replace_to, onKwPresent, onKwMissing)});
+void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
+    Collected_.push_back({keyword, TKeyword{keyword, from, to, deepReplaceTo, onKwPresent, onKwMissing}});
 }
 
 size_t TCmdProperty::Key2ArrayIndex(TStringBuf arg) const {
