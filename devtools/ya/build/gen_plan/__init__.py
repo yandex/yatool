@@ -84,8 +84,7 @@ def _make_repositories_config(
 
         if getattr(app_ctx.params, 'arc_arcadia_instead_of_arc_full', False):
             # prepare arc repo as an experiment
-            arc_info = vcsversion._get_raw_data("arc", root)
-            arc_hash = json.loads(arc_info[0])["hash"]
+            arc_hash = vcsversion.get_raw_version_info(root)['hash']
             return [
                 {
                     "pattern": "$({})".format(None if for_uid else source_root_pattern),
