@@ -635,7 +635,7 @@ class _JavaSemGraph(SemGraph):
             else:
                 jdk_real_path = Path(tools.tool(f'java{jdk_version}').replace('/bin/java', ''))
                 jdk_path = Path.home() / ".ya" / "jdk" / str(jdk_version)
-                if jdk_path.exists() and jdk_path.resolve() != jdk_real_path:
+                if jdk_path.is_symlink() and jdk_path.resolve() != jdk_real_path:
                     jdk_path.unlink()  # remove invalid symlink to JDK
                 if not jdk_path.exists():  # create new symlink to JDK
                     _SymlinkCollector.mkdir(jdk_path.parent)
