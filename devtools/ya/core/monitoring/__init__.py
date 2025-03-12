@@ -4,7 +4,6 @@ import enum
 
 class MetricNames(enum.StrEnum):
     YA_STARTED = enum.auto()
-    YA_FAILED = enum.auto()
     YA_FINISHED = enum.auto()
 
 

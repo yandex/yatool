@@ -804,17 +804,6 @@ def configure_report_interceptor(ctx, report_events):
                 'version': ctx.revision,
             },
         )
-        ctx.metrics_reporter.report_metric(
-            monitoring.MetricNames.YA_FAILED,
-            labels={
-                "handler": prefix[1] if len(prefix) > 1 else "undefined",
-                "prefix": " ".join(prefix),
-                "exc_info": exception_name,
-                "exit_code": exit_code,
-                "mute": exception_muted,
-            },
-            urgent=True,
-        )
         raise
     finally:
         duration = time.time() - start
