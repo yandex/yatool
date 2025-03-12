@@ -13,8 +13,8 @@
 //   * do not alter existing id-values (altering names is fine)
 //   * add new entries at the end, right before Count
 //   * do not delete entries, mark them as deprecated instead
-//   * treat altering semanics of existing mods as adding new (versions of) mods and deprecating the old ones
-// * "garbage collection" may freely rearrange the list, must flush caches via FAKEID
+//   * treat altering semantics of existing mods as adding new (versions of) mods and deprecating the old ones
+// * "garbage collection" may freely rearrange the list, must flush caches via TCommands::EngineTag() or suchlike
 //
 
 enum class EMacroFunction: ui32 {

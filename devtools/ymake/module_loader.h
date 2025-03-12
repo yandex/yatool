@@ -102,7 +102,7 @@ private:
     /// @brief construct module filename from REALPRJNAME, PREFIX and SUFFIX and set it to Module
     void InitFromConf();
 
-    /// Maps macro argument values to their names and retrives macros called
+    /// Maps macro argument values to their names and retrieves macros called
     /// @param args values of macro arguments produced by parser
     /// @param locals Vars where argument values associated with parameter names
     /// @return pointer to vector of macro calls or null if macro is unknown or doesn't have calls
