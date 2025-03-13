@@ -371,7 +371,7 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_YEXPORT_BIN = '--yexport-bin'
-    OPT_BUILD_CONTRIBS = '--build-contribs'
+    OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_REMOVE = '--remove'
 
@@ -379,7 +379,7 @@ class GradleOptions(yarg.Options):
         self.gradle_name = None
         self.settings_root = None
         self.yexport_bin = None
-        self.build_contribs = False
+        self.collect_contribs = True
         self.disable_errorprone = False
         self.yexport_debug_mode = None
         self.login = None
@@ -408,9 +408,9 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
-                [GradleOptions.OPT_BUILD_CONTRIBS],
-                help='Build all contribs from arcadia to jar files',
-                hook=yarg.SetConstValueHook('build_contribs', True),
+                [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
+                help='Export without collect contribs from Arcadia to jar files',
+                hook=yarg.SetConstValueHook('collect_contribs', False),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
@@ -446,11 +446,9 @@ class GradleOptions(yarg.Options):
             raise yarg.ArgsValidatingException(
                 'Not found yexport binary({}) {}.'.format(GradleOptions.OPT_YEXPORT_BIN, self.yexport_bin)
             )
-        if self.remove and (self.gradle_name or self.build_contribs):
+        if self.gradle_name and self.remove:
             raise yarg.ArgsValidatingException(
-                '{} and {} not applicable with {}'.format(
-                    GradleOptions.OPT_GRADLE_NAME, GradleOptions.OPT_BUILD_CONTRIBS, GradleOptions.OPT_REMOVE
-                )
+                '{} not applicable with {}'.format(GradleOptions.OPT_GRADLE_NAME, GradleOptions.OPT_REMOVE)
             )
 
 

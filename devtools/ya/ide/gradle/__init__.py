@@ -67,6 +67,10 @@ class _JavaSemConfig(SemConfig):
                     ]
                 )
             )
+        if not self.params.collect_contribs:
+            self.logger.warning(
+                "You have selected the mode without collecting contribs to jar files, to build successfully in Gradle, check bucket repository settings and access rights"
+            )
 
     def _get_export_root(self) -> Path:
         """Create export_root path by hash of targets"""
@@ -695,7 +699,7 @@ class _Exporter:
                         *attrs_for_all_templates,
                         '',
                         '[add_attrs.dir]',
-                        f'build_contribs = {'true' if self.config.params.build_contribs else 'false'}',
+                        f'build_contribs = {'true' if self.config.params.collect_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
                         *attrs_for_all_templates,
                         '',
@@ -777,7 +781,7 @@ class _Builder:
                 if self.config.in_rel_targets(rel_target):
                     # Skip target, already in input targets
                     continue
-                elif self.config.params.build_contribs or not is_contrib:
+                elif self.config.params.collect_contribs or not is_contrib:
                     # Build all non-input or not contrib targets
                     build_rel_targets.append(rel_target)
         except Exception as e:
