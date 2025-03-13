@@ -204,6 +204,9 @@ class YtStore(DistStore):
     def get_used_size(self):
         return self._client.get_tables_size()
 
+    def get_max_size(self):
+        return self._max_cache_size
+
     def _upload_data(self, stack, files, codec, root_dir, self_uid, uid, name, cuid):
         if codec == consts.YT_CACHE_NO_DATA_CODEC:
             raise Exception("Codec {} is not supported here".format(consts.YT_CACHE_NO_DATA_CODEC))

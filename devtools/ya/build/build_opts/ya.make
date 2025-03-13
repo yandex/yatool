@@ -13,6 +13,7 @@ PEERDIR(
     devtools/ya/test/opts
     devtools/ya/yalibrary/runner/fs
     devtools/ya/yalibrary/runner/schedule_strategy
+    devtools/ya/yalibrary/store/yt_store/opts_helper
     devtools/ya/yalibrary/upload/consts
     devtools/ya/yalibrary/vcs
 )

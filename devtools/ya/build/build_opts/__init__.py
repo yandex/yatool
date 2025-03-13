@@ -84,6 +84,7 @@ from devtools.ya.core.yarg import (
 )
 
 from library.python.fs import supports_clone
+from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
 
 logger = logging.getLogger(__name__)
 
@@ -2626,21 +2627,10 @@ class DistCacheSetupOptions(LocalCacheOptions):
         if self.yt_token_path:
             self.yt_token_path = os.path.expanduser(self.yt_token_path)
         self._read_token_file()
-        self.yt_max_cache_size = self._parse_yt_max_cache_size()
-
-    def _parse_yt_max_cache_size(self) -> str | int | None:
-        if self.yt_max_cache_size is None:
-            return None
-        s = self.yt_max_cache_size.strip()
         try:
-            if s.endswith("%"):
-                v = float(s[:-1])
-                if v < 0 or v > 100:
-                    raise ArgsValidatingException("yt_max_cache_size is out of range 0..100")
-                return s[:-1]
-            return parse_size_arg(self.yt_max_cache_size)
-        except Exception as e:
-            raise ArgsValidatingException(f"Wrong yt_max_cache_size value {s}: {e!s}")
+            self.yt_max_cache_size = parse_yt_max_cache_size(self.yt_max_cache_size)
+        except ValueError as e:
+            raise ArgsValidatingException(f"Wrong yt_max_cache_size value {self.yt_max_cache_size}: {e!s}")
 
     def _read_token_file(self):
         if self.yt_token:
