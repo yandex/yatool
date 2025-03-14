@@ -151,8 +151,9 @@ class VSCodeProject:
             build_params
         )
 
+        tools_root = devtools.ya.core.config.tool_root(toolscache_version())
+        is_windows = pm.my_platform() == "win32"
         if self.params.compile_commands_fix:
-            is_windows = pm.my_platform() == "win32"
             tools_replacements = [
                 ("clang++", tool_fetcher("c++")["executable"]),
                 ("clang", tool_fetcher("cc")["executable"]),
@@ -163,15 +164,19 @@ class VSCodeProject:
                 item["command"] = vscode.common.replace_prefix(item["command"], tools_replacements)
                 if is_windows:
                     item["command"] = item["command"].replace("\\", "/")
+            if is_windows:
+                tools_root = tools_root.replace("\\", "/")
 
-        tools_root = devtools.ya.core.config.tool_root(toolscache_version())
-        tool_resource_regex = re.compile(rf"({tools_root}/\d+)")
-        tools_resources_set = set()
-        for item in compilation_database:
-            for resource in tool_resource_regex.findall(item["command"]):
-                tools_resources_set.add(resource)
-        for resource in tools_resources_set:
-            lock_resource(resource)
+        try:
+            tool_resource_regex = re.compile(fr"({tools_root.replace("\\", "\\\\")}[/\\]\d+)")
+            tools_resources_set = set()
+            for item in compilation_database:
+                for resource in tool_resource_regex.findall(item["command"]):
+                    tools_resources_set.add(resource)
+            for resource in tools_resources_set:
+                lock_resource(resource)
+        except Exception as e:
+            ide_common.emit_message(f"[[warn]]Locking resources failed {repr(e)}[[rst]]")
 
         ide_common.emit_message(f"Writing {compile_commands_path}")
         with open(compile_commands_path, "w") as f:
