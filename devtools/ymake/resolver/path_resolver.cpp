@@ -92,17 +92,8 @@ EResolveStatus TPathResolver::ResolveAsKnown(TFileView curDir, bool check) {
     bool successPath = true;
     if (!NPath::IsTypedPathEx(Name_)) {
         do {
-            TStringBuf cutName = Name_;
-            if (CutRoot(cutName, TStringBuf("${CURDIR}/"))) {
-                Name_ = NPath::GenSourcePath(curDir.GetTargetStr(), cutName);
-                break;
-            }
-            // ToYPath fill output by construct new TString, usage Name as input and output is safely
-            if (NPath::ToYPath(Name_, Name_)) { // ${ARCADIA_ROOT}, ${ARCADIA_BUILD_ROOT}
-                break;
-            }
-            if (CutRoot(cutName, "${BINDIR}/")) {
-                Name_ = NPath::GenBuildPath(curDir.GetTargetStr(), cutName);
+            // ToYPath fill output by construct new TString, usage Name as input and output is safe
+            if (NPath::ToYPath(Name_, Name_, curDir.GetTargetStr())) { // ${ARCADIA_ROOT}, ${ARCADIA_BUILD_ROOT}, ${CURDIR}, ${BINDIR}
                 break;
             }
             // CanonPath use TFsPath inside, where copy Name, usage Name as input and output is safely

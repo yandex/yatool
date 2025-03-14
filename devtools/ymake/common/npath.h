@@ -303,23 +303,99 @@ inline TString ConstructPath(TStringBuf str, ERoot root = Unset) {
     return TString::Join(type, PATH_SEP_S, str);
 }
 
-inline bool ToYPath(TStringBuf path, TString& result) {
-    if (path.StartsWith("${ARCADIA_ROOT}") || path.StartsWith("${ARCADIA_BUILD_ROOT}")) {
-        TStringBuf bldFile = path;
-        ERoot dirType;
-        if (path.StartsWith("${ARCADIA_ROOT}")) {
-            bldFile.Skip(strlen("${ARCADIA_ROOT}"));
-            dirType = Source;
-        } else {
-            bldFile.Skip(strlen("${ARCADIA_BUILD_ROOT}"));
-            dirType = Build;
+inline TString SmartJoin(TStringBuf path, TStringBuf file) {
+    Validate(path);
+    if (!file) {
+        return TString(path);
+    }
+    TStringBuf cutPath = CutType(path);
+    return ConstructPath(TSplit(cutPath).ParsePart(file).Reconstruct(), GetType(path));
+}
+
+inline TString GenPath(TStringBuf dirname, TStringBuf name) {
+    return SmartJoin(dirname, name);
+}
+
+// same as GenPath but always places given root (Source or Build)
+inline TString GenTypedPath(TStringBuf dirname, TStringBuf name, ERoot root) {
+    return SetType(SmartJoin(dirname, name), root);
+}
+
+// same as GenPath but always places $S
+inline TString GenSourcePath(TStringBuf dirname, TStringBuf name) {
+    return GenTypedPath(dirname, name, Source);
+}
+
+// same as GenPath but always places $B
+inline TString GenBuildPath(TStringBuf dirname, TStringBuf name) {
+    return GenTypedPath(dirname, name, Build);
+}
+
+namespace NDetail {
+    struct TVarPathPrefixDescriptor {
+        TStringBuf Value;              // The var reference e.g. ${ARCADIA_ROOT}
+        size_t     DiscriminatingPos;  // Position of discriminating char. Prefer power of 2
+        ERoot      Root;
+        bool       NeedDir;
+    };
+
+    constexpr const std::array<TVarPathPrefixDescriptor, 4> VarPathPrefixes {{
+        // Basic vars (NeedPrefix == false) go here
+        {"${ARCADIA_ROOT}"sv, 12, Source, false},
+        {"${ARCADIA_BUILD_ROOT}"sv, 12, Build, false},
+        // Extended vars (NeedPrefix == true) go here
+        {"${CURDIR}"sv, 4, Source, true},
+        {"${BINDIR}"sv, 4, Build, true}
+    }};
+    const size_t VarPathPrefixesCountWithDir = VarPathPrefixes.size();
+    const size_t VarPathPrefixesCountWoDir = 2;
+
+    static_assert(VarPathPrefixes[0].Value[VarPathPrefixes[0].DiscriminatingPos] == 'O');
+    static_assert(VarPathPrefixes[1].Value[VarPathPrefixes[1].DiscriminatingPos] == 'I');
+    static_assert(VarPathPrefixes[2].Value[VarPathPrefixes[2].DiscriminatingPos] == 'R');
+    static_assert(VarPathPrefixes[3].Value[VarPathPrefixes[3].DiscriminatingPos] == 'N');
+
+    inline const TVarPathPrefixDescriptor* ClassifyPath(TStringBuf path, bool hasDir) {
+        size_t cnt = hasDir ? NDetail::VarPathPrefixesCountWithDir : NDetail::VarPathPrefixesCountWoDir;
+        for (size_t i = 0; i < cnt; ++i) {
+            auto res = &NDetail::VarPathPrefixes[i];
+            if (path.size() >= res->Value.size() && path[res->DiscriminatingPos] == res->Value[res->DiscriminatingPos]) {
+                return path.StartsWith(res->Value) ? res : nullptr;
+            }
         }
+        return nullptr;
+    }
+
+}
+
+/// Check whether path start with vars designating known full path, like `${ARCADIA_ROOT}`, `${ARCADIA_BUILD_ROOT}`
+/// If curDir is provided also handle `${CURDIR}` and `${BINDIR}`
+inline bool IsKnownPathVarPrefix(TStringBuf path, bool withCurDir = true) {
+    return NDetail::ClassifyPath(path, withCurDir) != nullptr;
+}
+
+/// Process vars designating known full path prefix `${ARCADIA_ROOT}`, `${ARCADIA_BUILD_ROOT}`
+/// If curDir is provided also handle `${CURDIR}` and `${BINDIR}`
+///
+/// @param path - the path to process
+/// @param result - resuling path string with internal prefixes (`$S`/`$B`)
+/// @param curDir - used as prefix construct references to `${CURDIR}` and `${BINDIR}`
+inline bool ToYPath(TStringBuf path, TString& result, TStringBuf curDir={}) {
+    const auto* varPathPrefix = NDetail::ClassifyPath(path, !curDir.empty());
+    if (varPathPrefix != nullptr) {
+        TStringBuf bldFile = path;
+        bldFile.Skip(varPathPrefix->Value.size());
         while (bldFile && bldFile.front() == PATH_SEP) {
             bldFile.Skip(1);
         }
-        while (bldFile && bldFile.back() == PATH_SEP)
+        while (bldFile && bldFile.back() == PATH_SEP) {
             bldFile.Chop(1);
-        result = ConstructPath(bldFile, dirType);
+        }
+        if (varPathPrefix->NeedDir) {
+            result = GenTypedPath(curDir, bldFile, varPathPrefix->Root);
+        } else {
+            result = ConstructPath(bldFile, varPathPrefix->Root);
+        }
         return true;
     }
     return false;
@@ -352,29 +428,6 @@ inline TString SmarterJoin(TStringBuf path, TStringBuf file) {
         return TString::Join(path, file);
     }
     return TString::Join(path, PATH_SEP_S, file);
-}
-
-inline TString SmartJoin(TStringBuf path, TStringBuf file) {
-    Validate(path);
-    if (!file) {
-        return TString(path);
-    }
-    TStringBuf cutPath = CutType(path);
-    return ConstructPath(TSplit(cutPath).ParsePart(file).Reconstruct(), GetType(path));
-}
-
-inline TString GenPath(TStringBuf dirname, TStringBuf name) {
-    return SmartJoin(dirname, name);
-}
-
-// same as GenPath but always places $S
-inline TString GenSourcePath(TStringBuf dirname, TStringBuf name) {
-    return SetType(SmartJoin(dirname, name), Source);
-}
-
-// same as GenPath but always places $B
-inline TString GenBuildPath(TStringBuf dirname, TStringBuf name) {
-    return SetType(SmartJoin(dirname, name), Build);
 }
 
 inline TString GenResultPath(TStringBuf module, TStringBuf origin) {
