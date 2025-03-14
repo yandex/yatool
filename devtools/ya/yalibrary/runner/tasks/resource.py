@@ -132,8 +132,6 @@ class PrepareResource(object):
         accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
         resource_type = self.parsed_uri.resource_type
 
-        logging.debug("accepted_resource_types={}".format(repr(accepted_resource_types)))
-
         assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
             resource_type, ', '.join(sorted(accepted_resource_types))
         )
