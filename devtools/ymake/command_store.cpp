@@ -55,7 +55,7 @@ namespace {
                     if (auto xfm = std::get_if<NCommands::TSyntax::TTransformation>(&term)) {
                         auto cutoff = std::find_if(
                             xfm->Mods.begin(), xfm->Mods.end(),
-                            [&](auto& mod) {return Condition(Mods.Func2Id(mod.Name));}
+                            [&](auto& mod) {return Condition(Mods.Func2Id(mod.Function));}
                         );
                         if (cutoff == xfm->Mods.end()) {
                             ReduceCmd(xfm->Body);
@@ -128,24 +128,16 @@ namespace {
 
         NPolexpr::TConstId ApplyMod(const NCommands::TSyntax::TTransformation::TModifier& mod, NPolexpr::TConstId val) {
             TVector<NPolexpr::TConstId> args;
-            args.reserve(mod.Values.size() + 1);
-            for (auto& modVal : mod.Values) {
+            args.reserve(mod.Arguments.size() + 1);
+            for (auto& modArg : mod.Arguments) {
                 TVector<NPolexpr::TConstId> catArgs;
-                catArgs.reserve(modVal.size());
-                for (auto& modTerm : modVal) {
-                    catArgs.push_back(std::visit(TOverloaded{
-                        [&](NPolexpr::TConstId id) {
-                            return id;
-                        },
-                        [&](NPolexpr::EVarId id) {
-                            return Wrap(Evaluate(id));
-                        },
-                    }, modTerm));
-                }
+                catArgs.reserve(modArg.size());
+                for (auto& modTerm : modArg)
+                    catArgs.push_back(EvalTerm(modTerm));
                 args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Cat), std::span(catArgs))));
             }
             args.push_back(val);
-            return Wrap(Evaluate(Mods.Func2Id(mod.Name), std::span(args)));
+            return Wrap(Evaluate(Mods.Func2Id(mod.Function), std::span(args)));
         }
 
     private:
@@ -428,7 +420,10 @@ private:
         for (auto& arg : x.Body)
             for (auto& term : arg)
                 term = LockVariables(std::move(term));
-        // TBD: TModifier::TValueTerm does not support TUnexpanded; do we need it there, as well?
+        for (auto& mod : x.Mods)
+            for (auto& arg : mod.Arguments)
+                for (auto& term : arg)
+                    term = LockVariables(std::move(term));
         return std::move(x);
     }
 
@@ -450,7 +445,10 @@ private:
         for (auto& arg : x.Body)
             for (auto& term : arg)
                 term = UnlockVariables(std::move(term));
-        // TBD: TModifier::TValueTerm does not support TUnexpanded; do we need it there, as well?
+        for (auto& mod : x.Mods)
+            for (auto& arg : mod.Arguments)
+                for (auto& term : arg)
+                    term = UnlockVariables(std::move(term));
         return std::move(x);
     }
 
@@ -484,9 +482,9 @@ void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TS
     }
 }
 
-void TCommands::TInliner::InlineModValueTerm(
-    const NCommands::TSyntax::TTransformation::TModifier::TValueTerm& term,
-    NCommands::TSyntax::TTransformation::TModifier::TValue& writer
+void TCommands::TInliner::InlineModArgTerm(
+    const NCommands::TSyntax::TTerm& term,
+    NCommands::TSyntax::TArgument& writer
 ) {
     ++Depth;
     Y_DEFER {--Depth;};
@@ -514,53 +512,84 @@ void TCommands::TInliner::InlineModValueTerm(
                 writer.push_back(id);
                 return;
             }
-            auto recurse = [&](auto subId) {
+            for (auto&& subTerm : def.Definition->Script[0][0]) {
                 if (def.LegacyMode != ELegacyMode::None) {
                     Y_ASSERT(LegacyVars.RecursionDepth.contains(id));
                     ++LegacyVars.RecursionDepth[id];
                     Y_DEFER {--LegacyVars.RecursionDepth[id];};
-                    InlineModValueTerm(subId, writer);
+                    InlineModArgTerm(subTerm, writer);
                 } else
-                    InlineModValueTerm(subId, writer);
-            };
-            for (auto&& thatTerm : def.Definition->Script[0][0]) {
-                std::visit(TOverloaded{
-                    [&](NPolexpr::TConstId subId) {
-                        recurse(subId);
-                    },
-                    [&](NPolexpr::EVarId subId) {
-                        recurse(subId);
-                    },
-                    [&](const NCommands::TSyntax::TTransformation& xfm) {
-                        if (xfm.Mods.empty() && xfm.Body.size() == 1 && xfm.Body.front().size() == 1 && std::visit(TOverloaded{
-                            [&](NPolexpr::EVarId subId) {
-                                recurse(subId);
-                                return true;
-                            },
-                            [&](const NCommands::TSyntax::TUnexpanded& x) {
-                                writer.push_back(x.Variable);
-                                return true;
-                            },
-                            [](auto&) {
-                                return false;
-                            }
-                        }, xfm.Body.front().front()))
-                            return;
-                        ythrow TError() << "cannot sub-substitute";
-                    },
-                    [&](const NCommands::TSyntax::TCall&) {
-                        throw TNotImplemented();
-                    },
-                    [&](const NCommands::TSyntax::TIdOrString&) {
-                        Y_ABORT();
-                    },
-                    [&](const NCommands::TSyntax::TUnexpanded& x) {
-                        writer.push_back(x.Variable);
-                    },
-                }, thatTerm);
+                    InlineModArgTerm(subTerm, writer);
             }
         },
+        [&](const NCommands::TSyntax::TTransformation& xfm) {
+            auto newXfm = NCommands::TSyntax::TTransformation();
+            InlineXfm(xfm, newXfm);
+            writer.push_back(std::move(newXfm));
+        },
+        [&](const NCommands::TSyntax::TCall&) {
+            throw TNotImplemented();
+        },
+        [&](const NCommands::TSyntax::TIdOrString&) {
+            Y_ABORT();
+        },
+        [&](const NCommands::TSyntax::TUnexpanded& x) {
+            writer.push_back(x.Variable);
+        },
     }, term);
+}
+
+void TCommands::TInliner::InlineXfm(
+    const NCommands::TSyntax::TTransformation& xfm,
+    NCommands::TSyntax::TTransformation& writer
+) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
+    writer.Mods.reserve(xfm.Mods.size());
+    for (auto& mod : xfm.Mods) {
+        writer.Mods.push_back({mod.Function, {}});
+        auto& newMod = writer.Mods.back();
+        newMod.Arguments.reserve(mod.Arguments.size());
+        for (auto& arg : mod.Arguments) {
+            auto& newArg = newMod.Arguments.emplace_back();
+            newArg.reserve(arg.size());
+            for (auto& term : arg) {
+                InlineModArgTerm(term, newArg);
+            }
+        }
+    }
+    bool bodyInlined = [&](){
+        if (xfm.Body.size() == 1 && xfm.Body.front().size() == 1) {
+            if (auto var = std::get_if<NPolexpr::EVarId>(&xfm.Body.front().front())) {
+                auto def = GetVariableDefinition(*var);
+                if (!def.Definition)
+                    return false;
+                if (def.Definition->Script.size() == 0)
+                    return true;
+                if (def.Definition->Script.size() != 1)
+                    ythrow TError() << "unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
+                NCommands::TSyntax newBody;
+                TCmdWriter newWriter(newBody, false);
+                if (def.LegacyMode != ELegacyMode::None) {
+                    Y_ASSERT(LegacyVars.RecursionDepth.contains(*var));
+                    ++LegacyVars.RecursionDepth[*var];
+                    Y_DEFER {--LegacyVars.RecursionDepth[*var];};
+                    InlineCommands(def.Definition->Script, newWriter);
+                } else
+                    InlineCommands(def.Definition->Script, newWriter);
+                if (newBody.Script.size() == 0)
+                    return true;
+                if (newBody.Script.size() != 1)
+                    ythrow TError() << "totally unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
+                    writer.Body = std::move(newBody.Script[0]);
+                return true;
+            }
+        }
+        return false;
+    }();
+    if (!bodyInlined)
+        writer.Body = xfm.Body;
 }
 
 void TCommands::TInliner::InlineScalarTerms(
@@ -606,50 +635,7 @@ void TCommands::TInliner::InlineScalarTerms(
             },
             [&](const NCommands::TSyntax::TTransformation& xfm) {
                 auto newXfm = NCommands::TSyntax::TTransformation();
-                newXfm.Mods.reserve(xfm.Mods.size());
-                for (auto& mod : xfm.Mods) {
-                    newXfm.Mods.push_back({mod.Name, {}});
-                    auto& newMod = newXfm.Mods.back();
-                    newMod.Values.reserve(mod.Values.size());
-                    for (auto& val : mod.Values) {
-                        auto& newVal = newMod.Values.emplace_back();
-                        newVal.reserve(val.size());
-                        for (auto& term : val) {
-                            InlineModValueTerm(term, newVal);
-                        }
-                    }
-                }
-                bool bodyInlined = [&](){
-                    if (xfm.Body.size() == 1 && xfm.Body.front().size() == 1) {
-                        if (auto var = std::get_if<NPolexpr::EVarId>(&xfm.Body.front().front())) {
-                            auto def = GetVariableDefinition(*var);
-                            if (!def.Definition)
-                                return false;
-                            if (def.Definition->Script.size() == 0)
-                                return true;
-                            if (def.Definition->Script.size() != 1)
-                                ythrow TError() << "unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
-                            NCommands::TSyntax newBody;
-                            TCmdWriter newWriter(newBody, false);
-                            if (def.LegacyMode != ELegacyMode::None) {
-                                Y_ASSERT(LegacyVars.RecursionDepth.contains(*var));
-                                ++LegacyVars.RecursionDepth[*var];
-                                Y_DEFER {--LegacyVars.RecursionDepth[*var];};
-                                InlineCommands(def.Definition->Script, newWriter);
-                            } else
-                                InlineCommands(def.Definition->Script, newWriter);
-                            if (newBody.Script.size() == 0)
-                                return true;
-                            if (newBody.Script.size() != 1)
-                                ythrow TError() << "totally unexpected multicommand in a substitution: " << Commands.Values.GetVarName(*var);
-                            newXfm.Body = std::move(newBody.Script[0]);
-                            return true;
-                        }
-                    }
-                    return false;
-                }();
-                if (!bodyInlined)
-                    newXfm.Body = xfm.Body;
+                InlineXfm(xfm, newXfm);
                 writer.WriteTerm(std::move(newXfm));
             },
             [&](const NCommands::TSyntax::TCall& call) {
@@ -910,9 +896,9 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
                     for (auto& mod : xfm.Mods) {
                         if (&mod != &xfm.Mods.front())
                             os << ", ";
-                        os << mod.Name;
-                        if (!mod.Values.empty())
-                            os << "/" << mod.Values.size(); // TODO print values
+                        os << mod.Function;
+                        if (!mod.Arguments.empty())
+                            PrintCmd(mod.Arguments, os);
                     }
                     if (!xfm.Mods.empty())
                         os << ": ";

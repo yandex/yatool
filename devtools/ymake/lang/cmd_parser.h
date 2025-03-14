@@ -49,19 +49,16 @@ namespace NCommands {
 
         struct TTransformation {
             struct TModifier {
-                using TValueTerm = std::variant<NPolexpr::EVarId, NPolexpr::TConstId>;
-                using TValue = TVector<TValueTerm>;
-                using TValues = TVector<TValue>;
-                EMacroFunction Name;
-                TValues Values;
+                EMacroFunction Function;
+                std::vector<TArgument> Arguments;
             };
-            TVector<TModifier> Mods;
-            TCommand Body;
+            std::vector<TModifier> Mods;
+            std::vector<TArgument> Body;
         };
 
         struct TCall {
             NPolexpr::EVarId Function;
-            TVector<TSyntax> Arguments;
+            std::vector<TSyntax> Arguments;
         };
 
         TScript Script;

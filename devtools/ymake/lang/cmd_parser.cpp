@@ -85,17 +85,17 @@ namespace {
         }
 
         std::any visitXModValue(CmdParser::XModValueContext *ctx) override {
-            GetCurrentXfm().Mods.back().Values.emplace_back();
+            GetCurrentXfm().Mods.back().Arguments.emplace_back();
             return visitChildren(ctx);
         }
 
         std::any visitXModValueT(CmdParser::XModValueTContext *ctx) override {
-            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
+            GetCurrentXfm().Mods.back().Arguments.back().push_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
             return visitChildren(ctx);
         }
 
         std::any visitXModValueV(CmdParser::XModValueVContext *ctx) override {
-            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertVar(Unvariable(ctx->getText())));
+            GetCurrentXfm().Mods.back().Arguments.back().push_back(Values.InsertVar(Unvariable(ctx->getText())));
             return visitChildren(ctx);
         }
 
@@ -104,7 +104,7 @@ namespace {
             if (!(text.size() > 3 && text.starts_with("${") && text.ends_with("}")))
                 throw yexception() << "bad variable name " << text;
             std::string_view sv(text.begin() + 2, text.end() - 1);
-            GetCurrentXfm().Mods.back().Values.back().push_back(Values.InsertVar(sv));
+            GetCurrentXfm().Mods.back().Arguments.back().push_back(Values.InsertVar(sv));
             return visitChildren(ctx);
         }
 
@@ -421,88 +421,71 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, const TModRegistry& mo
 
 namespace {
 
+    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder);
+
+    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder) {
+        std::visit(TOverloaded{
+            [&](NPolexpr::TConstId s) {
+                termsBuilder.Append(s);
+            },
+            [&](NPolexpr::EVarId v) {
+                termsBuilder.Append(v);
+            },
+            [&](const TSyntax::TTransformation& x) {
+                for (auto& m : x.Mods) {
+                    auto func = m.Function;
+                    if (mods.FuncArity(func) != m.Arguments.size() + 1)
+                        throw yexception()
+                            << "bad modifier argument count for " << m.Function
+                            << " (expected " << mods.FuncArity(func) - 1
+                            << ", given " << m.Arguments.size()
+                            << ")";
+                    termsBuilder.Append(mods.Func2Id(func));
+                    for (auto& v : m.Arguments) {
+                        if (v.size() == 1)
+                            CompileTerm(mods, v[0], termsBuilder);
+                        else {
+                            NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, mods.Func2Id(EMacroFunction::Cat));
+                            for (auto& t : v)
+                                CompileTerm(mods, t, catBuilder);
+                            catBuilder.Build<EMacroFunction>();
+                        }
+                    }
+                }
+                if (x.Body.size() == 1 && x.Body.front().size() == 1)
+                    // this special case is here mostly to reinforce the notion
+                    // that `${VAR}` should be equivalent to `$VAR`;
+                    // we use it with `${mods:VAR}`, as well,
+                    // to cut down on `Args(Terms(...))` wrappers;
+                    // conceptually, with proper typing support,
+                    // this should not be required
+                    CompileTerm(mods, x.Body.front().front(), termsBuilder);
+                else
+                    CompileArgs(mods, x.Body, termsBuilder);
+            },
+            [&](const TSyntax::TCall&) {
+                Y_ABORT();
+            },
+            [&](const TSyntax::TIdOrString&) {
+                Y_ABORT();
+            },
+            [&](const TSyntax::TUnexpanded&) {
+                Y_ABORT();
+            },
+        }, term);
+    }
+
     void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
         NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, mods.Func2Id(EMacroFunction::Args));
-        for (size_t arg = 0; arg != cmd.size(); ++arg) {
+        for (auto& arg : cmd) {
             NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, mods.Func2Id(EMacroFunction::Terms));
-            for (size_t term = 0; term != cmd[arg].size(); ++term) {
-                std::visit(TOverloaded{
-                    [&](NPolexpr::TConstId s) {
-                        termsBuilder.Append(s);
-                    },
-                    [&](NPolexpr::EVarId v) {
-                        termsBuilder.Append(v);
-                    },
-                    [&](const TSyntax::TTransformation& x) {
-                        for (auto&& m : x.Mods) {
-                            auto func = m.Name;
-                            if (mods.FuncArity(func) != m.Values.size() + 1)
-                                throw yexception()
-                                    << "bad modifier argument count for " << m.Name
-                                    << " (expected " << mods.FuncArity(func) - 1
-                                    << ", given " << m.Values.size()
-                                    << ")";
-                            termsBuilder.Append(mods.Func2Id(func));
-                            for (auto&& v : m.Values) {
-                                if (v.size() == 1) {
-                                    std::visit(TOverloaded{
-                                        [&](NPolexpr::TConstId id) {
-                                            termsBuilder.Append(id);
-                                        },
-                                        [&](NPolexpr::EVarId id) {
-                                            termsBuilder.Append(id);
-                                        }
-                                    }, v[0]);
-                                } else {
-                                    NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, mods.Func2Id(EMacroFunction::Cat));
-                                    for (auto&& t : v) {
-                                        std::visit(TOverloaded{
-                                            [&](NPolexpr::TConstId id) {
-                                                catBuilder.Append(id);
-                                            },
-                                            [&](NPolexpr::EVarId id) {
-                                                catBuilder.Append(id);
-                                            }
-                                        }, t);
-                                    }
-                                    catBuilder.Build<EMacroFunction>();
-                                }
-                            }
-                        }
-                        auto justOneThing
-                            = x.Body.size() == 1 && x.Body.front().size() == 1
-                            ? &x.Body.front().front()
-                            : nullptr;
-                        // these special cases are here mostly to reinforce the notion
-                        // that `${VAR}` should be equivalent to `$VAR`;
-                        // we use it with `${mods:VAR}`, as well,
-                        // to cut down on `Args(Terms(...))` wrappers
-                        // (the "const" version may appear as a result of preevaluation);
-                        // conceptually, with proper typing support,
-                        // this should not be required
-                        if (auto* id = std::get_if<NPolexpr::TConstId>(justOneThing)) {
-                            termsBuilder.Append(*id);
-                        } else if (auto* id = std::get_if<NPolexpr::EVarId>(justOneThing)) {
-                            termsBuilder.Append(*id);
-                        } else {
-                            CompileArgs(mods, x.Body, termsBuilder);
-                        }
-                    },
-                    [&](const TSyntax::TCall&) {
-                        Y_ABORT();
-                    },
-                    [&](const TSyntax::TIdOrString&) {
-                        Y_ABORT();
-                    },
-                    [&](const TSyntax::TUnexpanded&) {
-                        Y_ABORT();
-                    },
-                }, cmd[arg][term]);
-            }
+            for (auto& term : arg)
+                CompileTerm(mods, term, termsBuilder);
             termsBuilder.Build<EMacroFunction>();
         }
         argsBuilder.Build<EMacroFunction>();
     }
+
 }
 
 NPolexpr::TExpression NCommands::Compile(const TModRegistry& mods, const TSyntax& s) {
