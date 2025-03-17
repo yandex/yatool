@@ -243,7 +243,7 @@ class Source(object):
         elif self._use_hardlinks():
             exts.fs.hardlink_tree(source, destination)
         else:
-            package.fs_util.copy_tree(source, destination, symlinks=self.keep_symlinks())
+            package.fs_util.copy_tree(source, destination, symlinks=self.keep_symlinks(), dirs_exist_ok=True)
 
     def copy(self, source, destination):
         if _is_dir_path(source):
@@ -334,7 +334,7 @@ class Source(object):
             if _is_dir_path(destination):
                 destination = os.path.join(destination, os.path.basename(source))
 
-            if os.path.exists(destination):
+            if os.path.exists(destination) and not (os.path.isdir(source) and os.path.isdir(destination)):
                 raise YaPackageSourceException('File or directory {} already exists'.format(destination))
 
             self.create_directory_if_necessary(os.path.dirname(destination))
