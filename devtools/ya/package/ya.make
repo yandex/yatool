@@ -22,6 +22,7 @@ PY_SRCS(
     debian_uploader/__init__.py
     debian_uploader/uploader_curl.py
     debian_uploader/uploader_dist.py
+    debian_uploader/uploader_dist2.py
     package_tree/__init__.py
     package_tree/consts.py
     package_tree/tree.py

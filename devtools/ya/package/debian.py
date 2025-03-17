@@ -21,9 +21,7 @@ import package.noconffiles
 import package.process
 from devtools.ya.package import const
 
-
 logger = logging.getLogger(__name__)
-
 
 DEBUILD_COMMAND = 'debuild'
 
@@ -106,6 +104,13 @@ def create_debian_package(
     debian_arch,
     debian_distribution,
     debian_upload_token,
+    dist2_repo,
+    dist2_repo_pgp_private_key,
+    dist2_repo_reindex,
+    dist2_repo_s3_access_key,
+    dist2_repo_s3_bucket,
+    dist2_repo_s3_endpoint,
+    dist2_repo_s3_secret_key,
 ):
     package_name = package_context.package_name
     package_version = package_context.version
@@ -165,10 +170,21 @@ def create_debian_package(
                     upload_opts.debian_arch = debian_arch
                     upload_opts.debian_upload_token = debian_upload_token
 
+                    if dist2_repo:
+                        upload_opts.dist2_repo_pgp_private_key = dist2_repo_pgp_private_key
+                        upload_opts.dist2_repo_reindex = dist2_repo_reindex
+                        upload_opts.dist2_repo_s3_access_key = dist2_repo_s3_access_key
+                        upload_opts.dist2_repo_s3_bucket = dist2_repo_s3_bucket
+                        upload_opts.dist2_repo_s3_endpoint = dist2_repo_s3_endpoint
+                        upload_opts.dist2_repo_s3_secret_key = dist2_repo_s3_secret_key
+
                     publish_to_curl_list = []
                     publish_to_dist_list = []
+                    publish_to_dist2_repo_list = []
                     for rep in publish_to_list:
-                        if rep.startswith('http://') or rep.startswith('https://'):
+                        if dist2_repo:
+                            publish_to_dist2_repo_list.append(rep)
+                        elif rep.startswith(('http://', 'https://')):
                             publish_to_curl_list.append(rep)
                         else:
                             publish_to_dist_list.append(rep)
@@ -181,6 +197,10 @@ def create_debian_package(
                         upload_dist_opts = upload_opts
                         upload_dist_opts.publish_to_list = publish_to_list
                         uploader.uploader_dist.upload_package(temp_dir, full_package_name, upload_dist_opts)
+                    if publish_to_dist2_repo_list:
+                        upload_dist_opts = upload_opts
+                        upload_dist_opts.publish_to_list = publish_to_list
+                        uploader.uploader_dist2.upload_package(temp_dir, full_package_name, upload_dist_opts)
         finally:
             # Move result_dir back
             shutil.move(new_result_dir, result_dir)

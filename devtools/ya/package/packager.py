@@ -849,6 +849,13 @@ def create_package(package_context, output_root, builds):
                     params.debian_arch,
                     params.debian_distribution,
                     params.debian_upload_token,
+                    params.dist2_repo,
+                    params.dist2_repo_pgp_private_key,
+                    params.dist2_repo_reindex,
+                    params.dist2_repo_s3_access_key,
+                    params.dist2_repo_s3_bucket,
+                    params.dist2_repo_s3_endpoint,
+                    params.dist2_repo_s3_secret_key,
                 )
 
             elif package_format == const.PackageFormat.RPM:

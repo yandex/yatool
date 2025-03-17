@@ -308,6 +308,33 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             params.run_tests = test_opts.RunTestOptions.RunAllTests
 
 
+class Dist2RepoCustomizableOptions(devtools.ya.core.yarg.Options):
+    def __init__(self):
+        self.dist2_repo_s3_access_key = None
+        self.dist2_repo_s3_secret_key = None
+        self.dist2_repo_pgp_private_key = None
+
+    @staticmethod
+    def consumer():
+        return [
+            devtools.ya.core.yarg.EnvConsumer(
+                'DIST2_REPO_S3_ACCESS_KEY',
+                help='Dist 2.0 S3 access key',
+                hook=devtools.ya.core.yarg.SetValueHook('dist2_repo_s3_access_key'),
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'DIST2_REPO_S3_SECRET_KEY',
+                help='Dist 2.0 S3 secret key',
+                hook=devtools.ya.core.yarg.SetValueHook('dist2_repo_s3_secret_key'),
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'DIST2_REPO_PGP_PRIVATE_KEY',
+                help='Dist 2.0 PGP private key',
+                hook=devtools.ya.core.yarg.SetValueHook('dist2_repo_pgp_private_key'),
+            ),
+        ]
+
+
 class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
     """
     Don't add parameters here by default, otherwise user could use them in package.json.
@@ -337,6 +364,10 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.debian_arch = None
         self.debian_compression_level = None
         self.debian_compression_type = 'gzip'
+        self.dist2_repo = False
+        self.dist2_repo_reindex = True
+        self.dist2_repo_s3_bucket = None
+        self.dist2_repo_s3_endpoint = 'http://s3.mds.yandex.net'
         self.docker_add_host = []
         self.docker_build_arg = {}
         self.docker_build_network = None
@@ -669,6 +700,34 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--dupload-no-mail'],
                 help='dupload --no-mail',
                 hook=devtools.ya.core.yarg.SetConstValueHook('dupload_no_mail', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DEB_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--dist2-repo'],
+                help='Use Dist 2.0 reposiroty',
+                hook=devtools.ya.core.yarg.SetConstValueHook('dist2_repo', False),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DEB_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--dist2-repo-s3-bucket'],
+                help='Dist 2.0 S3 bucket',
+                hook=devtools.ya.core.yarg.SetValueHook('dist2_repo_s3_bucket'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DEB_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--dist2-repo-s3-endpoint'],
+                help='Dist 2.0 S3 endpoint',
+                hook=devtools.ya.core.yarg.SetValueHook('dist2_repo_s3_endpoint'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DEB_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--dist2-repo-reindex'],
+                help='Dist 2.0 reindex repo',
+                hook=devtools.ya.core.yarg.SetConstValueHook('dist2_repo_reindex', True),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DEB_SUBGROUP,
             ),

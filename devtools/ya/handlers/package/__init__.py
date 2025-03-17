@@ -33,6 +33,7 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
                 package_opts.PackageOperationalOptions(),
                 package_opts.PackageCustomizableOptions(),
                 package_opts.InterimOptions(),
+                package_opts.Dist2RepoCustomizableOptions(),
                 devtools.ya.core.common_opts.LogFileOptions(),
                 devtools.ya.core.common_opts.EventLogFileOptions(),
                 build_opts.BuildTypeOptions('release'),
