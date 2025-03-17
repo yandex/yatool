@@ -572,7 +572,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     NYMake::TTraceStage stage{"Load Deps cache"};
     YDebug() << "load cache from " << file << Endl;
 
-    bool useYmakeCache = !Conf.CachePath.empty();
+    bool useYmakeCache = Conf.ShouldUseOnlyYmakeCache();
     auto forceLoad = useYmakeCache || Conf.ReadFsCache && !Conf.ReadDepsCache;
     TCacheFileReader cacheReader(Conf, forceLoad, true);
 

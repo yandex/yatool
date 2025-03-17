@@ -167,6 +167,35 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
     }
 }
 
+void TBuildConfiguration::PostProcessCacheOptions() {
+    UseOnlyYmakeCache_ = CachePath.IsDefined();
+    if (CachePath.IsDefined()) {
+        WriteFsCache = false;
+        WriteDepsCache = false;
+        WriteJsonCache = false;
+        WriteDepManagementCache = false;
+        WriteUidsCache = false;
+    } else {
+        CachePath = YmakeCache;
+    }
+    auto dumpCacheFlags = [](const char* cacheName, bool rFlag, bool wFlag) {
+        if (rFlag) {
+            YDebug() << cacheName << " cache loading is enabled" << Endl;
+        }
+        if (wFlag) {
+            YDebug() << cacheName << " cache saving is enabled" << Endl;
+        }
+    };
+    dumpCacheFlags("Conf", ReadConfCache, WriteConfCache);
+    dumpCacheFlags("FS", ReadFsCache, WriteFsCache);
+    dumpCacheFlags("Deps", ReadDepsCache, WriteDepsCache);
+    dumpCacheFlags("DepManagement", ReadDepManagementCache, WriteDepManagementCache);
+    dumpCacheFlags("Json", ReadJsonCache, WriteJsonCache);
+    dumpCacheFlags("Uids", ReadUidsCache, WriteUidsCache);
+
+    LoadGraph_ = (!RebuildGraph && WriteYdx.empty() || ReadFsCache || ReadDepsCache) && CachePath.Exists();
+}
+
 void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DisableHumanReadableOutput) {
         Display()->SetStream(LockedStream());
@@ -202,6 +231,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     TCommandLineOptions::PostProcess(freeArgs);
     TStartUpOptions::PostProcess(freeArgs);
     TDebugOptions::PostProcess(freeArgs);
+    PostProcessCacheOptions();
 
     if (CheckDataPaths && !ArcadiaTestsDataRoot.IsDefined()) {
         throw TConfigurationError() << "-b (arcadia tests data path) is not specified";

@@ -203,6 +203,14 @@ public:
         return YmakeSaveAllCachesWhenBadLoops_;
     }
 
+    bool ShouldUseOnlyYmakeCache() const noexcept {
+        return UseOnlyYmakeCache_;
+    }
+
+    bool ShouldLoadGraph() const noexcept {
+        return LoadGraph_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
     IMemoryPool* GetStringPool() const { return StrPool.Get(); }
@@ -219,6 +227,7 @@ private:
     void FillMiscValues();
     void InitExcludedPeerdirs();
     void CompileAndRecalcAllConditions();
+    void PostProcessCacheOptions();
 
     bool TraverseRecurses = false;
     bool TraverseAllRecurses = false;     // Including RECURSE_FOR_TESTS
@@ -239,6 +248,9 @@ private:
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
     bool YmakeSaveAllCachesWhenBadLoops_ = false;
+
+    bool UseOnlyYmakeCache_ = false;
+    bool LoadGraph_ = false;
 
     TStringBuf UidsSalt;
     TStringBuf ExportSourceRoot;

@@ -2,6 +2,7 @@
 
 #include <library/cpp/getopt/small/last_getopt.h>
 
+#include <util/folder/path.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 
@@ -12,7 +13,7 @@ struct TCommandLineOptions {
     TVector<TString> ManagedDepTreeRoots;
     TVector<TString> DumpDMRoots;
     TString WriteMetaData;
-    TString CachePath;
+    TFsPath CachePath;
     TString PatchPath;
 
     bool Test = false;

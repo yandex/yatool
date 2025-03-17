@@ -690,50 +690,17 @@ int main_real(TBuildConfiguration& conf) {
     }
 
     TErrorsGuard errorsGuard(conf);
-    bool updateGraph = !conf.RebuildGraph && conf.WriteYdx.empty();
-    bool useOnlyYmakeCache = conf.CachePath.size();
-    TFsPath cachePath;
-    if (conf.CachePath.size() > 0) {
-        cachePath = TFsPath(conf.CachePath);
-        conf.WriteFsCache = false;
-        conf.WriteDepsCache = false;
-        conf.WriteJsonCache = false;
-        conf.WriteDepManagementCache = false;
-        conf.WriteUidsCache = false;
-    } else {
-        cachePath = conf.YmakeCache;
-    }
 
-    auto dumpCacheFlags = [](const char* cacheName, bool rFlag, bool wFlag) {
-        if (rFlag) {
-            YDebug() << cacheName << " cache loading is enabled" << Endl;
-        }
-        if (wFlag) {
-            YDebug() << cacheName << " cache saving is enabled" << Endl;
-        }
-    };
-    dumpCacheFlags("Conf", conf.ReadConfCache, conf.WriteConfCache);
-    dumpCacheFlags("FS", conf.ReadFsCache, conf.WriteFsCache);
-    dumpCacheFlags("Deps", conf.ReadDepsCache, conf.WriteDepsCache);
-    dumpCacheFlags("DepManagement", conf.ReadDepManagementCache, conf.WriteDepManagementCache);
-    dumpCacheFlags("Json", conf.ReadJsonCache, conf.WriteJsonCache);
-    dumpCacheFlags("Uids", conf.ReadUidsCache, conf.WriteUidsCache);
-
-    bool loadGraph = updateGraph || conf.ReadFsCache || conf.ReadDepsCache;
-
-    if (!cachePath.Exists()) {
-        if (useOnlyYmakeCache) {
-            YErr() << "Can not load ymake.cache. File does not exist: " << conf.YmakeCache << Endl;
-            return BR_FATAL_ERROR;
-        }
-        loadGraph = false;
+    if (!conf.CachePath.Exists() && conf.ShouldUseOnlyYmakeCache()) {
+        YErr() << "Can not load ymake.cache. File does not exist: " << conf.YmakeCache << Endl;
+        return BR_FATAL_ERROR;
     }
 
     THolder<TYMake> yMake(new TYMake(conf, errorsGuard.HasConfigureErrorsOnPrevLaunch()));
 
-    if (loadGraph) {
-        if (!yMake->Load(cachePath)) {
-            if (useOnlyYmakeCache) {
+    if (conf.ShouldLoadGraph()) {
+        if (!yMake->Load(conf.CachePath)) {
+            if (conf.ShouldUseOnlyYmakeCache()) {
                 YErr() << "Cache was not loaded. Stop." << Endl;
                 return BR_FATAL_ERROR;
             }
@@ -782,7 +749,7 @@ int main_real(TBuildConfiguration& conf) {
         }
 
         TMaybe<EBuildResult> configureBuildRes;
-        if (useOnlyYmakeCache || yMake->CanBypassConfigure()) {
+        if (conf.ShouldUseOnlyYmakeCache() || yMake->CanBypassConfigure()) {
             configureBuildRes = StaticConfigureGraph(yMake);
         } else {
             yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
