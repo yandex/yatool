@@ -37,8 +37,7 @@ namespace NYMake::NResourcePacker {
             TVector<TStringBuf> kv;
             append(kv, Objects_.paths, Objects_.keys, Objects_.kvs);
             TString lid = GetHashForOutput(std::move(kv));
-            TFsPath cwd = "${CURDIR}";
-            TString outputObj = cwd / TFsPath(TString::Join("objcopy_", lid, ".o"));
+            TString outputObj = TString::Join("${BINDIR}/objcopy_", lid, ".o");
 
             auto targetPlatform = GetTargetPlatform();
             TVector<TString> cmdArgs;
@@ -55,7 +54,7 @@ namespace NYMake::NResourcePacker {
             append_if(Objects_.paths.size() > 0, cmdArgs, "IN"sv, Objects_.paths);
             append(cmdArgs,
                    "TOOL"sv, Unit_.Get("_TOOL_RESCOMPRESSOR"), Unit_.Get("_TOOL_RESCOMPILER"),
-                   "OUT_NOAUTO"sv, outputObj);
+                   "OUT_GLOBAL"sv, outputObj);
 
             if (UseTextContext_) {
                 auto inputsMap = PrepareInputs(Objects_.paths);
@@ -63,10 +62,6 @@ namespace NYMake::NResourcePacker {
             }
 
             RunMacro("RUN_PYTHON3"sv, cmdArgs);
-
-            if (Unit_.Get("MODULE_TAG") != "CPP_PROTO"sv) {
-                Unit_.CallMacro("SRCS"sv, {"GLOBAL"sv, outputObj});
-            }
 
             EstimatedCmdLen_ = 0;
             Objects_.paths.clear();
