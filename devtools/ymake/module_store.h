@@ -119,8 +119,10 @@ public:
 
     THolder<TOwnEntries> ExtractSharedEntries(ui32 makefileId);;
 
-    TModuleNodeIds& GetModuleNodeIds(ui32 moduleId);
+    TModuleNodeLists GetModuleNodeLists(ui32 moduleId);
+    TModuleNodeLists GetModuleNodeLists(ui32 moduleId) const;
 
+    TModuleNodeIds& GetModuleNodeIds(ui32 moduleId);
     const TModuleNodeIds& GetModuleNodeIds(ui32 moduleId) const;
 
     TGlobalVars& GetGlobalVars(ui32 moduleId);

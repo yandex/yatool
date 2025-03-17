@@ -683,10 +683,8 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
                 TUniqVector<TNodeId> deps;
                 if (mod->GetPeerdirType() == EPT_BuildFrom) {
-                    const auto& lists = RestoreContext.Modules.GetNodeListStore();
-                    const auto& ids = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
-                    const auto& managedPeers = ids.UniqPeers;
-                    for (auto peerId : lists.GetList(managedPeers)) {
+                    const auto& managedPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers();
+                    for (auto peerId : managedPeers) {
                         auto peerModule = RestoreContext.Modules.Get(Graph.Get(peerId)->ElemId);
                         if (peerModule->IsFakeModule()) {
                             continue;
@@ -1223,8 +1221,8 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
             seenVars->insert(varName);
         }
 
-        const auto managedPeersListId = RestoreContext.Modules.GetModuleNodeIds(moduleElemId).UniqPeers;
-        for (TNodeId peerNodeId : RestoreContext.Modules.GetNodeListStore().GetList(managedPeersListId)) {
+        const auto& managedPeersListId = RestoreContext.Modules.GetModuleNodeLists(moduleElemId).UniqPeers();
+        for (TNodeId peerNodeId : managedPeersListId) {
             ui32 peerModuleElemId = RestoreContext.Graph[peerNodeId]->ElemId;
             addVarsFromModule(peerModuleElemId);
         }

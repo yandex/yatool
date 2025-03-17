@@ -738,9 +738,7 @@ namespace {
 
                 // Generate Misconfiguration error for DM errors on exists peers
                 const auto& modules = RestoreContext.Modules;
-                const auto& moduleLists = modules.GetModuleNodeIds(parent->GetId());
-                const auto& managedPeerClosureNodes = modules.GetNodeListStore().GetList(moduleLists.UniqPeers);
-                for (auto managedPeerClosureNode: managedPeerClosureNodes) {
+                for (auto managedPeerClosureNode: modules.GetModuleNodeLists(parent->GetId()).UniqPeers()) {
                     const auto* subModule = GetModule(managedPeerClosureNode);
                     auto peerDir = subModule->GetDir().CutAllTypes();
                     auto errIt = DMConfErrors.find(peerDir);
@@ -823,11 +821,7 @@ namespace {
         TVector<TNodeId> HandleUnmanageables(TStateItem& parentItem, TModule& parent) const {
             TUniqVector<TNodeId> unmanageablePeersClosure;
             auto& modules = RestoreContext.Modules;
-            auto& listStore = modules.GetNodeListStore();
-            auto& parentLists = modules.GetModuleNodeIds(parent.GetId());
-            auto& parentPeersClosureListId = parentLists.UniqPeers;
-            const auto& parentPeersClosure = listStore.GetList(parentPeersClosureListId);
-            for (TNodeId peer : parentPeersClosure) {
+            for (TNodeId peer : modules.GetModuleNodeLists(parent.GetId()).UniqPeers()) {
                 for (TNodeId unpeer : ManagedPeers.at(peer).UnmanageablePeersClosure) {
                     unmanageablePeersClosure.Push(unpeer);
                 }
@@ -1138,7 +1132,7 @@ namespace {
             : RestoreContext{restoreContext}
             , DMConf{restoreContext.Conf.CommandConf}
             , StartModule{startModule}
-            , StartModuleManagedDeps{restoreContext.Modules.GetNodeListStore().GetList(restoreContext.Modules.GetModuleNodeIds(startModule.GetId()).UniqPeers)} {
+            , StartModuleManagedDeps{restoreContext.Modules.GetModuleNodeLists(startModule.GetId()).UniqPeers()} {
         }
 
         enum EResolution {
@@ -1239,7 +1233,7 @@ namespace {
             if (!inserted) {
                 return it->second;
             }
-            for (TNodeId peerId: RestoreContext.Modules.GetNodeListStore().GetList(RestoreContext.Modules.GetModuleNodeIds(moduleId).UniqPeers)) {
+            for (TNodeId peerId: RestoreContext.Modules.GetModuleNodeLists(moduleId).UniqPeers()) {
                 auto* peer = RestoreContext.Modules.Get(RestoreContext.Graph[peerId]->ElemId);
                 Y_ASSERT(peer);
                 if (DMConf.IsContribWithVer(*peer)) {
@@ -1251,8 +1245,7 @@ namespace {
         }
 
         bool CanFollow(const TModule& parent, const TConstDepNodeRef& peerNode) {
-            const auto managedPeersListId = RestoreContext.Modules.GetModuleNodeIds(parent.GetId()).UniqPeers;
-            if (RestoreContext.Modules.GetNodeListStore().GetList(managedPeersListId).has(peerNode.Id())) {
+            if (RestoreContext.Modules.GetModuleNodeLists(parent.GetId()).UniqPeers().has(peerNode.Id())) {
                 return true;
             }
 
@@ -1585,13 +1578,9 @@ void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EMan
             }
         }
         Cout << module->GetName().CutAllTypes() << Endl;
-        const auto& transitiveInfo = restoreContext.Modules.GetModuleNodeIds(module->GetId());
-        for (
-            TNodeId dep:
-            restoreContext.Modules.GetNodeListStore().GetList(
-                depth == EManagedPeersDepth::Direct ? transitiveInfo.ManagedDirectPeers : transitiveInfo.UniqPeers
-            )
-        ) {
+        auto transitiveInfo = restoreContext.Modules.GetModuleNodeLists(module->GetId());
+        const auto& peers = depth == EManagedPeersDepth::Direct ? transitiveInfo.ManagedDirectPeers() : transitiveInfo.UniqPeers();
+        for (TNodeId dep: peers) {
             const TModule* depModule = restoreContext.Modules.Get(restoreContext.Graph[dep]->ElemId);
             Y_ASSERT(depModule);
             if (depModule->GetAttrs().RequireDepManagement) {

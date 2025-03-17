@@ -19,11 +19,7 @@ bool IsReachableManagedDependency(const TRestoreContext& restoreContext, TDepRef
     if (!peer->GetAttrs().RequireDepManagement && !parent->GetAttrs().ConsumeNonManageablePeers) {
         return true;
     }
-
-    const TModuleNodeIds& nodes = restoreContext.Modules.GetModuleNodeIds(parent->GetId());
-    const auto& managedPeers = restoreContext.Modules.GetNodeListStore().GetList(nodes.UniqPeers);
-
-    return managedPeers.has(dep.To().Id());
+    return restoreContext.Modules.GetModuleNodeLists(parent->GetId()).UniqPeers().has(dep.To().Id());
 }
 
 template <typename TVisitorState = TEntryStats,

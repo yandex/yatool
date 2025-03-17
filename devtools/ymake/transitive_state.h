@@ -66,6 +66,42 @@ struct TModuleNodeIds {
     TNodeListStore::TListId ManagedDirectPeers;
 };
 
+class TModuleNodeLists {
+public:
+    TModuleNodeLists() noexcept = default;
+    TModuleNodeLists(const TNodeListStore& store, const TModuleNodeIds& ids) noexcept
+        : Store_{&store}, Ids_{&ids}
+    {}
+
+    const absl::flat_hash_set<TNodeId>& DepCommandIds() const noexcept{
+        return Ids_->DepCommandIds;
+    }
+
+    const THashSet<TNodeId>& LocalPeers() const noexcept {
+        return Ids_->LocalPeers;
+    }
+
+    const TUniqVector<TNodeId>& GlobalSrcsIds() const noexcept {
+        return Store_->GetList(Ids_->GlobalSrcsIds);
+    }
+
+    const TUniqVector<TNodeId>& UniqPeers() const noexcept {
+        return Store_->GetList(Ids_->UniqPeers);
+    }
+
+    const TUniqVector<TNodeId>& Tools() const noexcept {
+        return Store_->GetList(Ids_->Tools);
+    }
+
+    const TUniqVector<TNodeId>& ManagedDirectPeers() const noexcept {
+        return Store_->GetList(Ids_->ManagedDirectPeers);
+    }
+
+private:
+    const TNodeListStore* Store_{nullptr};
+    const TModuleNodeIds* Ids_{nullptr};
+};
+
 struct TRealPathRoots {
     TFsPath SourceRoot;
     TFsPath BuildRoot;

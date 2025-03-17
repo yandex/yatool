@@ -18,8 +18,7 @@ namespace {
 
     const TVector<TNodeId>& EffectivePeersClosure(const TRestoreContext& restoreContext, const TModule& module) {
         Y_ASSERT(module.GetAttrs().RequireDepManagement || module.IsPeersComplete());
-        const auto& nodeIds = restoreContext.Modules.GetModuleNodeIds(module.GetId());
-        return restoreContext.Modules.GetNodeListStore().GetList(nodeIds.UniqPeers).Data();
+        return restoreContext.Modules.GetModuleNodeLists(module.GetId()).UniqPeers().Data();
     }
 
     TMaybe<EConstraintsType> EvalConstraintType(TStringBuf macro, TStringBuf types) {
@@ -834,7 +833,7 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
         return;
     auto testNode = restoreContext.Graph.GetFileNodeById(module->GetId());
 
-    auto selfPeers = restoreContext.Modules.GetModuleNodeIds(testNode->ElemId).LocalPeers;
+    const auto& selfPeers = restoreContext.Modules.GetModuleNodeLists(testNode->ElemId).LocalPeers();
     TNodeId target = TNodeId::Invalid;
 
     for (const auto& edge: testedNode.Edges()) {

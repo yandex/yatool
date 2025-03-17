@@ -466,14 +466,13 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
 
     if (Module->GetAttrs().RequireDepManagement) {
         Y_ASSERT(Module->IsDependencyManagementApplied());
-        const auto& lists = Context.Modules.GetNodeListStore();
-        const auto& ids = Context.Modules.GetModuleNodeIds(Module->GetId());
+        const auto lists = Context.Modules.GetModuleNodeLists(Module->GetId());
         vars["MANAGED_PEERS_CLOSURE"];
         vars["MANAGED_PEERS"];
-        for (TNodeId peer: lists.GetList(ids.UniqPeers)) {
+        for (TNodeId peer: lists.UniqPeers()) {
             AddPath(vars["MANAGED_PEERS_CLOSURE"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
         }
-        for (TNodeId peer: lists.GetList(ids.ManagedDirectPeers)) {
+        for (TNodeId peer: lists.ManagedDirectPeers()) {
             AddPath(vars["MANAGED_PEERS"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
         }
         if (const auto* dmInfo = Context.Modules.FindExtraDependencyManagementInfo(Module->GetId())) {
@@ -493,14 +492,14 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
 
     if (moduleUsesPeers) {
         TString prefix(NDetail::TReserveTag{32});
-        auto& modIds = Context.Modules.GetModuleNodeIds(Module->GetId());
+        auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
 
-        for (const auto& glSrcId : Context.Modules.GetNodeListStore().GetList(modIds.GlobalSrcsIds)) {
+        for (const auto& glSrcId : modLists.GlobalSrcsIds()) {
             AddPath(vars["SRCS_GLOBAL"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(glSrcId))));
         }
         TUniqVector<TString> lateOuts;
         bool usePeersLateOuts = Module->GetAttrs().UsePeersLateOuts;
-        for (const auto& peer : Context.Modules.GetNodeListStore().GetList(modIds.UniqPeers)) {
+        for (const auto& peer : modLists.UniqPeers()) {
             const auto peerRef = Context.Graph[peer];
             ui32 elemId = peerRef->ElemId;
             if (usePeersLateOuts) {
@@ -522,7 +521,7 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
             if (peerModule->IsFinalTarget()) {
                 prefix += ",final";
             }
-            if (modIds.LocalPeers.contains(peer)) {
+            if (modLists.LocalPeers().contains(peer)) {
                 prefix += ",local";
             }
             (prefix += ",") += peerModule->GetTag();
@@ -560,8 +559,8 @@ void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars) {
     appendModVars(Module->GetId(), false);
 
     if (Module->GetAttrs().RequireDepManagement) {
-        const auto managedPeersId = Context.Modules.GetModuleNodeIds(Module->GetId()).UniqPeers;
-        for (TNodeId peer: Context.Modules.GetNodeListStore().GetList(managedPeersId)) {
+        const auto& managedPeers = Context.Modules.GetModuleNodeLists(Module->GetId()).UniqPeers();
+        for (TNodeId peer: managedPeers) {
             appendModVars(Context.Graph[peer]->ElemId, true);
         }
         if (const auto* dmInfo = Context.Modules.FindExtraDependencyManagementInfo(Module->GetId())) {
@@ -588,10 +587,10 @@ TModule* TModuleRestorer::RestoreModule() {
 void TModuleRestorer::GetModuleDepIds(THashSet<TNodeId>& ids) {
     MinePeers();
 
-    const auto& modIds = Context.Modules.GetModuleNodeIds(Module->GetId());
-    const auto& modUniquePeers = Context.Modules.GetNodeListStore().GetList(modIds.UniqPeers);
+    const auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
+    const auto& modUniquePeers = modLists.UniqPeers();
     ids.insert(modUniquePeers.begin(), modUniquePeers.end());
-    ids.insert(modIds.DepCommandIds.begin(), modIds.DepCommandIds.end());
+    ids.insert(modLists.DepCommandIds().begin(), modLists.DepCommandIds().end());
 }
 
 const TUniqVector<TNodeId>& TModuleRestorer::GetPeers() {
@@ -600,7 +599,7 @@ const TUniqVector<TNodeId>& TModuleRestorer::GetPeers() {
     } else {
         Y_ASSERT(Module->IsPeersComplete());
     }
-    return Context.Modules.GetNodeListStore().GetList(Context.Modules.GetModuleNodeIds(Module->GetId()).UniqPeers);
+    return Context.Modules.GetModuleNodeLists(Module->GetId()).UniqPeers();
 }
 
 const TUniqVector<TNodeId>& TModuleRestorer::GetTools() {
@@ -608,14 +607,14 @@ const TUniqVector<TNodeId>& TModuleRestorer::GetTools() {
         TMineToolsVisitor visitor{Context.Modules};
         IterateAll(Node, visitor);
     }
-    return Context.Modules.GetNodeListStore().GetList(Context.Modules.GetModuleNodeIds(Module->GetId()).Tools);
+    return Context.Modules.GetModuleNodeLists(Module->GetId()).Tools();
 }
 
 void TModuleRestorer::GetPeerDirIds(THashSet<TNodeId>& peerDirIds) {
     MinePeers();
 
-    const auto& modIds = Context.Modules.GetModuleNodeIds(Module->GetId());
-    for (const auto& peer : Context.Modules.GetNodeListStore().GetList(modIds.UniqPeers)) {
+    const auto& uniqPeers = Context.Modules.GetModuleNodeLists(Module->GetId()).UniqPeers();
+    for (const auto& peer : uniqPeers) {
         TModule* module = Context.Modules.Get(Context.Graph[peer]->ElemId);
         Y_ASSERT(module);
         peerDirIds.insert(Context.Graph.GetFileNode(module->GetDir()).Id());
@@ -624,7 +623,7 @@ void TModuleRestorer::GetPeerDirIds(THashSet<TNodeId>& peerDirIds) {
 
 const TUniqVector<TNodeId>& TModuleRestorer::GetGlobalSrcsIds() {
     MinePeers();
-    return Context.Modules.GetNodeListStore().GetList(Context.Modules.GetModuleNodeIds(Module->GetId()).GlobalSrcsIds);
+    return Context.Modules.GetModuleNodeLists(Module->GetId()).GlobalSrcsIds();
 }
 
 TModule* TModuleRestorer::GetModule() {

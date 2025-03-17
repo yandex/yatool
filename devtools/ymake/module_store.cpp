@@ -163,14 +163,12 @@ void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
     for (const auto& [modId, module] : ModulesById) {
         ::Save(output, modId);
 
-        const auto& moduleLists = GetModuleNodeIds(modId);
-        const auto& uniqPeers = GetNodeListStore().GetList(moduleLists.UniqPeers);
-        const auto& managedDirectPeers = GetNodeListStore().GetList(moduleLists.ManagedDirectPeers);
+        const auto moduleLists = GetModuleNodeLists(modId);
         TVector<ui32> uniqPeersIds, managedDirectPeersIds;
-        for (auto peer : uniqPeers) {
+        for (auto peer : moduleLists.UniqPeers()) {
             uniqPeersIds.push_back(graph.Get(peer)->ElemId);
         }
-        for (auto peer : managedDirectPeers) {
+        for (auto peer : moduleLists.ManagedDirectPeers()) {
             managedDirectPeersIds.push_back(graph.Get(peer)->ElemId);
         }
         THashMap<TString, TString> dmVars;
@@ -276,6 +274,14 @@ THolder<TOwnEntries> TModules::ExtractSharedEntries(ui32 makefileId) {
         return {};
     }
     return std::move(it->second);
+}
+
+TModuleNodeLists TModules::GetModuleNodeLists(ui32 moduleId) {
+    return {NodeListStore, ModuleIncludesById[moduleId].NodeIds};
+}
+
+TModuleNodeLists TModules::GetModuleNodeLists(ui32 moduleId) const {
+    return {NodeListStore, ModuleIncludesById.at(moduleId).NodeIds};
 }
 
 TModuleNodeIds& TModules::GetModuleNodeIds(ui32 moduleId) {

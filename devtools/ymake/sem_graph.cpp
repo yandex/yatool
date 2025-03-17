@@ -183,14 +183,12 @@ namespace {
             if (!TBase::Enter(state)) {
                 return false;
             }
-            const auto& lists = RestoreContext.Modules.GetNodeListStore();
             TVector<ui32> tests;
             const auto& topNode = state.TopNode();
             if (IsModuleType(topNode->NodeType)) {
                 const TModule* mod = RestoreContext.Modules.Get(topNode->ElemId);
                 if (mod->IsDependencyManagementApplied()) {
-                    const auto& modListIds = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
-                    const auto& managedPeersClosure = lists.GetList(modListIds.UniqPeers).Data();
+                    const auto& managedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
                     if (!managedPeersClosure.empty()) {
                         // Iterate all peers closure before add node ids, else peers of contrib peers will not add to sem graph,
                         // and as result node ids below will to point to absent nodes
@@ -264,11 +262,9 @@ namespace {
                 auto mod = RestoreContext.Modules.Get(dep.To()->ElemId);
                 if (mod && mod->IsDependencyManagementApplied()) {
                     // Add peers closure only for module under DM
-                    const auto& modListIds = RestoreContext.Modules.GetModuleNodeIds(mod->GetId());
-                    const auto& lists = RestoreContext.Modules.GetNodeListStore();
-                    const auto& managedPeersClosure = lists.GetList(modListIds.UniqPeers).Data();
+                    const auto& managedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
                     THashSet<TNodeId> closure(managedPeersClosure.begin(), managedPeersClosure.end());
-                    const auto& managedDirectPeers = lists.GetList(modListIds.ManagedDirectPeers).Data();
+                    const auto& managedDirectPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).ManagedDirectPeers().Data();
                     // Erase from closure set all direct peers
                     for (const auto directPeerId: managedDirectPeers) {
                         closure.erase(directPeerId);
@@ -333,16 +329,13 @@ namespace {
                 // Excludes can compute only if both modules under DM
                 return {};
             }
-            const auto& lists = RestoreContext.Modules.GetNodeListStore();
-            auto toManagedPeersClosureListId = RestoreContext.Modules.GetModuleNodeIds(toMod->GetId()).UniqPeers;
-            const auto& toManagedPeersClosure = lists.GetList(toManagedPeersClosureListId).Data();
+            const auto& toManagedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(toMod->GetId()).UniqPeers().Data();
             if (toManagedPeersClosure.empty()) {
                 // Empty closure, nothing can be excluded
                 return {};
             }
             THashSet<TNodeId> excludeNodeIds(toManagedPeersClosure.begin(), toManagedPeersClosure.end());
-            auto fromManagedPeersClosureListId = RestoreContext.Modules.GetModuleNodeIds(fromMod->GetId()).UniqPeers;
-            const auto& fromManagedPeersClosure = lists.GetList(fromManagedPeersClosureListId).Data();
+            const auto& fromManagedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(fromMod->GetId()).UniqPeers().Data();
             // Remove from TO (library) managed peers closure all FROM (program) managed peers closure ids
             // As result, after subtracting sets, we found all nodes for exclude by this dependency
             for (auto nodeId : fromManagedPeersClosure) {
