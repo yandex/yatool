@@ -638,14 +638,22 @@ class _JavaSemGraph(SemGraph):
                 return self._cached_jdk_paths[jdk_version]
             else:
                 jdk_real_path = Path(tools.tool(f'java{jdk_version}').replace('/bin/java', ''))
-                jdk_path = Path.home() / ".ya" / "jdk" / str(jdk_version)
+                platform = platform_matcher.my_platform()
+                if platform.startswith('darwin'):
+                    jdk_home = Path.home() / "Library" / "Java" / "JavaVirtualMachines"
+                elif platform.startswith('linux'):
+                    jdk_home = Path.home() / ".jdks"
+                else:
+                    self.logger.error("Unknown platform %s, put JDK symlink to user home", platform)
+                    jdk_home = Path.home()
+                jdk_path = jdk_home / ("arcadia-jdk-" + str(jdk_version))
                 if jdk_path.is_symlink() and jdk_path.resolve() != jdk_real_path:
                     jdk_path.unlink()  # remove invalid symlink to JDK
                 if not jdk_path.exists():  # create new symlink to JDK
                     _SymlinkCollector.mkdir(jdk_path.parent)
                     jdk_path.symlink_to(jdk_real_path, target_is_directory=True)
         except Exception as e:
-            self.logger.error(f"Can't find JDK {jdk_version} in tools: {e}")
+            self.logger.error("Can't find JDK %s in tools: %s", jdk_version, e)
             jdk_path = self.JDK_PATH_NOT_FOUND
         jdk_path = str(jdk_path)
         self._cached_jdk_paths[jdk_version] = jdk_path
