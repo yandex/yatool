@@ -3,7 +3,6 @@
 #include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/options/static_options.h>
-#include <devtools/ymake/resolver/path_resolver.h>
 
 #include <util/generic/algorithm.h>
 #include <util/generic/strbuf.h>
@@ -134,7 +133,7 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
                 if (inpos != TStringBuf::npos) {
                     bool allowReplaceBefore = !inpos || IsValidSymbolBefore(arg[inpos - 1]);
                     bool allowReplaceAfter = (inpos + scriptArg.size() == arg.size() || IsValidSymbolAfter(arg[inpos + scriptArg.size()]));
-                    if (allowReplaceBefore && allowReplaceAfter && NPath::MustDeepReplace(scriptArg)) {
+                    if (allowReplaceBefore && allowReplaceAfter) {
                         TString mod = cmdProp.GetDeepReplaceTo(it->Argtype);
                         TString v = TString{arg.Head(inpos)} + "${" + mod + "\"" + scriptArg + "\"}" + TString{arg.Tail(inpos + scriptArg.size())};
                         YDIAG(V) << "Replacement: " << arg << "->" << v << Endl;

@@ -5,9 +5,24 @@
 #include <devtools/ymake/diag/manager.h>
 
 namespace {
+    bool CutRoot(TStringBuf& path, TStringBuf what) {
+        if (path.StartsWith(what)) {
+            path.Skip(what.length());
+            if (path.front() == NPath::PATH_SEP) {
+                path.Skip(1);
+            }
+            return true;
+        }
+        return false;
+    }
+
     TString PrepareName(TStringBuf name) {
         name = NPath::ResolveLink(name);
-        TStringBuf result = NPath::PreparePath(name);
+        TStringBuf result = name;
+        if (NPath::IsTypedPathEx(name) && NPath::IsType(name, NPath::Unset)) {
+            result = NPath::CutType(name);
+        }
+        CutRoot(result, TStringBuf("./"));
         if (NPath::HasWinSlashes(result)) {
             return NPath::NormalizeSlashes(result);
         } else {
