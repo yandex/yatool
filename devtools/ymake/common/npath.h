@@ -540,6 +540,34 @@ inline bool IsExplicitDirectory(TStringBuf name) noexcept {
    return name.EndsWith(PATH_SEP) || name.EndsWith(WIN_PATH_SEP);
 }
 
+inline TStringBuf CutPoint(TStringBuf path) {
+    if (path.StartsWith("./")) {
+        path.Skip(2);
+        if (path.front() == NPath::PATH_SEP) {
+            path.Skip(1);
+        }
+    }
+    return path;
+}
+
+inline TStringBuf PreparePath(TStringBuf path) {
+    if (IsTypedPathEx(path) && IsType(path, ERoot::Unset)) {
+        path = CutType(path);
+    }
+    return CutPoint(path);
+}
+
+inline bool MustDeepReplace(TStringBuf path) {
+    path = ResolveLink(path);
+    path = PreparePath(path);
+    TString s;
+    if (HasWinSlashes(path)) {
+        s = NormalizeSlashes(path);
+        path = s;
+    }
+    return !IsTypedPathEx(path) && !IsKnownPathVarPrefix(path, true);
+}
+
 } // NPath
 
 /// translate short canonical arcadia path to NPath (add root)
