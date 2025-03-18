@@ -18,7 +18,7 @@ from devtools.ya.core import sec
 
 
 logger = logging.getLogger(__name__)
-SUPPRESSIONS = None  # type: list[str]
+SUPPRESSIONS = []  # type: list[str]
 
 
 class ReportTypes(object):
@@ -150,7 +150,8 @@ class CompositeTelemetry:
 
     def init_reporter(self, shard='report', suppressions=None, report_events=None):
         global SUPPRESSIONS
-        SUPPRESSIONS = suppressions
+        if suppressions:
+            SUPPRESSIONS = suppressions
 
         if self.no_backends:
             return
