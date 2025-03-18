@@ -10,7 +10,6 @@ import exts.func
 import exts.archive
 import exts.deepget as deepget
 import exts.windows as windows
-import exts.uniq_id as uniq_id
 import exts.http_client
 import app_config
 
@@ -231,14 +230,6 @@ class UFetcherDownloader:
             except Exception as err:
                 logger.debug("Couldn't extract from tar: %s" % err)
 
-        transport_history = deepget.deepget(res_info, ("last_attempt", "result", "transport_history"))
-        is_downloaded_by_external_fetcher_program = (
-            transport_history
-            and transport_history[-1]["transport"] == universal_fetcher.SandboxTransportType.EXTERNAL_PROGRAM_FETCHER
-        )
-        if is_downloaded_by_external_fetcher_program and is_multifile and self._keep_dir_packed:
-            self._tar_external_program_fetcher_output(download_to)
-
         self._update_permissions(download_to, is_executable)
 
         # END Backwards compatability
@@ -285,14 +276,6 @@ class UFetcherDownloader:
                 os.chmod(dst, perms)
         elif self._resource_type.startswith("http"):
             os.chmod(dst, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-
-    @staticmethod
-    def _tar_external_program_fetcher_output(download_to: str) -> None:
-        src = download_to + "." + uniq_id.gen8()
-        if os.path.isdir(download_to):
-            os.rename(download_to, src)
-            logger.debug("Archive '%s' to '%s'", src, download_to)
-            exts.archive.create_tar([(src, os.path.basename(src))], download_to)
 
     @staticmethod
     def _get_sandbox_file_permissions(dst: str, executable: bool) -> int:
