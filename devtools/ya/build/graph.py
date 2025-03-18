@@ -2612,10 +2612,10 @@ def _make_yndexing_graph(graph: graph_descr.DictGraph, opts, ymake_bin, host_too
     py3_yndexing = opts.py3_yndexing
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('ytyndexer', 'YTYNDEXER'))
-    graph['conf']['resources'].append(host_tool_resolver.resolve('ymakeyndexer', 'YMAKEYNDEXER'))
     graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
 
-    graph['graph'].extend([_gen_ymake_yndex_node(opts, ymake_bin)])
+    if opts.flags.get('YMAKE_YNDEXING', 'no') == 'yes':
+        _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver)
     if py_yndexing:
         _gen_pyndex_nodes(graph)  # TODO: Remove?
     if py3_yndexing:
@@ -2706,7 +2706,7 @@ def _gen_merge_node(nodes):
     }
 
 
-def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
+def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostToolResolver"):
     tc = bg.gen_host_tc(getattr(opts, 'c_compiler', None), getattr(opts, 'cxx_compiler', None))
     tc_params = six.ensure_str(base64.b64encode(six.ensure_binary(json.dumps(tc, sort_keys=True))))
     conf_flags = []
@@ -2715,9 +2715,13 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
         if val is not None:
             conf_flags += ['-D', '{}={}'.format(f, val)]
 
-    ymakeyndexer_cmd = '$(YMAKEYNDEXER)/ymakeyndexer'
+    ymakeyndexer_cmd = None
     if ymakeyndexer_override := opts.flags.get('TOOL_YMAKEYNDEXER'):
         ymakeyndexer_cmd = ymakeyndexer_override
+    else:
+        resource_json = host_tool_resolver.resolve('ymakeyndexer', 'YMAKEYNDEXER')
+        graph['conf']['resources'].append(resource_json)
+        ymakeyndexer_cmd = '$({})/ymakeyndexer'.format(resource_json['pattern'])
 
     cmds = [
         {
@@ -2762,7 +2766,7 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
 
     cmdstr = ' '.join([' '.join(cmd['cmd_args']) for cmd in cmds])
     uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(hashing.md5_value('#' + cmdstr))
-    return {
+    yndexing_node = {
         'cmds': cmds,
         'kv': {'p': 'YY', 'pc': 'magenta'},
         'outputs': ['$(BUILD_ROOT)/ymake.ydx.pb2'],
@@ -2773,6 +2777,8 @@ def _gen_ymake_yndex_node(opts, ymake_bin) -> graph_descr.GraphNode:
         'type': 2,
         'cache': False,
     }
+
+    graph['graph'].extend([yndexing_node])
 
 
 def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
