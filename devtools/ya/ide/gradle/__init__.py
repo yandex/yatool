@@ -781,9 +781,7 @@ class _Builder:
     def build(self) -> None:
         """Extract build targets from sem-graph and build they"""
         try:
-            build_rel_targets = list(
-                set(self.sem_graph.foreign_targets + self.sem_graph.get_run_java_program_rel_targets())
-            )
+            build_rel_targets = list(set(self.sem_graph.get_run_java_program_rel_targets()))
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, is_contrib in rel_targets:
                 if self.config.in_rel_targets(rel_target):
@@ -797,14 +795,24 @@ class _Builder:
                 f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
             ) from e
 
-        if not build_rel_targets:
-            return
+        if build_rel_targets:
+            self._build_rel_targets(build_rel_targets)
 
+        if self.sem_graph.foreign_targets:
+            self._build_rel_targets(self.sem_graph.foreign_targets, True)
+
+    def _build_rel_targets(self, build_rel_targets: list[str], build_all_langs: bool = False) -> None:
+        """Build all relative targets by one graph, build_all_langs control only java targets or all languages targets"""
         import app_ctx
 
         try:
-            ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
-            opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
+            if build_all_langs:
+                opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True, build_type='release'))
+            else:
+                ya_make_opts = yarg.merge_opts(
+                    build_opts.ya_make_options(free_build_targets=True, build_type='release')
+                )
+                opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
 
             arcadia_root = self.config.arcadia_root
 
@@ -818,10 +826,10 @@ class _Builder:
                 opts.rel_targets.append(str(build_rel_target))
                 opts.abs_targets.append(str(arcadia_root / build_rel_target))
 
-            self.logger.info("Making building graph...")
+            self.logger.info("Making building graph for %s targets...", "foreign" if build_all_langs else "java")
             with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
                 graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
-            self.logger.info("Building all by graph...")
+            self.logger.info("Building all %s targets by graph...", "foreign" if build_all_langs else "java")
             builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
             return_code = builder.go()
             if return_code != 0:
