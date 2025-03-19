@@ -11,6 +11,7 @@
 #include <util/folder/path.h>
 #include <util/stream/file.h>
 #include <util/system/fs.h>
+#include <util/stream/pipe.h>
 
 static inline TFsPath GetConfDir(const TFsPath& root) {
     return root / "build";
@@ -45,9 +46,32 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("transition-source").StoreResult<ETransition>(&TransitionSource).Optional();
     opts.AddLongOption("descend-into-foreign", "follow deps leading into foreign platforms").StoreResult(&DescendIntoForeignPlatform);
     opts.AddLongOption("report-pic-nopic", "report pic/no-pic foreign target events").StoreResult(&ReportPicNoPic);
+    opts.AddLongOption("fd-in", "input pipe fd").StoreResult(&InputPipeFd);
+    opts.AddLongOption("fd-out", "output pipe fd").StoreResult(&OutputPipeFd);
+    opts.AddLongOption("fd-err", "error pipe fd").StoreResult(&ErrorPipeFd);
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
+    if (InputPipeFd != -1) {
+        InputStream = MakeAtomicShared<TPipedInput>(InputPipeFd);
+    } else {
+        InputStream = &Cin;
+        InputStream.ReferenceCounter()->Inc();  // hack to have smartptr interface but don't own the ptr
+    }
+    if (OutputPipeFd != -1) {
+        OutputStream = MakeAtomicShared<TPipedOutput>(OutputPipeFd);
+    } else {
+        OutputStream = &Cout;
+        OutputStream.ReferenceCounter()->Inc();  // hack to have smartptr interface but don't own the ptr
+    }
+    if (ErrorPipeFd != -1) {
+        ErrorStream = MakeAtomicShared<TPipedOutput>(ErrorPipeFd);
+        NYMake::SetTraceOutputStream(ErrorStream);
+    } else {
+        ErrorStream = &Cerr;
+        ErrorStream.ReferenceCounter()->Inc();  // hack to have smartptr interface but don't own the ptr
+    }
+
     TRootsOptions::PostProcess(freeArgs);
 
     if (!YmakeConf.IsDefined() || !YmakeConf.Exists() || !YmakeConf.IsFile()) {

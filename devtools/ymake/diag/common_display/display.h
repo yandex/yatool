@@ -11,10 +11,11 @@ namespace NCommonDisplay{
     class TLockedStream : private TNonCopyable {
     private:
         TAdaptiveLock Lock;
-        THolder<IOutputStream> Output;
+        TAtomicSharedPtr<IOutputStream> Output;
 
     public:
         TLockedStream();
+        void SetStream(TAtomicSharedPtr<IOutputStream> stream);
 
         void Emit(const TStringBuf& str);
     };

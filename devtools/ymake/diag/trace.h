@@ -16,6 +16,7 @@ namespace NYMake {
 
     void InitTraceSubsystem(const TString& events);
     bool TraceEnabled(ETraceEvent what) noexcept;
+    void SetTraceOutputStream(TAtomicSharedPtr<IOutputStream>);
 }
 
 #define TRACE(W, M)                                                    \

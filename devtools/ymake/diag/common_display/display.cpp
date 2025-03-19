@@ -43,6 +43,12 @@ namespace NCommonDisplay{
     {
     }
 
+    void TLockedStream::SetStream(TAtomicSharedPtr<IOutputStream> stream) {
+        with_lock (Lock) {
+            Output.Reset(stream);
+        }
+    }
+
     void TLockedStream::Emit(const TStringBuf& str) {
         with_lock (Lock) {
             (*Output << str).Flush();

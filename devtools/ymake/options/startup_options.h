@@ -7,6 +7,7 @@
 #include <library/cpp/getopt/small/last_getopt.h>
 
 #include <util/folder/path.h>
+#include <util/system/pipe.h>
 
 // configuration operates local-formatted paths
 struct TStartUpOptions: public TRootsOptions {
@@ -25,6 +26,13 @@ struct TStartUpOptions: public TRootsOptions {
     ETransition TransitionSource = ETransition::None;
     bool DescendIntoForeignPlatform = true;
     bool ReportPicNoPic = false;
+
+    PIPEHANDLE InputPipeFd = -1;
+    PIPEHANDLE OutputPipeFd = -1;
+    PIPEHANDLE ErrorPipeFd = -1;
+    TAtomicSharedPtr<IInputStream> InputStream;
+    TAtomicSharedPtr<IOutputStream> OutputStream;
+    TAtomicSharedPtr<IOutputStream> ErrorStream;
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);

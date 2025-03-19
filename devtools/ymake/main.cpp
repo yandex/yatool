@@ -623,7 +623,7 @@ void TYMake::DumpMetaData() {
     if (! Conf.WriteMetaData.size())
         return;
 
-    IOutputStream* out = &Cout;
+    IOutputStream* out = Conf.OutputStream.Get();
     THolder<IOutputStream> hout;
 
     if (Conf.WriteMetaData != "-") {
@@ -726,7 +726,7 @@ int main_real(TBuildConfiguration& conf) {
             // For now it's a synchronous reader w/o any buffering.
             // The client must ensure they use non-blocking writes on their side,
             // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
-            evlogServer.ProcessStreamBlocking(Cin);
+            evlogServer.ProcessStreamBlocking(*conf.InputStream);
 
             if (conf.StartDirs.empty()) {
                 FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
@@ -867,7 +867,7 @@ int main_real(TBuildConfiguration& conf) {
                 GetCmdValue(Get1(buildRootVar))) << Endl;
                 return BR_CONFIGURE_FAILED;
         }
-        RenderSemGraph(Cout, yMake->GetRestoreContext(), yMake->Commands, yMake->GetTraverseStartsContext());
+        RenderSemGraph(*yMake->Conf.OutputStream.Get(), yMake->GetRestoreContext(), yMake->Commands, yMake->GetTraverseStartsContext());
         yMake->Conf.SourceRoot = oldSourceRoot;
         yMake->Conf.BuildRoot = oldBuildRoot;
         return BR_OK;

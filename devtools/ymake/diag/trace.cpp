@@ -42,6 +42,10 @@ namespace {
             LockedStream()->Emit(ev + '\n');
         }
 
+        void SetStream(TAtomicSharedPtr<IOutputStream> stream) {
+            LockedStream()->SetStream(stream);
+        }
+
         TTraceEvents Enable;
     };
 
@@ -56,4 +60,8 @@ void NYMake::InitTraceSubsystem(const TString& events) {
 
 bool NYMake::TraceEnabled(ETraceEvent what) noexcept {
     return GLOBAL_TRACER.Enabled(what);
+}
+
+void NYMake::SetTraceOutputStream(TAtomicSharedPtr<IOutputStream> stream) {
+    GLOBAL_TRACER.SetStream(stream);
 }

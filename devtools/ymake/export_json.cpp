@@ -528,9 +528,9 @@ namespace {
 
     class TOutputStreamWrapper {
     public:
-        TOutputStreamWrapper(const TString& outFile, const TString& compressionCodec) {
+        TOutputStreamWrapper(const TString& outFile, const TString& compressionCodec, IOutputStream* defaultOutStream) {
             if (outFile == "-") {
-                OutputStreamPtr_ = &Cout;
+                OutputStreamPtr_ = defaultOutStream;
             } else {
                 OutputStreamHolder_ = MakeHolder<TUnbufferedFileOutput>(outFile);
                 OutputStreamPtr_ = OutputStreamHolder_.Get();
@@ -569,7 +569,7 @@ void ExportJSON(TYMake& yMake) {
     {
         NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
-        TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec};
+        TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
         NYMake::TJsonWriter jsonWriter(*output.Get());
         TMakePlan plan(jsonWriter);
         RenderJSONGraph(yMake, plan);

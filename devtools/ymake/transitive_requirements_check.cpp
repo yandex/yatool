@@ -915,13 +915,13 @@ void DoDumpLicenseInfo(const TBuildConfiguration& conf, const TVars& globals, NS
 
     if (humanReadable) {
         for (const auto& [prop, licenses]: orderdedPropsContent) {
-            Cout << prop << Endl;
+            *conf.OutputStream << prop << Endl;
             for (TStringBuf lic: licenses) {
-                Cout << '\t' << lic << Endl;
+                *conf.OutputStream << '\t' << lic << Endl;
             }
         }
     } else {
-        NJsonWriter::TBuf writer{NJsonWriter::HEM_DONT_ESCAPE_HTML, &Cout};
+        NJsonWriter::TBuf writer{NJsonWriter::HEM_DONT_ESCAPE_HTML, conf.OutputStream.Get()};
         writer.BeginObject();
         for (const auto& [prop, licenses]: orderdedPropsContent) {
             writer.WriteKey(prop);
