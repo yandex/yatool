@@ -327,6 +327,13 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
+    # heater options
+    build_options.yt_store_wt = params.yt_store_wt
+    build_options.eager_execution = params.eager_execution
+    build_options.yt_replace_result = params.yt_replace_result
+    build_options.yt_replace_result_add_objects = params.yt_replace_result_add_objects
+    build_options.dist_cache_evict_binaries = params.dist_cache_evict_binaries
+    build_options.dist_cache_evict_bundles = params.dist_cache_evict_bundles
 
     build_options.bazel_remote_store = params.bazel_remote_store
     build_options.bazel_remote_baseuri = params.bazel_remote_baseuri
@@ -1384,6 +1391,13 @@ def do_package(params):
         do_dump_input(params, arcadia_root, params.dump_inputs)
         return
 
+    heater_mode = not params.yt_store_wt
+
+    if heater_mode:
+        package.display.emit_message('[[warn]]Run in YT heater mode. No real package will be created')
+    elif params.yt_replace_result:
+        raise YaPackageException("--yt-replace-result option is allowed in YT heater mode only")
+
     for package_file in params.packages:
         logger.debug("Creating package: %s", package_file)
         package_params = copy.copy(params)
@@ -1443,7 +1457,7 @@ def do_package(params):
                             )
                             stage_finished("build_targets")
 
-                if not params.build_only:
+                if not params.build_only and not heater_mode:
                     stage_started("create_package")
                     name, version, path, debug_path = create_package(package_context, output_root, builds)
                     stage_finished("create_package")

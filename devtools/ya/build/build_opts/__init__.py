@@ -2810,7 +2810,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ArgConsumer(
                     ['--yt-write-through'],
                     help='Populate local cache while updating YT store',
-                    hook=SetValueHook('yt_store_wt', transform=return_true_if_enabled),
+                    hook=SetConstValueHook('yt_store_wt', True),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--no-yt-write-through'],
+                    help='Don\'t populate local cache while updating YT store (heater mode)',
+                    hook=SetConstValueHook('yt_store_wt', False),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
