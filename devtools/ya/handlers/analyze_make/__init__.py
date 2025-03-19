@@ -2,6 +2,7 @@ import devtools.ya.core.yarg
 import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
+import devtools.ya.handlers.analyze_make.graph_diff as graph_diff
 import devtools.ya.handlers.analyze_make.timeline as timeline
 import devtools.ya.handlers.analyze_make.timebloat as timebloat
 import os
@@ -73,6 +74,43 @@ class AnalyzeYaMakeOpts(devtools.ya.core.yarg.Options):
         ]
 
 
+class GraphDiffOptions(devtools.ya.core.yarg.Options):
+    def __init__(self):
+        self.find_diff_target_uids: list[str] = []
+        self.find_diff_target_output: str = ''
+        self.graphs: list[str] = []
+        self.compare_dest_dir: str = ''
+
+    @staticmethod
+    def consumer():
+        return [
+            devtools.ya.core.yarg.FreeArgConsumer(
+                help='paths to 2 json graph files', hook=devtools.ya.core.yarg.ExtendHook(name='graphs')
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--target-uid'],
+                help='target uid for comparison (none or 2 required)',
+                hook=devtools.ya.core.yarg.SetAppendHook('find_diff_target_uids'),
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--target-output'],
+                help='Output to identify uids for comparison',
+                hook=devtools.ya.core.yarg.SetValueHook('find_diff_target_output'),
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--compare-dest-dir'],
+                help='Destination directory for comparison info',
+                hook=devtools.ya.core.yarg.SetValueHook('compare_dest_dir'),
+            ),
+        ]
+
+    def postprocess(self):
+        if len(self.graphs) != 2:
+            raise devtools.ya.core.yarg.ArgsValidatingException("Must specify exactly 2 graph files")
+        if self.find_diff_target_uids and len(self.find_diff_target_uids) != 2:
+            raise devtools.ya.core.yarg.ArgsValidatingException("Must specify exactly 2 target uids")
+
+
 class TimeBloatOpts(devtools.ya.core.yarg.Options):
     def __init__(self) -> None:
         super().__init__()
@@ -132,6 +170,27 @@ class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
             action=execute(timebloat.main),
             description='build events in bloat format',
             opts=basic_options() + [TimeBloatOpts()],
+        )
+        self['graph-diff'] = devtools.ya.core.yarg.OptsHandler(
+            action=execute(graph_diff.diff),
+            description='find diff between two json graphs',
+            opts=[devtools.ya.core.yarg.help.ShowHelpOptions(), GraphDiffOptions()],
+            examples=[
+                devtools.ya.core.yarg.UsageExample('{prefix} <graph1> <graph2>', 'Create comparison info files in cwd'),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} <graph1> <graph2> --compare-dest-dir <dir_path>',
+                    'Create comparison info files in <dir_path>',
+                ),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} <graph1> <graph2> --target-uid <uid1> --target-uid <uid2>',
+                    'Print diff info between <uid1> and <uid2>',
+                ),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} <graph1> <graph2> --target-output <output>',
+                    'Print diff info for uids with output <output>',
+                ),
+            ],
+            unknown_args_as_free=False,
         )
         if app_config.in_house:
             self['task-contention'] = devtools.ya.core.yarg.OptsHandler(

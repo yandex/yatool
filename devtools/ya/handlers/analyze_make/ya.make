@@ -13,6 +13,7 @@ PEERDIR(
     devtools/ya/app/modules/params
     devtools/ya/app/modules/token_suppressions
     devtools/ya/app_config
+    devtools/ya/handlers/analyze_make/graph_diff
     devtools/ya/handlers/analyze_make/timeline
     devtools/ya/handlers/analyze_make/timebloat
     devtools/ya/yalibrary/evlog
