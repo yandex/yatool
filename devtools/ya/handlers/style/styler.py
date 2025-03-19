@@ -188,7 +188,7 @@ class Ruff(cfg.ConfigMixin):
         )
 
     def _run_ruff(self, content: str, path: PurePath, config_path: cfg.ConfigPath, cmd_args: list[str]) -> str:
-        ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-s", "-"]
+        ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-"]
 
         p = subprocess.Popen(
             ruff_args,
@@ -223,11 +223,15 @@ class Ruff(cfg.ConfigMixin):
     def format(self, path: PurePath, content: str) -> StylerOutput:
         ruff_config = self.lookup_config(path)
 
-        stdin_filename = ["--stdin-filename", path]
+        stdin_filename = ["--stdin-filename", str(path)]
 
+        # XXX: We first run `ruff format`. It either formats successfully or fails and returns
+        # non-zero exit code and error message which we print and then abort by raising StylingError.
+        # If it succeeds, we run `ruff check --fix-only`. It always returns zero code.
+        # So we catch and show only critical errors such as SyntaxError but don't notify about any linting errors.
         out = self._run_ruff(content, path, ruff_config.path, ["format"] + stdin_filename)
         # launch check fix to sort imports
-        out = self._run_ruff(out, path, ruff_config.path, ["check", "--fix"] + stdin_filename)
+        out = self._run_ruff(out, path, ruff_config.path, ["check", "--fix-only"] + stdin_filename)
         return StylerOutput(out, ruff_config)
 
 
