@@ -119,6 +119,10 @@ def _fix_output(out, rmap, mask_roots=False):
     )
 
 
+class TextFileBusyError(Exception):
+    mute = True
+
+
 class ExecutorBase(object):
     text_file_busy_retries = 10
     text_file_busy_retry_delay = 0.1
@@ -145,15 +149,19 @@ class PopenExecutor(ExecutorBase):
 
     def run(self, **kwargs):
         retries = self.text_file_busy_retries
+        stderr = ""
+        exit_code = 1
         while retries > 0:
             try:
-                return self._run_process(**kwargs)
+                stderr, exit_code = self._run_process(**kwargs)
+                return stderr, exit_code
             except OSError as e:
                 retries -= 1
                 if e.errno != errno.ETXTBSY or not retries:
                     raise
                 logger.warning("Text file busy, retrying...")
                 time.sleep(self.text_file_busy_retry_delay)
+        raise TextFileBusyError(stderr)
 
     def _run_process(self, args, stdout, env, cwd, nice, **kwargs):
         proc = None
@@ -232,6 +240,9 @@ class PopenExecutor(ExecutorBase):
 class LocalExecutor(ExecutorBase):
     def run(self, **kwargs):
         retries = self.text_file_busy_retries
+        stderr = ""
+        exit_code = 1
+
         while retries > 0:
             stderr, exit_code = self._run_process(**kwargs)
 
@@ -240,8 +251,9 @@ class LocalExecutor(ExecutorBase):
                 logger.warning("Text file busy, retrying...")
                 time.sleep(0.1)
                 continue
-
             return stderr, exit_code
+
+        raise TextFileBusyError(stderr)
 
     def _run_process(self, args, stdout, env, cwd, executor_address, requirements, nice, **kwargs):
         from devtools.executor.python import executor
