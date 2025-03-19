@@ -750,25 +750,6 @@ class _Exporter:
             self.logger.error("Fail generating by yexport:\n%s", r.stderr)
             raise YaIdeGradleException(f'Fail generating by yexport with exit_code={r.returncode}')
 
-        gradle_properties_file = self.config.export_root / ".gradle" / "gradle.properties"
-        if self.sem_graph.jdk_paths:
-            _SymlinkCollector.mkdir(gradle_properties_file.parent)
-            with (self.config.export_root / ".gradle" / "gradle.properties").open('w') as f:
-                f.write(
-                    '\n'.join(
-                        [
-                            f'org.gradle.java.home={gradle_jdk_path}' if gradle_jdk_path else None,
-                            'org.gradle.java.installations.fromEnv='
-                            + ','.join('JDK' + str(jdk_version) for jdk_version in self.sem_graph.jdk_paths.keys()),
-                            'org.gradle.java.installations.paths='
-                            + ','.join(jdk_path for jdk_path in self.sem_graph.jdk_paths.values()),
-                            '',
-                        ]
-                    )
-                )
-        elif gradle_properties_file.exists():
-            gradle_properties_file.unlink()
-
 
 class _Builder:
     """Build required targets"""
