@@ -372,6 +372,7 @@ class GradleOptions(yarg.Options):
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_YEXPORT_BIN = '--yexport-bin'
     OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
+    OPT_NO_BUILD_FOREIGN = '--no-build-foreign'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_REMOVE = '--remove'
 
@@ -380,6 +381,7 @@ class GradleOptions(yarg.Options):
         self.settings_root = None
         self.yexport_bin = None
         self.collect_contribs = True
+        self.build_foreign = True
         self.disable_errorprone = False
         self.yexport_debug_mode = None
         self.login = None
@@ -411,6 +413,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
                 help='Export without collect contribs from Arcadia to jar files',
                 hook=yarg.SetConstValueHook('collect_contribs', False),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_NO_BUILD_FOREIGN],
+                help='Export without build foreign targets',
+                hook=yarg.SetConstValueHook('build_foreign', False),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(

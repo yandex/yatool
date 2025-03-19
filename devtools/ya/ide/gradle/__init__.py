@@ -779,7 +779,7 @@ class _Builder:
         if build_rel_targets:
             self._build_rel_targets(build_rel_targets)
 
-        if self.sem_graph.foreign_targets:
+        if self.config.params.build_foreign and self.sem_graph.foreign_targets:
             self._build_rel_targets(self.sem_graph.foreign_targets, True)
 
     def _build_rel_targets(self, build_rel_targets: list[str], build_all_langs: bool = False) -> None:
