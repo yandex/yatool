@@ -608,6 +608,7 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
 
         if (conf.StartDirs.empty()) {
             FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
+            FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
             co_return BR_OK;
         }
     }

@@ -316,3 +316,8 @@ message TBypassConfigure {
     required bool Enabled = 1;
     required bool MaybeEnabled = 2;
 };
+
+message TCacheIsExpectedToBeEmpty {
+    option (message_id) = 52;
+    required string CachePath = 1;
+}
