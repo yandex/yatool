@@ -1391,12 +1391,12 @@ def do_package(params):
         do_dump_input(params, arcadia_root, params.dump_inputs)
         return
 
-    heater_mode = not params.yt_store_wt
-
-    if heater_mode:
+    if not params.yt_store_wt:
         package.display.emit_message('[[warn]]Run in YT heater mode. No real package will be created')
-    elif params.yt_replace_result:
-        raise YaPackageException("--yt-replace-result option is allowed in YT heater mode only")
+        params.build_only = True
+
+    if not params.build_only and params.yt_replace_result:
+        raise YaPackageException("--yt-replace-result option is allowed with --build-only or --no-yt-write-through")
 
     for package_file in params.packages:
         logger.debug("Creating package: %s", package_file)
@@ -1457,7 +1457,7 @@ def do_package(params):
                             )
                             stage_finished("build_targets")
 
-                if not params.build_only and not heater_mode:
+                if not params.build_only:
                     stage_started("create_package")
                     name, version, path, debug_path = create_package(package_context, output_root, builds)
                     stage_finished("create_package")
