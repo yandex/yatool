@@ -210,7 +210,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         InitTraceSubsystem(Events);
     }
 
-    RunStageWithTimer = MakeHolder<TTraceStageWithTimer>("ymake run", MON_NAME(EYmakeStats::RunTime));
+    TCyclesTimer runStageTimer;
 
     Diag()->Init(WarnFlags);
 
@@ -230,6 +230,9 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     TCommandLineOptions::PostProcess(freeArgs);
     TStartUpOptions::PostProcess(freeArgs);
+    // We must not trace anything before trace stream initialization
+    // which is done in StartUpOptions::PostProcess
+    RunStageWithTimer = MakeHolder<TTraceStageWithTimer>("ymake run", MON_NAME(EYmakeStats::RunTime), runStageTimer);
     TDebugOptions::PostProcess(freeArgs);
     PostProcessCacheOptions();
 

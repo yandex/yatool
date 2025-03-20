@@ -50,6 +50,12 @@ namespace NYMake {
             , Timer_()
         {}
 
+        TTraceStageWithTimer(const TString& stage, const TString& monName, TCyclesTimer realStart)
+            : TTraceStage(stage)
+            , MonName_(monName)
+            , Timer_(realStart)
+        {}
+
         ~TTraceStageWithTimer() {
             NStats::TStatsBase::MonEvent(MonName_, Timer_.GetSeconds());
         }
