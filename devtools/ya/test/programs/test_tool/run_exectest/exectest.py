@@ -28,7 +28,6 @@ TEST_NAMES = []
 
 REPLACEMENTS = {
     "${ARCADIA_BUILD_ROOT}": yatest.common.build_path(),
-    "${ARCADIA_DATA_ROOT}": yatest.common.data_path(),
     "${ARCADIA_ROOT}": yatest.common.source_path(),
     "${TEST_OUT_ROOT}": yatest.common.output_path(),
     "${TEST_SOURCE_ROOT}": yatest.common.test_source_path(),
