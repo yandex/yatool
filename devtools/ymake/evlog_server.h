@@ -4,6 +4,8 @@
 #include <library/cpp/protobuf/json/json2proto.h>
 #include <util/stream/input.h>
 
+#include <asio/thread_pool.hpp>
+
 namespace NEvlogServer {
     struct TTarget {
         TString Dir;
@@ -27,11 +29,6 @@ struct THash<NEvlogServer::TTarget> {
 };
 
 namespace NEvlogServer {
-    enum class EHandlerResult {
-        Continue,
-        AllDone,
-    };
-
     enum class EMode {
         Configure,
         CollectOnly,
@@ -39,28 +36,23 @@ namespace NEvlogServer {
 
     class TServer {
     public:
-        TServer(ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf) {
+        TServer(TConfigurationExecutor exec, ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf), Exec_{exec} {
             for (auto& dir : Conf.StartDirs) {
                 ReachableTargets_.insert({dir, "", true});
             }
-        };
-        void ProcessStreamBlocking(IInputStream& input);
+        }
+        asio::awaitable<void> ProcessStreamBlocking(IInputStream& input);
 
     private:
-        EHandlerResult ForeignPlatformTargetEventHandler(const TString& line);
-        EHandlerResult AllForeignPlatformsReportedEventHandler(const TString& line);
-        EHandlerResult BypassConfigureEventHandler(const TString& line);
-
-        const THashMap<TString, class std::function<EHandlerResult(const TString&)>> HandlerMap_ {
-            {"NEvent.TAllForeignPlatformsReported", std::bind(&TServer::AllForeignPlatformsReportedEventHandler, this, std::placeholders::_1)},
-            {"NEvent.TForeignPlatformTarget", std::bind(&TServer::ForeignPlatformTargetEventHandler, this, std::placeholders::_1)},
-            {"NEvent.TBypassConfigure", std::bind(&TServer::BypassConfigureEventHandler, this, std::placeholders::_1)},
-        };
+        asio::awaitable<void> ForeignPlatformTargetEventHandler(const TString& line);
+        void AllForeignPlatformsReportedEventHandler(const TString& line);
+        asio::awaitable<void> BypassConfigureEventHandler(const TString& line);
 
         ITargetConfigurator& Configurator_;
         TBuildConfiguration& Conf_;
         TMaybe<EMode> Mode_;
         THashSet<TTarget> ReachableTargets_;
         THashSet<TString> PossibleTargets_;
+        TConfigurationExecutor Exec_;
     };
 } // namespace NEvlogServer

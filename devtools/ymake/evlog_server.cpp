@@ -2,6 +2,9 @@
 #include <devtools/ymake/ymake.h>
 #include <library/cpp/protobuf/json/json2proto.h>
 
+#include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
+
 namespace NEvlogServer {
 
     template <class T, class = TGuardConversion<::google::protobuf::Message, T>>
@@ -18,10 +21,10 @@ namespace NEvlogServer {
         return nullptr;
     }
 
-    EHandlerResult TServer::ForeignPlatformTargetEventHandler(const TString& line) {
+    asio::awaitable<void> TServer::ForeignPlatformTargetEventHandler(const TString& line) {
         auto targetEvent = TryParseEventAs<NEvent::TForeignPlatformTarget>(line);
         if (targetEvent == nullptr) {
-            return EHandlerResult::Continue;
+            co_return;
         }
 
         if (targetEvent->GetReachable()) {
@@ -29,7 +32,7 @@ namespace NEvlogServer {
             Conf_.AddTarget(targetEvent->GetDir());
             if (Mode_.Defined()) {
                 if (Mode_ == EMode::Configure) {
-                    Configurator_.AddStartTarget(targetEvent->GetDir(), targetEvent->GetModuleTag(), false);
+                    co_await Configurator_.AddStartTarget(Exec_, targetEvent->GetDir(), targetEvent->GetModuleTag(), false);
                 }
             } else {
                 ReachableTargets_.insert({targetEvent->GetDir(), targetEvent->GetModuleTag(), false});
@@ -38,17 +41,17 @@ namespace NEvlogServer {
             YDebug() << "EvlogServer: Possible target found " << targetEvent->GetDir() << ", platform " << TForeignPlatformTarget_EPlatform_Name(targetEvent->GetPlatform()) << Endl;
             if (Mode_.Defined()) {
                 if (Mode_ == EMode::Configure) {
-                    Configurator_.AddTarget(targetEvent->GetDir());
+                    co_await Configurator_.AddTarget(Exec_, targetEvent->GetDir());
                 }
             } else {
                 PossibleTargets_.insert(targetEvent->GetDir());
             }
         }
 
-        return EHandlerResult::Continue;
+        co_return;
     }
 
-    EHandlerResult TServer::AllForeignPlatformsReportedEventHandler(const TString&) {
+    void TServer::AllForeignPlatformsReportedEventHandler(const TString&) {
         if (!Mode_.Defined()) {
             YDebug() << "EvlogServer: bypass state is unknown, continue in regular mode" << Endl;
             Conf_.ReadStartTargetsFromEvlog = false;
@@ -57,10 +60,9 @@ namespace NEvlogServer {
             Conf_.ReadStartTargetsFromEvlog = false;
         }
         YDebug() << "EvlogServer: DONE" << Endl;
-        return EHandlerResult::AllDone;
     }
 
-    EHandlerResult TServer::BypassConfigureEventHandler(const TString& line) {
+    asio::awaitable<void> TServer::BypassConfigureEventHandler(const TString& line) {
         if (Mode_.Defined()) {
             throw TConfigurationError() << "EvlogServer: Received multiple BypassConfigure events";
         }
@@ -73,18 +75,18 @@ namespace NEvlogServer {
             // configure all memoized targets and continue configuring on the fly
             Mode_ = EMode::Configure;
             for (auto& [dir, tag, followRecurses] : ReachableTargets_) {
-                Configurator_.AddStartTarget(dir, tag, followRecurses);
+                co_await Configurator_.AddStartTarget(Exec_, dir, tag, followRecurses);
             }
             for (auto dir : PossibleTargets_) {
-                Configurator_.AddTarget(dir);
+                co_await Configurator_.AddTarget(Exec_, dir);
             }
             // We cannot use bypass from now since some targets are configured
             Conf_.DisableGrandBypass();
         }
-        return EHandlerResult::Continue;
+        co_return;
     }
 
-    void TServer::ProcessStreamBlocking(IInputStream& input) {
+    asio::awaitable<void> TServer::ProcessStreamBlocking(IInputStream& input) {
         TString line;
         NJson::TJsonValue json;
         TString evtype;
@@ -94,13 +96,20 @@ namespace NEvlogServer {
             if (!NJson::GetString(json, "_typename", &evtype)) {
                 continue;
             }
-            auto handlerIt = HandlerMap_.find(evtype);
-            if (handlerIt == HandlerMap_.end()) {
-                continue;
-            }
-            if (handlerIt->second(line) == EHandlerResult::AllDone) {
+
+            if (evtype == "NEvent.TAllForeignPlatformsReported") {
+                AllForeignPlatformsReportedEventHandler(line);
                 break;
             }
+
+            if (evtype == "NEvent.TBypassConfigure") {
+                co_await BypassConfigureEventHandler(line);
+            }
+
+            if (evtype == "NEvent.TForeignPlatformTarget") {
+                co_await ForeignPlatformTargetEventHandler(line);
+            }
         }
-    };
+        co_return;
+    }
 } // namespace NEvlogServer

@@ -12,6 +12,9 @@
 #include <devtools/ymake/compute_reachability.h>
 #include <devtools/ymake/propagate_change_flags.h>
 
+#include <asio/co_spawn.hpp>
+#include <asio/use_awaitable.hpp>
+
 namespace {
     enum class ESortPriority {
         Peers           = 1,
@@ -164,24 +167,30 @@ void TYMake::ReportMakeCommandStats() {
     TMakeCommand::ReportStats();
 }
 
-void TYMake::AddStartTarget(const TString& dir, const TString& tag, bool followRecurses) {
-    TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
-    auto elemId = Names.AddName(EMNT_Directory, dirPath);
-    TNodeId nodeId = TNodeId::Invalid;
-    if (followRecurses) {
-        nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, elemId, &Modules.GetRootModule());
-    } else {
-        nodeId = UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
-    }
-    if (nodeId != TNodeId::Invalid) {
-        StartTargets.push_back({nodeId, 0, tag});
-    }
+asio::awaitable<void> TYMake::AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag, bool followRecurses) {
+    return asio::co_spawn(exec, [dir, tag, followRecurses, this] () -> asio::awaitable<void> {
+        TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
+        auto elemId = Names.AddName(EMNT_Directory, dirPath);
+        TNodeId nodeId = TNodeId::Invalid;
+        if (followRecurses) {
+            nodeId = UpdIter->RecursiveAddStartTarget(EMNT_Directory, elemId, &Modules.GetRootModule());
+        } else {
+            nodeId = UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+        }
+        if (nodeId != TNodeId::Invalid) {
+            StartTargets.push_back({nodeId, 0, tag});
+        }
+        co_return;
+    }, asio::use_awaitable);
 }
 
-void TYMake::AddTarget(const TString& dir) {
-    TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
-    auto elemId = Names.AddName(EMNT_Directory, dirPath);
-    UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+asio::awaitable<void> TYMake::AddTarget(TConfigurationExecutor exec, const TString& dir) {
+    return asio::co_spawn(exec, [dir, this] () -> asio::awaitable<void> {
+        TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
+        auto elemId = Names.AddName(EMNT_Directory, dirPath);
+        UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
+        co_return;
+    }, asio::use_awaitable);
 }
 
 void TYMake::ComputeReachableNodes() {

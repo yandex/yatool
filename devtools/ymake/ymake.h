@@ -24,6 +24,12 @@
 
 #include <util/stream/format.h>
 
+#include <asio/awaitable.hpp>
+#include <asio/thread_pool.hpp>
+#include <asio/strand.hpp>
+
+using TConfigurationExecutor = asio::strand<asio::thread_pool::executor_type>;
+
 using TDependsToModulesClosure = THashMap<TString, TVector<TNodeId>>;
 
 class TNodeEdgesComparator {
@@ -39,8 +45,8 @@ public:
 
 class ITargetConfigurator {
 public:
-    virtual void AddStartTarget(const TString& dir, const TString& tag = "", bool followRecurses = true) = 0;
-    virtual void AddTarget(const TString& dir) = 0;
+    virtual asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) = 0;
+    virtual asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) = 0;
 };
 
 class TYMake final : public ITargetConfigurator {
@@ -105,14 +111,14 @@ public:
 
     // Returns true if directory loops found
     bool DumpLoops();
-    void BuildDepGraph();
+    asio::awaitable<void> BuildDepGraph(TConfigurationExecutor exec);
     void CreateRecurseGraph();
     bool InitTargets();
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void ComputeDependsToModulesClosure();
-    void AddStartTarget(const TString& dir, const TString& tag = "", bool followRecurses = true) override;
-    void AddTarget(const TString& dir) override;
+    asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
+    asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

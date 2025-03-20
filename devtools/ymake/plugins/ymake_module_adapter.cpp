@@ -25,11 +25,13 @@ namespace {
         }
 
         ~TPluginAddParserImpl() override {
+            TPyThreadLock pylk;
             Py_XDECREF(Obj);
         }
 
         void Execute(const TString &path, TPluginUnit &unit, TVector<TString> &includes,
                      TPyDictReflection &inducedDeps) override {
+            TPyThreadLock pylk;
             PyObject *context = CreateContextObject(&unit);
             CheckForError();
 

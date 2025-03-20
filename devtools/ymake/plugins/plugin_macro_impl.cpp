@@ -11,6 +11,7 @@
 namespace NYMake {
     namespace NPlugins {
         void TPluginMacroImpl::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>*) {
+            TPyThreadLock pylk;
             PyObject* tupleArgs = PyTuple_New(params.size() + 1);
 
             PyTuple_SetItem(tupleArgs, 0, CreateContextObject(&unit));
@@ -32,6 +33,7 @@ namespace NYMake {
         }
 
         TPluginMacroImpl::~TPluginMacroImpl() {
+            TPyThreadLock pylk;
             Py_XDECREF(Obj_);
         }
 

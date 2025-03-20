@@ -13,6 +13,7 @@
 #include "sem_graph.h"
 #include "transitive_requirements_check.h"
 #include "ymake.h"
+#include "configure_tasks.h"
 
 #include <devtools/ymake/build_graph_scope.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
@@ -55,7 +56,17 @@
 #include <util/system/types.h>
 #include <util/system/yassert.h>
 
+#include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
+#include <asio/strand.hpp>
+#include <asio/thread_pool.hpp>
+#include <asio/use_awaitable.hpp>
+#include <asio/use_future.hpp>
+#include <asio/io_context.hpp>
+
 #include <fmt/format.h>
+
+#include <Python.h>
 
 namespace {
     void MakeUnique(TVector<TTarget>& targets) {
@@ -91,26 +102,6 @@ TYMake::TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch)
     Diag()->Where.clear();
 }
 
-static TMaybe<EBuildResult> ConfigureGraph(THolder<TYMake>& yMake) {
-    NYMake::TTraceStageWithTimer configureTimer("Configure graph", MON_NAME(EYmakeStats::ConfigureGraphTime));
-    try {
-        yMake->BuildDepGraph();
-    } catch (const TNotImplemented& e) {
-        TRACE(G, NEvent::TRebuildGraph(e.what()));
-        YConfWarn(KnownBug) << "Graph needs to be rebuilt: " << e.what() << Endl;
-        return TMaybe<EBuildResult>(BR_RETRYABLE_ERROR);
-    } catch (const TInvalidGraph& e) {
-        TRACE(G, NEvent::TRebuildGraph(e.what()));
-        YConfWarn(KnownBug) << "Graph update failed: " << e.what() << Endl;
-        yMake->UpdIter->DumpStackW();
-        return TMaybe<EBuildResult>(BR_RETRYABLE_ERROR);
-    } catch(const yexception& error) {
-        YErr() << error.what() << Endl;
-        return TMaybe<EBuildResult>(BR_FATAL_ERROR);
-    }
-    return TMaybe<EBuildResult>();
-}
-
 static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
     NYMake::TTraceStageWithTimer configureTimer("Configure readonly graph", MON_NAME(EYmakeStats::ConfigureReadonlyGraphTime));
     TBuildConfiguration& conf = yMake->Conf;
@@ -124,71 +115,6 @@ static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
             yMake->StartTargets.push_back(offs);
     }
     return yMake->StartTargets.size() ? TMaybe<EBuildResult>() : TMaybe<EBuildResult>(BR_CONFIGURE_FAILED);
-}
-
-void TYMake::BuildDepGraph() {
-    UpdIter->RestorePropsToUse();
-
-    TModule& rootModule = Modules.GetRootModule();
-    if (!Conf.ReadStartTargetsFromEvlog) {  // in server mode start targets are already added to the graph by evlog server
-        for (const auto& dir : Conf.StartDirs) {
-            AddStartTarget(dir);
-        }
-    }
-    if (Conf.ShouldTraverseDepsTests()) {
-        // PEERDIRS of added tests which are not required by targets reachable from start targets are added to
-        // the end of AllNodes collection as well as their tests. Thus the loop below acts similar to BFS: once
-        // the loop is finished all required libraries and their tests are configured and added to the graph.
-        //
-        // IMPORTANT deque has pointerstability on Push_back but not iterator stability. Loop body triggers
-        // some code which adds new items into AllNodes and range based for as well as any iterator based
-        // loop leads to UB.
-        for (size_t idx = 0; idx < UpdIter->RecurseQueue.GetAllNodes().size(); ++idx) {
-            auto node = UpdIter->RecurseQueue.GetAllNodes()[idx];
-            const auto* deps = UpdIter->RecurseQueue.GetDeps(node);
-            if (!deps) {
-                continue;
-            }
-            for (const auto& [to, dep] : *deps) {
-                if (IsTestRecurseDep(node.NodeType, dep, to.NodeType)) {
-                    UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
-                }
-            }
-        }
-    }
-
-    bool prevTraverseAllRecurses = Conf.ShouldTraverseAllRecurses();
-    bool prevTraverseRecurses = Conf.ShouldTraverseRecurses();
-    Conf.SetTraverseAllRecurses(false);
-    Conf.SetTraverseRecurses(false);
-
-    for (size_t idx = 0; idx < UpdIter->DependsQueue.GetAllNodes().size(); ++idx) {
-        auto node = UpdIter->DependsQueue.GetAllNodes()[idx];
-        const auto* deps = UpdIter->DependsQueue.GetDeps(node);
-        if (!deps) {
-            continue;
-        }
-        for (const auto& [to, dep] : *deps) {
-            if (IsDependsDep(node.NodeType, dep, to.NodeType)) {
-                UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
-            }
-        }
-    }
-
-    for (auto dependsNode : UpdIter->DependsQueue.GetAllNodes()) {
-        auto deps = UpdIter->DependsQueue.GetDeps(dependsNode);
-        if (deps) {
-            for (const auto& [to, dep] : *deps) {
-                UpdIter->RecurseQueue.AddEdge(dependsNode, to, dep);
-            }
-        }
-    }
-
-    Conf.SetTraverseAllRecurses(prevTraverseAllRecurses);
-    Conf.SetTraverseRecurses(prevTraverseRecurses);
-
-    UpdIter->DelayedSearchDirDeps.Flush(*Parser, Graph);
-    Graph.RelocateNodes(Parser->RelocatedNodes);
 }
 
 TNodeId TYMake::GetUserTarget(const TStringBuf& target) const {
@@ -676,6 +602,62 @@ void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
     FORCE_TRACE(C, bypassEvent);
 };
 
+asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBuildConfiguration& conf, TConfigurationExecutor exec) {
+    if (conf.ReadStartTargetsFromEvlog) {
+        co_await ProcessEvlogAsync(yMake, conf, *conf.InputStream, exec);
+
+        if (conf.StartDirs.empty()) {
+            FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
+            co_return BR_OK;
+        }
+    }
+
+    yMake->CheckStartDirsChanges();
+    yMake->GraphChangesPredictionEvent();
+    TraceBypassEvent(conf, *yMake);
+
+    if (yMake->CanBypassConfigure()) {
+        conf.DoNotWriteAllCaches();
+    } else {
+        ConfMsgManager()->ClearTopLevelMessages();
+    }
+
+    TMaybe<EBuildResult> configureBuildRes;
+    if (conf.ShouldUseOnlyYmakeCache() || yMake->CanBypassConfigure()) {
+        configureBuildRes = StaticConfigureGraph(yMake);
+    } else {
+        configureBuildRes = co_await RunConfigureAsync(yMake, exec);
+    }
+
+    if (configureBuildRes.Defined()) {
+        ConfMsgManager()->Flush();
+        co_return configureBuildRes.GetRef();
+    }
+
+    if (!conf.WriteYdx.empty()) {
+        THolder<IOutputStream> ydxOut(new TFileOutput(conf.WriteYdx));
+        yMake->Yndex.WriteJSON(*ydxOut);
+        ydxOut->Finish();
+        co_return BR_OK;
+    }
+
+    if (!yMake->InitTargets()) {
+        co_return BR_FATAL_ERROR;
+    }
+
+    if (yMake->CanBypassConfigure()) {
+        yMake->SetStartTargetsFromCache();
+        yMake->UpdateExternalFilesChanges();
+    } else {
+        yMake->AddRecursesToStartTargets();
+        yMake->AddModulesToStartTargets();
+        yMake->FindLostIncludes();
+    }
+
+    yMake->ReportGraphBuildStats();
+    co_return TMaybe<EBuildResult>();
+}
+
 int main_real(TBuildConfiguration& conf) {
     if (conf.DumpLicensesInfo || conf.DumpLicensesMachineInfo) {
         return DumpLicenseInfo(conf);
@@ -718,74 +700,21 @@ int main_real(TBuildConfiguration& conf) {
     };
 
     {
+        asio::thread_pool configure_workers{2};
+        auto serial_exec = asio::make_strand(configure_workers.executor());
         TBuildGraphScope scope(*yMake.Get());
+        TMaybe<EBuildResult> buildResult;
 
-        if (conf.ReadStartTargetsFromEvlog) {
-            yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
-            NEvlogServer::TServer evlogServer{*yMake, conf};
-            // For now it's a synchronous reader w/o any buffering.
-            // The client must ensure they use non-blocking writes on their side,
-            // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue
-            evlogServer.ProcessStreamBlocking(*conf.InputStream);
+        asio::co_spawn(configure_workers, [&]() -> asio::awaitable<void> {
+            buildResult = co_await ConfigureStage(yMake, conf, serial_exec);
+            co_return;
+        }, asio::detached);
 
-            if (conf.StartDirs.empty()) {
-                FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
-                return BR_OK;
-            }
+        configure_workers.wait();
+
+        if (buildResult.Defined()) {
+            return buildResult.GetRef();
         }
-
-        // This should be called after collecting StartDirs
-        yMake->CheckStartDirsChanges();
-        yMake->GraphChangesPredictionEvent();
-
-        TraceBypassEvent(conf, *yMake);
-        if (yMake->CanBypassConfigure()) {
-            // FIXME: Currently we are implementing plan "B" for Grand Bypass,
-            // that is we do not want to save caches when Grand Bypass occurs
-            conf.DoNotWriteAllCaches();
-        } else {
-            // we can use top level messages from cache only when Grand Bypass occurs
-            ConfMsgManager()->ClearTopLevelMessages();
-        }
-
-        TMaybe<EBuildResult> configureBuildRes;
-        if (conf.ShouldUseOnlyYmakeCache() || yMake->CanBypassConfigure()) {
-            configureBuildRes = StaticConfigureGraph(yMake);
-        } else {
-            yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
-            YDIAG(IPRP) << "Start of configure. CurStamp: " << int(yMake->TimeStamps.CurStamp()) << Endl;
-            configureBuildRes = ConfigureGraph(yMake);
-        }
-        if (configureBuildRes.Defined()) {
-            ConfMsgManager()->Flush();
-            return configureBuildRes.GetRef();
-        }
-
-        if (!conf.WriteYdx.empty()) {
-            THolder<IOutputStream> ydxOut;
-            ydxOut.Reset(new TFileOutput(conf.WriteYdx));
-            yMake->Yndex.WriteJSON(*ydxOut);
-            ydxOut->Finish();
-            return BR_OK;
-        }
-
-        if (!yMake->InitTargets()) {
-            return BR_FATAL_ERROR;
-        }
-
-        if (yMake->CanBypassConfigure()) {
-            yMake->SetStartTargetsFromCache();
-
-            yMake->UpdateExternalFilesChanges();
-        } else {
-            yMake->AddRecursesToStartTargets();
-
-            yMake->AddModulesToStartTargets();
-
-            yMake->FindLostIncludes();
-        }
-
-        yMake->ReportGraphBuildStats();
     }
 
     yMake->ReportModulesStats();

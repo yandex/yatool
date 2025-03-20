@@ -3,6 +3,7 @@ LIBRARY()
 USE_PYTHON3()
 
 PEERDIR(
+    contrib/libs/asio
     contrib/libs/yaml-cpp
     contrib/python/PyYAML
     contrib/python/python-rapidjson
@@ -78,6 +79,7 @@ SRCS(
     compute_reachability.cpp
     conf.cpp
     config/config.cpp
+    configure_tasks.cpp
     dump_graph_info.cpp
     debug_log.cpp
     dependency_management.cpp
@@ -183,6 +185,12 @@ SRCS(
 IF (NOT OPENSOURCE)
     PEERDIR(
         library/cpp/xml/document
+    )
+ENDIF()
+
+IF (MSVC)
+    CFLAGS(
+        GLOBAL -DASIO_WINDOWS_APP
     )
 ENDIF()
 

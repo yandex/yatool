@@ -123,3 +123,8 @@ void OnPluginLoadFail(const char* fileName, const char* msg);
 
 void OnConfigureError(const char* msg);
 void OnBadDirError(const char* msg, const char* dir);
+
+struct TPyThreadLock {
+    TPyThreadLock() noexcept;
+    ~TPyThreadLock() noexcept;
+};

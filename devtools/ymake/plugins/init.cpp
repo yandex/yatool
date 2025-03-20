@@ -5,6 +5,8 @@
 #include "scoped_py_object_ptr.h"
 #include "ymake_module.h"
 
+#include "devtools/ymake/diag/trace.h"
+
 #include <util/folder/path.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -109,6 +111,22 @@ namespace {
 
         LoadPluginsFromDirRecursively(conf, path, /* firstLevel */ true);
     }
+
+    PyGILState_STATE py_gstate;
+    thread_local int py_lock_depth = 0;
+}
+
+TPyThreadLock::TPyThreadLock() noexcept {
+    if (py_lock_depth == 0) {
+        py_gstate = PyGILState_Ensure();
+    }
+    py_lock_depth++;
+}
+TPyThreadLock::~TPyThreadLock() noexcept {
+    --py_lock_depth;
+    if (py_lock_depth == 0) {
+        PyGILState_Release(py_gstate);
+    }
 }
 
 void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
@@ -133,6 +151,9 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf
     }
 
     Py_Initialize();
+    PyEval_SaveThread();
+
+    TPyThreadLock lk;
 
     PyInit_ymake();
 
