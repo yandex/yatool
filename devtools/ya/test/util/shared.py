@@ -655,8 +655,9 @@ def create_cython_include_map(binaries, filename):
 
     for binary in binaries:
         subprocess.check_call([binary, script_path], env={'Y_PYTHON_ENTRY_POINT': ':main'})
-        with open(filename) as afile:
-            include_map.update(json.load(afile))
+        if os.path.exists(filename):
+            with open(filename) as afile:
+                include_map.update(json.load(afile))
 
     with open(filename, 'w') as afile:
         json.dump(include_map, afile)
