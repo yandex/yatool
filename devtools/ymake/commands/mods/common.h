@@ -7,6 +7,7 @@ namespace NCommands {
     template<typename T> const char *PrintableTypeName();
     // TMacroValues::TValue
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::monostate                       >() {return "[pre]Unit";}
+    template<> [[maybe_unused]] inline const char *PrintableTypeName<bool                                 >() {return "[pre]Bool";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::string_view                     >() {return "[pre]String";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::vector<std::string_view>        >() {return "[pre]Strings";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TTool                  >() {return "[pre]Tool";}

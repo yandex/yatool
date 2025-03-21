@@ -216,6 +216,7 @@ private:
         void FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst);
         void InlineModArgTerm(const NCommands::TSyntax::TTerm& term, NCommands::TSyntax::TArgument& writer);
         void InlineXfm(const NCommands::TSyntax::TTransformation& xfm, NCommands::TSyntax::TTransformation& writer);
+        void InlineScalarTerm(const NCommands::TSyntax::TTerm& term, TCmdWriter& writer);
         void InlineScalarTerms(const NCommands::TSyntax::TArgument& arg, TCmdWriter& writer);
         void InlineArguments(const NCommands::TSyntax::TCommand& cmd, TCmdWriter& writer);
         void InlineCommands(const NCommands::TSyntax::TScript& scr, TCmdWriter& writer);

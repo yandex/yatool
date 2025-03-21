@@ -160,6 +160,25 @@ namespace {
         }
 
         std::any doVisitTermC(CmdParser::TermCContext *ctx) {
+            static const auto ifBlockData = [&]() {
+                // cf. TConfBuilder::EnterMacro
+                auto keywords = TCmdProperty::TKeywords();
+                keywords.AddKeyword("THEN", 0, -1, "");
+                keywords.AddKeyword("ELSE", 0, -1, "");
+                auto blockData = TBlockData{};
+                blockData.Completed = true;
+                blockData.IsUserMacro = true;
+                auto plainArgs = JoinStrings({"COND"}, ", ");
+                const auto cmdArgs = TString::Join("(", plainArgs, ")");
+                blockData.CmdProps.Reset(new TCmdProperty{cmdArgs, std::move(keywords)});
+                plainArgs = blockData.CmdProps->ConvertCmdArgs(cmdArgs);
+                Y_ASSERT(plainArgs.length() > 1 && plainArgs[0] == '(' && plainArgs.back() == ')');
+                plainArgs[0] = ' ';
+                plainArgs.pop_back();
+                blockData.CmdProps->AddArgNames(plainArgs);
+                return blockData;
+            }();
+
             auto rawArgs = TSyntax::TCommand();
             auto result = std::any();
             {
@@ -171,10 +190,29 @@ namespace {
             }
             auto text = ctx->TEXT_VAR()->getText();
             auto macroName = Unvariable(text);
-            GetCurrentArgument().emplace_back(TSyntax::TCall{
-                .Function = Values.InsertVar(macroName),
-                .Arguments = CollectArgs(macroName, std::move(rawArgs))
-            });
+            if (macroName == "IF") {
+                auto args = CollectArgs(macroName, ifBlockData, std::move(rawArgs));
+                auto& cond = FindCallArg(args, "COND");
+                auto& then = FindCallArg(args, "THEN");
+                auto& notThen = FindCallArg(args, "ELSE");
+                if (!(cond.Script.size() == 1 && cond.Script.front().size() == 1 && cond.Script.front().front().size() == 1)) [[unlikely]]
+                    throw TError() << "Bad condition shape";
+                if (then.Script.size() != 1) [[unlikely]]
+                    throw TError() << "Bad then-branch shape";
+                if (notThen.Script.size() != 1) [[unlikely]]
+                    throw TError() << "Bad else-branch shape";
+                GetCurrentArgument().emplace_back(TSyntax::TBuiltinIf{
+                    .Cond = MakeSimpleShared<TSyntax::TTerm>(cond.Script.front().front().front()),
+                    .Then = std::move(then.Script.front()),
+                    .Else = std::move(notThen.Script.front())
+                });
+            } else {
+                Y_ASSERT(Conf);
+                auto blockDataIt = Conf->BlockData.find(macroName);
+                if (blockDataIt == Conf->BlockData.end()) [[unlikely]]
+                    throw TError() << "Macro " << macroName << " not found";
+                GetCurrentArgument().emplace_back(CollectArgs(macroName, blockDataIt->second, std::move(rawArgs)));
+            }
             return result;
         }
 
@@ -190,7 +228,14 @@ namespace {
 
     private:
 
-        TVector<TSyntax> CollectArgs(TStringBuf macroName, TSyntax::TCommand rawArgs) {
+        const TSyntax& FindCallArg(const TSyntax::TCall& call, TStringBuf name) {
+            auto it = std::find(call.ArgumentNames.begin(), call.ArgumentNames.end(), name);
+            if (it == call.ArgumentNames.end()) [[unlikely]]
+                ythrow TError() << "call argument " << name << " expected";
+            return call.Arguments[it - call.ArgumentNames.begin()];
+        }
+
+        TSyntax::TCall CollectArgs(TStringBuf macroName, const TBlockData& blockData, TSyntax::TCommand rawArgs) {
             // see the "functions/arg-passing" test for the sorts of patterns this logic is supposed to handle
 
             //
@@ -202,17 +247,12 @@ namespace {
             // the resulting collection follows the ordering in ArgNames
             //
 
-            Y_ASSERT(Conf);
-            auto blockDataIt = Conf->BlockData.find(macroName);
-            auto blockData = blockDataIt != Conf->BlockData.end() ? &blockDataIt->second : nullptr;
-            Y_ASSERT(blockData); // TODO handle unknown macros
-
-            auto args = TVector<TSyntax>(blockData->CmdProps->ArgNames().size());
+            auto args = TVector<TSyntax>(blockData.CmdProps->ArgNames().size());
             const TKeyword* kwDesc = nullptr;
 
-            auto kwArgCnt = blockData->CmdProps->GetKeyArgsNum();
-            auto posArgCnt = blockData->CmdProps->ArgNames().size() - blockData->CmdProps->GetKeyArgsNum();
-            auto hasVarArg = posArgCnt != 0 && blockData->CmdProps->ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+            auto kwArgCnt = blockData.CmdProps->GetKeyArgsNum();
+            auto posArgCnt = blockData.CmdProps->ArgNames().size() - blockData.CmdProps->GetKeyArgsNum();
+            auto hasVarArg = posArgCnt != 0 && blockData.CmdProps->ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
                 args[kwArgCnt + i].Script.emplace_back();
@@ -247,7 +287,7 @@ namespace {
 
                 if (rawArg->size() == 1)
                     if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front())) {
-                        if (auto *keywordData = blockData->CmdProps->GetKeywordData(kw->Value)) {
+                        if (auto *keywordData = blockData.CmdProps->GetKeywordData(kw->Value)) {
                             kwDesc = keywordData;
                             maybeStartNamedArg();
                             continue;
@@ -282,7 +322,7 @@ namespace {
                     << " called with too few positional arguments"
                     << " (" << posArgCnt << (hasVarArg ? " or more" : "") << " expected)";
 
-            for (const auto& [name, kw] : blockData->CmdProps->GetKeywords()) {
+            for (const auto& [name, kw] : blockData.CmdProps->GetKeywords()) {
                 auto namedArg = &args[kw.Pos];
                 if (!namedArg->Script.empty()) {
                     Y_ASSERT(namedArg->Script.size() == 1);
@@ -295,7 +335,20 @@ namespace {
                     AssignPreset(namedArg->Script, kw.OnKwMissing);
             }
 
-            return args;
+            auto argNames = std::vector<TStringBuf>();
+            argNames.reserve(blockData.CmdProps->ArgNames().size());
+            for (auto& name : blockData.CmdProps->ArgNames()) {
+                argNames.push_back(name);
+                if (argNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX))
+                    argNames.back().Chop(strlen(NStaticConf::ARRAY_SUFFIX));
+            }
+
+            Y_ASSERT(args.size() == argNames.size());
+            return TSyntax::TCall{
+                .Function = Values.InsertVar(macroName),
+                .Arguments = std::move(args),
+                .ArgumentNames = std::move(argNames)
+            };
         }
 
         void AssignPreset(TSyntax::TScript& dst, const TVector<TString>& src) {
@@ -464,6 +517,9 @@ namespace {
                     CompileArgs(mods, x.Body, termsBuilder);
             },
             [&](const TSyntax::TCall&) {
+                Y_ABORT();
+            },
+            [&](const TSyntax::TBuiltinIf&) {
                 Y_ABORT();
             },
             [&](const TSyntax::TIdOrString&) {

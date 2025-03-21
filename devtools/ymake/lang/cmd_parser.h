@@ -14,6 +14,7 @@ namespace NCommands {
 
         struct TTransformation;
         struct TCall;
+        struct TBuiltinIf;
 
         // `TIdOrString` can only appear as a temporarily unclassified entry in a macro argument list;
         // for example, in `$MYMACRO(A B C)`, "A", "B", and "C" can be either names or values,
@@ -39,6 +40,7 @@ namespace NCommands {
             NPolexpr::TConstId,
             TTransformation,
             TCall,
+            TBuiltinIf,
             // temporary entries that should not appear in user-facing data
             TIdOrString,
             TUnexpanded
@@ -57,8 +59,16 @@ namespace NCommands {
         };
 
         struct TCall {
+            // ArgumentNames and Arguments are a structure-of-arrays equivalent of std::vector<std::pair<TStringBuf, TSyntax>>
             NPolexpr::EVarId Function;
             std::vector<TSyntax> Arguments;
+            std::vector<TStringBuf> ArgumentNames;
+        };
+
+        struct TBuiltinIf {
+            TSimpleSharedPtr<TTerm> Cond;
+            TCommand Then;
+            TCommand Else;
         };
 
         TScript Script;

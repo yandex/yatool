@@ -8,6 +8,72 @@ using namespace NCommands;
 
 namespace {
 
+    inline bool IsEmpty(const TModMetadata& mod, const TMacroValues::TValue& val) {
+        return std::visit(TOverloaded{
+            [](std::monostate) {
+                return true;
+            },
+            [&](std::string_view x) {
+                return x.empty();
+            },
+            [&](const std::vector<std::string_view>& x) {
+                return x.empty();
+            },
+            [&](auto&& x) -> bool {
+                throw TBadArgType(mod.Name, x);
+            },
+        }, val);
+    }
+
+    inline bool IsEmpty(const TTermValue& val) {
+        return std::visit(TOverloaded{
+            [](TTermError) -> bool {
+                Y_ABORT();
+            },
+            [](TTermNothing) {
+                return true;
+            },
+            [&](const TString& x) {
+                return x.empty();
+            },
+            [&](const TVector<TString>& x) {
+                return x.empty();
+            },
+            [&](const TTaggedStrings& x) {
+                return x.empty();
+            }
+        }, val);
+    }
+
+    inline bool AsBool(const TModMetadata& mod, const TMacroValues::TValue& val) {
+        return std::visit(TOverloaded{
+            [](bool x) {
+                return !x;
+            },
+            [&](auto&& x) -> bool {
+                throw TBadArgType(mod.Name, x);
+            },
+        }, val);
+    }
+
+    inline bool ToBool(const TTermValue& val) {
+        return std::visit(TOverloaded{
+            [](TTermError) -> bool {
+                Y_ABORT();
+            },
+            [](TTermNothing) {
+                return false;
+            },
+            [&](auto&&) {
+                return true;
+            }
+        }, val);
+    }
+
+    inline TTermValue FromBool(bool val) {
+        return val ? TTermValue(TString()) : TTermValue(TTermNothing());
+    }
+
     //
     //
     //
@@ -32,7 +98,16 @@ namespace {
 
     class THideEmpty: public TBasicModImpl {
     public:
-        THideEmpty(): TBasicModImpl({.Id = EMacroFunction::HideEmpty, .Name = "hideempty", .Arity = 1, .CanEvaluate = true}) {
+        THideEmpty(): TBasicModImpl({.Id = EMacroFunction::HideEmpty, .Name = "hideempty", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            if (IsEmpty(*this, args[0]))
+                return std::monostate();
+            return args[0];
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -40,27 +115,34 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            return std::visit(TOverloaded{
-                [](TTermError) -> TTermValue {
-                    Y_ABORT();
-                },
-                [](TTermNothing) -> TTermValue {
-                    return TTermNothing();
-                },
-                [&](const TString& x) -> TTermValue {
-                    if (x.empty())
-                        return TTermNothing();
-                    return x;
-                },
-                [&](const TVector<TString>& x) -> TTermValue {
-                    if (x.empty())
-                        return TTermNothing();
-                    return x;
-                },
-                [&](const TTaggedStrings& x) -> TTermValue {
-                    throw TBadArgType(Name, x);
-                }
-            }, args[0]);
+            if (IsEmpty(args[0]))
+                return TTermNothing();
+            return args[0];
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
+    class TEmpty: public TBasicModImpl {
+    public:
+        TEmpty(): TBasicModImpl({.Id = EMacroFunction::Empty, .Name = "empty", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            return IsEmpty(*this, args[0]);
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            return FromBool(IsEmpty(args[0]));
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -78,25 +160,32 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            return std::visit(TOverloaded{
-                [](TTermError) -> TTermValue {
-                    Y_ABORT();
-                },
-                [](TTermNothing) -> TTermValue {
-                    return TTermNothing();
-                },
-                [&](const TString&) -> TTermValue {
-                    return TString();
-                },
-                [&](const TVector<TString>& v) -> TTermValue {
-                    if (v.empty())
-                        return TTermNothing();
-                    return TString();
-                },
-                [&](const TTaggedStrings& x) -> TTermValue {
-                    throw TBadArgType(Name, x);
-                }
-            }, args[0]);
+            return FromBool(!IsEmpty(args[0]));
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
+    class TNot: public TBasicModImpl {
+    public:
+        TNot(): TBasicModImpl({.Id = EMacroFunction::Not, .Name = "not", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            return AsBool(*this, args[0]);
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            return FromBool(!ToBool(args[0]));
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

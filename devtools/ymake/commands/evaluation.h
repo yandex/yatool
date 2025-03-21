@@ -10,7 +10,6 @@ namespace NCommands {
     struct TPreevalCtx {
         TMacroValues& Values;
         NCommands::TCompiledCommand& Sink;
-        EMacroFunction RootFnIdx;
     };
 
     struct TEvalCtx {

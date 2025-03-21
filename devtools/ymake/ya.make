@@ -75,6 +75,8 @@ SRCS(
     commands/compilation.cpp
     commands/evaluation.cpp
     commands/mod_registry.cpp
+    commands/preeval.cpp
+    commands/preeval_reducer.cpp
     commands/script_evaluator.cpp
     compute_reachability.cpp
     conf.cpp

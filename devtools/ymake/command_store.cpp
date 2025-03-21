@@ -1,6 +1,7 @@
 #include "command_store.h"
-#include "add_dep_adaptor.h"
-#include "add_dep_adaptor_inline.h"
+
+#include <devtools/ymake/commands/preeval.h>
+#include <devtools/ymake/commands/preeval_reducer.h>
 
 #include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/commands/compilation.h>
@@ -10,193 +11,13 @@
 #include <devtools/ymake/polexpr/evaluate.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/common/string.h>
+#include <devtools/ymake/conf.h>
 
 #include <fmt/format.h>
 #include <fmt/args.h>
 #include <util/generic/overloaded.h>
 #include <util/generic/scope.h>
 #include <ranges>
-
-namespace {
-
-    template <class...> [[maybe_unused]] constexpr std::false_type always_false_v{}; // TODO
-
-    struct TRefReducer {
-
-        using TInputs = NCommands::TCompiledCommand::TInputs;
-        using TOutputs = NCommands::TCompiledCommand::TOutputs;
-
-        TRefReducer(
-            const NCommands::TModRegistry& mods,
-            TMacroValues& values,
-            const TVars& vars,
-            NCommands::TCompiledCommand& sink
-        )
-            : Mods(mods)
-            , Values(values)
-            , Vars(vars)
-            , Sink(sink)
-        {
-        }
-
-    public:
-
-        void ReduceIf(NCommands::TSyntax& ast) {
-            for (auto& cmd : ast.Script)
-                ReduceCmd(cmd);
-            Sink.Expression = NCommands::Compile(Mods, ast);
-        }
-
-    private:
-
-        void ReduceCmd(NCommands::TSyntax::TCommand& cmd) {
-            for (auto& arg : cmd)
-                for (auto& term : arg)
-                    if (auto xfm = std::get_if<NCommands::TSyntax::TTransformation>(&term)) {
-                        auto cutoff = std::find_if(
-                            xfm->Mods.begin(), xfm->Mods.end(),
-                            [&](auto& mod) {return Condition(Mods.Func2Id(mod.Function));}
-                        );
-                        if (cutoff == xfm->Mods.end()) {
-                            ReduceCmd(xfm->Body);
-                            continue;
-                        }
-                        auto val = EvalCmd(xfm->Body);
-                        auto rcutoff = std::make_reverse_iterator(cutoff);
-                        for (auto mod = xfm->Mods.rbegin(); mod != rcutoff; ++mod)
-                            val = ApplyMod(*mod, val);
-                        xfm->Mods.erase(cutoff, xfm->Mods.end());
-                        if (xfm->Mods.empty())
-                            term = val;
-                        else
-                            xfm->Body = {{val}};
-                    }
-        }
-
-        NPolexpr::TConstId EvalCmd(const NCommands::TSyntax::TCommand& cmd) {
-            if (cmd.size() == 1 && cmd.front().size() == 1) {
-                // `input` modifier shenanigans:
-                // * do not add `Args(Terms(...))` wrappers when dealing with `${VAR}`
-                //   to avoid extra enquoting of `VAR` contents in, e.g.,
-                //   `${input:X}`, `X=${ARCADIA_ROOT}/some/path`
-                //   (cf. similar code in `CompileArgs` invoked by `NCommands::Compile`);
-                // * _do_ add these wrappers when dealing with `${...:"text"}`,
-                //   either direct, or an inlined version of
-                //   `${input:X}`, `X="file name with spaces.txt"`,
-                //   because the `input` modifier expects a stringified list of enquoted args
-                //   (see input processing in `TRefReducer::Evaluate`)
-                if (std::holds_alternative<NPolexpr::EVarId>(cmd.front().front()))
-                    return EvalTerm(cmd.front().front());
-            }
-            TVector<NPolexpr::TConstId> args;
-            args.reserve(cmd.size());
-            for (auto& arg : cmd) {
-                TVector<NPolexpr::TConstId> terms;
-                terms.reserve(arg.size());
-                for (auto& term : arg)
-                    terms.push_back(EvalTerm(term));
-                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Terms), std::span(terms))));
-            }
-            return Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Args), std::span(args)));
-        }
-
-        NPolexpr::TConstId EvalTerm(const NCommands::TSyntax::TTerm& term) {
-            return std::visit(TOverloaded{
-                [&](NPolexpr::TConstId id) {
-                    return id;
-                },
-                [&](NPolexpr::EVarId id) {
-                    return Wrap(Evaluate(id));
-                },
-                [&](const NCommands::TSyntax::TTransformation& xfm) -> NPolexpr::TConstId {
-                    auto val = EvalCmd(xfm.Body);
-                    for (auto& mod : std::ranges::reverse_view(xfm.Mods))
-                        val = ApplyMod(mod, val);
-                    return val;
-                },
-                [&](const NCommands::TSyntax::TCall&) -> NPolexpr::TConstId {
-                    Y_ABORT();
-                },
-                [&](const NCommands::TSyntax::TIdOrString&) -> NPolexpr::TConstId {
-                    Y_ABORT();
-                },
-                [&](const NCommands::TSyntax::TUnexpanded&) -> NPolexpr::TConstId {
-                    Y_ABORT();
-                }
-            }, term);
-        }
-
-        NPolexpr::TConstId ApplyMod(const NCommands::TSyntax::TTransformation::TModifier& mod, NPolexpr::TConstId val) {
-            TVector<NPolexpr::TConstId> args;
-            args.reserve(mod.Arguments.size() + 1);
-            for (auto& modArg : mod.Arguments) {
-                TVector<NPolexpr::TConstId> catArgs;
-                catArgs.reserve(modArg.size());
-                for (auto& modTerm : modArg)
-                    catArgs.push_back(EvalTerm(modTerm));
-                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Cat), std::span(catArgs))));
-            }
-            args.push_back(val);
-            return Wrap(Evaluate(Mods.Func2Id(mod.Function), std::span(args)));
-        }
-
-    private:
-
-        bool Condition(NPolexpr::TFuncId func) {
-            RootFnIdx = static_cast<EMacroFunction>(func.GetIdx());
-            auto mod = Mods.At(RootFnIdx);
-            if (Y_LIKELY(mod))
-                return mod->MustPreevaluate;
-            Y_DEBUG_ABORT();
-            return false;
-        };
-
-        TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
-            // TBD what about vector vars here?
-            auto name = Values.GetVarName(id);
-            auto var = Vars.Lookup(name);
-            if (!var || var->DontExpand /* see InitModuleVars() */) {
-                // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
-                // note that the extra braces in the result are significant:
-                // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
-                auto result = TString(fmt::format("${{{}}}", name));
-                return Values.GetValue(Values.InsertStr(result));
-            }
-            return Eval1(var);
-        }
-
-        TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<NPolexpr::TConstId> args) {
-            auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
-            auto mod = Mods.At(fnIdx);
-            if (Y_LIKELY(mod && mod->CanPreevaluate)) {
-                TVector<TMacroValues::TValue> unwrappedArgs;
-                unwrappedArgs.reserve(args.size());
-                for(auto&& arg : args)
-                    unwrappedArgs.push_back(Values.GetValue(arg));
-                return mod->Preevaluate({Values, Sink, RootFnIdx}, unwrappedArgs);
-            }
-            Y_DEBUG_ABORT_UNLESS(mod);
-            throw TConfigurationError()
-                << "Cannot process modifier [[bad]]" << ToString(fnIdx) << "[[rst]]"
-                << " while preevaluating [[bad]]" << ToString(RootFnIdx) << "[[rst]]";
-        }
-
-        NPolexpr::TConstId Wrap(TMacroValues::TValue value) {
-            return Values.InsertValue(std::move(value));
-        }
-
-    private:
-
-        const NCommands::TModRegistry& Mods;
-        TMacroValues& Values;
-        const TVars& Vars;
-        NCommands::TCompiledCommand& Sink;
-        EMacroFunction RootFnIdx;
-
-    };
-
-
-}
 
 struct TCommands::TInliner::TScope {
     explicit TScope(const TScope *base): Base(base) {}
@@ -206,9 +27,16 @@ public:
     TVarDefinitions VarDefinitions;
 };
 
-static inline ui64 GoodHash(const NPolexpr::TExpression& expr) noexcept {
-    auto bytes = std::as_bytes(expr.GetNodes());
-    return CityHash64(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+namespace {
+
+    static const auto True = TString("yes");
+    static const auto False = TString("no");
+
+    inline ui64 GoodHash(const NPolexpr::TExpression& expr) noexcept {
+        auto bytes = std::as_bytes(expr.GetNodes());
+        return CityHash64(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    }
+
 }
 
 const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *conf) const {
@@ -333,9 +161,10 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
 
     // validate contents
 
-    Y_ASSERT(var);
-    Y_ASSERT(var->size() == 1);
-    Y_ASSERT(var->front().HasPrefix);
+    if (!var) [[unlikely]]
+        ythrow TError() << "unknown macro: " << name;
+    if (!(var->size() == 1 && var->front().HasPrefix)) [[unlikely]]
+        ythrow TError() << "not a proper macro: " << name;
     ui64 subId;
     TStringBuf subName, subValue;
     ParseLegacyCommandOrSubst(var->front().Name, subId, subName, subValue);
@@ -458,19 +287,14 @@ private:
 
 };
 
+//
+//
+//
+
 void TCommands::TInliner::FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst) {
-    auto macroName = Commands.Values.GetVarName(src.Function);
-
-    auto blockDataIt = Conf.BlockData.find(macroName);
-    const TBlockData* blockData = blockDataIt != Conf.BlockData.end() ? &blockDataIt->second : nullptr;
-    Y_ASSERT(blockData); // TODO handle unknown macros
-
-    Y_ASSERT(blockData->CmdProps->ArgNames().size() == src.Arguments.size());
     auto argCnt = src.Arguments.size();
     for (size_t i = 0; i != argCnt; ++i) {
-        auto argName = TStringBuf(blockData->CmdProps->ArgNames()[i]);
-        if (argName.EndsWith(NStaticConf::ARRAY_SUFFIX))
-            argName.Chop(strlen(NStaticConf::ARRAY_SUFFIX));
+        auto argName = src.ArgumentNames[i];
         auto writer = TCmdWriter(dst.VarDefinitions[argName], true);
         InlineCommands(src.Arguments[i].Script, writer);
 #if 0
@@ -528,6 +352,9 @@ void TCommands::TInliner::InlineModArgTerm(
             writer.push_back(std::move(newXfm));
         },
         [&](const NCommands::TSyntax::TCall&) {
+            throw TNotImplemented();
+        },
+        [&](const NCommands::TSyntax::TBuiltinIf&) {
             throw TNotImplemented();
         },
         [&](const NCommands::TSyntax::TIdOrString&) {
@@ -592,6 +419,103 @@ void TCommands::TInliner::InlineXfm(
         writer.Body = xfm.Body;
 }
 
+void TCommands::TInliner::InlineScalarTerm(
+    const NCommands::TSyntax::TTerm& term,
+    TCmdWriter& writer
+) {
+    ++Depth;
+    Y_DEFER {--Depth;};
+    CheckDepth();
+    std::visit(TOverloaded{
+        [&](NPolexpr::TConstId id) {
+            writer.WriteTerm(id);
+        },
+        [&](NPolexpr::EVarId var) {
+            auto def = GetVariableDefinition(var);
+            if (!def.Definition) {
+                writer.WriteTerm(var);
+                return;
+            }
+            if (def.Definition->Script.size() == 0)
+                return;
+            if (def.Definition->Script.size() != 1)
+                ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(var);
+            if (def.Definition->Script[0].size() == 0)
+                return;
+            if (def.Definition->Script[0].size() != 1) {
+                // TODO just disallow this?
+                if (def.LegacyMode == ELegacyMode::None || LegacyVars.RecursionDepth[var] != 0)
+                    ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(var);
+                // TODO dev warning?
+                // leave it for the actual evaluation to expand
+                writer.WriteTerm(var);
+                return;
+            }
+            if (def.LegacyMode != ELegacyMode::None) {
+                Y_ASSERT(LegacyVars.RecursionDepth.contains(var));
+                ++LegacyVars.RecursionDepth[var];
+                Y_DEFER {--LegacyVars.RecursionDepth[var];};
+                InlineScalarTerms(def.Definition->Script[0][0], writer);
+            } else
+                InlineScalarTerms(def.Definition->Script[0][0], writer);
+        },
+        [&](const NCommands::TSyntax::TTransformation& xfm) {
+            auto newXfm = NCommands::TSyntax::TTransformation();
+            InlineXfm(xfm, newXfm);
+            writer.WriteTerm(std::move(newXfm));
+        },
+        [&](const NCommands::TSyntax::TCall& call) {
+            auto def = GetMacroDefinition(call.Function);
+            if (!def)
+                ythrow TError() << "unknown macro call";
+            TScope scope(Scope);
+            FillMacroArgs(call, scope);
+            Scope = &scope;
+            Y_DEFER {Scope = scope.Base;};
+            if (def->Script.size() == 0)
+                return;
+            if (def->Script.size() != 1)
+                ythrow TError() << "unexpected multicommand call: " << Commands.Values.GetVarName(call.Function);
+            if (def->Script[0].size() == 0)
+                return;
+            if (def->Script[0].size() != 1)
+                ythrow TError() << "unexpected multiargument call: " << Commands.Values.GetVarName(call.Function);
+            InlineScalarTerms(def->Script[0][0], writer);
+        },
+        [&](const NCommands::TSyntax::TBuiltinIf& call) {
+            NCommands::TSyntax condExpanded;
+            auto condWriter = TCmdWriter(condExpanded, false);
+            condWriter.BeginCommand();
+            condWriter.BeginArgument();
+            InlineScalarTerm(*call.Cond, condWriter);
+            condWriter.EndArgument();
+            condWriter.EndCommand();
+            if (!(condExpanded.Script.size() == 1 && condExpanded.Script.front().size() == 1 && condExpanded.Script.front().front().size() == 1))
+                ythrow TError() << "single-term condition expected";
+            auto eval = NCommands::TPreevaluator{Commands.Mods, Commands.Values, LegacyVars.Vars};
+            auto cond = eval.EvalTerm(condExpanded.Script.front().front().front());
+            auto condBool = std::get_if<bool>(&cond);
+            if (!condBool)
+                ythrow TError() << "boolean condition expected";
+            if (*condBool) {
+                if (call.Then.size() != 1)
+                    ythrow TError() << "unexpected multiargument evaluation";
+                InlineScalarTerms(call.Then[0], writer);
+            } else {
+                if (call.Else.size() != 1)
+                    ythrow TError() << "unexpected multiargument evaluation";
+                InlineScalarTerms(call.Else[0], writer);
+            }
+        },
+        [&](const NCommands::TSyntax::TIdOrString&) {
+            Y_ABORT();
+        },
+        [&](const NCommands::TSyntax::TUnexpanded& x) {
+            writer.WriteTerm(x);
+        },
+    }, term);
+}
+
 void TCommands::TInliner::InlineScalarTerms(
     const NCommands::TSyntax::TArgument& arg,
     TCmdWriter& writer
@@ -599,71 +523,8 @@ void TCommands::TInliner::InlineScalarTerms(
     ++Depth;
     Y_DEFER {--Depth;};
     CheckDepth();
-    for (auto& term : arg) {
-        std::visit(TOverloaded{
-            [&](NPolexpr::TConstId id) {
-                writer.WriteTerm(id);
-            },
-            [&](NPolexpr::EVarId var) {
-                auto def = GetVariableDefinition(var);
-                if (!def.Definition) {
-                    writer.WriteTerm(var);
-                    return;
-                }
-                if (def.Definition->Script.size() == 0)
-                    return;
-                if (def.Definition->Script.size() != 1)
-                    ythrow TError() << "unexpected multicommand substitution: " << Commands.Values.GetVarName(var);
-                if (def.Definition->Script[0].size() == 0)
-                    return;
-                if (def.Definition->Script[0].size() != 1) {
-                    // TODO just disallow this?
-                    if (def.LegacyMode == ELegacyMode::None || LegacyVars.RecursionDepth[var] != 0)
-                        ythrow TError() << "unexpected multiargument substitution: " << Commands.Values.GetVarName(var);
-                    // TODO dev warning?
-                    // leave it for the actual evaluation to expand
-                    writer.WriteTerm(var);
-                    return;
-                }
-                if (def.LegacyMode != ELegacyMode::None) {
-                    Y_ASSERT(LegacyVars.RecursionDepth.contains(var));
-                    ++LegacyVars.RecursionDepth[var];
-                    Y_DEFER {--LegacyVars.RecursionDepth[var];};
-                    InlineScalarTerms(def.Definition->Script[0][0], writer);
-                } else
-                    InlineScalarTerms(def.Definition->Script[0][0], writer);
-            },
-            [&](const NCommands::TSyntax::TTransformation& xfm) {
-                auto newXfm = NCommands::TSyntax::TTransformation();
-                InlineXfm(xfm, newXfm);
-                writer.WriteTerm(std::move(newXfm));
-            },
-            [&](const NCommands::TSyntax::TCall& call) {
-                auto def = GetMacroDefinition(call.Function);
-                if (!def)
-                    ythrow TError() << "unknown macro call";
-                TScope scope(Scope);
-                FillMacroArgs(call, scope);
-                Scope = &scope;
-                Y_DEFER {Scope = scope.Base;};
-                if (def->Script.size() == 0)
-                    return;
-                if (def->Script.size() != 1)
-                    ythrow TError() << "unexpected multicommand call: " << Commands.Values.GetVarName(call.Function);
-                if (def->Script[0].size() == 0)
-                    return;
-                if (def->Script[0].size() != 1)
-                    ythrow TError() << "unexpected multiargument call: " << Commands.Values.GetVarName(call.Function);
-                InlineScalarTerms(def->Script[0][0], writer);
-            },
-            [&](const NCommands::TSyntax::TIdOrString&) {
-                Y_ABORT();
-            },
-            [&](const NCommands::TSyntax::TUnexpanded& x) {
-                writer.WriteTerm(x);
-            },
-        }, term);
-    }
+    for (auto& term : arg)
+        InlineScalarTerm(term, writer);
 }
 
 void TCommands::TInliner::InlineArguments(
@@ -706,19 +567,46 @@ void TCommands::TInliner::InlineArguments(
         return true;
     };
     auto tryStandalone = [&](const NCommands::TSyntax::TTerm& term) {
-        if (auto var = std::get_if<NPolexpr::EVarId>(&term))
-            if (doAVariable(*var))
+        return std::visit(TOverloaded{
+            [&](NPolexpr::EVarId var) {
+                return doAVariable(var);
+            },
+            [&](const NCommands::TSyntax::TTransformation& xfm) {
+                if (xfm.Mods.empty())
+                    if (xfm.Body.size() == 1 && xfm.Body.front().size() == 1)
+                        if (auto var = std::get_if<NPolexpr::EVarId>(&xfm.Body.front().front()))
+                            if (doAVariable(*var))
+                                return true;
+                return false;
+            },
+            [&](const NCommands::TSyntax::TCall& call) {
+                return doACall(call);
+            },
+            [&](const NCommands::TSyntax::TBuiltinIf& call) {
+                NCommands::TSyntax condExpanded;
+                auto condWriter = TCmdWriter(condExpanded, false);
+                condWriter.BeginCommand();
+                condWriter.BeginArgument();
+                InlineScalarTerm(*call.Cond, condWriter);
+                condWriter.EndArgument();
+                condWriter.EndCommand();
+                if (!(condExpanded.Script.size() == 1 && condExpanded.Script.front().size() == 1 && condExpanded.Script.front().front().size() == 1))
+                    ythrow TError() << "single-term condition expected";
+                auto eval = NCommands::TPreevaluator{Commands.Mods, Commands.Values, LegacyVars.Vars};
+                auto cond = eval.EvalTerm(condExpanded.Script.front().front().front());
+                auto condBool = std::get_if<bool>(&cond);
+                if (!condBool)
+                    ythrow TError() << "boolean condition expected";
+                if (*condBool)
+                    InlineArguments(call.Then, writer);
+                else
+                    InlineArguments(call.Else, writer);
                 return true;
-        if (auto xfm = std::get_if<NCommands::TSyntax::TTransformation>(&term))
-            if (xfm->Mods.empty())
-                if (xfm->Body.size() == 1 && xfm->Body.front().size() == 1)
-                    if (auto var = std::get_if<NPolexpr::EVarId>(&xfm->Body.front().front()))
-                        if (doAVariable(*var))
-                            return true;
-        if (auto call = std::get_if<NCommands::TSyntax::TCall>(&term))
-            if (doACall(*call))
-                return true;
-        return false;
+            },
+            [&](auto&&) {
+                return false;
+            }
+        }, term);
     };
     for (auto& arg : cmd) {
         if (arg.size() == 1)
@@ -762,19 +650,46 @@ void TCommands::TInliner::InlineCommands(
         return true;
     };
     auto tryStandalone = [&](const NCommands::TSyntax::TTerm& term) {
-        if (auto var = std::get_if<NPolexpr::EVarId>(&term); var)
-            if (doAVariable(*var))
+        return std::visit(TOverloaded{
+            [&](NPolexpr::EVarId var) {
+                return doAVariable(var);
+            },
+            [&](const NCommands::TSyntax::TTransformation& xfm) {
+                if (xfm.Mods.empty())
+                    if (xfm.Body.size() == 1 && xfm.Body.front().size() == 1)
+                        if (auto var = std::get_if<NPolexpr::EVarId>(&xfm.Body.front().front()))
+                            if (doAVariable(*var))
+                                return true;
+                return false;
+            },
+            [&](const NCommands::TSyntax::TCall& call) {
+                return doACall(call);
+            },
+            [&](const NCommands::TSyntax::TBuiltinIf& call) {
+                NCommands::TSyntax condExpanded;
+                auto condWriter = TCmdWriter(condExpanded, false);
+                condWriter.BeginCommand();
+                condWriter.BeginArgument();
+                InlineScalarTerm(*call.Cond, condWriter);
+                condWriter.EndArgument();
+                condWriter.EndCommand();
+                if (!(condExpanded.Script.size() == 1 && condExpanded.Script.front().size() == 1 && condExpanded.Script.front().front().size() == 1))
+                    ythrow TError() << "single-term condition expected";
+                auto eval = NCommands::TPreevaluator{Commands.Mods, Commands.Values, LegacyVars.Vars};
+                auto cond = eval.EvalTerm(condExpanded.Script.front().front().front());
+                auto condBool = std::get_if<bool>(&cond);
+                if (!condBool)
+                    ythrow TError() << "boolean condition expected";
+                if (*condBool)
+                    InlineCommands({call.Then}, writer);
+                else
+                    InlineCommands({call.Else}, writer);
                 return true;
-        if (auto xfm = std::get_if<NCommands::TSyntax::TTransformation>(&term))
-            if (xfm->Mods.empty())
-                if (xfm->Body.size() == 1 && xfm->Body.front().size() == 1)
-                    if (auto var = std::get_if<NPolexpr::EVarId>(&xfm->Body.front().front()); var)
-                        if (doAVariable(*var))
-                            return true;
-        if (auto call = std::get_if<NCommands::TSyntax::TCall>(&term))
-            if (doACall(*call))
-                return true;
-        return false;
+            },
+            [&](auto&&) {
+                return false;
+            }
+        }, term);
     };
     for (auto& cmd : scr) {
         if (cmd.size() == 1 && cmd[0].size() == 1)
@@ -914,6 +829,15 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
                     }
                     os << ")";
                 },
+                [&](const NCommands::TSyntax::TBuiltinIf& call) {
+                    os << "IF(";
+                    PrintCmd({{*call.Cond}}, os);
+                    os << ", ";
+                    PrintCmd(call.Then, os);
+                    os << ", ";
+                    PrintCmd(call.Else, os);
+                    os << ")";
+                },
                 [&](const NCommands::TSyntax::TIdOrString& x) {
                     os << "~" << x.Value;
                 },
@@ -930,6 +854,7 @@ TString TCommands::PrintConst(NPolexpr::TConstId id) const {
     // TODO strings here would be better with the {:?s} formatting, but the current fmt is too old for that
     return std::visit(TOverloaded{
         [](std::monostate                           ) { return fmt::format("{{}}"); },
+        [](bool                                  val) { return fmt::format("#{}", val ? "t" : "f"); },
         [](std::string_view                      val) { return fmt::format("'{}'", val); },
         [](std::vector<std::string_view>         val) { return fmt::format("'{}'", fmt::join(val, "', '")); },
         [](TMacroValues::TTool                   val) { return fmt::format("Tool{{'{}'}}", val.Data); },
@@ -983,7 +908,7 @@ NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, con
     if (io.KnownOutputs)
         for (auto& x : *io.KnownOutputs)
             result.Outputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));
-    auto reducer = TRefReducer{Mods, Values, vars, result};
+    auto reducer = NCommands::TRefReducer{Mods, Values, vars, result};
     try {
         reducer.ReduceIf(expr);
     } catch(const std::exception&) {
@@ -1091,6 +1016,10 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
         [](std::monostate) {
             return NCommands::TTermValue(NCommands::TTermNothing());
         },
+        [](bool val) {
+            // TODO do we want proper render-time booleans?
+            return NCommands::TTermValue(val ? True : False);
+        },
         [](std::string_view val) {
             return NCommands::TTermValue(TString(val));
         },
@@ -1152,6 +1081,7 @@ TVector<TString> TCommands::InputToStringArray(const TMacroValues::TInput& input
 TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
     return std::visit(TOverloaded{
         [](std::monostate                           ) { return TString(); },
+        [](bool                                  val) { return val ? True : False; },
         [](std::string_view                      val) { return TString(val); },
         [](std::vector<std::string_view>         val) { return JoinArgs(std::span(val), std::identity()); },
         [](TMacroValues::TTool                   val) { return TString(val.Data); },

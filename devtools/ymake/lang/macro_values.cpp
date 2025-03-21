@@ -5,6 +5,8 @@
 #include <devtools/ymake/command_store.h>
 #include <devtools/ymake/commands/evaluation.h>
 
+#include <util/generic/overloaded.h>
+
 #include <fmt/format.h>
 
 namespace {
@@ -59,42 +61,56 @@ std::string_view TMacroValues::GetVarName(NPolexpr::EVarId id) const {
 }
 
 NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
-    return std::visit([this](auto&& val) {
-        using T = std::decay_t<decltype(val)>;
-        if constexpr (std::is_same_v<T, std::monostate>)
+    return std::visit(TOverloaded{
+        [](std::monostate) {
             return NPolexpr::TConstId(ST_LITERALS, InvalidNameId);
-        else if constexpr (std::is_same_v<T, std::string_view>)
+        },
+        [&](bool val) {
+            return NPolexpr::TConstId(ST_BOOL, val);
+        },
+        [&](std::string_view val) {
             return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val));
-        else if constexpr (std::is_same_v<T, std::vector<std::string_view>>)
+        },
+        [&](const std::vector<std::string_view>& val) {
             // TODO a general array storage
             return NPolexpr::TConstId(ST_STRING_ARRAYS, Strings.Add(ArrayToString(val)));
-        else if constexpr (std::is_same_v<T, TTool>)
+        },
+        [&](const TTool& val) {
             return NPolexpr::TConstId(ST_TOOLS, Refs.Add(val.Data));
-        else if constexpr (std::is_same_v<T, TInput>)
+        },
+        [&](const TInput& val) {
             return NPolexpr::TConstId(ST_INPUTS, val.Coord);
-        else if constexpr (std::is_same_v<T, TInputs>) {
+        },
+        [&](const TInputs& val) {
             // _obviously_, storing a proper array would be better,
             // but a naive implementation might actually be not as efficient;
             // TODO a general array storage
             auto encoded = fmt::format("{}", fmt::join(val.Coords, " "));
             return NPolexpr::TConstId(ST_INPUT_ARRAYS, Strings.Add(encoded));
-        } else if constexpr (std::is_same_v<T, TOutput>)
+        },
+        [&](const TOutput& val) {
             return NPolexpr::TConstId(ST_OUTPUTS, val.Coord);
-        else if constexpr (std::is_same_v<T, TOutputs>) {
+        },
+        [&](const TOutputs& val) {
             // _obviously_, storing a proper array would be better,
             // but a naive implementation might actually be not as efficient;
             // TODO a general array storage
             auto encoded = fmt::format("{}", fmt::join(val.Coords, " "));
             return NPolexpr::TConstId(ST_OUTPUT_ARRAYS, Strings.Add(encoded));
-        } else if constexpr (std::is_same_v<T, TGlobPattern>)
+        },
+        [&](const TGlobPattern& val) {
             return NPolexpr::TConstId(ST_GLOB, Strings.Add(JoinArgs(std::span(val.Data), std::identity())));
-        else if constexpr (std::is_same_v<T, TLegacyLateGlobPatterns>)
+        },
+        [&](const TLegacyLateGlobPatterns& val) {
             return NPolexpr::TConstId(ST_LEGACY_LATE_GLOB, Strings.Add(JoinArgs(std::span(val.Data), std::identity())));
+        }
     }, value);
 }
 
 TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
     switch (id.GetStorage()) {
+        case ST_BOOL:
+            return !!id.GetIdx();
         case ST_LITERALS: {
             auto idx = id.GetIdx();
             if (Y_UNLIKELY(idx == InvalidNameId))

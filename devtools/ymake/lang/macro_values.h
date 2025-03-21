@@ -65,6 +65,8 @@ enum class EMacroFunction: ui32 {
     OutputInclude,
     Hash,
     HideEmpty,
+    Empty,
+    Not,
     //
     Count
 };
@@ -109,6 +111,7 @@ public:
     };
     using TValue = std::variant<
         std::monostate,
+        bool,
         std::string_view,
         std::vector<std::string_view>,
         TTool,
@@ -128,6 +131,7 @@ public:
         ST_OUTPUT_ARRAYS,
         ST_LEGACY_LATE_GLOB,
         ST_STRING_ARRAYS,
+        ST_BOOL,
         ST_COUNT
     };
     static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));
