@@ -12,8 +12,8 @@ from exts import func
 logger = logging.getLogger(__name__)
 
 
-TOKEN_RE = re.compile(r'AQAD-[a-zA-Z0-9_\-]+')
-PRIVATE_KEY_PREFIX_RE = re.compile(r"-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----")
+TOKEN_RE = re.compile(r'AQAD-[a-zA-Z0-9_\-\\]+')
+PRIVATE_KEY_PREFIX_RE = re.compile(r"-----BEGIN (RSA |EC |DSA |PGP )?PRIVATE KEY( BLOCK)?-----")
 IN_CHECKS = ('access_key',)
 ENDSWITH_CHECKS = (
     'token',
