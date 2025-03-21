@@ -974,6 +974,9 @@ class AbstractTestSuite(facility.Suite):
         return set()
 
     def get_global_resources(self):
+        # XXX YTADMINREQ-47897 experiment
+        if 'ya:strip_global_resources' in self.tags:
+            return []
         return sorted('::'.join(i) for i in self.meta.global_resources.items())
 
     def get_ios_runtime(self):
