@@ -1042,7 +1042,19 @@ class AuthOptions(Options):
     def postprocess(self):
         if self.username is None:
             self.username = config.get_user()
-        self._read_token_file()
+
+        if self.oauth_token:
+            # Ignore token path
+            self.oauth_token_path = None
+        else:
+            self.oauth_token_path = self.oauth_token_path or cc.get_ya_token_path()
+            if self.oauth_token_path:
+                token = self._read_token_file(self.oauth_token_path)
+                if token:
+                    self.oauth_token = token
+                else:
+                    self.oauth_token_path = None
+
         self._find_docker_config()
 
     def _find_docker_config(self):
@@ -1055,28 +1067,20 @@ class AuthOptions(Options):
                 return
 
     # TODO: Use devtools/libs/ya_token here
-    def _read_token_file(self):
-        if self.oauth_token:
-            # Ignore token_path
-            self.oauth_token_path = None
+    @staticmethod
+    def _read_token_file(path):
+        try:
+            with open(path) as afile:
+                token = afile.read().strip()
+        except Exception as e:
+            logger.debug('Could not read file at %s: %s', path, e)
             return
 
-        if self.oauth_token_path is None:
-            self.oauth_token_path = cc.get_ya_token_path()
+        if not token:
+            logger.debug('Attempted to read a token from %s, but the file is empty', path)
+            return
 
-        try:
-            with open(self.oauth_token_path, 'r') as f:
-                token = f.read().strip()
-                if not token:
-                    logger.debug(
-                        'Attempted to read a token from {}, but the file is empty'.format(self.oauth_token_path)
-                    )
-                    return
-
-                self.oauth_token = token
-        except Exception as e:
-            logger.debug('Could not read .ya_token file at {}: {}'.format(self.oauth_token_path, e))
-            self.oauth_token_path = None
+        return token
 
     def postprocess2(self, params):
         if not cc.is_self_contained_runner3(params):
