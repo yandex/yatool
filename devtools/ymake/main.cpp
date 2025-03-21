@@ -707,7 +707,12 @@ int main_real(TBuildConfiguration& conf) {
         TMaybe<EBuildResult> buildResult;
 
         asio::co_spawn(configure_workers, [&]() -> asio::awaitable<void> {
-            buildResult = co_await ConfigureStage(yMake, conf, serial_exec);
+            try {
+                buildResult = co_await ConfigureStage(yMake, conf, serial_exec);
+            } catch (const yexception& error) {
+                YErr() << "Exception in configure stage: " << error.what() << Endl;
+                buildResult = BR_FATAL_ERROR;
+            }
             co_return;
         }, asio::detached);
 
