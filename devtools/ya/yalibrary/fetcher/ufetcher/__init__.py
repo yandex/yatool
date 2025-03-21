@@ -30,6 +30,8 @@ FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE = {
     "mds": universal_fetcher.SandboxTransportType.MDS,
 }
 
+DEFAULT_SKY_PATH = "/skynet/tools/sky"
+
 
 class UnableToFetchError(Exception):
     mute = True
@@ -88,7 +90,12 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
     for param in fetcher_params:
         param_name = param["name"]
         if param_name in FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE and param_name not in order:
-            if param_name == "custom" and not _get_external_program_fetcher_cmd():
+            if any(
+                [
+                    param_name == "custom" and not _get_external_program_fetcher_cmd(),
+                    param_name == "skynet" and not os.path.exists(DEFAULT_SKY_PATH),
+                ]
+            ):
                 continue
             order.append(FETCHER_PARAM_TO_UFETCHER_SANDBOX_TRANSPORT_TYPE[param_name])
     return order
