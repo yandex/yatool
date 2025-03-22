@@ -642,6 +642,22 @@
                     "type": "string",
                     "enum": ["gzip", "xz", "bzip2", "lzma", "none"]
                 },
+                "dist2_repo": {
+                    "description": "Use Dist 2.0 repository",
+                    "type": "boolean"
+                },
+                "dist2_repo_reindex": {
+                    "description": "Dist 2.0 reindex repo",
+                    "type": "boolean"
+                },
+                "dist2_repo_s3_bucket": {
+                    "description": "Dist 2.0 S3 bucket",
+                    "type": "string"
+                },
+                "dist2_repo_s3_endpoint": {
+                    "description": "Dist 2.0 S3 endpoint",
+                    "type": "string"
+                },
                 "docker_add_host": {
                     "description": "Same as Docker --add-host",
                     "type": "array",

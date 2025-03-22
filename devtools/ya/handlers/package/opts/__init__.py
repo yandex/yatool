@@ -705,8 +705,8 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--dist2-repo'],
-                help='Use Dist 2.0 reposiroty',
-                hook=devtools.ya.core.yarg.SetConstValueHook('dist2_repo', False),
+                help='Use Dist 2.0 repository',
+                hook=devtools.ya.core.yarg.SetConstValueHook('dist2_repo', True),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DEB_SUBGROUP,
             ),
@@ -726,7 +726,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--dist2-repo-reindex'],
-                help='Dist 2.0 reindex repo',
+                help='Dist 2.0 reindex repository',
                 hook=devtools.ya.core.yarg.SetConstValueHook('dist2_repo_reindex', True),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DEB_SUBGROUP,
