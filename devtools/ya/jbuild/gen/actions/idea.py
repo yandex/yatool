@@ -951,7 +951,7 @@ def create_directory_based(by_path, project_root, ctx):
                     out_path = os.path.join(project_root, '.plugins_root', kotlin_resource)
                     temp_path = out_path + '_'
                     logger.info('Download kotlin compiler resource')
-                    sandbox.SandboxClient(token=ctx.opts.oauth_token).fetch_from_sandbox(
+                    sandbox.SandboxClient(token=ctx.opts.sandbox_oauth_token).fetch_from_sandbox(
                         resource_id=kotlin_resource,
                         task_id=None,
                         resource_type=None,

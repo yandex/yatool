@@ -342,7 +342,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.bazel_remote_password_file = params.bazel_remote_password_file
     build_options.bazel_remote_readonly = params.bazel_remote_readonly
 
-    build_options.oauth_token = params.oauth_token
+    build_options.sandbox_oauth_token = params.sandbox_oauth_token
     if app_config.in_house:
         build_options.use_new_distbuild_client = params.use_new_distbuild_client
     build_options.username = params.username
@@ -1555,7 +1555,7 @@ def upload_package(built_package_file, package_json, opts):
         resource_attrs=package_attrs,
         ttl=opts.ttl,
         sandbox_url=opts.sandbox_url,
-        sandbox_token=opts.oauth_token,
+        sandbox_token=opts.sandbox_oauth_token,
         transport=opts.transport,
         ssh_keys=opts.ssh_keys,
         ssh_user=opts.username,
@@ -1576,7 +1576,7 @@ def upload_package(built_package_file, package_json, opts):
             resource_attrs=package_attrs,
             ttl=opts.ttl,
             sandbox_url=opts.sandbox_url,
-            sandbox_token=opts.oauth_token,
+            sandbox_token=opts.sandbox_oauth_token,
             transport=opts.transport,
             ssh_keys=opts.ssh_keys,
             ssh_user=opts.username,
