@@ -374,6 +374,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.docker_platform = None
         self.docker_registry = "registry.yandex.net"
         self.docker_repository = ""
+        self.docker_image_name = ""
         self.docker_save_image = False
         self.docker_secrets = []
         self.docker_target = None
@@ -548,6 +549,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--docker-repository'],
                 help='Specify private repository',
                 hook=devtools.ya.core.yarg.SetValueHook('docker_repository'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-image-name'],
+                help='Specify custom docker image name',
+                hook=devtools.ya.core.yarg.SetValueHook('docker_image_name'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),

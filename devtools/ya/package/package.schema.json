@@ -695,6 +695,10 @@
                     "description": "Specify private repository",
                     "type": "string"
                 },
+                "docker_image_name": {
+                    "description": "Specify custom docker image name",
+                    "type": "string"
+                },
                 "docker_save_image": {
                     "description": "Save docker image to archive",
                     "type": "boolean"

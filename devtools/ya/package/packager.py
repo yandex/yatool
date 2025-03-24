@@ -920,6 +920,7 @@ def create_package(package_context, output_root, builds):
                 package_path, info = package.docker.create_package(
                     params.docker_registry,
                     params.docker_repository,
+                    params.docker_image_name,
                     package_context,
                     content_dir,
                     result_dir,

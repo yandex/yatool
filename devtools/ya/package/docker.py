@@ -33,12 +33,13 @@ def get_docker_binary():
     raise Exception("Docker binary not found by {}".format(DOCKER_BIN_PATHS))
 
 
-def get_image_name(registry, repository, package_name, package_version):
+def get_image_name(registry, repository, image_name, package_name, package_version):
+    docker_image_name = image_name or package_name
     prefix = "/".join([_f for _f in [registry, repository] if _f])
     if prefix:
-        return "{}/{}:{}".format(prefix, package_name, package_version)
+        return "{}/{}:{}".format(prefix, docker_image_name, package_version)
     else:
-        return "{}:{}".format(package_name, package_version)
+        return "{}:{}".format(docker_image_name, package_version)
 
 
 def extract_digest(data):
@@ -50,6 +51,7 @@ def extract_digest(data):
 def create_package(
     registry,
     repository,
+    image_name,
     package_context,
     docker_root,
     result_dir,
@@ -69,7 +71,7 @@ def create_package(
 ):
     package_name = package_context.package_name
     package_version = package_context.version
-    image_full_name = get_image_name(registry, repository, package_name, package_version)
+    image_full_name = get_image_name(registry, repository, image_name, package_name, package_version)
 
     buildx_required = False
     build_command = ["build", ".", "-t", image_full_name]
@@ -89,7 +91,7 @@ def create_package(
     if docker_use_remote_cache:
         remote_name = image_full_name
         if docker_remote_image_version:
-            remote_name = get_image_name(registry, repository, package_name, docker_remote_image_version)
+            remote_name = get_image_name(registry, repository, image_name, package_name, docker_remote_image_version)
         build_command += ['--cache-from', remote_name]
 
     if platform:
