@@ -549,6 +549,8 @@ def print_distbuild_download_statistics(graph, filename, display):
     total_time_by_run = 0
     total_time_by_dl = 0
     cnt = 0
+    started = float('inf')
+    finished = float('-inf')
 
     try:
         for task in graph.prepare_tasks.values():
@@ -560,6 +562,8 @@ def print_distbuild_download_statistics(graph, filename, display):
             total_time_by_run += task.get_time_elapsed() or 0
             total_time_by_dl += task.download_time_ms or 0
             total_download_size += task.size or 0
+            started = min(started, task.start_time)
+            finished = max(finished, task.end_time)
 
         if total_download_size == 0:
             return
@@ -569,14 +573,17 @@ def print_distbuild_download_statistics(graph, filename, display):
     except Exception as e:  # just in case of memory and zerodivision errors
         logger.debug("Coudn't calculate disbuild download statistics due to: %s", e)
     else:
+        total_time_span = finished - started
+
         display.emit_message(
-            'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms'.format(
+            'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms, total_time_span={:.02f}ms'.format(
                 cnt,
                 format_size(total_download_size, binary=True),
                 format_size(speed_by_run_time),
                 format_size(speed_by_dl_time),
                 total_time_by_run,
                 total_time_by_dl,
+                total_time_span,
             )
         )
 
@@ -584,6 +591,7 @@ def print_distbuild_download_statistics(graph, filename, display):
             'total_download_size': total_download_size,
             'total_time_by_run': total_time_by_run,
             'total_time_by_dl': total_time_by_dl,
+            'total_time_span': total_time_span,
         }
 
         if filename is not None:
