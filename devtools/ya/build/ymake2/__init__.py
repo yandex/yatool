@@ -127,6 +127,8 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('report_pic_nopic', default_value=None),
         yarg.Param('descend_into_foreign', default_value=None),
         yarg.Param('drop_foreign_start_modules', default_value=None),
+        yarg.Param('multiconfig', default_value=False),
+        yarg.Param('order', default_value=None),
     ]
 
 
@@ -638,6 +640,8 @@ def _run_ymake(**kwargs):
                 is_output_compressed = True
 
             stdin_line_provider = kwargs.pop('stdin_line_provider', None)
+            multiconfig = kwargs.pop('multiconfig', False)
+            order = kwargs.pop('order', None)
             args = (
                 _cons_ymake_args(**kwargs)
                 + ['--quiet']
@@ -657,6 +661,8 @@ def _run_ymake(**kwargs):
                 stderr_listener,
                 raw_cpp_stdout=is_cpp_consumer,
                 stdin_line_provider=stdin_line_provider,
+                multiconfig=multiconfig,
+                order=order,
             )
             _stat_info_execution['finish'] = time.time()
             _stat_info_execution['duration'] = _stat_info_execution['finish'] - _stat_info_execution['start']
@@ -728,6 +734,10 @@ def _run_ymake(**kwargs):
         devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.RUN_YMAKE, _run_info)
 
     return YMakeResult(exit_code, stdout, stderr, meta_data), events
+
+
+def run_ymake_scheduled(count):
+    run_ymake.run_scheduled(count)
 
 
 def _mine_ymake_binary():

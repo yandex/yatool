@@ -1531,6 +1531,7 @@ class YMakeModeOptions(Options):
     def __init__(self):
         self.ymake_tool_servermode = False
         self.ymake_pic_servermode = False
+        self.ymake_multiconfig = False
 
     @staticmethod
     def consumer():
@@ -1573,6 +1574,25 @@ class YMakeModeOptions(Options):
                 hook=SetValueHook('ymake_pic_servermode', return_true_if_enabled),
             ),
             ConfigConsumer('ymake_pic_servermode'),
+            ArgConsumer(
+                ['--ymake-multiconfig'],
+                help='Run one ymake for all configurations',
+                hook=SetConstValueHook('ymake_multiconfig', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--no-ymake-multiconfig'],
+                help='Run one ymake for each configuration',
+                hook=SetConstValueHook('ymake_multiconfig', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_YMAKE_MULTICONFIG',
+                hook=SetValueHook('ymake_multiconfig', return_true_if_enabled),
+            ),
+            ConfigConsumer('ymake_multiconfig'),
         ]
 
 
