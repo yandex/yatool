@@ -142,8 +142,9 @@ namespace {
     class SemGraphRenderVisitor: public TManagedPeerConstVisitor<> {
     private:
         struct ModInfo {
-            TNodeId ModNode;
+            TNodeId ModNodeId;
             ui32 GlobalLibId;
+            THashSet<TNodeId> TransitiveOnlyPeersUnderDM;
         };
 
     public:
@@ -183,26 +184,31 @@ namespace {
             if (!TBase::Enter(state)) {
                 return false;
             }
-            TVector<ui32> tests;
             const auto& topNode = state.TopNode();
+            TModule* mod = nullptr;
             if (IsModuleType(topNode->NodeType)) {
-                const TModule* mod = RestoreContext.Modules.Get(topNode->ElemId);
+                mod = RestoreContext.Modules.Get(topNode->ElemId);
+                Y_ASSERT(mod);
+                const TVector<TNodeId>* managedPeersClosure = nullptr;
+                THashSet<TNodeId> transitiveOnlyPeersUnderDM;
                 if (mod->IsDependencyManagementApplied()) {
-                    const auto& managedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
-                    if (!managedPeersClosure.empty()) {
-                        // Iterate all peers closure before add node ids, else peers of contrib peers will not add to sem graph,
-                        // and as result node ids below will to point to absent nodes
-                        IterateAll(RestoreContext.Graph, managedPeersClosure, state, *this);
+                    managedPeersClosure = &RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
+                    const auto& managedDirectPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).ManagedDirectPeers();
+                    for (TNodeId peer: *managedPeersClosure) {
+                        if (!managedDirectPeers.has(peer)) {
+                            transitiveOnlyPeersUnderDM.insert(peer);
+                        }
                     }
                 }
                 ModulesStack.push({
-                    .ModNode = topNode.Id(),
-                    .GlobalLibId = mod->GetAttrs().UseGlobalCmd ? mod->GetGlobalLibId() : 0
+                    .ModNodeId = topNode.Id(),
+                    .GlobalLibId = mod->GetAttrs().UseGlobalCmd ? mod->GetGlobalLibId() : 0,
+                    .TransitiveOnlyPeersUnderDM = std::move(transitiveOnlyPeersUnderDM),
                 });
-                if (RestoreContext.Conf.ShouldTraverseDepsTests()) {
-                    tests = RenderTests(
-                        RestoreContext.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_MKF, mod->GetMakefile())
-                    );
+                if (managedPeersClosure && !managedPeersClosure->empty()) {
+                    // Iterate all peers closure before add node ids, else peers of contrib peers will not add to sem graph,
+                    // and as result node ids below will to point to absent nodes
+                    IterateAll(RestoreContext.Graph, *managedPeersClosure, state, *this);
                 }
             }
 
@@ -216,19 +222,16 @@ namespace {
                     const auto& modinfo = ModulesStack.top();
                     TDumpInfoSem semVarsProvider{
                         RestoreContext,
-                        modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNode] : topNode
+                        modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNodeId] : topNode
                     };
                     static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[\"" << TModuleConf::SEM_IGNORED << "\"]";
-                    auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNode, semVarsProvider, ModulesStatesCache);
+                    auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNodeId, semVarsProvider, ModulesStatesCache);
                     bool ignored = AnyOf(sem, [](const TSingleCmd& cmd) {
                         return cmd.CmdStr == CMD_IGNORED;
                     });
-                    if (!ignored) {
-                        auto mod = RestoreContext.Modules.Get(topNode->ElemId);
-                        if (mod && mod->IsSemIgnore()) {
-                            ignored = true;
-                            sem.emplace_back(CMD_IGNORED); // generate IGNORED in semantic by module SemIgnore flag
-                        }
+                    if (!ignored && mod && mod->IsSemIgnore()) {
+                        ignored = true;
+                        sem.emplace_back(CMD_IGNORED); // generate IGNORED in semantic by module SemIgnore flag
                     }
                     node.AddProp("semantics", sem);
                     if (ignored) {
@@ -238,51 +241,49 @@ namespace {
                     if (!tools.empty()) {
                         node.AddProp("Tools", tools);
                     }
-                    if (RestoreContext.Conf.ShouldTraverseDepsTests() && !tests.empty()) {
-                        node.AddProp("Tests", tests);
+                    if (mod && RestoreContext.Conf.ShouldTraverseDepsTests()) {
+                        auto tests = RenderTests(
+                            RestoreContext.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_MKF, mod->GetMakefile())
+                        );
+                        if (!tests.empty()) {
+                            node.AddProp("Tests", tests);
+                        }
                     }
                 }
             }
             return true;
         }
 
-        void Left(TState& state) {
-            TBase::Left(state);
-            const auto& dep = state.NextDep();
-            if (!ModulesStack.empty() && dep.To().Id() == ModulesStack.top().ModNode) {
+        void Leave(TState& state) {
+            const auto& topNode = state.TopNode();
+            if (!ModulesStack.empty() && topNode.Id() == ModulesStack.top().ModNodeId) {
+                auto mod = RestoreContext.Modules.Get(topNode->ElemId);
+                auto transitiveOnlyPeersUnderDM = std::move(ModulesStack.top().TransitiveOnlyPeersUnderDM);
                 ModulesStack.pop();
-            }
-            if (UseFileId(dep.From()->NodeType) && UseFileId(dep.To()->NodeType) && AcceptDep(state)) {
-                auto node = JsonWriter.AddLink(dep);
-                AddExcludeProperty(node, dep);
-            }
-            // Each node visits onetime only. When left module node time to add peers closure deps
-            if (IsModuleType(dep.To()->NodeType)) {
-                auto modNode = dep.To();
-                auto mod = RestoreContext.Modules.Get(dep.To()->ElemId);
-                if (mod && mod->IsDependencyManagementApplied()) {
-                    // Add peers closure only for module under DM
-                    const auto& managedPeersClosure = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
-                    THashSet<TNodeId> closure(managedPeersClosure.begin(), managedPeersClosure.end());
-                    const auto& managedDirectPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).ManagedDirectPeers().Data();
-                    // Erase from closure set all direct peers
-                    for (const auto directPeerId: managedDirectPeers) {
-                        closure.erase(directPeerId);
-                    }
-                    if (!closure.empty()) {
-                        // Add links to all peers closure (but not direct!) deps
-                        for (const auto peerId: closure) {
-                            auto peerNode = RestoreContext.Graph[peerId];
-                            auto peerMod = RestoreContext.Modules.Get(peerNode->ElemId);
-                            Y_ASSERT(peerMod);
-                            // Sem graph use ElemId as id of nodes, use TModule->GetId()
-                            auto node = JsonWriter.AddLink(mod->GetId(), mod->GetNodeType(), peerMod->GetId(), peerMod->GetNodeType(), EDepType::EDT_BuildFrom, NFlatJsonGraph::EIDFormat::Simple);
-                            AddExcludeProperty(node, modNode, peerNode, true); // generate Excludes attribute
-                            AddIsClosureProperty(node); // IsClosure flag attribute
-                        }
+                if (!transitiveOnlyPeersUnderDM.empty()) {
+                    for (const auto transitivePeerId: transitiveOnlyPeersUnderDM) {
+                        auto peerNode = RestoreContext.Graph[transitivePeerId];
+                        auto peerMod = RestoreContext.Modules.Get(peerNode->ElemId);
+                        Y_ASSERT(peerMod);
+                        // Sem graph use ElemId as id of nodes, use TModule->GetId()
+                        auto node = JsonWriter.AddLink(mod->GetId(), mod->GetNodeType(), peerMod->GetId(), peerMod->GetNodeType(), EDepType::EDT_BuildFrom, NFlatJsonGraph::EIDFormat::Simple);
+                        AddExcludeProperty(node, topNode, peerNode, true); // generate Excludes attribute
+                        AddIsClosureProperty(node); // IsClosure flag attribute
                     }
                 }
             }
+            TBase::Leave(state);
+        }
+
+        void Left(TState& state) {
+            if (state.Top().IsDepAccepted()) {
+                const auto& dep = state.Top().CurDep();
+                if (UseFileId(dep.From()->NodeType) && UseFileId(dep.To()->NodeType)) {
+                    auto node = JsonWriter.AddLink(dep);
+                    AddExcludeProperty(node, dep);
+                }
+            }
+            TBase::Left(state);
         }
 
     private:
