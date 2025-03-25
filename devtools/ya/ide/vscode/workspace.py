@@ -27,7 +27,7 @@ def merge_workspace(new, workspace_path):
         return new
 
     new_folders = OrderedDict((f["path"], f) for f in new["folders"])
-    for folder in old.get("folders"):
+    for folder in old.get("folders", []):
         new_folders[folder["path"]] = folder
     new["folders"] = list(new_folders.values())
 
