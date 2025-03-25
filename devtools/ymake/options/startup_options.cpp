@@ -49,6 +49,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("fd-in", "input pipe fd").StoreResult(&InputPipeFd);
     opts.AddLongOption("fd-out", "output pipe fd").StoreResult(&OutputPipeFd);
     opts.AddLongOption("fd-err", "error pipe fd").StoreResult(&ErrorPipeFd);
+    opts.AddLongOption("dont-check-transitive-requirements", "").StoreFalse(&CheckTransitiveRequirements);
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {

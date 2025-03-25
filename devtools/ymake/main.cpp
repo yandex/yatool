@@ -759,7 +759,7 @@ int main_real(TBuildConfiguration& conf) {
 
     MakeUnique(yMake->StartTargets);
 
-    if (!yMake->CanBypassConfigure()) {
+    if (!yMake->CanBypassConfigure() && conf.CheckTransitiveRequirements) {
         CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
     }
 

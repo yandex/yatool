@@ -26,6 +26,7 @@ struct TStartUpOptions: public TRootsOptions {
     ETransition TransitionSource = ETransition::None;
     bool DescendIntoForeignPlatform = true;
     bool ReportPicNoPic = false;
+    bool CheckTransitiveRequirements = true;
 
     PIPEHANDLE InputPipeFd = -1;
     PIPEHANDLE OutputPipeFd = -1;
