@@ -4,6 +4,5 @@ RECURSE(
     java_program
     page
     program
-    py_program
     py3_program
 )
