@@ -129,6 +129,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('drop_foreign_start_modules', default_value=None),
         yarg.Param('multiconfig', default_value=False),
         yarg.Param('order', default_value=None),
+        yarg.Param('dont_check_transitive_requirements', default_value=None),
     ]
 
 
@@ -304,6 +305,10 @@ def _cons_ymake_args(**kwargs):
     drop_foreign_start_modules = kwargs.pop('drop_foreign_start_modules', None)
     if drop_foreign_start_modules is not None:
         ret += ['--drop-foreign-start-modules', drop_foreign_start_modules]
+
+    dont_check_transitive_requirements = kwargs.pop('dont_check_transitive_requirements', False)
+    if dont_check_transitive_requirements:
+        ret += ['--dont-check-transitive-requirements']
 
     continue_on_fail = kwargs.pop('continue_on_fail', False)
     if continue_on_fail:

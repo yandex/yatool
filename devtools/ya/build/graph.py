@@ -1503,6 +1503,7 @@ class _GraphMaker:
                     source_root=self._opts.arc_root,
                     stdin_line_provider=stdin_line_provider,
                     transition_source='pic',
+                    dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
                 )
                 abs_targets_pic = []
 
