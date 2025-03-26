@@ -129,11 +129,7 @@ TPyThreadLock::~TPyThreadLock() noexcept {
     }
 }
 
-void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
-    if (pluginsRoots.empty()) {
-        return;
-    }
-
+TPyRuntime::TPyRuntime() {
     // Enable UTF-8 mode by default
     PyStatus status;
 
@@ -166,6 +162,23 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf
 
     Y_ABORT_UNLESS(ContextTypeInit(ymakeModule));
     Y_ABORT_UNLESS(CmdContextTypeInit(ymakeModule));
+}
+
+TPyRuntime::~TPyRuntime() {
+}
+
+void InitPyRuntime() {
+    Singleton<TPyRuntime>();
+}
+
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
+    if (pluginsRoots.empty()) {
+        return;
+    }
+
+    InitPyRuntime();
+
+    TPyThreadLock lk;
 
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {

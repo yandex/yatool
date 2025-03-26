@@ -22,6 +22,7 @@ namespace {
             , IndDepsRule(indDepsRule)
             , PassInducedIncludes(passInducedIncludes)
         {
+            Py_XINCREF(Obj);
         }
 
         ~TPluginAddParserImpl() override {

@@ -128,3 +128,8 @@ struct TPyThreadLock {
     TPyThreadLock() noexcept;
     ~TPyThreadLock() noexcept;
 };
+
+struct TPyRuntime {
+    TPyRuntime();
+    ~TPyRuntime();
+};
