@@ -67,6 +67,7 @@ enum class EMacroFunction: ui32 {
     HideEmpty,
     Empty,
     Not,
+    AddToIncl,
     //
     Count
 };

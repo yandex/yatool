@@ -366,4 +366,14 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
+    class TAddToIncl: public TOutputFlagger {
+    public:
+        TAddToIncl(): TOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TOutput& output) const override {
+            output.AddToIncl = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
 }

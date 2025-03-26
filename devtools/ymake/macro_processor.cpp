@@ -560,6 +560,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
             var.NoAutoSrc |= output.NoAutoSrc;
             var.NoRel |= output.NoRel;
             var.ResolveToBinDir |= output.ResolveToBinDir;
+            var.AddToIncl |= output.AddToIncl;
         });
     }
 
@@ -1307,7 +1308,7 @@ bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputN
     return true;
 }
 
-void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId) {
+void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, TNodeAddCtx& dst, bool structCmd) {
     TStringStream cfgVars;
     for (auto id : varLists) { // this loop is not optimized because there's hardly 1 element in varLists
         TStringBuf name = Graph->GetCmdNameByCacheId(id).GetStr();
@@ -1321,13 +1322,23 @@ void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId) 
     //Attach CFG_VARS to the source file
     YDIAG(VV) << "CFG_VARS [" << Module->Vars.Id << "] -> " << cfgVars.Str() << Endl;
     TYVar var;
-    var.SetSingleVal("CFG_VARS", cfgVars.Str(), nsId, Module->Vars.Id);
-    TVars vars(&Module->Vars); // TODO: move it to TCommandInfo?
-    vars.Id = var.Id;
-    ui64 id = InitCmdNode(var);
-    // TODO: handle a case when EntryPtr or AddCtx is null (is it possible at all?)
-    Cmd.EntryPtr->second.AddCtx->AddDep(EDT_Include, EMNT_BuildCommand, id);
-    FillAddCtx(var, vars);
+
+    if (structCmd) {
+        auto compiled = UpdIter->YMake.Commands.Compile(cfgVars.Str(), *Conf, Module->Vars, false, {});
+        auto subExpr = UpdIter->YMake.Commands.Add(*Graph, std::move(compiled.Expression));
+        auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
+        auto subBinding = TYVar();
+        subBinding.SetSingleVal("CFG_VARS", subExprRef, 0);
+        auto cmdElemId = InitCmdNode(subBinding);
+        dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
+    } else {
+        TVars vars(&Module->Vars); // TODO: move it to TCommandInfo?
+        var.SetSingleVal("CFG_VARS", cfgVars.Str(), nsId, Module->Vars.Id);
+        vars.Id = var.Id;
+        ui64 id = InitCmdNode(var);
+        dst.AddDep(EDT_Include, EMNT_BuildCommand, id);
+        FillAddCtx(var, vars);
+    }
 }
 
 void TCommandInfo::FillCoords(

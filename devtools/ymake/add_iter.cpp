@@ -970,7 +970,21 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {
                     auto& modData = Add->GetModuleData();
                     if (modData.CmdInfo) {
-                        modData.CmdInfo->AddCfgVars(propValues->Data(), Node.ElemId);
+                        Y_ABORT_UNLESS(!IsFile(modData.CmdInfo->Cmd.EntryPtr->first));
+                        bool structCmd = TVersionedCmdId(ElemId(modData.CmdInfo->Cmd.EntryPtr->first)).IsNewFormat();
+                        // TODO: handle a case when EntryPtr is null (is it possible at all?)
+                        auto dst = structCmd ? Add.Get() : modData.CmdInfo->Cmd.EntryPtr->second.AddCtx;
+                        if (!dst) {
+                            Y_ABORT_UNLESS(!structCmd);
+                            // as of this writing, we may end up here
+                            // after entering the shared command node for the second time;
+                            // the command node may be shared due to the (legacy) command builder
+                            // ignoring the source path and, for example,
+                            // making a node like "###:SRCSin=(build_info.cpp.in)"
+                            // for both `build_info.cpp.in` and `foobar/build_info.cpp.in`
+                            ythrow TError() << "Cannot add CFG_VARS to an unedi(ta)ble node " << modData.CmdInfo->Cmd;
+                        }
+                        modData.CmdInfo->AddCfgVars(propValues->Data(), Node.ElemId, *dst, structCmd);
                     }
                 }
                 //if (LeftType == EMNT_BuildCommand && !Add->Module->Incomplete()) {

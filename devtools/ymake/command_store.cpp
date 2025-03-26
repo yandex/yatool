@@ -82,6 +82,13 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
     auto var = LegacyVars.VarLookup(name, Conf);
     if (!var)
         return {};
+    if (var->empty())
+        // this is a weird setup,
+        // but it's reachable by not assigning any values (even the empty one)
+        // and instead making a block-data via `macro MYVAR() {...}` without a `.CMD`,
+        // so it's not actually a macro, but an attribute/property setter of sorts
+        // (a motivating example as of this writing: `CFG_VARS`)
+        return {};
 
     // check recursion
 

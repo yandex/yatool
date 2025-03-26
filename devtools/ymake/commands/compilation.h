@@ -21,6 +21,7 @@ namespace NCommands {
             bool NoAutoSrc = false;
             bool NoRel = false;
             bool ResolveToBinDir = false;
+            bool AddToIncl = false;
             TOutput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };

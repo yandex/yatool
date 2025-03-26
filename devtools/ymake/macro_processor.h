@@ -26,6 +26,7 @@ class TDepGraph;
 class TUpdIter;
 class TAddDepAdaptor;
 class TCommands;
+struct TNodeAddCtx;
 
 bool IsInternalReservedVar(const TStringBuf& cur);
 
@@ -160,7 +161,7 @@ public:
     }
     bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd);
     bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
-    void AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId);
+    void AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, TNodeAddCtx& dst, bool structCmd);
 
     bool GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod);
 
