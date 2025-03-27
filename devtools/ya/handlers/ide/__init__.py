@@ -374,7 +374,10 @@ class GradleOptions(yarg.Options):
     OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
     OPT_NO_BUILD_FOREIGN = '--no-build-foreign'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
+    OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
+
+    AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24')
 
     def __init__(self):
         self.gradle_name = None
@@ -383,6 +386,7 @@ class GradleOptions(yarg.Options):
         self.collect_contribs = True
         self.build_foreign = True
         self.disable_errorprone = False
+        self.force_jdk_version = None
         self.yexport_debug_mode = None
         self.login = None
         self.remove = None
@@ -428,6 +432,12 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
+                [GradleOptions.OPT_FORCE_JDK_VERSION],
+                help='Force JDK version in exported project, one of ' + ', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS),
+                hook=yarg.SetValueHook('force_jdk_version'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
                 [GradleOptions.OPT_REMOVE],
                 help='Remove gradle project files and all symlinks',
                 hook=yarg.SetConstValueHook('remove', True),
@@ -458,6 +468,15 @@ class GradleOptions(yarg.Options):
             raise yarg.ArgsValidatingException(
                 '{} not applicable with {}'.format(GradleOptions.OPT_GRADLE_NAME, GradleOptions.OPT_REMOVE)
             )
+        if self.force_jdk_version is not None:
+            if self.force_jdk_version not in GradleOptions.AVAILABLE_JDK_VERSIONS:
+                raise yarg.ArgsValidatingException(
+                    'Invalid JDK version {} in {}, must be one of {}.'.format(
+                        self.force_jdk_version,
+                        GradleOptions.OPT_FORCE_JDK_VERSION,
+                        ', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS),
+                    )
+                )
 
 
 class PycharmOptions(yarg.Options):

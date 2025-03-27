@@ -693,10 +693,18 @@ class _Exporter:
 
         gradle_jdk_path = self.sem_graph.get_jdk_path(self.GRADLE_JDK_VERSION)
         if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
-            attrs_for_all_templates = [
-                f"gradle_jdk_version = {self.GRADLE_JDK_VERSION}",
+            attrs_for_all_templates += [
+                f"gradle_jdk_version = '{self.GRADLE_JDK_VERSION}'",
                 f"gradle_jdk_path = '{gradle_jdk_path}'",
             ]
+
+        if self.config.params.force_jdk_version:
+            force_jdk_path = self.sem_graph.get_jdk_path(self.config.params.force_jdk_version)
+            if force_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
+                attrs_for_all_templates += [
+                    f"force_jdk_version = '{self.config.params.force_jdk_version}'",
+                    f"force_jdk_path = '{force_jdk_path}'",
+                ]
 
         yexport_toml = self.config.ymake_root / 'yexport.toml'
         with yexport_toml.open('w') as f:
