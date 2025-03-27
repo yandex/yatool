@@ -31,10 +31,11 @@ def get_default_client(proxy, token):
 class RetryPolicy:
     SLEEP_S = 0.5
 
-    def __init__(self, max_retries=5):
+    def __init__(self, max_retries=5, on_error_callback=None):
         self.max_retries = max_retries
         self.disabled = False
         self._retryable_errors = get_yt_retriable_errors()
+        self._on_error_callback = on_error_callback
 
     def execute(self, name, func):
         @functools.wraps(func)
@@ -53,11 +54,8 @@ class RetryPolicy:
 
     def on_error(self, err):
         if not self.disabled:
-            logger.warning(
-                "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
-                err.__repr__()[:100],
-            )
-            logger.debug("Disabling dist cache. Last caught error: %s", err.__repr__())
+            if self._on_error_callback:
+                self._on_error_callback(err)
             self.disabled = True
 
     def _is_yt_error_retryable(self, err):

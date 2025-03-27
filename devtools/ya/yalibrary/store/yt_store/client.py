@@ -48,7 +48,7 @@ class YtStoreClient(object):
         'GSID',
     }
 
-    def __init__(self, proxy, data_table, metadata_table, stat_table, token=None):
+    def __init__(self, proxy, data_table, metadata_table, stat_table, token=None, retry_policy=None):
         self._proxy = proxy
         self._data_table = data_table
         self._metadata_table = metadata_table
@@ -56,7 +56,8 @@ class YtStoreClient(object):
         self._token = token
         self._tls = threading.local()
         self._enable_proxy_cache()
-        self.retry_policy = retries.RetryPolicy()
+
+        self.retry_policy = retry_policy or retries.RetryPolicy()
 
     @property
     @memoize()

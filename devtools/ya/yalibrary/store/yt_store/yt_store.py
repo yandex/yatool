@@ -4,16 +4,13 @@ import os
 import time
 
 from contextlib2 import ExitStack
-from library.python import compress
-
-import exts.archive as archive
-import yalibrary.store.yt_store.client as client
-import yalibrary.store.yt_store.consts as consts
-import yalibrary.store.yt_store.utils as utils
+from devtools.ya.core import config as core_config
 from devtools.ya.core import report
-from exts import fs, tmp, asyncthread
+from exts import archive, asyncthread, fs, tmp
 from exts.timer import AccumulateTime
+from library.python import compress
 from yalibrary.store.dist_store import DistStore
+from yalibrary.store.yt_store import client, consts, retries, utils
 
 logger = logging.getLogger(__name__)
 # Suppress spam
@@ -61,6 +58,8 @@ class YtStore(DistStore):
         self._probe_before_put = probe_before_put
         self._probe_before_put_min_size = probe_before_put_min_size
 
+        self._data_dir = data_dir
+
         data_dir = data_dir.rstrip('/')
         data_table = data_dir + "/" + data_table_name
         metadata_table = data_dir + "/" + metadata_table_name
@@ -68,7 +67,14 @@ class YtStore(DistStore):
 
         self._total_compressed_size = 0
         self._total_raw_size = 0
-        self._client = client.YtStoreClient(proxy, data_table, metadata_table, stat_table, token=token)
+        self._client = client.YtStoreClient(
+            proxy,
+            data_table,
+            metadata_table,
+            stat_table,
+            token=token,
+            retry_policy=retries.RetryPolicy(on_error_callback=self._on_error_callback_for_retries_wrapper),
+        )
 
         self._time_to_first_recv_meta = None
         self._time_to_first_call_has = None
@@ -76,6 +82,8 @@ class YtStore(DistStore):
         self._disabled = False
         self._prepare_future = None
         self._prepare_tables_future = None
+
+        self._yt_store_exclusive = kwargs.get('yt_store_exclusive', False)
 
         if self._heater_mode:
             self._prepare_tables(create_tables, readonly, proxy, ttl, with_self_uid)
@@ -111,6 +119,32 @@ class YtStore(DistStore):
     @property
     def is_disabled(self):
         return self._client.is_disabled
+
+    def _on_error_callback_for_retries_wrapper(self, err):
+        pretty_error = repr(err)
+
+        if self._yt_store_exclusive or self._heater_mode:
+            logger.warning('Can\'t use dist cache: %s', pretty_error)
+        else:
+            if len(pretty_error) > 100:
+                logger.warning(
+                    "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
+                    pretty_error[:100],
+                )
+                logger.debug("Disabling dist cache. Last caught error: %s", pretty_error)
+            else:
+                logger.warning("Disabling dist cache. Last caught error: %s", pretty_error)
+
+        report.telemetry.report(
+            report.ReportTypes.YT_CACHE_ERROR,
+            {
+                "error": str(err),
+                "user": core_config.get_user(),
+                "error_type": type(err).__name__,
+                "yt_proxy": self._proxy,
+                "yt_dir": self._data_dir,
+            },
+        )
 
     def _get_cache_size_from_percent(self, percentage):
         total = self._client.account_size_limit

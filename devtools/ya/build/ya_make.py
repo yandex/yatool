@@ -443,6 +443,7 @@ class CacheFactory:
             probe_before_put=self._opts.yt_store_probe_before_put,
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
             cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
+            yt_store_exclusive=self._opts.yt_store_exclusive,
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -506,41 +507,24 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
     self_uids = [node.get('self_uid') or node['uid'] for node in graph_nodes]
     uids = [node['uid'] for node in graph_nodes]
 
-    try:
-        logger.debug("Waiting for dist cache setup")
-        cache = dist_cache_future()
-        if cache:
-            logger.debug("Loading meta from dist cache")
+    logger.debug("Waiting for dist cache setup")
+    cache = dist_cache_future()
+    if cache:
+        logger.debug("Loading meta from dist cache")
 
-            # needed for catching an error in this rare scenario
-            _async = not (opts.yt_store_exclusive or heater_mode)
+        # could raise error here if not async
+        _async = not (opts.yt_store_exclusive or heater_mode)
 
-            cache.prepare(
-                self_uids,
-                uids,
-                refresh_on_read=opts.yt_store_refresh_on_read,
-                content_uids=opts.force_content_uids,
-                _async=_async,
-            )
-
-        logger.debug("Dist cache prepared")
-        return cache
-    except Exception as e:
-        err = str(e)
-        devtools.ya.core.report.telemetry.report(
-            devtools.ya.core.report.ReportTypes.YT_CACHE_ERROR,
-            {
-                "error": "Can't use YT cache",
-                "user": core_config.get_user(),
-            },
+        cache.prepare(
+            self_uids,
+            uids,
+            refresh_on_read=opts.yt_store_refresh_on_read,
+            content_uids=opts.force_content_uids,
+            _async=_async,
         )
-        logger.warning(
-            'Can\'t use dist cache: %s... <Truncated. Complete message will be available in debug logs>', err[:100]
-        )
-        logger.debug('Can\'t use dist cache: %s', err)
-        if opts.yt_store_exclusive or heater_mode:
-            raise
-        return None
+
+    logger.debug("Dist cache prepared")
+    return cache
 
 
 def make_runner():
