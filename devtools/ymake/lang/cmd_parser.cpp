@@ -169,12 +169,8 @@ namespace {
                 blockData.Completed = true;
                 blockData.IsUserMacro = true;
                 auto plainArgs = JoinStrings({"COND"}, ", ");
-                const auto cmdArgs = TString::Join("(", plainArgs, ")");
-                blockData.CmdProps.Reset(new TCmdProperty{cmdArgs, std::move(keywords)});
-                plainArgs = blockData.CmdProps->ConvertCmdArgs(cmdArgs);
-                Y_ASSERT(plainArgs.length() > 1 && plainArgs[0] == '(' && plainArgs.back() == ')');
-                plainArgs[0] = ' ';
-                plainArgs.pop_back();
+                blockData.CmdProps.Reset(new TCmdProperty{plainArgs, std::move(keywords)});
+                plainArgs = blockData.CmdProps->ConvertCmdArgs(plainArgs);
                 blockData.CmdProps->AddArgNames(plainArgs);
                 return blockData;
             }();

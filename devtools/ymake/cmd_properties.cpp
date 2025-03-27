@@ -11,12 +11,7 @@ using namespace std::literals;
 namespace {
 
 size_t CountOwnArgs(TStringBuf cmd) noexcept {
-    size_t varEnd = 0;
-    if (cmd.at(0) == '(' && (varEnd = FindMatchingBrace(cmd)) != TString::npos) { //has own args
-        cmd = cmd.substr(0, varEnd);
-        return std::ranges::distance(cmd | std::views::split(", "sv));
-    }
-    return 0;
+    return std::max<size_t>(1, std::ranges::distance(cmd | std::views::split(", "sv)));
 }
 
 }
@@ -34,10 +29,9 @@ TCmdProperty::TCmdProperty(TStringBuf cmd, TKeywords&& kw)
 
 TString TCmdProperty::ConvertCmdArgs(TStringBuf cmd) const {
     TString res;
-    res = "(";
     for (const auto& [key, _]: Keywords_)
         res += key + "..., ";
-    return TString::Join(res, NumUsrArgs_ ? "" : ")", NumUsrArgs_ ? cmd.SubStr(1) : cmd);
+    return TString::Join(res, cmd);
 }
 
 void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {

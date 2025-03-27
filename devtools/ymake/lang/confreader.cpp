@@ -564,16 +564,11 @@ namespace {
             }
 
             const auto argNames = CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second);
-            auto plainArgs = JoinStrings(argNames, ", ");
+            TString plainArgs = JoinStrings(argNames, ", ");
 
             if (!keywords.Empty()) {
-                const auto cmdArgs = TString::Join("(", plainArgs, ")");
-                blockData.CmdProps.Reset(new TCmdProperty{cmdArgs, std::move(keywords)});
-                plainArgs = blockData.CmdProps->ConvertCmdArgs(cmdArgs);
-                Y_ASSERT(plainArgs.length() > 1 && plainArgs[0] == '(' && plainArgs.back() == ')');
-                // plainArgs = plainArgs.substr(1, plainArgs.length() - 2);
-                plainArgs[0] = ' ';
-                plainArgs.pop_back();
+                blockData.CmdProps.Reset(new TCmdProperty{plainArgs, std::move(keywords)});
+                plainArgs = blockData.CmdProps->ConvertCmdArgs(plainArgs);
             } else {
                 blockData.CmdProps.Reset(new TCmdProperty{});
             }
