@@ -272,8 +272,6 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
         if error_type:
             suite_entry["error_type"] = error_type
 
-        entries.append(suite_entry)
-
         effective_suite_id = suite_id
         effective_suite_hid = suite_hid
 
@@ -284,7 +282,7 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
             effective_suite_hid = None
 
         for i, chunk in enumerate(suite.chunks):
-            entry = copy.deepcopy(general_info)
+            chunk_entry = copy.deepcopy(general_info)
             chunk_name = "{}".format(chunk.get_name())
             chunk_id = get_id(
                 suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name(), chunk_name=chunk_name
@@ -294,7 +292,7 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
             )
 
             # TODO WIP
-            entry.update(
+            chunk_entry.update(
                 {
                     "chunk": True,
                     "id": chunk_id,
@@ -310,18 +308,16 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
             )
             error_type = get_test_error_type(chunk.get_status())
             if error_type:
-                entry["error_type"] = error_type
+                chunk_entry["error_type"] = error_type
             if chunk.metrics.get("wall_time"):
-                entry["duration"] = chunk.metrics.get("wall_time")
-
-            entries.append(entry)
+                chunk_entry["duration"] = chunk.metrics.get("wall_time")
 
             for test in chunk.tests:
                 # Don't make copy from suite_entry, it may contain or not some fields
                 # and they may be inherited and not overwritten by mistake
-                entry = copy.deepcopy(general_info)
+                test_entry = copy.deepcopy(general_info)
                 test_class_name = test.get_class_name() or "noname_suite"
-                entry.update(
+                test_entry.update(
                     {
                         "id": get_id(
                             test.path or suite.project_path,
@@ -350,20 +346,20 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                     }
                 )
                 if test.path:
-                    entry["path"] = test.path
+                    test_entry["path"] = test.path
 
                 if test.metrics:
-                    entry["metrics"].update(test.metrics)
+                    test_entry["metrics"].update(test.metrics)
 
                 if test.tags:
-                    entry["tags"] = list(set(entry["tags"] + test.tags))
+                    test_entry["tags"] = list(set(test_entry["tags"] + test.tags))
 
                 # Protocol's "status" field is binary: good/fail
                 # However suites/tests/subtests operates with status that may be good/fail/missing/crashed/skipped
                 # This extra information is saved in the field "error_type"
                 error_type = get_test_error_type(test.status)
                 if error_type:
-                    entry["error_type"] = error_type
+                    test_entry["error_type"] = error_type
 
                 if test.is_diff_test and test.status == Status.GOOD:
                     test_result = {}
@@ -377,10 +373,12 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                             }
                     except Exception:
                         logger.exception("Error while saving diff_test result")
-                    entry["result"] = test_result
+                    test_entry["result"] = test_result
 
-                entries.append(entry)
-
+                # XXX: the order below matters! (see YA-2468 for more info)
+                entries.append(test_entry)
+            entries.append(chunk_entry)
+        entries.append(suite_entry)
     return entries
 
 
