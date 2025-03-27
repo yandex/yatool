@@ -433,7 +433,7 @@ class GradleOptions(yarg.Options):
             ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_FORCE_JDK_VERSION],
-                help='Force JDK version in exported project, one of ' + ', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS),
+                help=f"Force JDK version in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
                 hook=yarg.SetValueHook('force_jdk_version'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
@@ -462,20 +462,16 @@ class GradleOptions(yarg.Options):
     def postprocess(self):
         if self.yexport_bin is not None and not os.path.exists(self.yexport_bin):
             raise yarg.ArgsValidatingException(
-                'Not found yexport binary({}) {}.'.format(GradleOptions.OPT_YEXPORT_BIN, self.yexport_bin)
+                f"Not found yexport binary {self.yexport_bin} in {GradleOptions.OPT_YEXPORT_BIN}"
             )
         if self.gradle_name and self.remove:
             raise yarg.ArgsValidatingException(
-                '{} not applicable with {}'.format(GradleOptions.OPT_GRADLE_NAME, GradleOptions.OPT_REMOVE)
+                f"{GradleOptions.OPT_GRADLE_NAME} not applicable with {GradleOptions.OPT_REMOVE}"
             )
         if self.force_jdk_version is not None:
             if self.force_jdk_version not in GradleOptions.AVAILABLE_JDK_VERSIONS:
                 raise yarg.ArgsValidatingException(
-                    'Invalid JDK version {} in {}, must be one of {}.'.format(
-                        self.force_jdk_version,
-                        GradleOptions.OPT_FORCE_JDK_VERSION,
-                        ', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS),
-                    )
+                    f"Invalid JDK version {self.force_jdk_version} in {GradleOptions.OPT_FORCE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
                 )
 
 
