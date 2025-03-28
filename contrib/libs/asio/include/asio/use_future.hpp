@@ -73,15 +73,6 @@ public:
   {
   }
 
-#if !defined(ASIO_NO_DEPRECATED)
-  /// (Deprecated: Use rebind().) Specify an alternate allocator.
-  template <typename OtherAllocator>
-  use_future_t<OtherAllocator> operator[](const OtherAllocator& allocator) const
-  {
-    return use_future_t<OtherAllocator>(allocator);
-  }
-#endif // !defined(ASIO_NO_DEPRECATED)
-
   /// Specify an alternate allocator.
   template <typename OtherAllocator>
   use_future_t<OtherAllocator> rebind(const OtherAllocator& allocator) const
@@ -99,7 +90,7 @@ public:
   /**
    * The @c package function is used to adapt a function object as a packaged
    * task. When this adapter is passed as a completion token to an asynchronous
-   * operation, the result of the function object is retuned via a std::future.
+   * operation, the result of the function object is returned via a std::future.
    *
    * @par Example
    *
