@@ -1,6 +1,6 @@
 #include "server.h"
 
-#include <util/generic/bt_exception.h>
+#include <util/generic/yexception.h>
 
 #include <type_traits>
 

@@ -10,7 +10,7 @@
 
 #include <util/datetime/systime.h>
 #include <util/folder/path.h>
-#include <util/generic/bt_exception.h>
+#include <util/generic/yexception.h>
 #include <util/generic/scope.h>
 #include <util/generic/singleton.h>
 #include <util/generic/strbuf.h>

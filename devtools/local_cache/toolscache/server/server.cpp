@@ -11,7 +11,7 @@
 #include <library/cpp/logger/global/common.h>
 #include <library/cpp/logger/global/rty_formater.h>
 
-#include <util/generic/bt_exception.h>
+#include <util/generic/yexception.h>
 #include <util/system/fs.h>
 
 #include <thread>

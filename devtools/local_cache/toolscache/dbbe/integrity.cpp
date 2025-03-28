@@ -7,7 +7,7 @@
 #include <library/cpp/logger/global/rty_formater.h>
 #include <library/cpp/threading/future/future.h>
 
-#include <util/generic/bt_exception.h>
+#include <util/generic/yexception.h>
 #include <util/generic/list.h>
 #include <util/string/cast.h>
 
