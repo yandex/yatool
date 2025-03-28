@@ -289,8 +289,6 @@ class TestFramer(object):
             self.opts,
             self.distbuild_runner,
             out_dir,
-            suite.fork_test_files_requested(self.opts),
-            self.opts.tests_retries,
         )
         if suite.special_runner == 'yt' and self.opts.run_tagged_tests_on_yt and not suite.is_skipped():
             suite.uid = "yt-{}".format(suite.uid)
@@ -1259,7 +1257,14 @@ def _stable_dir_outputs(suite, opts):
     return not _need_random_uid(suite, opts) and opts.dir_outputs_test_mode
 
 
-def get_suite_uid(suite, graph, arc_root, opts, is_for_distbuild, out_dir, has_split_files, retries):
+def get_suite_uid(
+    suite,
+    graph,
+    arc_root,
+    opts,
+    is_for_distbuild,
+    out_dir,
+):
     if _need_random_uid(suite, opts):
         uid = uid_gen.get_random_uid()
     else:
@@ -1297,8 +1302,9 @@ def get_suite_uid(suite, graph, arc_root, opts, is_for_distbuild, out_dir, has_s
         # Allows to change test's uid per suite type
         imprint_parts.append(str(opts.test_types_fakeid.get(suite.get_type(), '')))
         imprint_parts.append(str(opts.test_fakeid))
-        imprint_parts.append(str(retries))
-        imprint_parts.append(str(has_split_files))
+        imprint_parts.append(str(opts.tests_retries))
+        imprint_parts.append(str(suite.fork_test_files_requested(opts)))
+        imprint_parts.append(str(suite.get_fork_partition_mode()))
 
         uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(*imprint_parts)] if _f]))
     return uid
