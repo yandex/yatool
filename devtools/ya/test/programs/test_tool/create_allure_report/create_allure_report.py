@@ -27,9 +27,14 @@ def get_options():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     parser.add_option("--allure", dest="allure_report", help="allure file path", action='store', default=None)
+    parser.add_option("--token", dest="token", help="sb token path for downloading JDK", action='store', default=None)
+    parser.add_option(
+        "--token-path", dest="token_path", help="sb token path for downloading JDK", action='store', default=None
+    )
     parser.add_option(
         "--allure-tars", dest="allure_tars", help="list of allure report tars", action='append', default=[]
     )
+
     return parser.parse_args()
 
 

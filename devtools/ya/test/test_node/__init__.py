@@ -2159,6 +2159,8 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
     for allure_tar in allure_tars:
         allure_cmd += ["--allure-tars", allure_tar]
 
+    allure_cmd += util_shared.get_oauth_token_options(opts)
+
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
