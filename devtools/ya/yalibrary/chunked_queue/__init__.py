@@ -298,7 +298,12 @@ class ChunkedQueue(BaseQueue):
 
     def add(self, dct):
         with self._active_chunk_value_lock:
-            self._active_chunk.add(dct)
+            if not self._active_chunk:
+                chunk = self._generate_new_chunk()
+                chunk.add(dct)
+                chunk.close()
+            else:
+                self._active_chunk.add(dct)
 
         with self._condition:
             self._condition.notify_all()
@@ -322,6 +327,10 @@ class ChunkedQueue(BaseQueue):
             # Aquire lock for found chunk
             if chunk == self._active_chunk:
                 with self._active_chunk_value_lock:
+                    if self._active_chunk is None:
+                        self.logger.debug("Chunk %s seems to be already closed", chunk)
+                        continue
+
                     self._active_chunk.close()
                     # No need to free this chunk; we hold it and can work with it as needed.
                     self.logger.debug("Do not take lock for (previously) active chunk %s", chunk)
