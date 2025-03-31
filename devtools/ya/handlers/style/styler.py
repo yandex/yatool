@@ -178,7 +178,6 @@ class Ruff(cfg.ConfigMixin):
                 # - else if there is a custom config got from ruff trie, use it
                 # - else use default config
                 cfg.AutoincludeConfig.make(const.PythonLinterName.Ruff),
-                cfg.RuffConfig(),
                 cfg.DefaultConfig(
                     linter_name=const.PythonLinterName.Ruff,
                     defaults_file=const.DefaultLinterConfig.Python,
