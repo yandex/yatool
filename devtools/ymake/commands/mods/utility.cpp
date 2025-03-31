@@ -294,12 +294,9 @@ namespace {
                     writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
                 },
                 [&](const TVector<TString>& v) {
-                    if (v.empty())
-                        return;
-                    else if (v.size() == 1)
-                        writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
-                    else
-                        throw TNotImplemented() << "Env does not support arrays";
+                    for (const auto& s: v) {
+                        writer->WriteEnv(ctx.CmdInfo.SubstMacroDeeply(nullptr, s, ctx.Vars, false));
+                    }
                 },
                 [&](const TTaggedStrings& x) {
                     throw TBadArgType(Name, x);
