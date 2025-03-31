@@ -468,6 +468,7 @@ class VSCodeProject:
             ya_bin_path,
             self.params.languages,
             with_prepare=self.params.debug_enabled,
+            ext_py_enabled=self.params.ext_py_enabled,
         )
         workspace["tasks"] = OrderedDict(
             (

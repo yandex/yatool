@@ -29,6 +29,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.dlv_enabled = True
         self.compile_commands_fix = True
         self.allow_project_inside_arc = False
+        self.ext_py_enabled = True
         self.languages = []
         self.add_codegen_folder = False
         self.vscodium = False
@@ -118,6 +119,12 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 ["--no-tests"],
                 help="Do not configure tests",
                 hook=devtools.ya.core.yarg.SetConstValueHook("tests_enabled", False),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--no-ext-py"],
+                help="Disable --ext-py mode for Python tests",
+                hook=devtools.ya.core.yarg.SetConstValueHook("ext_py_enabled", False),
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(

@@ -36,7 +36,7 @@ def prepare_task_name(name, module_lang):
     return common.pretty_name(name)
 
 
-def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_prepare=False):
+def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_prepare=False, ext_py_enabled=True):
     tasks = []
     common_args.append("--ignore-recurses")
     COMMON_ARGS = " ".join(exts.shlex2.quote(arg) for arg in common_args)
@@ -69,6 +69,7 @@ def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_p
                 )
             )
         elif module_type in consts.TEST_MODULE_TYPES:
+            ext_py_arg = "--ext-py" if ext_py_enabled and module_type == "PY3TEST_PROGRAM__from__PY3TEST" else ""
             tasks.append(
                 OrderedDict(
                     (
@@ -77,8 +78,8 @@ def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_p
                         ("type", "shell"),
                         (
                             "command",
-                            "%s test --run-all-tests --regular-tests %s %s"
-                            % (ya_bin_path, module_args, abs_module_path),
+                            "%s test --run-all-tests --regular-tests %s %s %s"
+                            % (ya_bin_path, module_args, ext_py_arg, abs_module_path),
                         ),
                         ("group", "test"),
                     )
@@ -93,8 +94,8 @@ def gen_tasks(run_modules, common_args, arc_root, ya_bin_path, languages, with_p
                             ("type", "shell"),
                             (
                                 "command",
-                                "%s test --run-all-tests --regular-tests --keep-going --test-prepare --keep-temps %s %s"
-                                % (ya_bin_path, module_args, abs_module_path),
+                                "%s test --run-all-tests --regular-tests --keep-going --test-prepare --keep-temps %s %s %s"
+                                % (ya_bin_path, module_args, ext_py_arg, abs_module_path),
                             ),
                             ("group", "build"),
                         )
