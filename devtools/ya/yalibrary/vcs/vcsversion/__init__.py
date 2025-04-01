@@ -120,6 +120,7 @@ def _dump_json(
     j['BUILD_USER'] = _SystemInfo._to_text(build_user)
     j['BUILD_HOST'] = _SystemInfo._to_text(build_host)
     j['VCS'] = info.get('vcs', '')
+    j['REPOSITORY'] = info.get('repository', '')
     j['BRANCH'] = info.get('branch', '')
     j['ARCADIA_TAG'] = info.get('tag', '')
     j['DIRTY'] = info.get('dirty', '')
@@ -723,6 +724,7 @@ def _get_default_dictionary():
     return _ArcVersion.parse(
         *[
             '''{
+        "repository": "arcadia",
         "summary":"No VCS",
         "date":"2015-03-14T06:05:35Z",
         "hash":"0577215664901532860606512090082402431042",
