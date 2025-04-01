@@ -851,6 +851,7 @@ class MavenImportOptions(SandboxUploadOptions):
         self.minimal_pom_validation = True
         self.local_jar_resources = not app_config.in_house
         self.import_dm = False
+        self.ignore_errors = False
         self.repo_auth_username = None
         self.repo_auth_password = None
 
@@ -947,6 +948,12 @@ class MavenImportOptions(SandboxUploadOptions):
                 ['--import-managed-deps'],
                 help='Import artifacts from Dependency Managements',
                 hook=SetConstValueHook('import_dm', True),
+                group=MAVEN_OPT_GROUP,
+            ),
+            ArgConsumer(
+                ['--ignore-errors'],
+                help='Skip dependency from dependency management on error',
+                hook=SetConstValueHook('ignore_errors', True),
                 group=MAVEN_OPT_GROUP,
             ),
             ArgConsumer(

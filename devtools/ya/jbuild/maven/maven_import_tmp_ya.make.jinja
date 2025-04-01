@@ -24,6 +24,9 @@ RUN_JAVA_PROGRAM(
 {% if import_dm -%}
         --import-dm
 {% endif -%}
+{% if ignore_errors -%}
+        --ignore-errors
+{% endif -%}
 {% if repo_auth_username -%}
         --repo-auth-username {{ repo_auth_username }}
 {% endif -%}
