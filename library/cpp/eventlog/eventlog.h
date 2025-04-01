@@ -446,6 +446,7 @@ struct TEventLogBackendOptions {
     bool UseSyncPageCacheBackend = false;
     size_t SyncPageCacheBackendBufferSize = 0;
     size_t SyncPageCacheBackendMaxPendingSize = 0;
+    TMaybe<TDuration> SyncPageCacheBackendBufferFlushPeriod = Nothing();
 };
 
 class TEventLog: public IEventLog {

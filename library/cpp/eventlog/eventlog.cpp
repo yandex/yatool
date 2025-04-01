@@ -318,7 +318,12 @@ static THolder<TLogBackend> ConstructBackend(const TString& fileName, const TEve
     try {
         THolder<TLogBackend> backend;
         if (backendOpts.UseSyncPageCacheBackend) {
-            backend = MakeHolder<TSyncPageCacheFileLogBackend>(fileName, backendOpts.SyncPageCacheBackendBufferSize, backendOpts.SyncPageCacheBackendMaxPendingSize);
+            backend = MakeHolder<TSyncPageCacheFileLogBackend>(
+                fileName,
+                backendOpts.SyncPageCacheBackendBufferSize,
+                backendOpts.SyncPageCacheBackendMaxPendingSize,
+                backendOpts.SyncPageCacheBackendBufferFlushPeriod
+            );
         } else {
             backend = MakeHolder<TFileLogBackend>(fileName);
         }
