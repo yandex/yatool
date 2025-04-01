@@ -1,26 +1,29 @@
 # cython: profile=True
 
 
-import exts.yjson as json
+import collections
+import copy
+import enum
 import logging
+import math
 import os
 import time
 import traceback
-import copy
-import collections
-import enum
-import math
+from functools import cmp_to_key
 
 import exts.fs
-import devtools.ya.core.report
-
+import exts.yjson as json
 from humanfriendly import format_size
+from yalibrary.monitoring import YaMonEvent
 
-from devtools.ya.core import profiler
-from devtools.ya.core import stage_tracer
+import devtools.ya.core.report
 import devtools.ya.test.const as test_const
-from devtools.ya.build.stat.graph import create_graph_with_distbuild_log, create_graph_with_local_log, AbstractTask
-from functools import cmp_to_key
+from devtools.ya.build.stat.graph import (
+    AbstractTask,
+    create_graph_with_distbuild_log,
+    create_graph_with_local_log,
+)
+from devtools.ya.core import profiler, stage_tracer
 
 
 class TaskType(enum.Enum):
@@ -600,6 +603,11 @@ def print_distbuild_download_statistics(graph, filename, display):
             display.emit_message(f'DistBuild download stats are saved to {filename}')
 
         display.emit_message()
+
+        YaMonEvent.send('EYaStats::DistDownloadTimeSpan', total_time_span)
+        YaMonEvent.send('EYaStats::DistDownloadTotalDownloadSize', total_download_size)
+        YaMonEvent.send('EYaStats::DistDownloadTotalDownloadTimeByRuntime', total_time_by_run)
+        YaMonEvent.send('EYaStats::DistDownloadTotalDownloadTimeByDownloadTime', total_time_by_dl)
 
         return stats
 
