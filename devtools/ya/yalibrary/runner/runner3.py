@@ -537,13 +537,11 @@ class TaskContext(object):
         )
         patterns['RESOURCE_ROOT'] = exts.windows.win_path_fix(self._transient_resource_dir)
 
-        if self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path:
-            token_path = self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path
-            patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(token_path)
-        elif (self.opts.oauth_token or self.opts.sandbox_oauth_token) and self.opts.store_oauth_token:
-            token = self.opts.oauth_token or self.opts.sandbox_oauth_token
+        if self.opts.oauth_token_path:
+            patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(self.opts.oauth_token_path)
+        elif self.opts.oauth_token and self.opts.store_oauth_token:
             patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(
-                self._exit_stack.enter_context(self._token_context(token))
+                self._exit_stack.enter_context(self._token_context(self.opts.oauth_token))
             )
         if self.opts.frepkage_root:
             patterns['FREPKAGE_ROOT'] = exts.windows.win_path_fix(self.opts.frepkage_root)

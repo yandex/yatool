@@ -147,7 +147,7 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
     deps = suite.dep_uids + [suite.uid]
 
     if app_config.in_house:
-        storage = sandbox_storage.get_sandbox_storage("$(BUILD_ROOT)", opts.custom_fetcher, opts.sandbox_oauth_token)
+        storage = sandbox_storage.get_sandbox_storage("$(BUILD_ROOT)", opts.custom_fetcher, opts.oauth_token)
         for resource in resources:
             resource_node_uid = sandbox.inject_download_sandbox_resource_node(
                 graph, resource, opts, suite.global_resources

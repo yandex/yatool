@@ -15,7 +15,7 @@ def inject_download_sandbox_resource_node(graph, resource, opts, global_resource
     fake_id = 9 + int(opts.dir_outputs_in_nodes)
     uid = "sandbox-resource-{}-{}-ro".format(resource_id, fake_id)
     custom_fetcher = getattr(opts, "custom_fetcher", None)
-    oauth_token = getattr(opts, "sandbox_oauth_token", None)
+    oauth_token = getattr(opts, "oauth_token", None)
 
     if not graph.get_node_by_uid(uid):
         storage = sandbox_storage.get_sandbox_storage("$(BUILD_ROOT)", custom_fetcher, oauth_token)

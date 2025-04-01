@@ -252,7 +252,7 @@ def upload_artifacts_parallel_and_cacheble(nodes, opts, app_ctx):
                 result_path,
                 resource_type='JAVA_LIBRARY',
                 owner=opts.resource_owner,
-                token=opts.sandbox_oauth_token,
+                token=opts.oauth_token,
                 transport=opts.transport,
                 cwd=os.path.dirname(node.path),
             )
@@ -322,7 +322,7 @@ def upload_artifacts_parallel_and_cacheble_unified(poms, opts, app_ctx):
                 result_path,
                 resource_type='JAVA_LIBRARY',
                 owner=opts.resource_owner,
-                token=opts.sandbox_oauth_token,
+                token=opts.oauth_token,
                 transport=opts.transport,
                 cwd=os.path.dirname(fname),
             )

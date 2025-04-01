@@ -511,7 +511,7 @@ def configure_fetcher_params(app_ctx):
         custom_fetcher = getattr(app_ctx.params, 'custom_fetcher', None)
     fetcher_params = getattr(app_ctx.params, 'fetcher_params', [])
 
-    oauth_token = getattr(app_ctx.params, 'sandbox_oauth_token', None)
+    oauth_token = getattr(app_ctx.params, 'oauth_token', None)
 
     def custom_fetcher_is_top_priority():
         return custom_fetcher and fetcher_params and fetcher_params[0]['name'] == 'custom'
@@ -532,8 +532,8 @@ def configure_fetcher_params(app_ctx):
         if oauth_token is not None:
             oauth_token = six.ensure_str(oauth_token)
 
-        if oauth_token and hasattr(app_ctx.params, 'sandbox_oauth_token'):
-            setattr(app_ctx.params, 'sandbox_oauth_token', oauth_token)
+        if oauth_token and hasattr(app_ctx.params, 'oauth_token'):
+            setattr(app_ctx.params, 'oauth_token', oauth_token)
 
     fetcher_params_strip = copy.deepcopy(fetcher_params)
     for f in fetcher_params_strip:
