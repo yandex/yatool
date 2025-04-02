@@ -318,9 +318,6 @@ class VSCodeProject:
             if self.params.patch_gopls and self.params.gopls_index_targets:
                 settings["gopls"]["build.arcadiaIndexDirs"] = self.params.rel_targets
 
-        else:
-            settings["go.useLanguageServer"] = False
-
         return settings
 
     def venv_tmp_project(self):

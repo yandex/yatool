@@ -56,8 +56,7 @@ def merge_workspace(new, workspace_path):
             new["settings"][setting] = old["settings"][setting]
 
     # Drop deprecated settings
-    new["settings"].pop("python.formatting.provider", None)
-    new["settings"].get("gopls", {}).pop("build.expandWorkspaceToModule", None)
+    new["settings"].pop("black-formatter.args", None)
 
 
 def sort_tasks(workspace):
