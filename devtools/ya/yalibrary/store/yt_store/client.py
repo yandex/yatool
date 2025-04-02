@@ -92,10 +92,12 @@ class YtStoreClient(object):
     @property
     @memoize()
     def account_size_limit(self):
-        table_attrs = self._client.get('{}/@'.format(self._data_table))
+        table_attrs = self._client.get('{}/@'.format(self._data_table), read_from='cache')
         account_name = table_attrs['account']
         primary_medium = table_attrs['primary_medium']
-        limits = self._client.get('//sys/accounts/{}/@resource_limits/disk_space_per_medium'.format(account_name))
+        limits = self._client.get(
+            '//sys/accounts/{}/@resource_limits/disk_space_per_medium'.format(account_name), read_from='cache'
+        )
         size_limit = limits[primary_medium]
         return size_limit
 
@@ -142,7 +144,7 @@ class YtStoreClient(object):
     @property
     @memoize()
     def _meta_schema(self):
-        return self._client.get('{}/@schema'.format(self._metadata_table))
+        return self._client.get('{}/@schema'.format(self._metadata_table), read_from='cache')
 
     @property
     def _client(self):
@@ -192,7 +194,7 @@ class YtStoreClient(object):
     def get_tables_size(self):
         size = 0
         for table in self._data_table, self._metadata_table:
-            size += self._client.get('{}/@resource_usage/disk_space'.format(table))
+            size += self._client.get('{}/@resource_usage/disk_space'.format(table), read_from='cache')
         return size
 
     def get_data_replication_factor(self):
