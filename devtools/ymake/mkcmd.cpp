@@ -102,6 +102,12 @@ TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, const TRestore
     , Graph(restoreContext.Graph)
     , ModulesStatesCache(modulesStatesCache)
 {
+    // `CmdInfo` may be arbitrarily (re)used for `SubstMacro`'ing
+    // both top-level old-style commands and old-style fragments of new-style ones
+    // (see `SubstMacroDeeply` invocations in mod implementations, for example);
+    // we could set up subst-gateways in individual locations,
+    // but let's just do it "globally" once and for all
+    CmdInfo.SetCommandSource(Commands);
 }
 
 TString TMakeCommand::RealPath(const TConstDepNodeRef& node) const {
@@ -331,7 +337,6 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorSh
         acceptor->PostScript(Vars);
     } else {
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
-        CmdInfo.SetCommandSource(Commands);
         CmdString = CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, ECF_ExpandSimpleVars, true);
         CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
         const auto& cmdInfo = CmdInfo;
