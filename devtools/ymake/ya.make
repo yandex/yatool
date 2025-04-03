@@ -155,8 +155,6 @@ SRCS(
     path_matcher.cpp
     peers_rules.cpp
     peers.cpp
-    plugins/cmd_context_class.cpp
-    plugins/context_class.cpp
     plugins/cpp_plugins.cpp
     plugins/error.cpp
     plugins/init.cpp

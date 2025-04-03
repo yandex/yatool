@@ -1,7 +1,7 @@
 #include "ymake_module_adapter.h"
+#include "ymake_module.h"
 
 #include "error.h"
-#include "context_class.h"
 #include "convert.h"
 
 #include <devtools/ymake/conf.h>

@@ -1,11 +1,7 @@
 #include "error.h"
-#include "context_class.h"
-#include "cmd_context_class.h"
 #include "plugin_macro_impl.h"
 #include "scoped_py_object_ptr.h"
 #include "ymake_module.h"
-
-#include "devtools/ymake/diag/trace.h"
 
 #include <util/folder/path.h>
 #include <util/generic/string.h>
@@ -157,11 +153,6 @@ TPyRuntime::TPyRuntime() {
 
     // do not generate *.pyc files in source tree
     PyRun_SimpleString("import sys; sys.dont_write_bytecode = True");
-
-    TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
-
-    Y_ABORT_UNLESS(ContextTypeInit(ymakeModule));
-    Y_ABORT_UNLESS(CmdContextTypeInit(ymakeModule));
 }
 
 TPyRuntime::~TPyRuntime() {

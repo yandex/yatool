@@ -1,7 +1,6 @@
 #include "error.h"
-#include "context_class.h"
 #include "plugin_macro_impl.h"
-#include "convert.h"
+#include "ymake_module.h"
 
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/yndex/yndex.h>
