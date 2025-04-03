@@ -73,26 +73,3 @@ public:
     bool AcceptDep(TState& state);
     void Leave(TState& state);
 };
-
-class TErrorsGuard {
-public:
-    TErrorsGuard(const TBuildConfiguration& conf)
-    : HasErrorsFilePath_(conf.BuildRoot / "has_errors")
-    {
-        HasErrorsOnPrevLaunch_ = HasErrorsFilePath_.Exists();
-        TFile(HasErrorsFilePath_, CreateAlways | WrOnly);
-    }
-
-    ~TErrorsGuard() {
-        if (!Diag()->HasConfigurationErrors) {
-            HasErrorsFilePath_.DeleteIfExists();
-        }
-    }
-
-    bool HasConfigureErrorsOnPrevLaunch() const {
-        return HasErrorsOnPrevLaunch_;
-    }
-private:
-    TFsPath HasErrorsFilePath_;
-    bool HasErrorsOnPrevLaunch_ = false;
-};

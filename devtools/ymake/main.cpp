@@ -87,7 +87,7 @@ namespace {
     }
 }
 
-TYMake::TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch)
+TYMake::TYMake(TBuildConfiguration& conf)
     : Conf(conf)
     , Graph(Names)
     , RecurseGraph(Names)
@@ -96,7 +96,6 @@ TYMake::TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch)
     , IncParserManager(conf, Names)
     , Yndex(Conf.CommandDefinitions, Conf.CommandReferences)
     , Modules(Names, conf.PeersRules, Conf)
-    , HasErrorsOnPrevLaunch_(hasErrorsOnPrevLaunch)
 {
     TimeStamps.StartSession();
     Diag()->Where.clear();
@@ -672,14 +671,12 @@ int main_real(TBuildConfiguration& conf) {
         return PrintAbsTargetPath(conf);
     }
 
-    TErrorsGuard errorsGuard(conf);
-
     if (!conf.CachePath.Exists() && conf.ShouldUseOnlyYmakeCache()) {
         YErr() << "Can not load ymake.cache. File does not exist: " << conf.YmakeCache << Endl;
         return BR_FATAL_ERROR;
     }
 
-    THolder<TYMake> yMake(new TYMake(conf, errorsGuard.HasConfigureErrorsOnPrevLaunch()));
+    THolder<TYMake> yMake(new TYMake(conf));
 
     if (conf.ShouldLoadGraph()) {
         if (!yMake->Load(conf.CachePath)) {
@@ -687,7 +684,7 @@ int main_real(TBuildConfiguration& conf) {
                 YErr() << "Cache was not loaded. Stop." << Endl;
                 return BR_FATAL_ERROR;
             }
-            yMake.Reset(new TYMake(conf, errorsGuard.HasConfigureErrorsOnPrevLaunch()));
+            yMake.Reset(new TYMake(conf));
         }
     }
 

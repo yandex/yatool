@@ -93,7 +93,6 @@ private:
     TVector<ui32> CurStartDirs_;
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
-    bool HasErrorsOnPrevLaunch_{false};
     TStringBuf ExportLang_{"?"};
 
     TVector<ui32> PreserveStartTargets() const;
@@ -105,7 +104,7 @@ private:
     bool LoadDependsToModulesClosure(IInputStream* input);
     bool SaveDependsToModulesClosure(IOutputStream* output);
 public:
-    explicit TYMake(TBuildConfiguration& conf, bool hasErrorsOnPrevLaunch);
+    explicit TYMake(TBuildConfiguration& conf);
     void PostInit(); // Call this after Load: this may rely on loaded symbol table
     ~TYMake();
 
@@ -183,7 +182,7 @@ public:
     void ComputeReachableNodes();
     bool CanBypassConfigure() const {
         // --xcompletely-trust-fs-cache can't be passed without --patch-path
-        return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_ && !HasErrorsOnPrevLaunch_;
+        return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_;
     }
     void UpdateExternalFilesChanges();
     void UpdateUnreachableExternalFileChanges();
