@@ -219,8 +219,15 @@ def _get_env_arg(opts, suite):
     if opts and getattr(opts, 'test_env'):
         test_env.extend(opts.test_env)
 
+    gkv = dict(it.split('::', 1) for it in suite.get_global_resources())
+
+    def replace_global_resource(x):
+        for k in gkv.keys():
+            x = x.replace('$' + k, gkv[k])
+        return x
+
     arg = []
-    for s in test_env:
+    for s in map(replace_global_resource, test_env):
         if "=" in s:
             arg.extend(("--env", s))
         elif s in os.environ:

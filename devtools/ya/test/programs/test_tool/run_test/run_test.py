@@ -1094,6 +1094,8 @@ def setup_ram_drive(env, options, cmd):
 
 def set_user_env_vars(env, env_data, global_resources):
     for entry in env_data:
+        if '=' not in entry:
+            continue
         key, value = entry.split("=", 1)
         value = '=' + value
         for prefix, res_name, suffix in set(re.findall('([=:;])(\\$[A-Za-z0-9_]+_RESOURCE_GLOBAL)(/)', value)):
