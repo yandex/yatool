@@ -32,6 +32,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.custom_tests_data_root = None
         self.debian_distribution = 'unstable'
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
+        self.debian_force_bad_version = False
         self.docker_no_cache = False
         self.docker_push_image = False
         self.docker_remote_image_version = None
@@ -237,6 +238,21 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 'YA_DEBIAN_UPLOAD_TOKEN',
                 help='Iam token or path to iam token for nebiuscloud debian repository',
                 hook=devtools.ya.core.yarg.SetValueHook('debian_upload_token'),
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--debian-force-bad-version'],
+                help='Force bad version in dch changelog generation',
+                hook=devtools.ya.core.yarg.SetConstValueHook('debian_force_bad_version', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.EXPERT,
+                subgroup=DEB_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_DEBIAN_FORCE_BAD_VERSION',
+                hook=devtools.ya.core.yarg.SetConstValueHook(
+                    'debian_force_bad_version',
+                    devtools.ya.core.yarg.return_true_if_enabled,
+                ),
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--docker-push'],

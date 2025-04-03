@@ -361,7 +361,14 @@ def create_control_file(debian_dir, package_name, package_meta, arch_all, debug_
             )
 
 
-def create_changelog_file(debian_dir, package_name, package_version, distribution, changelog_message):
+def create_changelog_file(
+    debian_dir,
+    package_name,
+    package_version,
+    distribution,
+    changelog_message,
+    force_bad_version=False,
+):
     changelog_file_path = os.path.join(debian_dir, 'changelog')
 
     if not os.path.exists(changelog_file_path):
@@ -378,6 +385,10 @@ def create_changelog_file(debian_dir, package_name, package_version, distributio
         '-D',
         distribution,
     ]
+
+    if force_bad_version:
+        args.append('--force-bad-version')
+
     if changelog_message:
         args.append(changelog_message)
     with exts.os2.change_dir(os.path.join(debian_dir, '..')):

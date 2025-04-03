@@ -832,6 +832,7 @@ def create_package(package_context, output_root, builds):
                         package_version,
                         params.debian_distribution,
                         changelog_message,
+                        params.debian_force_bad_version,
                     )
 
                 if create_dbg:
