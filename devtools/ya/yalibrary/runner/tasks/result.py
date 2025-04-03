@@ -81,7 +81,7 @@ def process_output(
 
     def make_output(built, output, tared):
         if tared:
-            exts.archive.extract_from_tar(built, output)
+            exts.archive.extract_from_tar(built, output, apply_mtime=True)
         else:
             if os.path.exists(output) and os.path.isdir(output):
                 logger.warning("Not creating hardlink to %s: %s exists and is a directory", built, output)
