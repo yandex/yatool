@@ -745,10 +745,10 @@ class ReportGenerator:
             if requirements:
                 entry["requirements"] = requirements
 
-            # for now we change toolchain for all fat tests from default-linux-x86_64-relwithdebinfo to
+            # for now we change toolchain for all large tests from default-linux-x86_64-relwithdebinfo to
             # default-linux-x86_64-release except tests tagged with ya:relwithdebinfo
             if (
-                test_const.YaTestTags.Fat in entry["tags"]
+                test_size == test_const.TestSize.Large
                 and entry["toolchain"] == "default-linux-x86_64-relwithdebinfo"
                 and test_const.YaTestTags.RunWithAsserts not in entry["tags"]
             ):

@@ -294,7 +294,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--multi-target-platform-run", dest="multi_target_platform_run", action='store_true', default=False
     )
-    parser.add_argument("--test-size", dest="test_size", help="test size (e.g. 'fat')")
+    parser.add_argument("--test-size", dest="test_size", help="test size (e.g. 'large')")
     parser.add_argument("--test-type", dest="test_type", help="suite type (e.g. 'pytest')")
     parser.add_argument("--test-ci-type", dest="test_ci_type", help="suite CI type (e.g. 'style')")
     parser.add_argument("--stdout", dest="stdout", help="file to save stdout")
@@ -691,10 +691,9 @@ class CompositeProcessWatcher(object):
             watcher(*args, **kwargs)
 
 
-def need_to_rerun_test(stderr, return_code, try_num, tags, failed_recipes):
+def need_to_rerun_test(stderr, return_code, try_num, tags, failed_recipes, test_size):
     if failed_recipes:
         return False
-    is_fat = const.YaTestTags.Fat in tags
     if stderr is None:
         return True
     if tags and const.YaTestTags.Norestart in tags:
@@ -703,7 +702,7 @@ def need_to_rerun_test(stderr, return_code, try_num, tags, failed_recipes):
         return False
     if return_code == 0:
         return False
-    if const.INFRASTRUCTURE_ERROR_INDICATOR in stderr and is_fat:
+    if const.INFRASTRUCTURE_ERROR_INDICATOR in stderr and test_size == const.TestSize.Large:
         sys.exit(const.TestRunExitCode.InfrastructureError)
     for indicator in const.RESTART_TEST_INDICATORS:
         if indicator in stderr:
@@ -1608,7 +1607,9 @@ def main():
             logger.debug("Saved test context to %s", test_context_file_path)
 
         else:
-            while need_to_rerun_test(stderr, exit_code, test_command_retry_num, options.test_tags, failed_recipes):
+            while need_to_rerun_test(
+                stderr, exit_code, test_command_retry_num, options.test_tags, failed_recipes, options.test_size
+            ):
                 if test_command_retry_num > 0:
                     stages.stage("retry_preparations")
                     logger.debug("Running %d test attempt", test_command_retry_num + 1)
