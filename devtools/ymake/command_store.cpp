@@ -355,7 +355,7 @@ void TCommands::TInliner::InlineModArgTerm(
         },
         [&](const NCommands::TSyntax::TTransformation& xfm) {
             auto newXfm = NCommands::TSyntax::TTransformation();
-            InlineXfm(xfm, newXfm);
+            InlineTransformation(xfm, newXfm);
             writer.push_back(std::move(newXfm));
         },
         [&](const NCommands::TSyntax::TCall&) {
@@ -373,7 +373,7 @@ void TCommands::TInliner::InlineModArgTerm(
     }, term);
 }
 
-void TCommands::TInliner::InlineXfm(
+void TCommands::TInliner::InlineTransformation(
     const NCommands::TSyntax::TTransformation& xfm,
     NCommands::TSyntax::TTransformation& writer
 ) {
@@ -468,7 +468,7 @@ void TCommands::TInliner::InlineScalarTerm(
         },
         [&](const NCommands::TSyntax::TTransformation& xfm) {
             auto newXfm = NCommands::TSyntax::TTransformation();
-            InlineXfm(xfm, newXfm);
+            InlineTransformation(xfm, newXfm);
             writer.WriteTerm(std::move(newXfm));
         },
         [&](const NCommands::TSyntax::TCall& call) {

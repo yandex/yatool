@@ -521,7 +521,7 @@ void TModuleBuilder::AddDartsVars() {
 void TModuleBuilder::TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     try {
         ProcessStatement(name, args);
-    } catch (yexception& e) {
+    } catch (std::exception& e) {
         TString what = TString::Join(name, "(", JoinStrings(args.begin(), args.end(), " "), ") was not processed properly: ", e.what());
         TRACE(S, NEvent::TMakeSyntaxError(what, TString(Module.GetMakefile().GetTargetStr())));
         YConfErr(Syntax) << what << ". Skip " << name << Endl;

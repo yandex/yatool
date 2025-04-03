@@ -18,6 +18,7 @@ namespace NCommands {
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TGlobPattern           >() {return "[pre]Glob";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TLegacyLateGlobPatterns>() {return "[pre]LegacyGlob";}
     // TTermValue
+    template<> [[maybe_unused]] inline const char *PrintableTypeName<TTermError      >() {return "Error";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TTermNothing    >() {return "Unit";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TString         >() {return "String";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TVector<TString>>() {return "Strings";}
@@ -53,6 +54,7 @@ namespace NCommands {
             CheckArgCount(std::ssize(args));
         }
         void CheckArgCount(ssize_t count) const;
+        [[noreturn]] void FailArgCount(ssize_t count, std::string_view expected) const;
     };
 
 }

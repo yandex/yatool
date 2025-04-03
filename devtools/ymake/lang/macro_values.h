@@ -68,6 +68,7 @@ enum class EMacroFunction: ui32 {
     Empty,
     Not,
     AddToIncl,
+    DbgFail,
     //
     Count
 };

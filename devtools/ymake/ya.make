@@ -66,6 +66,7 @@ SRCS(
     command_helpers.cpp
     command_store.cpp
     commands/mods/common.cpp
+    GLOBAL commands/mods/internal.cpp
     GLOBAL commands/mods/io.cpp
     GLOBAL commands/mods/paths.cpp
     GLOBAL commands/mods/strings.cpp

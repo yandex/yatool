@@ -470,7 +470,60 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, const TModRegistry& mo
 
 namespace {
 
+    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder);
     void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder);
+
+    void CompileTransformation(
+        const TModRegistry& mods,
+        const TSyntax::TTransformation& x,
+        NPolexpr::TVariadicCallBuilder& builder,
+        size_t pos = 0
+    ) {
+        if (pos == x.Mods.size()) {
+            if (x.Body.size() == 1 && x.Body.front().size() == 1)
+                // this special case is here mostly to reinforce the notion
+                // that `${VAR}` should be equivalent to `$VAR`;
+                // we use it with `${mods:VAR}`, as well,
+                // to cut down on `Args(Terms(...))` wrappers;
+                // conceptually, with proper typing support,
+                // this should not be required
+                CompileTerm(mods, x.Body.front().front(), builder);
+            else
+                CompileArgs(mods, x.Body, builder);
+            return;
+        }
+
+        auto& m = x.Mods[pos];
+        auto func = m.Function;
+        auto arity = mods.FuncArity(func);
+        if (arity != 0 && arity != m.Arguments.size() + 1)
+            throw yexception()
+                << "bad modifier argument count for " << m.Function
+                << " (expected " << mods.FuncArity(func) - 1
+                << ", given " << m.Arguments.size()
+                << ")";
+        auto doTheArgs = [&](auto& builder) {
+            for (auto& v : m.Arguments) {
+                if (v.size() == 1)
+                    CompileTerm(mods, v[0], builder);
+                else {
+                    NPolexpr::TVariadicCallBuilder catBuilder(builder, mods.Func2Id(EMacroFunction::Cat));
+                    for (auto& t : v)
+                        CompileTerm(mods, t, catBuilder);
+                    catBuilder.Build<EMacroFunction>();
+                }
+            }
+            CompileTransformation(mods, x, builder, pos + 1);
+        };
+        if (arity == 0) {
+            NPolexpr::TVariadicCallBuilder modBuilder(builder, mods.Func2Id(func));
+            doTheArgs(modBuilder);
+            modBuilder.Build<EMacroFunction>();
+        } else {
+            builder.Append(mods.Func2Id(func));
+            doTheArgs(builder);
+        }
+    }
 
     void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder) {
         std::visit(TOverloaded{
@@ -481,36 +534,7 @@ namespace {
                 termsBuilder.Append(v);
             },
             [&](const TSyntax::TTransformation& x) {
-                for (auto& m : x.Mods) {
-                    auto func = m.Function;
-                    if (mods.FuncArity(func) != m.Arguments.size() + 1)
-                        throw yexception()
-                            << "bad modifier argument count for " << m.Function
-                            << " (expected " << mods.FuncArity(func) - 1
-                            << ", given " << m.Arguments.size()
-                            << ")";
-                    termsBuilder.Append(mods.Func2Id(func));
-                    for (auto& v : m.Arguments) {
-                        if (v.size() == 1)
-                            CompileTerm(mods, v[0], termsBuilder);
-                        else {
-                            NPolexpr::TVariadicCallBuilder catBuilder(termsBuilder, mods.Func2Id(EMacroFunction::Cat));
-                            for (auto& t : v)
-                                CompileTerm(mods, t, catBuilder);
-                            catBuilder.Build<EMacroFunction>();
-                        }
-                    }
-                }
-                if (x.Body.size() == 1 && x.Body.front().size() == 1)
-                    // this special case is here mostly to reinforce the notion
-                    // that `${VAR}` should be equivalent to `$VAR`;
-                    // we use it with `${mods:VAR}`, as well,
-                    // to cut down on `Args(Terms(...))` wrappers;
-                    // conceptually, with proper typing support,
-                    // this should not be required
-                    CompileTerm(mods, x.Body.front().front(), termsBuilder);
-                else
-                    CompileArgs(mods, x.Body, termsBuilder);
+                CompileTransformation(mods, x, termsBuilder);
             },
             [&](const TSyntax::TCall&) {
                 Y_ABORT();
