@@ -665,8 +665,8 @@ def detect_jdk(ctx):
         jdk_name = jdk_version
 
     kotlin_target = jdk_version
-    if int(kotlin_target) >= 23:
-        kotlin_target = '22'  # remove when kotlin starts supporting jdk23 bytecode
+    if int(kotlin_target) >= 24:
+        kotlin_target = '23'  # remove when kotlin starts supporting jdk24 bytecode
 
     return language_level, sdk_default_language_level, jdk_name, kotlin_target
 

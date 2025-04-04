@@ -1,7 +1,7 @@
 JAVA_CONTRIB_PROXY()
 
 PEERDIR(
-    contrib/java/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.1.0
+    contrib/java/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.1.20
 )
 
 END()
@@ -49,4 +49,8 @@ RECURSE(
     2.0.21
     1.9.22
     2.1.0
+    2.1.20-RC
+    2.1.20-RC2
+    2.1.20-RC3
+    2.1.20
 )
