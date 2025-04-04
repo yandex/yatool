@@ -56,6 +56,50 @@ namespace {
     //
     //
 
+    class TPrnOnlyRoot: public TBasicModImpl {
+    public:
+        TPrnOnlyRoot(): TBasicModImpl({.Id = EMacroFunction::PrnOnlyRoot, .Name = "rootdir", .Arity = 1, .CanEvaluate = true}) {
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            auto apply = [&ctx](TString s) {
+                // lifted from EMF_PrnOnlyRoot processing:
+                return TString(ctx.BuildConf.RealPathRoot(ctx.BuildConf.CanonPath(s)));
+            };
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                },
+                [&](TString s) -> TTermValue {
+                    return apply(std::move(s));
+                },
+                [&](TVector<TString> v) -> TTermValue {
+                    for (auto& s : v)
+                        s = apply(std::move(s));
+                    return std::move(v);
+                },
+                [&](const TTaggedStrings& v) -> TTermValue {
+                    TVector<TString> vv(v.size());
+                    std::transform(v.begin(), v.end(), vv.begin(), [&](auto& s) {
+                        return apply(s.Data);
+                    });
+                    return std::move(vv);
+                }
+            }, args[0]);
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TCutPath: public TBasicModImpl {
     public:
         TCutPath(): TBasicModImpl({.Id = EMacroFunction::CutPath, .Name = "nopath", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {

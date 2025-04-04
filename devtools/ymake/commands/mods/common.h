@@ -26,7 +26,7 @@ namespace NCommands {
 
     class TBadArgType: public yexception {
     public:
-        TBadArgType(TStringBuf fn, auto& arg) {
+        TBadArgType(TStringBuf fn, const auto& arg) {
             *this << "type " << PrintableTypeName<std::remove_cvref_t<decltype(arg)>>() << " is not supported by " << fn;
         }
     };

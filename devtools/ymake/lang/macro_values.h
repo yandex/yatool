@@ -57,7 +57,7 @@ enum class EMacroFunction: ui32 {
     Context, // input-only, preevaluated
     NoAutoSrc, // output-only, preevaluated
     NoRel, // output-only, preevaluated
-    ResolveToBinDir, // output-only, preevaluated
+    ResolveToBinDir, // input/output-only, preevaluated
     // latest additions TODO merge & sort
     ResourceUri,
     Requirements,
@@ -69,6 +69,10 @@ enum class EMacroFunction: ui32 {
     Not,
     AddToIncl,
     DbgFail,
+    Global,
+    OutInclsFromInput,
+    PrnOnlyRoot,
+    Main,
     //
     Count
 };

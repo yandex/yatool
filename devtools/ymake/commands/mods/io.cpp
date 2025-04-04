@@ -201,9 +201,49 @@ namespace {
         }
     private:
         std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            // TODO we appear to always hide output_includes, so just drop it
             auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
             ctx.Sink.OutputIncludes.CollectCoord(pooledName);
+            return pooledName;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TOutInclsFromInput: public TBasicModImpl {
+    public:
+        TOutInclsFromInput(): TBasicModImpl({.Id = EMacroFunction::OutInclsFromInput, .Name = "from_input", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            return std::visit(TOverloaded{
+                [&](std::string_view name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                    auto result = std::vector<std::string_view>();
+                    result.reserve(names.size());
+                    for (auto& name : names)
+                        result.push_back(ProcessOne(ctx, name));
+                    return result;
+                },
+                [&](std::vector<std::string_view> names) -> TMacroValues::TValue {
+                    for (auto& name : names)
+                        name = ProcessOne(ctx, name);
+                    return std::move(names);
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[0]);
+        }
+    private:
+        std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+            auto ix = ctx.Sink.OutputIncludes.Index(pooledName);
+            if (ix == NPOS) [[unlikely]]
+                throw TConfigurationError() << "Unknown output-include [[bad]]" << name << "[[rst]], could not mark as from-input";
+            ctx.Sink.OutputIncludes.Update(ix, [&](auto& var) {
+                var.OutInclsFromInput = true;
+            });
             return pooledName;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
@@ -311,34 +351,50 @@ namespace {
     //
     //
 
-    class TOutputFlagger: public TBasicModImpl {
+    class TInputOutputFlagger: public TBasicModImpl {
     public:
-        TOutputFlagger(TModMetadata metadata): TBasicModImpl(metadata) {
+        TInputOutputFlagger(TModMetadata metadata): TBasicModImpl(metadata) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            if (auto arg0 = std::get_if<TMacroValues::TOutput>(&args[0])) {
-                ctx.Sink.Outputs.UpdateCoord(arg0->Coord, [&](auto& var) {Do(var);});
-                return *arg0;
-            }
-            if (auto arg0 = std::get_if<TMacroValues::TOutputs>(&args[0])) {
-                std::for_each(arg0->Coords.begin(), arg0->Coords.end(), [&](const auto coord) {
-                    ctx.Sink.Outputs.UpdateCoord(coord, [&](auto& var) {Do(var);});
-                });
-                return *arg0;
-            }
-            throw TConfigurationError() << "Modifier [[bad]]" << ToString(Id) << "[[rst]] must be applied to a valid output";
+            std::visit(TOverloaded{
+                [&](TMacroValues::TInput input) {
+                    ctx.Sink.Inputs.UpdateCoord(input.Coord, [&](auto& var) {Do(var);});
+                },
+                [&](const TMacroValues::TInputs& inputs) {
+                    std::for_each(inputs.Coords.begin(), inputs.Coords.end(), [&](const auto coord) {
+                        ctx.Sink.Inputs.UpdateCoord(coord, [&](auto& var) {Do(var);});
+                    });
+                },
+                [&](TMacroValues::TOutput output) {
+                    ctx.Sink.Outputs.UpdateCoord(output.Coord, [&](auto& var) {Do(var);});
+                },
+                [&](const TMacroValues::TOutputs& outputs) {
+                    std::for_each(outputs.Coords.begin(), outputs.Coords.end(), [&](const auto coord) {
+                        ctx.Sink.Outputs.UpdateCoord(coord, [&](auto& var) {Do(var);});
+                    });
+                },
+                [&](const auto& x) {
+                    throw TBadArgType(Name, x);
+                }
+            }, args.front());
+            return args.front();
         }
     protected:
-        virtual void Do(TCompiledCommand::TOutput& output) const = 0;
+        virtual void Do(TCompiledCommand::TInput&) const {
+            throw TBadArgType(Name, TMacroValues::TInput());
+        }
+        virtual void Do(TCompiledCommand::TOutput&) const {
+            throw TBadArgType(Name, TMacroValues::TOutput());
+        }
     };
 
-    class TNoAutoSrc: public TOutputFlagger {
+    class TNoAutoSrc: public TInputOutputFlagger {
     public:
-        TNoAutoSrc(): TOutputFlagger({.Id = EMacroFunction::NoAutoSrc, .Name = "noauto", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TNoAutoSrc(): TInputOutputFlagger({.Id = EMacroFunction::NoAutoSrc, .Name = "noauto", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -346,9 +402,9 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
-    class TNoRel: public TOutputFlagger {
+    class TNoRel: public TInputOutputFlagger {
     public:
-        TNoRel(): TOutputFlagger({.Id = EMacroFunction::NoRel, .Name = "norel", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TNoRel(): TInputOutputFlagger({.Id = EMacroFunction::NoRel, .Name = "norel", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -356,23 +412,46 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
-    class TToBinDir: public TOutputFlagger {
+    class TToBinDir: public TInputOutputFlagger {
     public:
-        TToBinDir(): TOutputFlagger({.Id = EMacroFunction::ResolveToBinDir, .Name = "tobindir", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TToBinDir(): TInputOutputFlagger({.Id = EMacroFunction::ResolveToBinDir, .Name = "tobindir", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
     protected:
+        void Do(TCompiledCommand::TInput& input) const override {
+            input.ResolveToBinDir = true;
+        }
         void Do(TCompiledCommand::TOutput& output) const override {
             output.ResolveToBinDir = true;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
-    class TAddToIncl: public TOutputFlagger {
+    class TAddToIncl: public TInputOutputFlagger {
     public:
-        TAddToIncl(): TOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TAddToIncl(): TInputOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
             output.AddToIncl = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TGlobal: public TInputOutputFlagger {
+    public:
+        TGlobal(): TInputOutputFlagger({.Id = EMacroFunction::Global, .Name = "global", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TOutput& output) const override {
+            output.IsGlobal = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TMain: public TInputOutputFlagger {
+    public:
+        TMain(): TInputOutputFlagger({.Id = EMacroFunction::Main, .Name = "main", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TOutput& output) const override {
+            output.Main = true;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

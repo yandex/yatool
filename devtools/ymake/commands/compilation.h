@@ -12,6 +12,7 @@ namespace NCommands {
             ELinkType Context = ELinkType::ELT_Default;
             bool IsGlob = false;
             bool IsLegacyGlob = false;
+            bool ResolveToBinDir = false;
             TInput(TStringBuf name) : Name(name) {}
             operator TStringBuf() const { return Name; }
         };
@@ -22,11 +23,14 @@ namespace NCommands {
             bool NoRel = false;
             bool ResolveToBinDir = false;
             bool AddToIncl = false;
+            bool IsGlobal = false;
+            bool Main = false;
             TOutput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };
         struct TOutputInclude {
             TStringBuf Name;
+            bool OutInclsFromInput = false;
             TOutputInclude(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };

@@ -550,6 +550,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
             in.Name = TFileConf::ConstructLink(input.Context, NPath::ConstructPath(in.Name)); // lifted from TCommandInfo::ApplyMods
         in.IsGlob = input.IsGlob;
         in.IsMacro = input.IsLegacyGlob;
+        in.ResolveToBinDir = input.ResolveToBinDir;
         GetInputInternal().Push(in);
     }
 
@@ -557,15 +558,20 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         auto ix = GetOutputInternal().Push(output.Name).first;
         GetOutputInternal().Update(ix, [output](auto& var) {
             var.IsTmp |= output.IsTmp;
+            var.IsGlobal |= output.IsGlobal;
             var.NoAutoSrc |= output.NoAutoSrc;
             var.NoRel |= output.NoRel;
             var.ResolveToBinDir |= output.ResolveToBinDir;
             var.AddToIncl |= output.AddToIncl;
+            var.Main |= output.Main;
         });
     }
 
     for (const auto& outputInclude : cmdOutputIncludes) {
-        GetOutputIncludeInternal().Push(outputInclude.Name);
+        auto ix = GetOutputIncludeInternal().Push(outputInclude.Name).first;
+        GetOutputIncludeInternal().Update(ix, [outputInclude](auto& var) {
+            var.OutInclsFromInput |= outputInclude.OutInclsFromInput;
+        });
     }
 
     CollectVarsDeep(commands, cmdElemId, Cmd, vars);
