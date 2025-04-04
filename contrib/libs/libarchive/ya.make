@@ -2,12 +2,13 @@
 
 LIBRARY()
 
-VERSION(3.7.7)
+VERSION(3.7.8)
 
-ORIGINAL_SOURCE(https://github.com/libarchive/libarchive/archive/v3.7.7.tar.gz)
+ORIGINAL_SOURCE(https://github.com/libarchive/libarchive/archive/v3.7.8.tar.gz)
 
 LICENSE(
     "(CC0-1.0 OR OpenSSL OR Apache-2.0)" AND
+    0BSD AND
     BSD-2-Clause AND
     BSD-3-Clause AND
     Bsd-Unchanged AND
