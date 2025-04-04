@@ -441,6 +441,14 @@ def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, res
         meta = {}
         for fname in os.listdir(meta_files_dir):
             meta.update(json.load(open(os.path.join(meta_files_dir, fname))))
+
+    elif resolve_type == 'unified':
+        meta = {}
+        for fname in os.listdir(meta_files_dir):
+            raw_meta = json.load(open(os.path.join(meta_files_dir, fname)))
+            keys = meta.keys() | raw_meta.keys()
+            meta = {key: meta.get(key, []) + raw_meta.get(key, []) for key in keys}
+
     else:
         meta = []
         # Collect artifacts dependencies meta information
@@ -1249,14 +1257,15 @@ def import_unified(
 
         logger.info('Resolving artifacts...')
         meta = resolve_transitively(list(map(str, request_artifacts)), local_repo, repos, opts, app_ctx, 'unified')
+        artifacts = meta["ya_models"]
         nodes = {}
         empty_ya_makes, empty_incs = set(), set()
 
-        meta = license.enrich_with_licenses(meta)
-        license_aliases = license.build_licenses_aliases(license_aliases_file, meta, canonize_licenses)
+        artifacts = license.enrich_with_licenses(artifacts)
+        license_aliases = license.build_licenses_aliases(license_aliases_file, artifacts, canonize_licenses)
 
         replace_version = opts.replace_version
-        for data in meta:
+        for data in artifacts:
             key = extract_artefact(data['artifact'], replace_version)
 
             my_licenses = []
@@ -1325,6 +1334,10 @@ def import_unified(
             )
         if bombs:
             populate_bombs_unified(arcadia, bombs, opts.dry_run, forced_deps)
+
+        if "not_imported" in meta:
+            contribs = '\n'.join(contrib for contrib in meta["not_imported"])
+            logger.info('Managed dependency(ies) not added:\n%s', contribs)
 
 
 def extract_artefact(raw_artefact, replace_versions: dict):
