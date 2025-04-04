@@ -40,19 +40,19 @@ TOpts TOpts::Parse(int argc, char** argv) {
     opts.AddLongOption("py2", "Use python2 contrib version [deprecated]").NoArgument().StoreValue(&r.PyVer, "py2");
     opts.AddLongOption("py3", "Use python3 contrib version [default behavior] [deprecated]").NoArgument().StoreValue(&r.PyVer, "py3");
 
-    opts.AddLongOption(0, "dump-mode", "List divided by '|' of: sems (semantics tree to stdout), attrs (attributes tree to stdout)").Handler1T<std::string>([&](const std::string& arg) {
+    opts.AddLongOption(0, "dump-mode", "List divided by '" + DELIMETER + "' of: sems (semantics tree to stdout), attrs (attributes tree to stdout)").Handler1T<std::string>([&](const std::string& arg) {
         auto error = ParseDumpMode(arg, r.DumpOpts);
         if (!error.empty()) {
             spdlog::error(error);
         }
     });
-    opts.AddLongOption(0, "dump-path-prefixes", "Dump only this list of relative path prefixes divided by '|'").Handler1T<std::string>([&](const std::string& arg) {
+    opts.AddLongOption(0, "dump-path-prefixes", "Dump only this list of relative path prefixes divided by '" + DELIMETER + "'").Handler1T<std::string>([&](const std::string& arg) {
         auto error = ParseDumpPathPrefixes(arg, r.DumpOpts);
         if (!error.empty()) {
             spdlog::error(error);
         }
     });
-    opts.AddLongOption(0, "debug-mode", "List divided by '|' of: sems (semantics tree to \"dump_sems\" attribute of each templates), attrs (attributes tree to \"dump_attrs\" attribute of each templates)").Handler1T<std::string>([&](const std::string& arg) {
+    opts.AddLongOption(0, "debug-mode", "List divided by '" + DELIMETER + "' of: sems (semantics tree to \"dump_sems\" attribute of each templates), attrs (attributes tree to \"dump_attrs\" attribute of each templates)").Handler1T<std::string>([&](const std::string& arg) {
         auto error = ParseDebugMode(arg, r.DebugOpts);
         if (!error.empty()) {
             spdlog::error(error);

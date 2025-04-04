@@ -7,7 +7,7 @@
 
 namespace NYexport {
 
-    inline static const std::string DELIMETER = "|";
+    inline static const std::string DELIMETER = ",";
     inline static const std::string SEMS = "sems";
     inline static const std::string ATTRS = "attrs";
 
