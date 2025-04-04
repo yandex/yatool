@@ -55,6 +55,7 @@ PEERDIR(
     contrib/python/portalocker
     contrib/python/simplejson
     contrib/python/six
+    contrib/python/psutil
     devtools/ya/yalibrary/sjson
     library/python/archive
     library/python/cityhash

@@ -111,3 +111,28 @@ def wait_for_proc(proc, timeout=None):
     if alive:
         raise TimeoutExpired(res[0], res[1])
     return res[0], res[1]
+
+
+def find_opened_file_across_all_procs(filepath):
+    import psutil
+
+    for proc in psutil.process_iter():
+        try:
+            for f in proc.open_files():
+                if f.path == filepath:
+                    yield f, proc
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+
+def is_process_in_subtree(child_pid, parent_pid):
+    import psutil
+
+    parent = psutil.Process(parent_pid)
+
+    for child in parent.children(recursive=True):
+
+        if child.pid == child_pid:
+            return True
+
+    return False

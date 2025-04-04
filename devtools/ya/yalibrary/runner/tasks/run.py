@@ -7,6 +7,7 @@ import threading
 import time
 import typing as tp
 
+import exts.process
 import exts.shlex2
 import exts.windows
 import six
@@ -119,6 +120,30 @@ def _fix_output(out, rmap, mask_roots=False):
     )
 
 
+def log_for_text_file_busy(bin_path: str):
+    my_pid = os.getpid()
+    my_pgid = os.getpgid(my_pid)
+    logger.debug('my_pid=%s, my_pgid=%s', my_pid, my_pgid)
+    found_proc = None
+
+    for f, proc in exts.process.find_opened_file_across_all_procs(bin_path):
+        logger.debug(
+            'Text file busy details: %s (with mode %s) is busy by %s with pid %s', f.path, f.mode, proc.name(), proc.pid
+        )
+
+        if proc.pid != my_pid:
+            found_proc = proc
+            break
+
+    # see https://a.yandex-team.ru/arcadia/devtools/ya/cpp/lib/pgroup.cpp?rev=r16256072#L20
+    # In local scenario this check will probably resolve to true due to the fact that both processes are in the same group (probably terminal)
+    is_tty = any([os.isatty(fd) for fd in (0, 1, 2)])
+    if not is_tty and found_proc:
+        logger.debug(
+            'found process in same process group: %s', exts.process.is_process_in_subtree(found_proc.pid, my_pgid)
+        )
+
+
 class TextFileBusyError(Exception):
     mute = True
 
@@ -159,8 +184,14 @@ class PopenExecutor(ExecutorBase):
                 retries -= 1
                 if e.errno != errno.ETXTBSY or not retries:
                     raise
-                logger.warning("Text file busy, retrying...")
-                time.sleep(self.text_file_busy_retry_delay)
+
+                if retries == 0:
+                    log_for_text_file_busy(kwargs['args'][0])
+                    break
+                else:
+                    logger.warning("Text file busy, retrying...")
+                    time.sleep(self.text_file_busy_retry_delay)
+
         raise TextFileBusyError(stderr)
 
     def _run_process(self, args, stdout, env, cwd, nice, **kwargs):
@@ -248,11 +279,16 @@ class LocalExecutor(ExecutorBase):
 
             if exit_code != 0 and stderr.startswith("Process was not created: Text file busy"):
                 retries -= 1
-                logger.warning("Text file busy, retrying...")
-                time.sleep(0.1)
-                continue
-            return stderr, exit_code
 
+                if retries == 0:
+                    log_for_text_file_busy(kwargs['args'][0])
+                    break
+                else:
+                    logger.warning("Text file busy, retrying...")
+                    time.sleep(0.1)
+                    continue
+
+            return stderr, exit_code
         raise TextFileBusyError(stderr)
 
     def _run_process(self, args, stdout, env, cwd, executor_address, requirements, nice, **kwargs):
