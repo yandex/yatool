@@ -161,7 +161,7 @@ public:
             StoreInducedAttrValues(state.TopNode().Id(), semName, semArgs, data.Path);
             break;
         case ESNT_Unknown:
-            spdlog::error("Skip unknown semantic '{}' for file '{}'", semName, data.Path);
+            spdlog::warn("Skip unknown semantic '{}' for file '{}'", semName + (semArgs.empty() ? "" : " " + NYexport::join(semArgs)), data.Path);
             break;
         case ESNT_Ignored:
         case ESNT_Target:
