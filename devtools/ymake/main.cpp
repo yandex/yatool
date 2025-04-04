@@ -56,13 +56,12 @@
 #include <util/system/types.h>
 #include <util/system/yassert.h>
 
+#include <asio/awaitable.hpp>
 #include <asio/co_spawn.hpp>
-#include <asio/detached.hpp>
 #include <asio/strand.hpp>
 #include <asio/thread_pool.hpp>
 #include <asio/use_awaitable.hpp>
-#include <asio/use_future.hpp>
-#include <asio/io_context.hpp>
+#include <asio/detached.hpp>
 
 #include <fmt/format.h>
 
@@ -602,6 +601,8 @@ void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
 };
 
 asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBuildConfiguration& conf, TConfigurationExecutor exec) {
+    TBuildGraphScope scope(*yMake.Get());
+
     if (conf.ReadStartTargetsFromEvlog) {
         co_await ProcessEvlogAsync(yMake, conf, *conf.InputStream, exec);
 
@@ -658,25 +659,26 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
     co_return TMaybe<EBuildResult>();
 }
 
-int main_real(TBuildConfiguration& conf) {
+TMaybe<EBuildResult> EarlyDumpStage(TBuildConfiguration& conf) {
     if (conf.DumpLicensesInfo || conf.DumpLicensesMachineInfo) {
-        return DumpLicenseInfo(conf);
+        return TMaybe<EBuildResult>(DumpLicenseInfo(conf));
     }
     if (conf.DumpForcedDependencyManagements || conf.DumpForcedDependencyManagementsAsJson) {
         DumpFDM(conf.CommandConf, conf.DumpForcedDependencyManagementsAsJson);
-        return BR_OK;
+        return TMaybe<EBuildResult>(BR_OK);
     }
 
     if (conf.PrintTargetAbsPath) {
-        return PrintAbsTargetPath(conf);
+        return TMaybe<EBuildResult>(PrintAbsTargetPath(conf));
     }
+    return TMaybe<EBuildResult>();
+}
 
+TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& conf) {
     if (!conf.CachePath.Exists() && conf.ShouldUseOnlyYmakeCache()) {
         YErr() << "Can not load ymake.cache. File does not exist: " << conf.YmakeCache << Endl;
         return BR_FATAL_ERROR;
     }
-
-    THolder<TYMake> yMake(new TYMake(conf));
 
     if (conf.ShouldLoadGraph()) {
         if (!yMake->Load(conf.CachePath)) {
@@ -697,29 +699,10 @@ int main_real(TBuildConfiguration& conf) {
         NStats::StackDepthStats.Report();
     };
 
-    {
-        asio::thread_pool configure_workers{2};
-        auto serial_exec = asio::make_strand(configure_workers.executor());
-        TBuildGraphScope scope(*yMake.Get());
-        TMaybe<EBuildResult> buildResult;
+    return TMaybe<EBuildResult>();
+}
 
-        asio::co_spawn(configure_workers, [&]() -> asio::awaitable<void> {
-            try {
-                buildResult = co_await ConfigureStage(yMake, conf, serial_exec);
-            } catch (const yexception& error) {
-                YErr() << "Exception in configure stage: " << error.what() << Endl;
-                buildResult = BR_FATAL_ERROR;
-            }
-            co_return;
-        }, asio::detached);
-
-        configure_workers.wait();
-
-        if (buildResult.Defined()) {
-            return buildResult.GetRef();
-        }
-    }
-
+bool PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->ReportModulesStats();
 
     if (!yMake->CanBypassConfigure()) {
@@ -728,13 +711,6 @@ int main_real(TBuildConfiguration& conf) {
     }
 
     yMake->ReportForeignPlatformEvents();
-
-    if (!yMake->CanBypassConfigure() || conf.IsBlacklistHashChanged()) {
-        yMake->CheckBlacklist();
-    }
-    if (!yMake->CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged()) {
-        yMake->CheckIsolatedProjects();
-    }
 
     if (!yMake->CanBypassConfigure()) {
         yMake->Compact();
@@ -747,11 +723,21 @@ int main_real(TBuildConfiguration& conf) {
             conf.DoNotWriteAllCaches();
         }
     }
+    return hasBadLoops;
+}
+
+asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, THolder<TYMake>& yMake, bool hasBadLoops) {
+    if (!yMake->CanBypassConfigure() || conf.IsBlacklistHashChanged()) {
+        yMake->CheckBlacklist();
+    }
+    if (!yMake->CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged()) {
+        yMake->CheckIsolatedProjects();
+    }
 
     // Load Dependency Management and DependsToModulesClosure from cache if possible,
     // otherwise compute them and save to cache.
     if (auto result = yMake->ApplyDependencyManagement()) {
-        return result.GetRef();
+        co_return result.GetRef();
     }
 
     MakeUnique(yMake->StartTargets);
@@ -763,29 +749,32 @@ int main_real(TBuildConfiguration& conf) {
     if (!hasBadLoops && Diag()->ChkPeers && !yMake->CanBypassConfigure()) {
         yMake->FindMissingPeerdirs();
     }
+    co_return TMaybe<EBuildResult>();
+}
 
-    PerformDumps(conf, *yMake);
-
+asio::awaitable<void> ReportConfigureErrors(THolder<TYMake>& yMake) {
     // after reporting configuration errors from the cache, all other errors must be reported immediately,
     // so we disable the delay here
     ConfMsgManager()->DisableDelay();
     yMake->ReportConfigureEvents();
+    co_return;
+}
 
+asio::awaitable<void> SaveCaches(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     if (conf.WriteFsCache || conf.WriteDepsCache) {
         yMake->UpdateUnreachableExternalFileChanges();
         yMake->Save(conf.YmakeCache, true);
     }
+    co_return;
+}
 
-    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        return BR_CONFIGURE_FAILED;
-    }
-
+asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     if (conf.RenderSemantics) {
         const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_SOURCE_ROOT);
         const auto* buildRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_BUILD_ROOT);
         if (!sourceRootVar || !buildRootVar) {
             YConfErr(UndefVar) << "Configure variables EXPORTED_BUILD_SYSTEM_SOURCE_ROOT and EXPORTED_BUILD_SYSTEM_BUILD_ROOT are required for rendering --sem-graph" << Endl;
-            return BR_CONFIGURE_FAILED;
+            co_return BR_CONFIGURE_FAILED;
         }
         const auto oldSourceRoot = std::exchange(yMake->Conf.SourceRoot, GetCmdValue(Get1(sourceRootVar)));
         const auto oldBuildRoot = std::exchange(yMake->Conf.BuildRoot, GetCmdValue(Get1(buildRootVar)));
@@ -797,18 +786,22 @@ int main_real(TBuildConfiguration& conf) {
                 "EXPORTED_BUILD_SYSTEM_BUILD_ROOT='{}'",
                 GetCmdValue(Get1(sourceRootVar)),
                 GetCmdValue(Get1(buildRootVar))) << Endl;
-                return BR_CONFIGURE_FAILED;
+                co_return BR_CONFIGURE_FAILED;
         }
         RenderSemGraph(*yMake->Conf.OutputStream.Get(), yMake->GetRestoreContext(), yMake->Commands, yMake->GetTraverseStartsContext());
         yMake->Conf.SourceRoot = oldSourceRoot;
         yMake->Conf.BuildRoot = oldBuildRoot;
-        return BR_OK;
+        co_return BR_OK;
     }
 
     if (!conf.WriteJSON.empty()) {
         ExportJSON(*yMake);
     }
 
+    co_return TMaybe<EBuildResult>();
+}
+
+void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->ReportMakeCommandStats();
 
     yMake->Conf.SourceRoot = "$(SOURCE_ROOT)";
@@ -836,12 +829,57 @@ int main_real(TBuildConfiguration& conf) {
     yMake->Modules.ResetTransitiveInfo();
 
     yMake->DumpMetaData();
+}
+
+asio::awaitable<int> main_real(TBuildConfiguration& conf, asio::thread_pool::executor_type exec) {
+    THolder<TYMake> yMake(new TYMake(conf));
+    auto serial_exec = asio::make_strand(exec);
+
+    TMaybe<EBuildResult> result = EarlyDumpStage(conf);
+    if (result.Defined()) {
+        co_return result.GetRef();
+    }
+
+    result = PrepareStage(yMake, conf);
+    if (result.Defined()) {
+        co_return result.GetRef();
+    }
+
+    result = co_await asio::co_spawn(exec, ConfigureStage(yMake, conf, serial_exec), asio::use_awaitable);
+    if (result.Defined()) {
+        co_return result.GetRef();
+    }
+
+    bool hasBadLoops = PostConfigureStage(conf, yMake);
+
+    result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
+    if (result.Defined()) {
+        co_return result.GetRef();
+    }
+
+    co_await asio::co_spawn(exec, [&conf, &yMake]() -> asio::awaitable<void> {
+        PerformDumps(conf, *yMake);
+        co_return;
+    }, asio::use_awaitable);
+
+    co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
+    co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
 
     if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        return BR_CONFIGURE_FAILED;
+        co_return BR_CONFIGURE_FAILED;
+    }
+
+    result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake), asio::use_awaitable);
+    if (result.Defined()) {
+        co_return result.GetRef();
+    }
+
+    DumpDarts(conf, yMake);
+    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
+        co_return BR_CONFIGURE_FAILED;
     }
 
     yMake->CommitCaches();
 
-    return BR_OK;
+    co_return BR_OK;
 }

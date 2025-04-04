@@ -6,7 +6,6 @@
 #include <asio/strand.hpp>
 #include <asio/thread_pool.hpp>
 #include <asio/use_awaitable.hpp>
-#include <asio/io_context.hpp>
 
 namespace {
     static asio::awaitable<TMaybe<EBuildResult>> ConfigureGraph(THolder<TYMake>& yMake, TConfigurationExecutor exec) {

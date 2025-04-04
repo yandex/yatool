@@ -4,6 +4,7 @@
 #include "conf.h"
 #include "main.h"
 #include "trace_start.h"
+#include "ymake.h"
 
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/stats.h>
@@ -20,6 +21,11 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <asio/use_awaitable.hpp>
+#include <asio/thread_pool.hpp>
+#include <asio/detached.hpp>
+#include <asio/co_spawn.hpp>
 
 #if defined(__linux__)
 #include <sys/mman.h>
@@ -51,6 +57,50 @@ static TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** ar
 
 using namespace NLastGetopt;
 
+TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf) {
+    try {
+        TOpts opts;
+        opts.ArgPermutation_ = REQUIRE_ORDER;
+        opts.AddHelpOption('?');
+
+        conf.AddOptions(opts);
+
+        const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
+
+        // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
+        conf.PostProcess(res.GetFreeArgs());
+    } catch (const yexception& error) {
+        YErr() << "Conf initialization failed with error: " << error.what() << Endl;
+        return BR_FATAL_ERROR;
+    }
+    return TMaybe<EBuildResult>();
+}
+
+asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, asio::thread_pool::executor_type exec) {
+    TBuildConfiguration conf;
+    auto result = InitConf(value, conf);
+    if (result.Defined()) {
+        ret_code = result.GetRef();
+        co_return;
+    }
+
+    try {
+        LockAllMemory(LockCurrentMemory);
+    } catch (const yexception&) {
+        YDebug() << "mlockall failed" << Endl;
+    }
+
+    try {
+        FORCE_TRACE(U, NEvent::TStageStarted("ymake main"));
+        ret_code = co_await main_real(conf, exec);
+        FORCE_TRACE(U, NEvent::TStageFinished("ymake main"));
+    } catch (const yexception& error) {
+        YErr() << "Configure stage failed with error: " << error.what() << Endl;
+        ret_code = BR_FATAL_ERROR;
+    }
+    co_return;
+}
+
 int YMakeMain(int argc, char** argv) {
     TraceYmakeStart(argc, argv);
 
@@ -63,37 +113,19 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_MSC_VER
 
     SetAsyncSignalHandler(SIGINT, SigInt);
+    asio::thread_pool configure_workers(2);
+
+    auto configs = SplitMulticonfigCmdline(argc, argv);
+    TVector<int> states(configs.size());
+    for (size_t i = 0; i < configs.size(); ++i) {
+        asio::co_spawn(configure_workers, RunConfigure(configs[i], states[i], configure_workers.executor()), asio::detached);
+    }
+
+    configure_workers.wait();
 
     int ret_code = BR_OK;
-
-    for (const auto& value : SplitMulticonfigCmdline(argc, argv)) {
-        TBuildConfiguration conf;
-
-        try {
-            TOpts opts;
-            opts.ArgPermutation_ = REQUIRE_ORDER;
-            opts.AddHelpOption('?');
-
-            conf.AddOptions(opts);
-
-            const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
-
-            // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
-            conf.PostProcess(res.GetFreeArgs());
-        } catch (const yexception& error) {
-            YErr() << error.what() << Endl;
-            return BR_FATAL_ERROR;
-        }
-
-        try {
-            LockAllMemory(LockCurrentMemory);
-        } catch (const yexception&) {
-            YDebug() << "mlockall failed" << Endl;
-        }
-
-        FORCE_TRACE(U, NEvent::TStageStarted("ymake main"));
-        ret_code |= main_real(conf);
-        FORCE_TRACE(U, NEvent::TStageFinished("ymake main"));
+    for (const auto& state : states) {
+        ret_code |= state;
     }
 
     return ret_code;
