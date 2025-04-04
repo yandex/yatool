@@ -78,25 +78,29 @@ bool TModuleDef::IsGlobalInput(const TStringBuf& name) const {
 
 
 const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals) {
+    // Find macro to call
     auto pi = Conf.BlockData.find(name);
     if (!pi || !pi->second.CmdProps || !pi->second.CmdProps->HasMacroCalls()) {
         return nullptr;
     }
+    const auto& props = *pi->second.CmdProps;
 
-    const TVector<TStringBuf> argNames{pi->second.CmdProps->ArgNames().begin(), pi->second.CmdProps->ArgNames().end()};
-    TVector<TMacro> mcrargs;
+    // Patch incoming args to handle named macro arguments
     auto pArgs = args;
     TVector<TStringBuf> tempArgs;
-    if (HasNamedArgs(&pi->second)) {
+    if (props.IsNonPositional()) {
         tempArgs.insert(tempArgs.end(), args.begin(), args.end());
-        ConvertArgsToPositionalArrays(*pi->second.CmdProps, tempArgs, *MakeFileMap.Pool);
+        ConvertArgsToPositionalArrays(props, tempArgs, *MakeFileMap.Pool);
         pArgs = tempArgs;
     }
-    mcrargs.insert(mcrargs.end(), pArgs.begin(), pArgs.end());
-    if (argNames.size()) {
+
+    // Map arguments to local call vars using macro signature
+    if (props.ArgNames().size()) {
+        const TVector<TMacro> mcrargs{pArgs.begin(), pArgs.end()};
+        const TVector<TStringBuf> argNames{props.ArgNames().begin(), props.ArgNames().end()};
         MapMacroVars(mcrargs, argNames, locals, JoinStrings(args.begin(), args.end(), ", ")); //last arg is just for debug output
     }
-    return &pi->second.CmdProps->GetMacroCalls();
+    return &props.GetMacroCalls();
 }
 
 TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name) {
