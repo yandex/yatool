@@ -78,6 +78,10 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
         [&](const TTool& val) {
             return NPolexpr::TConstId(ST_TOOLS, Refs.Add(val.Data));
         },
+        [&](const TTools& val) {
+            // TODO a general array storage
+            return NPolexpr::TConstId(ST_TOOL_ARRAYS, Strings.Add(ArrayToString(val.Data)));
+        },
         [&](const TInput& val) {
             return NPolexpr::TConstId(ST_INPUTS, val.Coord);
         },
@@ -121,6 +125,8 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
             return StringToArray(Strings.GetName<TCmdView>(id.GetIdx()).GetStr());
         case ST_TOOLS:
             return TTool {.Data = Refs.GetName<TCmdView>(id.GetIdx()).GetStr()};
+        case ST_TOOL_ARRAYS:
+            return TTools {.Data = StringToArray(Strings.GetName<TCmdView>(id.GetIdx()).GetStr())};
         case ST_INPUTS: {
             auto idx = id.GetIdx();
             return TInput {.Coord = idx};

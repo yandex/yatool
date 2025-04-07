@@ -91,6 +91,10 @@ public:
         std::string_view Data;
         bool operator==(const TTool&) const = default;
     };
+    struct TTools {
+        std::vector<std::string_view> Data;
+        bool operator==(const TTools&) const = default;
+    };
     struct TInput {
         ui32 Coord;
         bool operator==(const TInput&) const = default;
@@ -120,7 +124,7 @@ public:
         bool,
         std::string_view,
         std::vector<std::string_view>,
-        TTool,
+        TTool, TTools,
         TInput, TInputs,
         TOutput, TOutputs,
         TGlobPattern,
@@ -138,6 +142,7 @@ public:
         ST_LEGACY_LATE_GLOB,
         ST_STRING_ARRAYS,
         ST_BOOL,
+        ST_TOOL_ARRAYS,
         ST_COUNT
     };
     static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));

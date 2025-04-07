@@ -11,6 +11,7 @@ namespace NCommands {
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::string_view                     >() {return "[pre]String";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::vector<std::string_view>        >() {return "[pre]Strings";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TTool                  >() {return "[pre]Tool";}
+    template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TTools                 >() {return "[pre]Tools";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TInput                 >() {return "[pre]Input";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TInputs                >() {return "[pre]Inputs";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TOutput                >() {return "[pre]Output";}

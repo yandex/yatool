@@ -24,20 +24,16 @@ namespace {
             return std::visit(TOverloaded{
                 [&](std::string_view name) -> TMacroValues::TValue {
                     auto names = SplitArgs(TString(name)); // TODO get rid of this
-                    if (names.empty())
-                        return std::monostate();
-                    else if (names.size() == 1)
+                    if (names.size() == 1)
                         return ProcessOne(ctx, names.front());
                     else
-                        throw std::runtime_error{"Tool arrays are not supported"};
+                        return ProcessMany(ctx, names);
                 },
                 [&](const std::vector<std::string_view>& names) -> TMacroValues::TValue {
-                    if (names.empty())
-                        return std::monostate();
-                    else if (names.size() == 1)
+                    if (names.size() == 1)
                         return ProcessOne(ctx, names.front());
                     else
-                        throw std::runtime_error{"Tool arrays are not supported"};
+                        return ProcessMany(ctx, names);
                 },
                 [](auto&&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
@@ -49,6 +45,12 @@ namespace {
             auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
             return TMacroValues::TTool {.Data = pooledName};
         };
+        TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& names) const {
+            auto result = TMacroValues::TTools();
+            for (auto& name : names)
+                result.Data.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name))));
+            return result;
+        }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
     //
