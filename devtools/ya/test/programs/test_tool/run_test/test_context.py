@@ -72,7 +72,6 @@ class Context(object):
 
         for opt_name in [
             'build_root',
-            'data_root',
             'project_path',
             'python_bin',
             'python_lib_path',

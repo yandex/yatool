@@ -531,10 +531,6 @@ class TaskContext(object):
         patterns = ptn.Patterns()
         patterns['SOURCE_ROOT'] = exts.windows.win_path_fix(self._ctx.src_dir)
         patterns['TOOL_ROOT'] = exts.windows.win_path_fix(self._ctx.res_dir)
-        patterns['TESTS_DATA_ROOT'] = exts.windows.win_path_fix(
-            self.opts.arcadia_tests_data_path
-            or os.path.normpath(os.path.join(self._ctx.src_dir, '..', 'arcadia_tests_data'))
-        )
         patterns['RESOURCE_ROOT'] = exts.windows.win_path_fix(self._transient_resource_dir)
 
         if self.opts.oauth_token_path:

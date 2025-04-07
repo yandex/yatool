@@ -315,7 +315,6 @@ def parse_args(args=None):
     parser.add_argument("--recipes", dest="recipes", help="base64-encoded recipes", action='store', default="")
     parser.add_argument("--source-root", dest="source_root", help="source route", action='store')
     parser.add_argument("--build-root", dest="build_root", help="build route", action='store')
-    parser.add_argument("--test-data-root", dest="data_root", help="test data route", action='store')
     parser.add_argument(
         "--sandbox-resources-root", dest="sandbox_resources_root", help="sandbox resources root", action='store'
     )
@@ -323,13 +322,6 @@ def parse_args(args=None):
         "--test-related-path",
         dest="test_related_paths",
         help="list of paths requested by wrapper (suite) or test - these paths will form PYTHONPATH",
-        action='append',
-        default=None,
-    )
-    parser.add_argument(
-        "--test-data-path",
-        dest="test_data_paths",
-        help="list of test data paths that test declared to be dependent on",
         action='append',
         default=None,
     )
@@ -1321,10 +1313,8 @@ def main():
     # create an isolated environment
     source_root = options.source_root
     build_root = options.build_root
-    data_root = options.data_root
 
-    test_data_paths = options.test_data_paths or []
-    for path in test_data_paths + test_related_paths:
+    for path in test_related_paths:
         root_rel_path = os.path.relpath(path, options.source_root)
         # it's ok to not have fuzz data at first run
         if not os.path.exists(path) and not root_rel_path.startswith(const.CORPUS_DATA_ROOT_DIR):
@@ -1387,12 +1377,10 @@ def main():
         mds_canon_storage = mds_storage.MdsStorage(resources_root, use_cached_only=True)
 
         if options.create_clean_environment:
-            new_source_root, _, new_data_root = testroot.create_environment(
+            new_source_root, _ = testroot.create_environment(
                 test_related_paths,
-                test_data_paths,
                 source_root,
                 build_root,
-                data_root,
                 cwd,
                 options.env_data_mode,
                 options.create_root_guidance_file,
@@ -1400,7 +1388,6 @@ def main():
             )
         else:
             new_source_root = source_root
-            new_data_root = data_root
 
         testroot.prepare_work_dir(
             build_root, work_dir, sandbox_resources, cached_storage, external_local_files, options.project_path
@@ -1519,7 +1506,6 @@ def main():
         context.update(
             'runtime',
             {
-                'atd_root': new_data_root,
                 'source_root': new_source_root,
             },
         )

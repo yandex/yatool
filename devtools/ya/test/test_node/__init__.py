@@ -1919,9 +1919,7 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
             raise devtools.ya.core.yarg.FlagNotSupportedException(
                 "--dist & -t & --checkout are not supported together, you can try --checkout --checkout-by-ya"
             )
-        custom_deps.extend(
-            inject_test_checkout_node(plan, suites, arc_root, testdeps.get_atd_root(test_opts), opts=test_opts)
-        )
+        custom_deps.extend(inject_test_checkout_node(plan, suites, arc_root, opts=test_opts))
         timer.show_step('inject test checkout nodes')
 
     if getattr(test_opts, "list_tests", False):
@@ -2289,7 +2287,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     return node
 
 
-def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
+def inject_test_checkout_node(graph, tests, arc_root, opts=None):
     checout_uids = []
     all_resources = {}
     for suite in tests:
@@ -2351,26 +2349,22 @@ def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
 
     arcadia_dirs = []
     arcadia_weak_dirs = []
-    arcadia_tests_data_dirs = []
     arcadia = "arcadia/"
-    arcadia_tests_data = "arcadia_tests_data/"
 
     for suite in tests:
-        for p in suite.get_atd_data() + suite.get_test_related_paths(arcadia, opts):
-            if p.startswith(arcadia_tests_data):
-                arcadia_tests_data_dirs.append(exts.strings.left_strip(p, arcadia_tests_data))
+        for p in suite.get_test_related_paths(arcadia, opts):
             # Fuzzy test node adds data dependency to the $arcadia/fuzzing/{ROOT_RELATIVE_PROJECT_PATH}
             # to obtain corpus.json file. However, it might no be presented in the repository
             # (there was no initial commit with fuzz data) and checkout node will fail.
             # That's why we try to checkout such weak deps and don't fail if they are not presented
-            elif p.startswith(devtools.ya.test.const.CORPUS_DATA_ROOT_DIR):
+            if p.startswith(devtools.ya.test.const.CORPUS_DATA_ROOT_DIR):
                 arcadia_weak_dirs.append(p)
             elif p.startswith(arcadia):
                 arcadia_dirs.append(exts.strings.left_strip(p, arcadia))
             else:
                 arcadia_dirs.append(p)
 
-    for x in [arcadia_dirs, arcadia_weak_dirs, arcadia_tests_data_dirs]:
+    for x in [arcadia_dirs, arcadia_weak_dirs]:
         x[:] = sorted(set(x))
 
     if arcadia_dirs:
@@ -2378,15 +2372,6 @@ def inject_test_checkout_node(graph, tests, arc_root, atd_root=None, opts=None):
 
     if arcadia_weak_dirs:
         inject_checkout_node(arcadia_weak_dirs, "checkout_weak_test_arcadia_paths.log", weak=True)
-
-    if arcadia_tests_data_dirs:
-        inject_checkout_node(
-            arcadia_tests_data_dirs,
-            "checkout_test_arcadia_tests_data_paths.log",
-            force_update=True,
-            destination=atd_root,
-            arc_rel_root_path="../arcadia_tests_data",
-        )
 
     return checout_uids
 

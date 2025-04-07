@@ -79,7 +79,6 @@ except ImportError:
 CACHE_GENERATION = '2'
 
 ARC_PREFIX = 'arcadia/'
-ATD_PREFIX = 'arcadia_tests_data/'
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("ya_make")
@@ -265,25 +264,14 @@ def _checkout(opts, display=None):
             dirs = normalize_by_dir(dirs, 'contrib/java')
 
         dirs = [x if not x.startswith(ARC_PREFIX) else x[len(ARC_PREFIX) :] for x in dirs]
-        add_arcadia_dirs, add_data_dirs = [], []
+        add_arcadia_dirs = []
         for x in dirs:
             if x not in missing_dirs:
-                if x.startswith(ATD_PREFIX):
-                    add_data_dirs.append(x)
-                else:
-                    add_arcadia_dirs.append(x)
+                add_arcadia_dirs.append(x)
         missing_dirs.update(add_arcadia_dirs)
-        missing_dirs.update(add_data_dirs)
         if add_arcadia_dirs:
             fetcher.fetch_dirs(add_arcadia_dirs, quiet=opts.checkout_quiet)
-        if add_data_dirs:
-            fetcher.fetch_dirs(
-                [x[len(ATD_PREFIX) :] for x in add_data_dirs],
-                quiet=opts.checkout_quiet,
-                destination=opts.arcadia_tests_data_path,
-                rel_root_path='../arcadia_tests_data',
-            )
-        if add_arcadia_dirs or add_data_dirs:
+        if add_arcadia_dirs:
             continue
         break
 
@@ -1340,10 +1328,6 @@ class YaMake:
     def _setup(self, opts):
         self.opts = opts
         self.arc_root = opts.arc_root
-        if not os.path.isabs(self.opts.arcadia_tests_data_path):
-            self.opts.arcadia_tests_data_path = os.path.join(
-                os.path.dirname(self.arc_root), self.opts.arcadia_tests_data_path
-            )
         self._setup_environment()
 
     def _post_clean_setup(self, opts):

@@ -74,7 +74,6 @@ def test_options(
     return [
         RunTestOptions(run_tests=run_tests, run_tests_size=run_tests_size, is_ya_test=is_ya_test),
         ListingOptions(),
-        ArcadiaTestsDataOptions(),
         CanonizationOptions(),
         ConsoleReportOptions(test_console_report),
         CoverageOptions(),
@@ -2050,27 +2049,6 @@ class InternalDebugOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.INTERNAL,
             ),
             devtools.ya.core.yarg.ConfigConsumer('store_original_tracefile'),
-        ]
-
-
-class ArcadiaTestsDataOptions(devtools.ya.core.yarg.Options):
-    def __init__(self):
-        self.arcadia_tests_data_path = 'arcadia_tests_data'
-
-    def consumer(self):
-        return [
-            TestArgConsumer(
-                ['--arcadia-tests-data'],
-                help='Custom path to arcadia_tests_data',
-                hook=devtools.ya.core.yarg.SetValueHook('arcadia_tests_data_path'),
-                subgroup=RUNTIME_ENVIRON_SUBGROUP,
-                visible=help_level.HelpLevel.EXPERT,
-            ),
-            devtools.ya.core.yarg.EnvConsumer(
-                'YA_ARCADIA_TESTS_DATA',
-                help='Custom path to arcadia_tests_data',
-                hook=devtools.ya.core.yarg.SetValueHook('arcadia_tests_data_path'),
-            ),
         ]
 
 

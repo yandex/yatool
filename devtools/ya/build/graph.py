@@ -1881,7 +1881,6 @@ class _GraphMaker:
                 not node_checks.is_tools_tc(tc)
                 and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends)
             ),
-            arcadia_tests_data_path=self._opts.arcadia_tests_data_path,
             checkout_data_by_ya=getattr(self._opts, "checkout_data_by_ya", False),
             strict_inputs=self._need_strict_inputs(flags),
             dump_inputs_map=self._is_inputs_map_required(),

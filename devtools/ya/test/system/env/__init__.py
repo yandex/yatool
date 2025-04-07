@@ -137,9 +137,6 @@ def update_test_initial_env_vars(env, suite, opts):
         }
     )
 
-    if suite.get_atd_data():
-        env["ARCADIA_TESTS_DATA_DIR"] = "$(TESTS_DATA_ROOT)"
-
     for san_opts in "LSAN_OPTIONS", "ASAN_OPTIONS", "UBSAN_OPTIONS", "MSAN_OPTIONS":
         env.extend_mandatory(san_opts, "exitcode={}".format(const.SANITIZER_ERROR_RC))
     env.extend_mandatory("UBSAN_OPTIONS", "print_stacktrace=1,halt_on_error=1")

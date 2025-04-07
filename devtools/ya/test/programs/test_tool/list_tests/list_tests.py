@@ -66,7 +66,6 @@ def get_options():
         "--multi-target-platform-run", dest="multi_target_platform_run", action='store_true', default=False
     )
     parser.add_option("--is-skipped", dest="is_skipped", action='store_true', default=False)
-    parser.add_option("--test-data-root", dest="data_root", help="test data route", action='store')
     parser.add_option("--test-name", dest="computed_test_name", default=[], action='append')
     parser.add_option(
         "--sandbox-resources-root", dest="sandbox_resources_root", help="sandbox resources root", action='store'
@@ -75,13 +74,6 @@ def get_options():
         "--test-related-path",
         dest="test_related_paths",
         help="list of paths requested by wrapper (suite) or test - these paths will form PYTHONPATH",
-        action='append',
-        default=[],
-    )
-    parser.add_option(
-        "--test-data-path",
-        dest="test_data_paths",
-        help="list of test data paths that test declared to be dependent on",
         action='append',
         default=[],
     )
@@ -138,16 +130,6 @@ def main():
     # create an isolated environment
     source_root = options.source_root
     build_root = options.build_root
-    data_root = options.data_root
-
-    test_data_paths = options.test_data_paths or []
-    for path in test_data_paths:
-        if not os.path.exists(path):
-            logger.error(
-                "{}: specified DATA '{}' doesn't exist".format(
-                    os.path.join(options.project_path, "CMakeLists.txt"), path
-                )
-            )
     sandbox_resources = options.sandbox_resources
 
     resources_root = build_root
@@ -166,12 +148,10 @@ def main():
     exts.fs.create_dirs(out_dir)
 
     if options.create_clean_environment:
-        new_source_root, new_build_root, new_data_root = testroot.create_environment(
+        new_source_root, new_build_root = testroot.create_environment(
             options.test_related_paths,
-            test_data_paths,
             source_root,
             build_root,
-            data_root,
             cwd,
             testroot.EnvDataMode.Symlinks,  # wait no copy data to environment during listing
         )

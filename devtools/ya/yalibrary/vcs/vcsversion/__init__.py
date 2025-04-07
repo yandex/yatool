@@ -274,7 +274,7 @@ class _SystemInfo:
 
 
 class _CommonUtils:
-    ARC_DIRECTORIES = ['arcadia', 'arcadia_tests_data', 'data', 'quality-eval']
+    ARC_DIRECTORIES = ['arcadia', 'data', 'quality-eval']
 
     @classmethod
     def _get_arcadia_branch_or_tag(cls, url, keywords):
@@ -285,9 +285,6 @@ class _CommonUtils:
             return '/'.join(parts[branch_ind[0] + 1 : root_ind[0]])
         else:
             return 'trunk'
-
-        logger.debug('External repository {}'.format(url))
-        return ''
 
     @classmethod
     def _get_arcadia_branch(cls, url):

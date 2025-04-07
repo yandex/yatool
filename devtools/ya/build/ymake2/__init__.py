@@ -116,7 +116,6 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('build_depends', default_value=False),
         yarg.Param('dump_make_files', default_value=None),
         yarg.Param('dump_tests', default_value=None),
-        yarg.Param('arcadia_tests_data_path', default_value=None),
         yarg.Param('checkout_data_by_ya', default_value=False),
         yarg.Param('dump_java', default_value=None),
         yarg.Param('disable_customization', default_value=False),
@@ -322,14 +321,11 @@ def _cons_ymake_args(**kwargs):
         ret += ['--xx']  # XXX
 
     dump_test_dart = kwargs.pop('dump_tests', None)
-    arcadia_tests_data_path = kwargs.pop('arcadia_tests_data_path', None)
     check_data_paths = kwargs.pop('checkout_data_by_ya', False)
     if dump_test_dart:
         ret += ['--test-dart', dump_test_dart]
         if check_data_paths:
             ret += ['--check-data-paths']
-
-        ret += ['--tests-data-root', os.path.normpath(arcadia_tests_data_path)]
 
     dump_java_dart = kwargs.pop('dump_java', None)
     if dump_java_dart:

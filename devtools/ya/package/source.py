@@ -22,7 +22,7 @@ import library.python.compress
 
 ATTRIBUTES = ['owner', 'group', 'mode']
 
-TEST_DATA_DIRECTORIES = ['arcadia_tests_data', 'data']
+TEST_DATA_DIRECTORIES = ['data']
 
 GLOB_PREFIX = "glob:"
 
@@ -87,7 +87,6 @@ class Source(object):
     def __init__(
         self,
         arcadia_root,
-        tests_data_root,
         data_root,
         builds,
         data,
@@ -99,7 +98,6 @@ class Source(object):
         opts,
     ):
         self.arcadia_root = arcadia_root
-        self.tests_data_root = tests_data_root
         self.data_root = data_root
         self.builds = builds
         self.data = data
@@ -522,11 +520,8 @@ class TestDataSource(Source):
     def _prepare(self):
         test_data_directory = exts.path2.path_explode(self.source_path())[0]
 
-        if test_data_directory in TEST_DATA_DIRECTORIES:
-            if test_data_directory == "arcadia_tests_data":
-                root = self.tests_data_root
-            elif test_data_directory == "data":
-                root = self.data_root
+        if test_data_directory == "data":
+            root = self.data_root
             test_data_path = os.path.join(root, self.source_path(skip_prefix=True))
             if not os.path.exists(test_data_path):
                 raise YaPackageSourceException('Test data path not found {}'.format(test_data_path))
@@ -535,9 +530,7 @@ class TestDataSource(Source):
             self.copy(test_data_path, destination)
         else:
             raise YaPackageSourceException(
-                'Test data source supports only {} directories, not {}'.format(
-                    ', '.join([directory for directory in TEST_DATA_DIRECTORIES]), test_data_directory
-                )
+                'Test data source supports only data directory, not {}'.format(test_data_directory)
             )
 
 

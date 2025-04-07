@@ -26,9 +26,6 @@ class Patterns(object):
     def build_root(self):
         return self['BUILD_ROOT']  # XXX
 
-    def atd_root(self):
-        return self['TESTS_DATA_ROOT']  # XXX
-
     def tool_root(self):
         return self['TOOL_ROOT']  # XXX
 

@@ -93,7 +93,6 @@ def create_strict_inputs_root(base_patterns, patterns, inputs):
 def _fix_output(out, rmap, mask_roots=False):
     source_root = rmap.source_root()
     build_root = rmap.build_root()
-    atd_root = rmap.atd_root()
     tool_root = rmap.tool_root()
     resource_root = rmap.resource_root()
 
@@ -109,7 +108,6 @@ def _fix_output(out, rmap, mask_roots=False):
             line = line.replace(source_root, '$(SOURCE_ROOT)')
             line = line.replace(resource_root, '$(RESOURCE_ROOT)')
             line = line.replace(build_root, '$(BUILD_ROOT)')
-            line = line.replace(atd_root, '$(TESTS_DATA_ROOT)')
             line = line.replace(tool_root, '$(TOOL_ROOT)')
 
         return line

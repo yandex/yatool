@@ -19,22 +19,6 @@ class NoATDInfoException(Exception):
     pass
 
 
-def get_arcadia_tests_data_repo(config):
-    if 'repos' not in config:
-        return None
-
-    global ARCADIA_TESTS_DATA_REPOS
-    key = id(config)
-    if key not in ARCADIA_TESTS_DATA_REPOS:
-        data = [repo for repo in config['repos'] if repo["pattern"] == "$(TESTS_DATA_ROOT)"]
-        if data:
-            ARCADIA_TESTS_DATA_REPOS[key] = data[0]
-        else:
-            ARCADIA_TESTS_DATA_REPOS[key] = None
-            logger.warning("Cannot get info about path and revision in %s", config)
-    return ARCADIA_TESTS_DATA_REPOS[key]
-
-
 class TestUidGenerator(object):
     """
     Gets uid for test
@@ -45,39 +29,6 @@ class TestUidGenerator(object):
 
     Path_To_Rev = None
     ATD_Base_Rev = None
-
-    @classmethod
-    def _get_atd_revisions(cls, arc_root, base_rev_only=False):
-        if cls.ATD_Base_Rev is not None and cls.Path_To_Rev is not None:
-            return cls.ATD_Base_Rev, cls.Path_To_Rev
-
-        if not base_rev_only:
-            cls.Path_To_Rev = {}
-
-        try:
-            rev_file = os.path.join(arc_root, "build", "yandex_specific", "atd", "revisions.txt")
-            with open(rev_file, "r") as f:
-                logger.debug("Using %s as arcadia_tests_data imprints source", rev_file)
-                for line in f.readlines():
-                    if not line.startswith("#"):
-                        if not cls.ATD_Base_Rev:
-                            raise Exception("No revision in header")
-                        if base_rev_only:
-                            break
-
-                        key, rev = line.strip().split(" ")[:2]
-                        cls.Path_To_Rev[key] = rev
-                    elif line.startswith(ATD_BASE_REV_PREFIX):
-                        cls.ATD_Base_Rev = line[len(ATD_BASE_REV_PREFIX) :].strip(" \n")
-                        logger.debug("Will use r{} for arcadia_tests_data".format(cls.ATD_Base_Rev))
-            if not base_rev_only and not cls.Path_To_Rev:
-                raise NoATDInfoException("PathToRev is empty")
-        except Exception:
-            logger.warning("Cannot use saved info for arcadia_tests_data")
-
-        if not base_rev_only:
-            logger.debug("Loaded {} atd revisions".format(len(cls.Path_To_Rev)))
-        return cls.ATD_Base_Rev, cls.Path_To_Rev
 
     @classmethod
     def get(cls, test, graph, arc_root, opts):
@@ -130,20 +81,6 @@ class TestUidGenerator(object):
             "sandbox-resource-ext-{}-ro".format(resource)
             for resource in testdeps.get_test_ext_sbr_resources(test, arc_root)
         ]
-
-        tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
-        if tests_paths:
-            from devtools.ya.core.imprint.atd import ArcadiaTestData
-
-            _, path_to_rev = cls._get_atd_revisions(arc_root)
-            if path_to_rev:
-                tests_paths = testdeps.get_test_data_paths(test, data_root="", abs_path=False)
-                for path in tests_paths:
-                    imprint_parts.append(ArcadiaTestData.generate_saved_imprint(path, path_to_rev))
-            else:
-                logger.warning(
-                    "Saved info for arcadia_tests_data is unavailable. Make sure file `build/yandex_specific/atd/revisions.txt` exists"
-                )
 
         if test.recipes:
             imprint_parts.append(test.recipes)

@@ -32,12 +32,6 @@ def get_environment_relative_options(suite, opts):
     for path in testdeps.get_test_related_paths(suite, "$(SOURCE_ROOT)", opts):
         options += ["--test-related-path", path]
 
-    atd_paths = testdeps.get_test_data_paths(suite, testdeps.get_atd_root(opts))
-    if atd_paths:
-        options += ["--test-data-root", testdeps.get_atd_root(opts)]
-        for path in atd_paths:
-            options += ["--test-data-path", path]
-
     if not suite.supports_clean_environment or devtools.ya.test.const.YaTestTags.Dirty in suite.tags:
         options += ["--no-clean-environment"]
 

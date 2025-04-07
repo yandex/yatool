@@ -29,7 +29,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.codec = None
         self.convert = None
         self.custom_data_root = None
-        self.custom_tests_data_root = None
         self.debian_distribution = 'unstable'
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
         self.debian_force_bad_version = False
@@ -90,13 +89,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 names=['--old'],
                 help='Use old ya package json format',
                 hook=devtools.ya.core.yarg.SetConstValueHook('convert', True),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--tests-data-root'],
-                help="Custom location for arcadia_tests_data dir, defaults to <source root>/../arcadia_tests_data",
-                hook=devtools.ya.core.yarg.SetValueHook('custom_tests_data_root'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),

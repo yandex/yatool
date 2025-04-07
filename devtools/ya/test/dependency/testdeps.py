@@ -5,32 +5,8 @@ import exts.func
 from .sandbox_resource import Reference
 from devtools.ya.test.util import path as util_path
 from yalibrary.large_files import ExternalFile
-from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
 logger = logging.getLogger(__name__)
-
-
-def get_test_data_paths(suite, data_root, abs_path=True):
-    result = suite.get_atd_data()
-
-    if abs_path:
-        result = [os.path.join(data_root, path) for path in result]
-
-    return result
-
-
-def get_test_data_svn_paths(test, branch_url):
-    """
-    Gets ready for use svn paths that test is dependent on
-    :param test: test instance
-    :param branch_url: branch to be combined with test data paths
-    :return: list of svn paths
-    """
-    arcadia_test_data_svn_paths = []
-    for data_paths in get_test_data_paths(test, branch_url, False):
-        arcadia_test_data_svn_paths.append("/".join([branch_url, "arcadia_tests_data", data_paths]))
-
-    return arcadia_test_data_svn_paths
 
 
 def get_test_related_paths(test, arc_root, opts):
@@ -167,20 +143,7 @@ def get_suite_requested_input(suite, opts):
     for path in get_test_related_paths(suite, "$(SOURCE_ROOT)", opts):
         inputs.add(path)
 
-    for path in get_test_data_paths(suite, '$(SOURCE_ROOT)', abs_path=False):
-        inputs.add(os.path.join("$(TESTS_DATA_ROOT)", path))
-
     return list(inputs)
-
-
-def get_atd_root(opts):
-    if (
-        getattr(opts, "arcadia_tests_data_path", None)
-        and getattr(opts, "repository_type", distbs_consts.DistbuildRepoType.TARED)
-        == distbs_consts.DistbuildRepoType.TARED
-    ):
-        return opts.arcadia_tests_data_path
-    return "$(TESTS_DATA_ROOT)"
 
 
 def unique(lst):

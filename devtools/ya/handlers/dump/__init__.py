@@ -377,12 +377,6 @@ class DumpYaHandler(CompositeHandler):
             import devtools.ya.handlers.dump.arcadia_specific as arcadia_specific
 
             self['groups'] = arcadia_specific.GroupsHandler()
-            self['atd-revisions'] = OptsHandler(
-                action=devtools.ya.app.execute(action=arcadia_specific.do_atd_revisions),
-                description='Dump revisions of trunk/arcadia_tests_data',
-                opts=self.common_opts
-                + [DumpAtdRevisionOptions(), CustomFetcherOptions(), SandboxAuthOptions(), ToolsOptions()],
-            )
 
 
 def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=None, **kwargs):
@@ -1111,7 +1105,6 @@ def get_tests(params):
         'debug_options': [],
         'flags': params.flags,
         'ymake_bin': params.ymake_bin,
-        'arcadia_tests_data_path': 'arcadia_tests_data',
     }
     (
         _,

@@ -72,10 +72,8 @@ class ResourceConflictException(Exception):
 
 def create_environment(
     test_source_paths,
-    test_data_paths,
     source_root,
     build_root,
-    data_root,
     destination,
     env_data_mode=EnvDataMode.Symlinks,
     create_root_guidance_file=False,
@@ -127,17 +125,14 @@ def create_environment(
 
     if exts.windows.on_win():
         env_arcadia_root = source_root
-        env_data_root = data_root or ""  # If set to None, won't work on windows and py3.
     else:
         env_arcadia_root = os.path.join(test_env_root, "arcadia")
-        env_data_root = os.path.join(test_env_root, "arcadia_tests_data")
         if env_data_mode == EnvDataMode.Symlinks:
             create_links(source_root, env_arcadia_root, test_source_paths)
         elif env_data_mode == EnvDataMode.Copy or env_data_mode == EnvDataMode.CopyReadOnly:
             copy_srcs(source_root, env_arcadia_root, test_source_paths, env_data_mode)
         else:
             raise EnvDataModeException('Unknown environment data mode "{}"'.format(env_data_mode))
-        create_links(data_root, env_data_root, test_data_paths)
 
     env_build_root = os.path.join(test_env_root, "build")
     try:
@@ -154,7 +149,7 @@ def create_environment(
         with open(os.path.join(env_build_root, ".pycache.path"), "w") as afile:
             afile.write(pycache_prefix)
 
-    return os.path.abspath(env_arcadia_root), os.path.abspath(env_build_root), os.path.abspath(env_data_root)
+    return os.path.abspath(env_arcadia_root), os.path.abspath(env_build_root)
 
 
 def prepare_work_dir(

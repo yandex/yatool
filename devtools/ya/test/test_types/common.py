@@ -404,7 +404,6 @@ class AbstractTestSuite(facility.Suite):
             ('sbr', 'sbr', False),
             ('mds', 'mds', False),
             ('arcadia/', 'arcadia', True),
-            ('arcadia_tests_data/', 'atd', True),
             ('ext', 'ext', False),
         )
 
@@ -466,14 +465,8 @@ class AbstractTestSuite(facility.Suite):
     def get_ext_resources(self):
         return self._get_all_test_data(data_type='ext')
 
-    def data_root(self, root):  # TODO: remove it
-        return os.path.normpath(os.path.join(root, "..", "arcadia_tests_data"))
-
     def get_arcadia_test_data(self):
         return self._get_all_test_data(data_type='arcadia')
-
-    def get_atd_data(self):
-        return self._get_all_test_data(data_type='atd')
 
     def get_state_hash(self):
         """

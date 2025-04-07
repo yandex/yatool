@@ -393,7 +393,6 @@ def prepare_package(
     result_dir,
     parsed_package,
     arcadia_root,
-    tests_data_root,
     data_root,
     builds,
     package_root,
@@ -420,7 +419,6 @@ def prepare_package(
 
             element = element_type(
                 arcadia_root,
-                tests_data_root,
                 data_root,
                 builds,
                 element,
@@ -685,7 +683,6 @@ def create_package(package_context, output_root, builds):
                 content_dir,
                 parsed_package,
                 arcadia_root,
-                params.custom_tests_data_root,
                 params.custom_data_root,
                 builds,
                 abs_package_root,
@@ -984,7 +981,7 @@ def create_package(package_context, output_root, builds):
 def checkout_data(arcadia_root, params):
     """
     Checkout parts of source code required for packaging
-    (package descriptions, %branch%/arcadia_tests_data, %branch%/data, etc),
+    (package descriptions, %branch%/data, etc),
     rest data will be obtained during the build.
     """
     from devtools.ya.yalibrary import checkout
@@ -1006,7 +1003,7 @@ def checkout_data(arcadia_root, params):
                 not_found_paths.append(pfnfe.missing_file_path)
                 fetcher.fetch_dirs([os.path.dirname(pfnfe.missing_file_path)])
 
-    data_roots = ['arcadia', 'arcadia_tests_data', 'data']
+    data_roots = ['arcadia', 'data']
     required_data = {root: set() for root in data_roots}
 
     # get list of required test_data and source code paths
@@ -1038,7 +1035,6 @@ def checkout_data(arcadia_root, params):
     # obtain required data for packages
     dest_dirs = {
         'arcadia': {"rel_path": None, "destination": arcadia_root},
-        'arcadia_tests_data': {"rel_path": "../arcadia_tests_data", "destination": params.custom_tests_data_root},
         'data': {"rel_path": "../data", "destination": params.custom_data_root},
     }
     for data_root, paths in required_data.items():
@@ -1326,8 +1322,6 @@ def do_package(params):
     if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
         raise YaPackageException('Cannot use --run-all-tests with --dist')
 
-    if not params.custom_tests_data_root:
-        params.custom_tests_data_root = os.path.abspath(os.path.join(arcadia_root, "..", "arcadia_tests_data"))
     if not params.custom_data_root:
         params.custom_data_root = os.path.abspath(os.path.join(arcadia_root, "..", "data"))
 

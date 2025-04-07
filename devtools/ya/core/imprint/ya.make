@@ -15,10 +15,4 @@ PEERDIR(
     # devtools/ya/yalibrary/monitoring
 )
 
-IF (NOT YA_OPENSOURCE)
-    PEERDIR(
-        devtools/ya/core/imprint/atd
-    )
-ENDIF()
-
 END()
