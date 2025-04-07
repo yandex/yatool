@@ -862,7 +862,7 @@ void TDirParser::CheckModuleSemantics() {
         }
         if (noSem) {
             if (module.IsFinalTarget()) {
-                IDEDependEvent(module);
+                module.SetSemForeign();
             }
             module.SetSemIgnore();
         }

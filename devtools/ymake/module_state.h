@@ -62,7 +62,7 @@ void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView 
 
 union TModuleAttrs {
     ui32 AllBits = 0;
-    struct { // 22 bits used
+    struct { // 23 bits used
         ui32 DontResolveIncludes : 1;  // Avoid includes resolution in any form
         ui32 FromMultimodule     : 1;  // This module is created from multimodule
         ui32 UsePeers            : 1;
@@ -71,19 +71,22 @@ union TModuleAttrs {
         ui32 Fake                : 1;  // fake_src was added
         ui32 FinalTarget         : 1;  // Programs and alike
         ui32 ProxyLibrary        : 1;  // For Proxy Libraries
+
         ui32 CheckProvides       : 1;  // Require to check PEER feature conflicts
-        ui32 RequireDepManagement : 1;  // Require to to to run dependendy management on module peers
+        ui32 RequireDepManagement : 1;  // Require to run dependency management on module peers
         ui32 ConsumeNonManageablePeers: 1; // Module with RequireDepManagement adds peers without PropagateDepManagement to MANAGED_PEERS_CLOSURE
         ui32 DepManagementVersionProxy: 1; // Module is used as proxy without version which must be replaced by real module with exact version during dependency management
         ui32 DynamicLink         : 1; // PEERDIR to this module is interpreted as dynamically linked dependency (used by license checks)
         ui32 UseGlobalCmd        : 1; // Use GLOBAL_CMD
         ui32 NeedGoDepsCheck     : 1; // Go internal test
         ui32 IsStartTarget       : 1; // Use this module as start target
+
         ui32 UsePeersLateOuts    : 1; // module uses PEERS_LATE_OUTS var
         ui32 RenderModuleType    : 2; // module type for target_properties
         ui32 SemIgnore           : 1; // module is ignored in sem graph
         ui32 IgnoreDupSrc        : 1; // ignore DupSrc errors for REPORT_ALL_DUPSRC
         ui32 UseAllSrcs          : 1; // module uses ALL_SRCS variable
+        ui32 SemForeign          : 1; // Foreign target for sem graph
     };
 };
 
@@ -456,6 +459,14 @@ public:
 
     bool IsSemIgnore() const {
         return Attrs.SemIgnore;
+    }
+
+    void SetSemForeign() {
+        Attrs.SemForeign = true;
+    }
+
+    bool IsSemForeign() const {
+        return Attrs.SemForeign;
     }
 
     bool IsExtraOut(ui32 elemId) const {

@@ -475,7 +475,7 @@ void TModuleBuilder::AddGlobalDep() {
         if (!Conf.ForeignOnNoSem) {
             YConfErr(NoSem) << "No semantics set for GLOBAL sources. Module " << Module.GetUserType() << " is not intended to be exported when GLOBAL sources are used." << Endl;
         } else if (Module.IsFinalTarget()) {
-            IDEDependEvent(Module);
+            Module.SetSemForeign();
         }
         Module.SetSemIgnore();
     }

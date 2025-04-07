@@ -33,10 +33,6 @@ namespace {
     }
 }
 
-void IDEDependEvent(const TModule& mod) {
-    FORCE_TRACE(T, RequiredIDEDependEvent(mod));
-}
-
 bool TForeignPlatformEventsReporter::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     const auto& node = state.TopNode();
@@ -56,6 +52,9 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
         if (IsModule(state.Top())) {
             if (RenderSemantics) {
                 auto module = Modules.Get(node->ElemId);
+                if (module->IsSemForeign()) {
+                    FORCE_TRACE(T, RequiredIDEDependEvent(*module));
+                }
                 if (module->IsSemIgnore()) {
                     return false;
                 }
