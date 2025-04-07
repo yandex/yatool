@@ -89,7 +89,7 @@ public:
     template<IterableValues Values>
     void SetPlatformAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
         if (!Project_) {
-            spdlog::error("attempt to add platform attribute '{}' while there is no active project at node {}", attrName, nodePath);
+            spdlog::warn("attempt to add platform attribute '{}' while there is no active project at node {}", attrName, nodePath);
             return;
         }
         Y_ASSERT(Project_->PlatformAttrs);
@@ -99,7 +99,7 @@ public:
     template<IterableValues Values>
     void SetDirectoryAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
         if (!CurSubdir_) {
-            spdlog::error("attempt to add directory attribute '{}' while there is no active directory at node {}", attrName, nodePath);
+            spdlog::warn("attempt to add directory attribute '{}' while there is no active directory at node {}", attrName, nodePath);
             return;
         }
         Y_ASSERT(CurSubdir_->Attrs);
@@ -109,7 +109,7 @@ public:
     template<IterableValues Values>
     void SetTargetAttr(const std::string_view attrName, const Values& values, const std::string& nodePath) {
         if (!CurTarget_) {
-            spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
+            spdlog::warn("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
             return;
         }
         Y_ASSERT(CurTarget_->Attrs);

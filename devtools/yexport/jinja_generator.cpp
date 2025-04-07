@@ -50,7 +50,7 @@ static bool AddValueToJinjaList(jinja2::ValuesList& list, const jinja2::Value& v
 
 bool TJinjaProject::TBuilder::AddToTargetInducedAttr(const std::string& attrName, const jinja2::Value& value, const std::string& nodePath) {
     if (!CurTarget_) {
-        spdlog::error("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
+        spdlog::warn("attempt to add target attribute '{}' while there is no active target at node {}", attrName, nodePath);
         return false;
     }
     auto& attrs = CurTarget_->Attrs->GetWritableMap();
@@ -258,7 +258,7 @@ public:
                                     AddValueToJinjaList(listIt->second.asList(), value);
                                 }
                             } else {
-                                spdlog::error("Not found induced for excluded node id {} at {}", ToUnderlying(excludeNodeId), data.Path);
+                                spdlog::warn("Not found induced for excluded node id {} at {}", ToUnderlying(excludeNodeId), data.Path);
                             }
                         }
                     }
@@ -575,7 +575,7 @@ jinja2::ValuesMap TJinjaGenerator::FinalizeSubdirsAttrs(TPlatformPtr platform, c
             NInternalAttrs::EmplaceAttr(dirMap, NInternalAttrs::DumpSems, std::string{semsDump});
         }
         if (dir->MainTargetMacro.empty() && !dir->Targets.empty()) {
-            spdlog::error("Only {} extra targets without main target in directory {}", dir->Targets.size(), dir->Path.string() + platformSuf());
+            spdlog::warn("Only {} extra targets without main target in directory {}", dir->Targets.size(), dir->Path.string() + platformSuf());
         }
         subdirsAttrs.emplace(dir->Path.c_str(), dirMap);
     }

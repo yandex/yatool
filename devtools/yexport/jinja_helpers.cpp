@@ -14,7 +14,7 @@ namespace NYexport {
                 MergeTree(attrIt->second.asMap(), attrValue.asMap());
             } else {
                 if (attrs.contains(attrName)) {
-                    spdlog::error("overwrite dict element {}", attrName);
+                    spdlog::warn("overwrite dict element {}", attrName);
                 }
                 attrs[attrName] = attrValue;
             }
