@@ -56,7 +56,7 @@ struct TTypedArgs : TVector<TTypedArgArray> {
 };
 
 static bool IsValidSymbol(char sym) {
-    return !(IsAsciiAlpha(sym) || sym == '_' || sym == '-' || sym == NPath::PATH_SEP);
+    return !(IsAsciiAlpha(sym) || sym == '_' || sym == '-' || sym == '\"' || sym == NPath::PATH_SEP);
 }
 
 static bool IsValidSymbolBefore(char sym) {
