@@ -750,13 +750,21 @@ class _Exporter:
         ]
         if self.config.params.yexport_debug_mode is not None:
             yexport_cmd += ["--debug-mode", str(self.config.params.yexport_debug_mode)]
+        yexport_cmd += ['--fail-on-error']
         yexport_cmd += ['--generator', 'ide-gradle', '--target', project_name]
 
         self.logger.info("Generate by yexport command:\n%s", ' '.join(yexport_cmd))
         r = subprocess.run(yexport_cmd, capture_output=True, text=True)
         if r.returncode != 0:
             self.logger.error("Fail generating by yexport:\n%s", r.stderr)
-            raise YaIdeGradleException(f'Fail generating by yexport with exit_code={r.returncode}')
+            raise YaIdeGradleException(
+                '\n'.join(
+                    [
+                        f'Fail generating by yexport with exit_code={r.returncode}',
+                        'Please, create ticket [to support queue](https://st.yandex-team.ru/createTicket?queue=DEVTOOLSSUPPORT&_form=6668786540e3616bc95905d3)',
+                    ]
+                )
+            )
 
 
 class _Builder:
