@@ -271,7 +271,6 @@ def _checkout(opts, display=None):
         missing_dirs.update(add_arcadia_dirs)
         if add_arcadia_dirs:
             fetcher.fetch_dirs(add_arcadia_dirs, quiet=opts.checkout_quiet)
-        if add_arcadia_dirs:
             continue
         break
 
