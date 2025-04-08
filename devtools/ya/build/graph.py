@@ -26,6 +26,7 @@ import exts.yjson as json
 import exts.hashing as hashing
 import exts.func
 from exts.strtobool import strtobool
+import exts.uniq_id
 
 import app_config
 import yalibrary.fetcher.tool_chain_fetcher as fetcher
@@ -2764,8 +2765,7 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
         },
     ]
 
-    cmdstr = ' '.join([' '.join(cmd['cmd_args']) for cmd in cmds])
-    uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(hashing.md5_value('#' + cmdstr))
+    uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(exts.uniq_id.gen16())
     yndexing_node = {
         'cmds': cmds,
         'kv': {'p': 'YY', 'pc': 'magenta'},
