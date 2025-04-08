@@ -21,13 +21,21 @@ class PreparePattern(object):
     worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(
-        self, pattern, ctx, res_dir, build_root, resources_map, fetchers_storage, fetch_resource_if_need, execution_log
+        self,
+        pattern,
+        ctx,
+        res_dir,
+        build_root,
+        resources_map,
+        legacy_sandbox_fetcher,
+        fetch_resource_if_need,
+        execution_log,
     ):
         self._pattern = pattern
         self._ctx = ctx
         self._res_dir = res_dir
         self._resources_map = resources_map
-        self._fetchers_storage = fetchers_storage
+        self._legacy_sandbox_fetcher = legacy_sandbox_fetcher
         self._fetch_resource_if_need = fetch_resource_if_need
 
         self._progress_info = progress_info_lib.ProgressInfo()
@@ -76,14 +84,10 @@ class PreparePattern(object):
         resource_type, resource_id = resource.split(':', 1)
         if resource_type == 'https':
             resource_type = 'http'
-        accepted_resource_types = {'file', 'http', 'base64'} | self._fetchers_storage.accepted_schemas()
 
-        assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
-            resource_type, ', '.join(sorted(accepted_resource_types))
-        )
         strip_prefix = resource_desc.get('strip_prefix')
 
-        if resource_type in ({'http'} | self._fetchers_storage.accepted_schemas()):
+        if resource_type in frozenset(['sbr', 'http', 'https', 'docker']):
 
             def progress_callback(downloaded, total_size):
                 if not self._shloud_use_universal_fetcher:
@@ -94,7 +98,7 @@ class PreparePattern(object):
 
             return os.path.abspath(
                 self._fetch_resource_if_need(
-                    self._fetchers_storage.get_by_type(resource_type),
+                    self._legacy_sandbox_fetcher,
                     self._res_dir,
                     resource,
                     progress_callback,
@@ -110,6 +114,8 @@ class PreparePattern(object):
             with open(os.path.join(dir_name, base_name), 'w') as c:
                 c.write(six.ensure_str(base64.b64decode(contents)))
             return dir_name
+        else:
+            raise RuntimeError(f"Unexpected resource type: {resource_type}")
 
     def __str__(self):
         return 'Pattern(' + self._pattern + ')'

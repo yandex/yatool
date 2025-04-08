@@ -4,8 +4,7 @@ import argparse
 from devtools.ya.yalibrary import app_ctx
 from devtools.ya.app import (
     configure_fetcher_params,
-    configure_fetchers_storage,
-    configure_fetcher,
+    configure_legacy_sandbox_fetcher,
     configure_active_state,
 )
 from devtools.ya.test.programs.test_tool.lib import run, get_tool_args
@@ -52,8 +51,7 @@ def get_executor():
                 ('display', configure_display()),
                 ('state', configure_active_state(ctx)),
                 ('fetcher_params', configure_fetcher_params(ctx)),
-                ('fetchers_storage', configure_fetchers_storage(ctx)),
-                ('fetcher', configure_fetcher(ctx)),
+                ('legacy_sandbox_fetcher', configure_legacy_sandbox_fetcher(ctx)),
             ]
         ):
             return run()

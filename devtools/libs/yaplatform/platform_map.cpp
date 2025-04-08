@@ -92,17 +92,13 @@ namespace NYa {
 
     TString ResourceDirName(TStringBuf uri, ui32 stripPrefix) {
         constexpr TStringBuf sbrPrefix{"sbr:"};
-        constexpr TStringBuf trsPrefix{"trs:"};
         constexpr TStringBuf httpPrefix{"http:"};
         constexpr TStringBuf httpsPrefix{"https:"};
         constexpr TStringBuf dockerPrefix{"docker:"};
 
-
         TString dirName;
         if (uri.StartsWith(sbrPrefix)) {
             dirName = uri.substr(sbrPrefix.size());
-        } else if (uri.StartsWith(trsPrefix)) {
-            dirName = uri.substr(trsPrefix.size());
         } else if (uri.StartsWith(dockerPrefix)) {
             dirName = DockerResourceDirName(uri, dockerPrefix);
         } else if (uri.StartsWith(httpPrefix) || uri.StartsWith(httpsPrefix)) {

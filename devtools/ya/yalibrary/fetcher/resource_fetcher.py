@@ -158,13 +158,6 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
             parsed_uri.resource_type,
         )
 
-    try:
-        import app_ctx
-
-        normal_fetched_schemas = app_ctx.fetchers_storage.accepted_schemas()
-    except (ImportError, AttributeError):  # internal tests can have no app_ctx or configured fetchers_storage
-        normal_fetched_schemas = {'sbr', 'http', 'https'}
-
     if parsed_uri.resource_type == 'http':
         if parsed_uri.fetcher_meta:
             resource_info['file_name'] = 'resource'
@@ -172,7 +165,7 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
             return _HttpDownloaderWithIntegrity(parsed_uri.resource_url, integrity, resource_info)
         return _HttpDownloader(parsed_uri.resource_url, parsed_uri.resource_id, resource_info)
 
-    elif parsed_uri.resource_type in normal_fetched_schemas:
+    elif parsed_uri.resource_type in frozenset(['sbr', 'http', 'https']):
         if config.has_mapping():
             return _HttpDownloader(parsed_uri.resource_url, None, resource_info)
         return _DefaultDownloader(fetcher, parsed_uri.resource_id, progress_callback, state, keep_directory_packed)

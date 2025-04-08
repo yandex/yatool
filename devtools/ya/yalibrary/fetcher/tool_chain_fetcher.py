@@ -63,17 +63,6 @@ def get_tool_chain_fetcher(
             force_refetch,
             bottle_name,
         )
-    elif "latest_matched_trs" in formula:
-        return _ToolChainLatestMatchedTRSResourceFetcher(
-            root,
-            toolchain_name,
-            platform_replacements,
-            formula["latest_matched_trs"],
-            for_platform,
-            binname,
-            force_refetch,
-            bottle_name,
-        )
     else:
         raise Exception("Unsupported formula: {}".format(formula))
 
@@ -182,7 +171,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
         platform_by_resource_id = {}
         for platform, resource_desc in self.__by_platform.items():
             parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
-            if parsed_uri.resource_type in ('sbr', 'trs'):
+            if parsed_uri.resource_type == 'sbr':
                 platform_by_resource_id[int(parsed_uri.resource_id)] = platform
         if platform_by_resource_id:
             resources = _list_all_resources(id=list(platform_by_resource_id.keys()))
@@ -428,213 +417,6 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         _dump_resources_file(dump_file, resources, self.__bottle_name)
 
 
-class _ToolChainLatestMatchedTRSResourceFetcher(_ToolChainFetcherImplBase):
-    _DEFAULT_UPDATE_INTERVAL = 24 * 3600
-    _DISABLE_AUTO_UPDATE_FILE_NAME = '.disable.auto.update'
-    _updated_toolchains = set()
-
-    def __init__(
-        self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name
-    ):
-        super(_ToolChainLatestMatchedTRSResourceFetcher, self).__init__(
-            root, toolchain_name, platform_replacements, for_platform, binname, force_refetch
-        )
-        self.__params = params
-        self.__bottle_name = bottle_name
-        self.__update_interval = params.get('update_interval', self._DEFAULT_UPDATE_INTERVAL)
-        self.__force_update = bool(os.environ.get('YA_TOOL_FORCE_UPDATE'))
-        if params.get('ignore_platform', False):
-            self.__platforms = []
-        else:
-            platforms = [for_platform] + platform_matcher.get_platform_replacements(
-                for_platform, self._platform_replacements
-            )
-            self.__platforms = self._add_default_arch(platforms)
-
-    def _add_default_arch(self, platforms):
-        default_arch = 'x86_64'
-        result = []
-        for p in platforms:
-            if '-' not in p:
-                result += [p, '{}-{}'.format(p, default_arch)]
-            else:
-                result.append(p)
-        return result
-
-    def resource_id_from_cache(self):
-        resource_id = self._get_matched_resource_id()
-        return 'trs:{}'.format(resource_id)
-
-    def _get_symlink_path(self):
-        return os.path.join(self._root, '-'.join([self.__bottle_name, self._platform]))
-
-    def _get_info_path(self):
-        return self._get_symlink_path() + '.info'
-
-    def _write_info(self, info):
-        info_path = self._get_info_path()
-        tmp = info_path + '.tmp'
-        with open(tmp, 'w') as f:
-            json.dump(info, f)
-        fs.replace(tmp, info_path)
-        logger.debug('{}: write info "{}" to {}'.format(self._toolchain_name, info, info_path))
-
-    def _read_info(self):
-        info_path = self._get_info_path()
-        with open(info_path) as f:
-            info = json.load(f)
-        logger.debug('{}: info "{}" was read from {}'.format(self._toolchain_name, info, info_path))
-        return info
-
-    def _get_matched_resource_id(self):
-        if config.has_mapping():
-            return self._get_resource_id_from_mapping_config()
-
-        resource_id = self._get_resource_id_from_info_file()
-        if resource_id is None:
-            link_path = self._get_symlink_path()
-            # Use symlink path for lock file as install_symlink() does
-            with safe_resource_lock(link_path):
-                resource = self._find_resource()
-                resource_id = resource['id']
-                info = {
-                    'update_time': int(time.time()),
-                    'resource_id': resource_id,
-                }
-                self._write_info(info)
-        return resource_id
-
-    def _get_resource_id_from_mapping_config(self):
-        mapping = config.mapping()
-        bottle = mapping.get('bottles')
-        if bottle is None:
-            raise Exception("'bottles' section is missing in mapping config file")
-        platforms = self.__platforms or ['any']
-        for platform in platforms:
-            if platform in bottle:
-                return bottle[platform]
-        raise ResourceNotFound('{}: no resource is found in bottle mapping: {}'.format(self._toolchain_name, bottle))
-
-    def _get_resource_id_from_info_file(self):
-        info_path = self._get_info_path()
-        update_time_threshold = time.time() - self.__update_interval
-        if os.path.exists(info_path):
-            info = self._read_info()
-            update_time = info['update_time']
-            if (
-                self.__force_update
-                and self._toolchain_name not in _ToolChainLatestMatchedResourceFetcher._updated_toolchains
-            ):
-                logger.debug('{}: force update'.format(self._toolchain_name))
-                _ToolChainLatestMatchedTRSResourceFetcher._updated_toolchains.add(self._toolchain_name)
-            elif update_time > update_time_threshold or self.__is_auto_update_disabled:
-                resource_id = info['resource_id']
-                logger.debug('{}: use cached toolchain with resource id: {}'.format(self._toolchain_name, resource_id))
-                return resource_id
-            else:
-                logger.debug('{}: it is time to check toolchain for update'.format(self._toolchain_name))
-        elif self.__is_auto_update_disabled:
-            raise Exception('File {} is mandatory if auto update is disabled'.format(info_path))
-        return None
-
-    def _find_resource(self):
-        import app_ctx
-
-        fetcher = app_ctx.fetchers_storage.get_by_type('trs')
-        assert fetcher, "TRS fetcher is not registered"
-
-        last_match = None
-        for label in self.__params['query']['labels']:
-            artifact_id = fetcher.find_resource(
-                project_name=self.__params['query']['project'],
-                bucket_name=self.__params['query']['bucket'],
-                label_name=label,
-            )
-            artifact_info = fetcher.get_resource_info(artifact_id=artifact_id)
-            artifact_platform = artifact_info.get('spec', {}).get('attributes', {}).get('platform', 'any')
-            if artifact_platform == 'any':
-                last_match = artifact_info
-            elif artifact_platform in self.__platforms:
-                last_match = artifact_info
-                break
-        if not last_match:
-            raise ResourceNotFound(
-                '{}: no resource is found. Search queries made:\n{}\nExpected platforms:\n{}'.format(
-                    self._toolchain_name,
-                    ',\n'.join(
-                        '{}/{}:{}'.format(
-                            self.__params['query']['project'],
-                            self.__params['query']['bucket'],
-                            '[{}]'.format(', '.join(self.__params['query']['labels'])),
-                        )
-                    ),
-                    '\n'.join(self.__platforms),
-                )
-            )
-        return {'id': last_match['meta']['id']}
-
-    def _get_resource_uri(self, resource_id):
-        return "trs:{}".format(resource_id)
-
-    def _details(self):
-        return "params: {}".format(self.__params)
-
-    def _fetch(self):
-        dump_file = os.environ.get("YA_DUMP_RESOURCES_FILE")
-        if dump_file:
-            self._dump_resources_to_file(dump_file)
-        resource_id = self._get_matched_resource_id()
-        fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'trs')
-        fetch_resource_if_need(
-            fetcher,
-            self._root,
-            self._get_resource_uri(resource_id),
-            progress_callback,
-            force_refetch=self._force_refetch,
-            **self._binname_kwargs
-        )
-        return self._install_symlink(resource_id)
-
-    def _install_symlink(self, resource_id):
-        resource_path = self._resource_path(resource_id)
-        link_path = self._get_symlink_path()
-        toolscache.notify_tool_cache(link_path)
-        return install_symlink(resource_path, link_path)
-
-    @func.lazy_property
-    def __is_auto_update_disabled(self):
-        return os.path.exists(os.path.join(self._root, self._DISABLE_AUTO_UPDATE_FILE_NAME))
-
-    # Dumped once
-    @stringify_memoize
-    def _dump_resources_to_file(self, dump_file):
-        import app_ctx
-
-        fetcher = app_ctx.fetchers_storage.get_by_type('trs')
-        assert fetcher, "TRS fetcher is not registered"
-
-        found_platforms = set()
-        resources = []
-        for label in self.__params['query']['labels']:
-            artifact_id = fetcher.find_resource(
-                project_name=self.__params['query']['project'],
-                bucket_name=self.__params['query']['bucket'],
-                label_name=label,
-            )
-            artifact_info = fetcher.get_resource_info(artifact_id=artifact_id)
-            platform = artifact_info.get('spec', {}).get('attributes', {}).get('platform', 'any')
-            if platform not in found_platforms:
-                found_platforms.add(platform)
-                resources.append(
-                    {
-                        'id': artifact_info['meta']['id'],
-                        'attributes': artifact_info.get('spec', {}).get('attributes', {}),
-                    }
-                )
-
-        _dump_resources_file(dump_file, resources, self.__bottle_name)
-
-
 def _to_list(val):
     if val is None:
         return []
@@ -682,24 +464,14 @@ def _get_fetcher(name, resource_type):
             progress_callback=progress_callback,
             finish_callback=finish_callback,
         )
-        return app_ctx.fetchers_storage.get_by_type(resource_type), progress_printer
+        return app_ctx.legacy_sandbox_fetcher, progress_printer
     except (ImportError, AttributeError):
         progress_printer = ProgressPrinter(
-            progress_callback=default_progress_callback,
-            finish_callback=default_finish_callback,
+            progress_callback=default_progress_callback, finish_callback=default_finish_callback
         )
+        from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
-        if resource_type == 'trs':
-            try:
-                from yalibrary.tasklet_resources_fetcher import trs_fetcher
-
-                return trs_fetcher.TRSFetcher(), progress_printer
-            except ImportError:
-                raise Exception('"trs" fetcher is not supported in this ya-bin')
-        else:
-            from devtools.ya.yalibrary.yandex.sandbox import fetcher
-
-            return fetcher.SandboxFetcher(), progress_printer
+        return fetcher.SandboxFetcher(), progress_printer
 
 
 def _list_all_resources(**kwargs):

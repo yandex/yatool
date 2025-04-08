@@ -32,7 +32,6 @@ PY_SRCS(
     __init__.py
     cache_helper.py
     common.py
-    fetchers_storage.py
     resource_fetcher.py
     tool_chain_fetcher.py
 )

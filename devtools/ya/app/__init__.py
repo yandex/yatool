@@ -117,7 +117,7 @@ def execute_early(action):
                 ('lifecycle_ts', configure_lifecycle_timestamps()),
                 ('env_checker', configure_environment_checker()),
                 # Need for ya nile {udf.so} handler
-                ('fetchers_storage', configure_fetchers_storage(ctx)),
+                ('legacy_sandbox_fetcher', configure_legacy_sandbox_fetcher(ctx)),
             ]
         )
 
@@ -158,8 +158,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('use_universal_fetcher_everywhere', configure_use_universal_fetcher_everywhere(ctx)),
             ('docker_config_path', configure_docker_config_path(ctx)),
             ('hide_token2', token_suppressions.configure(ctx)),
-            ('fetchers_storage', configure_fetchers_storage(ctx)),
-            ('fetcher', configure_fetcher(ctx)),
+            ('legacy_sandbox_fetcher', configure_legacy_sandbox_fetcher(ctx)),
             ('showstack', configure_showstack()),
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
@@ -551,48 +550,25 @@ def configure_fetcher_params(app_ctx):
 
 
 # TODO: kuzmich321@ (ufetcher) remove when full migration to universal fetcher completed
-def configure_fetcher(app_ctx):
-    yield app_ctx.fetchers_storage.get_default()  # in the name of legacy
+def configure_legacy_sandbox_fetcher(app_ctx):
+    if app_config.in_house:
+        try:
+            app_state = app_ctx.state
+        except Exception:
+            app_state = None  # execute early
 
-
-# TODO: kuzmich321@ (ufetcher) remove when full migration to universal fetcher completed
-def configure_fetchers_storage(app_ctx):
-    import yalibrary.fetcher.fetchers_storage as fetchers_storage
-
-    have_sandbox = app_config.in_house or app_config.have_sandbox_fetcher
-    storage = fetchers_storage.FetchersStorage()
-
-    try:
-        app_state = app_ctx.state
-    except Exception:
-        app_state = None  # execute early
-
-    if have_sandbox:
         from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
-        try:
+        if hasattr(app_ctx, 'fetcher_params'):
             custom_fetcher, fetcher_params, oauth_token = app_ctx.fetcher_params
-            fetcher_instance = fetcher.SandboxFetcher(
+
+            yield fetcher.SandboxFetcher(
                 custom_fetcher, fetcher_params=fetcher_params, sandbox_token=oauth_token, state=app_state
             )
-        except AttributeError:
-            fetcher_instance = fetcher.SandboxFetcher()  # execute_early
-        storage.register(fetcher_instance.ALLOWED_SCHEMAS, fetcher_instance, default=app_config.in_house)
-
-    try:
-        from yalibrary.tasklet_resources_fetcher import trs_fetcher
-
-        fetcher_instance = trs_fetcher.TRSFetcher(state=app_state)
-        storage.register(fetcher_instance.ALLOWED_SCHEMAS, fetcher_instance)
-    except ImportError:
-        pass
-
-    if not app_config.in_house:
-        storage.register(['sbr'], None)  # for opensource ya
-
-    storage.register(['docker'], None)
-
-    yield storage
+        else:
+            yield fetcher.SandboxFetcher()
+    else:
+        yield None
 
 
 def configure_display(app_ctx):

@@ -138,7 +138,7 @@ def create_patterns(params, graph, app_ctx):
                 where = resource_fetcher.fetch_base64_resource(build_root, resource_uri)
             else:
                 where = resource_fetcher.fetch_resource_if_need(
-                    app_ctx.fetchers_storage.get_by_type(resource_type),
+                    app_ctx.legacy_sandbox_fetcher,
                     tool_root,
                     resource_uri,
                     strip_prefix=strip_prefix,

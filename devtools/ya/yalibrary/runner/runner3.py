@@ -110,7 +110,7 @@ class TaskContext(object):
         self.opts = ctx.opts
         self.state = app_ctx.state.sub(__name__)
         self.resources: dict[str, dict] = {}
-        self.fetchers_storage = app_ctx.fetchers_storage
+        self.legacy_sandbox_fetcher = app_ctx.legacy_sandbox_fetcher
         self.content_uids: bool = self.opts.force_content_uids
         logger.debug("content UIDs %s in runner", "*enabled*" if self.content_uids else "*disabled*")
 
@@ -180,7 +180,7 @@ class TaskContext(object):
             self._ctx.res_dir,
             self._transient_resource_dir,
             self._resources_map,
-            self.fetchers_storage,
+            self.legacy_sandbox_fetcher,
             fetch_resource_if_need,
             self._execution_log,
         )
@@ -192,7 +192,7 @@ class TaskContext(object):
             uri_description,
             self,
             self._transient_resource_dir,
-            self.fetchers_storage,
+            self.legacy_sandbox_fetcher,
             fetch_resource_if_need,
             self._execution_log,
             self._ctx.cache,

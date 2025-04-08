@@ -37,11 +37,11 @@ class PrepareResource(object):
     worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(
-        self, uri_description, ctx, resource_root, fetchers_storage, fetch_resource_if_need, execution_log, cache
+        self, uri_description, ctx, resource_root, legacy_sandbox_fetcher, fetch_resource_if_need, execution_log, cache
     ):
         self._uri_description = dict(uri_description)
         self._ctx = ctx
-        self._fetchers_storage = fetchers_storage
+        self._legacy_sandbox_fetcher = legacy_sandbox_fetcher
         self._fetch_resource_if_need = fetch_resource_if_need
 
         self._progress_info = progress_info_lib.ProgressInfo()
@@ -59,7 +59,7 @@ class PrepareResource(object):
     def parsed_uri(self):
         if not self._parsed_uri:
             uri = self._uri_description['uri']
-            accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
+            accepted_resource_types = frozenset(['sbr', 'http', 'https', 'ext', 'docker'])
             self._parsed_uri = parse_resource_uri(uri, accepted_resource_types)
         return self._parsed_uri
 
@@ -79,7 +79,7 @@ class PrepareResource(object):
         uri = x['uri']
         resource_type, _ = uri.split(':', 1)
 
-        accepted_resource_types = {'ext'} | ctx.fetchers_storage.accepted_schemas()
+        accepted_resource_types = frozenset(['sbr', 'http', 'https', 'ext', 'docker'])
 
         assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
             resource_type, ', '.join(sorted(accepted_resource_types))
@@ -129,7 +129,7 @@ class PrepareResource(object):
             self._error = '[[bad]]ERROR[[rst]]: ' + str(e)
 
     def fetch(self):
-        accepted_resource_types = {'ext'} | self._fetchers_storage.accepted_schemas()
+        accepted_resource_types = frozenset(['sbr', 'http', 'https', 'ext', 'docker'])
         resource_type = self.parsed_uri.resource_type
 
         assert resource_type in accepted_resource_types, 'Resource schema {} not in accepted ({})'.format(
@@ -143,7 +143,7 @@ class PrepareResource(object):
             self._progress_info.set_total(total_size)
             self._progress_info.update_downloaded(downloaded)
 
-        if resource_type in self._fetchers_storage.accepted_schemas():
+        if resource_type in frozenset(['sbr', 'http', 'https', 'docker']):
             cacheable = not self._ctx.opts.clear_build
             resource_type_root = os.path.join(self._resource_root, resource_type)
 
@@ -155,7 +155,7 @@ class PrepareResource(object):
 
             result = os.path.abspath(
                 self._fetch_resource_if_need(
-                    self._fetchers_storage.get_by_type(resource_type),
+                    self._legacy_sandbox_fetcher,
                     resource_type_root,
                     self._uri_description['uri'],
                     progress_callback,
@@ -186,6 +186,8 @@ class PrepareResource(object):
             fs.ensure_dir(os.path.dirname(final_dest))
             fs.hardlink_or_copy(os.path.join(sb_out, 'resource'), final_dest)
             return final_dest
+        else:
+            raise RuntimeError(f"Unexpected resource type: {resource_type}")
 
     def __str__(self):
         return 'Resource(' + self._uri_description['uri'] + ')'

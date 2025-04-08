@@ -81,15 +81,7 @@ def parse_http_uri(resource_uri):  # type: (str) -> ParsedResourceUri
 
 
 def parse_resource_uri(resource_uri, force_accepted_schemas=None):  # type: (str, set[str]) -> ParsedResourceUri
-    if not force_accepted_schemas:
-        try:
-            import app_ctx
-
-            accepted_schemas = app_ctx.fetchers_storage.accepted_schemas()
-        except (ImportError, AttributeError):  # internal tests can have no app_ctx or configured fetchers_storage
-            accepted_schemas = {'sbr', 'http', 'https', 'docker'}
-    else:
-        accepted_schemas = force_accepted_schemas
+    accepted_schemas = force_accepted_schemas or {'sbr', 'http', 'https', 'docker'}
 
     resource_type, rest = resource_uri.split(':', 1)
     if resource_type in ('http', 'https'):
