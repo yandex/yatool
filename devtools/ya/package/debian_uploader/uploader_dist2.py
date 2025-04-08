@@ -53,7 +53,7 @@ def upload_package(package_file_dir, _, opts):
                 package.process.run_process(
                     dist2_command, upload_args, env=env, max_retry_times=opts.dupload_max_attempts
                 )
-            if opts.dist2_reindex:
+            if opts.dist2_repo_reindex:
                 reindex_args = [
                     'reindex',
                     '--bucket',
