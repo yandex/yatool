@@ -5,6 +5,8 @@
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 
+#include <cmath>
+
 using NPyBind::TPyObjectPtr;
 
 namespace NYa::NEdl {
