@@ -5,7 +5,6 @@ import json
 import os
 import platform
 import re
-import subprocess
 from collections import OrderedDict
 
 import devtools.ya.app
@@ -69,20 +68,18 @@ class VSCodeProject:
         if self.is_go:
             params.flags["CGO_ENABLED"] = "0"
 
-        if params.darwin_arm64_platform:
-            ide_common.emit_message("[[warn]]Option '--apple-arm-platform' is no longer needed[[rst]]")
-
         self.tool_platform = None
         if params.host_platform:
-            platform_parts = params.host_platform.split("-")
-            if len(platform_parts) > 2:
-                self.tool_platform = '-'.join(platform_parts[1:])
-            else:
-                self.tool_platform = params.host_platform
+            platform_parts = [p.to_lower() for p in params.host_platform.split("-")]
+            params.tool_platform = "-".join(p for p in platform_parts if p != "default")
 
         self.common_args = (
             params.ya_make_extra + [f"-j{params.build_threads}"] + [f"-D{k}={v}" for k, v in flags.items()]
         )
+
+        if pm.is_windows() and not params.output_root:
+            params.output_root = os.path.join(self.project_root, ".build")
+
         if params.output_root:
             self.common_args.append("--output=%s" % params.output_root)
         self.params = params
@@ -91,6 +88,11 @@ class VSCodeProject:
         if not os.path.exists(self.project_root):
             ide_common.emit_message(f"Creating directory: {self.project_root}")
             fs.ensure_dir(self.project_root)
+
+        if self.params.output_root:
+            if not os.path.exists(self.params.output_root):
+                ide_common.emit_message(f"Creating directory: {self.params.output_root}")
+                fs.ensure_dir(self.params.output_root)
 
         if self.is_cpp:
             self.codegen_cpp_dir = self.params.output_root or os.path.join(self.project_root, ".build")
@@ -152,7 +154,7 @@ class VSCodeProject:
         )
 
         tools_root = devtools.ya.core.config.tool_root(toolscache_version())
-        is_windows = pm.my_platform() == "win32"
+        is_windows = pm.is_windows()
         if self.params.compile_commands_fix:
             tools_replacements = [
                 ("clang++", tool_fetcher("c++")["executable"]),
@@ -380,7 +382,7 @@ class VSCodeProject:
 
         def tool_fetcher(name) -> dict:
             executable, params = tools_futures[name]()
-            if exts.windows.on_win() and not executable.endswith('.exe'):
+            if pm.is_windows() and not executable.endswith('.exe'):
                 executable += '.exe'
             lock_resource(params["toolchain_root_path"])
             return {
@@ -400,22 +402,14 @@ class VSCodeProject:
         if self.is_go:
             if not self.params.goroot:
                 self.params.goroot = tool_fetcher("go")["toolchain_root_path"]
+                gobin_path = tool_fetcher("go")["executable"]
+            else:
+                gobin_path = os.path.join(self.params.goroot, "bin", "go.exe" if pm.is_windows() else "go")
             workspace["settings"]["go.goroot"] = self.params.goroot
 
-            gobin_path = os.path.join(self.params.goroot, "bin", "go.exe" if pm.my_platform() == "win32" else "go")
             if not os.path.exists(gobin_path):
                 ide_common.emit_message("[[bad]]Go binary not found in:[[rst]] %s" % gobin_path)
                 return
-
-            if pm.is_darwin_arm64():
-                try:
-                    result = subprocess.check_output(["/usr/bin/file", gobin_path])
-                    if result.strip().rsplit(" ", 1)[1] != "arm64":
-                        ide_common.emit_message(
-                            "[[warn]]Using X86-64 Go toolchain. Debug will not work under Rosetta.[[rst]]"
-                        )
-                except Exception:
-                    pass
 
         ide_common.emit_message("Collecting modules info")
         dump_module_info_res = vscode.dump.module_info(self.params)
@@ -449,7 +443,7 @@ class VSCodeProject:
                 venv_args.append('--venv-add-tests')
 
         ide_common.emit_message("Generating tasks")
-        ya_bin_path = os.path.join(self.params.arc_root, "ya")
+        ya_bin_path = os.path.join(self.params.arc_root, "ya.bat" if pm.is_windows() else "ya")
         default_tasks = vscode.tasks.gen_default_tasks(self.params.abs_targets, ya_bin_path, self.common_args)
         codegen_tasks = vscode.tasks.gen_codegen_tasks(
             self.params,

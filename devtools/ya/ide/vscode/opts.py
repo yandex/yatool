@@ -7,7 +7,6 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.project_output = None
         self.workspace_name = None
-        self.darwin_arm64_platform = False
         self.codegen_enabled = True
         self.debug_enabled = True
         self.tests_enabled = True
@@ -89,13 +88,6 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook("goroot"),
                 group=cls.GROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                ["--apple-arm-platform"],
-                help="Build native Apple ARM64 binaries",
-                hook=devtools.ya.core.yarg.SetConstValueHook("darwin_arm64_platform", True),
-                group=cls.GROUP,
-                visible=False,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--clang-format"],
