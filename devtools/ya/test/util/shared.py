@@ -769,6 +769,8 @@ def get_oauth_token_options(opts, test_tool_mode=False):
     import devtools.ya.core.config as cc
 
     oauth_token = getattr(opts, "oauth_token", None)
+    if not oauth_token:
+        oauth_token = getattr(opts, "sandbox_oauth_token", None)
 
     cmd = []
     if oauth_token:

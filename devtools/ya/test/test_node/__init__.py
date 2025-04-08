@@ -1128,8 +1128,8 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         runner_cmd += ["--task-custom-fetcher", opts.custom_fetcher]
     if opts.resource_owner:
         runner_cmd += ['--task-sandbox-owner', opts.resource_owner]
-    if opts.oauth_token:
-        runner_cmd += ['--task-sandbox-token', opts.oauth_token]
+    if opts.sandbox_oauth_token:
+        runner_cmd += ['--task-sandbox-token', opts.sandbox_oauth_token]
 
     # All options added to the runner_cmd below this comment will be stolen from run_test handler
     runner_cmd += [
