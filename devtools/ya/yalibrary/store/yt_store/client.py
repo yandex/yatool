@@ -92,7 +92,9 @@ class YtStoreClient(object):
     @property
     @memoize()
     def account_size_limit(self):
-        table_attrs = self._client.get('{}/@'.format(self._data_table), read_from='cache')
+        table_attrs = self._client.get(
+            '{}/@'.format(self._data_table), read_from='cache', attributes=['account', 'primary_medium']
+        )
         account_name = table_attrs['account']
         primary_medium = table_attrs['primary_medium']
         limits = self._client.get(
