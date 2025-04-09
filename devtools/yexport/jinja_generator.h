@@ -92,8 +92,8 @@ public:
             spdlog::warn("attempt to add platform attribute '{}' while there is no active project at node {}", attrName, nodePath);
             return;
         }
-        Y_ASSERT(Project_->PlatformAttrs);
-        Project_->PlatformAttrs->SetAttrValue(attrName, values, nodePath);
+        Y_ASSERT(Project_->Attrs);
+        Project_->Attrs->SetAttrValue(attrName, values, nodePath);
     }
 
     template<IterableValues Values>

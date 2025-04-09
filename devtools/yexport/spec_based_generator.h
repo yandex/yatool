@@ -65,7 +65,7 @@ public:
         return DebugOpts_;
     }
 
-    TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter = nullptr) const;
+    TAttrsPtr MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter = nullptr, bool listObjectIndexing = false) const;
     bool IgnorePlatforms() const override;///< Generator ignore platforms and wait strong one sem-graph as input
     void SetSpec(const TGeneratorSpec& spec, const std::string& generatorFile = {});
     virtual const TAttrs::TReplacer* GetToolGetter() const { return nullptr; }

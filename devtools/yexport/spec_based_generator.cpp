@@ -372,10 +372,10 @@ TYexportSpec TSpecBasedGenerator::ReadYexportSpec(fs::path configDir) {
     return {};
 }
 
-TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter) const {
+TAttrsPtr TSpecBasedGenerator::MakeAttrs(EAttrGroup eattrGroup, const std::string& name, const TAttrs::TReplacer* toolGetter, bool listObjectIndexing) const {
     const auto attrGroupIt = GeneratorSpec.AttrGroups.find(eattrGroup);
     if (attrGroupIt != GeneratorSpec.AttrGroups.end()) {
-        return TAttrs::Create(attrGroupIt->second, name, Replacer_, toolGetter);
+        return TAttrs::Create(attrGroupIt->second, name, Replacer_, toolGetter, listObjectIndexing);
     } else {
         static const TAttrGroup EMPTY_ATTR_GROUP;
         spdlog::error("No attribute specification for {}", ToString<EAttrGroup>(eattrGroup));
@@ -504,7 +504,7 @@ void TSpecBasedGenerator::InsertPlatformAttrs(TAttrsPtr& attrs) {
     Y_ASSERT(attrs);
     jinja2::ValuesMap platformAttrs;
     for (const auto &platform: Platforms) {
-        platformAttrs.emplace(platform->Name, platform->Project->PlatformAttrs->GetMap());
+        platformAttrs.emplace(platform->Name, platform->Project->Attrs->GetMap());
     }
     NInternalAttrs::EmplaceAttr(attrs->GetWritableMap(), NInternalAttrs::PlatformAttrs, std::move(platformAttrs));
 }

@@ -14,8 +14,24 @@ namespace NYexport {
     public:
         using TReplacer = std::function<const std::string&(const std::string&)>;
 
-        static TSimpleSharedPtr<TAttrs> Create(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer = nullptr, const TReplacer* toolGetter = nullptr);
-        TAttrs(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer = nullptr, const TReplacer* toolGetter = nullptr);
+        static constexpr const char* OBJECT_INDEX = "_object_index";
+        static constexpr const char* PARENT_OBJECT_INDEX = "_parent_object_index";
+
+        static TSimpleSharedPtr<TAttrs> Create(
+            const TAttrGroup& attrGroup,
+            const std::string& name,
+            const TReplacer* replacer = nullptr,
+            const TReplacer* toolGetter = nullptr,
+            bool listObjectIndexing = false
+        );
+
+        TAttrs(
+            const TAttrGroup& attrGroup,
+            const std::string& name,
+            const TReplacer* replacer = nullptr,
+            const TReplacer* toolGetter = nullptr,
+            bool listObjectIndexing = false
+        );
 
         template<IterableValues Values>
         void SetAttrValue(const std::string_view attrName, const Values& values, const std::string& nodePath) {
@@ -41,6 +57,8 @@ namespace NYexport {
         const jinja2::ValuesMap& GetMap() const { return Attrs_; }
         jinja2::ValuesMap& GetWritableMap() { return Attrs_; }
 
+        void OnChangeDepth(size_t currentDepth); // Inform TAttrs object about current depth in subgraph
+
     private:
         using TGetDebugStr = const std::function<std::string()>&;
 
@@ -49,6 +67,10 @@ namespace NYexport {
         jinja2::ValuesMap Attrs_;
         const TReplacer* Replacer_;
         const TReplacer* ToolGetter_;
+
+        bool ListObjectIndexing_; // Mark each object in some list by unique index 1..N
+        size_t CurrentObjectIndex_{0}; // Current object index , 0 - no object
+        std::vector<std::vector<jinja2::ValuesMap*>> WaitParentObjects_{}; // Already created objects waiting parent
 
         void SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jinja2::ValuesList& values, size_t atPos, TGetDebugStr getDebugStr);
 
@@ -64,6 +86,7 @@ namespace NYexport {
         EAttrTypes GetItemAttrType(const std::string_view attrName) const;
         EAttrTypes GetAttrType(const std::string_view attrName) const;
         jinja2::Value GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr);
+        void FillNewDict(jinja2::ValuesMap& newDict);
     };
 
     using TAttrsPtr = TSimpleSharedPtr<TAttrs>;

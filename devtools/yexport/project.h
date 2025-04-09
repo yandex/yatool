@@ -29,21 +29,21 @@ namespace NYexport {
     template <typename T>
     concept CSubdirLike = std::derived_from<T, TProjectSubdir> && std::is_default_constructible_v<T>;
 
-    class TSemsDump {
+    class TSemsDumpWithAttrs {
     public:
         std::string SemsDump;///< Semantic dumps, collected during dispatch graph
         size_t SemsDumpDepth{0};///< Current depth of semantics for SemsDump
         size_t SemsDumpEmptyDepth{0};///< How many empty depth (cut off on leave)
+        TAttrsPtr Attrs;
     };
 
-    class TProjectTarget : public TSemsDump {
+    class TProjectTarget : public TSemsDumpWithAttrs {
     public:
         virtual ~TProjectTarget() = default;
 
         std::string Macro;
         std::string Name;
         TVector<std::string> MacroArgs;
-        TAttrsPtr Attrs;
 
         std::string TestModDir; ///< If target is test, here directory of module with this test inside
 
@@ -52,27 +52,24 @@ namespace NYexport {
         }
     };
 
-    class TProjectSubdir : public TSemsDump {
+    class TProjectSubdir : public TSemsDumpWithAttrs {
     public:
         virtual ~TProjectSubdir() = default;
         bool IsTopLevel() const;
 
         TVector<TProjectTargetPtr> Targets;///< All targets for directory
         TVector<TProjectSubdirPtr> Subdirs;///< Direct subdirectories
-        TAttrsPtr Attrs;
         fs::path Path;
         std::string MainTargetMacro;///< Macro attribute of main target
     };
 
-    class TProject  : public TSemsDump {
+    class TProject  : public TSemsDumpWithAttrs {
     public:
         class TBuilder;
         virtual ~TProject() = default;
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
         TVector<TProjectSubdirPtr>& GetSubdirs();
-
-        TAttrsPtr PlatformAttrs;
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>

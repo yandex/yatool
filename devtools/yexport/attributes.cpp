@@ -8,15 +8,16 @@
 
 namespace NYexport {
 
-TAttrsPtr TAttrs::Create(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter) {
-    return MakeSimpleShared<TAttrs>(attrGroup, name, replacer, toolGetter);
+TAttrsPtr TAttrs::Create(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter, bool listObjectIndexing) {
+    return MakeSimpleShared<TAttrs>(attrGroup, name, replacer, toolGetter, listObjectIndexing);
 }
 
-TAttrs::TAttrs(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter)
+TAttrs::TAttrs(const TAttrGroup& attrGroup, const std::string& name, const TReplacer* replacer, const TReplacer* toolGetter, bool listObjectIndexing)
     : AttrGroup_(attrGroup)
     , Name_(name)
     , Replacer_(replacer)
     , ToolGetter_(toolGetter)
+    , ListObjectIndexing_(listObjectIndexing)
 {}
 
 void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jinja2::ValuesList& values, size_t atPos, TGetDebugStr getDebugStr) {
@@ -69,7 +70,8 @@ void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jin
                 auto [listAttrIt, _] = attrs.emplace(attrName, jinja2::ValuesList{});
                 auto& list = listAttrIt->second.asList();
                 if (listItem == attr.str()) {// magic attribute <list>-ITEM must append new empty item
-                    list.emplace_back(jinja2::ValuesMap{});
+                    list.push_back(jinja2::ValuesMap{});
+                    FillNewDict(list.back().asMap());
                     break;
                 }
                 if (list.empty()) {
@@ -236,6 +238,42 @@ jinja2::Value TAttrs::GetSimpleAttrValue(const EAttrTypes attrType, const jinja2
         default:
             spdlog::error("try get simple value of {} with type {}", ToString<EAttrTypes>(attrType), getDebugStr());
             return {};// return empty value
+    }
+}
+
+void TAttrs::OnChangeDepth(size_t currentDepth) { // Inform TAttrs object about current depth in subgraph
+    if (!ListObjectIndexing_) {
+        return;
+    }
+    while (WaitParentObjects_.size() < currentDepth) {
+        WaitParentObjects_.emplace_back();
+    }
+    // When decrease depth move wait objects up
+    while (WaitParentObjects_.size() > currentDepth) {
+        auto& last = *WaitParentObjects_.rbegin();
+        if (!last.empty() && WaitParentObjects_.size() > 1) {
+            auto& prelast = *(WaitParentObjects_.rbegin() + 1);
+            prelast.insert(prelast.end(), last.begin(), last.end());
+        }
+        WaitParentObjects_.resize(WaitParentObjects_.size() - 1);
+    }
+}
+
+void TAttrs::FillNewDict(jinja2::ValuesMap& newDict) {
+    if (!ListObjectIndexing_) {
+        return;
+    }
+    newDict[OBJECT_INDEX] = std::to_string(++CurrentObjectIndex_);
+    if (!WaitParentObjects_.empty()) {
+    // Jinja generator use POST fill attrs, when create new object, use all wait objects as it childs
+    auto& last = *WaitParentObjects_.rbegin();
+        if (!last.empty()) {
+            for (auto* obj: last) {
+                (*obj)[PARENT_OBJECT_INDEX] = std::to_string(CurrentObjectIndex_);
+            }
+            last.clear();// then remove all used
+        }
+        last.push_back(&newDict); // and put just created as wait parent
     }
 }
 

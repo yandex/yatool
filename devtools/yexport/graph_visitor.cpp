@@ -44,7 +44,7 @@ namespace NYexport {
 
     void TGraphVisitor::FillPlatformName(const std::string& platformName) {
         if (!Generator_->IgnorePlatforms()) {
-            ProjectBuilder_->CurrentProject()->PlatformAttrs = Generator_->MakeAttrs(EAttrGroup::Platform, "platform " + platformName);
+            ProjectBuilder_->CurrentProject()->Attrs = Generator_->MakeAttrs(EAttrGroup::Platform, "platform " + platformName);
             if ((Generator_->DumpOpts().DumpSems || Generator_->DebugOpts().DebugSems)) {
                 auto* project = ProjectBuilder_->CurrentProject();
                 project->SemsDump += "--- PLATFORM " + platformName + "\n";
@@ -60,20 +60,23 @@ namespace NYexport {
             return false;
         }
 
-        auto onEnterRes = OnEnter(state);
-        if (onEnterRes.has_value()) {
-            return onEnterRes.value();
-        }
-
-        auto incSemsDepth = [](TSemsDump* semsDump) {
+        auto incSemsDepth = [](TSemsDumpWithAttrs* semsDump) {
             if (!semsDump) {
                 return;
             }
             ++semsDump->SemsDumpDepth;
+            if (semsDump->Attrs) {
+                semsDump->Attrs->OnChangeDepth(semsDump->SemsDumpDepth);
+            }
         };
         incSemsDepth(ProjectBuilder_->CurrentProject());
         incSemsDepth(ProjectBuilder_->CurrentSubdir());
         incSemsDepth(ProjectBuilder_->CurrentTarget());
+
+        auto onEnterRes = OnEnter(state);
+        if (onEnterRes.has_value()) {
+            return onEnterRes.value();
+        }
 
         const TSemNodeData& data = state.TopNode().Value();
         if (data.Sem.empty() || data.Sem.front().empty()) {
@@ -130,7 +133,7 @@ namespace NYexport {
                 continue;
             }
 
-            OnNodeSemanticPreOrder(state, semName, semNameType, semArgs);
+            OnNodeSemanticPreOrder(state, semName, semNameType, semArgs, isIgnored);
         }
 
         return !isIgnored;
@@ -154,12 +157,38 @@ namespace NYexport {
             return;
         }
 
-        auto decSemsDepth = [](TSemsDump* semsDump) {
+        const TSemNodeData& data = state.TopNode().Value();
+        if (!data.Sem.empty() && !data.Sem.front().empty()) {
+            const auto& semantics = Generator_->ApplyReplacement(data.Path, data.Sem);
+
+            bool isIgnored = false;
+            for (const auto& sem : semantics) {
+                const auto& semName = sem[0];
+                const auto semNameType = SemNameToType(semName);
+                if (semNameType == ESNT_Ignored) {
+                    isIgnored = true;
+                    break;
+                }
+            }
+
+            for (const auto& sem : semantics) {
+                const auto& semName = sem[0];
+                const auto semNameType = SemNameToType(semName);
+                const auto semArgs = std::span{sem}.subspan(1);
+
+                OnNodeSemanticPostOrder(state, semName, semNameType, semArgs, isIgnored);
+            }
+        }
+
+        auto decSemsDepth = [](TSemsDumpWithAttrs* semsDump) {
             if (!semsDump) {
                 return;
             }
             if (semsDump->SemsDumpDepth > 0) {
                 --semsDump->SemsDumpDepth;
+                if (semsDump->Attrs) {
+                    semsDump->Attrs->OnChangeDepth(semsDump->SemsDumpDepth);
+                }
             }
             if (semsDump->SemsDumpEmptyDepth > 0) {
                 --semsDump->SemsDumpEmptyDepth;
@@ -172,33 +201,6 @@ namespace NYexport {
         decSemsDepth(ProjectBuilder_->CurrentProject());
         decSemsDepth(ProjectBuilder_->CurrentSubdir());
         decSemsDepth(ProjectBuilder_->CurrentTarget());
-
-
-        const TSemNodeData& data = state.TopNode().Value();
-        if (data.Sem.empty() || data.Sem.front().empty()) {
-            TBase::Leave(state);
-            return;
-        }
-
-        const auto& semantics = Generator_->ApplyReplacement(data.Path, data.Sem);
-
-        bool isIgnored = false;
-        for (const auto& sem : semantics) {
-            const auto& semName = sem[0];
-            const auto semNameType = SemNameToType(semName);
-            if (semNameType == ESNT_Ignored) {
-                isIgnored = true;
-                break;
-            }
-        }
-
-        for (const auto& sem : semantics) {
-            const auto& semName = sem[0];
-            const auto semNameType = SemNameToType(semName);
-            const auto semArgs = std::span{sem}.subspan(1);
-
-            OnNodeSemanticPostOrder(state, semName, semNameType, semArgs, isIgnored);
-        }
 
         TBase::Leave(state);
     }
@@ -355,7 +357,7 @@ namespace NYexport {
             return dump;
         };
         auto maxSize = std::max(graphSems.size(), appliedSems.size());
-        auto renderNodePath = [&](TSemsDump* semsDump) {
+        auto renderNodePath = [&](TSemsDumpWithAttrs* semsDump) {
             if (semsDump) {
                 semsDump->SemsDump += Indent(semsDump->SemsDumpDepth) + "[ " + nodePath + " ]\n";
             }
@@ -387,7 +389,7 @@ namespace NYexport {
             auto isType = [&](ESemNameType semNameType) {
                 return graphSemType == semNameType || appliedSemType == semNameType;
             };
-            auto renderSemsDump = [&](TSemsDump* semsDump) {
+            auto renderSemsDump = [&](TSemsDumpWithAttrs* semsDump) {
                 Y_ASSERT(semsDump);
                 semsDump->SemsDump += Indent(semsDump->SemsDumpDepth) + "- " + appliedSemDump + (appliedSemDump == graphSemDump ? "" : " ( " + graphSemDump + " )") + "\n";
             };

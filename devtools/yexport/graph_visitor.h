@@ -68,7 +68,7 @@ namespace NYexport {
 
     protected:
         virtual void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) = 0;
-        virtual void OnNodeSemanticPreOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/) {};
+        virtual void OnNodeSemanticPreOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/, bool /*isIgnored*/) {};
         virtual void OnNodeSemanticPostOrder(TState& /*state*/, const std::string& /*semName*/, ESemNameType /*semNameType*/, const std::span<const std::string>& /*semArgs*/, bool /*isIgnored*/) {};
         virtual std::optional<bool> OnEnter(TState& /*state*/) { return {}; };
         virtual void OnLeave(TState& /*state*/) {};

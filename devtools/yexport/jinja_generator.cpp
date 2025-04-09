@@ -127,7 +127,7 @@ public:
         }
         curTarget->Macro = semName;
         curTarget->Name = semArgs[1];
-        curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name, Generator_->GetToolGetter());
+        curTarget->Attrs = Generator_->MakeAttrs(EAttrGroup::Target, "target " + curTarget->Macro + " " + curTarget->Name, Generator_->GetToolGetter(), true);
         auto& attrs = curTarget->Attrs->GetWritableMap();
         NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Macro, curTarget->Macro);
         NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Name, curTarget->Name);
