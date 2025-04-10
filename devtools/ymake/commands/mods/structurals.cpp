@@ -77,12 +77,18 @@ namespace {
                 return args.front();
             }
             for (auto& arg : args) {
-                if (auto piece = std::get_if<std::string_view>(&arg)) {
-                    result += *piece;
-                } else if (auto pieces = std::get_if<std::vector<std::string_view>>(&arg)) {
-                    for (auto& piece : *pieces)
+                std::visit(TOverloaded{
+                    [&](std::string_view piece) {
                         result += piece;
-                }
+                    },
+                    [&](const std::vector<std::string_view>& pieces) {
+                        for (auto& piece : pieces)
+                            result += piece;
+                    },
+                    [&](const auto& x) {
+                        throw TBadArgType(Name, x);
+                    }
+                }, arg);
             }
             return ctx.Values.GetValue(ctx.Values.InsertStr(result));
         }
