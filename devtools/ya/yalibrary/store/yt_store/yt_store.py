@@ -143,6 +143,7 @@ class YtStore(DistStore):
                 "error_type": type(err).__name__,
                 "yt_proxy": self._proxy,
                 "yt_dir": self._data_dir,
+                "is_heater": self._heater_mode,
             },
         )
 
