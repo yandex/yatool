@@ -172,31 +172,6 @@
             "required": ["type", "path"],
             "additionalProperties": false
         },
-        "testData": {
-            "type": "object",
-            "properties": {
-                "type": { "enum": ["TEST_DATA"] },
-                "path": {
-                    "type": "string"
-                },
-                "files": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "uniqueItems": true
-                    }
-                },
-                "exclude": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "uniqueItems": true
-                    }
-                }
-            },
-            "required": ["type", "path"],
-            "additionalProperties": false
-        },
         "directory": {
             "type": "object",
             "properties": {
@@ -542,7 +517,6 @@
                         "oneOf": [
                             {"$ref": "#/definitions/buildOutput"},
                             {"$ref": "#/definitions/arcadia"},
-                            {"$ref": "#/definitions/testData"},
                             {"$ref": "#/definitions/directory"},
                             {"$ref": "#/definitions/relative"},
                             {"$ref": "#/definitions/symlink"},

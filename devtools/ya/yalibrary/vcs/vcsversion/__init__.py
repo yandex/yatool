@@ -274,13 +274,11 @@ class _SystemInfo:
 
 
 class _CommonUtils:
-    ARC_DIRECTORIES = ['arcadia', 'data', 'quality-eval']
-
     @classmethod
     def _get_arcadia_branch_or_tag(cls, url, keywords):
         parts = url.split('/')[3:]  # skip schema (2) and hostname (1) entries
-        root_ind = [i for i, p in zip(range(len(parts)), parts) if p in cls.ARC_DIRECTORIES]
-        branch_ind = [i for i, p in zip(range(len(parts)), parts) if p in keywords]
+        root_ind = [i for i, p in enumerate(parts) if p == 'arcadia']
+        branch_ind = [i for i, p in enumerate(parts) if p in keywords]
         if root_ind and branch_ind and branch_ind[0] < root_ind[0]:
             return '/'.join(parts[branch_ind[0] + 1 : root_ind[0]])
         else:

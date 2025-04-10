@@ -281,7 +281,6 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
         testing_elapsed = 0
         compiling_elapsed = 0
         source_prepare_elapsed = 0
-        tests_data_prepare_elapsed = 0
         display.emit_message('Critical path:')
         for node in critical_path:
             nodes.append(node.as_json())
@@ -307,8 +306,6 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
                 testing_elapsed += node_time_elapsed
             elif node_type == 'source_prepare':
                 source_prepare_elapsed += node_time_elapsed
-            elif node_type == 'tests_data_prepare':
-                tests_data_prepare_elapsed += node_time_elapsed
             else:
                 compiling_elapsed += node_time_elapsed
 
@@ -332,7 +329,6 @@ def print_critical_path(critical_data, graph, filename, display, ymake_stats=Non
             'graph_testing_time': testing_elapsed,
             'graph_compiling_time': compiling_elapsed,
             'graph_source_time': source_prepare_elapsed,
-            'graph_tests_data_time': tests_data_prepare_elapsed,
         }
 
         for k, v in stats.items():

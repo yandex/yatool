@@ -66,7 +66,6 @@ SOURCE_ELEMENTS = {
     'RELATIVE': package.source.RelativeSource,
     'DIRECTORY': package.source.DirectorySource,
     'ARCADIA': package.source.ArcadiaSource,
-    'TEST_DATA': package.source.TestDataSource,
     'TEMP': package.source.TempSource,
     'SYMLINK': package.source.SymlinkSource,
     'INLINE': package.source.InlineFileSource,
@@ -268,8 +267,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.dump_sources = True
     build_options.javac_flags = {f["name"]: f["value"] for f in build_info.get("javac_flags", [])}
 
-    build_options.checkout = getattr(params, "checkout", False)
-
     build_options.print_statistics = True
     build_options.statistics_out_dir = params.statistics_out_dir
 
@@ -393,7 +390,6 @@ def prepare_package(
     result_dir,
     parsed_package,
     arcadia_root,
-    data_root,
     builds,
     package_root,
     formaters,
@@ -419,7 +415,6 @@ def prepare_package(
 
             element = element_type(
                 arcadia_root,
-                data_root,
                 builds,
                 element,
                 result_dir,
@@ -683,7 +678,6 @@ def create_package(package_context, output_root, builds):
                 content_dir,
                 parsed_package,
                 arcadia_root,
-                params.custom_data_root,
                 builds,
                 abs_package_root,
                 formatters,
@@ -977,71 +971,6 @@ def create_package(package_context, output_root, builds):
         return package_name, package_version, package_path, debug_package_path
 
 
-@timeit
-def checkout_data(arcadia_root, params):
-    """
-    Checkout parts of source code required for packaging
-    (package descriptions, %branch%/data, etc),
-    rest data will be obtained during the build.
-    """
-    from devtools.ya.yalibrary import checkout
-
-    # obtain specified package json descriptions
-    fetcher = checkout.VcsFetcher(arcadia_root)
-    fetcher.fetch_base_dirs()
-
-    packages = []
-    for package_file in params.packages:
-        not_found_paths = []
-        while True:
-            try:
-                packages.append(load_package(get_tree_info(arcadia_root, package_file)))
-                break
-            except PackageFileNotFoundException as pfnfe:
-                if pfnfe.missing_file_path in not_found_paths:  # looping over not existing path
-                    raise
-                not_found_paths.append(pfnfe.missing_file_path)
-                fetcher.fetch_dirs([os.path.dirname(pfnfe.missing_file_path)])
-
-    data_roots = ['arcadia', 'data']
-    required_data = {root: set() for root in data_roots}
-
-    # get list of required test_data and source code paths
-    for parsed_package in packages:
-        for element in parsed_package['data']:
-            source = element.get('source', None) or element.get('src', None)
-            if not source:
-                continue
-            path = source.get('path')
-            if not path:
-                continue
-
-            # old and new types
-            data_types = ['data', 'ARCADIA', 'TEST_DATA']
-            if source.get('type') in data_types:
-                # path in new format (convert required) is relative to root/arcadia for ARCADIA type
-                if source.get('type') == 'ARCADIA':
-                    path = os.path.join("arcadia", path)
-
-                root, path = path.split("/", 1)
-                if root in data_roots:
-                    required_data[root].add(path)
-            # obtain part of source code which will allow to convert old package format to the new one.
-            # conversion required some information from CMakeLists.txt (see adapter.convert for more info)
-            elif source.get('type') == "program":
-                root, path = path.split("/", 1)
-                required_data[root].add(path)
-
-    # obtain required data for packages
-    dest_dirs = {
-        'arcadia': {"rel_path": None, "destination": arcadia_root},
-        'data': {"rel_path": "../data", "destination": params.custom_data_root},
-    }
-    for data_root, paths in required_data.items():
-        if paths:
-            fetcher.fetch_dirs(paths, dest_dirs[data_root]["rel_path"], dest_dirs[data_root]["destination"])
-
-
 def update_params(parsed_package, package_params, filename):
     if 'params' not in parsed_package:
         return package_params
@@ -1322,13 +1251,8 @@ def do_package(params):
     if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
         raise YaPackageException('Cannot use --run-all-tests with --dist')
 
-    if not params.custom_data_root:
-        params.custom_data_root = os.path.abspath(os.path.join(arcadia_root, "..", "data"))
-
     if getattr(params, "checkout", False):
-        stage_started("checkout_data")
-        checkout_data(arcadia_root, params)
-        stage_started("checkout_data")
+        logger.warning("--checkout option is not supported any more")
 
     packages_meta_info = []
 

@@ -28,7 +28,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.cleanup = True
         self.codec = None
         self.convert = None
-        self.custom_data_root = None
         self.debian_distribution = 'unstable'
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
         self.debian_force_bad_version = False
@@ -89,13 +88,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 names=['--old'],
                 help='Use old ya package json format',
                 hook=devtools.ya.core.yarg.SetConstValueHook('convert', True),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--data-root'],
-                help="Custom location for data dir, defaults to <source root>/../data",
-                hook=devtools.ya.core.yarg.SetValueHook('custom_data_root'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),

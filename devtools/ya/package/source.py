@@ -87,7 +87,6 @@ class Source(object):
     def __init__(
         self,
         arcadia_root,
-        data_root,
         builds,
         data,
         result_dir,
@@ -98,7 +97,6 @@ class Source(object):
         opts,
     ):
         self.arcadia_root = arcadia_root
-        self.data_root = data_root
         self.builds = builds
         self.data = data
         self.result_dir = result_dir
@@ -514,24 +512,6 @@ Please consider defining your data paths more explicitly"
     def _use_hardlinks(self):
         # Avoid "[Errno 18] Cross-device link" error
         return False
-
-
-class TestDataSource(Source):
-    def _prepare(self):
-        test_data_directory = exts.path2.path_explode(self.source_path())[0]
-
-        if test_data_directory == "data":
-            root = self.data_root
-            test_data_path = os.path.join(root, self.source_path(skip_prefix=True))
-            if not os.path.exists(test_data_path):
-                raise YaPackageSourceException('Test data path not found {}'.format(test_data_path))
-
-            destination = os.path.join(self.result_dir, self.destination_path())
-            self.copy(test_data_path, destination)
-        else:
-            raise YaPackageSourceException(
-                'Test data source supports only data directory, not {}'.format(test_data_directory)
-            )
 
 
 class TempSource(Source):
