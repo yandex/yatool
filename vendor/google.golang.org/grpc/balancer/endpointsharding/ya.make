@@ -5,11 +5,10 @@ LICENSE(Apache-2.0)
 VERSION(v1.71.0)
 
 SRCS(
-    labels.go
-    metrics_recorder_list.go
+    endpointsharding.go
 )
 
-GO_XTEST_SRCS(metrics_recorder_list_test.go)
+GO_XTEST_SRCS(endpointsharding_test.go)
 
 END()
 

@@ -5,21 +5,17 @@ LICENSE(Apache-2.0)
 VERSION(v1.71.0)
 
 SRCS(
-    map.go
-    resolver.go
+    delegatingresolver.go
 )
 
 GO_TEST_SRCS(
-    map_test.go
-    resolver_test.go
+    # delegatingresolver_test.go
 )
+
+GO_XTEST_SRCS(delegatingresolver_ext_test.go)
 
 END()
 
 RECURSE(
-    dns
     gotest
-    manual
-    passthrough
-    # yo
 )
