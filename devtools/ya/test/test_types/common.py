@@ -46,6 +46,14 @@ DIFF_TEST_TYPE = "canon_diff"
 yatest_logger = logging.getLogger(__name__)
 
 
+class DataMeta:
+    def __init__(self, prefix, data_type, remove_prefix, transformer=None):
+        self.prefix = prefix
+        self.data_type = data_type
+        self.remove_prefix = remove_prefix
+        self.transformer = transformer
+
+
 class AbstractTestSuite(facility.Suite):
     """
     The top class in the test hierarchy, all test types should inherit from it
@@ -401,26 +409,28 @@ class AbstractTestSuite(facility.Suite):
             return []
 
         types = (
-            ('sbr', 'sbr', False),
-            ('mds', 'mds', False),
-            ('arcadia/', 'arcadia', True),
-            ('ext', 'ext', False),
+            DataMeta('sbr', 'sbr', False),
+            DataMeta('mds', 'mds', False),
+            DataMeta('arcadia/', 'arcadia', True, transformer=lambda x: os.path.normpath(x)),
+            DataMeta('ext', 'ext', False),
         )
 
         if self._test_data_map is None:
             self._test_data_map = collections.defaultdict(set)
 
             for entry in [_f for _f in self.meta.test_data if _f]:
-                for prefix, dtype, remove_prefix in types:
-                    if entry.startswith(prefix):
-                        if remove_prefix:
-                            x = entry[len(prefix) :]
+                for data_meta in types:
+                    if entry.startswith(data_meta.prefix):
+                        if data_meta.remove_prefix:
+                            x = entry[len(data_meta.prefix) :]
                         else:
                             x = entry
-                        self._test_data_map[dtype].add(x)
+                        if data_meta.transformer is not None:
+                            x = data_meta.transformer(x)
+                        self._test_data_map[data_meta.data_type].add(x)
 
-            for _, dtype, _ in types:
-                self._test_data_map[dtype] = sorted(self._test_data_map[dtype])
+            for data_meta in types:
+                self._test_data_map[data_meta.data_type] = sorted(self._test_data_map[data_meta.data_type])
 
         return self._test_data_map[data_type]
 
