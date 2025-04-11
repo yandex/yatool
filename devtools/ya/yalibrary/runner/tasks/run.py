@@ -396,7 +396,7 @@ class RunNodeTask(object):
             self._seen_tags.add(tag)
 
     def execute(self):
-        logging.debug('Run node %s in build root %s', self._node.uid, self._build_root.path)
+        logger.debug('Run node %s in build root %s', self._node.uid, self._build_root.path)
 
         if 'func' in self._node.args:
             res = self.execute_func()
