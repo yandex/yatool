@@ -230,16 +230,12 @@ void TCommandInfo::SetCommandSource(const TCommands* commands) {
 
 // macroDef is "(X Y Z)zzz"
 inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBuf& macroDef, const TYVar* modsVar, const TStringBuf& args, ESubstMode substMode, const TVars& vars, ECmdFormat cmdFormat, bool convertNamedArgs) {
-    TVars ownVars(&vars);
-    ownVars.Id = vars.Id;
     SBDIAG << "MacroCall: macroDef = " << macroDef << ", args = " << args << Endl;
     const ESubstMode nmode = substMode == ESM_DoSubst ? ESM_DoBothCm : ESM_DoBoth; // hack :(
 
     TVector<TMacroData> macros;
     GetMacrosFromPattern(args, macros, false);
 
-    TVector<TStringBuf> tempArgs;
-    TVector<TMacro> argsp;
 
     // We need to deeply substitute actual arguments for macro calls
     // AllVarsNeedSubst forces recursion in ApplyMods by call to SubstMacro
@@ -253,6 +249,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     const TString prepArgs = SubstMacro(modsVar, args, macros, nmode, vars, cmdFormat);
     AllVarsNeedSubst = saveAllVarsNeedSubst;
 
+    TVector<TStringBuf> tempArgs;
     if (!SplitArgs(prepArgs, tempArgs)) {
         TStringBuilder s;
         if (modsVar) {
@@ -271,19 +268,21 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     if (convertNamedArgs && HasNamedArgs(blockData)) {
         ConvertArgsToPositionalArrays(*blockData->CmdProps, tempArgs, *Conf->GetStringPool());
     }
-    argsp.insert(argsp.end(), tempArgs.begin(), tempArgs.end());
 
     ApplyToolOptions(macroName, vars);
 
+    TVector<TMacro> argsp{tempArgs.begin(), tempArgs.end()};
     PassMacroFlags(argsp, prepArgs, macros);
 
-    TVector<TStringBuf> argNames;
     SBDIAG << "MacroCall in for '" << macroDef << "', argsp.size() = " << argsp.size() << Endl;
 
+    TVector<TStringBuf> argNames;
     if (!SplitArgs(macroDef, argNames)) {
         throw yexception() << "MacroCall: no args in '" << macroDef << "'" << Endl;
     }
 
+    TVars ownVars(&vars);
+    ownVars.Id = vars.Id;
     if (!MapMacroVars(argsp, argNames, ownVars, prepArgs)) {
         throw yexception() << "MapMacroVars failed" << Endl;
     }
