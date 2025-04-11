@@ -125,8 +125,14 @@ def log_for_text_file_busy(bin_path: str):
     found_proc = None
 
     for f, proc in exts.process.find_opened_file_across_all_procs(bin_path):
+        cmdline = proc.cmdline().join(' ')
         logger.debug(
-            'Text file busy details: %s (with mode %s) is busy by %s with pid %s', f.path, f.mode, proc.name(), proc.pid
+            'Text file busy details: path=%s, mode=%s, busy_by=%s, pid=%s, cmdline=%s',
+            f.path,
+            f.mode,
+            proc.name(),
+            proc.pid,
+            cmdline,
         )
 
         if proc.pid != my_pid:
@@ -137,9 +143,7 @@ def log_for_text_file_busy(bin_path: str):
     # In local scenario this check will probably resolve to true due to the fact that both processes are in the same group (probably terminal)
     is_tty = any([os.isatty(fd) for fd in (0, 1, 2)])
     if not is_tty and found_proc:
-        logger.debug(
-            'found process in same process group: %s', exts.process.is_process_in_subtree(found_proc.pid, my_pgid)
-        )
+        logger.debug('found process in same subtree: %s', exts.process.is_process_in_subtree(found_proc.pid, my_pgid))
 
 
 class TextFileBusyError(Exception):
@@ -174,10 +178,11 @@ class PopenExecutor(ExecutorBase):
         retries = self.text_file_busy_retries
         stderr = ""
         exit_code = 1
+        pid = -1
         while retries > 0:
             try:
-                stderr, exit_code = self._run_process(**kwargs)
-                return stderr, exit_code
+                stderr, exit_code, pid = self._run_process(**kwargs)
+                return stderr, exit_code, pid
             except OSError as e:
                 retries -= 1
                 if e.errno != errno.ETXTBSY or not retries:
@@ -263,7 +268,7 @@ class PopenExecutor(ExecutorBase):
 
             self._state.check_cancel_state()
 
-            return stderr, proc.returncode
+            return stderr, proc.returncode, proc.pid
 
 
 class LocalExecutor(ExecutorBase):
@@ -271,9 +276,10 @@ class LocalExecutor(ExecutorBase):
         retries = self.text_file_busy_retries
         stderr = ""
         exit_code = 1
+        pid = -1
 
         while retries > 0:
-            stderr, exit_code = self._run_process(**kwargs)
+            stderr, exit_code, pid = self._run_process(**kwargs)
 
             if exit_code != 0 and stderr.startswith("Process was not created: Text file busy"):
                 retries -= 1
@@ -286,7 +292,7 @@ class LocalExecutor(ExecutorBase):
                     time.sleep(0.1)
                     continue
 
-            return stderr, exit_code
+            return stderr, exit_code, pid
         raise TextFileBusyError(stderr)
 
     def _run_process(self, args, stdout, env, cwd, executor_address, requirements, nice, **kwargs):
@@ -311,9 +317,9 @@ class LocalExecutor(ExecutorBase):
                         self._display_func(line[self.prefix_len :].replace("|n", "\n"))
                     else:
                         stderr += line
-                return stderr, res.returncode
+                return stderr, res.returncode, res.pid
         except executor.ShutdownException:
-            return stderr, 1
+            return stderr, 1, -1
 
 
 class RunNodeTask(object):
@@ -358,6 +364,7 @@ class RunNodeTask(object):
         self._patterns = ctx.patterns.sub()
         self._patterns['BUILD_ROOT'] = self._build_root.path
         self._exit_code = 0
+        self._pid = -1
         self._fuse_manager = fuse_manager
         self._executor = ctx.executor_type(
             self._ctx.state, self._display.emit_message, self.set_status, self.append_tag
@@ -371,6 +378,10 @@ class RunNodeTask(object):
     @property
     def exit_code(self):
         return self._exit_code
+
+    @property
+    def pid(self):
+        return self._pid
 
     @property
     def uid(self):
@@ -388,16 +399,20 @@ class RunNodeTask(object):
         logging.debug('Run node %s in build root %s', self._node.uid, self._build_root.path)
 
         if 'func' in self._node.args:
-            return self.execute_func()
+            res = self.execute_func()
+        else:
+            res = self.execute_command()
 
-        return self.execute_command()
+        logger.debug('Run node %s finished with exit_code=%s, pid=%s', self._node.uid, res[1], res[2])
+
+        return res
 
     def execute_func(self):
         try:
             self._node.args['func'](self._patterns)
-            return '', 0
+            return '', 0, -1
         except yalibrary.runner.ExpectedNodeException as e:
-            return str(e), e.exit_code
+            return str(e), e.exit_code, -1
         except Exception:
             from traceback import format_exc
 
@@ -407,6 +422,7 @@ class RunNodeTask(object):
     def execute_command(self):
         errs = []
         exit_code = 0
+        pid = -1
         for cmd in self._node.commands(self._build_root.path):
             args = cmd['cmd_args']
             stdout = open(os.devnull, "w") if cmd['stdout'] is None else open(cmd['stdout'], 'w')
@@ -442,7 +458,7 @@ class RunNodeTask(object):
                 if self._ctx.opts.detailed_args:
                     full_cmd = ' '.join(map(six.ensure_str, args))
                 self._detailed_timings.start_stage(DetailedStages.EXECUTE_COMMAND, time.time(), cmd=full_cmd)
-                stderr, exit_code = self._executor.run(
+                stderr, exit_code, pid = self._executor.run(
                     args=args,
                     stdout=stdout,
                     env=this_env,
@@ -463,7 +479,9 @@ class RunNodeTask(object):
 
             if exit_code:
                 c = ' '.join(map(six.ensure_str, args))
-                errs.append('command {} failed with exit code [[imp]]{}[[rst]] in {}'.format(c, exit_code, cwd))
+                errs.append(
+                    'command (pid: {}) {} failed with exit code [[imp]]{}[[rst]] in {}'.format(pid, c, exit_code, cwd)
+                )
 
             if stderr:
                 self.raw_stderr = stderr
@@ -475,7 +493,7 @@ class RunNodeTask(object):
             if exit_code:
                 break
 
-        return '\n'.join(map(six.ensure_str, (strings.encode(s) for s in errs))), exit_code
+        return '\n'.join(map(six.ensure_str, (strings.encode(s) for s in errs))), exit_code, pid
 
     def _remove_dir(self, dir):
         remove_tree_with_perm_update(dir)
@@ -492,7 +510,7 @@ class RunNodeTask(object):
             create_dirs(dirname)
 
         start_time = time.time()
-        full_stderr, exit_code = self.execute()
+        full_stderr, exit_code, pid = self.execute()
         finish_time = time.time()
         self._detailed_timings.start_stage(DetailedStages.EVALUATE_NODE_RESULTS, finish_time)
 
@@ -552,7 +570,7 @@ class RunNodeTask(object):
         if self._supports_build_time_cache():
             self._ctx.build_time_cache.touch(self._node.static_uid, id=int(finish_time - start_time))
 
-        return six.ensure_str(full_stderr, errors='replace'), exit_code, (start_time, finish_time)
+        return six.ensure_str(full_stderr, errors='replace'), exit_code, pid, (start_time, finish_time)
 
     def __call__(self, deps):
         self._detailed_timings.start_stage(DetailedStages.SETUP_NODE)
@@ -617,14 +635,14 @@ class RunNodeTask(object):
 
         if have_broken:
             self._tags.append('BROKEN_BY_DEPS')
-            self._stderr, self._exit_code, timing = six.ensure_str(err_msg), 1, None
+            self._stderr, self._exit_code, self._pid, timing = six.ensure_str(err_msg), 1, -1, None
         elif cached_by_content_uid:
             self._build_root.validate()
-            self._stderr, self._exit_code, timing = '', 0, (start_time, finish_time)
+            self._stderr, self._exit_code, self._pid, timing = '', 0, -1, (start_time, finish_time)
             self._execution_log[self._node.uid]['dynamically_resolved_cache'] = True
         else:
             with self._fuse_manager.manage(self._node, self._patterns):
-                self._stderr, self._exit_code, timing = self.run()
+                self._stderr, self._exit_code, self._pid, timing = self.run()
 
         self._detailed_timings.start_stage(DetailedStages.FINALIZE_NODE)
 
