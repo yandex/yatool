@@ -366,31 +366,40 @@ class IdeaOptions(yarg.Options):
 
 
 class GradleOptions(yarg.Options):
-    YGRADLE_OPT_GROUP = yarg.Group('Yexport gradle project options', 0)
+    YGRADLE_OPT_GROUP = yarg.Group('IDE Gradle project options', 0)
 
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
-    OPT_YEXPORT_BIN = '--yexport-bin'
-    OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
-    OPT_NO_BUILD_FOREIGN = '--no-build-foreign'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
+    OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
+
+    # Advanced options
+    ADVOPT_NO_BUILD_FOREIGN = '--no-build-foreign'
+    ADVOPT_REEXPORT = '--reexport'
+
+    # Expert options
+    EXPOPT_YEXPORT_BIN = '--yexport-bin'
+    EXPOPT_DUMP_YMAKE_STDERR = '--dump-ymake-stderr'
+    EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
 
     AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24')
 
     def __init__(self):
         self.gradle_name = None
         self.settings_root = None
-        self.yexport_bin = None
-        self.collect_contribs = True
-        self.build_foreign = True
         self.disable_errorprone = False
         self.force_jdk_version = None
-        self.yexport_debug_mode = None
-        self.login = None
         self.remove = None
+
+        self.collect_contribs = True
+        self.build_foreign = True
+        self.reexport = None
+
+        self.yexport_bin = None
         self.dump_ymake_stderr = None
+        self.yexport_debug_mode = None
 
     @staticmethod
     def consumer():
@@ -403,26 +412,8 @@ class GradleOptions(yarg.Options):
             ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_SETTINGS_ROOT],
-                help='Directory in Arcadia to place Gradle project settings',
+                help='Directory in Arcadia to place Gradle project settings (by default, if one target use target dir, else current dir or first target dir (if current dir not in arcadia))',
                 hook=yarg.SetValueHook('settings_root'),
-                group=GradleOptions.YGRADLE_OPT_GROUP,
-            ),
-            yarg.ArgConsumer(
-                [GradleOptions.OPT_YEXPORT_BIN],
-                help='Full path to yexport binary',
-                hook=yarg.SetValueHook('yexport_bin'),
-                group=GradleOptions.YGRADLE_OPT_GROUP,
-            ),
-            yarg.ArgConsumer(
-                [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
-                help='Export without collect contribs from Arcadia to jar files',
-                hook=yarg.SetConstValueHook('collect_contribs', False),
-                group=GradleOptions.YGRADLE_OPT_GROUP,
-            ),
-            yarg.ArgConsumer(
-                [GradleOptions.OPT_NO_BUILD_FOREIGN],
-                help='Export without build foreign targets',
-                hook=yarg.SetConstValueHook('build_foreign', False),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
@@ -444,25 +435,53 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
-                ['--dump-ymake-stderr'],
+                [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
+                help='Export without collect contribs from Arcadia to jar files',
+                hook=yarg.SetConstValueHook('collect_contribs', False),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.ADVOPT_NO_BUILD_FOREIGN],
+                help='Export without build foreign targets',
+                hook=yarg.SetConstValueHook('build_foreign', False),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.ADVOPT_REEXPORT],
+                help='Do remove before export',
+                hook=yarg.SetConstValueHook('reexport', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_YEXPORT_BIN],
+                help='Full path to yexport binary',
+                hook=yarg.SetValueHook('yexport_bin'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_DUMP_YMAKE_STDERR],
                 help='Dump stderr of YMake call to file (or to console if set to "log")',
                 hook=yarg.SetValueHook('dump_ymake_stderr'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
-                visible=HelpLevel.INTERNAL,
+                visible=HelpLevel.EXPERT,
             ),
             yarg.ArgConsumer(
-                ['--yexport-debug-mode'],
+                [GradleOptions.EXPOPT_YEXPORT_DEBUG_MODE],
                 help='Debug mode for yexport',
                 hook=yarg.SetValueHook('yexport_debug_mode'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
-                visible=HelpLevel.INTERNAL,
+                visible=HelpLevel.EXPERT,
             ),
         ]
 
     def postprocess(self):
         if self.yexport_bin is not None and not os.path.exists(self.yexport_bin):
             raise yarg.ArgsValidatingException(
-                f"Not found yexport binary {self.yexport_bin} in {GradleOptions.OPT_YEXPORT_BIN}"
+                f"Not found yexport binary {self.yexport_bin} in {GradleOptions.EXPOPT_YEXPORT_BIN}"
             )
         if self.gradle_name and self.remove:
             raise yarg.ArgsValidatingException(

@@ -23,7 +23,8 @@ class YaIdeGradleException(Exception):
 class _JavaSemConfig(SemConfig):
     """Check and use command line options for configure roots and flags"""
 
-    GRADLE_PROPS_FILE: Path = Path.home() / '.gradle' / 'gradle.properties'
+    GRADLE_PROPS = 'gradle.properties'  # Gradle properties filename auto detected by Gradle
+    GRADLE_PROPS_FILE: Path = Path.home() / '.gradle' / GRADLE_PROPS  # User Gradle properties file
     GRADLE_REQUIRED_PROPS: tuple[str] = (
         'bucketUsername',
         'bucketPassword',
@@ -81,11 +82,13 @@ class _JavaSemConfig(SemConfig):
 
     def _get_settings_root(self) -> Path:
         """Create settings_root path by options and targets"""
-        settings_root = (
-            self.arcadia_root / Path(self.params.settings_root)
-            if self.params.settings_root
-            else Path(self.params.abs_targets[0])
-        )
+        settings_root = Path(self.params.abs_targets[0])
+        if self.params.settings_root:
+            settings_root = self.arcadia_root / Path(self.params.settings_root)
+        elif len(self.params.abs_targets) > 1:
+            cwd = Path.cwd()
+            if cwd.is_relative_to(self.arcadia_root):
+                settings_root = cwd
         self.logger.info("Settings root: %s", settings_root)
         if not settings_root.exists() or not settings_root.is_dir():
             raise YaIdeGradleException('Not found settings root directory')
@@ -149,8 +152,9 @@ class _SymlinkCollector:
         "gradlew",
         "gradlew.bat",
         _YaSettings.YA_SETTINGS_XML,
+        _JavaSemConfig.GRADLE_PROPS,
     )  # Files for symlink to settings root
-    SETTINGS_MKDIRS: tuple[str] = (".gradle", ".idea")  # Folders for creating at settings root
+    SETTINGS_MKDIRS: tuple[str] = (".gradle", ".idea", ".kotlin")  # Folders for creating at settings root
     SETTINGS_DIRS: tuple[str] = list(SETTINGS_MKDIRS) + ["gradle"]  # Folders for symlink to settings root
 
     BUILD_SKIP_ROOT_DIRS: tuple[str] = list(SETTINGS_DIRS) + [
@@ -384,6 +388,9 @@ class _JavaSemGraph(SemGraph):
         self._cached_jdk_paths = {}
         self.jdk_paths: dict[int, str] = {}
         self.foreign_targets: list[str] = []
+        self.gradle_jdk_version: int = 17  # by default use JDK 17 for Gradle
+        if self.config.params.force_jdk_version and self.config.params.force_jdk_version > self.gradle_jdk_version:
+            self.gradle_jdk_version = self.config.params.force_jdk_version
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
@@ -659,6 +666,8 @@ class _JavaSemGraph(SemGraph):
         self._cached_jdk_paths[jdk_version] = jdk_path
         if jdk_path != self.JDK_PATH_NOT_FOUND:
             self.jdk_paths[jdk_version] = jdk_path  # Public only valid jdk paths
+            if jdk_version > self.gradle_jdk_version:
+                self.gradle_jdk_version = jdk_version  # Use for Gradle max JDK version in graph
         return jdk_path
 
     @staticmethod
@@ -671,56 +680,83 @@ class _JavaSemGraph(SemGraph):
 class _Exporter:
     """Generating files to export root"""
 
-    GRADLE_JDK_VERSION = 17
-
     def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
         self.config: _JavaSemConfig = java_sem_config
         self.sem_graph: _JavaSemGraph = java_sem_graph
+        self.project_name: str = None
+        self.attrs_for_all_templates: list[str] = []
 
     def export(self) -> None:
         """Generate files from sem-graph by yexport"""
-        project_name = (
+        self._make_project_name()
+        self._make_project_gradle_props()
+        self._apply_force_jdk_version()
+        self._make_yexport_toml()
+        self._run_yexport()
+
+    def _make_project_name(self) -> None:
+        """Fill project name by options and targets"""
+        self.project_name = (
             self.config.params.gradle_name
             if self.config.params.gradle_name
             else Path(self.config.params.abs_targets[0]).name
         )
-        self.logger.info("Project name: %s", project_name)
+        self.logger.info("Project name: %s", self.project_name)
 
-        self.logger.info("Path prefixes for skip in yexport: %s", self.config.params.rel_targets)
+    def _make_project_gradle_props(self) -> None:
+        """Make project specific gradle.properties file"""
+        project_gradle_properties = ['org.gradle.jvmargs=-Xmx2048m']
 
-        attrs_for_all_templates = []
-
-        gradle_jdk_path = self.sem_graph.get_jdk_path(self.GRADLE_JDK_VERSION)
+        gradle_jdk_path = self.sem_graph.get_jdk_path(self.sem_graph.gradle_jdk_version)
         if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
-            attrs_for_all_templates += [
-                f"gradle_jdk_version = '{self.GRADLE_JDK_VERSION}'",
+            self.attrs_for_all_templates += [
+                f"gradle_jdk_version = '{self.sem_graph.gradle_jdk_version}'",
                 f"gradle_jdk_path = '{gradle_jdk_path}'",
             ]
+            project_gradle_properties.append(f"org.gradle.java.home={gradle_jdk_path}")
 
-        if self.config.params.force_jdk_version:
-            force_jdk_path = self.sem_graph.get_jdk_path(self.config.params.force_jdk_version)
-            if force_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
-                attrs_for_all_templates += [
-                    f"force_jdk_version = '{self.config.params.force_jdk_version}'",
-                    f"force_jdk_path = '{force_jdk_path}'",
-                ]
+        if self.sem_graph.jdk_paths:
+            project_gradle_properties.append(
+                f"org.gradle.java.installations.fromEnv={','.join('JDK' + str(jdk_version) for jdk_version in self.sem_graph.jdk_paths.keys())}"
+            )
+            project_gradle_properties.append(
+                f"org.gradle.java.installations.paths={','.join(jdk_path for jdk_path in self.sem_graph.jdk_paths.values())}"
+            )
 
+        project_gradle_properties_file = self.config.export_root / _JavaSemConfig.GRADLE_PROPS
+        with project_gradle_properties_file.open('w') as f:
+            f.write('\n'.join(project_gradle_properties))
+
+    def _apply_force_jdk_version(self) -> None:
+        """Apply force JDK version from options, if exists"""
+        if not self.config.params.force_jdk_version:
+            return
+        force_jdk_path = self.sem_graph.get_jdk_path(self.config.params.force_jdk_version)
+        if force_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
+            self.attrs_for_all_templates += [
+                f"force_jdk_version = '{self.config.params.force_jdk_version}'",
+                f"force_jdk_path = '{force_jdk_path}'",
+            ]
+
+    def _make_yexport_toml(self) -> None:
+        """Make yexport.toml with yexport special options"""
+        self.logger.info("Path prefixes for skip in yexport: %s", self.config.params.rel_targets)
         yexport_toml = self.config.ymake_root / 'yexport.toml'
         with yexport_toml.open('w') as f:
             f.write(
                 '\n'.join(
                     [
                         '[add_attrs.root]',
-                        *attrs_for_all_templates,
+                        *self.attrs_for_all_templates,
                         '',
                         '[add_attrs.dir]',
                         f'build_contribs = {'true' if self.config.params.collect_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
-                        *attrs_for_all_templates,
+                        *self.attrs_for_all_templates,
                         '',
                         '[add_attrs.target]',
-                        *attrs_for_all_templates,
+                        *self.attrs_for_all_templates,
                         '',
                         '[[target_replacements]]',
                         f'skip_path_prefixes = [ "{'", "'.join(self.config.params.rel_targets)}" ]',
@@ -735,6 +771,8 @@ class _Exporter:
                 )
             )
 
+    def _run_yexport(self) -> None:
+        """Generating export files by run yexport"""
         yexport_cmd = [
             self.config.yexport_bin,
             '--arcadia-root',
@@ -751,7 +789,9 @@ class _Exporter:
         if self.config.params.yexport_debug_mode is not None:
             yexport_cmd += ["--debug-mode", str(self.config.params.yexport_debug_mode)]
         yexport_cmd += ['--fail-on-error']
-        yexport_cmd += ['--generator', 'ide-gradle', '--target', project_name]
+        yexport_cmd += ['--generator', 'ide-gradle']
+        if self.project_name is not None:
+            yexport_cmd += ['--target', self.project_name]
 
         self.logger.info("Generate by yexport command:\n%s", ' '.join(yexport_cmd))
         r = subprocess.run(yexport_cmd, capture_output=True, text=True)
@@ -858,6 +898,15 @@ class _Remover:
             self.logger.info("Export root %s already not found", self.config.export_root)
 
 
+def _collect_symlinks(config: _JavaSemConfig) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
+    """Collect exists and invalid symlinks, remove invalid symlinks"""
+    exists_symlinks = _ExistsSymlinkCollector(config)
+    exists_symlinks.collect()
+    remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
+    remove_symlinks.remove_invalid_symlinks()
+    return exists_symlinks, remove_symlinks
+
+
 def do_gradle(params):
     """Real handler of `ya ide gradle`"""
     do_gradle_stage = stage_tracer.get_tracer("gradle").start('do_gradle')
@@ -865,15 +914,14 @@ def do_gradle(params):
     try:
         config = _JavaSemConfig(params)
 
-        exists_symlinks = _ExistsSymlinkCollector(config)
-        exists_symlinks.collect()
-        remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
-        remove_symlinks.remove_invalid_symlinks()
+        exists_symlinks, remove_symlinks = _collect_symlinks(config)
 
-        if config.params.remove:
+        if config.params.remove or config.params.reexport:
             remover = _Remover(config, remove_symlinks)
             remover.remove()
-            return
+            if not config.params.reexport:
+                return
+            exists_symlinks, remove_symlinks = _collect_symlinks(config)
 
         sem_graph = _JavaSemGraph(config)
         sem_graph.make()
