@@ -59,52 +59,72 @@ namespace {
 
     class TInput: public TBasicModImpl {
     public:
-        TInput(): TBasicModImpl({.Id = EMacroFunction::Input, .Name = "input", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TInput(): TBasicModImpl({.Id = EMacroFunction::Input, .Name = "input", .Arity = 0, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
+
+            auto _args = TArgs();
+            if (args.size() == 1)
+                _args.Path = args[0];
+            else if (args.size() == 2) {
+                auto arg0 = std::get<std::string_view>(args[0]);
+                _args.Context = TFileConf::GetContextType(arg0);
+                _args.Path = args[1];
+            } else
+                FailArgCount(args.size(), "1-2");
+
             return std::visit(TOverloaded{
                 [&](std::string_view name) {
                     auto names = SplitArgs(TString(name)); // TODO get rid of this
                     if (names.size() == 1)
-                        return ProcessOne(ctx, names.front(), false, false);
-                    return ProcessMany(ctx, names, false, false);
+                        return ProcessOne(ctx, names.front(), _args.Context, false, false);
+                    return ProcessMany(ctx, names, _args.Context, false, false);
                 },
                 [&](const std::vector<std::string_view>& names) {
                     if (names.size() == 1)
-                        return ProcessOne(ctx, names.front(), false, false);
-                    return ProcessMany(ctx, names, false, false);
+                        return ProcessOne(ctx, names.front(), _args.Context, false, false);
+                    return ProcessMany(ctx, names, _args.Context, false, false);
                 },
                 [&](TMacroValues::TGlobPattern glob) {
                     if (glob.Data.size() == 1)
-                        return ProcessOne(ctx, glob.Data.front(), true, false);
-                    return ProcessMany(ctx, glob.Data, true, false);
+                        return ProcessOne(ctx, glob.Data.front(), _args.Context, true, false);
+                    return ProcessMany(ctx, glob.Data, _args.Context, true, false);
                 },
                 [&](TMacroValues::TLegacyLateGlobPatterns glob) {
-                    return ProcessMany(ctx, glob.Data, false, true);
+                    return ProcessMany(ctx, glob.Data, _args.Context, false, true);
                 },
-                [](auto&&) -> TMacroValues::TValue {
-                    throw std::bad_variant_access();
+                [&](const auto& x) -> TMacroValues::TValue {
+                    throw TBadArgType(Name, x);
                 },
-            }, args[0]);
+            }, _args.Path);
         }
     private:
-        auto ProcessCoord(const TPreevalCtx& ctx, std::string_view name, bool isGlob, bool isLegacyGlob) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+        struct TArgs {
+            ELinkType Context = ELinkType::ELT_Default;
+            TMacroValues::TValue Path;
+        };
+        auto ProcessCoord(const TPreevalCtx& ctx, std::string_view name, ELinkType context, bool isGlob, bool isLegacyGlob) const {
+            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue([&]() {
+                if (context != ELT_Default)
+                    return ctx.Values.InsertStr(TFileConf::ConstructLink(context, NPath::ConstructPath(name))); // lifted from TCommandInfo::ApplyMods
+                else
+                    return ctx.Values.InsertStr(name);
+            }()));
             auto coord = ctx.Sink.Inputs.CollectCoord(pooledName);
             ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) { var.IsGlob = isGlob; var.IsLegacyGlob = isLegacyGlob; });
             return coord;
         };
-        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name, bool isGlob, bool isLegacyGlob) const {
-            return TMacroValues::TInput {.Coord = ProcessCoord(ctx, name, isGlob, isLegacyGlob)};
+        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name, ELinkType context, bool isGlob, bool isLegacyGlob) const {
+            return TMacroValues::TInput {.Coord = ProcessCoord(ctx, name, context, isGlob, isLegacyGlob)};
         };
-        TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& names, bool isGlob, bool isLegacyGlob) const {
+        TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& names, ELinkType context, bool isGlob, bool isLegacyGlob) const {
             auto result = TMacroValues::TInputs();
             for (auto& name : names)
-                result.Coords.push_back(ProcessCoord(ctx, name, isGlob, isLegacyGlob));
+                result.Coords.push_back(ProcessCoord(ctx, name, context, isGlob, isLegacyGlob));
             std::sort(result.Coords.begin(), result.Coords.end());
             result.Coords.erase(std::unique(result.Coords.begin(), result.Coords.end()), result.Coords.end());
             return result;
@@ -323,7 +343,7 @@ namespace {
 
     class TContext: public TBasicModImpl {
     public:
-        TContext(): TBasicModImpl({.Id = EMacroFunction::Context, .Name = "context", .Arity = 2, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TContext(): TBasicModImpl({.Id = EMacroFunction::Context_Deprecated, .Name = "context", .Arity = 2, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -335,13 +355,13 @@ namespace {
             if (auto arg1 = std::get_if<TMacroValues::TInputs>(&args[1])) {
                 for (auto& coord : arg1->Coords)
                     ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) {
-                        var.Context = context;
+                        var.Context_Deprecated = context;
                     });
                 return *arg1;
             }
             if (auto arg1 = std::get_if<TMacroValues::TInput>(&args[1])) {
                 ctx.Sink.Inputs.UpdateCoord(arg1->Coord, [=](auto& var) {
-                    var.Context = context;
+                    var.Context_Deprecated = context;
                 });
                 return *arg1;
             }

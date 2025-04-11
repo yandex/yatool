@@ -545,8 +545,16 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 
     for (const auto& input : cmdInputs) {
         TVarStrEx in(input.Name);
-        if (input.Context)
-            in.Name = TFileConf::ConstructLink(input.Context, NPath::ConstructPath(in.Name)); // lifted from TCommandInfo::ApplyMods
+        if (input.Context_Deprecated) [[unlikely]] {
+            if (NPath::IsLink(in.Name)) {
+                // ...as built by the "input" modifier;
+                // strip and redo
+                in.Name = NPath::GetTargetFromLink(in.Name);
+                if (NPath::IsTypedPath(in.Name) && NPath::GetType(in.Name) == NPath::Unset)
+                    in.Name = NPath::CutType(in.Name);
+            }
+            in.Name = TFileConf::ConstructLink(input.Context_Deprecated, NPath::ConstructPath(in.Name)); // lifted from TCommandInfo::ApplyMods
+        }
         in.IsGlob = input.IsGlob;
         in.IsMacro = input.IsLegacyGlob;
         in.ResolveToBinDir = input.ResolveToBinDir;

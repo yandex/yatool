@@ -9,7 +9,7 @@ namespace NCommands {
     struct TCompiledCommand {
         struct TInput {
             TStringBuf Name;
-            ELinkType Context = ELinkType::ELT_Default;
+            ELinkType Context_Deprecated = ELinkType::ELT_Default;
             bool IsGlob = false;
             bool IsLegacyGlob = false;
             bool ResolveToBinDir = false;
