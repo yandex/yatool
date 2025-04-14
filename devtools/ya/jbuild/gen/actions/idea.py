@@ -1006,15 +1006,15 @@ def create_directory_based(by_path, project_root, ctx):
                 )
             print_pretty(template, os.path.join(libraries_dir, filename))
 
-    prmanager = structure['.idea/misc.xml'].find('./component[@name="ProjectModuleManager"]')
-    if prmanager:
-        if prmanager.attrib.get('languageLevel') != language_level:
+    prmanager = structure['.idea/misc.xml'].find('./component[@name="ProjectRootManager"]')
+    if ctx.opts.idea_jdk_version and prmanager is not None:
+        if prmanager.attrib.get('languageLevel') == '':
             prmanager.attrib['languageLevel'] = language_level
             dump_keys.add('.idea/misc.xml')
-        if prmanager.attrib.get('default') != sdk_default_language_level:
+        if prmanager.attrib.get('default') == '':
             prmanager.attrib['default'] = sdk_default_language_level
             dump_keys.add('.idea/misc.xml')
-        if prmanager.attrib.get('project-jdk-name') != jdk_name:
+        if prmanager.attrib.get('project-jdk-name') == '':
             prmanager.attrib['project-jdk-name'] = jdk_name
             dump_keys.add('.idea/misc.xml')
 
