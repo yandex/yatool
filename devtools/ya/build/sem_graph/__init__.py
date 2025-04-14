@@ -272,7 +272,6 @@ class SemGraph:
             build_type='nobuild',
             build_targets=self.config.params.abs_targets,
             flags=self.config.params.flags,
-            ymake_bin=self.config.ymake_bin,
             host_platform=self.config.params.host_platform,
             target_platforms=self.config.params.target_platforms,
             arc_root=self.config.arcadia_root,
@@ -283,15 +282,19 @@ class SemGraph:
         shutil.copy(conf, ymake_conf)
 
         dump_ymake_stderr = kwargs.pop('dump_ymake_stderr', None)
+        for key, value in {  # Defaults from config, if absent in kwargs
+            'source_root': self.config.arcadia_root,
+            'custom_build_directory': self.config.ymake_root,
+            'ymake_bin': self.config.ymake_bin,
+        }.items():
+            if key not in kwargs:
+                kwargs[key] = value
         r, _ = ymake_sem_graph(
-            **kwargs,
-            source_root=self.config.arcadia_root,
-            custom_build_directory=self.config.ymake_root,
             custom_conf=ymake_conf,
             continue_on_fail=True,
             dump_sem_graph=True,
-            ymake_bin=self.config.ymake_bin,
             abs_targets=self.config.params.abs_targets,
+            **kwargs,
         )
         if dump_ymake_stderr:
             if dump_ymake_stderr == "log":
