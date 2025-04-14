@@ -146,6 +146,7 @@ def obtain_targets_graph2(dart, cpp_graph):
                 jdk_version = int(jdk_version[len('JDK') :])
             except Exception:
                 jdk_version = None
+        kotlin_version = entry.get(consts.KOTLIN_VERSION)
 
         if module_type == 'JTEST_FOR' and 'UNITTEST_DIR' in entry:
             module_args = [entry['UNITTEST_DIR']] + module_args
@@ -189,6 +190,7 @@ def obtain_targets_graph2(dart, cpp_graph):
         plain.pop('UNITTEST_DIR', None)
         plain.pop('TEST_DATA', None)
         plain.pop(consts.JDK_RESOURCE_PREFIX, None)
+        plain.pop(consts.KOTLIN_VERSION, None)
 
         # Replace ${ARCADIA_ROOT} --> $(SOURCE_ROOT), etc.
         vars = default_vars(path)
@@ -198,6 +200,9 @@ def obtain_targets_graph2(dart, cpp_graph):
                     args[i] = replace_vars(args[i], vars)
 
         plain['JDK_VERSION_INT'] = jdk_version
+        if kotlin_version:
+            plain[consts.KOTLIN_VERSION] = kotlin_version
+
         extra_idea_paths[path] = plain
 
     cpp_node_by_uid = {n['uid']: n for n in cpp_graph['graph']}

@@ -635,16 +635,23 @@ def create_plugin_config(project_root, ctx):
 
 
 def detect_jdk(ctx):
-    def find_jdk_version(ctx):
-        versions = list()
+    def find_versions(ctx):
+        versions = set()
+        kotlin_versions = set()
         for target in ctx.by_path.values():
-            if target.is_idea_target() and consts.JDK_VERSION in target.plain:
-                versions.append(target.plain.get(consts.JDK_VERSION))
+            if not target.is_idea_target():
+                continue
+            if consts.JDK_VERSION in target.plain:
+                versions.add(target.plain.get(consts.JDK_VERSION))
+            if consts.KOTLIN_VERSION in target.plain:
+                kotlin_versions.add(target.plain.get(consts.KOTLIN_VERSION))
         if not versions:
-            return ''
-        return str(max(versions))
+            versions = {''}
+        if not kotlin_versions:
+            kotlin_versions = {''}
+        return str(max(versions)), str(max(kotlin_versions))
 
-    jdk_version_found = find_jdk_version(ctx)
+    jdk_version_found, kotlin_version_found = find_versions(ctx)
     if ctx.opts.idea_jdk_version:
         jdk_version = ctx.opts.idea_jdk_version
     elif jdk_version_found:
@@ -668,7 +675,13 @@ def detect_jdk(ctx):
     if int(kotlin_target) >= 24:
         kotlin_target = '23'  # remove when kotlin starts supporting jdk24 bytecode
 
-    return language_level, sdk_default_language_level, jdk_name, kotlin_target
+    kotlin_version, kotlin_language_version = None, None
+    if kotlin_version_found:
+        kotlin_version = kotlin_version_found
+        # 2.1.20 -> 2.1
+        kotlin_language_version = '.'.join(kotlin_version.split('.')[:2])
+
+    return language_level, sdk_default_language_level, jdk_name, kotlin_target, kotlin_version, kotlin_language_version
 
 
 def get_vcs(arc_root):
@@ -861,7 +874,9 @@ def create_directory_based(by_path, project_root, ctx):
     project_root = ctx.opts.idea_files_root or project_root
     if not os.path.exists(os.path.join(project_root, '.idea')):
         os.makedirs(os.path.join(project_root, '.idea'))
-    language_level, sdk_default_language_level, jdk_name, kotlin_target = detect_jdk(ctx)
+    language_level, sdk_default_language_level, jdk_name, kotlin_target, kotlin_version, kotlin_language_version = (
+        detect_jdk(ctx)
+    )
     structure = empty_directory_based_project()
     dump_keys = set()
 
@@ -952,6 +967,28 @@ def create_directory_based(by_path, project_root, ctx):
         if aargs is None:
             aargs = et.SubElement(kcs, 'option', attrib={'name': 'additionalArguments'})
         aargs.attrib['value'] = ' '.join(opts)
+
+        if kotlin_language_version:
+            kccs = kotlin_opts.find('./component[@name="KotlinCommonCompilerSettings"]')
+            if kccs is None:
+                kccs = et.SubElement(kotlin_opts, 'component', attrib={'name': 'KotlinCommonCompilerSettings'})
+            k_api_version = kccs.find('./option[@name="apiVersion"]')
+            if k_api_version is None:
+                k_api_version = et.SubElement(kccs, 'option', attrib={'name': 'apiVersion'})
+            k_api_version.attrib['value'] = kotlin_language_version
+            k_language_version = kccs.find('./option[@name="languageVersion"]')
+            if k_language_version is None:
+                k_language_version = et.SubElement(kccs, 'option', attrib={'name': 'languageVersion'})
+            k_language_version.attrib['value'] = kotlin_language_version
+
+        if kotlin_version:
+            kjps = kotlin_opts.find('./component[@name="KotlinJpsPluginSettings"]')
+            if kjps is None:
+                kjps = et.SubElement(kotlin_opts, 'component', attrib={'name': 'KotlinJpsPluginSettings'})
+            k_version = kjps.find('./option[@name="version"]')
+            if k_version is None:
+                k_version = et.SubElement(kjps, 'option', attrib={'name': 'version'})
+            k_version.attrib['value'] = kotlin_version
 
     modules, libs = get_modules_and_libs(by_path, project_root, ctx)
     modules_item = structure['.idea/modules.xml'].find('./*/modules')
