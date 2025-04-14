@@ -17,6 +17,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.build_venv = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
+        self.use_tool_clangd = True
         self.clangd_extra_args = []
         self.clangd_index_mode = "only-targets"
         self.clangd_index_threads = 0
@@ -123,6 +124,12 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 ["--no-clangd-tidy"],
                 help="Disable clangd-tidy linting",
                 hook=devtools.ya.core.yarg.SetConstValueHook("clang_tidy_enabled", False),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--no-tool-clangd"],
+                help="Do not use clangd from ya tool",
+                hook=devtools.ya.core.yarg.SetConstValueHook("use_tool_clangd", False),
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(

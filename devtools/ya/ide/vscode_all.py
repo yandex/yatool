@@ -122,6 +122,8 @@ class VSCodeProject:
                 tools_list.append("gdbnew")
             if self.params.clang_format_enabled:
                 tools_list.append("clang-format-18")
+            if self.params.use_tool_clangd:
+                tools_list.append("clangd")
         if self.is_go:
             if not self.params.goroot:
                 tools_list.append("go")
@@ -394,6 +396,8 @@ class VSCodeProject:
             self.do_codegen()
 
         if self.is_cpp:
+            if self.params.use_tool_clangd:
+                workspace["settings"]["clangd.path"] = tool_fetcher("clangd")["executable"]
             workspace["settings"]["yandex.codegenRoot"] = self.codegen_cpp_dir
             self.gen_compile_commands(tool_fetcher)
         else:
