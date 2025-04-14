@@ -685,34 +685,18 @@ def get_vcs(arc_root):
     return vcs_type[0]
 
 
-def has_content_root(module_path, by_path, rel_targets):
+def has_content_root(module_path, by_path):
     parts = module_path.split(op.sep)
     while parts:
         parts = parts[:-1]
-        module_path = op.sep.join(parts)
-        if module_path in by_path and module_path in rel_targets:
+        parent_path = op.sep.join(parts)
+        if parent_path in by_path:
             return True
     return False
 
 
-def _module_group(item, trim_last, ctx):
-    if isinstance(item, Module) and not item.is_content_root:
-        parts = [x for x in item.path.split(op.sep) if x]
-        if trim_last and len(parts) > 1:
-            parts = parts[:-1]
-        if parts:
-            sep = '/' if ctx.opts.group_modules == 'tree' else '.'
-            return sep.join(parts)
-        else:
-            return None
-    else:
-        return None
-
-
 def get_modules_and_libs(by_path, project_root, ctx):
     modules, libs = {}, set()
-
-    all_groups = {_module_group(m, True, ctx) for m in by_path.values()} if ctx.opts.separate_tests_modules else set()
 
     for p, item in sorted(by_path.items()):
         if isinstance(item, Module):
@@ -729,16 +713,12 @@ def get_modules_and_libs(by_path, project_root, ctx):
             attrib['filepath'] = iml_p
 
             if ctx.opts.group_modules:
-                if (
-                    item.is_content_root or not has_content_root(item.path, by_path, ctx.opts.rel_targets)
-                ) or not ctx.opts.with_content_root_modules:
-                    group_name = _module_group(item, not ctx.opts.separate_tests_modules, ctx)
-                    is_test = all([r.is_test for c in item.contents for r in c.roots])
-                    if ctx.opts.separate_tests_modules and is_test and group_name not in all_groups:
-                        # если есть модули $app и $app/ut, хотелось бы чтобы они входили в одну группу $app
-                        group_name = _module_group(item, True, ctx)
-                    if group_name:
-                        attrib['group'] = group_name
+                parts = [x for x in item.path.split(op.sep) if x]
+                parts = parts[:-1]
+                sep = '/' if ctx.opts.group_modules == 'tree' else '.'
+                group_name = sep.join(parts)
+                if group_name and not has_content_root(item.path, by_path):
+                    attrib['group'] = group_name
 
             modules[iml_p] = attrib
 
