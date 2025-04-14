@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 IF(PYTHON3)
     SET(XXCLIENT_SRC xx_client.pyx)
