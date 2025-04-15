@@ -10,6 +10,7 @@ import devtools.ya.test.const as const
 import yalibrary.platform_matcher as pm
 from devtools.ya.ide import ide_common
 from . import excludes
+from .opts import IDEName
 
 
 def merge_workspace(new, workspace_path):
@@ -305,10 +306,10 @@ def get_recommended_extensions(params):
     extensions = []
     if "CPP" in params.languages:
         extensions.append("llvm-vs-code-extensions.vscode-clangd")
-        if is_mac or params.vscodium:
-            extensions.append("vadimcn.vscode-lldb")
-        else:
+        if is_mac or params.ide_name == IDEName.VSCODE:
             extensions.append("ms-vscode.cpptools")
+        else:
+            extensions.append("vadimcn.vscode-lldb")
         if params.clang_format_enabled:
             extensions.append("xaver.clang-format")
     if "PY3" in params.languages:
@@ -318,10 +319,10 @@ def get_recommended_extensions(params):
                 "ms-python.debugpy",
             ]
         )
-        if params.vscodium:
-            extensions.append("detachhead.basedpyright")
-        else:
+        if params.ide_name == IDEName.VSCODE:
             extensions.append("ms-python.vscode-pylance")
+        else:
+            extensions.append("detachhead.basedpyright")
         if params.black_formatter_enabled:
             extensions.append("ms-python.black-formatter")
     if "GO" in params.languages:

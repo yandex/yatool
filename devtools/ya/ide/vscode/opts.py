@@ -1,4 +1,13 @@
+from enum import Enum
+
 import devtools.ya.core.yarg
+
+
+# IDE name doubles as URI scheme for ssh connection
+class IDEName(Enum):
+    VSCODE = "vscode"
+    VSCODIUM = "vscodium"
+    CURSOR = "cursor"
 
 
 class VSCodeAllOptions(devtools.ya.core.yarg.Options):
@@ -32,7 +41,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.ext_py_enabled = True
         self.languages = []
         self.add_codegen_folder = False
-        self.vscodium = False
+        self.ide_name = IDEName.VSCODE
 
     @classmethod
     def consumer(cls):
@@ -247,7 +256,14 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
             devtools.ya.core.yarg.ArgConsumer(
                 ["--vscodium"],
                 help="Generate workspace for VSCodium",
-                hook=devtools.ya.core.yarg.SetConstValueHook("vscodium", True),
+                hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.VSCODIUM),
+                group=cls.GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--cursor"],
+                help="Generate workspace for Cursor IDE",
+                hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.CURSOR),
                 group=cls.GROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),

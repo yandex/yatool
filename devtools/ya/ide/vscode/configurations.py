@@ -7,6 +7,7 @@ import exts.fs as fs
 import yalibrary.platform_matcher as pm
 from devtools.ya.ide import ide_common
 from . import common, consts, dump, tasks
+from .opts import IDEName
 
 
 def create_python_wrapper(wrapper_dir, template, arguments):
@@ -21,26 +22,12 @@ def create_python_wrapper(wrapper_dir, template, arguments):
 
 def gen_debug_configurations(run_modules, params, codegen_cpp_dir, tool_fetcher, python_wrappers_dir):
     arc_root = params.arc_root
-    use_lldb = pm.my_platform().startswith("darwin") or params.vscodium
+    use_lldb = pm.my_platform().startswith("darwin") or params.ide_name != IDEName.VSCODE
     is_win = pm.my_platform().startswith("win")
     output_dir = params.output_root or arc_root
     cpp_debug_params = None
     if "CPP" in params.languages:
-        if use_lldb:
-            cpp_debug_params = OrderedDict(
-                (
-                    ("type", "lldb"),
-                    ("env", {}),
-                    (
-                        "sourceMap",
-                        {
-                            "/-S": arc_root,
-                            "/-B": codegen_cpp_dir or output_dir,
-                        },
-                    ),
-                )
-            )
-        elif is_win:
+        if is_win:
             cpp_debug_params = OrderedDict(
                 (
                     ("type", "cppvsdbg"),
@@ -48,6 +35,20 @@ def gen_debug_configurations(run_modules, params, codegen_cpp_dir, tool_fetcher,
                     ("visualizerFile", os.path.join(arc_root, "devtools/msvs/arcadia.natvis")),
                     (
                         "sourceFileMap",
+                        {
+                            "/-S": arc_root,
+                            "/-B": codegen_cpp_dir or output_dir,
+                        },
+                    ),
+                )
+            )
+        elif use_lldb:
+            cpp_debug_params = OrderedDict(
+                (
+                    ("type", "lldb"),
+                    ("env", {}),
+                    (
+                        "sourceMap",
                         {
                             "/-S": arc_root,
                             "/-B": codegen_cpp_dir or output_dir,

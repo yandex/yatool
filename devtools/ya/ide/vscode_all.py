@@ -20,6 +20,7 @@ import yalibrary.tools
 from yalibrary.toolscache import lock_resource, toolscache_version
 
 from devtools.ya.ide import ide_common, venv, vscode
+from devtools.ya.ide.vscode.opts import IDEName
 
 
 class VSCodeProject:
@@ -276,8 +277,10 @@ class VSCodeProject:
         if self.is_py3:
             settings["python.analysis.indexing"] = self.params.python_index_enabled
             settings["python.analysis.persistAllIndices"] = True
-            if not self.params.vscodium:
+            if self.params.ide_name == IDEName.VSCODE:
                 settings["python.languageServer"] = "Pylance"
+            else:
+                settings["python.languageServer"] = "None"
 
         if self.is_go:
             settings.update(
@@ -540,7 +543,7 @@ class VSCodeProject:
 
         if os.getenv("SSH_CONNECTION"):
             ide_common.emit_message(
-                f"[[good]]{"vscodium" if self.params.vscodium else "vscode"}://vscode-remote/ssh-remote+{platform.node()}{workspace_path}?windowId=_blank[[rst]]"
+                f"[[good]]{self.params.ide_name.value}://vscode-remote/ssh-remote+{platform.node()}{workspace_path}?windowId=_blank[[rst]]"
             )
 
 
