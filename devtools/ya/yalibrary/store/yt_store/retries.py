@@ -1,10 +1,12 @@
-import time
 import logging
 import functools
+import threading
+from collections.abc import Callable
 
 import yt.wrapper as yt
 import yalibrary.store.yt_store.consts as consts
 
+from library.python.retry import RetryConf, retry_call
 from yt.wrapper.dynamic_table_commands import (
     get_dynamic_table_retriable_errors as get_yt_retriable_errors,
 )
@@ -12,7 +14,7 @@ from yt.wrapper.dynamic_table_commands import (
 logger = logging.getLogger(__name__)
 
 
-def get_default_client(proxy, token):
+def get_default_client(proxy: str, token: str) -> yt.YtClient:
     retries_policy = yt.default_config.retries_config(
         count=1,
         enable=False,
@@ -29,59 +31,57 @@ def get_default_client(proxy, token):
 
 
 class RetryPolicy:
-    SLEEP_S = 0.5
+    MIN_SLEEP = 0.3
+    MAX_SLEEP = 10
 
-    def __init__(self, max_retries=5, on_error_callback=None):
-        self.max_retries = max_retries
+    def __init__(
+        self, max_retries: int = 5, on_error_callback: Callable | None = None, retry_time_limit: float | None = None
+    ):
         self.disabled = False
-        self._retryable_errors = get_yt_retriable_errors()
+        self._lock = threading.Lock()
         self._on_error_callback = on_error_callback
+        retry_conf = (
+            RetryConf()
+            .on(*get_yt_retriable_errors())
+            .waiting(delay=self.MIN_SLEEP, backoff=1.3, jitter=0.2, limit=self.MAX_SLEEP)
+        )
+        if retry_time_limit:
+            self._retry_conf = retry_conf.upto(retry_time_limit)
+        elif max_retries:
+            self._retry_conf = retry_conf.upto_retries(max_retries)
+        else:
+            raise RuntimeError("Either max_retries or max_retry_timeout must be specified")
 
-    def execute(self, name, func):
+    def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            for attempt_num in range(1, self.max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as err:
-                    if self.should_raise_error(err, attempt_num):
-                        self.on_error(err)
-                        raise err
-
-                    time.sleep(self.SLEEP_S)
+            try:
+                return retry_call(func, f_args=args, f_kwargs=kwargs, conf=self._retry_conf)
+            except Exception as err:
+                self.on_error(err)
+                raise
 
         return wrapper
 
-    def on_error(self, err):
-        if not self.disabled:
+    def on_error(self, err: Exception) -> None:
+        with self._lock:
+            if self.disabled:
+                return
+            self.disabled = True
             if self._on_error_callback:
                 self._on_error_callback(err)
-            self.disabled = True
-
-    def _is_yt_error_retryable(self, err):
-        # type: (Exception) -> bool
-        return isinstance(err, self._retryable_errors)
-
-    def should_raise_error(self, err, attempt):
-        # type: (Exception, int) -> bool
-        return attempt >= self.max_retries or not self._is_yt_error_retryable(err)
 
 
 class YtClientProxy:
-    def __init__(self, client, retry_policy):
+    def __init__(self, client: yt.YtClient, retry_policy: RetryPolicy):
         self._client = client
         self._retry_policy = retry_policy
-        self.is_disabled = False
 
-    def __getattr__(self, name):
-        try:
-            v = getattr(self._client, name)
-            if callable(v):
-                return self._retry_policy.execute(name, v)
-            return v
-        except Exception:  # noqa
-            self.is_disabled = True
-            raise
+    def __getattr__(self, name: str):
+        v = getattr(self._client, name)
+        if callable(v):
+            return self._retry_policy.wrap(v)
+        return v
 
     @property
     def __dict__(self):

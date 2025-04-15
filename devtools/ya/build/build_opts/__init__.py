@@ -2592,6 +2592,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
         self.yt_readonly = True
         self.yt_max_cache_size = None
         self.yt_store_ttl = 24
+        self.yt_store_retry_time_limit = None
 
     @staticmethod
     def consumer():
@@ -2680,6 +2681,11 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 'YA_YT_STORE_TTL',
                 help='YT store ttl in hours(0 for infinity)',
                 hook=SetValueHook('yt_store_ttl'),
+            ),
+            EnvConsumer(
+                'YA_YT_STORE_RETRY_TIME_LIMIT',
+                help='Maximum duration of YT method execution attempts',
+                hook=SetValueHook('yt_store_retry_time_limit', transform=float),
             ),
             ConfigConsumer('yt_proxy'),
             ConfigConsumer('yt_dir'),

@@ -1,13 +1,6 @@
 PY3_LIBRARY()
 
-IF(PYTHON3)
-    SET(XXCLIENT_SRC xx_client.pyx)
-    SRCS(xx_client.cpp)
-    PEERDIR(
-        library/cpp/ucompress
-        yt/cpp/mapreduce/client
-    )
-ENDIF()
+SRCS(xx_client.cpp)
 
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store
@@ -17,7 +10,7 @@ PY_SRCS(
     consts.py
     utils.py
     retries.py
-    ${XXCLIENT_SRC}
+    xx_client.pyx
 )
 
 PEERDIR(
@@ -28,6 +21,9 @@ PEERDIR(
     devtools/ya/core/gsid
     devtools/ya/core/report
     devtools/ya/yalibrary/store
+    library/cpp/ucompress
+    library/python/retry
+    yt/cpp/mapreduce/client
     yt/python/client_lite
     yt/python/yt/yson
     yt/yt/python/yt_yson_bindings

@@ -431,6 +431,7 @@ class CacheFactory:
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
             cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
             yt_store_exclusive=self._opts.yt_store_exclusive,
+            retry_time_limit=self._opts.yt_store_retry_time_limit,
         )
 
     def _can_use_bazel_remote_cache(self):

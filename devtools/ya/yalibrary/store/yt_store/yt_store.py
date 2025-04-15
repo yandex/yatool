@@ -41,6 +41,7 @@ class YtStore(DistStore):
         with_self_uid=False,
         probe_before_put=False,
         probe_before_put_min_size=0,
+        retry_time_limit=None,
         **kwargs
     ):
         super(YtStore, self).__init__(
@@ -73,7 +74,9 @@ class YtStore(DistStore):
             metadata_table,
             stat_table,
             token=token,
-            retry_policy=retries.RetryPolicy(on_error_callback=self._on_error_callback_for_retries_wrapper),
+            retry_policy=retries.RetryPolicy(
+                on_error_callback=self._on_error_callback_for_retries_wrapper, retry_time_limit=retry_time_limit
+            ),
         )
 
         self._time_to_first_recv_meta = None
