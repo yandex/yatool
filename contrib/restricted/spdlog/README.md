@@ -36,6 +36,7 @@ see example [CMakeLists.txt](https://github.com/gabime/spdlog/blob/v1.x/example/
 * Gentoo: `emerge dev-libs/spdlog`
 * Arch Linux: `pacman -S spdlog`
 * openSUSE: `sudo zypper in spdlog-devel`
+* ALT Linux: `apt-get install libspdlog-devel`
 * vcpkg: `vcpkg install spdlog`
 * conan: `conan install --requires=spdlog/[*]`
 * conda: `conda install -c conda-forge spdlog`

@@ -267,7 +267,8 @@ SPDLOG_INLINE int utc_minutes_offset(const std::tm &tm) {
 
     #if defined(sun) || defined(__sun) || defined(_AIX) || \
         (defined(__NEWLIB__) && !defined(__TM_GMTOFF)) ||  \
-        (!defined(_BSD_SOURCE) && !defined(_GNU_SOURCE))
+        (!defined(__APPLE__) && !defined(_BSD_SOURCE) && !defined(_GNU_SOURCE) && \
+            (!defined(_POSIX_VERSION) || (_POSIX_VERSION < 202405L)))
     // 'tm_gmtoff' field is BSD extension and it's missing on SunOS/Solaris
     struct helper {
         static long int calculate_gmt_offset(const std::tm &localtm = details::os::localtime(),
