@@ -87,7 +87,7 @@ class _JavaSemConfig(SemConfig):
             settings_root = self.arcadia_root / Path(self.params.settings_root)
         elif len(self.params.abs_targets) > 1:
             cwd = Path.cwd()
-            if cwd.is_relative_to(self.arcadia_root):
+            if cwd.is_relative_to(self.arcadia_root) and cwd != self.arcadia_root:
                 settings_root = cwd
         self.logger.info("Settings root: %s", settings_root)
         if not settings_root.exists() or not settings_root.is_dir():
@@ -391,6 +391,7 @@ class _JavaSemGraph(SemGraph):
         self.gradle_jdk_version: int = 17  # by default use JDK 17 for Gradle
         if self.config.params.force_jdk_version and self.config.params.force_jdk_version > self.gradle_jdk_version:
             self.gradle_jdk_version = self.config.params.force_jdk_version
+        self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
@@ -406,6 +407,8 @@ class _JavaSemGraph(SemGraph):
                 and event.get('Platform') == self._FOREIGN_IDE_DEPEND_PLATFORM
             ):
                 foreign_targets.append(event['Dir'])
+
+        self.dont_symlink_jdk = kwargs.pop('dont_symlink_jdk', False)
 
         super().make(
             **kwargs,
@@ -640,28 +643,31 @@ class _JavaSemGraph(SemGraph):
                     self._graph_patched = True
 
     def get_jdk_path(self, jdk_version: int) -> str:
-        try:
-            if jdk_version in self._cached_jdk_paths:
-                return self._cached_jdk_paths[jdk_version]
-            else:
+        if jdk_version in self._cached_jdk_paths:
+            return self._cached_jdk_paths[jdk_version]
+
+        platform = platform_matcher.my_platform()
+        if platform.startswith('darwin'):
+            jdk_home = Path.home() / "Library" / "Java" / "JavaVirtualMachines"
+        elif platform.startswith('linux'):
+            jdk_home = Path.home() / ".jdks"
+        else:
+            self.logger.error("Unknown platform %s, put JDK symlink to user home", platform)
+            jdk_home = Path.home()
+        jdk_path = jdk_home / ("arcadia-jdk-" + str(jdk_version))
+
+        if not self.dont_symlink_jdk:
+            try:
                 jdk_real_path = Path(tools.tool(f'java{jdk_version}').replace('/bin/java', ''))
-                platform = platform_matcher.my_platform()
-                if platform.startswith('darwin'):
-                    jdk_home = Path.home() / "Library" / "Java" / "JavaVirtualMachines"
-                elif platform.startswith('linux'):
-                    jdk_home = Path.home() / ".jdks"
-                else:
-                    self.logger.error("Unknown platform %s, put JDK symlink to user home", platform)
-                    jdk_home = Path.home()
-                jdk_path = jdk_home / ("arcadia-jdk-" + str(jdk_version))
                 if jdk_path.is_symlink() and jdk_path.resolve() != jdk_real_path:
                     jdk_path.unlink()  # remove invalid symlink to JDK
                 if not jdk_path.exists():  # create new symlink to JDK
                     _SymlinkCollector.mkdir(jdk_path.parent)
                     jdk_path.symlink_to(jdk_real_path, target_is_directory=True)
-        except Exception as e:
-            self.logger.error("Can't find JDK %s in tools: %s", jdk_version, e)
-            jdk_path = self.JDK_PATH_NOT_FOUND
+            except Exception as e:
+                self.logger.error("Can't find JDK %s in tools: %s", jdk_version, e)
+                jdk_path = self.JDK_PATH_NOT_FOUND
+
         jdk_path = str(jdk_path)
         self._cached_jdk_paths[jdk_version] = jdk_path
         if jdk_path != self.JDK_PATH_NOT_FOUND:
@@ -692,6 +698,7 @@ class _Exporter:
         self._make_project_name()
         self._make_project_gradle_props()
         self._apply_force_jdk_version()
+        self._fill_common_dir()
         self._make_yexport_toml()
         self._run_yexport()
 
@@ -737,6 +744,16 @@ class _Exporter:
             self.attrs_for_all_templates += [
                 f"force_jdk_version = '{self.config.params.force_jdk_version}'",
                 f"force_jdk_path = '{force_jdk_path}'",
+            ]
+
+    def _fill_common_dir(self) -> None:
+        common_dir = os.path.commonpath(self.config.params.rel_targets)
+        if not common_dir:
+            return
+        common_path = self.config.arcadia_root / common_dir
+        if common_path.is_relative_to(self.config.settings_root):
+            self.attrs_for_all_templates += [
+                f"common_dir = '{self.config.settings_root.relative_to(self.config.arcadia_root)}'",
             ]
 
     def _make_yexport_toml(self) -> None:

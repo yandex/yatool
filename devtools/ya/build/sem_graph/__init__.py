@@ -58,10 +58,10 @@ class SemConfig:
         self.logger = logging.getLogger(type(self).__name__)
         self.lang = lang
         self.params = copy.copy(params)
-        self.arcadia_root = Path(self.params.arc_root)
+        self.arcadia_root: Path = Path(self.params.arc_root)
         self._prepare_targets()
-        self.export_root = self._get_export_root()
-        self.ymake_root = self.export_root / SemConfig.YMAKE_DIR
+        self.export_root: Path = self._get_export_root()
+        self.ymake_root: Path = self.export_root / SemConfig.YMAKE_DIR
         self._ymake_bin_cache = None
         if hasattr(self.params, 'ymake_bin'):
             self._ymake_bin_cache = self.params.ymake_bin
@@ -267,19 +267,24 @@ class SemGraph:
     def make(self, **kwargs) -> None:
         """Make sem-graph file with current config params to ymake_root"""
 
-        conf = build_facade.gen_conf(
-            build_root=core_config.build_root(),
-            build_type='nobuild',
-            build_targets=self.config.params.abs_targets,
-            flags=self.config.params.flags,
-            host_platform=self.config.params.host_platform,
-            target_platforms=self.config.params.target_platforms,
-            arc_root=self.config.arcadia_root,
-        )
-
         self.config.ymake_root.mkdir(0o755, parents=True, exist_ok=True)
         ymake_conf = self.config.ymake_root / 'ymake.conf'
-        shutil.copy(conf, ymake_conf)
+
+        prepared_ymake_conf = kwargs.pop('prepared_ymake_conf', None)
+        if prepared_ymake_conf:
+            if prepared_ymake_conf != ymake_conf:
+                shutil.copy(prepared_ymake_conf, ymake_conf)
+        else:
+            conf = build_facade.gen_conf(
+                build_root=core_config.build_root(),
+                build_type='nobuild',
+                build_targets=self.config.params.abs_targets,
+                flags=self.config.params.flags,
+                host_platform=self.config.params.host_platform,
+                target_platforms=self.config.params.target_platforms,
+                arc_root=self.config.arcadia_root,
+            )
+            shutil.copy(conf, ymake_conf)
 
         dump_ymake_stderr = kwargs.pop('dump_ymake_stderr', None)
         for key, value in {  # Defaults from config, if absent in kwargs
@@ -289,6 +294,7 @@ class SemGraph:
         }.items():
             if key not in kwargs:
                 kwargs[key] = value
+
         r, _ = ymake_sem_graph(
             custom_conf=ymake_conf,
             continue_on_fail=True,
@@ -296,6 +302,7 @@ class SemGraph:
             abs_targets=self.config.params.abs_targets,
             **kwargs,
         )
+
         if dump_ymake_stderr:
             if dump_ymake_stderr == "log":
                 self.logger.info("YMake call stderr:\n%s\n\n", r.stderr)
