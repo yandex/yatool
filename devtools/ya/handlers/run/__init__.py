@@ -230,7 +230,6 @@ def _reduced_ya_make_options():
         devtools.ya.core.common_opts.ProfilerOptions,
         devtools.ya.core.common_opts.TeamcityOptions,
         devtools.ya.core.yarg.options.RawParamsOptions,
-        devtools.ya.test.opts.ArcadiaTestsDataOptions,
         devtools.ya.test.opts.CanonizationOptions,
         devtools.ya.test.opts.ConsoleReportOptions,
         devtools.ya.test.opts.CoverageOptions,
