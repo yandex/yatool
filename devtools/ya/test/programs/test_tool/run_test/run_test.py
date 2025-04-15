@@ -1426,6 +1426,9 @@ def main():
             logger.debug("Changed python paths: %s", tools.get_python_paths(env))
 
         # set up coverage
+        for envvar_name in const.COVERAGE_ENV_VARS:
+            env.set(envvar_name, "")
+
         coverage = {}
         if options.java_coverage_path:
             coverage["java"] = {"output_file": options.java_coverage_path}
