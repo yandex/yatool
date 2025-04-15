@@ -6,7 +6,6 @@ import collections
 import six
 
 import exts.fs
-import exts.func
 
 from yalibrary.store import file_store
 import yalibrary.runner.fs
@@ -71,11 +70,19 @@ class UidStore(object):
 
         ret = []
 
-        for rel_path, file_hash in six.iteritems(kv):
-            f_path = os.path.join(into_dir, rel_path)
+        try:
+            for rel_path, file_hash in six.iteritems(kv):
+                f_path = os.path.join(into_dir, rel_path)
 
-            yalibrary.runner.fs.make_hardlink(self._file_store.get(file_hash), f_path)
-            ret.append(f_path)
+                yalibrary.runner.fs.make_hardlink(self._file_store.get(file_hash), f_path)
+                ret.append(f_path)
+        except file_store.NotInCacheError as e:
+            logger.error(
+                "Could not restore some files from cache: %s"
+                "It likely means that the cache has been corrupted. Run 'ya gc cache --age-limit 0' to drop the cache.",
+                e,
+            )
+            raise
 
         return ret
 
