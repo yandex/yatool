@@ -30,6 +30,7 @@
 #include <devtools/ymake/include_parsers/proto_parser.h>
 #include <devtools/ymake/include_parsers/ragel_parser.h>
 #include <devtools/ymake/include_parsers/ros_parser.h>
+#include <devtools/ymake/include_parsers/ros_topic_parser.h>
 #include <devtools/ymake/include_parsers/sc_parser.h>
 #include <devtools/ymake/include_parsers/swig_parser.h>
 #include <devtools/ymake/include_parsers/xs_parser.h>
@@ -201,4 +202,8 @@ TParserBaseRef MakeTsParser(TParsersCache* cache) {
 
 TParserBaseRef MakeRosParser(TParsersCache* cache) {
     return new TIncludesProcessor<TRosDep, TRosIncludeParser, TRosIncludeProcessor>(cache);
+}
+
+TParserBaseRef MakeRosTopicParser(TParsersCache* cache) {
+    return new TIncludesProcessor<TRosDep, TRosTopicIncludeParser, TRosIncludeProcessor>(cache);
 }

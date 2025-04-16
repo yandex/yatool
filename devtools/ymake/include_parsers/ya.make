@@ -19,6 +19,7 @@ SRCS(
     proto_parser.cpp
     ragel_parser.cpp
     ros_parser.cpp
+    ros_topic_parser.cpp
     sc_parser.cpp
     swig_parser.cpp
     xs_parser.cpp

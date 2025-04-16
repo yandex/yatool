@@ -77,7 +77,6 @@ void TRosIncludeProcessor::ProcessIncludes(
 
         if (resolvedInclude.Empty()) {
             TString typeName = include.PackageName.empty() ? include.MessageName : TString::Join(include.PackageName, "/", include.MessageName);
-            YConfErr(BadIncl) << "Failed to resolve ROS type " << typeName << Endl;
             continue;
         }
 

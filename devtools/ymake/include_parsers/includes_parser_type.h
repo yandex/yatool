@@ -24,6 +24,7 @@ enum class EIncludesParserType: ui32 {
     CfgprotoParser,
     TsParser,
     RosParser,
+    RosTopicParser,
     PARSERS_COUNT,
     BAD_PARSER = Max<ui32>()
 };

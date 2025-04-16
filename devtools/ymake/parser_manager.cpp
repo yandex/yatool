@@ -127,6 +127,7 @@ namespace {
         std::make_tuple(EIncludesParserType::CfgprotoParser, "proto", TVector<TStringBuf>({"cfgproto"}), ParserConstructor<MakeCfgprotoParser>()),
         std::make_tuple(EIncludesParserType::TsParser, "other", TVector<TStringBuf>({"ts", "js", "tsx", "jsx"}), ParserConstructor<MakeTsParser>()),
         std::make_tuple(EIncludesParserType::RosParser, "ros", TVector<TStringBuf>({"msg", "srv"}), ParserConstructor<MakeRosParser>()),
+        std::make_tuple(EIncludesParserType::RosTopicParser, "ros", TVector<TStringBuf>({"rostopic"}), ParserConstructor<MakeRosTopicParser>()),
     };
 
     const auto& GetLanguagesWithNonPathAddincls() {
