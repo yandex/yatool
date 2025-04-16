@@ -20,6 +20,7 @@ PEERDIR(
     contrib/python/six
     devtools/ya/core/gsid
     devtools/ya/core/report
+    devtools/ya/core/monitoring
     devtools/ya/yalibrary/store
     library/cpp/ucompress
     library/python/retry

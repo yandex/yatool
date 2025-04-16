@@ -5,6 +5,7 @@ import time
 
 from contextlib2 import ExitStack
 from devtools.ya.core import config as core_config
+from devtools.ya.core import monitoring as core_monitoring
 from devtools.ya.core import report
 from exts import archive, asyncthread, fs, tmp
 from exts.timer import AccumulateTime
@@ -138,16 +139,33 @@ class YtStore(DistStore):
             else:
                 logger.warning("Disabling dist cache. Last caught error: %s", pretty_error)
 
+        labels = {
+            "error_type": type(err).__name__,
+            "yt_proxy": self._proxy,
+            "yt_dir": self._data_dir,
+            "is_heater": self._heater_mode,
+        }
+
+        try:
+            import app_ctx
+
+            if hasattr(app_ctx, 'metrics_reporter'):
+                app_ctx.metrics_reporter.report_metric(
+                    core_monitoring.MetricNames.YT_CACHE_ERROR,
+                    labels=labels,
+                    urgent=True,
+                    report_type=report.ReportTypes.YT_CACHE_METRICS,
+                )
+        except Exception:
+            logger.debug('Failed to report yt cache error metric to snowden', exc_info=True)
+            pass
+
+        labels['error'] = str(err)
+        labels['user'] = core_config.get_user
+
         report.telemetry.report(
             report.ReportTypes.YT_CACHE_ERROR,
-            {
-                "error": str(err),
-                "user": core_config.get_user(),
-                "error_type": type(err).__name__,
-                "yt_proxy": self._proxy,
-                "yt_dir": self._data_dir,
-                "is_heater": self._heater_mode,
-            },
+            labels,
         )
 
     def _get_cache_size_from_percent(self, percentage):
