@@ -324,6 +324,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
+    build_options.yt_store_retry_time_limit = params.yt_store_retry_time_limit
     # heater options
     build_options.yt_store_wt = params.yt_store_wt
     build_options.eager_execution = params.eager_execution
