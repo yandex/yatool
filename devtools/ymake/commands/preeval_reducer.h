@@ -140,18 +140,41 @@ namespace NCommands {
             return false;
         };
 
+        TStringBuf Evaluate(const TVarStr& val) {
+            if (val.HasPrefix)
+                return GetCmdValue(val.Name);
+            else
+                return val.Name;
+        }
+
         TMacroValues::TValue Evaluate(NPolexpr::EVarId id) {
-            // TBD what about vector vars here?
             auto name = Values.GetVarName(id);
             auto var = Vars.Lookup(name);
-            if (!var || var->DontExpand /* see InitModuleVars() */) {
+            if (!var) {
+                // this is a special case for when we get a macro argument like IN = "$L/TEXT/$U/__init__.py":
+                // the "$L" etc. are not variables, but root markers (see `NPath::ERoot` & Co.), we should keep them;
+                // TODO: _ackshually_, we should mark/type the whole thing as a file path and never parse it to begin with
+                auto result = TString(fmt::format("${}", name));
+                return Values.GetValue(Values.InsertStr(result));
+            }
+            if (var->DontExpand /* see InitModuleVars() */) {
                 // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
                 // note that the extra braces in the result are significant:
                 // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
                 auto result = TString(fmt::format("${{{}}}", name));
                 return Values.GetValue(Values.InsertStr(result));
             }
-            return Eval1(var);
+            // TODO? support for TVarStr with .StructCmd
+            if (var->size() == 1) {
+                auto& val = var->front();
+                return Evaluate(val);
+            } else {
+                std::vector<std::string_view> result;
+                result.reserve(var->size());
+                for (const auto &val : *var)
+                    result.push_back(Evaluate(val));
+                return result;
+            }
         }
 
         TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<NPolexpr::TConstId> args) {

@@ -378,10 +378,20 @@ namespace {
             [[maybe_unused]] const TVector<TMacroValues::TValue>& args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto md5 = Md5Beg(arg0);
-            auto id = ctx.Values.InsertStr(Md5End(md5));
-            return ctx.Values.GetValue(id);
+            return std::visit(TOverloaded{
+                [](std::monostate) -> TMacroValues::TValue {
+                    return std::monostate();
+                },
+                [&](std::string_view body) -> TMacroValues::TValue {
+                    return ctx.Values.GetValue(ctx.Values.InsertStr(DoString(body)));
+                },
+                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
+                    return ctx.Values.GetValue(ctx.Values.InsertStr(DoStrings(bodies)));
+                },
+                [&](auto& x) -> TMacroValues::TValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, args[0]);
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -397,18 +407,10 @@ namespace {
                     return TTermNothing();
                 },
                 [&](const TString& body) -> TTermValue {
-                    auto md5 = Md5Beg(body);
-                    return TString{Md5End(md5)};
+                    return DoString(body);
                 },
                 [&](const TVector<TString>& bodies) -> TTermValue {
-                    static const TStringBuf separator = "|";
-                    // Init and complete by separator for make different digests of empty string and empty array
-                    auto md5 = Md5Beg(separator);
-                    for (const auto& body: bodies) {
-                        md5.Update(body);
-                        md5.Update(separator);
-                    }
-                    return TString{Md5End(md5)};
+                    return DoStrings(bodies);
                 },
                 [&](const TTaggedStrings& x) -> TTermValue {
                     throw TBadArgType(Name, x);
@@ -427,6 +429,22 @@ namespace {
             char buffer[33]; // MD5 class require 33 bytes buffer
             md5.End(buffer);
             return std::string{buffer};
+        }
+
+        static TString DoString(const auto& s) {
+            auto md5 = Md5Beg(s);
+            return Md5End(md5);
+        }
+
+        static TString DoStrings(const auto& ss) {
+            static const TStringBuf separator = "|";
+            // Init and complete by separator for make different digests of empty string and empty array
+            auto md5 = Md5Beg(separator);
+            for (const auto& s: ss) {
+                md5.Update(s);
+                md5.Update(separator);
+            }
+            return Md5End(md5);
         }
 
     } Y_GENERATE_UNIQUE_ID(Mod);
