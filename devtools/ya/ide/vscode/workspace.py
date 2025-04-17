@@ -307,9 +307,9 @@ def get_recommended_extensions(params):
     if "CPP" in params.languages:
         extensions.append("llvm-vs-code-extensions.vscode-clangd")
         if is_mac or params.ide_name == IDEName.VSCODE:
-            extensions.append("ms-vscode.cpptools")
-        else:
             extensions.append("vadimcn.vscode-lldb")
+        else:
+            extensions.append("ms-vscode.cpptools")
         if params.clang_format_enabled:
             extensions.append("xaver.clang-format")
     if "PY3" in params.languages:
