@@ -23,7 +23,7 @@ from devtools.ya.build.stat.graph import (
     create_graph_with_distbuild_log,
     create_graph_with_local_log,
 )
-from devtools.ya.core import profiler, stage_tracer
+from devtools.ya.core import profiler, stage_tracer, stages_profiler
 
 
 class TaskType(enum.Enum):
@@ -574,17 +574,27 @@ def print_distbuild_download_statistics(graph, filename, display):
     else:
         total_time_span = finished - started
 
-        display.emit_message(
-            'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms, total_time_span={:.02f}ms'.format(
-                cnt,
-                format_size(total_download_size, binary=True),
-                format_size(speed_by_run_time),
-                format_size(speed_by_dl_time),
-                total_time_by_run,
-                total_time_by_dl,
-                total_time_span,
-            )
+        download_tail_time = -1
+
+        _, build_finished = stages_profiler.get_stage_timestamps('distbs-worktime')
+
+        if build_finished is not None:
+            download_tail_time = finished - build_finished
+
+        msg = 'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms, total_time_span={:.02f}ms'.format(
+            cnt,
+            format_size(total_download_size, binary=True),
+            format_size(speed_by_run_time),
+            format_size(speed_by_dl_time),
+            total_time_by_run,
+            total_time_by_dl,
+            total_time_span,
         )
+
+        if download_tail_time != -1:
+            msg += ', download_tail_time={:.02f}ms'.format(download_tail_time)
+
+        display.emit_message(msg)
 
         stats = {
             'total_download_size': total_download_size,
@@ -600,10 +610,22 @@ def print_distbuild_download_statistics(graph, filename, display):
 
         display.emit_message()
 
+        # DistDownloadTimeSpan = max(DistDownloadTask.end_time) - min(DistDownloadTask.start_time)
+        # DistDownloadTotalDownloadSize = sum(DistDownloadTask.size)
+        # DistDownloadTotalDownloadTimeByRuntime = sum(DistDownloadTask.end_time - DistDownloadTask.start_time)
+        # DistDownloadTotalDownloadTimeByDownloadTime = sum(DistDownloadTask.download_time_ms)  *download_time_ms is time for one SUCCESSFUL download (without retries)
+        # DistDownloadSpeedByRuntime = DistDownloadTotalDownloadSize / DistDownloadTotalDownloadTimeByRuntime
+        # DistDownloadSpeedByDlTime = DistDownloadTotalDownloadSize / DistDownloadTotalDownloadTimeByDownloadTime
+        # DistDownloadTailTime = max(DistDownloadTask.end_time) - time when build has finished on distbuild (all nodes in graph)
         YaMonEvent.send('EYaStats::DistDownloadTimeSpan', total_time_span)
         YaMonEvent.send('EYaStats::DistDownloadTotalDownloadSize', total_download_size)
         YaMonEvent.send('EYaStats::DistDownloadTotalDownloadTimeByRuntime', total_time_by_run)
         YaMonEvent.send('EYaStats::DistDownloadTotalDownloadTimeByDownloadTime', total_time_by_dl)
+        YaMonEvent.send('EYaStats::DistDownloadSpeedByRuntime', speed_by_run_time)
+        YaMonEvent.send('EYaStats::DistDownloadSpeedByDlTime', speed_by_run_time)
+
+        if download_tail_time != -1:
+            YaMonEvent.send('EYaStats::DistDownloadTailTime', download_tail_time)
 
         return stats
 

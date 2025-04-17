@@ -2,7 +2,7 @@ import logging
 import os
 import time
 
-from devtools.ya.core import stage_tracer
+from devtools.ya.core import stage_tracer, stages_profiler
 from devtools.ya.yalibrary import sjson
 import exts.fs
 from exts.compress import ucopen
@@ -54,6 +54,12 @@ def monitoring_stage_finished(stage_name):
     else:
         YaMonEvent.send('EYaStats::ContextTime', time.time() - stage_begin_time[stage_name])
         del stage_begin_time[stage_name]
+
+    _, build_finished = stages_profiler.get_stage_timestamps('distbs-worktime')
+
+    if build_finished is not None:
+        # NOW (end of ya make) - time when build has finished on distbuild (all nodes in graph)
+        YaMonEvent.send('EYaStats::YmakeHandlerTailTimeAfterDistBuildFinish', time.time() - build_finished)
 
 
 def do_ya_make(params):

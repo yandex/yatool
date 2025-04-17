@@ -46,6 +46,7 @@ PEERDIR(
     devtools/ya/core/report
     devtools/ya/core/respawn
     devtools/ya/core/stage_tracer
+    devtools/ya/core/stages_profiler
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/test/common

@@ -43,12 +43,30 @@ def _set_value(k, v):
                 json.dump(data, afile, indent=4, sort_keys=True)
 
 
+def _get_value(stage):
+    if not STAGES_FILE:
+        return
+
+    try:
+        with open(STAGES_FILE) as afile:
+            data = json.load(afile)
+        return data[stage]
+    except (IOError, KeyError):
+        return
+
+
 def stage_started(name, ts=None):
     _set_value(name + '_started', ts or time.time())
 
 
 def stage_finished(name, ts=None):
     _set_value(name + '_finished', ts or time.time())
+
+
+def get_stage_timestamps(name):
+    started = _get_value(name + '_started')
+    finished = _get_value(name + '_finished')
+    return started, finished
 
 
 def load_stages(stages, prefix=''):
