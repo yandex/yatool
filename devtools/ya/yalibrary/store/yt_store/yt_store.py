@@ -312,7 +312,10 @@ class YtStore(DistStore):
 
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         if self.is_disabled:
-            return False
+            if self._heater_mode:
+                raise Exception('Dist cache is disabled - no reason to work in heater_mode')
+            else:
+                return False
 
         name = files[0][len(root_dir) + 1 :] if len(files) else 'none'
         logger.debug('Put %s(%s) to YT', name, uid)
