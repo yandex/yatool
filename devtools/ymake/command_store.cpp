@@ -113,7 +113,7 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
 
     // do the thing
 
-    TLegacyVars::TDefinition def;
+    auto def = TLegacyVars::TDefinition();
     def.LegacyMode = ELegacyMode::Expr;
     if (var->size() == 1 && var->front().HasPrefix) {
         // a conventional variable
@@ -124,27 +124,26 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
         ParseLegacyCommandOrSubst(var->front().Name, scopeId, cmdName, cmdValue);
         def.Definition = MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(cmdValue)));
     } else {
+        auto has_nested_macro = false;
+        auto has_no_nested_macro = false;
+        for (auto& val : *var)
+            (val.IsMacro ? has_nested_macro : has_no_nested_macro) = true;
+        if (has_nested_macro && has_no_nested_macro)
+            ythrow TError() << "inconsistent variable array items (" << name << ")";
         def.Definition = MakeHolder<NCommands::TSyntax>();
-        auto& dst = def.Definition->Script.emplace_back();
-        TMacroValues::TLegacyLateGlobPatterns late_globs;
-        for (auto& val : *var) {
-            if (val.IsMacro) {
+        if (has_nested_macro) {
             // a passthrough hack pretending to be "a macro" (used by _LATE_GLOB)
+            auto late_globs = TMacroValues::TLegacyLateGlobPatterns();
+            for (auto& val : *var)
                 late_globs.Data.push_back(val.Name);
-            } else {
-                // a macro argument
-                auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val.Name);
-                for (auto& cmd : _val.Script)
-                    dst.insert(dst.end(),
-                        std::make_move_iterator(cmd.begin()),
-                        std::make_move_iterator(cmd.end()));
-            }
-        }
-        if (!late_globs.Data.empty()) {
-            if (!dst.empty())
-                ythrow TError() << "inconsistent variable array items (" << name << ")";
-            dst.push_back({Commands.Values.InsertValue(late_globs)});
+            def.Definition->Script = {{{Commands.Values.InsertValue(late_globs)}}};
             def.LegacyMode = ELegacyMode::Macro;
+        }
+        if (has_no_nested_macro) {
+            // a proper macro argument
+            auto val = GetAll(var);
+            auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val);
+            def.Definition->Script = std::move(_val.Script);
         }
     }
     defs->second->push_back(std::move(def));
