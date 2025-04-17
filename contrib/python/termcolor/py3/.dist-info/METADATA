@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: termcolor
-Version: 3.0.0
+Version: 3.0.1
 Summary: ANSI color formatting for output in terminal
 Project-URL: Changelog, https://github.com/termcolor/termcolor/releases
 Project-URL: Homepage, https://github.com/termcolor/termcolor
@@ -8,6 +8,7 @@ Project-URL: Source, https://github.com/termcolor/termcolor
 Author-email: Konstantin Lepa <konstantin.lepa@gmail.com>
 Maintainer: Hugo van Kemenade
 License-Expression: MIT
+License-File: COPYING.txt
 Keywords: ANSI,ANSI color,ANSI colour,color,colour,formatting,termcolor,terminal
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Environment :: Console
