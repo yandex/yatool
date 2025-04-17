@@ -71,7 +71,7 @@ class VSCodeProject:
 
         self.tool_platform = None
         if params.host_platform:
-            platform_parts = [p.to_lower() for p in params.host_platform.split("-")]
+            platform_parts = [p.lower() for p in params.host_platform.split("-")]
             params.tool_platform = "-".join(p for p in platform_parts if p != "default")
 
         self.common_args = (
