@@ -48,28 +48,64 @@ def _is_branch(path):
 def _make_repositories_config(
     for_uid,
     root,
+    revision,
+    arcadia_svn_path,
     patch,
     repository_type,
     source_root_pattern,
+    arc_url,
 ):
     if repository_type == distbs_consts.DistbuildRepoType.TARED:
         return make_tared_repositories_config(True)
+
+    if revision is None:
+        revision, arcadia_svn_path = vcsversion.repo_config(root)
+
+    arcadia_svn_path = arcadia_svn_path or TRUNK_PATH  # TODO: compat
 
     pf, p = '', ''
     if patch:
         trs, data = patch_tools.convert_patch_spec(patch)
         pf, p = patch_tools.combine_transformations(trs), data
 
-    arc_hash = vcsversion.get_raw_version_info(root)['hash']
-    return [
-        {
-            "pattern": "$({})".format(None if for_uid else source_root_pattern),
-            "patch_filters": pf,
-            "patch": p,
-            "use_arcc": True,
-            "arc_url": f"arc://arcadia#{arc_hash}",
-        }
-    ]
+    if arc_url:
+        # prepare arc repo
+        return [
+            {
+                "pattern": "$({})".format(None if for_uid else source_root_pattern),
+                "patch_filters": pf,
+                "patch": p,
+                "use_arcc": True,
+                "arc_url": arc_url,
+            }
+        ]
+    else:
+        import app_ctx
+
+        if getattr(app_ctx.params, 'arc_arcadia_instead_of_arc_full', False):
+            # prepare arc repo as an experiment
+            arc_hash = vcsversion.get_raw_version_info(root)['hash']
+            return [
+                {
+                    "pattern": "$({})".format(None if for_uid else source_root_pattern),
+                    "patch_filters": pf,
+                    "patch": p,
+                    "use_arcc": True,
+                    "arc_url": f"arc://arcadia#{arc_hash}",
+                }
+            ]
+        else:
+            # prepare svn repo
+            return [
+                {
+                    "repository": "svn:/" + arcadia_svn_path,
+                    "pattern": "$({})".format(None if for_uid else source_root_pattern),
+                    "revision": revision,
+                    "patch_filters": pf,
+                    "patch": p,
+                    "use_arcc": repository_type == distbs_consts.DistbuildRepoType.ARCC,
+                }
+            ]
 
 
 # Don't do slow libc version discovering for Linux
@@ -96,6 +132,8 @@ def gen_description():
 def _gen_extra_dict(
     for_uid,
     root,
+    revision,
+    arcadia_svn_path,
     priority,
     patch,
     cluster,
@@ -106,14 +144,18 @@ def _gen_extra_dict(
     repository_type,
     source_root_pattern,
     distbuild_pool,
+    arc_url,
     default_node_requirements,
 ):
     repos = _make_repositories_config(
         for_uid,
         root,
+        revision,
+        arcadia_svn_path,
         patch,
         repository_type,
         source_root_pattern,
+        arc_url,
     )
     conf = {
         'repos': repos,
@@ -152,6 +194,8 @@ def gen_extra_dict_by_opts(
     return _gen_extra_dict(
         for_uid,
         getattr(opts, 'arc_root', None),
+        getattr(opts, 'revision_for_check', None),
+        getattr(opts, 'svn_url_for_check', None),
         priority or getattr(opts, 'dist_priority', 0),
         getattr(opts, 'distbuild_patch', None),
         cluster or getattr(opts, 'distbuild_cluster', None),
@@ -162,6 +206,7 @@ def gen_extra_dict_by_opts(
         repository_type,
         getattr(opts, 'build_graph_source_root_pattern', 'SOURCE_ROOT'),
         distbuild_pool or getattr(opts, 'distbuild_pool', None),
+        getattr(opts, 'arc_url_as_working_copy_in_distbuild', None),
         getattr(opts, 'default_node_requirements', None),
     )
 
