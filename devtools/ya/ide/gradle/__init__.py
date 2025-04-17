@@ -306,16 +306,18 @@ class _RemoveSymlinkCollector(_SymlinkCollector):
         del self.symlinks[arcadia_file]
 
     def remove_invalid_symlinks(self):
-        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root)
+        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root, top_only=True)
         for rel_target in self.config.params.rel_targets:
             _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.arcadia_root / rel_target)
 
     @staticmethod
-    def _remove_invalid_symlinks(dirtree: Path) -> None:
+    def _remove_invalid_symlinks(dirtree: Path, top_only: bool = False) -> None:
         """Remove all invalid symlinks"""
         for walk_root, dirs, files in dirtree.walk():
             for item in dirs + files:
                 _SymlinkCollector.resolve(walk_root / item)
+            if top_only:
+                dirs.clear()
 
 
 class _NewSymlinkCollector(_SymlinkCollector):
