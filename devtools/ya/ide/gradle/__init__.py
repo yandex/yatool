@@ -389,7 +389,7 @@ class _JavaSemGraph(SemGraph):
         self.jdk_paths: dict[int, str] = {}
         self.foreign_targets: list[str] = []
         self.gradle_jdk_version: int = 17  # by default use JDK 17 for Gradle
-        if self.config.params.force_jdk_version and self.config.params.force_jdk_version > self.gradle_jdk_version:
+        if self.config.params.force_jdk_version and int(self.config.params.force_jdk_version) > self.gradle_jdk_version:
             self.gradle_jdk_version = self.config.params.force_jdk_version
         self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
 
