@@ -30,6 +30,7 @@ TEST_STATUS = {
     "passed": const.Status.GOOD,
     "failed": const.Status.FAIL,
     "pending": const.Status.SKIPPED,
+    "todo": const.Status.SKIPPED,
 }
 COVERAGE_INFO_FILENAME = "coverage.jsonl"
 
