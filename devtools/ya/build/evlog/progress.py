@@ -137,9 +137,6 @@ class ModulesFilesStatistic:
         self._print_message()
         self._set_new_info_false()
 
-    def force_clear(self):
-        self._stream('')
-
     def handler(
         self, event, delta_done=None, delta_total=None, delta_files=None, delta_rendered=None, delta_rendered_total=None
     ):
@@ -264,9 +261,6 @@ class PrintProgressSubscriber(
             prev_ymake_state.rendered_total = event["Total"]
         else:
             self.modules_files_stats.handler(event)
-
-    def on_unsubscribe(self):
-        self.modules_files_stats.force_clear()
 
 
 def get_print_status_func(opts, display, logger):

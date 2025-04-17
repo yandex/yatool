@@ -50,15 +50,22 @@ class Display(object):
             self._stream = stream
         self._formatter = formatter
         self._lock = threading.Lock()
+        # list of tuples (stream, data)
+        self._dump_after_close = []
 
         self._write(self._formatter.header())
         self._closed = False
+
+    def dump_after_close(self, stream, data):
+        self._dump_after_close.append((stream, data))
 
     def close(self):
         self.emit_status('')  # clear status
 
         self._write(self._formatter.footer())
         self._closed = True
+        for stream, data in self._dump_after_close:
+            stream.write(data)
 
     def _write(self, text):
         if six.PY2:

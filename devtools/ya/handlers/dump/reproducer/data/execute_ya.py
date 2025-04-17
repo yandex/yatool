@@ -140,11 +140,7 @@ def clean_arcadia(path: pathlib.Path):
     ]
 
     for cmd in cmd_list:
-        proc = subprocess.run(
-            args=cmd,
-            cwd=str(path),
-            stdout=sys.stderr
-        )
+        proc = subprocess.run(args=cmd, cwd=str(path), stdout=sys.stderr)
         if proc.returncode != 0:
             raise Exception(f"during {' '.join(cmd)}")
 

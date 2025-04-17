@@ -397,7 +397,7 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
             **kwargs
         )
     if write_stdout:
-        sys.stdout.write(res.stdout)
+        delay_stdout_write(res.stdout)
     return res
 
 
@@ -454,7 +454,7 @@ def do_dir_graph(params):
             )
 
     if params.trace_from is not None:
-        print('\n'.join(reachable(dg, params.trace_from, params.split_by_type)))
+        delay_stdout_write('\n'.join(reachable(dg, params.trace_from, params.split_by_type)) + "\n")
 
     elif params.plain_dump:
 
@@ -465,9 +465,9 @@ def do_dir_graph(params):
                 plain_deps |= set(v)
             return sorted(list(plain_deps))
 
-        json.dump(get_plain_deps(), sys.stdout, indent=4, sort_keys=True)
+        delay_json_stdout_write(get_plain_deps())
     else:
-        json.dump(dg, sys.stdout, indent=4, sort_keys=True)
+        delay_json_stdout_write(dg)
 
 
 def get_canondata_paths(arc_root, test):
@@ -1024,7 +1024,7 @@ def do_build_plan(params):
             no_ymake_resource=params.no_ymake_resource,
             vcs_file=params.vcs_file,
         )
-        json.dump(graph, sys.stdout, indent=4, sort_keys=True)
+        delay_json_stdout_write(graph)
 
 
 def do_relation(params):
@@ -1132,7 +1132,7 @@ def do_conf(params):
     with temp_dir() as tmp:
         generation_conf = _do_dump(gen_conf, params, write_stdout=False, build_root=tmp)
         with open(generation_conf) as afile:
-            print(afile.read())
+            delay_stdout_write(afile.read())
 
 
 def do_conf_docs(params):
@@ -1180,3 +1180,19 @@ def do_recipes(params):
         recipes_str = [' '.join(recipe) for recipe in recipes]
         output = ' '.join(recipes_str)
     print(output)
+
+
+def delay_stdout_write(data):
+    # that function need to avoid conflicts between ya display and ya dump output
+    try:
+        import app_ctx
+
+        display = app_ctx.display
+        display.dump_after_close(sys.stdout, data)
+    except ImportError:
+        sys.stderr.write("\n")
+        sys.stdout.write(data)
+
+
+def delay_json_stdout_write(data):
+    delay_stdout_write(json.dumps(data, indent=4, sort_keys=True))
