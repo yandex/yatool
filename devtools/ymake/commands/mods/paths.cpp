@@ -112,14 +112,14 @@ namespace {
             return std::visit(TOverloaded{
                 [&](std::string_view path) -> TMacroValues::TValue {
                     auto names = SplitArgs(TString(path)); // TODO get rid of this
-                    if (names.size() != 1)
-                        throw std::runtime_error{"nopath modifier requires a single argument"};
-                    return ProcessOne(ctx, names.front());
+                    if (names.size() == 1)
+                        return ProcessOne(ctx, names.front());
+                    return ProcessMany(ctx, names);
                 },
                 [&](const std::vector<std::string_view>& paths) -> TMacroValues::TValue {
-                    if (paths.size() != 1)
-                        throw std::runtime_error{"nopath modifier requires a single argument"};
-                    return ProcessOne(ctx, paths.front());
+                    if (paths.size() == 1)
+                        return ProcessOne(ctx, paths.front());
+                    return ProcessMany(ctx, paths);
                 },
                 [](auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
@@ -163,7 +163,14 @@ namespace {
         static TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) {
             return ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)));
         }
-    } Y_GENERATE_UNIQUE_ID(Mod);
+        static TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& paths) {
+            auto result = std::vector<std::string_view>();
+            result.reserve(paths.size());
+            for (auto& path : paths)
+                result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)))));
+            return result;
+        }
+} Y_GENERATE_UNIQUE_ID(Mod);
 
     //
     //
@@ -181,14 +188,14 @@ namespace {
             return std::visit(TOverloaded{
                 [&](std::string_view path) -> TMacroValues::TValue {
                     auto names = SplitArgs(TString(path)); // TODO get rid of this
-                    if (names.size() != 1)
-                        throw std::runtime_error{"noext modifier requires a single argument"};
-                    return ProcessOne(ctx, names.front());
+                    if (names.size() == 1)
+                        return ProcessOne(ctx, names.front());
+                    return ProcessMany(ctx, names);
                 },
                 [&](const std::vector<std::string_view>& paths) -> TMacroValues::TValue {
-                    if (paths.size() != 1)
-                        throw std::runtime_error{"noext modifier requires a single argument"};
-                    return ProcessOne(ctx, paths.front());
+                    if (paths.size() == 1)
+                        return ProcessOne(ctx, paths.front());
+                    return ProcessMany(ctx, paths);
                 },
                 [](auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
@@ -234,6 +241,13 @@ namespace {
         }
         static TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) {
             return ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)));
+        }
+        static TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& paths) {
+            auto result = std::vector<std::string_view>();
+            result.reserve(paths.size());
+            for (auto& path : paths)
+                result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)))));
+            return result;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
