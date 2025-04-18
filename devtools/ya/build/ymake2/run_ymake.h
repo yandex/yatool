@@ -23,3 +23,15 @@ TRunYMakeResultPtr RunYMake(
     PyObject* stderrLineReader,
     PyObject* stdinLineProvider
 );
+
+struct TRunYmakeParams {
+    TString Binary;
+    TList<TString> Args;
+    THashMap<TString, TString> Env;
+    PyObject* StderrLineReader;
+    PyObject* StdinLineProvider;
+};
+
+using TRunYmakeMulticonfigResultPtr = TAtomicSharedPtr<THashMap<int, TRunYMakeResultPtr>>;
+
+TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& params);

@@ -1347,7 +1347,9 @@ class _GraphMaker:
         cl_generator,
     ):
         self._opts = opts
-        self._platform_threadpool = ThreadPoolExecutor(max_workers=getattr(opts, 'ya_threads'))
+        self._platform_threadpool = ThreadPoolExecutor(
+            max_workers=getattr(opts, 'ya_threads')
+        )  # must be unbound when ymake is multithreaded
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
         self._src_dir = src_dir
@@ -1361,6 +1363,7 @@ class _GraphMaker:
         self._heater = self._opts.build_graph_cache_heater
         self._allow_changelist = True
         self._cl_generator = cl_generator
+        self.ymakes_scheduled = 0
 
     def disable_changelist(self):
         self._allow_changelist = False
@@ -1446,6 +1449,12 @@ class _GraphMaker:
                     report_pic_nopic=True,
                 )
 
+            ymake_opts_nopic = dict(
+                ymake_opts_nopic or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
+
             def gen_no_pic():
                 return no_pic_func(
                     flags,
@@ -1498,6 +1507,12 @@ class _GraphMaker:
                     dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
                 )
                 abs_targets_pic = []
+
+            ymake_opts_pic = dict(
+                ymake_opts_pic or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
 
             def gen_pic():
                 return pic_func(
@@ -1927,6 +1942,9 @@ class _GraphMaker:
         if self._opts.compress_ymake_output:
             assert self._opts.compress_ymake_output_codec, "Compress codec must be defined"
             o['compress_ymake_output_codec'] = self._opts.compress_ymake_output_codec
+
+        if self._opts.ymake_multiconfig:
+            o['multiconfig'] = self._opts.ymake_multiconfig
 
         return o
 
@@ -2928,6 +2946,8 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             extra_conf=opts.extra_conf,
             **kwargs,
         )
+        if opts.ymake_multiconfig:
+            ymake2.run_ymake_scheduled(graph_maker.ymakes_scheduled)
         graph_tools = tg.pic().graph
 
     graph_tools.add_host_mark(strtobool(host_tc['flags'].get('SANDBOXING', "no")))
