@@ -45,17 +45,43 @@ struct TKeyword {
     );
 };
 
-class TUnitProperty {
+class TCmdProperty {
 public:
     using TMacroCall = std::pair<TString, TString>;
     using TMacroCalls = TVector<TMacroCall>;
 
+    class TKeywords {
+    public:
+        TKeywords() noexcept = default;
+        ~TKeywords() noexcept = default;
+
+        TKeywords(const TKeywords&) = delete;
+        TKeywords& operator=(const TKeywords&) = delete;
+        TKeywords(TKeywords&&) noexcept = default;
+        TKeywords& operator=(TKeywords&&) noexcept = default;
+
+
+        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
+
+        bool Empty() const noexcept {
+            return Collected_.empty();
+        }
+
+        TVector<std::pair<TString, TKeyword>> Take() && noexcept {
+            return std::move(Collected_);
+        }
+    private:
+        TVector<std::pair<TString, TKeyword>> Collected_;
+    };
+
+    TCmdProperty() noexcept = default;
+    TCmdProperty(const TVector<TString>& cmd, TKeywords&& kw);
+
     bool AddMacroCall(const TStringBuf& name, const TStringBuf& argList);
-    void AddArgNames(const TString& argNamesList);
 
     static bool IsBaseMacroCall(const TStringBuf& name);
 
-    void Inherit(const TUnitProperty& parent) {
+    void Inherit(const TCmdProperty& parent) {
         //TODO: fix bad and slow insertion
         if (parent.MacroCalls_.size()) {
             MacroCalls_.insert(MacroCalls_.begin(), parent.MacroCalls_.begin(), parent.MacroCalls_.end());
@@ -88,51 +114,7 @@ public:
         return HasConditions_;
     }
 
-    Y_SAVELOAD_DEFINE(
-        HasConditions_,
-        ArgNames_,
-        MacroCalls_,
-        SpecVars_
-    );
-
-private:
-    bool HasConditions_ = false;
-    //for macrocalls
-    TVector<TString> ArgNames_;
-    TMacroCalls MacroCalls_;
-    TVars SpecVars_; //use only for inner scope
-};
-
-class TCmdProperty: public TUnitProperty {
-public:
-    class TKeywords {
-    public:
-        TKeywords() noexcept = default;
-        ~TKeywords() noexcept = default;
-
-        TKeywords(const TKeywords&) = delete;
-        TKeywords& operator=(const TKeywords&) = delete;
-        TKeywords(TKeywords&&) noexcept = default;
-        TKeywords& operator=(TKeywords&&) noexcept = default;
-
-
-        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
-
-        bool Empty() const noexcept {
-            return Collected_.empty();
-        }
-
-        TVector<std::pair<TString, TKeyword>> Take() && noexcept {
-            return std::move(Collected_);
-        }
-    private:
-        TVector<std::pair<TString, TKeyword>> Collected_;
-    };
-
-    TCmdProperty() noexcept = default;
-    TCmdProperty(TStringBuf cmd, TKeywords&& kw);
-
-    TString ConvertCmdArgs(TStringBuf cmd) const;
+    TString ConvertCmdArgs() const;
     size_t Key2ArrayIndex(TStringBuf arg) const;
 
     bool HasKeyword(TStringBuf arg) const {
@@ -174,21 +156,21 @@ public:
         return NumUsrArgs_;
     }
 
-    TUnitProperty& GetBaseReference() {
-        return *this;
-    }
-
-    const TUnitProperty& GetBaseReference() const {
-        return *this;
-    }
-
     Y_SAVELOAD_DEFINE(
-        GetBaseReference(),
+        HasConditions_,
+        ArgNames_,
+        MacroCalls_,
+        SpecVars_,
         Keywords_,
         NumUsrArgs_
     );
 
 private:
+bool HasConditions_ = false;
+    //for macrocalls
+    TVector<TString> ArgNames_;
+    TMacroCalls MacroCalls_;
+    TVars SpecVars_; //use only for inner scope
     // /me cries loudly because of absence of std::flat_map right here and right now.
     // Do not hesitate to remove this coment once proper time will come.
     TVector<std::pair<TString, TKeyword>> Keywords_;

@@ -168,10 +168,8 @@ namespace {
                 auto blockData = TBlockData{};
                 blockData.Completed = true;
                 blockData.IsUserMacro = true;
-                auto plainArgs = JoinStrings({"COND"}, ", ");
-                blockData.CmdProps.Reset(new TCmdProperty{plainArgs, std::move(keywords)});
-                plainArgs = blockData.CmdProps->ConvertCmdArgs(plainArgs);
-                blockData.CmdProps->AddArgNames(plainArgs);
+                const TVector<TString> positionalArgs = {"COND"};
+                blockData.CmdProps.Reset(new TCmdProperty{positionalArgs, std::move(keywords)});
                 return blockData;
             }();
 

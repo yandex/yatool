@@ -26,7 +26,7 @@ namespace {
     using namespace NConfReader;
 
     static constexpr const ui32 MAGIC = 0x5afec0de;
-    static constexpr const ui32 VERSION = 0x7;
+    static constexpr const ui32 VERSION = 0x8;
 
     bool IsActualFile(const TString& fileName,
                       const TString& md5,

@@ -564,18 +564,11 @@ namespace {
             }
 
             const auto argNames = CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second);
-            TString plainArgs = JoinStrings(argNames, ", ");
 
-            if (!keywords.Empty()) {
-                blockData.CmdProps.Reset(new TCmdProperty{plainArgs, std::move(keywords)});
-                plainArgs = blockData.CmdProps->ConvertCmdArgs(plainArgs);
-            } else {
-                blockData.CmdProps.Reset(new TCmdProperty{});
-            }
+            blockData.CmdProps.Reset(new TCmdProperty{argNames, std::move(keywords)});
 
-            if (!plainArgs.empty()) {
-                block.SetArgs(plainArgs);
-                blockData.CmdProps->AddArgNames(plainArgs);
+            if (!blockData.CmdProps->ArgNames().empty()) {
+                block.SetArgs(blockData.CmdProps->ConvertCmdArgs());
             }
 
             // Add "guard" for conditions. All conditions defined inside the macro are prepended
