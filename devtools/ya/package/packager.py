@@ -361,10 +361,18 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     # TODO: Rewrite with statuses
     if not build_options.run_tests and builder.exit_code:
-        msg = f"{build_key_str}Building targets: [[bad]]failed"
-    elif build_options.run_tests and builder.exit_code != devtools.ya.core.error.ExitCodes.TEST_FAILED:
-        msg = f"{build_key_str}Building targets: [[bad]]failed with exit code {builder.exit_code}[[rst]], testing: not lauched"
-    elif build_options.run_tests and builder.exit_code == devtools.ya.core.error.ExitCodes.TEST_FAILED:
+        msg = f"{build_key_str}Building targets: [[bad]]failed with exit code {builder.exit_code}"
+    elif (
+        build_options.run_tests
+        and builder.exit_code
+        and builder.exit_code
+        not in (devtools.ya.core.error.ExitCodes.TEST_FAILED, devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR)
+    ):
+        msg = f"{build_key_str}Building targets: [[bad]]failed with exit code {builder.exit_code}"
+    elif build_options.run_tests and builder.exit_code in (
+        devtools.ya.core.error.ExitCodes.TEST_FAILED,
+        devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR,
+    ):
         msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[bad]]failed"
     elif build_options.run_tests:
         msg = f"{build_key_str}Building targets: [[good]]done[[rst]], testing: [[good]]done"
