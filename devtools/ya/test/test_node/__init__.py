@@ -1741,21 +1741,21 @@ def filter_last_failed(tests, opts):
     store_path = last_failed.get_tests_restart_cache_dir(opts.bld_dir)
     status_storage = last_failed.StatusStore(store_path)
     is_all_empty = True
-    result_tests = []
+    suites_to_rerun = []
     for suite in tests:
-        config_test_hash = suite.get_state_hash()
-        content = status_storage.get(config_test_hash)
-        if content is None:
-            continue
-        if content.keys():
+        suite_hash = suite.get_state_hash()
+        failed_tests = status_storage.get(suite_hash)
+        if failed_tests:
             is_all_empty = False
-            suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in content.keys()])
-            result_tests.append(suite)
+            suites_to_rerun.append(suite)
+            if suite_hash not in failed_tests:
+                # if a suite is not marked as failed we add filters to run only failed tests
+                suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in failed_tests.keys()])
     status_storage.flush()
     if is_all_empty or opts.tests_filters:
         return tests
     else:
-        return result_tests
+        return suites_to_rerun
 
 
 def configure_suites(suites, process, stage, add_error_func):
