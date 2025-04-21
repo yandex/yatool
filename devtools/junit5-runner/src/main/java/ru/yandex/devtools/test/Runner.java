@@ -14,6 +14,7 @@ import org.junit.platform.engine.discovery.ClassNameFilter;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
+import org.junit.platform.launcher.PostDiscoveryFilter;
 import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
@@ -72,8 +73,9 @@ public class Runner extends AbstractRunner {
         cfg.start();
 
         YaTestNameBase baseName = new YaTestNameBase();
-        LauncherDiscoveryRequest request = getRequest(baseName, params);
-        TestPlan plan = LauncherFactory.create().discover(request);
+        Launcher launcher = LauncherFactory.create();
+        LauncherDiscoveryRequest request = getRequestWithForkFilter(launcher, baseName, params);
+        TestPlan plan = launcher.discover(request);
         YaTestName testName = new YaTestName(baseName, plan);
 
         Map<Object, Object> subtestInfo = new HashMap<>();
@@ -109,8 +111,8 @@ public class Runner extends AbstractRunner {
         }
 
         YaTestNameBase baseName = new YaTestNameBase();
-        LauncherDiscoveryRequest request = getRequest(baseName, params);
         Launcher launcher = LauncherFactory.create();
+        LauncherDiscoveryRequest request = getRequestWithForkFilter(launcher, baseName, params);
         TestPlan plan = launcher.discover(request);
 
         YaTestName testName = new YaTestName(baseName, plan);
@@ -154,7 +156,8 @@ public class Runner extends AbstractRunner {
     }
 
 
-    static LauncherDiscoveryRequest getRequest(YaTestNameBase baseName, Parameters params) {
+    static LauncherDiscoveryRequest getRequest(YaTestNameBase baseName, Parameters params,
+                                               PostDiscoveryFilter additionalFilter) {
         LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
         if (params.testsJar.startsWith("class:")) {
             builder.selectors(DiscoverySelectors.selectClass(params.testsJar.substring("class:".length())));
@@ -162,15 +165,48 @@ public class Runner extends AbstractRunner {
             builder.selectors(DiscoverySelectors.selectClasspathRoots(new HashSet<>(
                     Collections.singletonList(new File(params.testsJar).toPath()))));
         }
+
         return builder
                 .filters(
                         ClassNameFilter.includeClassNamePatterns(".*"),
                         new YaFilter(baseName, params.filters),
                         new RuntimeTagFilter(baseName, params.junit_tags),
-                        new ForkSubtests(baseName, params.forkSubtests, params.modulo, params.moduloIndex))
+                        additionalFilter
+                )
                 .build();
     }
 
+
+    static LauncherDiscoveryRequest getRequestWithForkFilter(Launcher launcher, YaTestNameBase baseName,
+                                                             Parameters params) {
+        if (!params.experimentalFork) {
+            var filter = new ForkSubtests(baseName, params.forkSubtests, params.modulo, params.moduloIndex);
+            return getRequest(baseName, params, filter);
+        }
+
+        var request = getRequest(baseName, params, new AlwaysAcceptFilter());
+        if (params.modulo <= 1) {
+            return request;
+        }
+
+        var plan = launcher.discover(request);
+        var testName = new YaTestName(baseName, plan);
+
+        var testIdentifiers = plan.getRoots()
+                .stream()
+                .flatMap(root -> plan.getDescendants(root).stream())
+                .filter(testName::isTest)
+                .collect(Collectors.toList());
+
+        PostDiscoveryFilter filter = null;
+        if (params.forkSubtests) {
+            filter = new ForkSubtestsFilter(testName, params.modulo, params.moduloIndex, testIdentifiers);
+        } else {
+            filter = new ForkTestsFilter(testName, params.modulo, params.moduloIndex, testIdentifiers);
+        }
+
+        return getRequest(baseName, params, filter);
+    }
 
 
     public static void main(String[] args) throws Exception {

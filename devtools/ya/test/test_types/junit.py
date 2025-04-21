@@ -70,6 +70,8 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         self.tests_jar = os.path.join(graph_consts.BUILD_ROOT, self.meta.test_jar)
         self.classpath_file = os.path.splitext(self.tests_jar)[0] + '.test.cpf'
 
+        self.experimental_fork = self.meta.experimental_fork
+
     def init_from_opts(self, opts):
         self.jdk_resource = base.resolve_jdk(
             self.global_resources,
@@ -389,6 +391,8 @@ class JavaTestSuite(test_types.AbstractTestSuite):
                 str(self._modulo_index),
             ]
         )
+        if self.experimental_fork == 'yes':
+            cmd.append('--experimental-fork')
 
         if build_root:
             cmd.extend(['--build-root', build_root])

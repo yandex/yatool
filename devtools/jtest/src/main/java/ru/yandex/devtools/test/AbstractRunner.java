@@ -55,10 +55,11 @@ public abstract class AbstractRunner {
 
         Parameters params = task.getParams();
 
-        logger.info("Modulo      : %s", params.modulo);
-        logger.info("Modulo index: %s", params.moduloIndex);
-        logger.info("Fork mode   : %s", (params.forkSubtests ? "subtests" : "tests"));
-        logger.info("Filters     : %s", params.filters);
+        logger.info("Modulo           : %s", params.modulo);
+        logger.info("Modulo index     : %s", params.moduloIndex);
+        logger.info("Fork mode        : %s", (params.forkSubtests ? "subtests" : "tests"));
+        logger.info("Experimental fork: %s", params.experimentalFork);
+        logger.info("Filters          : %s", params.filters);
 
         Shared.initTmpDir();
 

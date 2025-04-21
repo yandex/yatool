@@ -78,6 +78,9 @@ public class Shared {
         @Parameter(names = {"-s", "--fork-subtests"})
         public boolean forkSubtests;
 
+        @Parameter(names = {"--experimental-fork"})
+        public boolean experimentalFork;
+
         @Parameter(names = {"-F", "--filter"}, splitter = NonSplitter.class)
         public List<String> filters = new ArrayList<>();
 

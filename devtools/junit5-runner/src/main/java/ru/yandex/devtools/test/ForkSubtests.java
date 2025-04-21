@@ -7,6 +7,9 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.launcher.PostDiscoveryFilter;
 
 
+/**
+ * Old ForkSubtests filter. Keeping it during migration to new ForkFilter implementation.
+ */
 public class ForkSubtests implements PostDiscoveryFilter {
 
     private final YaTestNameBase testName;

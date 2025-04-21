@@ -68,6 +68,10 @@ class MetaInfo(object):
         return self._fork_test_files
 
     @property
+    def experimental_fork(self):
+        return self._experimental_fork or ''
+
+    @property
     def fuzz_dicts(self):
         return self._fuzz_dicts or ()
 
@@ -382,6 +386,7 @@ class DartInfo(MetaInfo):
         self._test_jar = dart_info.get('TEST_JAR')
         self._test_name = dart_info.get("TEST-NAME")
         self._test_partition = dart_info.get('TEST_PARTITION')
+        self._experimental_fork = dart_info.get('TEST_EXPERIMENTAL_FORK')
         self._test_recipes = dart_info.get('TEST-RECIPES')
         self._test_runner_bin = dart_info.get('TEST-RUNNER-BIN')
         self._test_timeout = dart_info.get('TEST-TIMEOUT')

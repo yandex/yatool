@@ -6,6 +6,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
 
@@ -66,6 +67,11 @@ public class YaTestName extends CachedTestNames<String, TestIdentifier> {
     public boolean isClass(TestIdentifier test) {
         return baseName.isClass(test);
     }
+
+    public boolean isTest(TestDescriptor test) {
+        return baseName.isTest(test);
+    }
+
 
     public boolean isTest(TestIdentifier test) {
         return baseName.isTest(test);
