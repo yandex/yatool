@@ -182,7 +182,7 @@ class YtStore(DistStore):
             pass
 
         labels['error'] = str(err)
-        labels['user'] = core_config.get_user
+        labels['user'] = core_config.get_user()
 
         report.telemetry.report(
             report.ReportTypes.YT_CACHE_ERROR,
