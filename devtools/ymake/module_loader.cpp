@@ -98,7 +98,10 @@ const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& na
     if (props.ArgNames().size()) {
         const TVector<TMacro> mcrargs{pArgs.begin(), pArgs.end()};
         const TVector<TStringBuf> argNames{props.ArgNames().begin(), props.ArgNames().end()};
-        MapMacroVars(mcrargs, argNames, locals, JoinStrings(args.begin(), args.end(), ", ")); //last arg is just for debug output
+        MapMacroVars(mcrargs, argNames, locals).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
+            err.Report(JoinStrings(args.begin(), args.end(), ", "));
+            return {};
+        }).value();
     }
     return &props.GetMacroCalls();
 }

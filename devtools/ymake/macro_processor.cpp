@@ -283,9 +283,10 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     TVars ownVars(&vars);
     ownVars.Id = vars.Id;
-    if (!MapMacroVars(argsp, argNames, ownVars, prepArgs)) {
+    MapMacroVars(argsp, argNames, ownVars).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
+        err.Report(prepArgs);
         throw yexception() << "MapMacroVars failed" << Endl;
-    }
+    }).value();
 
     for (auto& var : ownVars)
         var.second.NoInline = true;

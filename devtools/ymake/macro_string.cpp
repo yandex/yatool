@@ -2,7 +2,6 @@
 
 #include "macro.h"
 #include "vars.h"
-#include "prop_names.h"
 
 #include <devtools/ymake/lang/macro_parser.h>
 
@@ -27,7 +26,7 @@
 #include <util/system/types.h>
 #include <util/system/yassert.h>
 
-#include <ctype.h>
+#include <fmt/format.h>
 
 static const char CmdDelimC = ':';
 static const char* const CmdDelimS = ":";
@@ -356,11 +355,9 @@ char BreakQuotedExec(TString& substval, const TStringBuf& parDelim, bool allSpac
     return topQuote;
 }
 
-static void ReportWrongNumberOfArguments(size_t numberOfFormals, size_t numberOfActuals, TStringBuf argsStr) {
+static std::string FormatWrongNumberOfArgumentsErr(size_t numberOfFormals, size_t numberOfActuals) {
     Y_ASSERT(numberOfFormals != numberOfActuals);
-    auto what = TString::Join("Wrong number of arguments: ", ToString(numberOfFormals), "!=", ToString(numberOfActuals), ". Args: ", argsStr);
-    TRACE(S, NEvent::TMakeSyntaxError(what, Diag()->Where.back().second));
-    YConfErr(Syntax) << what << Endl;
+    return fmt::format("Wrong number of arguments: {} != {}", ToString(numberOfFormals), ToString(numberOfActuals));
 }
 
 bool IsPropertyVarName(const TVarStr& var) {
@@ -368,15 +365,31 @@ bool IsPropertyVarName(const TVarStr& var) {
     return !cmdName.empty();
 }
 
-bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNames, TVars& vars, const TStringBuf& argsStr) {
+void TMapMacroVarsErr::Report(TStringBuf argsStr) const {
+    switch (ErrorClass) {
+        case EMapMacroVarsErrClass::UserSyntaxError: {
+            const auto what = TString::Join(Message, "\n\tArgs: ", argsStr);
+            TRACE(S, NEvent::TMakeSyntaxError(what, Diag()->Where.back().second));
+            YConfErr(Syntax) << what << Endl;
+            break;
+        }
+        case EMapMacroVarsErrClass::ArgsSequenceError:
+            YErr() << Message << "\n\tArgs: " << argsStr << Endl;
+        break;
+    }
+}
+
+std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNames, TVars& vars) {
     if (args.empty() && argNames.empty()) {
-        return true;
+        return {};
     }
     bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
     bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
     if (argNames.size() != args.size() && (argNames.empty() || (argNames.size() > args.size() && !lastMayBeEmpty))) {
-        ReportWrongNumberOfArguments(argNames.size(), args.size(), argsStr);
-        return false;
+        return std::unexpected(TMapMacroVarsErr{
+            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+            .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
+        );
     }
 
     bool isLastArg = false;
@@ -385,8 +398,10 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
     size_t argNamesIndex = 0;
     for (const auto& arg : args) {
         if (argNamesIndex >= argNames.size() && !hasVarArg) {
-            ReportWrongNumberOfArguments(argNames.size(), args.size(), argsStr);
-            return false;
+            return std::unexpected(TMapMacroVarsErr{
+                .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+                .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
+            );
         }
 
         isLastArg = argNamesIndex >= argNames.size() - 1;
@@ -394,8 +409,10 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
         bool isArrayArg = name.EndsWith(NStaticConf::ARRAY_SUFFIX);
 
         if (!isLastArg && insideArray && !isArrayArg) {
-            YErr() << "Passed array but expected element " << name << "\n" << "Args: " << argsStr << "\n";
-            return false;
+            return std::unexpected(TMapMacroVarsErr{
+                .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+                .Message = fmt::format("Passed array but expected element {}", name)}
+            );
         }
 
         if (isArrayArg) {
@@ -412,8 +429,10 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
 
         if (val.StartsWith(NStaticConf::ARRAY_START)) {
             if (insideArray) {
-                YErr() << NStaticConf::ARRAY_START << " inside " << NStaticConf::ARRAY_START << " " << NStaticConf::ARRAY_END << " in args: " << argsStr << Endl;
-                return false;
+                return std::unexpected(TMapMacroVarsErr{
+                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+                    .Message = "'[' inside '[ ]'"}
+                );
             }
             insideArray = true;
             isEmptyArray = true;
@@ -425,8 +444,10 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
 
         if (val.EndsWith(NStaticConf::ARRAY_END)) {
             if (!insideArray) {
-                YErr() << "Expected " << NStaticConf::ARRAY_START << " before " << NStaticConf::ARRAY_END << " in args: " << argsStr << Endl;
-                return false;
+                return std::unexpected(TMapMacroVarsErr{
+                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+                    .Message = "Expected '[' before ']'"}
+                );
             }
             insideArray = false;
             val.Chop(1);
@@ -462,16 +483,20 @@ bool MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNam
     }
 
     if (insideArray) {
-        YErr() << "Expected " << NStaticConf::ARRAY_END << " in args: " << argsStr << Endl;
-        return false;
+        return std::unexpected(TMapMacroVarsErr{
+            .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+            .Message = "Expected ']'"}
+        );
     }
 
     if (!isLastArg) {
-        ReportWrongNumberOfArguments(argNames.size(), args.size(), argsStr);
-        return false;
+        return std::unexpected(TMapMacroVarsErr{
+            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+            .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
+        );
     }
 
-    return true;
+    return {};
 }
 
 size_t FindMatchingBrace(const TStringBuf& source, size_t leftPos) noexcept {
