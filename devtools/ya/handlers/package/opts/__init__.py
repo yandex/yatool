@@ -52,6 +52,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.upload = False
         self.wheel_access_key_path = None
         self.wheel_secret_key_path = None
+        self.hardlink_package_outputs = False
 
     @staticmethod
     def consumer():
@@ -290,6 +291,14 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--hardlink-package-outputs'],
+                help='Make hardlinks to the result dir instead of copy files (Dangerous: may corrupt internal cache!)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('hardlink_package_outputs', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
+            ),
         ]
 
     def postprocess(self):
@@ -299,6 +308,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using --nanny-release without --docker-push is pointless"
             )
+        if self.hardlink_package_outputs:
+            logger.warning(
+                "Using --hardlink-package-outputs option. "
+                "Instead of creating full package copies, this flag makes hard links directly to Arcadia and build cache. "
+                "This may cause issues if post-processing modifies original files and can corrupt local cache. "
+                "If you experience problems, run 'ya dump debug last' and remove ~/.ya directory."
+            )
 
     def postprocess2(self, params):
         if params.raw_package_path and not params.raw_package:
@@ -306,6 +322,10 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         # old params compatibility
         if getattr(params, 'run_long_tests', False):
             params.run_tests = test_opts.RunTestOptions.RunAllTests
+        if self.hardlink_package_outputs and not self.raw_package:
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "You cannot use `--hardlink-package-outputs` argument without `--raw-package`, because it will create non-consistent package (with hardlinks instead file copies"
+            )
 
 
 class Dist2RepoCustomizableOptions(devtools.ya.core.yarg.Options):
@@ -393,7 +413,6 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.sloppy_deb = False
         self.store_debian = True
         self.strip = False
-        self.hardlink_package_outputs = False
         self.wheel_platform = ""
         self.wheel_limited_api = ""
         self.wheel_python3 = False
@@ -774,14 +793,6 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--hardlink-package-outputs'],
-                help='Make hardlinks to the result dir instead of copy files (Dangerous: may corrupt internal cache!)',
-                hook=devtools.ya.core.yarg.SetConstValueHook('hardlink_package_outputs', True),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
-            ),
         ]
 
     def postprocess(self):
@@ -797,13 +808,6 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         if self.include_traversal_variant not in (None, 'postorder', 'preorder'):
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using unsupported include traversal variant: {}".format(self.include_traversal_variant)
-            )
-        if self.hardlink_package_outputs:
-            logger.warning(
-                "Using --hardlink-package-outputs option. "
-                "Instead of creating full package copies, this flag makes hard links directly to Arcadia and build cache. "
-                "This may cause issues if post-processing modifies original files and can corrupt local cache. "
-                "If you experience problems, run 'ya dump debug last' and remove ~/.ya directory."
             )
 
 
