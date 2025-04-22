@@ -2456,7 +2456,7 @@ def _enable_imprint_fs_cache(opts):
             logger.debug("imprint fs cache is enabled")
             YaMonEvent.send('EYaStats::ImprintFSCacheEnabled', True)
         except Exception:
-            logger.exception("Something goes wrong while enabling fs cache / changleist")
+            logger.exception("Something goes wrong while enabling fs cache / changelist")
             imprint.disable_fs()
         finally:
             imprint_enable_fs_cache_stage.finish()
