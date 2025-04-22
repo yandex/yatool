@@ -116,6 +116,7 @@ def run(params):
     ya_make_opts = yarg.merge_opts(build_opts.ya_make_options())
     opts = yarg.merge_params(ya_make_opts.initialize([]), params)
     opts.show_final_ok = False
+    opts.create_symlinks = False
 
     if opts.ya_run_build_type is not None:
         opts.build_type = opts.ya_run_build_type
