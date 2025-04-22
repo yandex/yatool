@@ -260,6 +260,8 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     }
 
     TStringBuf macroName = GetCmdName(Get1(macroDefVar));
+    ApplyToolOptions(macroName, vars);
+
     auto blockDataIt = Conf->BlockData.find(macroName);
     const TBlockData* blockData
         = blockDataIt != Conf->BlockData.end()
@@ -268,8 +270,6 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     if (convertNamedArgs && HasNamedArgs(blockData)) {
         ConvertArgsToPositionalArrays(*blockData->CmdProps, tempArgs, *Conf->GetStringPool());
     }
-
-    ApplyToolOptions(macroName, vars);
 
     TVector<TMacro> argsp{tempArgs.begin(), tempArgs.end()};
     PassMacroFlags(argsp, prepArgs, macros);
