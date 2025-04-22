@@ -752,18 +752,8 @@ bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringB
     }
 
     bool globalNext = false;
-    bool keepDirStruct = false;
     for (size_t i = firstSimple; i < args.size(); ++i) {
-        if (args[i] == "KEEP_DIR_STRUCT") {
-            if (i == 0) {
-                keepDirStruct = true;
-            }
-            continue;
-        } else // TODO: remove this hack
-        if (args[i] == "RESULT" || args[i] == "DESTINATION") {
-            i++;
-            continue;
-        } else if (args[i] == "GLOBAL") {
+        if (args[i] == "GLOBAL") {
             globalNext = true;
         } else {
             TVarStrEx src(args[i]);
@@ -771,9 +761,6 @@ bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringB
             if (globalNext) {
                 src.IsGlobal = true;
                 globalNext = false;
-            }
-            if (keepDirStruct) {
-                src.KeepDirStruct = true;
             }
 
             srcArgs[srcArgs.size() - 1] = NPath::Basename(src.Name);

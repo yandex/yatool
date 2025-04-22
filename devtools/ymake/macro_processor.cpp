@@ -646,13 +646,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
             sectionArg.assign(args->begin(), args->end() - 1);
         }
 
-        if (src.KeepDirStruct && NPath::IsPrefixOf(InputDirStr, src.Name)) {
-            sectionArg.push_back(src.Name);
-            sectionArg.back().Skip(InputDirStr.size() + 1);
-        }
-        else {
-            sectionArg.push_back(NPath::Basename(src.Name));
-        }
+        sectionArg.push_back(NPath::Basename(src.Name));
 
         Y_ASSERT(sectionArg.back().size());
         args = &sectionArg;
@@ -731,9 +725,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
 
     if (!src.IsMacro) {
         TVarStrEx in(src);
-        TStringBuf inputName = (src.KeepDirStruct && NPath::IsPrefixOf(InputDirStr, in.Name)) ?
-                                TStringBuf(in.Name, InputDirStr.size() + 1, TStringBuf::npos) :
-                                NPath::Basename(in.Name);
+        TStringBuf inputName = NPath::Basename(in.Name);
         size_t inputIdx = GetInputInternal().Index(inputName);
         if (inputIdx != NPOS) {
             in.MergeFlags(GetInputInternal()[inputIdx]);
