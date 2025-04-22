@@ -4,7 +4,6 @@ import threading
 from collections.abc import Callable
 
 import yt.wrapper as yt
-import yalibrary.store.yt_store.consts as consts
 
 from library.python.retry import RetryConf, retry_call
 from yt.wrapper.dynamic_table_commands import (
@@ -21,7 +20,6 @@ def get_default_client(proxy: str, token: str) -> yt.YtClient:
     )
     yt_fixed_config = {
         "proxy": {
-            "request_timeout": consts.YT_CACHE_REQUEST_TIMEOUT_MS,
             "retries": retries_policy,
         },
         "dynamic_table_retries": retries_policy,
