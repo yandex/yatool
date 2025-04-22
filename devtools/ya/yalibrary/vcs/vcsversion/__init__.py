@@ -722,7 +722,7 @@ def _get_default_dictionary():
         "repository": "arcadia",
         "summary":"No VCS",
         "date":"2015-03-14T06:05:35Z",
-        "hash":"0577215664901532860606512090082402431042",
+        "hash":"THIS_REVISION_IS_A_DUMMY",
         "branch":"unknown-vcs-branch",
         "remote":"users/plus/infinity",
         "author":"ordinal",
