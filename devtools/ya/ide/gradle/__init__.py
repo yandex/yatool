@@ -202,12 +202,19 @@ class _SymlinkCollector:
         path.mkdir(0o755, parents=True, exist_ok=True)
 
     @staticmethod
-    def resolve(path: Path) -> tuple[bool, Path]:
+    def resolve(path: Path, path_root: Path = None, export_root: Path = None) -> tuple[bool, Path]:
         """If symlink, resolve path, else return path as is"""
         if not path.is_symlink():
             return True, path
         try:
-            return True, path.resolve(True)
+            resolved_path = path.resolve(True)
+            if path_root is not None and export_root is not None and resolved_path.is_relative_to(export_root):
+                tail = str(path.relative_to(path_root))  # Tail of path relative to root
+                if not str(resolved_path).endswith(tail):  # Resolved must has same tail
+                    # else it invalid symlink
+                    path.unlink()  # remove invalid symlink
+                    return False, path
+            return True, resolved_path
         except Exception:
             path.unlink()  # remove invalid symlink
             return False, path
@@ -306,16 +313,18 @@ class _RemoveSymlinkCollector(_SymlinkCollector):
         del self.symlinks[arcadia_file]
 
     def remove_invalid_symlinks(self):
-        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root, top_only=True)
+        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root, True, self.config.export_root)
         for rel_target in self.config.params.rel_targets:
-            _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.arcadia_root / rel_target)
+            _RemoveSymlinkCollector._remove_invalid_symlinks(
+                self.config.arcadia_root / rel_target, False, self.config.export_root
+            )
 
     @staticmethod
-    def _remove_invalid_symlinks(dirtree: Path, top_only: bool = False) -> None:
+    def _remove_invalid_symlinks(dirtree: Path, top_only: bool = False, export_root: Path = None) -> None:
         """Remove all invalid symlinks"""
         for walk_root, dirs, files in dirtree.walk():
             for item in dirs + files:
-                _SymlinkCollector.resolve(walk_root / item)
+                _SymlinkCollector.resolve(walk_root / item, dirtree, export_root)
             if top_only:
                 dirs.clear()
 
