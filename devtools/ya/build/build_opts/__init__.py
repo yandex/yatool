@@ -203,6 +203,7 @@ class DumpReportOptions(Options):
         self.report_config_path = None
         self.dump_raw_results = False
         self.json_line_report_file = None
+        self.dump_results2_json = False
 
     @staticmethod
     def consumer():
@@ -292,6 +293,11 @@ class DumpReportOptions(Options):
                 hook=SetValueHook('json_line_report_file'),
                 group=AUTOCHECK_GROUP,
                 visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_DUMP_RESULTS2_JSON',
+                help='Dump build results to results2.json',
+                hook=SetConstValueHook('dump_results2_json', True),
             ),
         ]
 
