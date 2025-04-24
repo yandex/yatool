@@ -164,9 +164,9 @@ def _run_server_entry_point():
 
     try:
         RunServer(cstr, cache_stderr, debug)
-        exit(0)
+        sys.exit(0)
     except Exception:
-        exit(1)
+        sys.exit(1)
 
 
 @contextlib.contextmanager
