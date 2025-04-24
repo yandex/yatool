@@ -751,7 +751,7 @@ class _Exporter:
         """Apply force JDK version from options, if exists"""
         if not self.config.params.force_jdk_version:
             return
-        force_jdk_path = self.sem_graph.get_jdk_path(self.config.params.force_jdk_version)
+        force_jdk_path = self.sem_graph.get_jdk_path(int(self.config.params.force_jdk_version))
         if force_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
             self.attrs_for_all_templates += [
                 f"force_jdk_version = '{self.config.params.force_jdk_version}'",
