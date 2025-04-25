@@ -752,22 +752,21 @@ bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringB
     }
 
     bool globalNext = false;
-    for (size_t i = firstSimple; i < args.size(); ++i) {
-        if (args[i] == "GLOBAL") {
+    for (const auto& arg: args) {
+        if (arg == "GLOBAL") {
             globalNext = true;
-        } else {
-            TVarStrEx src(args[i]);
-            ResolveAsKnownWithoutCheck(src);
-            if (globalNext) {
-                src.IsGlobal = true;
-                globalNext = false;
-            }
-
-            srcArgs[srcArgs.size() - 1] = NPath::Basename(src.Name);
-            YDIAG(DG) << "Section element process:" << TVecDumpSb(srcArgs) << Endl;
-            ProcessConfigMacroCalls(name, srcArgs);
-            AddByExt(name, src, srcArgs.size() > 1 ? &srcArgs : nullptr);
+            continue;
         }
+        TVarStrEx src(arg);
+        ResolveAsKnownWithoutCheck(src);
+        if (std::exchange(globalNext, false)) {
+            src.IsGlobal = true;
+        }
+
+        srcArgs[srcArgs.size() - 1] = NPath::Basename(src.Name);
+        YDIAG(DG) << "Section element process:" << TVecDumpSb(srcArgs) << Endl;
+        ProcessConfigMacroCalls(name, srcArgs);
+        AddByExt(name, src, srcArgs.size() > 1 ? &srcArgs : nullptr);
     }
     return true;
 }
