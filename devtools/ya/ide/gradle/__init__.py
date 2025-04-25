@@ -875,9 +875,7 @@ class _Builder:
             if build_all_langs:
                 opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True, build_type='release'))
             else:
-                ya_make_opts = yarg.merge_opts(
-                    build_opts.ya_make_options(free_build_targets=True, build_type='release')
-                )
+                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True, build_type='debug'))
                 opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
                 opts.dump_sources = True
 
