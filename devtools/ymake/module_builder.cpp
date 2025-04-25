@@ -246,8 +246,6 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
         }
         return true;
     }
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
-    cmdInfo->SetCommandSink(&Commands);
     if (!src.IsMacro && src.ElemId && src.OutputInThisModule) {
         TAddDepAdaptor& node = AddOutput(src.ElemId, NodeTypeForVar(src));
         node.GetModuleData().CheckIfUsed = true;
@@ -255,6 +253,8 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
     if (src.NoAutoSrc) {
         return false;
     }
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
+    cmdInfo->SetCommandSink(&Commands);
     if (!cmdInfo->Init(sname, src, args, *this)) {
         // cmdInfo will be discarded
         return false;
