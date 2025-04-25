@@ -87,24 +87,6 @@ namespace {
         return macros.size() == 1 && macros[0].SameName && macros[0].OrigFragment == pat;
     }
 
-    void PassMacroFlags(TVector<TMacro>& argsp, const TStringBuf& prepArgs, const TVector<TMacroData>& macros) {
-        for (size_t n = 0, k = 0; n < argsp.size() && k < macros.size(); n++) {
-            for (; k < macros.size(); k++) {
-                const char* mStart = prepArgs.data() + macros[k].DstStart;
-                const char* mEnd = prepArgs.data() + macros[k].DstEnd;
-                if (mStart < argsp[n].Name.end() && mEnd >= argsp[n].Name.begin()) {
-                    argsp[n].CopyFlags(macros[k]);
-                    if (macros[k].Flags.Any({EMF_AsStdout, EMF_WorkDir, EMF_SetEnv, EMF_ResourceUri}))
-                        SBDIAG << "Flags copy: " << macros[k].Name << " -> " << argsp[n].Name << Endl;
-                }
-
-                if (mStart >= argsp[n].Name.end()) {
-                    break;
-                }
-            }
-        }
-    }
-
     inline bool MatchTags(const TVector<TVector<TStringBuf>>& macroTags, const TVector<TStringBuf> peerTags) {
         Y_ASSERT(!macroTags.empty());
         if (peerTags.empty()) {
@@ -272,7 +254,6 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     }
 
     TVector<TMacro> argsp{tempArgs.begin(), tempArgs.end()};
-    PassMacroFlags(argsp, prepArgs, macros);
 
     SBDIAG << "MacroCall in for '" << macroDef << "', argsp.size() = " << argsp.size() << Endl;
 
