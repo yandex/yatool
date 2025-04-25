@@ -89,16 +89,11 @@ bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const 
 
 class TJinjaGeneratorVisitor: public TGraphVisitor {
 public:
-    TJinjaGeneratorVisitor(TJinjaGenerator* generator, TAttrsPtr rootAttrs, const TGeneratorSpec& generatorSpec)
+    TJinjaGeneratorVisitor(TJinjaGenerator* generator, TAttrsPtr rootAttrs)
         : TGraphVisitor(generator)
     {
         JinjaProjectBuilder_ = MakeSimpleShared<TJinjaProject::TBuilder>(generator, rootAttrs);
         ProjectBuilder_ = JinjaProjectBuilder_;
-        if (const auto* tests = generatorSpec.Merge.FindPtr("test")) {
-            for (const auto& item : *tests) {
-                TestSubdirs_.push_back(item.c_str());
-            }
-        }
     }
 
     std::optional<bool> OnEnter(TState& state) override {
@@ -110,12 +105,21 @@ public:
 
     void OnTargetNodeSemantic(TState& state, const std::string& semName, const std::span<const std::string>& semArgs) override {
         bool isTestTarget = false;
-        std::string modDir = semArgs[0].c_str();
-        for (const auto& testSubdir: TestSubdirs_) {
-            if (modDir != testSubdir && modDir.ends_with(testSubdir)) {
-                modDir.resize(modDir.size() - testSubdir.size());
-                isTestTarget = true;
-                break;
+        std::string testRelDir;
+        std::string modDir = semArgs[0];
+        const auto& targetSpecs = Generator_->GetGeneratorSpec().Targets;
+        const auto specIt = targetSpecs.find(semName);
+        if (specIt != targetSpecs.end() && specIt->second.IsExtraTarget && specIt->second.IsTest) {
+            isTestTarget = true;
+            auto p = modDir.size() - 1;
+            while ((p > 1) && ((p = modDir.rfind('/', p - 1)) != std::string::npos)) {
+                std::string_view mayModDir(modDir.data(), p);
+                auto subdir = ProjectBuilder_->CurrentProject()->GetSubdir(mayModDir);
+                if (subdir) {
+                    testRelDir = modDir.substr(subdir->Path.string().size() + 1/* slash */);
+                    modDir = subdir->Path;
+                    break;
+                }
             }
         }
         auto macroArgs = semArgs.subspan(2);
@@ -136,7 +140,10 @@ public:
             NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::MacroArgs, jinja2::ValuesList(curTarget->MacroArgs.begin(), curTarget->MacroArgs.end()));
         }
         NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::IsTest, isTestTarget);
-        const auto* jinjaTarget = dynamic_cast<const TProjectTarget*>(JinjaProjectBuilder_->CurrentTarget());
+        if (!testRelDir.empty()) {
+            NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::TestRelDir, testRelDir);
+        }
+        const auto* jinjaTarget = JinjaProjectBuilder_->CurrentTarget();
         Mod2Target_.emplace(state.TopNode().Id(), jinjaTarget);
     }
 
@@ -302,7 +309,6 @@ private:
 
     THashMap<TNodeId, const TProjectTarget*> Mod2Target_;
     THashMap<TNodeId, TAttrsPtr> InducedAttrs_;
-    TVector<std::string> TestSubdirs_;
 
     std::optional<bool> AddCopyIfNeed(const TStringBuf path) {
         static constexpr std::string_view ARCADIA_SCRIPTS_RELPATH = "build/scripts";
@@ -353,7 +359,7 @@ void TJinjaGenerator::LoadSemGraph(const std::string& platformName, const fs::pa
 }
 
 TProjectPtr TJinjaGenerator::AnalizeSemGraph(const TPlatform& platform) {
-    TJinjaGeneratorVisitor visitor(this, RootAttrs, GeneratorSpec);
+    TJinjaGeneratorVisitor visitor(this, RootAttrs);
     visitor.FillPlatformName(platform.Name);
     ProjectBuilder_ = visitor.GetProjectBuilder();
     IterateAll(*platform.Graph, platform.StartDirs, visitor);

@@ -67,7 +67,6 @@ struct TGeneratorSpec {
     THashMap<std::string, TVector<uint32_t>> AttrToRuleIds;
     THashMap<std::string, TVector<uint32_t>> AttrWithValuesToRuleIds;
     THashMap<std::string, TVector<uint32_t>> PlatformToRuleIds;
-    THashMap<std::string, TVector<fs::path>> Merge;
     THashMap<uint32_t, TGeneratorRule> Rules;
     bool UseManagedPeersClosure{false};///< If true parse peers closure as direct peers during read sem-graph
     bool IgnorePlatforms{false};///< If true all platform-specific options not supported and generate generator spec validation error

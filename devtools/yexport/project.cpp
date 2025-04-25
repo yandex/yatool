@@ -17,6 +17,14 @@ namespace NYexport {
         return Subdirs_;
     }
 
+    TProjectSubdirPtr TProject::GetSubdir(std::string_view path) const {
+        const auto it = PathToSubdir_.find(path);
+        if (it != PathToSubdir_.end()) {
+            return it->second;
+        }
+        return nullptr;
+    }
+
     void TProject::Reset() {
         Factory_ = nullptr;
         PathToSubdir_.clear();

@@ -30,7 +30,6 @@ namespace NKeys {
     constexpr const char* Platforms = "platforms";
     constexpr const char* Attr = "attr";
     constexpr const char* Attrs = "attrs";
-    constexpr const char* Merge = "merge";
     constexpr const char* UseManagedPeersClosure = "use_managed_peers_closure";
     constexpr const char* IgnorePlatforms = "ignore_platforms";
     constexpr const char* SourceRootReplacer = "source_root_replacer";
@@ -444,14 +443,6 @@ namespace {
         VERIFY_GENSPEC(!rule.Copy.Useless() || !rule.AddValues.empty(), value, NGeneratorSpecError::SpecificationError, "Module should have non empty field [copy] or [add_values]");
         return rule;
     }
-
-    TVector<fs::path> ParseMergeSpec(const toml::value& value) {
-        TVector<fs::path> ans;
-        for (const auto& item : AsArray(&value)) {
-            ans.emplace_back(AsString(&item));
-        }
-        return ans;
-    }
 }
 
 TGeneratorSpec ReadGeneratorSpec(const fs::path& path) {
@@ -553,12 +544,6 @@ TGeneratorSpec ReadGeneratorSpec(std::istream& input, const fs::path& path) {
                         curTargetAttrItemType = targetAttrItemType;
                     }
                 }
-            }
-        }
-
-        if (doc.contains(NKeys::Merge)) {
-            for (const auto& [name, mergespec] : find<toml::table>(doc, NKeys::Merge)) {
-                genspec.Merge[name] = ParseMergeSpec(mergespec);
             }
         }
 

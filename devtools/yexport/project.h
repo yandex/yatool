@@ -70,6 +70,7 @@ namespace NYexport {
 
         const TVector<TProjectSubdirPtr>& GetSubdirs() const;
         TVector<TProjectSubdirPtr>& GetSubdirs();
+        TProjectSubdirPtr GetSubdir(std::string_view path) const;
 
     protected:
         template <CSubdirLike TSubdirLike, CTargetLike TTargetLike>
