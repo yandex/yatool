@@ -880,7 +880,7 @@ class MavenImportOptions(SandboxUploadOptions):
             ArgConsumer(
                 ['-t'],
                 help='oAuth token',
-                hook=SetValueHook('oauth_token', default_value=lambda _: '[HIDDEN]'),
+                hook=SetValueHook('sandbox_oauth_token', default_value=lambda _: '[HIDDEN]'),
                 group=AUTH_OPT_GROUP,
             ),
             ArgConsumer(
