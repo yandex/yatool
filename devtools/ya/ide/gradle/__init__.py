@@ -879,6 +879,7 @@ class _Builder:
                     build_opts.ya_make_options(free_build_targets=True, build_type='release')
                 )
                 opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
+                opts.dump_sources = True
 
             arcadia_root = self.config.arcadia_root
 
