@@ -34,7 +34,15 @@ def do_venv(params):
     )
     params.ya_make_extra.append('-DBUILD_LANGUAGES=PY3')
     params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
+    _check_paths(params)
     gen_venv(params)
+
+
+def _check_paths(params):
+    for rel_target in params.rel_targets:
+        path = os.path.join(params.arc_root, rel_target)
+        if not os.path.exists(path):
+            raise CreateVenvError(f"Target '{rel_target}' doesn't exist")
 
 
 def gen_venv(params):
