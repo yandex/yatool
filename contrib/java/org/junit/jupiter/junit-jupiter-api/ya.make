@@ -1,7 +1,7 @@
 JAVA_CONTRIB_PROXY()
 
 PEERDIR(
-    contrib/java/org/junit/jupiter/junit-jupiter-api/5.12.0
+    contrib/java/org/junit/jupiter/junit-jupiter-api/5.13.0-M2
 )
 
 END()
@@ -40,4 +40,5 @@ RECURSE(
     5.11.4
     5.11.2
     5.12.0
+    5.13.0-M2
 )
