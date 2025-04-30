@@ -15,6 +15,7 @@ def default_options():
         build_opts.YMakeBinOptions(),
         build_opts.YMakeRetryOptions(),
         build_opts.FlagsOptions(),
+        build_opts.SandboxAuthOptions(),
     ]
 
 
