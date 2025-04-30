@@ -243,6 +243,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     build_options.run_tests = params.run_tests
     build_options.cache_tests = params.cache_tests
+    build_options.test_env = params.test_env
     if params.run_tests:
         build_options.print_test_console_report = True
         if params.junit_path:
