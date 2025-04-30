@@ -27,13 +27,11 @@ import devtools.ya.core.config as core_config
 import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.profiler as cp
-import devtools.ya.core.report
 import devtools.ya.core.yarg
 import exts.asyncthread as core_async
 import exts.filelock
 import exts.fs
 import exts.hashing as hashing
-import exts.os2
 import exts.path2
 import exts.timer
 import exts.tmp
@@ -1497,14 +1495,7 @@ class YaMake:
         if self.opts.dump_failed_node_info_to_evlog:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
 
-        if all(
-            [
-                self.opts.json_line_report_file is None,
-                self.opts.build_results_report_file is None,
-                self.opts.streaming_report_id is None
-                or (self.opts.streaming_report_url is None and not self.opts.report_to_ci),
-            ]
-        ):
+        if self.opts.json_line_report_file is None and self.opts.build_results_report_file is None:
             if self.opts.print_test_console_report:
                 self._build_results_listener.add(test_node_listener)
             return
@@ -1517,40 +1508,6 @@ class YaMake:
         )
         self._report = results_report.StoredReport()
         report_list = [self._report]
-        if self.opts.streaming_report_url or self.opts.report_to_ci:
-            # streaming_client is not available in OSS version of the ya
-            from yalibrary import streaming_client as sc
-
-            if self.opts.report_to_ci:
-                adapter = sc.StreamingCIAdapter(
-                    self.opts.ci_logbroker_token,
-                    self.opts.ci_topic,
-                    self.opts.ci_source_id,
-                    self.opts.ci_check_id,
-                    self.opts.ci_check_type,
-                    self.opts.ci_iteration_number,
-                    self.opts.stream_partition,
-                    self.opts.ci_task_id_string,
-                    self.opts.streaming_task_id,
-                    self.opts.ci_logbroker_partition_group,
-                    use_ydb_topic_client=self.opts.ci_use_ydb_topic_client,
-                )
-            else:
-                adapter = sc.StreamingHTTPAdapter(
-                    self.opts.streaming_report_url,
-                    self.opts.streaming_report_id,
-                    self.opts.stream_partition,
-                    self.opts.streaming_task_id,
-                )
-            report_list.append(
-                results_report.AggregatingStreamingReport(
-                    self.targets,
-                    sc.StreamingClient(adapter, self.opts.streaming_task_id),
-                    self.opts.report_config_path,
-                    self.opts.keep_alive_streams,
-                    self.opts.report_only_stages,
-                )
-            )
 
         if self.opts.json_line_report_file:
             report_list.append(results_report.JsonLineReport(self.opts.json_line_report_file))

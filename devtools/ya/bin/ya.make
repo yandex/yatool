@@ -29,6 +29,8 @@ ENDIF()
 CHECK_DEPENDENT_DIRS(
     DENY
     contrib/python/lxml
+    contrib/ydb
+    kikimr
 )
 
 ENABLE(NO_STRIP)

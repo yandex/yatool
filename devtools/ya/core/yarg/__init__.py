@@ -44,6 +44,7 @@ from devtools.ya.core.yarg.hooks import (  # noqa: F401
     UpdateValueHook,
     CaseInsensitiveValues,
     NoValueDummyHook,
+    SwallowValueDummyHook,
 )
 from devtools.ya.core.yarg.options import Options, merge_opts, RawParamsOptions, ParamAsArgs  # noqa: F401
 from devtools.ya.core.yarg.params import Params, merge_params  # noqa: F401, F403

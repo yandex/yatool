@@ -7,7 +7,6 @@ from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimesp
 
 import app_config
 import exts.path2
-import exts.fs
 import exts.func
 
 import yalibrary.upload.consts as upload_consts
@@ -81,6 +80,8 @@ from devtools.ya.core.yarg import (
     MDS_UPLOAD_OPT_GROUP,
     RawParamsOptions,
     return_true_if_enabled,
+    NoValueDummyHook,
+    SwallowValueDummyHook,
 )
 
 from library.python.fs import supports_clone
@@ -2078,82 +2079,12 @@ class TestenvReportDirOptions(Options):
 
 
 class StreamReportOptions(Options):
-    stream_types = ('configure', 'build', 'test', 'style', 'small', 'medium', 'large')
-
     def __init__(self):
-        self.streaming_report_id = None
-        self.streaming_report_url = None
-        self.stream_partition = 0
-        self.streaming_task_id = None
-        self.keep_alive_streams = None
         self.streaming_stage_namespace = None
-        self.report_only_stages = False
-        self.report_to_ci = False
-        self.ci_logbroker_token = None
-        self.ci_topic = None
-        self.ci_source_id = None
-        self.ci_check_id = None
-        self.ci_check_type = None
-        self.ci_iteration_number = None
-        self.ci_task_id_string = None
-        self.ci_logbroker_partition_group = None
-        self.ci_use_ydb_topic_client = False
-
-    @staticmethod
-    def return_all_stream_types(x):
-        if return_true_if_enabled(x):
-            return ','.join(StreamReportOptions.stream_types)
-        return None
 
     @staticmethod
     def consumer():
         return [
-            ArgConsumer(
-                ['--streaming-report-url'],
-                help='Url for streaming TestEnvironment report',
-                hook=SetValueHook('streaming_report_url'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            ArgConsumer(
-                ['--streaming-report-id'],
-                help='Id of streaming TestEnvironment report',
-                hook=SetValueHook('streaming_report_id'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            ArgConsumer(
-                ['--stream-partition'],
-                help='Index of stream partition',
-                hook=SetValueHook('stream_partition', int),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            ArgConsumer(
-                ['--streaming-task-id'],
-                help='Id of sandbox task',
-                hook=SetValueHook('streaming_task_id'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            ArgConsumer(
-                ['--keep-alive-streams'],
-                help='Specify streams which should not be closed',
-                hook=SetValueHook('keep_alive_streams', values=StreamReportOptions.stream_types),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            EnvConsumer('YA_KEEP_ALIVE_STREAMS', hook=SetValueHook('keep_alive_streams')),
-            ArgConsumer(
-                ['--keep-alive-all-streams'],
-                hook=SetConstValueHook('keep_alive_streams', ','.join(StreamReportOptions.stream_types)),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
-            ),
-            EnvConsumer(
-                'YA_KEEP_ALIVE_ALL_STREAMS',
-                hook=SetValueHook('keep_alive_streams', StreamReportOptions.return_all_stream_types),
-            ),
             ArgConsumer(
                 ['--streaming-stage-namespace'],
                 help='Infix to trace build stages with (will be prefixed with "distbuild/"',
@@ -2162,87 +2093,118 @@ class StreamReportOptions(Options):
                 visible=HelpLevel.INTERNAL,
             ),
             EnvConsumer('YA_STREAMING_STAGE_NAMESPACE', hook=SetValueHook('streaming_stage_namespace')),
+        ] + StreamReportOptions._deprecated_options()
+
+    # TODO Remove when we make sure no one uses it
+    @staticmethod
+    def _deprecated_options():
+        return [
+            ArgConsumer(
+                ['--streaming-report-url'],
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--streaming-report-id'],
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--stream-partition'],
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--streaming-task-id'],
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--keep-alive-streams'],
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
+            ArgConsumer(
+                ['--keep-alive-all-streams'],
+                help='Deprecated. Do nothing',
+                hook=NoValueDummyHook(),
+                visible=False,
+                deprecated=True,
+            ),
             ArgConsumer(
                 ['--report-only-stages'],
-                help='Dump raw build results to the output root',
-                hook=SetConstValueHook('report_only_stages', True),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=NoValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
-            EnvConsumer('YA_REPORT_ONLY_STAGES', hook=SetValueHook('report_only_stages')),
             ArgConsumer(
                 ['--report-to-ci'],
-                help='Report stages, build and test messages to ci',
-                hook=SetConstValueHook('report_to_ci', True),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=NoValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
-            EnvConsumer('YA_CI_LOGBROKER_TOKEN', hook=SetValueHook('ci_logbroker_token')),
             ArgConsumer(
                 ['--ci-topic'],
-                help='CI topic',
-                hook=SetValueHook('ci_topic'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-source-id'],
-                help='CI source id',
-                hook=SetValueHook('ci_source_id'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-check-id'],
-                help='CI check id',
-                hook=SetValueHook('ci_check_id'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-check-type'],
-                help='CI check type',
-                hook=SetValueHook('ci_check_type'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-iteration-number'],
-                help='CI iteration number',
-                hook=SetValueHook('ci_iteration_number', int),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-task-id-string'],
-                help='CI task id string',
-                hook=SetValueHook('ci_task_id_string'),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
             ArgConsumer(
                 ['--ci-logbroker-partition-group'],
-                help='CI logbroker partition group',
-                hook=SetValueHook('ci_logbroker_partition_group', int),
-                group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                help='Deprecated. Do nothing',
+                hook=SwallowValueDummyHook(),
+                visible=False,
+                deprecated=True,
             ),
-            EnvConsumer('YA_CI_USE_YDB_TOPIC_CLIENT', hook=SetConstValueHook('ci_use_ydb_topic_client', True)),
         ]
-
-    def postprocess(self):
-        if self.keep_alive_streams:
-            self.keep_alive_streams = {_f for _f in [s.strip() for s in self.keep_alive_streams.split(",")] if _f}
-            unknown = self.keep_alive_streams - set(StreamReportOptions.stream_types)
-            if unknown:
-                raise ArgsValidatingException("Unknown stream types: {}".format(unknown))
-        else:
-            self.keep_alive_streams = set()
-
-        if self.report_to_ci and self.streaming_report_url is not None:
-            raise ArgsValidatingException(
-                '--streaming-report-url must not be used with --report-to-ci, choose how to upload data to ci'
-            )
 
 
 class LocalConfOptions(Options):

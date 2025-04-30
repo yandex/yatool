@@ -85,7 +85,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/yalibrary/build_graph_cache
         devtools/ya/yalibrary/checkout
         devtools/ya/yalibrary/diagnostics
-        devtools/ya/yalibrary/streaming_client
         devtools/ya/yalibrary/yandex/distbuild
         devtools/ya/yalibrary/svn
         devtools/ya/yalibrary/upload
