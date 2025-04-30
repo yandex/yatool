@@ -115,7 +115,7 @@ public:
             while ((p > 1) && ((p = modDir.rfind('/', p - 1)) != std::string::npos)) {
                 std::string_view mayModDir(modDir.data(), p);
                 auto subdir = ProjectBuilder_->CurrentProject()->GetSubdir(mayModDir);
-                if (subdir) {
+                if (subdir && !subdir->Targets.empty()) {
                     testRelDir = modDir.substr(subdir->Path.string().size() + 1/* slash */);
                     modDir = subdir->Path;
                     break;
