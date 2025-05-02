@@ -81,9 +81,14 @@ namespace {
             Y_ABORT_UNLESS(methodArgs.size() == 1);
             return NPyBind::BuildPyObject(cmdContext->Unit->ResolveToBinDirLocalized(methodArgs[0]));
         } else if (cmdContext->Name.starts_with("on")) {
-            TString macroName = cmdContext->Name.substr(2);
-            macroName.to_upper();
-            cmdContext->Unit->CallMacro(macroName, methodArgs);
+            try {
+                TString macroName = cmdContext->Name.substr(2);
+                macroName.to_upper();
+                cmdContext->Unit->CallMacro(macroName, methodArgs);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+                return nullptr;
+            }
             Py_IncRef(self);
             return self;
         } else if (cmdContext->Name == TStringBuf("resolve_include")) {
