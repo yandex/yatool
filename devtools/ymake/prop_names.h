@@ -15,6 +15,8 @@ constexpr TStringBuf TEST_RECURSES = "TEST_RECURSES";
 constexpr TStringBuf RECURSES = "RECURSES";
 constexpr TStringBuf DEPENDS = "DEPENDS";
 constexpr TStringBuf ALL_SRCS = "ALL_SRCS";
+constexpr TStringBuf MULTIMODULE = TStringBuf("MULTIMODULE");
+constexpr TStringBuf NEVERCACHE_PROP = TStringBuf("NEVER=CACHE");
 
 }
 

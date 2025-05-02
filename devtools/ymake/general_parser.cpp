@@ -47,7 +47,7 @@ namespace {
     void ProcessNeverCacheModules(TNodeAddCtx& node, std::span<const TModuleDef* const> modules) {
         const bool hasNevercacheMods = std::ranges::any_of(modules, [](const TModuleDef* mod) {return mod->IsNeverCache();});
         if (hasNevercacheMods) {
-            const auto elem = node.UpdIter.Graph.Names().AddName(EMNT_Property, NEVERCACHE_PROP);
+            const auto elem = node.UpdIter.Graph.Names().AddName(EMNT_Property, NProps::NEVERCACHE_PROP);
             node.AddUniqueDep(EDT_Property, EMNT_Property, elem);
         }
     }
@@ -462,7 +462,7 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     }
 
     if (const auto multiModuleName = parser.GetMultiModuleName(); !multiModuleName.empty()) {
-        TDepsCacheId propId = MakeDepsCacheId(EMNT_Property, Graph.Names().AddName(EMNT_Property, FormatProperty(MULTIMODULE_PROP_NAME, multiModuleName)));
+        TDepsCacheId propId = MakeDepsCacheId(EMNT_Property, Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::MULTIMODULE, multiModuleName)));
         dirProps.Push(propId);
         if (const auto it = Conf.BlockData.find(multiModuleName); it != Conf.BlockData.end()) {
             if (it->second.HasPeerdirSelf) {

@@ -25,7 +25,7 @@ TGetPeerNodeResult NPeers::GetPeerNode(const TModules& modules, const TConstDepN
     for (auto dep : dirNode.Edges()) {
         if (*dep == EDT_Property && !matchTags) {
             auto modNode = dep.To();
-            if (modNode->NodeType == EMNT_Property && GetPropertyName(TDepGraph::GetCmdName(modNode).GetStr()) == MULTIMODULE_PROP_NAME) {
+            if (modNode->NodeType == EMNT_Property && GetPropertyName(TDepGraph::GetCmdName(modNode).GetStr()) == NProps::MULTIMODULE) {
                 Y_ASSERT(!matchTagsFinalized);
 
                 if (request.UseRules) {

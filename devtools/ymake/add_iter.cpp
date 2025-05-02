@@ -28,7 +28,7 @@
 
 namespace {
     ui32 GetNeverCachePropElem(const TDepGraph& graph) {
-        auto node = graph.GetCommandNode(NEVERCACHE_PROP);
+        auto node = graph.GetCommandNode(NProps::NEVERCACHE_PROP);
         return node.IsValid() ? node->ElemId : 0;
     }
 

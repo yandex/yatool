@@ -478,7 +478,7 @@ public:
     bool AcceptDep(TState& state) {
         const auto dep = state.NextDep();
         if (*dep == EDT_Property) {
-            if (dep.To()->NodeType == EMNT_Property && GetPropertyName(TDepGraph::GetCmdName(dep.To()).GetStr()) == MULTIMODULE_PROP_NAME) {
+            if (dep.To()->NodeType == EMNT_Property && GetPropertyName(TDepGraph::GetCmdName(dep.To()).GetStr()) == NProps::MULTIMODULE) {
                 IsMultimodule = true;
             }
         }

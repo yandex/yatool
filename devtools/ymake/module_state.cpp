@@ -333,10 +333,10 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
         Attrs.PassPeers = GetNodeType() == EMNT_Bundle || IsStaticLib();
     }
     Attrs.SemIgnore |= Get(NVariableDefs::VAR_MODULE_SEM_IGNORE) == "yes";
-    if (Vars.Contains(VAR_MODULE_TAG)) {
-        Tag = Get(VAR_MODULE_TAG);
+    if (Vars.Contains(NVariableDefs::VAR_MODULE_TAG)) {
+        Tag = Get(NVariableDefs::VAR_MODULE_TAG);
     } else {
-        AssertEx(!Attrs.FromMultimodule, TString("Variable ") + TString{VAR_MODULE_TAG} + " is not set for sub-module of multimodule");
+        AssertEx(!Attrs.FromMultimodule, TString("Variable ") + TString{NVariableDefs::VAR_MODULE_TAG} + " is not set for sub-module of multimodule");
     }
     Attrs.UseAllSrcs = Get(NVariableDefs::VAR_USE_ALL_SRCS) == "yes";
     SetupPeerdirRestrictions();

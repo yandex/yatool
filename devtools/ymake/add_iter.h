@@ -788,7 +788,7 @@ bool IsPropDep(V& v) {
 
 template <class V>
 bool IsAtDir2MultiModulePropertyDep(V& v, const TDepGraph& graph) {
-    return v.size() >= 2 && IsDirType(v[v.size() - 2].Node.NodeType) && IsPropDep(v) && IsPropertyTypeNode(v.back().Node.NodeType) && GetPropertyName(graph.GetCmdName(v.back().Node).GetStr()) == MULTIMODULE_PROP_NAME;
+    return v.size() >= 2 && IsDirType(v[v.size() - 2].Node.NodeType) && IsPropDep(v) && IsPropertyTypeNode(v.back().Node.NodeType) && GetPropertyName(graph.GetCmdName(v.back().Node).GetStr()) == NProps::MULTIMODULE;
 }
 
 /// Property of a directory or makefile

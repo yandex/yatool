@@ -14,6 +14,7 @@
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/macro_string.h>
 #include <devtools/ymake/out.h>
+#include <devtools/ymake/vardefs.h>
 
 #include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/iterator/mapped.h>
@@ -732,7 +733,7 @@ namespace {
             AppendCondition(TString::Join("$", envVar, "==\"yes\""));
             if (inMultiModule) {
                 // Set default value of MODULE_TAG in submodule to name of the submodule
-                AddMacroCall(NMacro::SET, TString::Join(VAR_MODULE_TAG, " ", name), {});
+                AddMacroCall(NMacro::SET, TString::Join(NVariableDefs::VAR_MODULE_TAG, " ", name), {});
             }
         }
 

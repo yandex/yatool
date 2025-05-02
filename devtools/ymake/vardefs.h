@@ -60,6 +60,9 @@ VARIABLE(MODULE_KIND, "")
 VARIABLE(MODULE_LANG, "")
 VARIABLE(MODULE_PREFIX, "")
 VARIABLE(MODULE_SUFFIX, "")
+VARIABLE(MODULE_TAG, "Defines TAG of the module. Module tags compatibility is checked when processing PEERDIR "
+    "macro in order to forbind bad deps (like dependency between C++ library and Java library) or to choose "
+    "proper submodule in multimodule")
 VARIABLE(MODULE_TYPE, "")
 VARIABLE(MODULE_SEM_IGNORE, "Skip traverse into module during render sem-graph, add IGNORED to semantics")
 VARIABLE(NON_NAMAGEABLE_PEERS, "")
