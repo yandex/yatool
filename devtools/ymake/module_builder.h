@@ -179,7 +179,6 @@ private:
 
     void TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args); // try-catch for ProcessStatement
     void ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
-    bool BundleStatements(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool SrcStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool RememberStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool MacroToVarStatement(const TStringBuf& name, const TVector<TStringBuf>& args);

@@ -535,7 +535,6 @@ void TModuleBuilder::ProcessStatement(const TStringBuf& name, const TVector<TStr
     LateGlobStatement(name, args) ||
     MacroToVarStatement(name, args) ||
     GenStatement(name, args) ||
-    BundleStatements(name, args) ||
     PluginStatement(name, args) ||
     SkipStatement(name, args);
     // Make directories immediately available after command processing
@@ -727,10 +726,6 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
         return false;
     }
     return true;
-}
-
-bool TModuleBuilder::BundleStatements(const TStringBuf& , const TVector<TStringBuf>& ) {
-    return false;
 }
 
 bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
