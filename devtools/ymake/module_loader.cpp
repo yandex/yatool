@@ -1,7 +1,7 @@
 #include "module_loader.h"
 #include "macro_string.h"
 
-#include "args_converter.h"
+#include "args2locals.h"
 #include "builtin_macro_consts.h"
 #include "makefile_loader.h"
 #include "prop_names.h"
@@ -76,7 +76,6 @@ bool TModuleDef::IsGlobalInput(const TStringBuf& name) const {
     return ModuleConf.IsGlobalInput(NPath::Extension(name));
 }
 
-
 const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& name, TArrayRef<const TStringBuf> args, TVars& locals) {
     // Find macro to call
     auto pi = Conf.BlockData.find(name);
@@ -84,25 +83,7 @@ const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& na
         return nullptr;
     }
     const auto& props = *pi->second.CmdProps;
-
-    // Patch incoming args to handle named macro arguments
-    auto pArgs = args;
-    TVector<TStringBuf> tempArgs;
-    if (props.IsNonPositional()) {
-        tempArgs.insert(tempArgs.end(), args.begin(), args.end());
-        ConvertArgsToPositionalArrays(props, tempArgs, *MakeFileMap.Pool);
-        pArgs = tempArgs;
-    }
-
-    // Map arguments to local call vars using macro signature
-    if (props.ArgNames().size()) {
-        const TVector<TMacro> mcrargs{pArgs.begin(), pArgs.end()};
-        const TVector<TStringBuf> argNames{props.ArgNames().begin(), props.ArgNames().end()};
-        MapMacroVars(mcrargs, argNames, locals).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
-            err.Report(JoinStrings(args.begin(), args.end(), ", "));
-            return {};
-        }).value();
-    }
+    AddMacroArgsToLocals(props, args, locals, *MakeFileMap.Pool);
     return &props.GetMacroCalls();
 }
 

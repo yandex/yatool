@@ -60,6 +60,7 @@ SRCS(
     add_node_context.cpp
     addincls.cpp
     args_converter.cpp
+    args2locals.cpp
     blacklist.cpp
     blacklist_checker.cpp
     cmd_properties.cpp

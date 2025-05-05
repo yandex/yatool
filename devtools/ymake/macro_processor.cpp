@@ -4,7 +4,7 @@
 #include "add_node_context_inline.h"
 #include "add_dep_adaptor.h"
 #include "add_dep_adaptor_inline.h"
-#include "args_converter.h"
+#include "args2locals.h"
 #include "builtin_macro_consts.h"
 #include "conf.h"
 #include "module_state.h"
@@ -231,6 +231,22 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
     const TString prepArgs = SubstMacro(modsVar, args, macros, nmode, vars, cmdFormat);
     AllVarsNeedSubst = saveAllVarsNeedSubst;
 
+    TStringBuf macroName = GetCmdName(Get1(macroDefVar));
+    ApplyToolOptions(macroName, vars);
+
+    auto blockDataIt = Conf->BlockData.find(macroName);
+    const TBlockData* blockData
+        = blockDataIt != Conf->BlockData.end()
+        ? &blockDataIt->second
+        : nullptr;
+
+    TVector<TStringBuf> argNames;
+    if (!SplitArgs(macroDef, argNames)) {
+        throw yexception() << "MacroCall: no args in '" << macroDef << "'" << Endl;
+    }
+    TVars ownVars(&vars);
+    ownVars.Id = vars.Id;
+
     TVector<TStringBuf> tempArgs;
     if (!SplitArgs(prepArgs, tempArgs)) {
         TStringBuilder s;
@@ -240,31 +256,13 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         }
         throw yexception() << "Expected argument list in () brackets, got [" << prepArgs << "] in [" << s << "]";
     }
-
-    TStringBuf macroName = GetCmdName(Get1(macroDefVar));
-    ApplyToolOptions(macroName, vars);
-
-    auto blockDataIt = Conf->BlockData.find(macroName);
-    const TBlockData* blockData
-        = blockDataIt != Conf->BlockData.end()
-        ? &blockDataIt->second
-        : nullptr;
-    if (convertNamedArgs && HasNamedArgs(blockData)) {
-        ConvertArgsToPositionalArrays(*blockData->CmdProps, tempArgs, *Conf->GetStringPool());
-    }
-
-    TVector<TMacro> argsp{tempArgs.begin(), tempArgs.end()};
-
-    SBDIAG << "MacroCall in for '" << macroDef << "', argsp.size() = " << argsp.size() << Endl;
-
-    TVector<TStringBuf> argNames;
-    if (!SplitArgs(macroDef, argNames)) {
-        throw yexception() << "MacroCall: no args in '" << macroDef << "'" << Endl;
-    }
-
-    TVars ownVars(&vars);
-    ownVars.Id = vars.Id;
-    MapMacroVars(argsp, argNames, ownVars).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
+    AddMacroArgsToLocals(
+        convertNamedArgs && blockData && blockData->CmdProps ? blockData->CmdProps.get() : nullptr,
+        argNames,
+        tempArgs,
+        ownVars,
+        *Conf->GetStringPool()
+    ).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
         err.Report(prepArgs);
         throw yexception() << "MapMacroVars failed" << Endl;
     }).value();
