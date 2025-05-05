@@ -273,6 +273,7 @@ class VSCodeProject:
             ] + self.params.clangd_extra_args
             if self.params.clangd_index_mode == "disabled":
                 settings["clangd.arguments"].append("--background-index=0")
+            settings["clangd.checkUpdates"] = False
 
         if self.is_py3:
             settings["python.analysis.indexing"] = self.params.python_index_enabled
