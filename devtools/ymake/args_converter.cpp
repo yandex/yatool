@@ -11,23 +11,23 @@
 #include <util/string/ascii.h>
 
 namespace {
-    constexpr TStringBuf KnownRoots[] = {
-        "$ARCADIA_BUILD_ROOT/"sv,
-        "${ARCADIA_BUILD_ROOT}/"sv,
-        "$ARCADIA_ROOT/"sv,
-        "${ARCADIA_ROOT}/"sv
-    };
 
-    bool ignoreArg(TStringBuf arg) {
-        return arg.empty() || arg[0] == '$' && AnyOf(KnownRoots, [arg](auto elem) { return arg.StartsWith(elem); });
-    }
+constexpr TStringBuf KnownRoots[] = {
+    "$ARCADIA_BUILD_ROOT/"sv,
+    "${ARCADIA_BUILD_ROOT}/"sv,
+    "$ARCADIA_ROOT/"sv,
+    "${ARCADIA_ROOT}/"sv
+};
+
+bool IgnoreArg(TStringBuf arg) {
+    return arg.empty() || arg[0] == '$' && AnyOf(KnownRoots, [arg](auto elem) { return arg.StartsWith(elem); });
 }
 
 struct TScriptArg {
     TStringBuf Arg;
     size_t Argtype;
 
-    TScriptArg(const TStringBuf& arg, size_t argtype)
+    TScriptArg(const TStringBuf& arg, size_t argtype) noexcept
         : Arg(arg)
         , Argtype(argtype)
     {
@@ -39,7 +39,7 @@ struct TTypedArgArray {
     bool GotKeyword = false;
     size_t AlienArgs = 0;
 
-    size_t NumNativeArgs() const {
+    size_t NumNativeArgs() const noexcept {
         return Args.size() - AlienArgs;
     }
 };
@@ -55,20 +55,22 @@ struct TTypedArgs : TVector<TTypedArgArray> {
     const size_t OrigArgId;
 };
 
-static bool IsValidSymbol(char sym) {
+bool IsValidSymbol(char sym) {
     return !(IsAsciiAlpha(sym) || sym == '_' || sym == '-' || sym == '\"' || sym == NPath::PATH_SEP);
 }
 
-static bool IsValidSymbolBefore(char sym) {
+bool IsValidSymbolBefore(char sym) {
     return IsValidSymbol(sym) && sym != '.';;
 }
 
-static bool IsValidSymbolAfter(char sym) {
+bool IsValidSymbolAfter(char sym) {
     return IsValidSymbol(sym);
 }
 
-//note: we are really need module here only for use string pool. May be pass string pool instead module?
-static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, TTypedArgs& typedArgs, IMemoryPool& sspool) {
+TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, IMemoryPool& sspool) {
+    TTypedArgs typedArgs(cmdProp.GetKeyArgsNum());
+    typedArgs.resize(cmdProp.GetKeyArgsNum() + 1); //last is for Args... without keywords
+
     TVector<TScriptArg> scriptArgs;
     TVector<std::pair<size_t, size_t>> origArgsPos;
     size_t argId = typedArgs.OrigArgId;
@@ -123,9 +125,9 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
         std::sort(scriptArgs.begin(), scriptArgs.end(), [](const TScriptArg& arg1, const TScriptArg& arg2) {
                     return arg1.Arg.size() > arg2.Arg.size(); //sort from long to short
         });
-        for (TVector<TScriptArg>::iterator it = scriptArgs.begin(); it != scriptArgs.end(); ++it) {
-            const TStringBuf scriptArg = it->Arg;
-            if (ignoreArg(scriptArg)) {
+        for (const auto& sarg: scriptArgs) {
+            const TStringBuf scriptArg = sarg.Arg;
+            if (IgnoreArg(scriptArg)) {
                 continue;
             }
             for (auto pos = origArgsPos.begin(); pos != origArgsPos.end();) {
@@ -135,7 +137,7 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
                     bool allowReplaceBefore = !inpos || IsValidSymbolBefore(arg[inpos - 1]);
                     bool allowReplaceAfter = (inpos + scriptArg.size() == arg.size() || IsValidSymbolAfter(arg[inpos + scriptArg.size()]));
                     if (allowReplaceBefore && allowReplaceAfter && NPath::MustDeepReplace(scriptArg)) {
-                        TString mod = cmdProp.GetDeepReplaceTo(it->Argtype);
+                        TString mod = cmdProp.GetDeepReplaceTo(sarg.Argtype);
                         TString v = TString{arg.Head(inpos)} + "${" + mod + "\"" + scriptArg + "\"}" + TString{arg.Tail(inpos + scriptArg.size())};
                         YDIAG(V) << "Replacement: " << arg << "->" << v << Endl;
                         typedArgs[typedArgs.OrigArgId].Args[pos->second] = sspool.Append(v);
@@ -149,9 +151,10 @@ static void FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>
             }
         }
     }
+    return typedArgs;
 }
 
-static size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, const TTypedArgs& typedArgs, TVector<TStringBuf>& res) {
+size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, const TTypedArgs& typedArgs, TVector<TStringBuf>& res) {
     size_t firstOrig = 0;
     for (size_t cnt = 0; cnt < typedArgs.size(); cnt++) {
         const TTypedArgArray& outArg = typedArgs[cnt];
@@ -180,11 +183,10 @@ static size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStrin
     return firstOrig;
 }
 
-size_t ConvertArgsToPositionalArrays(const TCmdProperty& cmdProp, TVector<TStringBuf>& args, IMemoryPool& sspool) {
-    TTypedArgs typedArgs(cmdProp.GetKeyArgsNum());
-    typedArgs.resize(cmdProp.GetKeyArgsNum() + 1); //last is for Args... without keywords
+}
 
-    FillTypedArgs(cmdProp, args, typedArgs, sspool);
+size_t ConvertArgsToPositionalArrays(const TCmdProperty& cmdProp, TVector<TStringBuf>& args, IMemoryPool& sspool) {
+    const auto typedArgs = FillTypedArgs(cmdProp, args, sspool);
     TVector<TStringBuf> res;
     size_t firstOrig = ConvertTypedArgs(cmdProp, args, typedArgs, res);
 
