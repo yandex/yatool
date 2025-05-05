@@ -17,7 +17,6 @@ PEERDIR(
     devtools/ya/core/profiler
     devtools/ya/core/report
     devtools/ya/core/stage_tracer
-    devtools/ya/core/stages_profiler
     devtools/ya/test/const
     devtools/ya/build/node_checks
     devtools/ya/build/graph_description

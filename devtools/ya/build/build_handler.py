@@ -62,6 +62,11 @@ def monitoring_stage_finished(stage_name):
         # NOW (end of ya make) - time when build has finished on distbuild (all nodes in graph)
         YaMonEvent.send('EYaStats::YmakeHandlerTailTimeAfterDistBuildFinish', time.time() - build_finished)
 
+        _, dist_download_finished = stages_profiler.get_stage_timestamps('distbs-download-result')
+        if dist_download_finished is not None:
+            # DistDownloadTailTime = max(DistDownloadTask.end_time) - time when build has finished on distbuild (all nodes in graph)
+            YaMonEvent.send('EYaStats::DistDownloadTailTime', dist_download_finished - build_finished)
+
 
 def do_ya_make(params):
     from devtools.ya.build import ya_make

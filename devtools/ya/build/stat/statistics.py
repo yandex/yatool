@@ -23,7 +23,7 @@ from devtools.ya.build.stat.graph import (
     create_graph_with_distbuild_log,
     create_graph_with_local_log,
 )
-from devtools.ya.core import profiler, stage_tracer, stages_profiler
+from devtools.ya.core import profiler, stage_tracer
 
 
 class TaskType(enum.Enum):
@@ -578,13 +578,6 @@ def print_distbuild_download_statistics(graph, filename, display):
     else:
         total_time_span = finished - started
 
-        download_tail_time = -1
-
-        _, build_finished = stages_profiler.get_stage_timestamps('distbs-worktime')
-
-        if build_finished is not None:
-            download_tail_time = finished - build_finished
-
         msg = 'DistBuild download: count={}, size={}, speed_by_run_time={}/s, speed_by_dl_time={}/s, total_time_by_run={:.02f}ms, total_time_by_dl={:.02f}ms, total_time_span={:.02f}ms'.format(
             cnt,
             format_size(total_download_size, binary=True),
@@ -594,9 +587,6 @@ def print_distbuild_download_statistics(graph, filename, display):
             total_time_by_dl,
             total_time_span,
         )
-
-        if download_tail_time != -1:
-            msg += ', download_tail_time={:.02f}ms'.format(download_tail_time)
 
         display.emit_message(msg)
 
@@ -627,9 +617,6 @@ def print_distbuild_download_statistics(graph, filename, display):
         YaMonEvent.send('EYaStats::DistDownloadTotalDownloadTimeByDownloadTime', total_time_by_dl)
         YaMonEvent.send('EYaStats::DistDownloadSpeedByRuntime', speed_by_run_time)
         YaMonEvent.send('EYaStats::DistDownloadSpeedByDlTime', speed_by_run_time)
-
-        if download_tail_time != -1:
-            YaMonEvent.send('EYaStats::DistDownloadTailTime', download_tail_time)
 
         return stats
 
