@@ -1,5 +1,6 @@
 from enum import Enum
 
+import app_config
 import devtools.ya.core.yarg
 
 
@@ -270,6 +271,10 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         ]
 
     def postprocess(self):
+        if not app_config.in_house:
+            self.dlv_enabled = False
+            self.patch_gopls = False
+            self.gopls_index_targets = False
         if self.use_arcadia_root and not self.files_visibility:
             self.files_visibility = "targets-and-deps"
         if self.files_visibility and not self.use_arcadia_root:
