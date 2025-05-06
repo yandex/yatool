@@ -1247,6 +1247,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.merge_coverage = False
         self.nlg_coverage = False
         self.python_coverage = False
+        self.cython_coverage = False
         self.sancov_coverage = False
         self.ts_coverage = False
         self.upload_coverage_report = False
@@ -1289,6 +1290,13 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 ['--python-coverage'],
                 help='Collect python coverage information',
                 hook=devtools.ya.core.yarg.SetConstValueHook('python_coverage', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.BASIC,
+            ),
+            TestArgConsumer(
+                ['--cython-coverage'],
+                help='Collect cython coverage information',
+                hook=devtools.ya.core.yarg.SetConstValueHook('cython_coverage', True),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
             ),
@@ -1431,6 +1439,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
             self.clang_coverage = True
             self.java_coverage = True
             self.python_coverage = True
+            self.cython_coverage = True
             self.ts_coverage = True
             # TODO backward compatibility - need to break it
             self.build_coverage_report = True
@@ -1445,6 +1454,11 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 "You can use '--fast-clang-coverage-merge' only with '--clang-coverage' options"
             )
 
+        if self.cython_coverage and not self.python_coverage:
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "You can use '--cython-coverage' only with '--python-coverage' options"
+            )
+
     def postprocess2(self, params):
         coverage_requested = False
 
@@ -1454,8 +1468,11 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
 
         if params.python_coverage:
             params.flags['PYTHON_COVERAGE'] = 'yes'
-            params.flags['CYTHON_COVERAGE'] = 'yes'
+            params.flags['CYTHON_COVERAGE'] = 'yes'  # REMOVEME(YA-2565)
             coverage_requested = True
+
+        if params.cython_coverage:
+            params.flags['CYTHON_COVERAGE'] = 'yes'
 
         if params.ts_coverage:
             params.flags['TS_COVERAGE'] = 'yes'
