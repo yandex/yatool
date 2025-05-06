@@ -71,7 +71,7 @@ void TAttrs::SetAttrValue(jinja2::ValuesMap& attrs, const TAttr& attr, const jin
                 auto& list = listAttrIt->second.asList();
                 if (listItem == attr.str()) {// magic attribute <list>-ITEM must append new empty item
                     list.push_back(jinja2::ValuesMap{});
-                    FillNewDict(list.back().asMap());
+                    FillNewDict(list.back().asMap(), atPos);
                     break;
                 }
                 if (list.empty()) {
@@ -259,8 +259,8 @@ void TAttrs::OnChangeDepth(size_t currentDepth) { // Inform TAttrs object about 
     }
 }
 
-void TAttrs::FillNewDict(jinja2::ValuesMap& newDict) {
-    if (!ListObjectIndexing_) {
+void TAttrs::FillNewDict(jinja2::ValuesMap& newDict, size_t atPos) {
+    if (!ListObjectIndexing_ || atPos > 0) {
         return;
     }
     newDict[OBJECT_INDEX] = std::to_string(++CurrentObjectIndex_);

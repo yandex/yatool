@@ -86,7 +86,7 @@ namespace NYexport {
         EAttrTypes GetItemAttrType(const std::string_view attrName) const;
         EAttrTypes GetAttrType(const std::string_view attrName) const;
         jinja2::Value GetSimpleAttrValue(const EAttrTypes attrType, const jinja2::ValuesList& values, TGetDebugStr getDebugStr);
-        void FillNewDict(jinja2::ValuesMap& newDict);
+        void FillNewDict(jinja2::ValuesMap& newDict, size_t atPos);
     };
 
     using TAttrsPtr = TSimpleSharedPtr<TAttrs>;
