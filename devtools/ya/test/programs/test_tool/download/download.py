@@ -76,7 +76,7 @@ def compact_resinfo(res):
                 v['links'] = v['links'][:10]
         return sandbox_storage.StoredResourceInfo(resinfo)
     except Exception as e:
-        logger.error("Failed to compact sandbox sources: %s", e)
+        logger.debug("Failed to compact sandbox sources: %s", e)
         return res
 
 
