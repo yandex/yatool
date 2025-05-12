@@ -8,6 +8,7 @@ SRCS(
 PEERDIR(
     devtools/ya/cpp/lib
     # Add handlers here
+    devtools/ya/cpp/handlers/gc
     devtools/ya/cpp/handlers/tool
 )
 

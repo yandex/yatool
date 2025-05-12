@@ -13,6 +13,7 @@ namespace NYa {
         virtual TFsPath HomeDir() const = 0;
         virtual TFsPath MiscRoot() const = 0;
         virtual TFsPath LogsRoot() const = 0;
+        virtual TFsPath TmpRoot() const= 0;
         virtual TFsPath ToolRoot() const = 0;
         virtual int ToolCacheVersion() const = 0;
         // Get arcadia root from a current working dir and only as a last resort use YA_SOURCE_ROOT.

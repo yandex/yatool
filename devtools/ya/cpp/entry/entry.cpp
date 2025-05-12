@@ -18,7 +18,11 @@ namespace NYa {
         extern "C" TMain mainptr;
         TMain prevMainPtr;
 
-        bool allowLogging(const TVector<TStringBuf> args) {
+        bool allowLogging(const IYaHandler *handlerPtr, const TVector<TStringBuf> args) {
+            if (!handlerPtr->AllowLogging()) {
+                return false;
+            }
+
             // find YA_NO_LOGS
             auto noLogsEnv = GetEnv("YA_NO_LOGS");
             auto noLogsArg = false;
@@ -40,11 +44,12 @@ namespace NYa {
 
         void InitLoggerRespectConfig(
             const TFsPath &miscRoot,
+            const IYaHandler *handlerPtr,
             const TVector<TStringBuf> &args,
             ELogPriority priority,
             bool verbose
         ) {
-            if (allowLogging(args)) {
+            if (allowLogging(handlerPtr, args)) {
                 InitLogger(miscRoot, args, priority, verbose);
             } else {
                 InitNullLogger();
@@ -76,7 +81,7 @@ namespace NYa {
                         args.push_back(argv[i]);
                     }
                     const IConfig& config = GetConfig();
-                    InitLoggerRespectConfig(config.MiscRoot(), args, TLOG_DEBUG, verbose);
+                    InitLoggerRespectConfig(config.MiscRoot(), handlerPtr, args, TLOG_DEBUG, verbose);
 
                     if (newPgid != 0) {
                         DEBUG_LOG << "Ya changed its pgid: " << newPgid << "\n";

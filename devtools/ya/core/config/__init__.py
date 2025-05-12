@@ -62,16 +62,16 @@ def evlogs_root():
 
 
 # no caching to make testing possible
-def _guess_tool_root(version):
-    dir_name = os.getenv('YA_CACHE_DIR_TOOLS') or os.path.join(_guess_misc_root(), 'tools')
+def _guess_tool_root(version, cache_dir=None):
+    dir_name = cache_dir or os.getenv('YA_CACHE_DIR_TOOLS') or os.path.join(_guess_misc_root(), 'tools')
     dir_name = os.path.join(dir_name, 'v' + str(version))
     return dir_name
 
 
 @func.memoize()
-def tool_root(version=None):
+def tool_root(version=None, cache_dir=None):
     DEFAULT_TOOL_CACHE_VERSION = 3
-    dir_name = _guess_tool_root(version or DEFAULT_TOOL_CACHE_VERSION)
+    dir_name = _guess_tool_root(version or DEFAULT_TOOL_CACHE_VERSION, cache_dir)
     return os.path.realpath(fs.create_dirs(dir_name))
 
 

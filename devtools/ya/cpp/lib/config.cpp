@@ -67,6 +67,7 @@ namespace NYa {
                 HomeDir_ = [this]() {return HomeDirImpl();};
                 MiscRoot_ = [this]() {return MiscRootImpl();};
                 LogsRoot_ = [this]() {return LogsRootImpl();};
+                TmpRoot_ = [this]() {return TmpRootImpl();};
                 ToolRoot_ = [this]() {return ToolRootImpl();};
                 ToolCacheVersion_ = [this]() {return ToolCacheVersionImpl();};
                 ArcadiaRoot_ = [this]() {return ArcadiaRootImpl();};
@@ -83,6 +84,10 @@ namespace NYa {
 
             TFsPath LogsRoot() const override  {
                 return LogsRoot_.GetRef();
+            }
+
+            TFsPath TmpRoot() const override  {
+                return TmpRoot_.GetRef();
             }
 
             TFsPath ToolRoot() const override  {
@@ -147,6 +152,10 @@ namespace NYa {
                     return root;
                 }
                 return MiscRoot() / "logs";
+            }
+
+            TFsPath TmpRootImpl() {
+                return MiscRoot() / "tmp";
             }
 
             int ToolCacheVersionImpl() {
@@ -242,6 +251,7 @@ namespace NYa {
             TLazyValue<TFsPath> HomeDir_;
             TLazyValue<TFsPath> MiscRoot_;
             TLazyValue<TFsPath> LogsRoot_;
+            TLazyValue<TFsPath> TmpRoot_;
             TLazyValue<TFsPath> ToolRoot_;
             TLazyValue<int> ToolCacheVersion_;
             TLazyValue<TFsPath> ArcadiaRoot_;
