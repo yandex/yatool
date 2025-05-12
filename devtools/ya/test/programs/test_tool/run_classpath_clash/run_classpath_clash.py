@@ -15,7 +15,9 @@ import exts.hashing as hashing
 _TAB = ' ' * 4
 
 # because reasons
-IGNORED_CLASSES_REGEX = re.compile(r'(.*module-info\.class$)|(ru/yandex/library/svnversion/SvnConstants\.class)')
+IGNORED_CLASSES_REGEX = re.compile(
+    r'(.*(module|package)-info\.class$)|(ru/yandex/library/svnversion/SvnConstants\.class)'
+)
 IGNORE_CLASS_MARKER = 'ignore_class:'
 VERBOSE = [False]
 
