@@ -56,19 +56,7 @@ EMacroType GetMacrosFromPattern(const TStringBuf& pat, TVector<TMacroData>& macr
 bool BreakQuotedEval(TString& substval, const TStringBuf& parDelim, bool allSpace, bool inQuote = false);
 char BreakQuotedExec(TString& substval, const TStringBuf& parDelim, bool allSpace, char topQuote = 0);
 
-enum class EMapMacroVarsErrClass {
-    UserSyntaxError,
-    ArgsSequenceError
-};
-struct TMapMacroVarsErr {
-    EMapMacroVarsErrClass ErrorClass;
-    std::string Message;
-
-    void Report(TStringBuf argsStr) const;
-};
-
-// ["X", "Y", "Z"], ["A", "B", "C"] -> ["X=A", "Y=B", "Z=C"]
-std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNames, TVars& vars);
+bool IsPropertyVarName(TStringBuf var);
 
 // Takes source line starting with opening brace and finds position of
 // matching closing brace of the same kind (skips inner matching pairs)
