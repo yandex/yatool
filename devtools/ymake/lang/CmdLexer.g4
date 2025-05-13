@@ -9,7 +9,7 @@ fragment SPACE: [\p{White_Space}];
 LPAREN: '(';
 RPAREN: ')';
 
-TEXT_RAW: ('\\' . | ~([&'"\\] | [$()\p{White_Space}]))+;
+TEXT_RAW: ('\\' . | ~([&'"\\] | [$()\p{White_Space}]))+ | '$'; // FIXME: the last part is a workaround for "$.server" etc. in makefiles
 SQSTR_BEGIN: '\'' -> pushMode(SQSTR);
 DQSTR_BEGIN: '"' -> pushMode(DQSTR);
 
