@@ -222,7 +222,7 @@ modifiers:
     ;
 
 modifier:
-    ( 'input' | 'output' | 'tool' )
+    ( 'input' | 'output' | 'tool' | 'env' )
     ;
 
 arraySpec:
