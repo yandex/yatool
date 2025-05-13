@@ -109,4 +109,23 @@ namespace {
 
     } Y_GENERATE_UNIQUE_ID(Mod);
 
+    //
+    //
+    //
+
+    // TODO deprecate & remove
+    class TComma: public TBasicModImpl {
+        public:
+            TComma(): TBasicModImpl({.Id = EMacroFunction::Comma, .Name = "comma", .Arity = 1, .CanEvaluate = true}) {
+            }
+            TTermValue Evaluate(
+                [[maybe_unused]] std::span<const TTermValue> args,
+                [[maybe_unused]] const TEvalCtx& ctx,
+                [[maybe_unused]] ICommandSequenceWriter* writer
+            ) const override {
+                CheckArgCount(args);
+                return ",";
+            }
+        } Y_GENERATE_UNIQUE_ID(Mod);
+
 }

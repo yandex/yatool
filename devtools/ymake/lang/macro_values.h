@@ -74,6 +74,7 @@ enum class EMacroFunction: ui32 {
     PrnOnlyRoot,
     Main,
     ParseBool,
+    Comma,
     //
     Count
 };
