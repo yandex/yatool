@@ -1468,7 +1468,6 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
 
         if params.python_coverage:
             params.flags['PYTHON_COVERAGE'] = 'yes'
-            params.flags['CYTHON_COVERAGE'] = 'yes'  # REMOVEME(YA-2565)
             coverage_requested = True
 
         if params.cython_coverage:
