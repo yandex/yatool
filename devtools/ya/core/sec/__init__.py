@@ -147,10 +147,12 @@ def mine_suppression_filter(obj=None, argv=None, env=None):
 
     secrets.update(*_iter_deep(obj))
 
+    logger.debug("Found %d secrets", len(secrets))
+
     # YA-1248, in logs we see \\n if there was \n in token value
     escaped = {s.replace("\\n", "\\\\n") for s in secrets} | {s.replace("\n", "\\n") for s in secrets}
     secrets.update(escaped)
 
-    logger.debug("Found %d secrets", len(secrets))
+    logger.debug("Added %d variations for escaped secrets", len(secrets - escaped))
 
     return sorted(secrets)
