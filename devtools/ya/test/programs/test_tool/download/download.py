@@ -2,7 +2,6 @@
 Fetches resources from sandbox
 """
 
-import collections
 import logging
 import optparse
 import os
@@ -43,41 +42,6 @@ def get_options():
     )
 
     return parser.parse_args()
-
-
-def compact_resinfo(res):
-    def split(s):
-        i = 0
-        for i, c in enumerate(reversed(s)):
-            if not c.isdigit():
-                break
-        if i:
-            return s[:-i], s[-i:]
-        return s, None
-
-    def fmt(p, s):
-        if len(s) > 1:
-            return "%s{%s}" % (p, ','.join(s))
-        if s[0] is None:
-            return p
-        return p + s[0]
-
-    def compact_sources(s):
-        d = collections.defaultdict(list)
-        for prefix, suffix in (split(x) for x in sorted(s)):
-            d[prefix].append(suffix)
-        return [fmt(k, v) for k, v in d.items()]
-
-    try:
-        resinfo = dict(res._info)
-        resinfo["sources"] = compact_sources(resinfo["sources"])
-        for k, v in resinfo.items():
-            if isinstance(v, dict) and v.get('links'):
-                v['links'] = v['links'][:10]
-        return sandbox_storage.StoredResourceInfo(resinfo)
-    except Exception as e:
-        logger.error("Failed to compact sandbox sources: %s", e)
-        return res
 
 
 def sigalrm_handler(s, f):
@@ -129,7 +93,6 @@ def main():
             storage.dir_outputs_prepare_downloaded_resource(
                 resource, resource_id, dir_outputs_in_runner=not options.for_dist_build
             )
-        logger.debug("downloaded resource info (compacted): %s", compact_resinfo(resource))
     except Exception as e:
         logger.exception("Error while downloading resource %s", resource_id)
         if devtools.ya.core.error.is_temporary_error(e):
