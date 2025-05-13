@@ -152,14 +152,6 @@ public:
         HasPrefix = hasPrefix;
     }
 
-    void ImportInhFlags(const TMacro& from) {
-        AsStdout = from.Flags.Get(EMF_AsStdout);
-        WorkDir = from.Flags.Get(EMF_WorkDir);
-        SetEnv = from.Flags.Get(EMF_SetEnv);
-        ResourceUri = from.Flags.Get(EMF_ResourceUri);
-        TaredOut = from.Flags.Get(EMF_TaredOut);
-    }
-
     void MergeFlags(const TVarStr& from) {
         Y_ASSERT(!from.CurCoord);
         AllFlags |= from.AllFlags;
