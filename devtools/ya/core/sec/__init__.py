@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN_RE = re.compile(r'AQAD-[a-zA-Z0-9_\-\\]+')
 PRIVATE_KEY_PREFIX_RE = re.compile(r"-----BEGIN (RSA |EC |DSA |PGP )?PRIVATE KEY( BLOCK)?-----")
-IN_CHECKS = ('access_key',)
+IN_CHECKS = ('access_key', 'secret_key')
 ENDSWITH_CHECKS = (
     'token',
     'secret',
@@ -148,7 +148,7 @@ def mine_suppression_filter(obj=None, argv=None, env=None):
     secrets.update(*_iter_deep(obj))
 
     # YA-1248, in logs we see \\n if there was \n in token value
-    escaped = {s.replace("\\n", "\\\\n") for s in secrets}
+    escaped = {s.replace("\\n", "\\\\n") for s in secrets} | {s.replace("\n", "\\n") for s in secrets}
     secrets.update(escaped)
 
     logger.debug("Found %d secrets", len(secrets))
