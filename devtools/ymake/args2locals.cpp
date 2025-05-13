@@ -16,7 +16,7 @@ std::string FormatWrongNumberOfArgumentsErr(size_t numberOfFormals, size_t numbe
     return fmt::format("Wrong number of arguments: {} != {}", ToString(numberOfFormals), ToString(numberOfActuals));
 }
 
-std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, const TVector<TStringBuf>& argNames, TVars& vars) {
+std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> args, const TVector<TStringBuf>& argNames, TVars& vars) {
     if (args.empty() && argNames.empty()) {
         return {};
     }
@@ -33,7 +33,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, 
     bool isEmptyArray = false;
     bool insideArray = false;
     size_t argNamesIndex = 0;
-    for (const auto& arg : args) {
+    for (TStringBuf arg : args) {
         if (argNamesIndex >= argNames.size() && !hasVarArg) {
             return std::unexpected(TMapMacroVarsErr{
                 .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
@@ -56,7 +56,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, 
             name.Chop(3);
         }
 
-        TStringBuf val = arg.Name;
+        TStringBuf val = arg;
         if (val == "SKIPPED") {
             //SBDIAG << "PMV: Skip: " << name << Endl;
             vars[name]; //leave empty value
@@ -99,7 +99,6 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(const TVector<TMacro>& args, 
 
         //if (name == "MnInfo") YDIAG(VV) << vars << "*************\n";
         vars[name].push_back(TVarStr(val, false, false));
-        vars[name].back().ImportInhFlags(arg);
         if (IsPropertyVarName(vars[name].back().Name)) {
             vars[name].back().IsMacro = true;
         }
@@ -156,7 +155,7 @@ std::expected<void, TMapMacroVarsErr> AddMacroArgsToLocals(const TCmdProperty* p
     if (prop && prop->IsNonPositional()) {
         ConvertArgsToPositionalArrays(*prop, args, memPool);
     }
-    return MapMacroVars(TVector<TMacro>{args.begin(), args.end()}, argNames, locals);
+    return MapMacroVars(args, argNames, locals);
 }
 
 void AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStringBuf> args, TVars& locals, IMemoryPool& memPool) {
@@ -171,9 +170,8 @@ void AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStrin
 
     // Map arguments to local call vars using macro signature
     if (macroProps.ArgNames().size()) {
-        const TVector<TMacro> mcrargs{pArgs.begin(), pArgs.end()};
         const TVector<TStringBuf> argNames{macroProps.ArgNames().begin(), macroProps.ArgNames().end()};
-        MapMacroVars(mcrargs, argNames, locals).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
+        MapMacroVars(pArgs, argNames, locals).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
             err.Report(JoinStrings(args.begin(), args.end(), ", "));
             return {};
         }).value();
