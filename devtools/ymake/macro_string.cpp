@@ -28,10 +28,15 @@
 
 #include <fmt/format.h>
 
-static const char CmdDelimC = ':';
-static const char* const CmdDelimS = ":";
-static const char CmdNameDelimC = '=';
-static const char* const CmdNameDelimS = "=";
+#include <contrib/libs/re2/re2/re2.h>
+
+namespace {
+    const char CmdDelimC = ':';
+    const char* const CmdDelimS = ":";
+    const char CmdNameDelimC = '=';
+    const char* const CmdNameDelimS = "=";
+    const re2::RE2 CmdPrefix("\\d+:(\\w+)=");
+}
 
 TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value) {
     return TString::Join(ToString<ui64>(id), CmdDelimS, name, CmdNameDelimS, value);
@@ -69,13 +74,10 @@ TStringBuf GetCmdName(const TStringBuf& cmd) {
     return cmd.SubStr(afterId + 1, afterCmdName - afterId - 1);
 }
 
-TStringBuf CheckAndGetCmdName(const TStringBuf& cmd) {
-    size_t afterId = cmd.find(CmdDelimC);
-    size_t afterCmdName = cmd.find(CmdNameDelimC, afterId);
-    if (afterId == TStringBuf::npos || afterCmdName == TStringBuf::npos) {
-        return TStringBuf();
-    }
-    return cmd.SubStr(afterId + 1, afterCmdName - afterId - 1);
+TStringBuf CheckAndGetCmdName(TStringBuf cmd) {
+    std::string_view result;
+    re2::RE2::Consume(&cmd, CmdPrefix, &result);
+    return result;
 }
 
 TStringBuf GetCmdValue(const TStringBuf& cmd) {
