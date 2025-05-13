@@ -426,7 +426,8 @@ void TGeneralParser::ReportStats() {
 void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
     const auto tools = YMake.Commands.GetCommandTools(node.ElemId);
     for (const auto& toolValue : tools) {
-        const auto tool = NPath::ConstructPath(toolValue, NPath::Source);
+        // lifted from tool handling in ProcessBuildCommand
+        TString tool = NPath::IsExternalPath(toolValue) ? TString{toolValue} : NPath::ConstructYDir(toolValue, TStringBuf(), ConstrYDirDiag);
         SBDIAG << "Tool dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
     }

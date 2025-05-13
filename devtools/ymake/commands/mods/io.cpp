@@ -2,6 +2,8 @@
 
 #include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/config/config.h> // for GetOrInit()
+#include <devtools/ymake/module_state.h> // for ConstrYDirDiag
+
 #include <util/generic/overloaded.h>
 
 using namespace NCommands;
@@ -41,14 +43,19 @@ namespace {
             }, args[0]);
         }
     private:
+        std::string_view ProcessPath(const TPreevalCtx& ctx, std::string_view path) const {
+            // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
+            auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
+            auto key = NPath::CutType(dir);
+            return std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(key)));
+        }
         TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
-            return TMacroValues::TTool {.Data = pooledName};
+            return TMacroValues::TTool {.Data = ProcessPath(ctx, name)};
         };
         TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& names) const {
             auto result = TMacroValues::TTools();
             for (auto& name : names)
-                result.Data.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name))));
+                result.Data.push_back(ProcessPath(ctx, name));
             return result;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
