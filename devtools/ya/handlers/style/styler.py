@@ -241,7 +241,7 @@ class ClangFormat(cfg.ConfigMixin):
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
-        self._tool: str = yalibrary.tools.tool("clang-format-18")  # type: ignore
+        self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
         super().__init__(
             styler_opts.config_loaders
             if styler_opts.config_loaders
