@@ -188,13 +188,12 @@ class VSCodeProject:
             json.dump(compilation_database, f, indent=4)
 
     def do_codegen(self):
-        build_params = copy.deepcopy(self.params)
-        build_params.replace_result = True
-        build_params.continue_on_fail = True
-        if build_params.tests_enabled:
-            build_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
-
         if self.is_cpp:
+            build_params = copy.deepcopy(self.params)
+            build_params.replace_result = True
+            build_params.continue_on_fail = True
+            if build_params.tests_enabled:
+                build_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
             build_params.add_result = [ext for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get("CPP", [])]
             build_params.suppress_outputs = [ext for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get("CPP", [])]
             build_params.output_root = self.codegen_cpp_dir
@@ -205,6 +204,11 @@ class VSCodeProject:
 
         languages = [lang for lang in build_params.languages if lang != "CPP"]
         if languages:
+            build_params = copy.deepcopy(self.params)
+            build_params.replace_result = True
+            build_params.continue_on_fail = True
+            if build_params.tests_enabled:
+                build_params.flags["TRAVERSE_RECURSE_FOR_TESTS"] = "yes"
             build_params.add_result = [
                 ext for lang in languages for ext in vscode.consts.CODEGEN_EXTS_BY_LANG.get(lang, [])
             ]
