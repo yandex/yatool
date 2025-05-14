@@ -1947,9 +1947,30 @@ void TCommandInfo::SubstData(
         } else if (macro.NeedCoord() && !nextsubst.Name.empty() && (substMode == ESM_DoSubst || substMode == ESM_DoBothCm)) {
                 // If the macro is a tool or result, use the value set by MineVariables.
                 if (macro.Flags.Get(EMF_Tool) || (macro.Flags.Get(EMF_Result) && !macro.Flags.Get(EMF_Output))) {
-                    auto& minedVars = macro.Flags.Get(EMF_Tool) ? ToolPaths : ResultPaths;
+                    auto& minedVarsHolder = macro.Flags.Get(EMF_Tool) ? ToolPaths : ResultPaths;
+                    auto& minedVars = GetOrInit(minedVarsHolder);
                     TString normalizedName = NPath::ConstructYDir(nextsubst.Name, TStringBuf(), ConstrYDirNoDiag);
-                    nextsubst = TVarStr(GetOrInit(minedVars)[NPath::CutType(normalizedName)]);
+                    auto key = NPath::CutType(normalizedName);
+                    auto item = minedVars.find(key);
+                    if (item != minedVars.end()) {
+                        nextsubst = TVarStr(item->second);
+                    } else if (macro.Flags.Get(EMF_Tool)) {
+                        // when preparing macro arguments for the new command engine,
+                        // we do not allocate a command node (yet), do not build a respective subgraph, and do no variable mining;
+                        // instead, we reconstruct the tool reference to be processed by said engine later
+                        // (in a manner not unlike the `PostProcessRawMacroValue()` thing below);
+
+                        // a motivating example:
+                        // ```
+                        // M4_PATH=contrib/tools/m4
+                        // M4_BINARY=${tool:M4_PATH}
+                        // RUN_PROGRAM(contrib/tools/bison ... ENV M4=${M4_BINARY} ...)
+                        // ```
+
+                        nextsubst = TVarStr(TString::Join("${tool:\"", EscapeC(TString(key)), "\"}"));
+                    } else {
+                        throw TConfigurationError() << "Could not handle the result reference " << nextsubst.Name;
+                    }
                 } else if (macroCoordVal != nullptr) {
                     nextsubst = (*macroCoordVal)[nextsubst.CurCoord];
                 }
