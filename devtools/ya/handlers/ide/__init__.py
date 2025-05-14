@@ -371,6 +371,7 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
+    OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
     OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
@@ -420,6 +421,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_DISABLE_ERRORPRONE],
                 help='Disable errorprone in Gradle project',
                 hook=yarg.SetConstValueHook('disable_errorprone', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_DISABLE_LOMBOK_PLUGIN],
+                help='Disable lombok plugin in Gradle project',
+                hook=yarg.SetConstValueHook('disable_lombok_plugin', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(

@@ -818,6 +818,7 @@ class _Exporter:
                         '[add_attrs.dir]',
                         f'build_contribs = {'true' if self.config.params.collect_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
+                        f'disable_lombok_plugin = {'true' if self.config.params.disable_lombok_plugin else 'false'}',
                         *self.attrs_for_all_templates,
                         '',
                         '[add_attrs.target]',
