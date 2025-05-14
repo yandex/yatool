@@ -391,6 +391,7 @@ class GradleOptions(yarg.Options):
         self.gradle_name = None
         self.settings_root = None
         self.disable_errorprone = False
+        self.disable_lombok_plugin = False
         self.force_jdk_version = None
         self.remove = None
 
