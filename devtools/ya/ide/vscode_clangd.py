@@ -184,6 +184,7 @@ def gen_compile_commands(params, compile_commands_path):
     build_params.cmd_build_root = params.output_root
     build_params.force_build_depends = True
     build_params.target_file = compile_commands_path
+    build_params.dont_strip_compiler_path = True
 
     def gen(prms):
         try:

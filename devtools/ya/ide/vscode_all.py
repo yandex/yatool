@@ -148,6 +148,7 @@ class VSCodeProject:
         build_params.cmd_build_root = self.codegen_cpp_dir
         build_params.force_build_depends = self.params.tests_enabled
         build_params.target_file = compile_commands_path
+        build_params.dont_strip_compiler_path = True
 
         def gen(prms):
             return bc.gen_compilation_database(prms, self.app_ctx)

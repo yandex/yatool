@@ -37,6 +37,7 @@ class CompilationDatabaseOptions(devtools.ya.core.yarg.Options):
         self.target_file = None
         self.update = False
         self.dont_fix_roots = False
+        self.dont_strip_compiler_path = False
 
     @staticmethod
     def consumer():
@@ -89,6 +90,13 @@ class CompilationDatabaseOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('dont_fix_roots', True),
                 group=COMPILATION_DATABASE_OPTS_GROUP,
             ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--dont-strip-compiler-path'],
+                help='Dont strip compiler path',
+                hook=devtools.ya.core.yarg.SetConstValueHook('dont_strip_compiler_path', True),
+                group=COMPILATION_DATABASE_OPTS_GROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer("dont_strip_compiler_path"),
         ]
 
     def postprocess(self):
@@ -208,8 +216,10 @@ def gen_compilation_database(params, app_ctx):
                 cmd_args = cmd_args[i + 1 :]
                 break
 
-        cmd_args[0] = os.path.basename(cmd_args[0])
-        _log_compiler(app_ctx, compilers, cmd_args[0])
+        base_compiler_command = os.path.basename(cmd_args[0])
+        _log_compiler(app_ctx, compilers, base_compiler_command)
+        if not params.dont_strip_compiler_path:
+            cmd_args[0] = base_compiler_command
         cmd_args = [_fix_macros(x, **patterns) for x in cmd_args]
         cmd_args += params.cmd_extra_args
         return subprocess.list2cmdline(cmd_args), _fix_macros(files[0], **patterns)
