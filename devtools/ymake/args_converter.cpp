@@ -56,11 +56,11 @@ struct TTypedArgs : TVector<TTypedArgArray> {
 };
 
 bool IsValidSymbol(char sym) {
-    return !(IsAsciiAlpha(sym) || sym == '_' || sym == '-' || sym == '\"' || sym == NPath::PATH_SEP);
+    return !(IsAsciiAlpha(sym) || sym == '.' || sym == '_' || sym == '-' || sym == '\"' || sym == NPath::PATH_SEP);
 }
 
 bool IsValidSymbolBefore(char sym) {
-    return IsValidSymbol(sym) && sym != '.';;
+    return IsValidSymbol(sym);
 }
 
 bool IsValidSymbolAfter(char sym) {
