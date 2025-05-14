@@ -514,11 +514,13 @@ class _JavaSemGraph(SemGraph):
             )
             self._graph_patched = True
 
+    def get_configs_dir(self) -> Path:
+        """Get directory with ya ide gradle configs"""
+        return self.config.arcadia_root / "build" / "yandex_specific" / "gradle"
+
     def _configure_patch_annotation_processors(self) -> None:
         """Read mapping AP class -> path from configure"""
-        annotation_processors_file = (
-            self.config.arcadia_root / "build" / "yandex_specific" / "gradle" / "annotation_processors.json"
-        )
+        annotation_processors_file = self.get_configs_dir() / "annotation_processors.json"
         if not annotation_processors_file.exists():
             raise YaIdeGradleException(f"Not found {annotation_processors_file}")
         with annotation_processors_file.open('rb') as f:
@@ -756,8 +758,11 @@ class _Exporter:
 
     def _make_project_gradle_props(self) -> None:
         """Make project specific gradle.properties file"""
-        project_gradle_properties = ['org.gradle.jvmargs=-Xmx2048m']
-
+        const_gradle_properties_file = self.sem_graph.get_configs_dir() / ("const." + _JavaSemConfig.GRADLE_PROPS)
+        project_gradle_properties = []
+        if const_gradle_properties_file.exists():
+            with const_gradle_properties_file.open('r') as f:
+                project_gradle_properties += f.read().split("\n")
         gradle_jdk_path = self.sem_graph.get_jdk_path(self.sem_graph.gradle_jdk_version)
         if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
             self.attrs_for_all_templates += [
