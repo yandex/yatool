@@ -711,7 +711,6 @@ class SandboxAuthOptions(AuthOptions):
         self.sandbox_oauth_token = None
         self.sandbox_oauth_token_path = None
         self.sandbox_oauth_token_path_depr = None
-        self.internal_use_sb_token_as_oauth_token = True
 
     def consumer(self):
         return super().consumer() + [
@@ -729,9 +728,6 @@ class SandboxAuthOptions(AuthOptions):
                 hook=SetValueHook('sandbox_oauth_token_path_depr'),
             ),
             EnvConsumer('SANDBOX_TOKEN_PATH', help='oAuth token path', hook=SetValueHook('sandbox_oauth_token_path')),
-            ConfigConsumer(
-                'internal_use_sb_token_as_oauth_token', hook=SetValueHook('internal_use_sb_token_as_oauth_token')
-            ),
             ArgConsumer(
                 [self.ssh_user_option_name],
                 help='Custom user name for authorization',
@@ -760,11 +756,6 @@ class SandboxAuthOptions(AuthOptions):
                 self.sandbox_oauth_token = token
             else:
                 self.sandbox_oauth_token_path = None
-
-        if self.internal_use_sb_token_as_oauth_token and self.sandbox_oauth_token:
-            # TODO(YA-1851): remove when every usage of auth_token is replaced with sandbox_oauth_token where needed
-            self.oauth_token = self.sandbox_oauth_token
-            self.oauth_token_path = self.sandbox_oauth_token_path
 
         if not self.sandbox_oauth_token:
             # fall back to common oauth token if sandbox options are not set.
