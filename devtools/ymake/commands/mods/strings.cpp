@@ -46,82 +46,95 @@ namespace {
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-
                 [](TTermError) -> TTermValue {
                     Y_ABORT();
                 },
-
                 [](TTermNothing) -> TTermValue {
                     return TTermNothing();
                 },
-
                 [&](const TString& body) {
-                    return std::visit(TOverloaded{
-                        [](TTermError) -> TTermValue {
-                            Y_ABORT();
-                        },
-                        [&](TTermNothing x) -> TTermValue {
-                            throw TBadArgType(Name, x);
-                        },
-                        [&](const TString& prefix) -> TTermValue {
-                            if (prefix.EndsWith(' ')) {
-                                auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
-                                return TVector<TString>{std::move(trimmedPrefix), body};
-                            }
-                            return prefix + body;
-                        },
-                        [&](const TVector<TString>& prefixes) -> TTermValue {
-                            TVector<TString> result;
-                            result.reserve(prefixes.size());
-                            for (auto& prefix : prefixes)
-                                result.push_back(prefix + body);
-                            return std::move(result);
-                        },
-                        [&](const TTaggedStrings& x) -> TTermValue {
-                            throw TBadArgType(Name, x);
-                        }
-                    }, args[0]);
+                    return NToOne(args[0], body);
                 },
-
                 [&](const TVector<TString>& bodies) -> TTermValue {
-                    return std::visit(TOverloaded{
-                        [](TTermError) -> TTermValue {
-                            Y_ABORT();
-                        },
-                        [&](TTermNothing x) -> TTermValue {
-                            throw TBadArgType(Name, x);
-                        },
-                        [&](const TString& prefix) -> TTermValue {
-                            TVector<TString> result;
-                            if (prefix.EndsWith(' ')) {
-                                auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
-                                result.reserve(bodies.size() * 2);
-                                for (auto& body : bodies) {
-                                    result.push_back(trimmedPrefix);
-                                    result.push_back(body);
-                                }
-                            } else {
-                                result.reserve(bodies.size());
-                                for (auto& body : bodies)
-                                    result.push_back(prefix + body);
-                            }
-                            return std::move(result);
-                        },
-                        [&](const TVector<TString>& prefixes) -> TTermValue {
-                            Y_UNUSED(prefixes);
-                            ythrow TNotImplemented() << "Pre arguments should not both be arrays";
-                        },
-                        [&](const TTaggedStrings& x) -> TTermValue {
-                            throw TBadArgType(Name, x);
-                        }
-                    }, args[0]);
+                    if (bodies.size() == 1)
+                        return NToOne(args[0], bodies.front());
+                    return NToMany(args[0], bodies);
                 },
-
                 [&](const TTaggedStrings& x) -> TTermValue {
                     throw TBadArgType(Name, x);
                 }
 
             }, args[1]);
+        }
+    private:
+        TTermValue NToOne(const TTermValue& prefixArg, const TString& body) const {
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                },
+                [&](const TString& prefix) -> TTermValue {
+                    return OneToOne(prefix, body);
+                },
+                [&](const TVector<TString>& prefixes) -> TTermValue {
+                    return ManyToOne(prefixes, body);
+                },
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, prefixArg);
+        }
+        TTermValue NToMany(const TTermValue& prefixArg, const TVector<TString>& bodies) const {
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                },
+                [&](const TString& prefix) -> TTermValue {
+                    return OneToMany(prefix, bodies);
+                },
+                [&](const TVector<TString>& prefixes) -> TTermValue {
+                    Y_UNUSED(prefixes);
+                    ythrow TNotImplemented() << "Pre arguments should not both be arrays";
+                },
+                [&](const TTaggedStrings& x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                }
+            }, prefixArg);
+        }
+        TTermValue OneToOne(const TString& prefix, const TString& body) const {
+            if (prefix.EndsWith(' ')) {
+                auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
+                return TVector<TString>{std::move(trimmedPrefix), body};
+            }
+            return prefix + body;
+        }
+        TTermValue OneToMany(const TString& prefix, const TVector<TString>& bodies) const {
+            TVector<TString> result;
+            if (prefix.EndsWith(' ')) {
+                auto trimmedPrefix = prefix.substr(0, 1 + prefix.find_last_not_of(' '));
+                result.reserve(bodies.size() * 2);
+                for (auto& body : bodies) {
+                    result.push_back(trimmedPrefix);
+                    result.push_back(body);
+                }
+            } else {
+                result.reserve(bodies.size());
+                for (auto& body : bodies)
+                    result.push_back(prefix + body);
+            }
+            return std::move(result);
+        }
+        TTermValue ManyToOne(const TVector<TString>& prefixes, const TString& body) const {
+            TVector<TString> result;
+            result.reserve(prefixes.size());
+            for (auto& prefix : prefixes)
+                result.push_back(prefix + body);
+            return std::move(result);
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
