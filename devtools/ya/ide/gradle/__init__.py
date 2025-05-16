@@ -437,6 +437,11 @@ class _JavaSemGraph(SemGraph):
         if foreign_targets:
             self.foreign_targets = list(set(foreign_targets))
             self.logger.info("Foreign targets: %s", self.foreign_targets)
+        # Save graph before patch for debug purposes
+        if self.sem_graph_file and self.sem_graph_file.exists():
+            with self.sem_graph_file.open('r') as fr:
+                with (self.sem_graph_file.parent / "raw.sem.json").open('w') as fw:
+                    fw.write(fr.read())
         if 'dont_patch_graph' not in kwargs:
             self._patch_graph()
 
