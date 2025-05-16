@@ -42,7 +42,14 @@ class ResourceNotFound(RuntimeError):
 
 @stringify_memoize
 def get_tool_chain_fetcher(
-    root, toolchain_name, bottle_name, formula, for_platform=None, binname=None, force_refetch=False
+    root,
+    toolchain_name,
+    bottle_name,
+    formula,
+    for_platform=None,
+    binname=None,
+    force_refetch=False,
+    download_fn=fetch_resource_if_need,
 ):
     if for_platform is None:
         for_platform = platform_matcher.my_platform()
@@ -50,7 +57,14 @@ def get_tool_chain_fetcher(
     platform_replacements = formula.get("platform_replacements")
     if "by_platform" in formula:
         return _ToolChainByPlatformFetcher(
-            root, toolchain_name, platform_replacements, formula["by_platform"], for_platform, binname, force_refetch
+            root,
+            toolchain_name,
+            platform_replacements,
+            formula["by_platform"],
+            for_platform,
+            binname,
+            force_refetch,
+            download_fn,
         )
     elif "latest_matched" in formula:
         return _ToolChainLatestMatchedResourceFetcher(
@@ -61,6 +75,7 @@ def get_tool_chain_fetcher(
             for_platform,
             binname,
             force_refetch,
+            download_fn,
             bottle_name,
         )
     else:
@@ -91,7 +106,7 @@ class _ToolChainFetcherBase(object):
 
 
 class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
-    def __init__(self, root, toolchain_name, platform_replacements, for_platform, binname, force_refetch):
+    def __init__(self, root, toolchain_name, platform_replacements, for_platform, binname, force_refetch, download_fn):
         self._root = root
         self._where = None
         self._toolchain_name = toolchain_name
@@ -100,6 +115,7 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
         self._binname = binname
         self._binname_kwargs = dict(install_params=(BINARY, True), binname=binname) if binname else {}
         self._force_refetch = force_refetch
+        self._download_fn = download_fn
 
     def resource_id_from_cache(self):
         resource = self._get_matched_resource()
@@ -139,7 +155,7 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
     def _fetch(self):
         resource = self._get_matched_resource()
-        return fetch_resource_if_need(
+        return self._download_fn(
             None,
             self._root,
             self._get_resource_uri(resource),
@@ -159,9 +175,11 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
 
 class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
-    def __init__(self, root, name, platform_replacements, by_platform, for_platform, binname, force_refetch):
+    def __init__(
+        self, root, name, platform_replacements, by_platform, for_platform, binname, force_refetch, download_fn
+    ):
         super(_ToolChainByPlatformFetcher, self).__init__(
-            root, name, platform_replacements, for_platform, binname, force_refetch
+            root, name, platform_replacements, for_platform, binname, force_refetch, download_fn
         )
         self.__by_platform = by_platform
 
@@ -199,7 +217,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
         strip_prefix = resource_desc.get('strip_prefix')
         parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, parsed_uri.resource_type)
-        where = fetch_resource_if_need(
+        where = self._download_fn(
             fetcher,
             self._root,
             self._get_resource_uri(resource_desc),
@@ -217,10 +235,19 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
     _updated_toolchains = set()
 
     def __init__(
-        self, root, toolchain_name, platform_replacements, params, for_platform, binname, force_refetch, bottle_name
+        self,
+        root,
+        toolchain_name,
+        platform_replacements,
+        params,
+        for_platform,
+        binname,
+        force_refetch,
+        download_fn,
+        bottle_name,
     ):
         super(_ToolChainLatestMatchedResourceFetcher, self).__init__(
-            root, toolchain_name, platform_replacements, for_platform, binname, force_refetch
+            root, toolchain_name, platform_replacements, for_platform, binname, force_refetch, download_fn
         )
         self.__params = params
         self.__bottle_name = bottle_name
@@ -382,7 +409,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
             self._dump_resources_to_file(dump_file)
         resource_id = self._get_matched_resource_id()
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
-        fetch_resource_if_need(
+        self._download_fn(
             fetcher,
             self._root,
             self._get_resource_uri(resource_id),

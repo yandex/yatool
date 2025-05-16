@@ -210,9 +210,6 @@ class UFetcherDownloader:
                 self._progress_callback.finalize()
 
     def _post_process(self, res_info: dict, download_to: str) -> None:
-        # TODO: kuzmich321@ (ufetcher) YA-2028
-
-        # START Backwards compatability
         res_info_attrs = deepget.deepget(res_info, ("last_attempt", "result", "resource_info", "attrs"))
 
         orig_fname = res_info_attrs.get('original_filename', None)
@@ -238,8 +235,6 @@ class UFetcherDownloader:
                 logger.debug("Couldn't extract from tar: %s" % err)
 
         self._update_permissions(download_to, is_executable)
-
-        # END Backwards compatability
 
     @staticmethod
     def _handle_error(res_info: dict) -> None:

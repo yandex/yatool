@@ -68,7 +68,7 @@ def fetch_resource_if_need(
     force_refetch=False,
     keep_directory_packed=False,
     strip_prefix=None,
-    force_universal_fetcher=False,
+    force_universal_fetcher=True,
 ):
     global FALLBACK_MSG_LOGGED
 
