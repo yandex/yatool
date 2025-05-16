@@ -128,18 +128,47 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
         auto has_no_nested_macro = false;
         for (auto& val : *var)
             (val.IsMacro ? has_nested_macro : has_no_nested_macro) = true;
-        if (has_nested_macro && has_no_nested_macro)
-            ythrow TError() << "inconsistent variable array items (" << name << ")";
         def.Definition = MakeHolder<NCommands::TSyntax>();
-        if (has_nested_macro) {
+        if (has_nested_macro && has_no_nested_macro) {
+            // WORKAROUND[mixed LATE_GLOBs]
+
+            // a motivating example
+            // ```
+            // DECLARE_IN_DIRS(FOO ...)
+            // RUN_PYTHON3(stuff.py \${FOO_FILES} bar.txt IN ${FOO_FILES} IN bar.txt ...)
+            // ```
+
+            // we end up with a mix of strings and "123:LATE_GLOB=..."-style values in `ARGS...` and `IN[]` parameters;
+            // ideally, we want support for heterogeneous arrays here (TODO),
+            // but for now we do the "type erasure" by treating glob refs as plain strings
+            // and (later) detecting them by content kind of like we did when setting that `.IsMacro` flag;
+            // note that deep replacement is not in effect here,
+            // so we have to put globs under input-modifiers in `ARGS...` but not in `IN[]`
+
+            auto val = TString();
+            for (const auto &part : *var) {
+                if (val.size())
+                    val += " ";
+                if (var->FakeDeepReplacement && part.IsMacro) {
+                    if (auto name = CheckAndGetCmdName(part.Name); name == "LATE_GLOB") {
+                        val += "${input:\"";
+                        EscapeC(part.Name, val);
+                        val += "\"}";
+                        continue;
+                    }
+                }
+                val += part.Name;
+            }
+            auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val);
+            def.Definition->Script = std::move(_val.Script);
+        } else if (has_nested_macro) {
             // a passthrough hack pretending to be "a macro" (used by _LATE_GLOB)
             auto late_globs = TMacroValues::TLegacyLateGlobPatterns();
             for (auto& val : *var)
                 late_globs.Data.push_back(val.Name);
             def.Definition->Script = {{{Commands.Values.InsertValue(late_globs)}}};
             def.LegacyMode = ELegacyMode::Macro;
-        }
-        if (has_no_nested_macro) {
+        } else if (has_no_nested_macro) {
             // a proper macro argument
             auto val = GetAll(var);
             auto _val = Commands.Parse(Conf, Commands.Mods, Commands.Values, val);

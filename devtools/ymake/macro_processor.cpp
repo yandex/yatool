@@ -301,6 +301,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
             TStringBuf name = argNames.back();
             name.Chop(3);
             ownVars[name].NoInline = false;
+            ownVars[name].FakeDeepReplacement = true;
         }
 
     }

@@ -115,6 +115,13 @@ namespace {
             TMacroValues::TValue Path;
         };
         auto ProcessCoord(const TPreevalCtx& ctx, std::string_view name, ELinkType context, bool isGlob, bool isLegacyGlob) const {
+            if (!isLegacyGlob) {
+                // WORKAROUND[mixed LATE_GLOBs]
+                // see the respective note in `TCommands::TInliner::GetVariableDefinition`
+                auto propName = CheckAndGetCmdName(name);
+                if (propName == "LATE_GLOB")
+                    isLegacyGlob = true;
+            }
             auto pooledName = std::get<std::string_view>(ctx.Values.GetValue([&]() {
                 if (context != ELT_Default)
                     return ctx.Values.InsertStr(TFileConf::ConstructLink(context, NPath::ConstructPath(name))); // lifted from TCommandInfo::ApplyMods

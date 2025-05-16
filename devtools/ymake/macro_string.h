@@ -17,6 +17,7 @@ void ParseCmd(const TStringBuf& source, ui64& id, TStringBuf& cmdName, TStringBu
 ui64 GetId(const TStringBuf& cmd);
 TStringBuf SkipId(const TStringBuf& cmd);
 TStringBuf GetCmdName(const TStringBuf& cmd);
+TStringBuf CheckAndGetCmdName(TStringBuf cmd);
 TStringBuf GetCmdValue(const TStringBuf& cmd);
 
 // + intent self-documentation wrappers
