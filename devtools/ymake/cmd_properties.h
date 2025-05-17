@@ -166,7 +166,7 @@ public:
     );
 
 private:
-bool HasConditions_ = false;
+    bool HasConditions_ = false;
     //for macrocalls
     TVector<TString> ArgNames_;
     TMacroCalls MacroCalls_;
