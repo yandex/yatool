@@ -223,7 +223,7 @@ namespace {
                 [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
                     if (bodies.empty())
                         return std::monostate();
-                    return JoinSeq(glue, bodies);
+                    return ctx.Values.GetValue(ctx.Values.InsertStr(JoinSeq(glue, bodies)));
                 },
                 [&](auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
