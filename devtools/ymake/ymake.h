@@ -28,7 +28,7 @@
 #include <asio/thread_pool.hpp>
 #include <asio/strand.hpp>
 
-using TConfigurationExecutor = asio::strand<asio::thread_pool::executor_type>;
+using TConfigurationExecutor = asio::strand<asio::any_io_executor>;
 
 using TDependsToModulesClosure = THashMap<TString, TVector<TNodeId>>;
 

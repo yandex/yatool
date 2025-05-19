@@ -5,6 +5,7 @@
 #include "main.h"
 #include "trace_start.h"
 #include "ymake.h"
+#include "context_executor.h"
 
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/stats.h>
@@ -76,7 +77,7 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
     return TMaybe<EBuildResult>();
 }
 
-asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, asio::thread_pool::executor_type exec) {
+asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, TExecutorWithContext<TExecContext> exec) {
     TBuildConfiguration conf;
     auto result = InitConf(value, conf);
     if (result.Defined()) {
@@ -118,7 +119,15 @@ int YMakeMain(int argc, char** argv) {
     auto configs = SplitMulticonfigCmdline(argc, argv);
     TVector<int> states(configs.size());
     for (size_t i = 0; i < configs.size(); ++i) {
-        asio::co_spawn(configure_workers, RunConfigure(configs[i], states[i], configure_workers.executor()), asio::detached);
+        auto ctx = std::make_shared<TExecContext>(
+            std::make_shared<NCommonDisplay::TLockedStream>(),
+            std::make_shared<TConfMsgManager>()
+        );
+        auto proxy = TExecutorWithContext<TExecContext>(
+            asio::require(configure_workers.executor(), asio::execution::blocking.never),
+            ctx
+        );
+        asio::co_spawn(proxy, RunConfigure(configs[i], states[i], proxy), asio::detached);
     }
 
     configure_workers.wait();

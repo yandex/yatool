@@ -1,6 +1,8 @@
 #include "manager.h"
 #include "trace.h"
 
+#include <devtools/ymake/context_executor.h>
+
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
 #include <library/cpp/iterator/mapped.h>
 
@@ -245,6 +247,10 @@ void TConfMsgManager::Load(IInputStream* input, THashMap<ui32, Container>& confV
 }
 
 TConfMsgManager* ConfMsgManager() {
+    auto ctx = CurrentContext<TExecContext>;
+    if (ctx && ctx->ConfMsgManager) {
+        return ctx->ConfMsgManager.get();
+    }
     return Singleton<TConfMsgManager>();
 }
 

@@ -33,6 +33,7 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/evlog_server.h>
+#include <devtools/ymake/context_executor.h>
 
 #include <devtools/ymake/yndex/yndex.h>
 
@@ -698,7 +699,6 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
     Y_DEFER {
         NStats::StackDepthStats.Report();
     };
-
     return TMaybe<EBuildResult>();
 }
 
@@ -831,7 +831,7 @@ void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->DumpMetaData();
 }
 
-asio::awaitable<int> main_real(TBuildConfiguration& conf, asio::thread_pool::executor_type exec) {
+asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<TExecContext> exec) {
     THolder<TYMake> yMake(new TYMake(conf));
     auto serial_exec = asio::make_strand(exec);
 

@@ -1,6 +1,7 @@
 LIBRARY()
 
 PEERDIR(
+    contrib/libs/asio
     library/cpp/json
     library/cpp/on_disk/multi_blob
     library/cpp/protobuf/json

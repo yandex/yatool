@@ -1,6 +1,8 @@
 #include "display.h"
 #include "trace.h"
 
+#include <devtools/ymake/context_executor.h>
+
 #include <library/cpp/json/json_value.h>
 #include <library/cpp/json/json_writer.h>
 
@@ -56,6 +58,10 @@ namespace NCommonDisplay{
     }
 
     TLockedStream* LockedStream() {
+        auto ctx = CurrentContext<TExecContext>;
+        if (ctx && ctx->LockedStream) {
+            return ctx->LockedStream.get();
+        }
         return Singleton<TLockedStream>();
     }
 
