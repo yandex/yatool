@@ -698,7 +698,7 @@ def get_module_type(node):
 
 
 def is_target_binary(node):
-    is_binary = get_module_type(node) == 'bin'
+    is_binary = get_module_type(node) in ['bin', 'so']
     return is_binary and not node.get('host_platform')
 
 
