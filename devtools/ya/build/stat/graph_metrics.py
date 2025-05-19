@@ -17,7 +17,7 @@ def _traverse_deps(
     modules: typing.Set[GraphNodeUid],
     not_modules: typing.Set[GraphNodeUid],
     nodes: typing.Dict[GraphNodeUid, GraphNode],
-    deps: typing.Dict[GraphNodeUid, typing.List[GraphNodeUid]],
+    deps: typing.DefaultDict[GraphNodeUid, typing.List[GraphNodeUid]],
 ) -> None:
     if v in modules or v in not_modules:
         return
@@ -73,11 +73,13 @@ def _calculate_elapsed_time_by_deps(
     return res
 
 
-def _add_metric(n: GraphNode, name: str, value: typing.Any, metrics: typing.Dict[GraphNodeUid, typing.Any]) -> None:
+def _add_metric(
+    n: GraphNode, name: str, value: typing.Any, metrics: typing.DefaultDict[GraphNodeUid, typing.Any]
+) -> None:
     metrics[n['uid']].update({name: value})
 
 
-def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Dict) -> typing.Dict:
+def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Dict) -> typing.DefaultDict:
     metrics = defaultdict(dict)
     deps = _make_dependencies_lists(graph)
 

@@ -11,7 +11,7 @@ import tempfile
 import typing as tp
 from collections import defaultdict
 from collections.abc import Iterator, Iterable, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from yalibrary.fetcher import http_client
 from yalibrary.status_view.helpers import format_paths
@@ -423,7 +423,7 @@ def _get_log(log: str) -> 'Generator[io.TextIOWrapper]':
 @dataclass
 class _PrepareTasksTimes:
     start_time: _Time = 0
-    end_times: dict[_PrepareType, _Time] = {}
+    end_times: dict[_PrepareType, _Time] = field(default_factory=dict)
 
 
 class _WorkerIdToHostBinder:

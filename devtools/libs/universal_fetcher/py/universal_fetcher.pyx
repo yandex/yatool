@@ -125,7 +125,7 @@ cdef class UniversalFetcher:
                 c_result = self._impl.Get().DownloadToFile(c_url, c_dst_path, c_fetch_params)
             else:
                 c_result = self._impl.Get().DownloadToDir(c_url, c_dst_path, c_fetch_params)
-        
+
         result = json.loads(c_result.Get().ToJsonString())
 
         if is_http and integrity.Defined() and result['last_attempt']['result']['status'] == OK:

@@ -139,7 +139,9 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
     def _get_matched_resource(self):
         by_platform = self._by_platform
-        best_match = platform_matcher.match_platform(self._platform, by_platform, self._platform_replacements)
+        best_match = platform_matcher.match_platform(
+            self._platform, list(by_platform.keys()), self._platform_replacements
+        )
         if best_match is not None:
             logger.debug("{0}: will use '{1}' platform".format(self._toolchain_name, best_match))
             return by_platform[best_match]

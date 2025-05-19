@@ -32,8 +32,8 @@ cdef extern from *:
         #include <Python.h>
         #include <devtools/libs/yaplatform/platform.h>
 
-        extern "C" PyObject* PyPlatformNotSupportedException;
-        extern "C" PyObject* PyInvalidPlatformSpecification;
+        extern "C++" PyObject* PyPlatformNotSupportedException;
+        extern "C++" PyObject* PyInvalidPlatformSpecification;
 
         void _exception_handler() {
             try {
