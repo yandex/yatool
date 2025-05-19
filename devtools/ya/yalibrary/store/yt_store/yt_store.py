@@ -22,26 +22,6 @@ class YtInitException(Exception):
     pass
 
 
-class CacheFullness2:
-    MIN_DURATION = 180
-
-    def __init__(self, self_uids: list[str], uids: list[str], content_uids: bool):
-        self._self_uids = self_uids
-        self._uids = uids
-        self._content_uids = content_uids
-        self._start_time = time.time()
-
-    def found(self, yt_client: client.YtStoreClient) -> int | None:
-        if yt_client.is_disabled:
-            return
-        if time.time() > self._start_time + self.MIN_DURATION or os.getenv("__YA_FORCE_CACHE_FULLNESS2"):
-            try:
-                meta = yt_client.get_metadata(self._self_uids, self._uids, content_uids=self._content_uids)
-                return len(set(self._uids).intersection(meta.keys()))
-            except Exception:
-                pass
-
-
 class YtStore(DistStore):
     def __init__(
         self,
@@ -63,7 +43,7 @@ class YtStore(DistStore):
         probe_before_put=False,
         probe_before_put_min_size=0,
         retry_time_limit=None,
-        **kwargs,
+        **kwargs
     ):
         super(YtStore, self).__init__(
             name='yt-store',
@@ -139,7 +119,6 @@ class YtStore(DistStore):
                 logger.warning('Failed to init new yt store client', exc_info=True)
             if self._xx_prepare_data:
                 logger.debug('Will use C++ reimplementation of prepare_data')
-        self._cache_fullness2 = None
 
     @property
     def is_disabled(self):
@@ -247,8 +226,6 @@ class YtStore(DistStore):
             self._load_meta(self_uids, uids, refresh_on_read, content_uids)
 
     def _load_meta(self, self_uids, uids, refresh_on_read=False, content_uids=False):
-        if self.readonly() and self._data_dir == '//home/devtools/cache':
-            self._cache_fullness2 = CacheFullness2(self_uids, uids, content_uids)
         with self._stager.scope('loading-yt-meta'):
             self.wait_until_tables_ready()
 
@@ -624,8 +601,6 @@ class YtStore(DistStore):
         }
 
     def stats(self, execution_log, evlog_writer):
-        if self._cache_fullness2:
-            self._cache_hit["found2"] = self._cache_fullness2.found(self._client)
         super(YtStore, self).stats(execution_log, evlog_writer)
         self._send_client_metrics()
 

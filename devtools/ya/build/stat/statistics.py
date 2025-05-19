@@ -533,10 +533,6 @@ def print_dist_cache_statistics(graph, filename, display):
         'put_real_speed': put_real_speed,
     }
 
-    cache_found2 = cache_hit_stat.get('found2')
-    if cache_requested > 0 and cache_found2:
-        stats["cache_fullness2"] = 100.0 * cache_found2 / cache_requested
-
     if filename is not None:
         with open(filename, 'w') as output_file:
             json.dump(stats, output_file, indent=4, sort_keys=True)
