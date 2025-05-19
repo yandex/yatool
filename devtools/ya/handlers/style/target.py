@@ -25,14 +25,16 @@ class MineOptions(tp.NamedTuple):
     tty: bool = os.isatty(sys.stdin.fileno())
 
 
-def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generator[Target]:
+def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
         yield PurePath(STDIN_FILENAME_STAMP + mine_opts.stdin_filename), sys.stdin.read
 
     # read cwd if target is not specified
-    if not targets and mine_opts.tty:
+    if not mine_opts.targets and mine_opts.tty:
         targets = (Path.cwd(),)
+    else:
+        targets = mine_opts.targets
 
     for target in targets:
         if target.is_symlink():
@@ -51,7 +53,7 @@ def _mine_targets(targets: tuple[Path, ...], mine_opts: MineOptions) -> Generato
 
 
 def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[styler.Styler]]]]:
-    for target in _mine_targets(mine_opts.targets, mine_opts):
+    for target in _mine_targets(mine_opts):
         state_helper.check_cancel_state()
 
         if styler_classes := styler.select_suitable_stylers(target=target[0], file_types=mine_opts.file_types):
