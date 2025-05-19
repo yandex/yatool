@@ -541,7 +541,7 @@ inline bool IsExplicitDirectory(TStringBuf name) noexcept {
 }
 
 inline TStringBuf CutPoint(TStringBuf path) {
-    if (path.StartsWith("./")) {
+    if (path.StartsWith("./") && path.size() > 2) {
         path.Skip(2);
         if (path.front() == NPath::PATH_SEP) {
             path.Skip(1);
