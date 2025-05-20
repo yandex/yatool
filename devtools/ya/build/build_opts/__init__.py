@@ -2570,7 +2570,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
         self.yt_token_path = '~/.yt/token'
         self.yt_readonly = True
         self.yt_max_cache_size = None
-        self.yt_store_ttl = 24
+        self.yt_store_ttl = None
         self.yt_store_retry_time_limit = None
 
     @staticmethod
@@ -2621,7 +2621,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             ),
             ArgConsumer(
                 ['--yt-store-ttl'],
-                help='YT store ttl in hours(0 for infinity)',
+                help='YT store ttl in hours',
                 hook=SetValueHook('yt_store_ttl', transform=int),
                 group=YT_CACHE_PUT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
@@ -2658,7 +2658,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             ),
             EnvConsumer(
                 'YA_YT_STORE_TTL',
-                help='YT store ttl in hours(0 for infinity)',
+                help='YT store ttl in hours',
                 hook=SetValueHook('yt_store_ttl'),
             ),
             EnvConsumer(

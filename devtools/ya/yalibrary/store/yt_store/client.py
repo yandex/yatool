@@ -181,7 +181,7 @@ class YtStoreClient(object):
         attrs = {
             'auto_compaction_period': 24 * 60 * 60 * 1000,  # 1d
         }
-        if ttl != 0:
+        if ttl:
             attrs['min_data_versions'] = 0
             attrs['max_data_ttl'] = ttl * 60 * 60 * 1000
 

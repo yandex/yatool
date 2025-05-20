@@ -32,7 +32,7 @@ class YtStore(DistStore):
         readonly=False,
         create_tables=False,
         max_cache_size=None,
-        ttl=24,
+        ttl=None,
         data_table_name=consts.YT_CACHE_DEFAULT_DATA_TABLE_NAME,
         metadata_table_name=consts.YT_CACHE_DEFAULT_METADATA_TABLE_NAME,
         stat_table_name=consts.YT_CACHE_DEFAULT_STAT_TABLE_NAME,
