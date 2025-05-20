@@ -114,8 +114,11 @@ class VSCodeProject:
 
     def async_fetch_tools(self, for_platform=None):
         tools_list = []
-        if self.is_py3 and self.params.black_formatter_enabled:
-            tools_list.append("black")
+        if self.is_py3:
+            if self.params.black_formatter_enabled:
+                tools_list.append("black")
+            if self.params.ruff_formatter_enabled:
+                tools_list.append("ruff")
         if self.is_cpp:
             if self.params.compile_commands_fix:
                 tools_list.extend(["cc", "c++"])
@@ -203,7 +206,7 @@ class VSCodeProject:
             ide_common.emit_message("Running codegen for C++")
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
-        languages = [lang for lang in build_params.languages if lang != "CPP"]
+        languages = [lang for lang in self.params.languages if lang != "CPP"]
         if languages:
             build_params = copy.deepcopy(self.params)
             build_params.replace_result = True
@@ -521,8 +524,11 @@ class VSCodeProject:
                 if os.path.exists(os.path.join(self.codegen_cpp_dir, ".clangd")):
                     os.remove(os.path.join(self.codegen_cpp_dir, ".clangd"))
 
-        if self.is_py3 and self.params.black_formatter_enabled:
-            workspace["settings"].update(vscode.workspace.gen_black_settings(self.params.arc_root, tool_fetcher))
+        if self.is_py3:
+            if self.params.black_formatter_enabled:
+                workspace["settings"].update(vscode.workspace.gen_black_settings(self.params.arc_root, tool_fetcher))
+            if self.params.ruff_formatter_enabled:
+                workspace["settings"].update(vscode.workspace.gen_ruff_settings(self.params.arc_root, tool_fetcher))
         if self.is_go:
             alt_tools = {}
             if self.params.patch_gopls:

@@ -22,6 +22,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.tests_enabled = True
         self.skip_modules = []
         self.black_formatter_enabled = True
+        self.ruff_formatter_enabled = False
         self.write_pyright_config = True
         self.python_index_enabled = True
         self.build_venv = False
@@ -165,6 +166,12 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
+                ["--ruff-formatter"],
+                help="Configure \"ruff\" code style formatting",
+                hook=devtools.ya.core.yarg.SetConstValueHook("ruff_formatter_enabled", True),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--no-gopls-fix"],
                 help="Do not use patched gopls",
                 hook=devtools.ya.core.yarg.SetConstValueHook("patch_gopls", False),
@@ -279,6 +286,9 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
             self.files_visibility = "targets-and-deps"
         if self.files_visibility and not self.use_arcadia_root:
             self.use_arcadia_root = True
+
+        if self.ruff_formatter_enabled:
+            self.black_formatter_enabled = False
 
         if not self.languages:
             self.languages = ["CPP", "PY3"]

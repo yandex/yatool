@@ -174,6 +174,31 @@ def gen_black_settings(arc_root, tool_fetcher):
     )
 
 
+def gen_ruff_settings(arc_root, tool_fetcher):
+    try:
+        ruff_binary_path = tool_fetcher("ruff")["executable"]
+    except Exception as e:
+        ide_common.emit_message(f"[[warn]]Could not get \"ya tool ruff\"[[rst]]: {e!r}")
+        return {}
+
+    success = setup_linter_config(arc_root, const.DefaultLinterConfig.Python, const.PythonLinterName.Ruff)
+    if not success:
+        return {}
+
+    return OrderedDict(
+        (
+            (
+                "[python]",
+                {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.formatOnSaveMode": "file",
+                },
+            ),
+            ("ruff.path", [ruff_binary_path]),
+        )
+    )
+
+
 def gen_clang_format_settings(arc_root, tool_fetcher):
     try:
         clang_format_binary_path = tool_fetcher("clang-format-18")["executable"]
@@ -325,6 +350,8 @@ def get_recommended_extensions(params):
             extensions.append("detachhead.basedpyright")
         if params.black_formatter_enabled:
             extensions.append("ms-python.black-formatter")
+        if params.ruff_formatter_enabled:
+            extensions.append("charliermarsh.ruff")
     if "GO" in params.languages:
         extensions.append("golang.go")
     return extensions
