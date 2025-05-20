@@ -1186,9 +1186,6 @@ class PackageContext:
 
 def _get_arcadia_root(params):
     arcadia_root = params.custom_source_root
-    if arcadia_root and os.path.exists(os.path.join(arcadia_root, 'arcadia')):
-        # support old style root
-        arcadia_root = os.path.join(arcadia_root, 'arcadia')
     if not arcadia_root and os.path.exists(params.packages[0]):
         arcadia_root = find_root.detect_root(params.packages[0])
     if not arcadia_root:
