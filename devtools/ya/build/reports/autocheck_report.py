@@ -1,3 +1,5 @@
+# Keep this file up to date with docs/yateam/build/usage/ya_make/reports/jsonl.md
+
 import os
 import copy
 import exts.yjson as json
