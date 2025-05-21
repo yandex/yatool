@@ -469,7 +469,7 @@ class YtStore(DistStore):
         with AccumulateTime(lambda x: inc_time(x, 'get_replication_factor')):
             replication_factor = self._client.get_data_replication_factor()
         with AccumulateTime(lambda x: inc_time(x, 'read_meta')):
-            meta_status = self._client.get_metadata_status()
+            meta_status = self._client.get_metadata_status(precise_data_size=bool(self._max_cache_size))
         min_access_time = meta_status['min_access_time']
         total_data_size = meta_status['total_data_size'] * replication_factor
 
