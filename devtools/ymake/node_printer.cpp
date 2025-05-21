@@ -393,6 +393,7 @@ private:
 
     const TFoldersTree* FoldersTree;
     THashSet<ui32> SeenDataPaths;
+    THashMap<ui32, TNodeId> DirElemId2ModuleNodeId;
     bool WithData = false;
     bool WithYaMake = false;
     bool SkipMakeFiles = false;
@@ -481,6 +482,15 @@ bool TNodePrinter<TFormatter>::AcceptDep(TState& state) {
     if (SkipMakeFiles && IsDirType(dep.From()->NodeType) && IsMakeFileType(dep.To()->NodeType)) {
         return false;
     }
+    if (IsPeerdirDep(dep)) {
+        const auto* module = RestoreContext.Modules.Get(dep.From()->ElemId);
+        if (module->GetAttrs().RequireDepManagement) {
+            const auto it = DirElemId2ModuleNodeId.find(dep.To()->ElemId);
+            if (it.IsEnd() || !RestoreContext.Modules.GetModuleNodeLists(module->GetId()).UniqPeers().has(it->second)) {
+                return false;
+            }
+        }
+    }
     return DepFilter(dep, !state.HasIncomingDep()) && IsReachableManagedDependency(RestoreContext, dep);
 }
 
@@ -489,6 +499,16 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
     TStateItem& st = state.Top();
     EMakeNodeType nodeType = st.Node()->NodeType;
+
+    if (fresh && IsModuleType(nodeType)) {
+        const TModule* module = RestoreContext.Modules.Get(st.Node()->ElemId);
+        if (module->GetAttrs().RequireDepManagement) {
+            for (TNodeId peerId: RestoreContext.Modules.GetModuleNodeLists(module->GetId()).UniqPeers()) {
+                const TModule* peer = RestoreContext.Modules.Get(RestoreContext.Graph.Get(peerId)->ElemId);
+                DirElemId2ModuleNodeId[peer->GetDirId()] = peerId;
+            }
+        }
+    }
 
     if (fresh && state.HasIncomingDep() && !SubGraphFilter(state.IncomingDep())) {
         fresh = false;
