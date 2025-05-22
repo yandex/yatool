@@ -239,6 +239,36 @@ namespace {
         return CollectArgNamesIf(signature, [] (const auto& arg) { return IsSpecialization(arg.Type); });
     }
 
+    TCmdProperty::TKeywords CollectKeywords(const TArgs& arguments) {
+        TCmdProperty::TKeywords keywords;
+        for (const auto& arg : arguments) {
+            TStringBuf kwPresent, kwMissing;
+            switch (arg.Type) {
+                case EArgType::NamedBool:
+                    if (!arg.InitTrue.empty()) {
+                        kwPresent = arg.InitTrue;
+                    }
+                    if (!arg.InitFalse.empty()) {
+                        kwMissing = arg.InitFalse;
+                    }
+                    keywords.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
+                    break;
+                case EArgType::NamedScalar:
+                    if (!arg.InitFalse.empty()) {
+                        kwMissing = arg.InitFalse;
+                    }
+                    keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
+                    break;
+                case EArgType::NamedArray:
+                    keywords.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
+                    break;
+                default:
+                    break;
+            }
+        }
+        return keywords;
+    };
+
     class TArgsBuilder {
     public:
         using TArgsList = std::span<NConfReader::TConfParser::FormalArgContext* const>;
@@ -632,57 +662,24 @@ namespace {
             auto& block = BlockStack.back();
 
             // Now we are ready to process named arguments since the BlockData is already created
-            TCmdProperty::TKeywords keywords;
             for (const auto& arg : arguments) {
-                bool isNamedArrayOrScalar = IsNamedArray(arg.Type) || IsNamedScalar(arg.Type);
+                const bool isNamedArrayOrScalar = IsNamedArray(arg.Type) || IsNamedScalar(arg.Type);
                 if (!arg.DeepReplace.empty() && !isNamedArrayOrScalar) {
                     ReportError(
                         "DeepReplace modifiers are allowed for named arrays or scalar arguments only");
                 }
-                TStringBuf kwPresent, kwMissing;
-                switch (arg.Type) {
-                    case EArgType::NamedBool:
-                        YDIAG(Conf) << "Keyword ? for [" << name << "] is [" << arg.Name << "]" << Endl;
-                        if (!arg.InitTrue.empty()) {
-                            kwPresent = arg.InitTrue;
-                        }
-                        if (!arg.InitFalse.empty()) {
-                            kwMissing = arg.InitFalse;
-                        }
-                        keywords.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
-                        break;
-                    case EArgType::NamedScalar:
-                        YDIAG(Conf) << "Keyword = for [" << name << "] is [" << arg.Name << "] := ["
-                            << arg.InitFalse << "]" << Endl;
-                        if (!arg.InitFalse.empty()) {
-                            kwMissing = arg.InitFalse;
-                        }
-                        keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
-                        break;
-                    case EArgType::NamedArray:
-                        YDIAG(Conf) << "Keyword [] for [" << name << "] is [" << arg.Name << "]" << Endl;
-                        keywords.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
-                        break;
-                    default:
-                        break;
-                }
-
                 // Add argument name to the set of formal argument names (This set
                 // will be used in ExitMacro to determine which formal arguments
                 // were used in conditions). Report an error in case of duplication.
                 if (!IsSpecialization(arg.Type) && !block.AddArgName(arg.Name)) {
-                    TStringStream message;
-                    message << "Parameter [" << arg.Name
-                            << "] has been already decalred for macro ["
-                            << block.Name() << "]";
-                    ReportError(message.Str());
+                    ReportError(fmt::format("Parameter [{}] has been already declared for macro [{}]", arg.Name, block.Name()));
                 }
             }
 
-            const auto argNames = CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second);
-
-            blockData.CmdProps.Reset(new TCmdProperty{argNames, std::move(keywords)});
-
+            blockData.CmdProps.Reset(new TCmdProperty{
+                CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second),
+                CollectKeywords(arguments)
+            });
             if (!blockData.CmdProps->ArgNames().empty()) {
                 block.SetArgs(blockData.CmdProps->ConvertCmdArgs());
             }
