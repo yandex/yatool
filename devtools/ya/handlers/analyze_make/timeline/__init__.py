@@ -1,3 +1,4 @@
+import os
 import sys
 
 import exts.yjson as json
@@ -39,7 +40,9 @@ def main(opts):
     file_name, nodes = common.load_evlog(opts, display, check_for_distbuild=True)
 
     if nodes:
-        fname = file_name + '.json'
+        fname = os.path.abspath(file_name + '.json')
         with open(fname, 'w') as fout:
             json.dump(list(convert_to_chromium_trace(nodes)), fout)
-        display.emit_message(f'[[imp]]Open about://tracing in Chromium and load {fname} file.')
+        display.emit_message(
+            f'[[imp]]Open [[alt1]]about://tracing[[imp]] in Chromium and load [[alt1]]{fname}[[imp]] file.'
+        )
