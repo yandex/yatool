@@ -83,10 +83,14 @@ class _JavaSemConfig(SemConfig):
     def _get_settings_root(self) -> Path:
         """Create settings_root path by options and targets"""
         settings_root = Path(self.params.abs_targets[0])
+        cwd = Path.cwd()
         if self.params.settings_root:
-            settings_root = self.arcadia_root / Path(self.params.settings_root)
+            cwd_settings_root = cwd / self.params.settings_root
+            if cwd.is_relative_to(self.arcadia_root) and cwd_settings_root.exists():
+                settings_root = cwd_settings_root
+            else:
+                settings_root = self.arcadia_root / Path(self.params.settings_root)
         elif len(self.params.abs_targets) > 1:
-            cwd = Path.cwd()
             if cwd.is_relative_to(self.arcadia_root) and cwd != self.arcadia_root:
                 settings_root = cwd
         self.logger.info("Settings root: %s", settings_root)
