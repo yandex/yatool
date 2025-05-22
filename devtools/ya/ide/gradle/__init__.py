@@ -406,7 +406,7 @@ class _JavaSemGraph(SemGraph):
         self._cached_jdk_paths = {}
         self.jdk_paths: dict[int, str] = {}
         self.foreign_targets: list[str] = []
-        self.gradle_jdk_version: int = 17  # by default use JDK 17 for Gradle
+        self.gradle_jdk_version: int = 11  # by default use JDK 11 for Gradle
         if self.config.params.force_jdk_version and int(self.config.params.force_jdk_version) > self.gradle_jdk_version:
             self.gradle_jdk_version = int(self.config.params.force_jdk_version)
         self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
@@ -696,6 +696,8 @@ class _JavaSemGraph(SemGraph):
                     self._graph_patched = True
 
     def get_jdk_path(self, jdk_version: int) -> str:
+        if self.config.params.force_jdk_version:
+            jdk_version = int(self.config.params.force_jdk_version)
         if jdk_version in self._cached_jdk_paths:
             return self._cached_jdk_paths[jdk_version]
 
