@@ -764,7 +764,7 @@ static void DumpGraphInternal(TYMake& yMake) {
         if (!i.second.HasBuildFrom || !i.second.IsFile) {
             continue;
         }
-        NodesByDepth.push_back(std::make_pair(i.second.Depth, i.first));
+        NodesByDepth.emplace_back(i.second.Depth, i.first);
     }
     std::sort(NodesByDepth.begin(), NodesByDepth.end());
     TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
@@ -1694,7 +1694,7 @@ public:
                         if (!IsFileType(st.Node()->NodeType)) {
                             name = SkipId(name);
                         }
-                        pathErrMsgs.push_back(TString{name});
+                        pathErrMsgs.emplace_back(name);
 
                         TString dir = TString{NPath::Parent(name)};
                         if (InBuildDir(dir)) {

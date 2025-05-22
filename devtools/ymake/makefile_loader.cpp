@@ -505,7 +505,7 @@ bool TDirParser::ModuleStatement(const TStringBuf& name, TArrayRef<const TString
         if (IsBlockDataMultiModule(&i->second)) {
             MultiModuleName = i->second.ModuleConf->Name;
             for (const auto& sub : i->second.ModuleConf->OrderedSubModules) {
-                SubModules.push_back({sub.first, sub.second->Name});
+                SubModules.push_back(TSubModule{sub.first, sub.second->Name});
                 if (sub.second->IncludeTag) {
                     DefaultTags.insert(sub.first);
                 }
@@ -549,9 +549,9 @@ TVector<TString> TDirParser::GetDirsFromArgs(const TStringBuf& statementName,
             Y_ASSERT(arg);
             continue;
         }
-        const TString dirName = dirBuilder(arg);
+        auto dirName = dirBuilder(arg);
         if (!dirName.empty()) {
-            dirs.push_back(dirName);
+            dirs.push_back(std::move(dirName));
         }
     }
     return dirs;
@@ -630,11 +630,11 @@ bool TDirParser::DirStatement(const TStringBuf& name, const TVector<TStringBuf>&
                 auto allRecurseDirs = GetRecurseDirs(macrosName, newArgs);
                 std::transform(allRecurseDirs.begin(), allRecurseDirs.end(),
                                allRecurseDirs.begin(), NPath::CutType);
-                for (const auto& dir: allRecurseDirs) {
+                for (auto& dir: allRecurseDirs) {
                     if (partitionDirsAux.contains(dir)) {
-                        takenRecurseDirs.push_back(dir);
+                        takenRecurseDirs.push_back(std::move(dir));
                     } else {
-                        ignoredRecurseDirs.push_back(dir);
+                        ignoredRecurseDirs.push_back(std::move(dir));
                     }
                 }
                 ReportFailOnRecurse(takenRecurseDirs, ignoredRecurseDirs);

@@ -91,7 +91,7 @@ public:
             Script.emplace_back();
         }
         void WriteArgument(TStringBuf arg) override {
-            Script.back().push_back(TString(arg));
+            Script.back().emplace_back(arg);
         }
         void EndCommand() override {
         }

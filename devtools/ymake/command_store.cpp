@@ -221,7 +221,7 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
     // do the thing
 
     auto defBody = MacroDefBody(subValue);
-    defs->second->push_back({
+    defs->second->push_back(TLegacyVars::TDefinition{
         MakeHolder<NCommands::TSyntax>(Commands.Parse(Conf, Commands.Mods, Commands.Values, TString(defBody))),
         ELegacyMode::Macro
     });
@@ -1074,7 +1074,7 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             TVector<TString> result;
             result.reserve(val.size());
             for (auto& x : val)
-                result.push_back(TString(x));
+                result.emplace_back(x);
             return NCommands::TTermValue(result);
         },
         [&](TMacroValues::TTool val) {

@@ -2,7 +2,7 @@
 
 void TDirs::IntoStrings(TVector<TString>& into) const {
     for (const auto& dir: *this) {
-        into.push_back(TString{dir.GetTargetStr()});
+        into.emplace_back(dir.GetTargetStr());
     }
 }
 

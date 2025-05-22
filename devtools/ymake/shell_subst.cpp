@@ -95,18 +95,15 @@ void TSubst2Shell::WriteStdout(TStringBuf path) {
 }
 
 void TSubst2Shell::WriteEnv(TStringBuf env) {
-    auto envStr = TString(env);
-    Commands.back().EnvSetDefs.push_back(envStr);
+    Commands.back().EnvSetDefs.emplace_back(env);
 }
 
 void TSubst2Shell::WriteResource(TStringBuf uri) {
-    auto uriStr = TString(uri);
-    Commands.back().ResourceUris.push_back(uriStr);
+    Commands.back().ResourceUris.emplace_back(uri);
 }
 
 void TSubst2Shell::WriteTaredOut(TStringBuf path) {
-    auto pathStr = TString(path);
-    Commands.back().TaredOuts.push_back(pathStr);
+    Commands.back().TaredOuts.emplace_back(path);
 }
 
 void TSubst2Shell::EndCommand() {

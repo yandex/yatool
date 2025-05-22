@@ -34,7 +34,7 @@ TString TCmdProperty::ConvertCmdArgs() const {
 }
 
 void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Collected_.push_back({keyword, TKeyword{keyword, from, to, deepReplaceTo, onKwPresent, onKwMissing}});
+    Collected_.emplace_back(keyword, TKeyword{keyword, from, to, deepReplaceTo, onKwPresent, onKwMissing});
 }
 
 size_t TCmdProperty::Key2ArrayIndex(TStringBuf arg) const {
@@ -44,7 +44,7 @@ size_t TCmdProperty::Key2ArrayIndex(TStringBuf arg) const {
 }
 
 bool TCmdProperty::AddMacroCall(const TStringBuf& name, const TStringBuf& argList) {
-    MacroCalls_.push_back(std::make_pair(TString{name}, SpecVars_.size() ? TCommandInfo().SubstMacroDeeply(nullptr, argList, SpecVars_, false) : TString{argList}));
+    MacroCalls_.emplace_back(name, SpecVars_.size() ? TCommandInfo().SubstMacroDeeply(nullptr, argList, SpecVars_, false) : argList);
     return true;
 }
 

@@ -102,7 +102,7 @@ void TModuleBuilder::RecursiveAddInputs() {
             }
             // Command was not successful, Inputs will not be accessible
             // unless we attach it to module via Search
-            CmdAddQueue.push_back(cmdInfo);
+            CmdAddQueue.push_back(std::move(cmdInfo));
             continue;
         }
         firstFail = nullptr;
@@ -259,14 +259,14 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
         // cmdInfo will be discarded
         return false;
     }
-    CmdAddQueue.push_back(cmdInfo);
+    CmdAddQueue.push_back(std::move(cmdInfo));
     return false;
 }
 
 void TModuleBuilder::AddPluginCustomCmd(TMacroCmd& macroCmd) {
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->GetCommandInfoFromPluginCmd(macroCmd, Vars, Module);
-    CmdAddQueue.push_back(cmdInfo);
+    CmdAddQueue.push_back(std::move(cmdInfo));
 }
 
 void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool isInput, ui64 groupId) {
@@ -820,7 +820,7 @@ bool TModuleBuilder::RememberStatement(const TStringBuf& name, const TVector<TSt
             }
             files.push_back(MakeUnresolved(resolved));
         }
-        DelayedInducedDeps.push_back({TString{args[0]}, std::move(files)});
+        DelayedInducedDeps.push_back(TInducedDeps{TString{args[0]}, std::move(files)});
     } else if (name == "DECLARE_EXTERNAL_RESOURCE") {
         if (!args) {
             YConfErr(UserErr) << "Missed arguments in [[alt1]]DECLARE_EXTERNAL_RESOURCE[[rst]]" << Endl;

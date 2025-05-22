@@ -26,7 +26,7 @@ struct NCommands::TArgAccumulator: TCommandSequenceWriterStubs {
     }
     virtual void WriteArgument(TStringBuf arg) {
         // TODO optimize the `TString arg` case?
-        Args.push_back(TString(arg));
+        Args.emplace_back(arg);
     }
     virtual void EndCommand() {
         Y_ABORT();

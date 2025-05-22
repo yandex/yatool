@@ -155,7 +155,7 @@ void TJsonCmdAcceptor::BeginCommand() {
 }
 
 void TJsonCmdAcceptor::WriteArgument(TStringBuf arg) {
-    std::get<TVector<TString>>(Commands.back().CmdStr).push_back(TString(arg));
+    std::get<TVector<TString>>(Commands.back().CmdStr).emplace_back(arg);
 }
 
 void TJsonCmdAcceptor::WriteCwd(TStringBuf cwd) {
@@ -177,17 +177,15 @@ void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     // TODO: what are these backslashes doing there to begin with?
     BreakQuotedExec(envStr, "\", \"", false);
 
-    Commands.back().EnvSetDefs.push_back(envStr);
+    Commands.back().EnvSetDefs.push_back(std::move(envStr));
 }
 
 void TJsonCmdAcceptor::WriteResource(TStringBuf uri) {
-    auto uriStr = TString(uri);
-    Commands.back().ResourceUris.push_back(uriStr);
+    Commands.back().ResourceUris.emplace_back(uri);
 }
 
 void TJsonCmdAcceptor::WriteTaredOut(TStringBuf path) {
-    auto pathStr = TString(path);
-    Commands.back().TaredOuts.push_back(pathStr);
+    Commands.back().TaredOuts.emplace_back(path);
 }
 
 void TJsonCmdAcceptor::EndCommand() {
@@ -297,13 +295,13 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
     for (const auto& dep : DumpInfo.Deps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
         auto nodeUid = nodeIt->second.GetNodeUid();
-        makeNode.Deps.push_back(nodeUid);
+        makeNode.Deps.push_back(std::move(nodeUid));
     }
 
     for (const auto& dep : DumpInfo.ToolDeps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
         auto nodeUid = nodeIt->second.GetNodeUid();
-        makeNode.ToolDeps.push_back(nodeUid);
+        makeNode.ToolDeps.push_back(std::move(nodeUid));
     }
 
     if (IsFake) {

@@ -380,7 +380,7 @@ TVarStr& TModuleRestorer::AddPath(TYVar& var, const TStringBuf& what) {
     TVarStr path(what);
     path.IsPathResolved = true;
     path.IsYPath = false;
-    var.push_back(path);
+    var.push_back(std::move(path));
     return var.back();
 }
 
@@ -420,7 +420,7 @@ void TModuleRestorer::MineGlobVars() {
             TVarStr realPath{Context.Conf.RealPath(Context.Graph.Names().FileConf.ResolveLink(fileView))};
             realPath.IsPathResolved = true;
             realPath.IsYPath = false;
-            var.push_back(realPath);
+            var.push_back(std::move(realPath));
         }
         var.IsReservedName = true;
     }

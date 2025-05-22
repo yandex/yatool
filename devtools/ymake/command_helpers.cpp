@@ -13,9 +13,9 @@ namespace {
         for (size_t i = 0; i < str.size(); ++i) {
             if (str.compare(i, delimiter.size(), delimiter) == 0 && !inEscape && !inQuotes) {
                 if (!token.empty()) {
-                    tokens.push_back(token);
+                    tokens.push_back(std::move(token));
+                    token.clear();
                 }
-                token.clear();
 
                 i += delimiter.size() - 1;
                 continue;
@@ -56,7 +56,7 @@ namespace {
         }
 
         if (!token.empty()) {
-            tokens.push_back(token);
+            tokens.push_back(std::move(token));
         }
 
         return tokens;

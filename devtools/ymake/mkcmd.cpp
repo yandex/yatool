@@ -185,22 +185,22 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
         YDIAG(MkCmd) << "Input dependency: " << MainFileName << " " << Graph.ToString(node) << Endl;
 
         TString inputPath = InputToPath(Conf, node, getModuleDir);
-        TVarStr inputVarItem = TVarStr(inputPath, false, true);
+        auto inputVarItem = TVarStr(inputPath, false, true);
 
         if (!explicitInputs) {
             // We don't need GlobalSrcs in AUTO_INPUT.
             Y_ASSERT(!isGlobalSrc(node));
 
             inputVarItem.IsAuto = true;
-            Vars[NVariableDefs::VAR_AUTO_INPUT].push_back(inputVarItem);
+            Vars[NVariableDefs::VAR_AUTO_INPUT].push_back(std::move(inputVarItem));
 
         } else {
-            Vars[NVariableDefs::VAR_INPUT].push_back(inputVarItem);
+            Vars[NVariableDefs::VAR_INPUT].push_back(std::move(inputVarItem));
         }
     };
 
     auto addSpanInput = [&](ui32 inputId, ui32 inputSize) {
-        Inputs.push_back({ Vars[NVariableDefs::VAR_INPUT].begin() + inputId, inputSize });
+        Inputs.push_back(std::span<TVarStr>{ Vars[NVariableDefs::VAR_INPUT].begin() + inputId, inputSize });
     };
 
     auto addOutput = [&](const TConstDepNodeRef& depNode) {
@@ -250,7 +250,7 @@ void TMakeCommand::MineVarsAndExtras(TDumpInfoEx* addInfo, TNodeId nodeId, TNode
             for (TNodeId peerId : ModuleState->PeerIds) {
                 const auto node = Graph[peerId].Value();
                 if (!IsFakeModule(node)) {
-                    peers.push_back({Graph.GetFileName(node).GetTargetStr(), peerId});
+                    peers.emplace_back(Graph.GetFileName(node).GetTargetStr(), peerId);
                 }
             }
             Sort(peers);

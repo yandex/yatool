@@ -27,11 +27,11 @@ struct TKeyword {
         , DeepReplaceTo(deepReplaceTo)
     {
         if (onKwPresent.data() != nullptr) // "" from file is not NULL
-            OnKwPresent.push_back(TString{onKwPresent});
+            OnKwPresent.emplace_back(onKwPresent);
         else if (!From && !To)
             OnKwPresent.push_back(myName);
         if (onKwMissing.data() != nullptr)
-            OnKwMissing.push_back(TString{onKwMissing});
+            OnKwMissing.emplace_back(onKwMissing);
         //YDIAG(V) << "Added keyword: "  << From << "->" << To << " with deep_replace " << deep_replace_to << Endl;
     }
 

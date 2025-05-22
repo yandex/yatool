@@ -274,7 +274,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             const auto globId = Names.AddName(EMNT_BuildCommand, globCmd);
             const auto globHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
             const auto refferer = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
-            ModuleGlobs.push_back({globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), refferer});
+            ModuleGlobs.push_back(TModuleGlobInfo{globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), refferer});
         } catch (const yexception& error){
             YConfErrPrecise(Syntax, location.first, location.second) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
