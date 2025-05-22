@@ -38,6 +38,8 @@
 #include <util/string/strip.h>
 #include <util/string/type.h>
 
+#include <fmt/format.h>
+
 #include <string>
 #include <string_view>
 
@@ -235,6 +237,119 @@ namespace {
 
     TVector<TString> CollectSpecArgNames(const TArgs& signature) {
         return CollectArgNamesIf(signature, [] (const auto& arg) { return IsSpecialization(arg.Type); });
+    }
+
+    class TArgsBuilder {
+    public:
+        using TArgsList = std::span<NConfReader::TConfParser::FormalArgContext* const>;
+
+        TArgsBuilder(TArgsList args, TStringBuf fileName, TStringBuf macroName) noexcept
+            : RemainingArgs_{args}
+            , FileName_{fileName}
+            , MacroName_{macroName}
+        {}
+
+        TArgsBuilder& ConsumeSpecArgs() {
+            if (RemainingArgs_.empty())
+                return *this;
+
+            while(auto specArg = RemainingArgs_.front()->specArg()) {
+                Arguments_.emplace_back(TArgDesc{
+                    .Type = EArgType::Specialization,
+                    .Name = TString(specArg->string()->stringContent()->getText()),
+                    .DeepReplace = {},
+                    .InitTrue = {},
+                    .InitFalse = {},
+                });
+                if (Arguments_.back().Name == "*") {
+                    ReportConfigError(fmt::format(
+                        "This value {} is prohibited for use as specialization parameter in the definition of macro [{}]", RemainingArgs_.front()->getText(), MacroName_
+                    ), FileName_);
+                }
+                RemainingArgs_ = RemainingArgs_.subspan(1);
+            }
+            return *this;
+        }
+
+        TArgsBuilder& ConsumeRegularArgs() {
+            const bool specArgSeen = std::ranges::any_of(Arguments_, [](const auto& arg) {return arg.Type == EArgType::Specialization;});
+            while (!RemainingArgs_.empty()) {
+                const auto arg = RemainingArgs_.front();
+                RemainingArgs_ = RemainingArgs_.subspan(1);
+
+                Arguments_.emplace_back(TArgDesc());
+                auto& argDesc = Arguments_.back();
+                argDesc.Name = TString(arg->argName()->getText());
+                if (auto deepReplace = arg->deepReplace()) {
+                    argDesc.DeepReplace = TString(deepReplace->modifiers()->getText());
+                    Y_ASSERT(!argDesc.DeepReplace.empty());
+                    argDesc.DeepReplace += ":";
+                }
+                if (arg->arraySpec()) {
+                    argDesc.Type = EArgType::NamedArray;
+                } else if (arg->boolSpec()) {
+                    argDesc.Type = EArgType::NamedBool;
+                    if (auto boolInit = arg->boolInit()) {
+                        auto initTrue = boolInit->initTrue;
+                        Y_ASSERT(initTrue != nullptr);
+                        argDesc.InitTrue = TString(initTrue->stringContent()->getText());
+                        auto initFalse = boolInit->initFalse;
+                        Y_ASSERT(initFalse != nullptr);
+                        argDesc.InitFalse = TString(initFalse->stringContent()->getText());
+                    }
+                } else if (auto defaultInit = arg->defaultInit()) {
+                    argDesc.Type = EArgType::NamedScalar;
+                    argDesc.InitFalse = TString(defaultInit->string()->stringContent()->getText());
+                } else if (auto specArg = arg->specArg()) {
+                    ReportConfigError(fmt::format(
+                        "Specialization parameter [{}] must precede all positional and named arguments in the definition of macro [{}]", arg->getText(), MacroName_
+                    ), FileName_);
+                } else {
+                    argDesc.Type = EArgType::Positional;
+                }
+                if (specArgSeen && IsNamedArgType(argDesc.Type)) {
+                    ReportConfigError(fmt::format(
+                        "Named parameter [{}] is prohibited in the definition of partial macro specialization [{}]", argDesc.Name, MacroName_
+                    ), FileName_);
+                }
+            }
+            return *this;
+        }
+
+        TArgsBuilder& ConsumeVarargs(NConfReader::TConfParser::VarargContext* vararg) {
+            if (vararg) {
+                Arguments_.emplace_back(TArgDesc{
+                    .Type = EArgType::Vararg,
+                    .Name = TString{vararg->getText()},
+                    .DeepReplace = {},
+                    .InitTrue = {},
+                    .InitFalse = {},
+                });
+            }
+            return *this;
+        }
+
+        TArgs Build() noexcept {
+            return std::move(Arguments_);
+        }
+
+    private:
+        TArgsList RemainingArgs_;
+        TStringBuf FileName_;
+        TStringBuf MacroName_;
+        TArgs Arguments_;
+    };
+
+    TArgs FillArguments(NConfReader::TConfParser::FormalArgsContext* formalArgs, TStringBuf fileName, TStringBuf macroName) {
+        if (!formalArgs) {
+            return {};
+        }
+
+        return TArgsBuilder{formalArgs->formalArg(), fileName, macroName}
+            .ConsumeSpecArgs()
+            .ConsumeRegularArgs()
+            .ConsumeVarargs(formalArgs->vararg())
+            .Build();
     }
 
     class TBlockDesc
@@ -1348,80 +1463,6 @@ namespace {
             ScopeKind = EScopeKind::Macro;
 
             TString macroName(ctx->macroDefSignature()->macroName()->getText());
-            TArgs arguments;
-
-            if (auto formalArgs = ctx->macroDefSignature()->formalArgs()) {
-                bool specArgAllowed = true;
-                bool specArgSeen = false;
-                for (auto arg : formalArgs->formalArg()) {
-                    arguments.emplace_back(TArgDesc());
-                    auto& argDesc = arguments.back();
-                    if (auto specArg = arg->specArg()) {
-                        specArgSeen = true;
-                        if (!specArgAllowed) {
-                            TStringStream message;
-                            message << "Specialization parameter ["
-                                << arg->getText()
-                                << "] must precede all positional and named arguments in the definition of macro ["
-                                << macroName
-                                << "]";
-                            ReportConfigError(message.Str(), FileName);
-                        }
-                        argDesc.Name = TString(specArg->string()->stringContent()->getText());
-                        if (argDesc.Name == "*") {
-                            TStringStream message;
-                            message << "This value "
-                                << arg->getText()
-                                << " is prohibited for use as specialization parameter in the definition of macro ["
-                                << macroName
-                                << "]";
-                            ReportConfigError(message.Str(), FileName);
-                        }
-                        argDesc.Type = EArgType::Specialization;
-                    } else {
-                        specArgAllowed = false;
-                        argDesc.Name = TString(arg->argName()->getText());
-                        if (auto deepReplace = arg->deepReplace()) {
-                            argDesc.DeepReplace = TString(deepReplace->modifiers()->getText());
-                            Y_ASSERT(!argDesc.DeepReplace.empty());
-                            argDesc.DeepReplace += ":";
-                        }
-                        if (arg->arraySpec()) {
-                            argDesc.Type = EArgType::NamedArray;
-                        } else if (arg->boolSpec()) {
-                            argDesc.Type = EArgType::NamedBool;
-                            if (auto boolInit = arg->boolInit()) {
-                                auto initTrue = boolInit->initTrue;
-                                Y_ASSERT(initTrue != nullptr);
-                                argDesc.InitTrue = TString(initTrue->stringContent()->getText());
-                                auto initFalse = boolInit->initFalse;
-                                Y_ASSERT(initFalse != nullptr);
-                                argDesc.InitFalse = TString(initFalse->stringContent()->getText());
-                            }
-                        } else if (auto defaultInit = arg->defaultInit()) {
-                            argDesc.Type = EArgType::NamedScalar;
-                            argDesc.InitFalse = TString(defaultInit->string()->stringContent()->getText());
-                        } else {
-                            argDesc.Type = EArgType::Positional;
-                        }
-                    }
-                    if (specArgSeen && IsNamedArgType(argDesc.Type)) {
-                        TStringStream message;
-                        message << "Named parameter ["
-                            << argDesc.Name
-                            << "] is prohibited in the definition of partial macro specialization ["
-                            << macroName
-                            << "]";
-                        ReportConfigError(message.Str(), FileName);
-                    }
-                }
-                if (auto vararg = formalArgs->vararg()) {
-                    arguments.emplace_back(TArgDesc());
-                    auto& argDesc = arguments.back();
-                    argDesc.Type = EArgType::Vararg;
-                    argDesc.Name = TString(vararg->getText());
-                }
-            }
 
             antlr4::Token* token = ctx->macroDefSignature()->macroName()->getStart();
             TSourceRange range {
@@ -1435,7 +1476,12 @@ namespace {
                 DocStream << "@usage: " << ctx->macroDefSignature()->getText();
             }
 
-            Builder.EnterMacro(macroName, arguments, range, DocStream.Str());
+            Builder.EnterMacro(
+                macroName,
+                FillArguments(ctx->macroDefSignature()->formalArgs(), FileName, macroName),
+                range,
+                DocStream.Str()
+            );
             visitChildren(ctx->block());
             Builder.ExitMacro();
 

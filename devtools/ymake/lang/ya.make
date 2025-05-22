@@ -18,6 +18,7 @@ PEERDIR(
     library/cpp/fieldcalc
     library/cpp/eventlog
     contrib/libs/antlr4_cpp_runtime
+    contrib/libs/fmt
 )
 
 RUN_ANTLR4_CPP(
