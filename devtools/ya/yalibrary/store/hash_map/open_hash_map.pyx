@@ -77,28 +77,28 @@ cdef class OpenHashMap:
             yield struct_module.unpack(self._fmt, py_data)
 
     def sum_values(self):
-        if self._fmt.startswith('b'):
+        if self._fmt.startswith(b'b'):
             return SumValues[i8](self._map)
 
-        elif self._fmt.startswith('B'):
+        elif self._fmt.startswith(b'B'):
             return SumValues[ui8](self._map)
 
-        elif self._fmt.startswith('h'):
+        elif self._fmt.startswith(b'h'):
             return SumValues[i16](self._map)
 
-        elif self._fmt.startswith('H'):
+        elif self._fmt.startswith(b'H'):
             return SumValues[ui16](self._map)
 
-        elif self._fmt.startswith('i') or self._fmt.startswith('l'):
+        elif self._fmt.startswith(b'i') or self._fmt.startswith(b'l'):
             return SumValues[i32](self._map)
 
-        elif self._fmt.startswith('I') or self._fmt.startswith('L'):
+        elif self._fmt.startswith(b'I') or self._fmt.startswith(b'L'):
             return SumValues[ui32](self._map)
 
-        elif self._fmt.startswith('q'):
+        elif self._fmt.startswith(b'q'):
             return SumValues[i64](self._map)
 
-        elif self._fmt.startswith('Q'):
+        elif self._fmt.startswith(b'Q'):
             return SumValues[ui64](self._map)
 
         else:
