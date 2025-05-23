@@ -8,22 +8,22 @@ cdef class Pattern:
     cdef bint encoded  # True if this was originally a Unicode pattern
     cdef RE2 * re_pattern
 
-    def search(self, object string, int pos=0, int endpos=-1):
+    def search(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """Scan through string looking for a match, and return a corresponding
         Match instance. Return None if no position in the string matches."""
         return self._search(string, pos, endpos, UNANCHORED)
 
-    def match(self, object string, int pos=0, int endpos=-1):
+    def match(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """Matches zero or more characters at the beginning of the string."""
         return self._search(string, pos, endpos, ANCHOR_START)
 
-    def fullmatch(self, object string, int pos=0, int endpos=-1):
+    def fullmatch(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """"fullmatch(string[, pos[, endpos]]) --> Match object or None."
 
         Matches the entire string."""
         return self._search(string, pos, endpos, ANCHOR_BOTH)
 
-    cdef _search(self, object string, int pos, int endpos,
+    cdef _search(self, object string, Py_ssize_t pos, Py_ssize_t endpos,
             re2_Anchor anchoring):
         """Scan through string looking for a match, and return a corresponding
         Match instance. Return None if no position in the string matches."""
@@ -34,7 +34,7 @@ cdef class Pattern:
         cdef int encoded = 0
         cdef StringPiece * sp
         cdef Match m = Match(self, self.groups + 1)
-        cdef int cpos = 0, upos = pos
+        cdef Py_ssize_t cpos = 0, upos = pos
 
         if 0 <= endpos <= pos:
             return None
@@ -78,7 +78,7 @@ cdef class Pattern:
             release_cstring(&buf)
         return m
 
-    def contains(self, object string, int pos=0, int endpos=-1):
+    def contains(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """"contains(string[, pos[, endpos]]) --> bool."
 
         Scan through string looking for a match, and return True or False."""
@@ -117,7 +117,7 @@ cdef class Pattern:
             release_cstring(&buf)
         return retval != 0
 
-    def count(self, object string, int pos=0, int endpos=-1):
+    def count(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """Return number of non-overlapping matches of pattern in string."""
         cdef char * cstring
         cdef Py_ssize_t size
@@ -166,7 +166,7 @@ cdef class Pattern:
             release_cstring(&buf)
         return result
 
-    def findall(self, object string, int pos=0, int endpos=-1):
+    def findall(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """Return all non-overlapping matches of pattern in string as a list
         of strings."""
         cdef char * cstring
@@ -232,14 +232,14 @@ cdef class Pattern:
             release_cstring(&buf)
         return resultlist
 
-    def finditer(self, object string, int pos=0, int endpos=-1):
+    def finditer(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         """Yield all non-overlapping matches of pattern in string as Match
         objects."""
         result = iter(self._finditer(string, pos, endpos))
         next(result)  # dummy value to raise error before start of generator
         return result
 
-    def _finditer(self, object string, int pos=0, int endpos=-1):
+    def _finditer(self, object string, Py_ssize_t pos=0, Py_ssize_t endpos=-1):
         cdef char * cstring
         cdef Py_ssize_t size
         cdef Py_buffer buf
@@ -247,7 +247,7 @@ cdef class Pattern:
         cdef StringPiece * sp = NULL
         cdef Match m
         cdef int encoded = 0
-        cdef int cpos = 0, upos = pos
+        cdef Py_ssize_t cpos = 0, upos = pos
 
         bytestr = unicode_to_bytes(string, &encoded, self.encoded)
         if pystring_to_cstring(bytestr, &cstring, &size, &buf) == -1:
@@ -303,7 +303,7 @@ cdef class Pattern:
         cdef char * cstring
         cdef Py_ssize_t size
         cdef int retval
-        cdef int pos = 0
+        cdef Py_ssize_t pos = 0
         cdef int lookahead = 0
         cdef int num_split = 0
         cdef StringPiece * sp
@@ -417,7 +417,7 @@ cdef class Pattern:
         if not repl_encoded and not isinstance(repl, bytes):
             repl_b = bytes(repl)  # coerce buffer to bytes object
 
-        if count > 1 or (b'\\' if PY2 else <char>b'\\') in repl_b:
+        if count > 1 or <char>b'\\' in repl_b:
             # Limit on number of substitutions or replacement string contains
             # escape sequences; handle with Match.expand() implementation.
             # RE2 does support simple numeric group references \1, \2,
@@ -459,14 +459,14 @@ cdef class Pattern:
         cdef Py_ssize_t size
         cdef Py_buffer buf
         cdef int retval
-        cdef int prevendpos = -1
-        cdef int endpos = 0
-        cdef int pos = 0
+        cdef Py_ssize_t prevendpos = -1
+        cdef Py_ssize_t endpos = 0
+        cdef Py_ssize_t pos = 0
         cdef int encoded = 0
         cdef StringPiece * sp
         cdef Match m
         cdef bytearray result = bytearray()
-        cdef int cpos = 0, upos = 0
+        cdef Py_ssize_t cpos = 0, upos = 0
 
         if count < 0:
             count = 0
@@ -525,9 +525,9 @@ cdef class Pattern:
         cdef Py_ssize_t size
         cdef Py_buffer buf
         cdef int retval
-        cdef int prevendpos = -1
-        cdef int endpos = 0
-        cdef int pos = 0
+        cdef Py_ssize_t prevendpos = -1
+        cdef Py_ssize_t endpos = 0
+        cdef Py_ssize_t pos = 0
         cdef int encoded = 0
         cdef StringPiece * sp
         cdef Match m

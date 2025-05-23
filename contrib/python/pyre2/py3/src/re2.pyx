@@ -121,7 +121,26 @@ UNICODE = re.UNICODE
 VERBOSE = re.VERBOSE
 LOCALE = re.LOCALE
 DEBUG = re.DEBUG
+NOFLAG = 0  # Python 3.11
 ASCII = 256  # Python 3
+
+if sys.version_info[:2] >= (3, 11):
+    import enum
+
+    @enum.global_enum
+    @enum._simple_enum(enum.IntFlag, boundary=enum.KEEP)
+    class RegexFlag:
+        NOFLAG = 0
+        ASCII = A = re.ASCII # assume ascii "locale"
+        IGNORECASE = I = re.IGNORECASE # ignore case
+        LOCALE = L = re.LOCALE # assume current 8-bit locale
+        UNICODE = U = re.UNICODE # assume unicode "locale"
+        MULTILINE = M = re.MULTILINE # make anchors look for newline
+        DOTALL = S = re.DOTALL # make dot match newline
+        VERBOSE = X = re.VERBOSE # ignore whitespace and comments
+        DEBUG = re.DEBUG # dump pattern after compilation
+        __str__ = object.__str__
+        _numeric_repr_ = hex
 
 FALLBACK_QUIETLY = 0
 FALLBACK_WARNING = 1
@@ -132,7 +151,6 @@ VERSION_HEX = 0x000217
 
 cdef int _I = I, _M = M, _S = S, _U = U, _X = X, _L = L
 cdef int current_notification = FALLBACK_QUIETLY
-cdef bint PY2 = PY_MAJOR_VERSION == 2
 
 # Type of compiled re object from Python stdlib
 SREPattern = type(re.compile(''))
@@ -233,7 +251,7 @@ def escape(pattern):
     """Escape all non-alphanumeric characters in pattern."""
     cdef bint uni = isinstance(pattern, unicode)
     cdef list s
-    if PY2 or uni:
+    if uni:
         s = list(pattern)
     else:
         s = [bytes([c]) for c in pattern]
@@ -311,7 +329,7 @@ cdef inline unicode cpp_to_unicode(cpp_string input):
             input.data(), input.length(), 'strict')
 
 
-cdef inline unicode char_to_unicode(const char * input, int length):
+cdef inline unicode char_to_unicode(const char * input, Py_ssize_t length):
     """Convert a C string to a unicode string."""
     return cpython.unicode.PyUnicode_DecodeUTF8(input, length, 'strict')
 
@@ -331,9 +349,9 @@ cdef inline unicode_to_bytes(object pystring, int * encoded,
         encoded[0] = 1 if origlen == len(pystring) else 2
     else:
         encoded[0] = 0
-    if not PY2 and checkotherencoding > 0 and not encoded[0]:
+    if checkotherencoding > 0 and not encoded[0]:
         raise TypeError("can't use a string pattern on a bytes-like object")
-    elif not PY2 and checkotherencoding == 0 and encoded[0]:
+    elif checkotherencoding == 0 and encoded[0]:
         raise TypeError("can't use a bytes pattern on a string-like object")
     return pystring
 
@@ -347,14 +365,7 @@ cdef inline int pystring_to_cstring(
     cdef int result = -1
     cstring[0] = NULL
     size[0] = 0
-    if PY2:
-        # Although the new-style buffer interface was backported to Python 2.6,
-        # some modules, notably mmap, only support the old buffer interface.
-        # Cf. http://bugs.python.org/issue9229
-        if PyObject_CheckReadBuffer(pystring) == 1:
-            result = PyObject_AsReadBuffer(
-                    pystring, <const void **>cstring, size)
-    elif PyObject_CheckBuffer(pystring) == 1:  # new-style Buffer interface
+    if PyObject_CheckBuffer(pystring) == 1:  # new-style Buffer interface
         result = PyObject_GetBuffer(pystring, buf, PyBUF_SIMPLE)
         if result == 0:
             cstring[0] = <char *>buf.buf
@@ -364,17 +375,16 @@ cdef inline int pystring_to_cstring(
 
 cdef inline void release_cstring(Py_buffer *buf):
     """Release buffer if necessary."""
-    if not PY2:
-        PyBuffer_Release(buf)
+    PyBuffer_Release(buf)
 
 
-cdef utf8indices(char * cstring, int size, int *pos, int *endpos):
+cdef utf8indices(char * cstring, Py_ssize_t size, Py_ssize_t *pos, Py_ssize_t *endpos):
     """Convert unicode indices ``pos`` and ``endpos`` to UTF-8 indices.
 
     If the indices are out of range, leave them unchanged."""
     cdef unsigned char * data = <unsigned char *>cstring
-    cdef int newpos = pos[0], newendpos = -1
-    cdef int cpos = 0, upos = 0
+    cdef Py_ssize_t newpos = pos[0], newendpos = -1
+    cdef Py_ssize_t cpos = 0, upos = 0
     while cpos < size:
         if data[cpos] < 0x80:
             cpos += 1
@@ -405,11 +415,11 @@ cdef utf8indices(char * cstring, int size, int *pos, int *endpos):
     endpos[0] = newendpos
 
 
-cdef void unicodeindices(map[int, int] &positions,
-        char * cstring, int size, int * cpos, int * upos):
+cdef void unicodeindices(map[Py_ssize_t, Py_ssize_t] &positions,
+        char * cstring, Py_ssize_t size, Py_ssize_t * cpos, Py_ssize_t * upos):
     """Convert UTF-8 byte indices to unicode indices."""
     cdef unsigned char * s = <unsigned char *>cstring
-    cdef map[int, int].iterator it = positions.begin()
+    cdef map[Py_ssize_t, Py_ssize_t].iterator it = positions.begin()
 
     if dereference(it).first == -1:
         dereference(it).second = -1
@@ -456,6 +466,7 @@ __all__ = [
         'FALLBACK_EXCEPTION', 'FALLBACK_QUIETLY', 'FALLBACK_WARNING', 'DEBUG',
         'S', 'DOTALL', 'I', 'IGNORECASE', 'L', 'LOCALE', 'M', 'MULTILINE',
         'U', 'UNICODE', 'X', 'VERBOSE', 'VERSION', 'VERSION_HEX',
+        'NOFLAG', 'RegexFlag',
         # classes
         'Match', 'Pattern', 'SREPattern',
         # functions

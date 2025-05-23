@@ -20,13 +20,12 @@ Unused vs. empty group:
     ('a', '')
     >>> re2.search(r'((.*)+.)', 'a').groups()
     ('a', '')
-
-The following show different behavior for re and re2:
-
     >>> re.search(r'((.*)*.)', 'a').groups()
     ('a', '')
     >>> re2.search(r'((.*)*.)', 'a').groups()
-    ('a', None)
+    ('a', '')
+
+The following show different behavior for re and re2:
 
     >>> re.search(r'((.*)*.)', 'Hello').groups()
     ('Hello', '')

@@ -1,6 +1,6 @@
 
 def compile(pattern, int flags=0, int max_mem=8388608):
-    cachekey = (type(pattern), pattern, flags)
+    cachekey = (type(pattern), pattern, flags, current_notification)
     if cachekey in _cache:
         return _cache[cachekey]
     p = _compile(pattern, flags, max_mem)
@@ -42,14 +42,13 @@ def _compile(object pattern, int flags=0, int max_mem=8388608):
         return fallback(original_pattern, flags, "re.LOCALE not supported")
     pattern = unicode_to_bytes(pattern, &encoded, -1)
     newflags = flags
-    if not PY2:
-        if not encoded and flags & _U:  # re.UNICODE
-            pass  # can use UNICODE with bytes pattern, but assumes valid UTF-8
-            # raise ValueError("can't use UNICODE flag with a bytes pattern")
-        elif encoded and not (flags & ASCII):  # re.ASCII (not in Python 2)
-            newflags = flags | _U  # re.UNICODE
-        elif encoded and flags & ASCII:
-            newflags = flags & ~_U  # re.UNICODE
+    if not encoded and flags & _U:  # re.UNICODE
+        pass  # can use UNICODE with bytes pattern, but assumes valid UTF-8
+        # raise ValueError("can't use UNICODE flag with a bytes pattern")
+    elif encoded and not (flags & ASCII):  # re.ASCII (not in Python 2)
+        newflags = flags | _U  # re.UNICODE
+    elif encoded and flags & ASCII:
+        newflags = flags & ~_U  # re.UNICODE
     try:
         pattern = _prepare_pattern(pattern, newflags)
     except BackreferencesException:
@@ -87,7 +86,7 @@ def _compile(object pattern, int flags=0, int max_mem=8388608):
             raise RegexError(error_msg)
         elif error_code not in (ErrorBadPerlOp, ErrorRepeatSize,
                 # ErrorBadEscape,
-                ErrorPatternTooLarge):
+                ErrorRepeatOp, ErrorPatternTooLarge):
             # Raise an error because these will not be fixed by using the
             # ``re`` module.
             raise RegexError(error_msg)
