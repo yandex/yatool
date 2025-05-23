@@ -584,7 +584,7 @@ bool TYMake::DumpLoops() {
     }
 
     if (Loops.HasBadLoops()) {
-        Diag()->HasConfigurationErrors = true;
+        ConfMsgManager()->HasConfigurationErrors = true;
         Loops.RemoveBadLoops(Graph, StartTargets);
     }
 
@@ -865,7 +865,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
     co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
     co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
 
-    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
+    if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         co_return BR_CONFIGURE_FAILED;
     }
 
@@ -875,7 +875,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
     }
 
     DumpDarts(conf, yMake);
-    if (Diag()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
+    if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         co_return BR_CONFIGURE_FAILED;
     }
 

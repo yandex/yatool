@@ -107,6 +107,8 @@ public:
 
     void ClearTopLevelMessages();
 
+    mutable bool HasConfigurationErrors = false;
+
 private:
     void SaveEvent(ETraceEvent what, const TString& event);
     TStringStream& SaveConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0, bool useCache = true);

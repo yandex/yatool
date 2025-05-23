@@ -121,7 +121,8 @@ int YMakeMain(int argc, char** argv) {
     for (size_t i = 0; i < configs.size(); ++i) {
         auto ctx = std::make_shared<TExecContext>(
             std::make_shared<NCommonDisplay::TLockedStream>(),
-            std::make_shared<TConfMsgManager>()
+            std::make_shared<TConfMsgManager>(),
+            std::make_shared<TDiagCtrl>()
         );
         auto proxy = TExecutorWithContext<TExecContext>(
             asio::require(configure_workers.executor(), asio::execution::blocking.never),

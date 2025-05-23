@@ -9,8 +9,6 @@
 #include <util/generic/strbuf.h>
 
 struct TDiagCtrl {
-    static TDiagCtrl Instance_;
-
     struct TWhere {
     public:
         static constexpr const char* TOP_LEVEL = "At top level";
@@ -43,8 +41,6 @@ struct TDiagCtrl {
     private:
         TVector<std::pair<ui32, TString>> where;
     } Where;
-
-    mutable bool HasConfigurationErrors = false;
 
     bool Persistency = true;
 
@@ -144,9 +140,7 @@ struct TDiagCtrl {
     void Init(const TVector<TString>& list, bool suppressDbgWarn = false);
 };
 
-inline TDiagCtrl* Diag() {
-    return &TDiagCtrl::Instance_;
-}
+TDiagCtrl* Diag();
 
 class TScopedContext {
 public:

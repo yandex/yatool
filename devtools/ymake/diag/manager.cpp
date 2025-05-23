@@ -31,7 +31,7 @@ TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStrin
         return TStreamMessage(&SaveConfigureMessage(type, var, row, column, Diag()->Persistency), [](IOutputStream*) {});
     } else {
         if (type == EConfMsgType::Error) {
-            Diag()->HasConfigurationErrors = true;
+            HasConfigurationErrors = true;
         }
         return TStreamMessage(Display()->NewConfMsg(type, var, Diag()->Where.back().second, row, column).Release());
     }
@@ -67,7 +67,7 @@ void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32
                 output.Finish();
             }
             *Display()->NewConfMsg(EConfMsgType::Error, "-WDupSrc", TDiagCtrl::TWhere::TOP_LEVEL, 0, 0) << message;
-            Diag()->HasConfigurationErrors = true;
+            HasConfigurationErrors = true;
         }
     }
 }
@@ -99,7 +99,7 @@ void TConfMsgManager::FlushConfigureMessages(ui32 owner) const {
     if (Messages.contains(owner)) {
         for (const auto& msg : Messages.at(owner)) {
             if (msg.Type == EConfMsgType::Error) {
-                Diag()->HasConfigurationErrors = true;
+                HasConfigurationErrors = true;
             }
             *Display()->NewConfMsg(msg.Type, msg.Kind, Diag()->Where.back().second, msg.Row, msg.Column) << msg.Message.Str();
         }

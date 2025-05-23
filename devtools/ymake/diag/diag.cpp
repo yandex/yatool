@@ -1,11 +1,11 @@
 #include "diag.h"
 #include "display.h"
 
+#include <devtools/ymake/context_executor.h>
+
 #include <util/stream/output.h>
 #include <util/string/split.h>
 #include <util/system/env.h>
-
-TDiagCtrl TDiagCtrl::Instance_;
 
 void TDiagCtrl::Init(const TVector<const char*>& list, bool suppressDbgWarn) {
     TVector<TString> args;
@@ -57,4 +57,12 @@ void TDiagCtrl::Init(const TVector<TString>& list, bool suppressDbgWarn) {
     if (DbgMsg && !suppressDbgWarn)
         YWarn() << "-W: some of the dbg flags will be ignored in release build of ymake" << Endl;
 #endif
+}
+
+TDiagCtrl* Diag() {
+    auto ctx = CurrentContext<TExecContext>;
+    if (ctx && ctx->DiagCtrl) {
+        return ctx->DiagCtrl.get();
+    }
+    return Singleton<TDiagCtrl>();
 }
