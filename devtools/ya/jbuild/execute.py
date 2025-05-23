@@ -39,7 +39,7 @@ def execute(graph, result, opts, app_ctx):
     pattern_tool_map = DEFAULT_JAVA_PATTERN_TOOL_MAP
 
     task = {
-        'graph': graph,
+        'graph': list(graph),
         'result': result,
         'conf': _conf(pm.my_platform(), pattern_tool_map),
     }
