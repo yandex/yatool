@@ -333,8 +333,8 @@ namespace {
                 [](TTermError) {
                     Y_ABORT();
                 },
-                [&](TTermNothing x) {
-                    throw TBadArgType(Name, x);
+                [&](TTermNothing) {
+                    // valid - do nothing
                 },
                 [&](const TString& s) {
                     GetOrInit(ctx.CmdInfo.LateOuts).push_back(s);
