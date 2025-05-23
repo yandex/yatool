@@ -158,7 +158,7 @@ class _SymlinkCollector:
         _YaSettings.YA_SETTINGS_XML,
         _JavaSemConfig.GRADLE_PROPS,
     )  # Files for symlink to settings root
-    SETTINGS_MKDIRS: tuple[str] = (".gradle", ".idea", ".kotlin")  # Folders for creating at settings root
+    SETTINGS_MKDIRS: tuple[str] = (".gradle", ".idea", ".kotlin", "build")  # Folders for creating at settings root
     SETTINGS_DIRS: tuple[str] = list(SETTINGS_MKDIRS) + ["gradle"]  # Folders for symlink to settings root
 
     BUILD_SKIP_ROOT_DIRS: tuple[str] = list(SETTINGS_DIRS) + [
