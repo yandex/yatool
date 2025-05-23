@@ -9,7 +9,7 @@ from pathlib import Path
 
 from devtools.ya.core import config as core_config, yarg, stage_tracer
 from devtools.ya.build import build_opts, graph as build_graph, ya_make
-from devtools.ya.build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph
+from devtools.ya.build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph, SemException
 from yalibrary import platform_matcher, tools
 from exts import hashing
 from devtools.ya.yalibrary import sjson
@@ -1023,6 +1023,9 @@ def do_gradle(params):
 
         builder = _Builder(config, sem_graph)
         builder.build()
+
+    except SemException as e:
+        logging.error("%s", str(e))
 
     finally:
         do_gradle_stage.finish()

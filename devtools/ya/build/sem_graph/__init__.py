@@ -92,6 +92,9 @@ class SemConfig:
             abs_target = Path.cwd().resolve()
             self.params.abs_targets.append(str(abs_target))
             self.params.rel_targets.append(os.path.relpath(abs_target, self.arcadia_root))
+        for abs_target in self.params.abs_targets:
+            if not Path(abs_target).exists():
+                raise SemException(f"Not found target {abs_target}")
         self.logger.info("Targets: %s", self.params.rel_targets)
 
     def _get_export_root(self) -> Path:
