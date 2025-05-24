@@ -421,7 +421,9 @@ namespace {
                     return s;
                 },
                 [&](const TVector<TString>& v) -> TTermValue {
-                    if (v.size() == 1) {
+                    if (v.empty()) {
+                        return TTermNothing();
+                    } else if (v.size() == 1) {
                         writer->WriteTaredOut(ctx.CmdInfo.SubstMacroDeeply(nullptr, v.front(), ctx.Vars, false));
                         return v.front();
                     } else
