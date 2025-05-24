@@ -64,6 +64,56 @@ namespace {
     //
     //
 
+    class TResult: public TBasicModImpl {
+        // more precisely, "result of the specified target";
+        // this is basically `tool` without switching to the host platform;
+        // so far, only single-target usage has been noticed
+    public:
+        TResult(): TBasicModImpl({.Id = EMacroFunction::Result, .Name = "result", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            return std::visit(TOverloaded{
+                [&](std::string_view name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                    if (names.size() == 1)
+                        return ProcessOne(ctx, names.front());
+                    else
+                        return ProcessMany(ctx, names);
+                },
+                [&](const std::vector<std::string_view>& names) -> TMacroValues::TValue {
+                    if (names.size() == 1)
+                        return ProcessOne(ctx, names.front());
+                    else
+                        return ProcessMany(ctx, names);
+                },
+                [](auto&&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                },
+            }, args[0]);
+        }
+    private:
+        std::string_view ProcessPath(const TPreevalCtx& ctx, std::string_view path) const {
+            // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
+            auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
+            auto key = NPath::CutType(dir);
+            return std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(key)));
+        }
+        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            return TMacroValues::TResult {.Data = ProcessPath(ctx, name)};
+        };
+        TMacroValues::TValue ProcessMany(const TPreevalCtx&, auto& names) const {
+            throw TBadArgType(Name, names);
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TInput: public TBasicModImpl {
     public:
         TInput(): TBasicModImpl({.Id = EMacroFunction::Input, .Name = "input", .Arity = 0, .MustPreevaluate = true, .CanPreevaluate = true}) {

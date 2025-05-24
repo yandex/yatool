@@ -63,6 +63,11 @@ struct TErrorShowerState {
     }
 };
 
+struct TToolsAndResults {
+    TVector<TStringBuf> Tools;
+    TVector<TStringBuf> Results;
+};
+
 class TCommands {
     friend NCommands::TScriptEvaluator;
 
@@ -159,7 +164,7 @@ public:
 
     // TODO collect vars and tools while compiling
     TVector<TStringBuf> GetCommandVars(ui32 elemId) const;
-    TVector<TStringBuf> GetCommandTools(ui32 elemId) const;
+    TToolsAndResults GetCommandToolsEtc(ui32 elemId) const;
 
     void Save(TMultiBlobBuilder& builder) const;
     void Load(const TBlob& multi);

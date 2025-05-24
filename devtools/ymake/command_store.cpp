@@ -894,6 +894,7 @@ TString TCommands::PrintConst(NPolexpr::TConstId id) const {
         [](std::vector<std::string_view>         val) { return fmt::format("'{}'", fmt::join(val, "', '")); },
         [](TMacroValues::TTool                   val) { return fmt::format("Tool{{'{}'}}", val.Data); },
         [](TMacroValues::TTools                  val) { return fmt::format("Tools{{{}}}", fmt::join(val.Data, " ")); },
+        [](TMacroValues::TResult                 val) { return fmt::format("Result{{'{}'}}", val.Data); },
         [](TMacroValues::TInput                  val) { return fmt::format("Input{{{}}}", val.Coord); },
         [](TMacroValues::TInputs                 val) { return fmt::format("Inputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TOutput                 val) { return fmt::format("Output{{{}}}", val.Coord); },
@@ -1027,13 +1028,14 @@ TVector<TStringBuf> TCommands::GetCommandVars(ui32 elemId) const {
     return result.Take();
 }
 
-TVector<TStringBuf> TCommands::GetCommandTools(ui32 elemId) const {
+TToolsAndResults TCommands::GetCommandToolsEtc(ui32 elemId) const {
     const auto* expr = GetByElemId(elemId);
     if (Y_UNLIKELY(expr == nullptr)) {
         return {};
     }
 
-    TUniqVector<TStringBuf> result;
+    TUniqVector<TStringBuf> tools;
+    TUniqVector<TStringBuf> results;
     for (const auto& node : expr->GetNodes()) {
         if (node.GetType() != NPolexpr::TExpression::TNode::EType::Constant)
             continue;
@@ -1043,19 +1045,26 @@ TVector<TStringBuf> TCommands::GetCommandTools(ui32 elemId) const {
             {
                 auto tool = std::get<TMacroValues::TTool>(Values.GetValue(id)).Data;
                 if (!tool.empty())
-                    result.Push(tool);
+                    tools.Push(tool);
                 break;
             }
         case TMacroValues::ST_TOOL_ARRAYS:
             {
-                auto tools = std::get<TMacroValues::TTools>(Values.GetValue(id)).Data;
-                for (auto& tool : tools)
-                    result.Push(tool);
+                auto _tools = std::get<TMacroValues::TTools>(Values.GetValue(id)).Data;
+                for (auto& tool : _tools)
+                    tools.Push(tool);
+                break;
+            }
+        case TMacroValues::ST_RESULTS:
+            {
+                auto result = std::get<TMacroValues::TResult>(Values.GetValue(id)).Data;
+                if (!result.empty())
+                    results.Push(result);
                 break;
             }
         }
     }
-    return result.Take();
+    return {tools.Take(), results.Take()};
 }
 
 NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, const NCommands::TEvalCtx& ctx) const {
@@ -1091,6 +1100,11 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             for (auto& tool : val.Data)
                 result.push_back(ctx.CmdInfo.ToolPaths->at(tool));
             return NCommands::TTermValue(result);
+        },
+        [&](TMacroValues::TResult val) {
+            if (!ctx.CmdInfo.ResultPaths)
+                return NCommands::TTermValue(TString("TODO/unreachable?/result/") + val.Data);
+            return NCommands::TTermValue(ctx.CmdInfo.ResultPaths->at(val.Data));
         },
         [&](TMacroValues::TInput input) {
             return NCommands::TTermValue(InputToStringArray(input, ctx));
@@ -1141,6 +1155,7 @@ TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
         [](std::vector<std::string_view>         val) { return JoinArgs(std::span(val), std::identity()); },
         [](TMacroValues::TTool                   val) { return TString(val.Data); },
         [](TMacroValues::TTools                  val) { return TString(fmt::format("{}", fmt::join(val.Data, " "))); },
+        [](TMacroValues::TResult                 val) { return TString(val.Data); },
         [](TMacroValues::TInput                  val) { return TString(fmt::format("{}", val.Coord)); },
         [](TMacroValues::TInputs                 val) { return TString(fmt::format("{}", fmt::join(val.Coords, " "))); },
         [](TMacroValues::TOutput                 val) { return TString(fmt::format("{}", val.Coord)); },

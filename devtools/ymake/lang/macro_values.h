@@ -75,6 +75,7 @@ enum class EMacroFunction: ui32 {
     Main,
     ParseBool,
     Comma,
+    Result,
     //
     Count
 };
@@ -96,6 +97,10 @@ public:
     struct TTools {
         std::vector<std::string_view> Data;
         bool operator==(const TTools&) const = default;
+    };
+    struct TResult {
+        std::string_view Data;
+        bool operator==(const TResult&) const = default;
     };
     struct TInput {
         ui32 Coord;
@@ -127,6 +132,7 @@ public:
         std::string_view,
         std::vector<std::string_view>,
         TTool, TTools,
+        TResult,
         TInput, TInputs,
         TOutput, TOutputs,
         TGlobPattern,
@@ -145,6 +151,7 @@ public:
         ST_STRING_ARRAYS,
         ST_BOOL,
         ST_TOOL_ARRAYS,
+        ST_RESULTS,
         ST_COUNT
     };
     static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));

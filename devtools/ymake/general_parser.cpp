@@ -424,12 +424,19 @@ void TGeneralParser::ReportStats() {
 }
 
 void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
-    const auto tools = YMake.Commands.GetCommandTools(node.ElemId);
-    for (const auto& toolValue : tools) {
+    const auto toolsAndStuff = YMake.Commands.GetCommandToolsEtc(node.ElemId);
+    for (const auto& toolValue : toolsAndStuff.Tools) {
         // lifted from tool handling in ProcessBuildCommand
         TString tool = NPath::IsExternalPath(toolValue) ? TString{toolValue} : NPath::ConstructYDir(toolValue, TStringBuf(), ConstrYDirDiag);
         SBDIAG << "Tool dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
+    }
+    for (const auto& resultValue : toolsAndStuff.Results) {
+        // lifted from tool handling in ProcessBuildCommand
+        TString tool = NPath::IsExternalPath(resultValue) ? TString{resultValue} : NPath::ConstructYDir(resultValue, TStringBuf(), ConstrYDirDiag);
+        SBDIAG << "Result dep: " << tool << Endl;
+        node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
+        Graph.Names().CommandConf.GetById(TVersionedCmdId(node.ElemId).CmdId()).KeepTargetPlatform = true;
     }
 }
 
