@@ -353,8 +353,8 @@ def upload_artifacts_parallel_and_cacheble_unified(poms, opts, app_ctx):
 
     # Collapse nodes by uid because the same jar may have different coordinates in different repos
     by_uid = {n['uid']: n for n in graph}
-    result = by_uid.keys()
-    graph = by_uid.values()
+    result = list(by_uid.keys())
+    graph = list(by_uid.values())
 
     graph_to_log = []
     for n in graph:
