@@ -206,10 +206,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
             Display()->SetCutoff(warnLevel);
     }
 
-    if (!Events.empty()) {
-        InitTraceSubsystem(Events);
-    }
-
     TCyclesTimer runStageTimer;
 
     Diag()->Init(WarnFlags);

@@ -59,6 +59,27 @@ static TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** ar
 
 using namespace NLastGetopt;
 
+void InitGlobalOpts(int argc, char** argv) {
+    try {
+        TVector<TString> events;
+        for (int i = 1; i < argc; ++i) {
+            TString value = argv[i];
+            if (value == "--events" || value == "-E") {
+                events.emplace_back(argv[++i]);
+            }
+        }
+        if (!events.empty()) {
+            if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) {return event == events.front();})) {
+                YWarn() << "All trace events must be the same" << Endl;
+            }
+            NYMake::InitTraceSubsystem(events.front());
+            YDebug() << "Trace events enabled: " << events.front() << Endl;
+        }
+    } catch (const yexception& error) {
+        YErr() << "Global opts initialization failed with error: " << error.what() << Endl;
+    }
+}
+
 TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf) {
     try {
         TOpts opts;
@@ -115,7 +136,9 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_MSC_VER
 
     SetAsyncSignalHandler(SIGINT, SigInt);
-    asio::thread_pool configure_workers(2);
+    asio::thread_pool configure_workers(10);
+
+    InitGlobalOpts(argc, argv);
 
     auto configs = SplitMulticonfigCmdline(argc, argv);
     TVector<std::future<int>> ret_codes(configs.size());
