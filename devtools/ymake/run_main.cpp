@@ -136,7 +136,7 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_MSC_VER
 
     SetAsyncSignalHandler(SIGINT, SigInt);
-    asio::thread_pool configure_workers(10);
+    asio::thread_pool configure_workers(2);
 
     InitGlobalOpts(argc, argv);
 
