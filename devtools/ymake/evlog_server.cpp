@@ -4,6 +4,8 @@
 
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
+#include <asio/use_awaitable.hpp>
+#include <asio/thread_pool.hpp>
 
 namespace NEvlogServer {
 
@@ -86,11 +88,35 @@ namespace NEvlogServer {
         co_return;
     }
 
+    class TAsyncLineReader {
+    public:
+        explicit TAsyncLineReader(IInputStream& input)
+            : ReadPool_(1)
+            , Input_(input)
+        {}
+
+        asio::awaitable<std::optional<TString>> ReadLine() {
+            return asio::co_spawn(ReadPool_.executor(), [this]() -> asio::awaitable<std::optional<TString>> {
+                TString line;
+                if (Input_.ReadLine(line)) {
+                    co_return std::make_optional(line);
+                }
+                co_return std::nullopt;
+            }, asio::use_awaitable);
+        }
+
+    private:
+        asio::thread_pool ReadPool_;
+        IInputStream& Input_;
+    };
+
     asio::awaitable<void> TServer::ProcessStreamBlocking(IInputStream& input) {
-        TString line;
         NJson::TJsonValue json;
         TString evtype;
-        while (input.ReadLine(line)) {
+
+        TAsyncLineReader reader(input);
+        while (auto line_or_exit = co_await reader.ReadLine()) {
+            auto line = line_or_exit.value();
             if (!NJson::ReadJsonTree(line, &json, false))
                 continue;
             if (!NJson::GetString(json, "_typename", &evtype)) {

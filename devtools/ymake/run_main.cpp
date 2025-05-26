@@ -7,6 +7,7 @@
 #include "ymake.h"
 #include "context_executor.h"
 
+#include <asio/use_future.hpp>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/stats.h>
 
@@ -77,12 +78,11 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
     return TMaybe<EBuildResult>();
 }
 
-asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, TExecutorWithContext<TExecContext> exec) {
+asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithContext<TExecContext> exec) {
     TBuildConfiguration conf;
     auto result = InitConf(value, conf);
     if (result.Defined()) {
-        ret_code = result.GetRef();
-        co_return;
+        co_return result.GetRef();
     }
 
     try {
@@ -91,6 +91,7 @@ asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, TE
         YDebug() << "mlockall failed" << Endl;
     }
 
+    int ret_code = BR_OK;
     try {
         FORCE_TRACE(U, NEvent::TStageStarted("ymake main"));
         ret_code = co_await main_real(conf, exec);
@@ -99,7 +100,7 @@ asio::awaitable<void> RunConfigure(TVector<const char*> value, int& ret_code, TE
         YErr() << "Configure stage failed with error: " << error.what() << Endl;
         ret_code = BR_FATAL_ERROR;
     }
-    co_return;
+    co_return ret_code;
 }
 
 int YMakeMain(int argc, char** argv) {
@@ -117,7 +118,7 @@ int YMakeMain(int argc, char** argv) {
     asio::thread_pool configure_workers(2);
 
     auto configs = SplitMulticonfigCmdline(argc, argv);
-    TVector<int> states(configs.size());
+    TVector<std::future<int>> ret_codes(configs.size());
     for (size_t i = 0; i < configs.size(); ++i) {
         auto ctx = std::make_shared<TExecContext>(
             std::make_shared<NCommonDisplay::TLockedStream>(),
@@ -128,15 +129,14 @@ int YMakeMain(int argc, char** argv) {
             asio::require(configure_workers.executor(), asio::execution::blocking.never),
             ctx
         );
-        asio::co_spawn(proxy, RunConfigure(configs[i], states[i], proxy), asio::detached);
+        ret_codes[i] = asio::co_spawn(proxy, RunConfigure(configs[i], proxy), asio::use_future);
     }
 
+    int main_ret_code = BR_OK;
+    for (auto& ret_code : ret_codes) {
+        main_ret_code |= ret_code.get();
+    }
     configure_workers.wait();
 
-    int ret_code = BR_OK;
-    for (const auto& state : states) {
-        ret_code |= state;
-    }
-
-    return ret_code;
+    return main_ret_code;
 }
