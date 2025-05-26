@@ -748,6 +748,8 @@ class _Exporter:
         self.sem_graph: _JavaSemGraph = java_sem_graph
         self.project_name: str = None
         self.attrs_for_all_templates: list[str] = []
+        if self.config.output_root != self.config.arcadia_root:
+            self.attrs_for_all_templates += [f"output_root = '{self.config.output_root}'"]
 
     def export(self) -> None:
         """Generate files from sem-graph by yexport"""

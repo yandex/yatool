@@ -620,6 +620,8 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.YWarnModeOptions(),
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.DistCacheOptions(),
+                build_opts.OutputOptions(),
+                build_opts.CreateSymlinksOptions(),
             ],
         )
         self['qt'] = yarg.OptsHandler(

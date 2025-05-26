@@ -59,6 +59,14 @@ class SemConfig:
         self.lang = lang
         self.params = copy.copy(params)
         self.arcadia_root: Path = Path(self.params.arc_root)
+        # Use from ya.conf/cli output_root only if create_symlinks disabled
+        self.output_root: Path = (
+            Path(self.params.output_root)
+            if not self.params.create_symlinks and self.params.output_root
+            else self.arcadia_root
+        )
+        if self.output_root != self.arcadia_root:
+            self.logger.info("Output root: %s", self.output_root)
         self._prepare_targets()
         self.export_root: Path = self._get_export_root()
         self.ymake_root: Path = self.export_root / SemConfig.YMAKE_DIR
