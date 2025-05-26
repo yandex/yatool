@@ -113,6 +113,10 @@ class GraphBuildError(Exception):
     retriable = False
 
 
+class GraphMergeError(Exception):
+    retriable = False
+
+
 class _OptimizableGraph(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2282,15 +2286,18 @@ def _build_graph_and_tests(
     # Note: run merge_target_graphs() in parallel (in different threads) is unsafe because graph_tools is shared between target graphs.
     merged_target_graphs: list[_MergeTargetGraphResult] = []
     for num, target_graph in enumerate(graph_handles, start=1):
-        graph = _merge_target_graphs(
-            graph_maker,
-            conf_error_reporter,
-            opts,
-            any_tests,
-            graph_tools,
-            target_graph,
-            num,
-        )
+        try:
+            graph = _merge_target_graphs(
+                graph_maker,
+                conf_error_reporter,
+                opts,
+                any_tests,
+                graph_tools,
+                target_graph,
+                num,
+            )
+        except RuntimeError as e:
+            raise GraphMergeError(e)
         merged_target_graphs.append(graph)
 
     with stager.scope('build-merged-graph'):
