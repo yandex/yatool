@@ -88,6 +88,7 @@ class YtStore(DistStore):
         self._prepare_tables_future = None
 
         self._yt_store_exclusive = kwargs.get('yt_store_exclusive', False)
+        self._retry_time_limit = retry_time_limit
 
         if self._heater_mode:
             self._prepare_tables(create_tables, readonly, proxy, ttl, with_self_uid)
@@ -189,7 +190,7 @@ class YtStore(DistStore):
                 raise YtInitException('Can\'t create tables at {}: {}'.format(proxy, str(e)))
 
         try:
-            self._client.assert_tables_are_ready()
+            self._client.assert_tables_are_ready(not self._retry_time_limit)
         except YtInitException:
             raise
         except Exception as e:

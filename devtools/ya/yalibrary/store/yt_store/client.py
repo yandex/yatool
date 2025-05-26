@@ -110,10 +110,29 @@ class YtStoreClient(object):
     def exists(self, path):
         return self._client.exists(path)
 
-    def assert_tables_are_ready(self):
+    def assert_tables_are_ready(self, fast_check=True):
         from yt.logger import LOGGER
 
-        #  Use yt.wrapper because unwrapped client timeouts are hard to change (almost impossible)
+        saved_log_level = LOGGER.getEffectiveLevel()
+        try:
+            # Suppress YT error messages during check
+            LOGGER.setLevel(logging.CRITICAL)
+            ytc = self._fast_check_client() if fast_check else self._client
+            try:
+                for table in self._metadata_table, self._data_table:
+                    ytc.select_rows('1 from [{}] limit 1'.format(table), format="json")
+            except Exception as e:
+                if fast_check:
+                    # TODO YA-2591, issue #1
+                    # We don't use retry_policy in the fast checking so we should explicitly notify it about an error
+                    self.retry_policy.on_error(e)
+                raise
+            _ = self._meta_schema  # Init internal schema cache
+
+        finally:
+            LOGGER.setLevel(saved_log_level)
+
+    def _fast_check_client(self):
         retries_policy = retries_config(
             count=consts.YT_CACHE_REQUEST_RETRIES,
             enable=True,
@@ -130,18 +149,7 @@ class YtStoreClient(object):
             "dynamic_table_retries": retries_policy,
         }
         yt_config = yt_config_update(get_config_from_env(), yt_fixed_config)
-
-        saved_log_level = LOGGER.getEffectiveLevel()
-        try:
-            # Suppress YT error messages during check
-            LOGGER.setLevel(logging.CRITICAL)
-            # Don't reuse self._client because we need special retry policy here
-            ytc = YtClient(proxy=self._proxy, token=self._token, config=yt_config)
-            for table in self._metadata_table, self._data_table:
-                ytc.select_rows('1 from [{}] limit 1'.format(table), format="json")
-            _ = self._meta_schema  # Init internal schema cache
-        finally:
-            LOGGER.setLevel(saved_log_level)
+        return YtClient(proxy=self._proxy, token=self._token, config=yt_config)
 
     @property
     @memoize()
