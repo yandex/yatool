@@ -55,6 +55,9 @@ namespace NCommands {
         TInputs Inputs;
         TOutputs Outputs;
         TOutputIncludes OutputIncludes;
+
+        THolder<TVector<TStringBuf>> AddIncls;
+        THolder<TVector<TStringBuf>> AddPeers;
     };
 
 }

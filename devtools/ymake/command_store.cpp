@@ -228,6 +228,35 @@ TCommands::TInliner::GetMacroDefinition(NPolexpr::EVarId id) {
     return defs->second->back().Definition.Get();
 }
 
+void TCommands::TInliner::ProcessMacroSideChannels(const NCommands::TSyntax::TCall& call) {
+    auto getDirsFromOpts = [&](const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst) {
+        TCommandInfo cmdInfo(Conf, nullptr, nullptr);
+        auto dirs = MakeHolder<TVector<TStringBuf>>();
+        if (!opt.empty()) {
+            TStringBuf optsSubst = Conf.GetStringPool()->Append(cmdInfo.SubstMacroDeeply(nullptr, opt, vars, false));
+            Split(optsSubst, " ", *dirs);
+        }
+        if (dst)
+            dst->insert(dst->end(), dirs->begin(), dirs->end());
+        else
+            dst = std::move(dirs);
+    };
+
+    auto macroName = Commands.Values.GetVarName(call.Function);
+    auto bd = Conf.BlockData.find(macroName);
+    if (bd != Conf.BlockData.end()) {
+        const TToolOptions* toolOptions = bd->second.ToolOptions.Get();
+        if (toolOptions) {
+            if (!toolOptions->AddPeers.empty()) {
+                getDirsFromOpts(toolOptions->AddPeers, LegacyVars.Vars, SideChannels.AddPeers);
+            }
+            if (!toolOptions->AddIncl.empty()) {
+                getDirsFromOpts(toolOptions->AddIncl, LegacyVars.Vars, SideChannels.AddIncls);
+            }
+        }
+    }
+}
+
 const NCommands::TSyntax* TCommands::TInliner::VarLookup(TStringBuf name) {
     for (auto scope = Scope; scope; scope = scope->Base) {
         auto it = scope->VarDefinitions.find(name);
@@ -503,6 +532,7 @@ void TCommands::TInliner::InlineScalarTerm(
             auto def = GetMacroDefinition(call.Function);
             if (!def)
                 ythrow TError() << "unknown macro call";
+            ProcessMacroSideChannels(call);
             TScope scope(Scope);
             FillMacroArgs(call, scope);
             Scope = &scope;
@@ -590,6 +620,7 @@ void TCommands::TInliner::InlineArguments(
         auto def = GetMacroDefinition(call.Function);
         if (!def)
             return false;
+        ProcessMacroSideChannels(call);
         TScope scope(Scope);
         FillMacroArgs(call, scope);
         Scope = &scope;
@@ -677,6 +708,7 @@ void TCommands::TInliner::InlineCommands(
         auto def = GetMacroDefinition(call.Function);
         if (!def)
             return false;
+        ProcessMacroSideChannels(call);
         TScope scope(Scope);
         FillMacroArgs(call, scope);
         Scope = &scope;
@@ -736,19 +768,21 @@ void TCommands::TInliner::InlineCommands(
     }
 }
 
-NCommands::TSyntax TCommands::TInliner::Inline(const NCommands::TSyntax& ast) {
+std::pair<NCommands::TSyntax, TCommands::TInlinerSideChannels>
+TCommands::TInliner::Inline(const NCommands::TSyntax& ast) {
     auto checkRecursionStuff = [&]() {
 #ifndef NDEBUG
         for (auto& [k, v] : LegacyVars.RecursionDepth)
             Y_ASSERT(v == 0);
 #endif
     };
+    SideChannels = {};
     auto result = NCommands::TSyntax();
     auto writer = TCmdWriter(result, false);
     checkRecursionStuff();
     InlineCommands(ast.Script, writer);
     checkRecursionStuff();
-    return result;
+    return {result, std::move(SideChannels)};
 }
 
 void TCommands::TInliner::CheckDepth() {
@@ -765,13 +799,15 @@ NCommands::TCompiledCommand TCommands::Compile(
 ) {
     auto inliner = TInliner(conf, *this, vars);
     auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
-    auto ast = inliner.Inline(cachedAst);
+    auto [ast, sideChannels] = inliner.Inline(cachedAst);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate) {
 #if 0
         YDebug() << "preevaluating " << PrintExpr(ast) << Endl;
 #endif
         auto result = Preevaluate(ast, vars, io);
+        result.AddIncls = std::move(sideChannels.AddIncls);
+        result.AddPeers = std::move(sideChannels.AddPeers);
 #if 0
         YDebug() << "           -> " << PrintCmd(result.Expression) << Endl;
 #endif

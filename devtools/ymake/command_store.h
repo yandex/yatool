@@ -194,6 +194,12 @@ private:
 
     const NCommands::TSyntax& Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
 
+    struct TInlinerSideChannels {
+        // TODO merge inlining with preevaluation, dump this stuff directly into TCompiledCommand
+        THolder<TVector<TStringBuf>> AddIncls;
+        THolder<TVector<TStringBuf>> AddPeers;
+    };
+
     struct TCmdWriter;
     struct TInliner {
         TInliner(
@@ -208,7 +214,7 @@ private:
             }
         {}
     public:
-        NCommands::TSyntax Inline(const NCommands::TSyntax& ast);
+        std::pair<NCommands::TSyntax, TInlinerSideChannels> Inline(const NCommands::TSyntax& ast);
     private:
         enum class ELegacyMode {None, Expr, Macro};
         struct TVarDefinition {
@@ -218,6 +224,7 @@ private:
         struct TScope;
         TVarDefinition GetVariableDefinition(NPolexpr::EVarId id);
         const NCommands::TSyntax* GetMacroDefinition(NPolexpr::EVarId id);
+        void ProcessMacroSideChannels(const NCommands::TSyntax::TCall& src);
         void FillMacroArgs(const NCommands::TSyntax::TCall& src, TScope& dst);
         void InlineModArgTerm(const NCommands::TSyntax::TTerm& term, NCommands::TSyntax::TArgument& writer);
         void InlineTransformation(const NCommands::TSyntax::TTransformation& xfm, NCommands::TSyntax::TTransformation& writer);
@@ -244,6 +251,8 @@ private:
     private: // misc
         int Depth = 0;
         void CheckDepth();
+    private:
+        TInlinerSideChannels SideChannels;
     };
 
 private:

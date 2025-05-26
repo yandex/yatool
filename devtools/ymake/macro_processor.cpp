@@ -318,6 +318,10 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), compiled.OutputIncludes.Take(), ownVars);
+        if (compiled.AddIncls)
+            GetOrInit(AddIncls).insert(AddIncls->end(), compiled.AddIncls->begin(), compiled.AddIncls->end());
+        if (compiled.AddPeers)
+            GetOrInit(AddPeers).insert(AddPeers->end(), compiled.AddPeers->begin(), compiled.AddPeers->end());
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
         return TString(res);
     }
