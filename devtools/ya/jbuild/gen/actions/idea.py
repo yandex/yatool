@@ -533,8 +533,8 @@ def create_iml(path, by_path, project_root, ctx):
             c.append(d)
         if d.get('level') == 'application':
             application_level_entries.append(d)
-    # Sort first by scope (compile, test) and then name
-    for p, s in sorted(zip(m.dep_paths, m.dep_scopes), key=lambda x: (x[1], x[0])):
+
+    for p, s in zip(m.dep_paths, m.dep_scopes):
         if isinstance(by_path[p], Module):
             attrib = collections.OrderedDict()
             attrib['type'] = 'module'
