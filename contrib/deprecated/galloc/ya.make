@@ -12,15 +12,11 @@ NO_UTIL()
 
 NO_COMPILER_WARNINGS()
 
-IF (OS_DARWIN)
-    PEERDIR(
-        contrib/libs/gperftools
-    )
-ELSE()
-    SRCS(
-        galloc.cpp
-        hack.cpp
-    )
-ENDIF()
+NO_BUILD_IF(OS_DARWIN)
+
+SRCS(
+    galloc.cpp
+    hack.cpp
+)
 
 END()
