@@ -22,8 +22,7 @@ class MissingResourceError(Exception):
     mute = True
 
 
-IS_PY3 = sys.version_info[0] >= 3
-CAN_USE_UNIVERSAL_FETCHER = IS_PY3 and os.name != "nt"
+CAN_USE_UNIVERSAL_FETCHER = sys.version_info[0] >= 3
 FALLBACK_MSG_LOGGED = False
 
 

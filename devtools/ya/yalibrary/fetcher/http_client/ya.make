@@ -4,7 +4,7 @@ PEERDIR(
     devtools/ya/exts
 )
 
-IF (PYTHON3 AND NOT OS_WINDOWS AND NOT YA_OPENSOURCE)
+IF (PYTHON3)
     PEERDIR(
         devtools/libs/universal_fetcher/py
     )
