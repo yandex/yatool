@@ -76,6 +76,7 @@ enum class EMacroFunction: ui32 {
     ParseBool,
     Comma,
     Result,
+    InducedDeps,
     //
     Count
 };

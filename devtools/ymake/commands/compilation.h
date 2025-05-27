@@ -55,6 +55,7 @@ namespace NCommands {
         TInputs Inputs;
         TOutputs Outputs;
         TOutputIncludes OutputIncludes;
+        THashMap<TString, TOutputIncludes> OutputIncludesForType;
 
         THolder<TVector<TStringBuf>> AddIncls;
         THolder<TVector<TStringBuf>> AddPeers;

@@ -317,11 +317,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         }
         auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
         const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
-        GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled.Inputs.Take(), compiled.Outputs.Take(), compiled.OutputIncludes.Take(), ownVars);
-        if (compiled.AddIncls)
-            GetOrInit(AddIncls).insert(AddIncls->end(), compiled.AddIncls->begin(), compiled.AddIncls->end());
-        if (compiled.AddPeers)
-            GetOrInit(AddPeers).insert(AddPeers->end(), compiled.AddPeers->begin(), compiled.AddPeers->end());
+        GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled, false, ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
         return TString(res);
     }
@@ -519,16 +515,15 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
 bool TCommandInfo::GetCommandInfoFromStructCmd(
     TCommands& commands,
     ui32 cmdElemId,
-    std::span<const NCommands::TCompiledCommand::TInput> cmdInputs,
-    std::span<const NCommands::TCompiledCommand::TOutput> cmdOutputs,
-    std::span<const NCommands::TCompiledCommand::TOutputInclude> cmdOutputIncludes,
+    NCommands::TCompiledCommand& compiled,
+    bool skipMainOutput,
     const TVars& vars
 ) {
 
     AddCmdNode(Cmd, cmdElemId);
     Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), true);
 
-    for (const auto& input : cmdInputs) {
+    for (const auto& input : compiled.Inputs.Take()) {
         TVarStrEx in(input.Name);
         if (input.Context_Deprecated) [[unlikely]] {
             if (NPath::IsLink(in.Name)) {
@@ -546,7 +541,11 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         GetInputInternal().Push(in);
     }
 
-    for (const auto& output : cmdOutputs) {
+    auto outputs = compiled.Outputs.Take();
+    auto output_view = std::span(outputs);
+    if (skipMainOutput)
+        output_view = output_view.subspan(1); // the main output is processed elsewhere
+    for (const auto& output : output_view) {
         auto ix = GetOutputInternal().Push(output.Name).first;
         GetOutputInternal().Update(ix, [output](auto& var) {
             var.IsTmp |= output.IsTmp;
@@ -559,12 +558,23 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         });
     }
 
-    for (const auto& outputInclude : cmdOutputIncludes) {
+    for (const auto& outputInclude : compiled.OutputIncludes.Take()) {
         auto ix = GetOutputIncludeInternal().Push(outputInclude.Name).first;
         GetOutputIncludeInternal().Update(ix, [outputInclude](auto& var) {
             var.OutInclsFromInput |= outputInclude.OutInclsFromInput;
         });
     }
+
+    for (auto& kv : compiled.OutputIncludesForType) {
+        auto& dst = GetOutputIncludeForTypeInternal(kv.first);
+        for (const auto& inducedDep : kv.second.Take())
+            dst.Push(inducedDep.Name);
+    }
+
+    if (compiled.AddIncls)
+        GetOrInit(AddIncls).insert(AddIncls->end(), compiled.AddIncls->begin(), compiled.AddIncls->end());
+    if (compiled.AddPeers)
+        GetOrInit(AddPeers).insert(AddPeers->end(), compiled.AddPeers->begin(), compiled.AddPeers->end());
 
     CollectVarsDeep(commands, cmdElemId, Cmd, vars);
 

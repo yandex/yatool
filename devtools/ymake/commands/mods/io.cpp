@@ -294,6 +294,7 @@ namespace {
     } Y_GENERATE_UNIQUE_ID(Mod);
 
     class TOutInclsFromInput: public TBasicModImpl {
+        // TBD: the old engine seems to also support this for induced_deps, but this feature is unused; do we want it?
     public:
         TOutInclsFromInput(): TBasicModImpl({.Id = EMacroFunction::OutInclsFromInput, .Name = "from_input", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
         }
@@ -330,6 +331,49 @@ namespace {
             ctx.Sink.OutputIncludes.Update(ix, [&](auto& var) {
                 var.OutInclsFromInput = true;
             });
+            return pooledName;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
+    class TInducedDeps: public TBasicModImpl {
+        // this is basically parameterized `output_include`
+    public:
+        TInducedDeps(): TBasicModImpl({.Id = EMacroFunction::InducedDeps, .Name = "induced_deps", .Arity = 2, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+        TMacroValues::TValue Preevaluate(
+            [[maybe_unused]] const TPreevalCtx& ctx,
+            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+        ) const override {
+            CheckArgCount(args);
+            auto exts = std::get<std::string_view>(args[0]);
+            auto& dst = ctx.Sink.OutputIncludesForType[exts];
+            return std::visit(TOverloaded{
+                [&](std::string_view name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                    auto result = std::vector<std::string_view>();
+                    result.reserve(names.size());
+                    for (auto& name : names)
+                        result.push_back(ProcessOne(ctx, name, dst));
+                    return result;
+                },
+                [&](std::vector<std::string_view> names) -> TMacroValues::TValue {
+                    for (auto& name : names)
+                        name = ProcessOne(ctx, name, dst);
+                    return std::move(names);
+                },
+                [](auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
+                }
+            }, args[1]);
+        }
+    private:
+        std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name, NCommands::TCompiledCommand::TOutputIncludes& dst) const {
+            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+            dst.CollectCoord(pooledName);
             return pooledName;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);

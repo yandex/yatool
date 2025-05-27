@@ -398,10 +398,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         cmdInfo->InitFromModule(Module);
 
-        auto outputs = compiled.Outputs.Take();
-        auto output_view = std::span(outputs);
-        output_view = output_view.subspan(1); // drop the main output, it's processed elsewhere
-        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled.Inputs.Take(), output_view, compiled.OutputIncludes.Take(), Vars);
+        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
 
         if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
             AddGlobalVarDeps(node, true);

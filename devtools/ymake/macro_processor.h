@@ -127,13 +127,6 @@ private:
     TSpecFileList& GetOutputIncludeForTypeInternal(TStringBuf type) {
         return std::get<0>(SpecFiles).OutputIncludeForType[type];
     }
-    template<typename TAction>
-    void ApplyToOutputIncludesInternal(TAction&& action) {
-        action(TStringBuf{}, GetOutputIncludeInternal());
-        for (auto& [type, outputIncludes] : std::get<0>(SpecFiles).OutputIncludeForType) {
-            action(type, outputIncludes);
-        }
-    }
 
 public:
     // The only public user of this one is mkcmd.cpp :(
@@ -168,9 +161,8 @@ public:
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
         ui32 cmdElemId,
-        std::span<const NCommands::TCompiledCommand::TInput> cmdInputs,
-        std::span<const NCommands::TCompiledCommand::TOutput> cmdOutputs,
-        std::span<const NCommands::TCompiledCommand::TOutputInclude> cmdOutputIncludes,
+        NCommands::TCompiledCommand& compiled,
+        bool skipMainOutput,
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
