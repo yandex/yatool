@@ -216,6 +216,7 @@ RECURSE(
     compact_graph
     contrib
     diag
+    libs
     lang
     lang/expansion_fuzz
     lang/confreader_fuzz
