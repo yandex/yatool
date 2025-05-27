@@ -21,6 +21,7 @@ import exts.windows
 import app_config
 import yalibrary.tools as tools
 
+import devtools.ya.core.error as core_error
 import devtools.ya.core.yarg as yarg
 import devtools.ya.core.config
 import devtools.ya.core.report
@@ -690,7 +691,12 @@ def _run_ymake(**kwargs):
                 _debug_info['stdout'] = stdout
                 _debug_info['stderr'] = stderr
                 if exit_code == 2:
-                    raise YMakeConfigureError('Configure error (use -k to proceed)')
+                    # XXX YA-1456
+                    if getattr(app_ctx.params, 'ignore_configure_errors', True):
+                        ecode = None
+                    else:
+                        ecode = core_error.ExitCodes.CONFIGURE_ERROR
+                    raise YMakeConfigureError('Configure error (use -k to proceed)', exit_code=ecode)
                 if exit_code == 3:
                     raise YMakeNeedRetryError('YMake wants to be retried', [_f for _f in [custom_build_dir] if _f])
                 if exit_code < 0:

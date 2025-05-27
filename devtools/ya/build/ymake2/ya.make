@@ -12,6 +12,7 @@ SRCS(
 
 PEERDIR(
     devtools/ya/core/config
+    devtools/ya/core/error
     devtools/ya/core/event_handling
     devtools/ya/core/report
     devtools/ya/core/yarg

@@ -8,12 +8,12 @@ import sys
 import time
 
 import app_config
+import devtools.ya.core.error as core_error
 import devtools.ya.core.config
 import devtools.ya.core.gsid
 import devtools.ya.core.sig_handler
 import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.stage_aggregator as stage_aggregator
-import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
@@ -941,21 +941,22 @@ def configure_exit_code_definition():
     try:
         yield
     except Exception as e:
-        from devtools.ya.core import error
-
-        temp_error = error.is_temporary_error(e)
+        temp_error = core_error.is_temporary_error(e)
         mute_error = getattr(e, 'mute', False)
         retriable_error = getattr(e, 'retriable', True)
 
         if mute_error:
-            error_code = devtools.ya.core.error.ExitCodes.GENERIC_ERROR
+            if getattr(e, 'exit_code', None) is not None:
+                error_code = getattr(e, 'exit_code')
+            else:
+                error_code = core_error.ExitCodes.GENERIC_ERROR
         else:
-            error_code = devtools.ya.core.error.ExitCodes.UNHANDLED_EXCEPTION
+            error_code = core_error.ExitCodes.UNHANDLED_EXCEPTION
 
         if not retriable_error:
-            error_code = devtools.ya.core.error.ExitCodes.NOT_RETRIABLE_ERROR
+            error_code = core_error.ExitCodes.NOT_RETRIABLE_ERROR
         elif temp_error:
-            error_code = devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
+            error_code = core_error.ExitCodes.INFRASTRUCTURE_ERROR
 
         logger.debug("Derived exit code is %s", error_code)
 
