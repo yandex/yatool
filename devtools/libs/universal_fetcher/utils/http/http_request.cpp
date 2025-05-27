@@ -25,6 +25,8 @@ namespace NUniversalFetcher {
 
         options.Host(TString(scheme) + TString(host));
         options.Port(port);
+        options.UseKeepAlive(false);
+        options.UseConnectionPool(true);
 
         TRedirectableHttpClient client(options);
         client.DoGet(relUrl, output, headers, outHeaders, std::move(cancellation));
