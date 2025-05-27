@@ -214,6 +214,7 @@ RECURSE(
     bin
     common
     compact_graph
+    contrib
     diag
     lang
     lang/expansion_fuzz
