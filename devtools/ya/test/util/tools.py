@@ -182,10 +182,6 @@ def get_wine64_path(global_resources):
     return '{}/bin/wine64'.format(global_resources.get(const.WINE_TOOL, '$({})'.format(const.WINE_TOOL)))
 
 
-def get_wine32_path(global_resources):
-    return '{}/bin/wine'.format(global_resources.get(const.WINE32_TOOL, '$({})'.format(const.WINE32_TOOL)))
-
-
 def jdk_tool(name, jdk_path):
     return os.path.join(jdk_path, 'bin', name)
 

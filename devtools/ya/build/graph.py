@@ -1998,8 +1998,6 @@ class _GraphMaker:
             with_wine = None
             if self._needs_wine64_for_tests([tc]):
                 with_wine = 'wine64'
-            elif self._needs_wine32_for_tests([tc]):
-                with_wine = 'wine32'
             tests = list(
                 te.generate_tests_by_dart(
                     dart,
@@ -2055,16 +2053,6 @@ class _GraphMaker:
     @staticmethod
     def _needs_wine64_for_tests(test_target_platforms):
         return _needs_wine_for_tests(test_target_platforms, ('x86_64',))
-
-    @staticmethod
-    def _needs_wine32_for_tests(test_target_platforms):
-        return _needs_wine_for_tests(
-            test_target_platforms,
-            (
-                'i386',
-                'i686',
-            ),
-        )
 
 
 def _build_graph_and_tests(

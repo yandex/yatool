@@ -115,11 +115,8 @@ def gen_suite(
                 multi_target_platform_run=multi_target_platform_run,
             )
             if with_wine:
-                assert with_wine in ('wine32', 'wine64'), 'unexpected wine type (use wine32 or wine64)'
-                if with_wine == 'wine32':
-                    _suite.wine_path = tools.get_wine32_path(_suite.global_resources)
-                else:
-                    _suite.wine_path = tools.get_wine64_path(_suite.global_resources)
+                assert with_wine == 'wine64', 'unexpected wine type (use wine64)'
+                _suite.wine_path = tools.get_wine64_path(_suite.global_resources)
             return _suite
         except Exception as e:
             logger.exception("%s - for %r suite", e, suite)
