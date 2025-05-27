@@ -1528,7 +1528,6 @@ class YaMake:
         self._build_results_listener.add(
             pr.BuildResultsListener(
                 self.ctx.graph,
-                tests,
                 self._reports_generator,
                 test_results_path,
                 self.opts,

@@ -27,7 +27,7 @@ if tp.TYPE_CHECKING:
 class BuildResultsListener:
     _logger = logging.getLogger('BuildResultsListener')
 
-    def __init__(self, graph, tests, report_generator, build_root, opts):
+    def __init__(self, graph, report_generator, build_root, opts):
         self._lock = threading.Lock()
         self._build_metrics = st.make_targets_metrics(graph['graph'], {})
         self._report_generator = report_generator
@@ -36,15 +36,12 @@ class BuildResultsListener:
         self._processed = set()
         self._reversed_deps = defaultdict(list)
         self._nodes = {}
-        self._tests = {}
         self._opts = opts
 
         for node in graph['graph']:
             self._nodes[node['uid']] = node
             for dep in set(node['deps']):
                 self._reversed_deps[dep].append(node['uid'])
-        for tst in tests:
-            self._tests[tst.uid] = tst
 
     def __call__(self, res=None, build_stage=None):
         if res is None:
