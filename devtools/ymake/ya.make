@@ -20,6 +20,7 @@ PEERDIR(
     devtools/ymake/include_parsers
     devtools/ymake/lang
     devtools/ymake/lang/makelists
+    devtools/ymake/libs/ymakeyaml
     devtools/ymake/make_plan
     devtools/ymake/options
     devtools/ymake/resolver
