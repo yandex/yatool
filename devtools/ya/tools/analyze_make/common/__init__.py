@@ -36,8 +36,7 @@ def get_cmd_from_evlog(filename: str) -> str:
 
 
 def get_latest_evlog():
-    def filter_func(filename, root):
-        evlog_path = os.path.join(root, filename)
+    def filter_func(evlog_path):
         reader = yalibrary.evlog.EvlogReader(evlog_path)
         try:
             for node in reader:

@@ -75,9 +75,13 @@ class EvlogReader:
         with self._get_stream() as stream:
             for nline, line in enumerate(stream):
                 try:
-                    yield yjson.loads(line)
+                    entry = yjson.loads(line)
+                    if not isinstance(entry, dict):
+                        logging.warning("Evlog entry is not a dict, skip %d line. File: %s", nline + 1, self.filepath)
+                        continue
+                    yield entry
                 except Exception:
-                    logging.warning("Skip broken entry at %s line. File: %s", nline + 1, self.filepath)
+                    logging.warning("Skip broken entry at %d line. File: %s", nline + 1, self.filepath)
                     continue
 
 
@@ -207,21 +211,25 @@ class EvlogWriter(BaseEvlogWriter):
 
 
 class EvlogFileFinder(object):
-    def __init__(self, evlog_dir, filter_func=lambda x, y: True):
+    def __init__(self, evlog_dir, filter_func=lambda f: True):
         self._evlog_dir = evlog_dir
         self._filter_func = filter_func
 
     def __iter__(self):
+        evlog_suffixes = EvlogSuffix.all()
+        candidates = []
         for root, dirs, files in os2.fastwalk(self._evlog_dir):
-            for f in files:
-                if f.endswith(EvlogSuffix.all()) and self._filter_func(f, root):
-                    yield os.path.join(root, f)
+            candidates.extend(os.path.join(root, f) for f in files if f.endswith(evlog_suffixes))
+
+        # sorting matters when searching for the latest one
+        for f in sorted(candidates, reverse=True):
+            if self._filter_func(f):
+                yield f
 
     def get_latest(self):
-        evlogs = sorted(self)
-        if not evlogs:
-            raise EmptyEvlogListException('Empty event logs list')
-        return evlogs[-1]
+        for evlog in self:
+            return evlog
+        raise EmptyEvlogListException('Empty event logs list')
 
 
 class BaseEvlogFacade:
@@ -264,7 +272,7 @@ class EvlogFacade(BaseEvlogFacade):
         logging.debug('Event log file is %s', filepath)
 
         self.writer = EvlogWriter(filepath, replacements)
-        self.file_finder = EvlogFileFinder(evlog_dir, lambda f, r: f != os.path.basename(filepath))
+        self.file_finder = EvlogFileFinder(evlog_dir, lambda f: os.path.basename(f) != os.path.basename(filepath))
 
     @property
     def filepath(self):
