@@ -6,7 +6,6 @@ PEERDIR(
     contrib/libs/asio
     contrib/libs/yaml-cpp
     contrib/python/PyYAML
-    contrib/python/python-rapidjson
     contrib/python/six
     contrib/libs/fmt
     contrib/libs/re2
@@ -16,6 +15,7 @@ PEERDIR(
     devtools/ymake/all_srcs
     devtools/ymake/common
     devtools/ymake/compact_graph
+    devtools/ymake/contrib/python-rapidjson
     devtools/ymake/diag
     devtools/ymake/include_parsers
     devtools/ymake/lang
