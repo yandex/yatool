@@ -13,6 +13,7 @@ namespace NCommands {
             bool IsGlob = false;
             bool IsLegacyGlob = false;
             bool ResolveToBinDir = false;
+            bool NoTransformRelativeBuildDir = false;
             TInput(TStringBuf name) : Name(name) {}
             operator TStringBuf() const { return Name; }
         };

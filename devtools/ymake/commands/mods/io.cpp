@@ -555,6 +555,16 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
+    class TNoTransformRelativeBuildDir: public TInputOutputFlagger {
+    public:
+        TNoTransformRelativeBuildDir(): TInputOutputFlagger({.Id = EMacroFunction::NoTransformRelativeBuildDir, .Name = "notransformbuilddir", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TInput& input) const override {
+            input.NoTransformRelativeBuildDir = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
     class TAddToIncl: public TInputOutputFlagger {
     public:
         TAddToIncl(): TInputOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {

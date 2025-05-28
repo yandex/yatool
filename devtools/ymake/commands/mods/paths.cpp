@@ -176,9 +176,9 @@ namespace {
     //
     //
 
-    class TCutExt: public TBasicModImpl {
+    class TCutSomeExt: public TBasicModImpl {
     public:
-        TCutExt(): TBasicModImpl({.Id = EMacroFunction::CutExt, .Name = "noext", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TCutSomeExt(bool total, TModMetadata metadata): TBasicModImpl(metadata), TotalAnnihilation(total) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -229,25 +229,38 @@ namespace {
             }, args[0]);
         }
     private:
-        static TStringBuf Cut(TStringBuf path) {
-            // lifted from EMF_CutExt processing:
+        const bool TotalAnnihilation;
+        TStringBuf Cut(TStringBuf path) const {
+            // lifted from EMF_CutExt & EMF_CutAllExt processing:
             size_t slash = path.rfind(NPath::PATH_SEP); //todo: windows slash!
             if (slash == TString::npos)
                 slash = 0;
-            size_t dot = path.rfind('.');
+            size_t dot = TotalAnnihilation ? path.find('.', slash) : path.rfind('.');
             if (dot != TString::npos && dot >= slash)
                 path = path.substr(0, dot);
             return path;
         }
-        static TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) {
+        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, TStringBuf path) const {
             return ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)));
         }
-        static TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& paths) {
+        TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& paths) const {
             auto result = std::vector<std::string_view>();
             result.reserve(paths.size());
             for (auto& path : paths)
                 result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(Cut(path)))));
             return result;
+        }
+    };
+
+    class TCutExt: public TCutSomeExt {
+    public:
+        TCutExt(): TCutSomeExt(false, {.Id = EMacroFunction::CutExt, .Name = "noext", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TCutAllExt: public TCutSomeExt {
+    public:
+        TCutAllExt(): TCutSomeExt(true, {.Id = EMacroFunction::CutAllExt, .Name = "noallext", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

@@ -77,6 +77,8 @@ enum class EMacroFunction: ui32 {
     Comma,
     Result,
     InducedDeps,
+    CutAllExt,
+    NoTransformRelativeBuildDir,
     //
     Count
 };

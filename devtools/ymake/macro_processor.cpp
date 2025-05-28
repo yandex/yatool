@@ -538,6 +538,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         in.IsGlob = input.IsGlob;
         in.IsMacro = input.IsLegacyGlob;
         in.ResolveToBinDir = input.ResolveToBinDir;
+        in.NoTransformRelativeBuildDir = input.NoTransformRelativeBuildDir;
         GetInputInternal().Push(in);
     }
 
