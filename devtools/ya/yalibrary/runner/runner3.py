@@ -317,7 +317,8 @@ class TaskContext(object):
             self._execution_log,
             dump_evlog_stat=self.opts.evlog_dump_node_stat,
             store_links_in_memory=self.opts.store_links_in_memory,
-            use_universal_fetcher=self.opts.use_universal_fetcher_for_dist_results,
+            use_universal_fetcher=self.opts.use_universal_fetcher_for_dist_results
+            or self.opts.use_universal_fetcher_everywhere,
         )
 
     def dispatch_uid(self, uid: GraphNodeUid, *args, **kwargs) -> None:
