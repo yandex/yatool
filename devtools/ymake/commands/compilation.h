@@ -26,6 +26,7 @@ namespace NCommands {
             bool AddToIncl = false;
             bool IsGlobal = false;
             bool Main = false;
+            bool AddToModOutputs = false;
             TOutput(TStringBuf name): Name(name) {}
             operator TStringBuf() const { return Name; }
         };

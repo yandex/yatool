@@ -595,4 +595,14 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
+    class TAddToModOutputs: public TInputOutputFlagger {
+    public:
+        TAddToModOutputs(): TInputOutputFlagger({.Id = EMacroFunction::AddToModOutputs, .Name = "add_to_outs", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TOutput& output) const override {
+            output.AddToModOutputs = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
 }

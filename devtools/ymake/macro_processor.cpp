@@ -556,6 +556,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
             var.ResolveToBinDir |= output.ResolveToBinDir;
             var.AddToIncl |= output.AddToIncl;
             var.Main |= output.Main;
+            var.AddToModOutputs |= output.AddToModOutputs;
         });
     }
 

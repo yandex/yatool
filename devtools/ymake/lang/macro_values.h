@@ -79,6 +79,7 @@ enum class EMacroFunction: ui32 {
     InducedDeps,
     CutAllExt,
     NoTransformRelativeBuildDir,
+    AddToModOutputs,
     //
     Count
 };
