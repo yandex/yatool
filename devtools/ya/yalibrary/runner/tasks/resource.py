@@ -162,7 +162,7 @@ class PrepareResource(object):
                     self._ctx.state,
                     install_params=(fetcher_common.FIXED_NAME, False),
                     keep_directory_packed=True,
-                    force_universal_fetcher=fetcher_common.need_universal_fetcher(resource_type),
+                    force_universal_fetcher=self._shloud_use_universal_fetcher,
                 )
             )
 

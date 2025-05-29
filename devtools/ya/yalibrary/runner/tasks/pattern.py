@@ -104,6 +104,7 @@ class PreparePattern(object):
                     progress_callback,
                     self._ctx.state,
                     strip_prefix=strip_prefix,
+                    force_universal_fetcher=self._shloud_use_universal_fetcher,
                 )
             )
         elif resource_type == 'file':
