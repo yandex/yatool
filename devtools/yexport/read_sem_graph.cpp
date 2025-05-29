@@ -1,4 +1,5 @@
 #include "read_sem_graph.h"
+#include "stat.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
@@ -416,6 +417,7 @@ namespace {
 }
 
 std::pair<THolder<TSemGraph>, TVector<TNodeId>> ReadSemGraph(const fs::path& path, bool useManagedPeersClosure) {
+    TStageCall stage("load>graph>read");
     TFileInput in{path};
     return ReadSemGraph(in, useManagedPeersClosure);
 }

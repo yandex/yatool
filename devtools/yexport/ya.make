@@ -19,6 +19,7 @@ SRCS(
     read_sem_graph.cpp
     sem_graph.cpp
     spec_based_generator.cpp
+    stat.cpp
     std_helpers.cpp
     target_replacements.cpp
     yexport_generator.cpp

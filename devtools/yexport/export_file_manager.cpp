@@ -16,15 +16,18 @@ TExportFileManager::TExportFileManager(const fs::path& exportRoot, const fs::pat
 
 TExportFileManager::~TExportFileManager() {
     for (const auto& file : CreatedFiles_) {
-        TraceFileExported(ExportRoot_ / file);
+        TraceFileExported(AbsPath(file));
     }
 }
 
 TFile TExportFileManager::Open(const fs::path& relativeToRoot) {
-    auto absPath = ExportRoot_ / relativeToRoot;
-    fs::create_directories(absPath.parent_path());
     CreatedFiles_.insert(relativeToRoot);
-    spdlog::debug("[TExportFileManager] Opened file: {}", relativeToRoot.c_str());
+    return AbsOpen(AbsPath(relativeToRoot));
+}
+
+TFile TExportFileManager::AbsOpen(const fs::path& absPath) {
+    spdlog::debug("[TExportFileManager] Opened file: {}", absPath.c_str());
+    fs::create_directories(absPath.parent_path());
     return TFile{absPath, CreateAlways};
 }
 
@@ -37,7 +40,7 @@ bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelati
         }
         return false;
     }
-    auto absPath = ExportRoot_ / destRelativeToRoot;
+    auto absPath = AbsPath(destRelativeToRoot);
     if (fs::exists(absPath) && fs::equivalent(absPath, source)) {
         spdlog::debug("[TExportFileManager] Skipping file copy becase source is same as destination: {}", source.c_str());
         return true;
@@ -50,16 +53,16 @@ bool TExportFileManager::Copy(const fs::path& source, const fs::path& destRelati
 }
 
 bool TExportFileManager::CopyFromExportRoot(const fs::path& sourceRelativeToRoot, const fs::path& destRelativeToRoot, bool logError) {
-    return Copy(ExportRoot_ / sourceRelativeToRoot, destRelativeToRoot, logError);
+    return Copy(AbsPath(sourceRelativeToRoot), destRelativeToRoot, logError);
 }
 
 bool TExportFileManager::Exists(const fs::path& relativeToRoot) {
-    return fs::exists(ExportRoot_ / relativeToRoot);
+    return fs::exists(AbsPath(relativeToRoot));
 }
 
 void TExportFileManager::Remove(const fs::path& relativeToRoot) {
     CreatedFiles_.erase(relativeToRoot);
-    const auto path = ExportRoot_ / relativeToRoot;
+    const auto path = AbsPath(relativeToRoot);
     NYexport::TracePathRemoved(path);
     fs::remove(path);
 }
@@ -68,7 +71,24 @@ TString TExportFileManager::MD5(const fs::path& relativeToRoot) {
     if (!CreatedFiles_.contains(relativeToRoot)) {
         return {};
     }
-    return MD5::File((ExportRoot_ / relativeToRoot).c_str());
+    return MD5::File(AbsPath(relativeToRoot).string());
+}
+
+fs::path TExportFileManager::AbsPath(const fs::path& relativeToRoot) {
+    return ExportRoot_ / relativeToRoot;
+}
+
+bool TExportFileManager::Save(const fs::path& relativeToRoot, const TString& content) {
+    CreatedFiles_.insert(relativeToRoot);
+    const auto absPath = AbsPath(relativeToRoot);
+    if (fs::exists(absPath)) {
+        if (MD5::File(absPath.string()) == MD5::Calc(content)) {
+            return false; // already exists file with same content
+        }
+    }
+    auto out = AbsOpen(absPath);
+    out.Write(content.data(), content.size());
+    return true; // created
 }
 
 const fs::path& TExportFileManager::GetExportRoot() const {

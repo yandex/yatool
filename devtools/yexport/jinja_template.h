@@ -22,6 +22,8 @@ namespace NYexport {
         TAttrsPtr ValueMap;
         std::optional<jinja2::Template> Template;
         std::string RenderBasename;
+
+        jinja2::Result<TString> RenderAsString();
     };
 
     std::vector<TJinjaTemplate> LoadJinjaTemplates(const fs::path& templatesDir, jinja2::TemplateEnv* env, const std::vector<TTemplateSpec>& templateSpecs);

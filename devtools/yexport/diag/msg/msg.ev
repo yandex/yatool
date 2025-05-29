@@ -15,3 +15,13 @@ message TPathRemoved {
     option (message_id) = 34;
     required string FilePath = 1;
 }
+
+message TStageStat {
+    option (message_id) = 35;
+    required string Stage = 1;
+    required double SumSec = 2;
+    required int32 Calls = 3;
+    required double MinSec = 4;
+    required double AvrSec = 5;
+    required double MaxSec = 6;
+}

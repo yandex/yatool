@@ -2,6 +2,7 @@
 #include "read_sem_graph.h"
 #include "graph_visitor.h"
 #include "internal_attributes.h"
+#include "stat.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/common/uniq_vector.h>
@@ -359,6 +360,7 @@ void TJinjaGenerator::LoadSemGraph(const std::string& platformName, const fs::pa
 }
 
 TProjectPtr TJinjaGenerator::AnalizeSemGraph(const TPlatform& platform) {
+    TStageCall stage("load>graph>analize");
     TJinjaGeneratorVisitor visitor(this, RootAttrs);
     visitor.FillPlatformName(platform.Name);
     ProjectBuilder_ = visitor.GetProjectBuilder();

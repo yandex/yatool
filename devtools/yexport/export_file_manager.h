@@ -23,6 +23,8 @@ public:
     bool Exists(const fs::path& relativeToRoot);
     void Remove(const fs::path& relativeToRoot);
     TString MD5(const fs::path& relativeToRoot);
+    fs::path AbsPath(const fs::path& relativeToRoot);
+    bool Save(const fs::path& relativeToRoot, const TString& content);
 
     //! Do not use this function to perform operations with files in ExportRoot (that may break generated file tracking)
     const fs::path& GetExportRoot() const;
@@ -32,6 +34,8 @@ private:
     THashSet<fs::path> CreatedFiles_;
     fs::path ExportRoot_;
     fs::path ProjectRoot_;
+
+    TFile AbsOpen(const fs::path& absPath);
 };
 
 }

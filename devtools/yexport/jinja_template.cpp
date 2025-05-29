@@ -1,4 +1,5 @@
 #include "jinja_template.h"
+#include "stat.h"
 
 #include <spdlog/spdlog.h>
 
@@ -10,6 +11,7 @@ namespace {
 
 namespace NYexport {
     bool TJinjaTemplate::Load(const fs::path& path, jinja2::TemplateEnv* env, const std::string& renderBasename) {
+        TStageCall stage("load>jinja");
         Template = {};
 
         std::ifstream file(path);
@@ -47,20 +49,22 @@ namespace NYexport {
         }
     }
 
+    jinja2::Result<TString> TJinjaTemplate::RenderAsString() {
+        TStageCall stage("render>jinja");
+        return Template->RenderAsString(ValueMap->GetMap());
+    }
+
     bool TJinjaTemplate::RenderTo(TExportFileManager& exportFileManager, const fs::path& relativeToExportRootDirname, const std::string& platformName) {
         if (!Template || !ValueMap) {
             return false;
         }
-        jinja2::Result<TString> result = Template->RenderAsString(ValueMap->GetMap());
-
+        auto result = RenderAsString();
         auto renderFileName = RenderFilename(relativeToExportRootDirname, platformName);
         if (!result.has_value()) {
             spdlog::error("Failed to render {} due to jinja template error: {}", renderFileName.c_str(), result.error().ToString());
             return false;
         }
-        auto out = exportFileManager.Open(renderFileName);
-        TString renderResult = result.value();
-        out.Write(renderResult.data(), renderResult.size());
+        exportFileManager.Save(renderFileName, result.value());
         return true;
     }
 
