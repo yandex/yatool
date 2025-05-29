@@ -7,16 +7,24 @@
 #include <asio/any_io_executor.hpp>
 
 class TConfMsgManager;
+class TProgressManager;
 struct TDiagCtrl;
 
 struct TExecContext {
     std::shared_ptr<NCommonDisplay::TLockedStream> LockedStream;
     std::shared_ptr<TConfMsgManager> ConfMsgManager;
+    std::shared_ptr<TProgressManager> ProgressManager;
     std::shared_ptr<TDiagCtrl> DiagCtrl;
 
-    TExecContext(std::shared_ptr<NCommonDisplay::TLockedStream> lockedStream, std::shared_ptr<TConfMsgManager> confManager, std::shared_ptr<TDiagCtrl> diagCtrl)
+    TExecContext(
+        std::shared_ptr<NCommonDisplay::TLockedStream> lockedStream,
+        std::shared_ptr<TConfMsgManager> confManager,
+        std::shared_ptr<TProgressManager> progressManager,
+        std::shared_ptr<TDiagCtrl> diagCtrl
+    )
         : LockedStream(std::move(lockedStream))
         , ConfMsgManager(std::move(confManager))
+        , ProgressManager(std::move(progressManager))
         , DiagCtrl(std::move(diagCtrl))
     {}
 };

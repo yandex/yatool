@@ -1,6 +1,7 @@
 #include "progress_manager.h"
 
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/context_executor.h>
 
 #include <util/datetime/base.h>
 #include <util/generic/vector.h>
@@ -131,6 +132,10 @@ void TProgressManager::ForceRenderModulesDone(const TInstant currentTime) {
     }
 }
 
-TProgressManager* TProgressManager::Instance() {
+TProgressManager* Instance() {
+    auto ctx = CurrentContext<TExecContext>;
+    if (ctx && ctx->ProgressManager) {
+        return ctx->ProgressManager.get();
+    }
     return Singleton<TProgressManager>();
 }

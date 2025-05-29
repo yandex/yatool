@@ -9,6 +9,7 @@
 
 #include <asio/use_future.hpp>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/stats.h>
 
 #include <library/cpp/sighandler/async_signals_handler.h>
@@ -146,6 +147,7 @@ int YMakeMain(int argc, char** argv) {
         auto ctx = std::make_shared<TExecContext>(
             std::make_shared<NCommonDisplay::TLockedStream>(),
             std::make_shared<TConfMsgManager>(),
+            std::make_shared<TProgressManager>(),
             std::make_shared<TDiagCtrl>()
         );
         auto proxy = TExecutorWithContext<TExecContext>(

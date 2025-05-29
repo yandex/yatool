@@ -1437,7 +1437,7 @@ inline void TUpdIter::Leave(TState& state) {
     }
 
     if (IsModuleType(st.Node.NodeType) && st.WasFresh) {
-        TProgressManager::Instance()->IncConfModulesDone();
+        Instance()->IncConfModulesDone();
     }
 
     if (Diag()->Where.size() && IsModuleType(st.Node.NodeType)) {

@@ -702,7 +702,7 @@ void TFileConf::RecordStats(ui64 size, TInstant start, bool mapped) {
         }
     }
 
-    TProgressManager::Instance()->UpdateFilesData(size, duration, Stats.Get(NStats::EFileConfStats::MappedCount) + Stats.Get(NStats::EFileConfStats::LoadedCount));
+    Instance()->UpdateFilesData(size, duration, Stats.Get(NStats::EFileConfStats::MappedCount) + Stats.Get(NStats::EFileConfStats::LoadedCount));
 }
 
 void TFileConf::SumUsStat(size_t us, NStats::EFileConfStats countStat, NStats::EFileConfStats sumUsStat, NStats::EFileConfStats minUsStat, NStats::EFileConfStats maxUsStat) const {

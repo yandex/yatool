@@ -64,6 +64,6 @@ public:
     void ForceUpdateRenderModulesTotal(const ui64 modulesTotal, const TInstant currentTime = Now());
     void IncRenderModulesDone(const TInstant currentTime = Now());
     void ForceRenderModulesDone(const TInstant currentTime = Now());
-
-    static TProgressManager* Instance();
 };
+
+TProgressManager* Instance();
