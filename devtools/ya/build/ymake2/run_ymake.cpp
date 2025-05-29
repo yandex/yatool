@@ -6,6 +6,7 @@
 #include <library/cpp/pybind/ptr.h>
 #include <library/cpp/ucompress/writer.h>
 
+#include <util/datetime/base.h>
 #include <util/generic/scope.h>
 #include <util/stream/file.h>
 #include <util/stream/str.h>
@@ -216,7 +217,8 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
 #endif
 
     TShellCommandOptions options = TShellCommandOptions()
-        .SetUseShell(false);
+        .SetUseShell(false)
+        .SetDetachSession(false);
     options.Environment = Env;
     // SetUseShell disables quoting if it's enabled. Call SetQuoteArguments after SetUseShell.
     // It's safe to set quote on the windows, because args will be quoted only if it's required.

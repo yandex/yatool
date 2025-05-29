@@ -3,6 +3,7 @@ from collections import defaultdict
 import copy
 import functools
 import itertools
+import threading
 import exts.yjson as json
 import logging
 import os
@@ -744,7 +745,12 @@ def _run_ymake(**kwargs):
 
 
 def run_ymake_scheduled(count):
-    run_ymake.run_scheduled(count)
+    # it's crucial to call run_ymake.run_scheduled in a separate thread
+    # to ensure that main thread is not blocked in "hard" way
+    # and signal handlers continue to work
+    thread = threading.Thread(target=run_ymake.run_scheduled, args=(count,))
+    thread.start()
+    thread.join()
 
 
 def _mine_ymake_binary():
