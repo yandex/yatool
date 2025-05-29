@@ -65,6 +65,7 @@ public:
     TIsolatedProjects IsolatedProjects;
     THashSet<TString> ExcludedPeerdirs;
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
+    TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
 
 public:

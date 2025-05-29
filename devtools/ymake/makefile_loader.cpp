@@ -228,7 +228,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                         ReadMakeFile(LintersMake);
                     } else {
                         TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));
-                        YConfErr(Misconfiguration) << LINTERS_MAKE_INC << " file not found at [[imp]]" << Dir << Endl;
+                        YConfErr(Misconfiguration) << LINTERS_MAKE_INC << " must be present at [[imp]]" << Dir << "[[rst]] when the path is specified in any of " << JoinStrings(Conf.AutoincludeJsonPaths.begin(), Conf.AutoincludeJsonPaths.end(), ", ") << Endl;
                     }
                 }
                 // Process module EPILOGUE statement if there is one

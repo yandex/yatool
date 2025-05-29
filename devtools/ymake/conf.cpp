@@ -357,6 +357,7 @@ void TBuildConfiguration::LoadAutoincludes(MD5& confData) {
     TVector<TFsPath> autoincludeFiles;
     for (const auto& it : StringSplitter(autoincludes).Split(' ').SkipEmpty()) {
         autoincludeFiles.emplace_back(SourceRoot / it.Token());
+        AutoincludeJsonPaths.emplace_back(it.Token());
     }
     AutoincludePathsTrie = ::LoadAutoincludes(autoincludeFiles, confData);
 }
