@@ -18,20 +18,33 @@ namespace {
 }
 
 struct NCommands::TArgAccumulator: TCommandSequenceWriterStubs {
-    virtual void BeginScript() {
+public:
+    TArgAccumulator(ICommandSequenceWriter* parent): Parent(parent) {
+    }
+public:
+    // TODO we should probably accumulate then merge instead of writing directly;
+    // TODO consider WriteCwd() etc.
+    void WriteEnv(TStringBuf env) override {
+        if (Parent)
+            Parent->WriteEnv(env);
+        else
+            TCommandSequenceWriterStubs::WriteEnv(env);
+    }
+public:
+    void BeginScript() override {
         Y_ABORT();
     }
-    virtual void BeginCommand() {
+    void BeginCommand() override {
         Y_ABORT();
     }
-    virtual void WriteArgument(TStringBuf arg) {
+    void WriteArgument(TStringBuf arg) override {
         // TODO optimize the `TString arg` case?
         Args.emplace_back(arg);
     }
-    virtual void EndCommand() {
+    void EndCommand() override {
         Y_ABORT();
     }
-    virtual void EndScript(TCommandInfo&, const TVars&) {
+    void EndScript(TCommandInfo&, const TVars&) override {
         Y_ABORT();
     }
 public:
@@ -62,6 +75,8 @@ public:
         }, std::move(term));
     }
     TVector<TString> Args;
+private:
+    ICommandSequenceWriter* const Parent;
 };
 
 inline
@@ -136,7 +151,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
             auto var = Vars->Lookup(varName);
             if (!var)
                 return TVector<TString>();
-            TArgAccumulator subWriter;
+            TArgAccumulator subWriter(writer);
             bool error = false;
             bool hasPeerDirTags = false;
             bool hasNoPeerDirTags = false;
@@ -217,7 +232,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
 }
 
 TScriptEvaluator::TSubResult TScriptEvaluator::DoArgument(const NPolexpr::TExpression* expr, size_t argBegin, ICommandSequenceWriter* writer) {
-    TArgAccumulator args;
+    TArgAccumulator args(writer);
     args.WriteArgument({});
     auto [termBegin, termCnt] = GetFnArgs(*expr, argBegin, EMacroFunction::Terms);
     bool error = false;
@@ -250,7 +265,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
             auto var = Vars->Lookup(varName);
             if (!var)
                 return TVector<TString>();
-            TArgAccumulator subWriter;
+            TArgAccumulator subWriter(writer);
             auto error = false;
             for (auto& varStr : *var) {
                 auto val = varStr.HasPrefix ? GetCmdValue(varStr.Name) : varStr.Name;
