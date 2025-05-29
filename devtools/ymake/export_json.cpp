@@ -452,7 +452,7 @@ namespace {
                 plan.Inputs = cmdbuilder.GetInputs(graph);
             }
 
-            Instance()->ForceUpdateRenderModulesTotal(cmdbuilder.GetModuleNodesNum());
+            TProgressManager::Instance()->ForceUpdateRenderModulesTotal(cmdbuilder.GetModuleNodesNum());
 
             THashSet<TNodeId> results;
             for (const auto& startTarget : startTargets) {
@@ -495,11 +495,11 @@ namespace {
                     const auto& node = cmdbuilder.Nodes.at(nodeId);
                     RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer, modulesStatesCache);
                     if (IsModuleType(graph[nodeId]->NodeType)) {
-                        Instance()->IncRenderModulesDone();
+                        TProgressManager::Instance()->IncRenderModulesDone();
                     }
                 }
 
-                Instance()->ForceRenderModulesDone();
+                TProgressManager::Instance()->ForceRenderModulesDone();
                 tmpFile = cache.SaveToFile();
                 cacheFile = cache.GetCachePath();
                 YDebug() << cache.GetStatistics() << Endl;

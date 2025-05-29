@@ -79,7 +79,7 @@ void TModules::Commit(TModule& module) {
     module.Committed = true;
     YDIAG(V) << "Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
 
-    Instance()->UpdateConfModulesTotal(ModulesById.size());
+    TProgressManager::Instance()->UpdateConfModulesTotal(ModulesById.size());
 }
 
 void TModules::Destroy(TModule& module) {
@@ -245,7 +245,7 @@ void TModules::ReportStats() const {
     Stats.Set(NStats::EModulesStats::Accessed, countAccessed);
 
     Stats.Report();
-    Instance()->ForceUpdateConfModulesDoneTotal(countLoaded + countParsed, countTotal);
+    TProgressManager::Instance()->ForceUpdateConfModulesDoneTotal(countLoaded + countParsed, countTotal);
 }
 
 void TModules::Clear() {

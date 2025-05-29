@@ -132,7 +132,7 @@ void TProgressManager::ForceRenderModulesDone(const TInstant currentTime) {
     }
 }
 
-TProgressManager* Instance() {
+TProgressManager* TProgressManager::Instance() {
     auto ctx = CurrentContext<TExecContext>;
     if (ctx && ctx->ProgressManager) {
         return ctx->ProgressManager.get();
