@@ -73,7 +73,26 @@ namespace NUniversalFetcher {
                     .Timeout = Params_.Timeout,
                 };
                 Log() << TLOG_INFO << "Run skopeo: " << JoinSeq(" ", args);
-                auto res = ProcessRunner_->Run(args, runParams, std::move(cancellation));
+                auto res = ProcessRunner_->Run(args, runParams, cancellation);
+
+                if (res.StdErr && !res.StdErr.empty() && res.StdErr.find("no image found in image index for architecture") != TString::npos) {
+                    Log() << TLOG_INFO << "No image found in image index for architecture, trying to fetch it with --override-os linux";
+
+                    args.clear();
+                    args = {Params_.SkopeoBinaryPath, "--insecure-policy", "--override-os", "linux", "copy", uri, TString("docker-archive:") + dstPath.FilePath()};
+                    if (Params_.AuthJsonFile) {
+                        args.push_back("--src-authfile");
+                        args.push_back(Params_.AuthJsonFile);
+                    }
+                    if (Params_._SkopeoArgs) {
+                        for (auto& arg : Params_._SkopeoArgs) {
+                            args.push_back(arg);
+                        }
+                    }
+
+                    Log() << TLOG_INFO << "Run skopeo: " << JoinSeq(" ", args);
+                    res = ProcessRunner_->Run(args, runParams, std::move(cancellation));
+                }
 
                 // TODO(trofimenkov): Where Skopeo will store temporary files with layers?
                 // Setup env for it like in https://a.yandex-team.ru/arcadia/devtools/experimental/podman_recipe/run.sh
