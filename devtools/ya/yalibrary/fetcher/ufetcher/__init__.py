@@ -118,8 +118,6 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
         connect_timeout_ms=30_000,
     )
 
-    http_config = universal_fetcher.HttpConfig(http_params)
-
     sandbox_config = None
     docker_config = None
 
@@ -159,11 +157,14 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
 
         sandbox_config = universal_fetcher.SandboxConfig(**kwargs)
 
+    http_config = universal_fetcher.HttpConfig(
+        http_params,
+        default_retry_policy,
+    )
+    configs.append(http_config)
+
     if sandbox_config:
         configs.append(sandbox_config)
-
-    if http_config:
-        configs.append(http_config)
 
     if docker_config:
         configs.append(docker_config)
