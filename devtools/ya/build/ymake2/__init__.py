@@ -177,7 +177,12 @@ def _sem_graph_params():
         yarg.Param('dump_sem_graph', default_value=None),
         yarg.Param('dump_raw_graph', default_value=None),
         yarg.Param('foreign_on_nosem', default_value=None),
-        yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
+        yarg.Param(
+            'enabled_events',
+            default_value=consts.YmakeEvents.DEFAULT.value
+            + consts.YmakeEvents.PROGRESS.value
+            + consts.YmakeEvents.TOOLS.value,
+        ),
     ]
 
 

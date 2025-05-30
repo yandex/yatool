@@ -4,16 +4,20 @@ import logging
 import shutil
 import subprocess
 import re
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
-from devtools.ya.core import config as core_config, yarg, stage_tracer
+from devtools.ya.core import config as core_config, yarg, stage_tracer, event_handling
 from devtools.ya.build import build_opts, graph as build_graph, ya_make
 from devtools.ya.build.sem_graph import SemLang, SemConfig, SemNode, SemDep, SemGraph, SemException
 from yalibrary import platform_matcher, tools
 from exts import hashing
 from devtools.ya.yalibrary import sjson
 import xml.etree.ElementTree as eTree
+
+
+tracer = stage_tracer.get_tracer("gradle")
 
 
 class YaIdeGradleException(Exception):
@@ -377,6 +381,27 @@ class _NewSymlinkCollector(_SymlinkCollector):
                 self.has_errors = True
 
 
+class _ForeignEventSubscriber(event_handling.SubscriberSpecifiedTopics):
+    topics = {"NEvent.TForeignPlatformTarget"}
+
+    _FOREIGN_PLATFORM_TARGET_TYPENAME = 'NEvent.TForeignPlatformTarget'
+    _FOREIGN_IDE_DEPEND_PLATFORM = 3
+
+    def __init__(self):
+        self.foreign_targets: list[str] = []
+
+    def _action(self, event: dict) -> None:
+        if not isinstance(event, dict):
+            return
+        if event.get('Type') == 'Error':
+            self.logger.error("%s", event)
+        if (
+            event.get('_typename') == self._FOREIGN_PLATFORM_TARGET_TYPENAME
+            and event.get('Platform') == self._FOREIGN_IDE_DEPEND_PLATFORM
+        ):
+            self.foreign_targets.append(event['Dir'])
+
+
 class _JavaSemGraph(SemGraph):
     """Creating and reading sem-graph"""
 
@@ -389,9 +414,6 @@ class _JavaSemGraph(SemGraph):
     _OLD_AP_SEM = 'annotation_processors'
     _NEW_AP_SEM = 'use_annotation_processor'
     _KAPT_SEM = 'kapt-classpaths'
-
-    _FOREIGN_PLATFORM_TARGET_TYPENAME = 'NEvent.TForeignPlatformTarget'
-    _FOREIGN_IDE_DEPEND_PLATFORM = 3
 
     def __init__(self, config: _JavaSemConfig):
         super().__init__(config, skip_invalid=True)
@@ -413,41 +435,40 @@ class _JavaSemGraph(SemGraph):
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
-        foreign_targets = []
 
-        def listener(event) -> None:
-            if not isinstance(event, dict):
-                return
-            if event.get('Type') == 'Error':
-                self.logger.error("%s", event)
-            if (
-                event.get('_typename') == self._FOREIGN_PLATFORM_TARGET_TYPENAME
-                and event.get('Platform') == self._FOREIGN_IDE_DEPEND_PLATFORM
-            ):
-                foreign_targets.append(event['Dir'])
+        with tracer.scope('sem-graph>make'):
+            self.dont_symlink_jdk = kwargs.pop('dont_symlink_jdk', False)
 
-        self.dont_symlink_jdk = kwargs.pop('dont_symlink_jdk', False)
+            # Register subscriber for foreign events
+            if 'dont_foreign' not in kwargs:
+                import app_ctx
 
-        super().make(
-            **kwargs,
-            ev_listener=listener,
-            dump_raw_graph=self.config.ymake_root / "raw_graph",
-            foreign_on_nosem=True,
-            debug_options=self.config.params.debug_options,
-            dump_file=self.config.params.dump_file_path,
-            warn_mode=self.config.params.warn_mode,
-            dump_ymake_stderr=self.config.params.dump_ymake_stderr,
-        )
-        if foreign_targets:
-            self.foreign_targets = list(set(foreign_targets))
-            self.logger.info("Foreign targets: %s", self.foreign_targets)
-        # Save graph before patch for debug purposes
-        if self.sem_graph_file and self.sem_graph_file.exists():
-            with self.sem_graph_file.open('r') as fr:
-                with (self.sem_graph_file.parent / "raw.sem.json").open('w') as fw:
-                    fw.write(fr.read())
+                foreign_subscriber = _ForeignEventSubscriber()
+                app_ctx.event_queue.subscribe(foreign_subscriber)
+
+            super().make(
+                **kwargs,
+                dump_raw_graph=self.config.ymake_root / "raw_graph",
+                foreign_on_nosem=True,
+                debug_options=self.config.params.debug_options,
+                dump_file=self.config.params.dump_file_path,
+                warn_mode=self.config.params.warn_mode,
+                dump_ymake_stderr=self.config.params.dump_ymake_stderr,
+            )
+            if 'dont_foreign' not in kwargs:
+                if foreign_subscriber.foreign_targets:
+                    self.foreign_targets = list(set(foreign_subscriber.foreign_targets))
+                    self.logger.info("Foreign targets: %s", self.foreign_targets)
+
+            # Save graph before patch for debug purposes
+            if self.sem_graph_file and self.sem_graph_file.exists():
+                with self.sem_graph_file.open('r') as fr:
+                    with (self.sem_graph_file.parent / "raw.sem.json").open('w') as fw:
+                        fw.write(fr.read())
+
         if 'dont_patch_graph' not in kwargs:
-            self._patch_graph()
+            with tracer.scope('sem-graph>patch'):
+                self._patch_graph()
 
     def get_rel_targets(self) -> list[(Path, bool)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
@@ -742,6 +763,8 @@ class _JavaSemGraph(SemGraph):
 class _Exporter:
     """Generating files to export root"""
 
+    _YEXPORT_STAT_PREFIX = '[info] Stat:'
+
     def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
         self.config: _JavaSemConfig = java_sem_config
@@ -758,7 +781,8 @@ class _Exporter:
         self._apply_force_jdk_version()
         self._fill_common_dir()
         self._make_yexport_toml()
-        self._run_yexport()
+        with tracer.scope('export>yexport'):
+            self._run_yexport()
 
     def _make_project_name(self) -> None:
         """Fill project name by options and targets"""
@@ -873,6 +897,7 @@ class _Exporter:
             yexport_cmd += ['--target', self.project_name]
 
         self.logger.info("Generate by yexport command:\n%s", ' '.join(yexport_cmd))
+        t = time.time()
         r = subprocess.run(yexport_cmd, capture_output=True, text=True)
         if r.returncode != 0:
             self.logger.error("Fail generating by yexport:\n%s", r.stderr)
@@ -884,6 +909,17 @@ class _Exporter:
                     ]
                 )
             )
+        for line in r.stderr.split("\n"):
+            try:
+                event = sjson.loads(line.strip())
+                if ("_typename" not in event) or (event["_typename"] != "NEvent.TStageStat"):
+                    continue
+            except RuntimeError:
+                continue
+            # self.logger.info("Yexport stat: %s", event)
+            stage = tracer.start('export>yexport>' + event["Stage"], start_time=t)
+            t += event["SumSec"]  # emulate stage duration
+            stage.finish(finish_time=t)
 
 
 class _Builder:
@@ -912,10 +948,12 @@ class _Builder:
             ) from e
 
         if build_rel_targets:
-            self._build_rel_targets(build_rel_targets)
+            with tracer.scope('build>java'):
+                self._build_rel_targets(build_rel_targets)
 
         if self.config.params.build_foreign and self.sem_graph.foreign_targets:
-            self._build_rel_targets(self.sem_graph.foreign_targets, True)
+            with tracer.scope('build>foreign'):
+                self._build_rel_targets(self.sem_graph.foreign_targets, True)
 
     def _build_rel_targets(self, build_rel_targets: list[str], build_all_langs: bool = False) -> None:
         """Build all relative targets by one graph, build_all_langs control only java targets or all languages targets"""
@@ -988,46 +1026,84 @@ def _collect_symlinks(config: _JavaSemConfig) -> tuple[_ExistsSymlinkCollector, 
     return exists_symlinks, remove_symlinks
 
 
+def _print_stat() -> None:
+    logging.info("--- Stage durations")
+    stat = stage_tracer.get_stat("gradle")
+    stages = []
+    predeep = 0
+    deep_i_min = {0: 0}
+    for stage in stat.keys():
+        deep = stage.count('>')
+        if predeep > deep:
+            for d in range(0, deep + 1):
+                if d in deep_i_min:
+                    m = deep_i_min[d]
+                else:
+                    deep_i_min[d] = m
+            i = len(stages) - 1
+            while (i > deep_i_min[deep]) and (stages[i].count('>') > deep):
+                i -= 1
+            stages.insert(i + 1, stage)
+            deep_i_min[deep] = len(stages) - 1
+        else:
+            stages.append(stage)
+        predeep = deep
+    for stage in stages:
+        if stage == 'summary':
+            continue
+        shift = "    " * (stage.count('>') + 1)
+        pos = stage.rfind('>')
+        logging.info("%s%s: %3.3f sec", shift, stage if pos < 0 else stage[pos + 1 :], stat[stage].duration)
+    logging.info("=== %3.3f sec", stat['summary'].duration)
+
+
 def do_gradle(params):
     """Real handler of `ya ide gradle`"""
-    do_gradle_stage = stage_tracer.get_tracer("gradle").start('do_gradle')
+    with tracer.scope('summary'):
+        try:
+            config = _JavaSemConfig(params)
 
-    try:
-        config = _JavaSemConfig(params)
+            with tracer.scope('collect symlinks'):
+                exists_symlinks, remove_symlinks = _collect_symlinks(config)
 
-        exists_symlinks, remove_symlinks = _collect_symlinks(config)
+            if config.params.remove or config.params.reexport:
+                with tracer.scope('remove'):
+                    remover = _Remover(config, remove_symlinks)
+                    remover.remove()
+                if not config.params.reexport:
+                    return
+                with tracer.scope('recollect symlinks'):
+                    exists_symlinks, remove_symlinks = _collect_symlinks(config)
 
-        if config.params.remove or config.params.reexport:
-            remover = _Remover(config, remove_symlinks)
-            remover.remove()
-            if not config.params.reexport:
-                return
-            exists_symlinks, remove_symlinks = _collect_symlinks(config)
+            with tracer.scope('sem-graph'):
+                sem_graph = _JavaSemGraph(config)
+                sem_graph.make()
 
-        sem_graph = _JavaSemGraph(config)
-        sem_graph.make()
+            with tracer.scope('export'):
+                exporter = _Exporter(config, sem_graph)
+                exporter.export()
 
-        exporter = _Exporter(config, sem_graph)
-        exporter.export()
+            ya_settings = _YaSettings(config)
+            ya_settings.save()
 
-        ya_settings = _YaSettings(config)
-        ya_settings.save()
+            with tracer.scope('make symlinks'):
+                new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
+                new_symlinks.collect()
 
-        new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
-        new_symlinks.collect()
+                if new_symlinks.has_errors:
+                    raise YaIdeGradleException(
+                        'Some errors during creating symlinks, read the logs for more information'
+                    )
 
-        if new_symlinks.has_errors:
-            raise YaIdeGradleException('Some errors during creating symlinks, read the logs for more information')
+                remove_symlinks.remove()
+                new_symlinks.create()
+                exists_symlinks.save()
 
-        remove_symlinks.remove()
-        new_symlinks.create()
-        exists_symlinks.save()
+            with tracer.scope('build'):
+                builder = _Builder(config, sem_graph)
+                builder.build()
 
-        builder = _Builder(config, sem_graph)
-        builder.build()
+        except SemException as e:
+            logging.error("%s", str(e))
 
-    except SemException as e:
-        logging.error("%s", str(e))
-
-    finally:
-        do_gradle_stage.finish()
+    _print_stat()
