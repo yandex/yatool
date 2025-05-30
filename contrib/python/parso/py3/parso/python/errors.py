@@ -356,7 +356,7 @@ class _Context:
 
                 if not found_global_or_nonlocal:
                     raise_(message)
-                    # Only add an error for the first occurence.
+                    # Only add an error for the first occurrence.
                     break
 
             for param in params:

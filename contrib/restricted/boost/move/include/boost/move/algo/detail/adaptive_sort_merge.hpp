@@ -373,7 +373,7 @@ void merge_blocks_bufferless
 // Complexity: 2*distance(first, last)+max_collected^2/2
 //
 // Tries to collect at most n_keys unique elements from [first, last),
-// in the begining of the range, and ordered according to comp
+// in the beginning of the range, and ordered according to comp
 // 
 // Returns the number of collected keys
 template<class RandIt, class Compare, class XBuf>

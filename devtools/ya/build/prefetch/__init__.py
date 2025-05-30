@@ -47,7 +47,7 @@ def _join_thread(thr, name):
     _, exc = thr()
     logger.debug("Thread %s finished", name)
     if exc:
-        logger.exception("Exception occured during execution of %s thread", name, exc_info=exc)
+        logger.exception("Exception occurred during execution of %s thread", name, exc_info=exc)
 
 
 class MixedPrefetchMeta(type(event_handling.SubscriberSpecifiedTopics), type(event_handling.SingletonSubscriber)):

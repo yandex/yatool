@@ -1697,7 +1697,7 @@ static SLJIT_INLINE sljit_s32 emit_single_op(struct sljit_compiler *compiler, sl
 				else if (src2 != dst)
 					overflow_ra = reg_map[src2];
 				else {
-					/* Rare ocasion. */
+					/* Rare occasion. */
 					FAIL_IF(ADD(TMP_EREG2, reg_map[src1], ZERO));
 					overflow_ra = TMP_EREG2;
 				}
@@ -1780,7 +1780,7 @@ static SLJIT_INLINE sljit_s32 emit_single_op(struct sljit_compiler *compiler, sl
 				if (src1 != dst)
 					overflow_ra = reg_map[src1];
 				else {
-					/* Rare ocasion. */
+					/* Rare occasion. */
 					FAIL_IF(ADD(TMP_EREG2, reg_map[src1], ZERO));
 					overflow_ra = TMP_EREG2;
 				}
@@ -1807,7 +1807,7 @@ static SLJIT_INLINE sljit_s32 emit_single_op(struct sljit_compiler *compiler, sl
 				if (src1 != dst)
 					overflow_ra = reg_map[src1];
 				else {
-					/* Rare ocasion. */
+					/* Rare occasion. */
 					FAIL_IF(ADD(TMP_EREG2, reg_map[src1], ZERO));
 					overflow_ra = TMP_EREG2;
 				}

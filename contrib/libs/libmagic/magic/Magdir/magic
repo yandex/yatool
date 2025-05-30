@@ -24,16 +24,16 @@
 # few (6/339) samples with 1st comment line and without separator comment line
 # like: blcr bsi selinux sisu ssh svf
 >4	default		x
-# few sample with 1st comment line and without seperator comment line and regular expression like: sisu
+# few sample with 1st comment line and without separator comment line and regular expression like: sisu
 >>1	search/112	regex\x09
 >>>0	use		magic-fragment
 >>1	default		x
-# few samples with 1st comment line and without seperator comment line and string value like:
+# few samples with 1st comment line and without separator comment line and string value like:
 # blcr bsi selinux ssh (file 3.34) digital gnu wordperfect
 >>>1	search/471	string\x09
 >>>>0	use		magic-fragment
 >>>1	default		x
-# few samples with 1st comment line and without seperator comment line and short value like:
+# few samples with 1st comment line and without separator comment line and short value like:
 # (file 3.34) os9 osf1
 >>>>1	search/1716	short\x09
 >>>>>0	use		magic-fragment

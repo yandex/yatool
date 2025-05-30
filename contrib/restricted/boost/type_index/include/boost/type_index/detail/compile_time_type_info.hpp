@@ -195,7 +195,7 @@ constexpr ctti_skip skip() noexcept { return detail::make_ctti_skip(0, 0, ""); }
     }
 
     template <unsigned int ArrayLength>
-    BOOST_CXX14_CONSTEXPR inline const char* skip_begining_runtime(const char* begin) noexcept {
+    BOOST_CXX14_CONSTEXPR inline const char* skip_beginning_runtime(const char* begin) noexcept {
         constexpr auto skip_value = detail::skip();  // to have the same `.until_runtime` value in code below
         const char* const it = detail::constexpr_search(
             begin, begin + ArrayLength,
@@ -205,10 +205,10 @@ constexpr ctti_skip skip() noexcept { return detail::make_ctti_skip(0, 0, ""); }
     }
 
     template <unsigned int ArrayLength>
-    BOOST_CXX14_CONSTEXPR inline const char* skip_begining(const char* begin) noexcept {
+    BOOST_CXX14_CONSTEXPR inline const char* skip_beginning(const char* begin) noexcept {
         detail::assert_compile_time_legths<(ArrayLength > skip().size_at_begin + skip().size_at_end)>();
         return skip().until_runtime_length
-            ? detail::skip_begining_runtime<ArrayLength - skip().size_at_begin>(begin + skip().size_at_begin)
+            ? detail::skip_beginning_runtime<ArrayLength - skip().size_at_begin>(begin + skip().size_at_begin)
             : begin + skip().size_at_begin
         ;
     }
@@ -323,9 +323,9 @@ struct ctti {
     /// Returns raw name. Must be as short, as possible, to avoid code bloat
     BOOST_CXX14_CONSTEXPR static const char* n() noexcept {
     #if defined(BOOST_TYPE_INDEX_FUNCTION_SIGNATURE)
-        return boost::typeindex::detail::skip_begining< sizeof(BOOST_TYPE_INDEX_FUNCTION_SIGNATURE) >(BOOST_TYPE_INDEX_FUNCTION_SIGNATURE);
+        return boost::typeindex::detail::skip_beginning< sizeof(BOOST_TYPE_INDEX_FUNCTION_SIGNATURE) >(BOOST_TYPE_INDEX_FUNCTION_SIGNATURE);
     #elif defined(__FUNCSIG__)
-        return boost::typeindex::detail::skip_begining< sizeof(__FUNCSIG__) >(__FUNCSIG__);
+        return boost::typeindex::detail::skip_beginning< sizeof(__FUNCSIG__) >(__FUNCSIG__);
     #elif defined(__PRETTY_FUNCTION__) \
                 || defined(__GNUC__) \
                 || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x5130)) \
@@ -334,7 +334,7 @@ struct ctti {
                 || defined(__ghs__) \
                 || defined(__DMC__) \
                 || defined(__clang__)
-        return boost::typeindex::detail::skip_begining< sizeof(__PRETTY_FUNCTION__) >(__PRETTY_FUNCTION__);
+        return boost::typeindex::detail::skip_beginning< sizeof(__PRETTY_FUNCTION__) >(__PRETTY_FUNCTION__);
     #else
         boost::typeindex::detail::failed_to_get_function_name<T>();
         return "";

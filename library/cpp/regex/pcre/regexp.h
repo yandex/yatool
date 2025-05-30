@@ -12,7 +12,7 @@
 //THIS CODE LOOKS LIKE A TRASH, BUT WORKS.
 
 #define NMATCHES 100
-#define REGEXP_GLOBAL 0x0080 // use this if you want to find all occurences
+#define REGEXP_GLOBAL 0x0080 // use this if you want to find all occurrences
 
 class TRegExBaseImpl;
 
