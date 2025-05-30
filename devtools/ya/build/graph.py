@@ -3016,6 +3016,7 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
         graph_kind=_GraphKind.GLOBAL_TOOLS,
         debug_id=debug_id,
         enabled_events='PSLGE',
+        ymake_opts={'multiconfig': False},
     )
     no_pic = tg.no_pic
     graph = no_pic().graph
