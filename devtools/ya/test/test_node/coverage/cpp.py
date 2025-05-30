@@ -399,7 +399,8 @@ def inject_clang_coverage_nodes(graph, suites, resolvers_map, opts, platform_des
         # Don't resolve all clang coverage from suite in a single node.
         # Otherwise, in some degenerate complex cases it may took an enormous amount of time.
         # Skip go binaries - they are not instrumented.
-        for uid, binary in rigel.get_suite_binary_deps(suite, graph, skip_module_lang=['go']):
+        # Sort binary deps to have the same sequence number (itertools.count) in the filenames for different runs.
+        for uid, binary in sorted(rigel.get_suite_binary_deps(suite, graph, skip_module_lang=['go'])):
             binname = os.path.basename(binary)
             filename = binname
             for i in itertools.count():
