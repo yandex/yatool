@@ -469,19 +469,26 @@ def _get_fetcher(name, resource_type):
     try:
         import app_ctx
 
-        if getattr(app_ctx, 'state') and getattr(app_ctx, 'display'):
-
+        if (
+            getattr(app_ctx, 'state')
+            and getattr(app_ctx, 'display')
+            and getattr(app_ctx, 'use_universal_fetcher_everywhere') is not None
+        ):
+            use_universal_fetcher_everywhere = (
+                hasattr(app_ctx, 'use_universal_fetcher_everywhere') and app_ctx.use_universal_fetcher_everywhere
+            )
             progress_info = progress_info_lib.ProgressInfo()
 
             def display_progress(downloaded, total):
-                if app_ctx.state.check_cancel_state():
+                if not use_universal_fetcher_everywhere:
+                    app_ctx.state.check_cancel_state()
 
-                    progress_info.set_total(total)
-                    progress_info.update_downloaded(downloaded)
+                progress_info.set_total(total)
+                progress_info.update_downloaded(downloaded)
 
-                    app_ctx.display.emit_status(
-                        'Downloading [[imp]]{}[[rst]] - [[imp]]{}[[rst]]'.format(name, progress_info.pretty_progress)
-                    )
+                app_ctx.display.emit_status(
+                    'Downloading [[imp]]{}[[rst]] - [[imp]]{}[[rst]]'.format(name, progress_info.pretty_progress)
+                )
 
             def display_finish():
                 app_ctx.display.emit_status('')
