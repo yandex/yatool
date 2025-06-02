@@ -5,14 +5,11 @@ import six
 import sys
 import time
 import signal
-import devtools.ya.core.config
 import logging
 import argparse
 
 import app_config
 
-import devtools.ya.core.error
-import devtools.ya.core.respawn
 import devtools.ya.core.sec as sec
 import devtools.ya.core.sig_handler
 import devtools.ya.core.stage_tracer as stage_tracer
@@ -168,7 +165,7 @@ def main(args):
         const=True,
         default=True if os.environ.get('YA_NO_TMP_DIR') in ("1", "yes") else False,
     )
-    p.add_argument('--no-respawn', action='store_const', const=True, default=False, help=argparse.SUPPRESS)
+    p.add_argument('--no-respawn', action='store_const', const=True, default=False)
     p.add_argument('--print-path', action='store_const', const=True, default=False)
     p.add_argument('--version', action='store_const', const=True, default=False)
     p.add_argument(
@@ -201,6 +198,9 @@ def main(args):
         a.precise = True
 
     init_logger(a.verbose_level)
+
+    if a.no_respawn:
+        os.environ["YA_NO_RESPAWN"] = "1"
 
     if a.precise:
         start = time.time()
