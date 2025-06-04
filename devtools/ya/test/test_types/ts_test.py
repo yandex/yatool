@@ -321,9 +321,6 @@ class PlaywrightTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
-                "--timeout",
-                str(self.timeout),
-                "--verbose",
             ]
         )
 

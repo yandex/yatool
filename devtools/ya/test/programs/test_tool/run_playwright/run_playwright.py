@@ -3,10 +3,6 @@ import json
 import logging
 import os
 import signal
-import six
-import sys
-
-import library.python.archive as archive
 
 from devtools.ya.test import const
 from devtools.ya.test.system import process
@@ -25,13 +21,20 @@ from build.plugins.lib.nots.package_manager.base.constants import (
 from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("run_playwright")
+
+
+def log_execute_env(env: dict[str, str], cwd: str):
+    logger.debug(f"{cwd=}")
+    for key, value in sorted(env.items()):
+        logger.debug(f"\t{key}={value}")
 
 
 TEST_STATUS = {
-    "passed": const.Status.GOOD,
-    "failed": const.Status.FAIL,
-    "pending": const.Status.SKIPPED,
+    "expected": const.Status.GOOD,
+    "unexpected": const.Status.FAIL,
+    "skipped": const.Status.SKIPPED,
+    "flaky": const.Status.GOOD,
 }
 
 
@@ -43,16 +46,13 @@ def parse_args():
     parser.add_argument("--project-path", help="Relative path to test module directory (my/project/tests)")
     parser.add_argument("--test-work-dir", default=".")
     parser.add_argument("--output-dir")
-    parser.add_argument("--test-data-dirs", nargs="*", required=False)
     parser.add_argument("--test-for-path", help="Absolute path to testing module ($B/my/project)")
     parser.add_argument(
         "--node-path", help="Absolute path to node_modules in testing module ($B/my/project/node_modules)"
     )
     parser.add_argument("--tracefile")
     parser.add_argument("--config", help="Relative path to playwright config, from testing module root")
-    parser.add_argument("--timeout", default=0, type=int)
     parser.add_argument("--nodejs")
-    parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
 
@@ -60,29 +60,6 @@ def parse_args():
 
 
 def run_tests(opts):
-    cmd = get_test_cmd(opts)
-
-    stdout_file = os.path.join(opts.output_dir, "stdout")
-    stderr_file = os.path.join(opts.output_dir, "stderr")
-
-    if getattr(opts, "test_data_dirs"):
-        ts_utils.link_test_data(
-            opts.build_root, opts.source_root, opts.test_for_path, opts.test_data_dirs, opts.test_data_dirs_rename
-        )
-
-    # Unpack to opts.build_root to not spam working directory even more (as it will be brought as results dir)
-    env = os.environ.copy()
-    browsers_arch_path = os.path.join(opts.test_work_dir, "playwright-browsers.tgz")
-    if os.path.exists(browsers_arch_path):
-        browsers_directory = os.path.join(opts.build_root, "playwright-browsers")
-        required_libs_directory = os.path.join(browsers_directory, "required-ubuntu-x86-64-libs")
-        os.makedirs(browsers_directory, exist_ok=True)
-        archive.extract_tar(browsers_arch_path, browsers_directory)
-        env["LD_LIBRARY_PATH"] = required_libs_directory
-        env["PLAYWRIGHT_BROWSERS_PATH"] = browsers_directory
-
-    os.chdir(opts.test_for_path)
-
     test_for_project_path = os.path.relpath(
         opts.test_for_path,
         opts.build_root,
@@ -111,24 +88,36 @@ def run_tests(opts):
         bin_root=opts.build_root,
     )
 
-    results_file = "results.json"
+    exit_code = 0
+
     try:
-        env["PLAYWRIGHT_JSON_OUTPUT_NAME"] = results_file
-        env["PATH"] = os.pathsep.join([env.get("PATH"), opts.nodejs])
-        res = process.execute(
+        stdout_file = os.path.join(opts.output_dir, "playwright-test-stdout.log")
+        stderr_file = os.path.join(opts.output_dir, "playwright-test-stderr.log")
+        report_file = os.path.join(opts.output_dir, "report.json")
+
+        env = os.environ.copy()
+        env["PLAYWRIGHT_JSON_OUTPUT_NAME"] = report_file
+        env["PATH"] = os.pathsep.join([opts.nodejs, env.get("PATH")])
+
+        cmd = get_test_cmd(opts)
+
+        log_execute_env(
+            env=env,
+            cwd=opts.test_for_path,
+        )
+
+        process.execute(
             cmd,
             check_exit_code=False,
             env=env,
+            cwd=opts.test_for_path,
             stdout=stdout_file,
             stderr=stderr_file,
             wait=True,
         )
 
-        exit_code = res.returncode
-        logger.debug(f"cmd: {cmd}, exited with code: {exit_code}")
-
-        with open(results_file, "r") as stdout:
-            suite = parse_stdout(opts, stdout)
+        with open(report_file, "r") as report:
+            suite = create_suite_from_json_report(opts, report)
             shared.dump_trace_file(suite, opts.tracefile)
 
     except process.SignalInterruptionError:
@@ -140,7 +129,7 @@ def run_tests(opts):
 def get_test_cmd(opts):
     cmd = [
         os.path.join(opts.nodejs, "node"),
-        os.path.join(opts.node_path, "playwright", "cli.js"),
+        os.path.join(opts.node_path, "@playwright", "test", "cli.js"),
         "test",
         "--config",
         os.path.join(opts.test_for_path, opts.config),
@@ -150,35 +139,51 @@ def get_test_cmd(opts):
     return cmd
 
 
-def parse_stdout(opts, stdout):
-    results = json.load(stdout)
+def create_suite_from_json_report(opts, json_report: str):
     suite = PerformedTestSuite(None, opts.project_path)
     suite.set_work_dir(opts.test_work_dir)
     suite.register_chunk()
 
+    results = json.load(json_report)
+    project_dirs = {p["id"]: os.path.relpath(p["testDir"], opts.test_for_path) for p in results["config"]["projects"]}
+
     for suite_result in results.get("suites", []):
-        rel_test_path = os.path.join(os.path.relpath(opts.test_work_dir, opts.build_root), suite_result["file"])
-        for spec in suite_result["specs"]:
-            test_name = spec["title"]
-            test_engine = spec["tests"][0]["projectId"]
-            test_status = spec["tests"][0]["results"][0]["status"]
-            full_test_name = six.ensure_str("{}: {}::{}".format(rel_test_path, test_engine, test_name))
-            status = TEST_STATUS[test_status]
-            comment = ""
-            if status == const.Status.FAIL:
-                comment = spec["tests"][0]["results"][0]["error"]["message"]
-            suite.chunk.tests.append(facility.TestCase(full_test_name, status, comment=comment, path=opts.project_path))
+        fill_suite(suite, suite_result, "", project_dirs)
 
     return suite
 
 
-def setup_logging(verbose):
-    level = logging.DEBUG if verbose else logging.ERROR
-    logging.basicConfig(
-        level=level,
-        stream=sys.stdout,
-        format="%(asctime)s (%(relativeCreated)d): %(levelname)s: [%(process)d|%(thread)d]: %(message)s",
-    )
+def fill_suite(suite: PerformedTestSuite, pw_suite: dict, suite_title: str, project_dirs: dict[str, str]):
+    for spec in pw_suite.get("specs", []):
+        spec_name = spec["title"]
+        spec_file = spec["file"]
+
+        for test in spec.get("tests", []):
+            test_project = test["projectName"]
+            test_project_id = test["projectId"]
+            test_file = os.path.join(project_dirs[test_project_id], spec_file)
+            test_status = TEST_STATUS[test["status"]]
+            result = test.get("results", [])[0]
+            test_duration_ms = result.get("duration", 0)
+            comment = ""
+
+            if "error" in result:
+                comment += shared.clean_ansi_escape_sequences(result["error"]["message"])
+                comment += "\n"
+                comment += shared.clean_ansi_escape_sequences(result["error"]["snippet"])
+
+            full_test_name = f"{test_file}[{test_project}]::{suite_title}{spec_name}"
+            test_case = facility.TestCase(
+                name=full_test_name,
+                status=test_status,
+                comment=comment,
+                elapsed=test_duration_ms / 1000,
+            )
+            suite.chunk.tests.append(test_case)
+
+    for nested_suite in pw_suite.get("suites", []):
+        nested_suite_title = suite_title + nested_suite["title"] + " / "
+        fill_suite(suite, nested_suite, nested_suite_title, project_dirs)
 
 
 def on_timeout(_signum, _frame):
@@ -187,7 +192,8 @@ def on_timeout(_signum, _frame):
 
 def main():
     args = parse_args()
-    setup_logging(args.verbose)
+    log_path = os.path.join(args.output_dir, "run_playwright.log")
+    shared.setup_logging(logging.DEBUG, log_path)
 
     if hasattr(signal, "SIGUSR2"):
         signal.signal(signal.SIGUSR2, on_timeout)
