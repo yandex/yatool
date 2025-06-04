@@ -896,7 +896,7 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
         if opts.replace_result:
             graph = strip_graph(graph)
 
-    if opts.download_artifacts and 'result' in graph:
+    if opts.upload_to_remote_store and opts.download_artifacts and 'result' in graph:
         graph_result = set(graph['result'])  # TODO YA-316
         for node in graph['graph']:
             if node.get('uid') in graph_result:
