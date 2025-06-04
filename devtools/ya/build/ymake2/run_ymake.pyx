@@ -83,6 +83,8 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
         }
         result_ready_event.wait()
         res = results[order]
+        # it's important to reset global objects since some handlers run this function multiple times
+        results.erase(results.find(order))
     else:
         with nogil:
             res = RunYMake(binary_c, args_c, env_c, stderr_line_reader, stdin_line_provider)
@@ -124,3 +126,6 @@ def run_scheduled(count):
     for k in arg_collection:
         results[k] = results_c.Get().at(k)
     result_ready_event.set()
+    # it's important to reset global objects since some handlers run this function multiple times
+    result_ready_event.clear()
+    arg_collection.clear()
