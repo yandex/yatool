@@ -192,7 +192,7 @@ class SemNode:
                     raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
 
     def has_semantics(self) -> bool:
-        return self.semantics is not None
+        return self.semantics is not None and len(self.semantics) > 0
 
     @staticmethod
     def take_id(data: dict) -> int:
