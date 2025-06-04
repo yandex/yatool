@@ -1947,9 +1947,6 @@ class _GraphMaker:
             assert self._opts.compress_ymake_output_codec, "Compress codec must be defined"
             o['compress_ymake_output_codec'] = self._opts.compress_ymake_output_codec
 
-        if self._opts.ymake_multiconfig:
-            o['multiconfig'] = self._opts.ymake_multiconfig
-
         return o
 
     def _need_strict_inputs(self, flags):
@@ -2246,6 +2243,7 @@ def _build_graph_and_tests(
     graph_handles: list[_TargetGraphsResult] = []
     tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
+    ymake_opts = {'multiconfig': opts.ymake_multiconfig}
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):
@@ -2261,11 +2259,19 @@ def _build_graph_and_tests(
             extra_conf=opts.extra_conf,
             enabled_events=enabled_events,
             tool_targets_queue=tool_targets_queue,
+            ymake_opts=ymake_opts,
         )
         graph_handles.append(target_graph)
 
     with stager.scope("get-tools"):
-        graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc, opts)
+        graph_tools = _get_tools(
+            tool_targets_queue,
+            graph_maker,
+            opts.arc_root,
+            host_tc,
+            opts,
+            ymake_opts,
+        )
 
     graph_maker.disable_changelist()
 
@@ -2899,7 +2905,7 @@ def _gen_merge_nodes(nodes):
     return merging_nodes, alone_nodes
 
 
-def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts):
+def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts, ymake_opts):
     if should_use_servermode_for_tools(opts):
 
         def stdin_line_provider():
@@ -2917,6 +2923,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
                 'targets_from_evlog': True,
                 'source_root': arc_root,
                 'stdin_line_provider': stdin_line_provider,
+                **ymake_opts,
             },
         }
     else:
@@ -2930,6 +2937,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
 
         kwargs = {
             'abs_targets': abs_targets,
+            'ymake_opts': ymake_opts,
         }
 
     with stager.scope('build-tool-graphs'):
@@ -3016,7 +3024,6 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
         graph_kind=_GraphKind.GLOBAL_TOOLS,
         debug_id=debug_id,
         enabled_events='PSLGE',
-        ymake_opts={'multiconfig': False},
     )
     no_pic = tg.no_pic
     graph = no_pic().graph
