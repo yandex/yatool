@@ -470,23 +470,28 @@ class _JavaSemGraph(SemGraph):
             with tracer.scope('sem-graph>patch'):
                 self._patch_graph()
 
-    def get_rel_targets(self) -> list[(Path, bool)]:
+    def get_rel_targets(self) -> list[(Path, bool, bool)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
         rel_targets = []
         for node in self.read():
-            if not isinstance(node, SemNode):
-                continue  # interest only nodes
-            if not node.name.startswith(self.BUILD_ROOT) or not node.name.endswith(
-                '.jar'
-            ):  # Search only *.jar with semantics
+            if (
+                not isinstance(node, SemNode)
+                or not node.has_semantics()
+                or not node.name.startswith(self.BUILD_ROOT)
+                or not node.name.endswith('.jar')
+            ):
+                # Search only *.jar nodes with semantics
                 continue
             rel_target = Path(node.name.replace(self.BUILD_ROOT, '')).parent  # Relative target - directory of *.jar
             is_contrib = False
+            is_proto = False
             for semantic in node.semantics:
+                if semantic.sems[0] == 'jar_proto':
+                    is_proto = True
                 if semantic.sems == ['consumer-type', 'contrib']:
                     is_contrib = True
                     break
-            rel_targets.append((rel_target, is_contrib))
+            rel_targets.append((rel_target, is_contrib, is_proto))
         return rel_targets
 
     def get_run_java_program_rel_targets(self) -> list[Path]:
@@ -933,15 +938,19 @@ class _Builder:
     def build(self) -> None:
         """Extract build targets from sem-graph and build they"""
         try:
-            build_rel_targets = list(set(self.sem_graph.get_run_java_program_rel_targets()))
+            build_rel_targets: list[Path] = list(set(self.sem_graph.get_run_java_program_rel_targets()))
+            proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
-            for rel_target, is_contrib in rel_targets:
+            for rel_target, is_contrib, is_proto in rel_targets:
                 if self.config.in_rel_targets(rel_target):
                     # Skip target, already in input targets
                     continue
                 elif self.config.params.collect_contribs or not is_contrib:
                     # Build all non-input or not contrib targets
-                    build_rel_targets.append(rel_target)
+                    if is_proto:
+                        proto_rel_targets.append(rel_target)
+                    else:
+                        build_rel_targets.append(rel_target)
         except Exception as e:
             raise YaIdeGradleException(
                 f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
@@ -949,16 +958,19 @@ class _Builder:
 
         if build_rel_targets:
             with tracer.scope('build>java'):
-                self._build_rel_targets(build_rel_targets)
+                self._build_rel_targets(build_rel_targets, proto_rel_targets)
 
         if self.config.params.build_foreign and self.sem_graph.foreign_targets:
             with tracer.scope('build>foreign'):
-                self._build_rel_targets(self.sem_graph.foreign_targets, True)
+                self._build_rel_targets(self.sem_graph.foreign_targets, build_all_langs=True)
 
-    def _build_rel_targets(self, build_rel_targets: list[str], build_all_langs: bool = False) -> None:
+    def _build_rel_targets(
+        self, build_rel_targets: list[Path], proto_rel_targets: list[Path] = None, build_all_langs: bool = False
+    ) -> None:
         """Build all relative targets by one graph, build_all_langs control only java targets or all languages targets"""
         import app_ctx
 
+        junk_ya_make = None
         try:
             if build_all_langs:
                 ya_make_opts = yarg.merge_opts(
@@ -969,18 +981,36 @@ class _Builder:
                 ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True, build_type='debug'))
                 opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
                 opts.dump_sources = True
-
-            arcadia_root = self.config.arcadia_root
+                if proto_rel_targets:
+                    opts.add_result.append(".jar")  # require make symlinks to all .jar files
+                    # For build PROTO_SCHEMA to jar, require build it as PEERDIR
+                    # Make one temporary ya.make with JAVA_PROGRAM and PEERDIR to all proto targets
+                    junk_ya_make = self.config.arcadia_root / "junk" / "ya_ide_gradle" / "ya.make"
+                    _SymlinkCollector.mkdir(junk_ya_make.parent)
+                    with junk_ya_make.open('w') as f:
+                        f.write(
+                            "\n".join(
+                                [
+                                    "JAVA_PROGRAM()",
+                                    "PEERDIR(",
+                                    *["    " + str(proto_rel_target) for proto_rel_target in proto_rel_targets],
+                                    ")",
+                                    "END()",
+                                    "",
+                                ]
+                            )
+                        )
+                    build_rel_targets.append(junk_ya_make.parent.relative_to(self.config.arcadia_root))
 
             opts.bld_dir = self.config.params.bld_dir
-            opts.arc_root = str(arcadia_root)
+            opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
 
             opts.rel_targets = []
             opts.abs_targets = []
             for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
                 opts.rel_targets.append(str(build_rel_target))
-                opts.abs_targets.append(str(arcadia_root / build_rel_target))
+                opts.abs_targets.append(str(self.config.arcadia_root / build_rel_target))
 
             self.logger.info("Making building graph for %s targets...", "foreign" if build_all_langs else "java")
             with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
@@ -992,6 +1022,10 @@ class _Builder:
                 raise YaIdeGradleException('Some builds failed')
         except Exception as e:
             raise YaIdeGradleException(f'Failed in build process: {e}') from e
+        finally:
+            if junk_ya_make:
+                if junk_ya_make.parent.exists():
+                    shutil.rmtree(junk_ya_make.parent)
 
 
 class _Remover:
