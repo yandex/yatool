@@ -488,11 +488,10 @@ YmakeyamlLoad(PyObject* /* self */, PyObject* args, PyObject* kwargs) {
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|$O", (char**)keys, &stream, &loader)) {
         return nullptr;
     }
-    // FIXME(snermolaev): check values of stream and loader and report en error if needed
     if (loader == nullptr || Py_IsNone(loader)) {
         PyErr_SetString(PyExc_RuntimeError, "Keyword `Loader` must be spcified in call to `ymakeyaml.load`");
         return nullptr;
-    } else if (!PyType_Check(loader)) {
+    } else if (!PyType_Check(loader) || PyObject_IsSubclass(loader, (PyObject*)&CSafeLoaderType) != 1 || PyObject_IsSubclass((PyObject*)&CSafeLoaderType, loader) != 1) {
         PyErr_SetString(PyExc_RuntimeError, "The only value supported for keyword `Loader` is `ymakeyaml.CSafeLoader`");
         return nullptr;
     }
