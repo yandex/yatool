@@ -1023,7 +1023,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
         outputIncludeForType.emplace(type, TNodeAddCtx::CreateParsedIncls(
             Module, *Graph, *UpdIter, UpdIter->YMake,
-            EMNT_BuildCommand, cmdElemId, type, outputIncludes
+            mainOutType, mainOutId, type, outputIncludes
         ));
     });
 
