@@ -1,7 +1,11 @@
 import datetime
 import logging
 import os
+import psutil
+import re
+import resource
 import six
+import sys
 
 from exts import fs
 from exts import func
@@ -11,13 +15,14 @@ from exts.compress import UCompressor
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
 _DAYS_TO_SAVE = 7
-FILE_LOG_FMT = '%(asctime)s %(levelname)s (%(name)s) [%(threadName)s] %(message)s'
+FILE_LOG_FMT = '%(asctime)s %(memUsage)s%(levelname)s (%(name)s) [%(threadName)s] %(message)s'
 
 
 class TokenFilterFormatter(logging.Formatter):
-    def __init__(self, fmt, replacements=None):
+    def __init__(self, fmt, replacements=None, add_mem_usage=False):
         super(TokenFilterFormatter, self).__init__(fmt)
         self._replacements = replacements or []
+        self._add_mem_usage = add_mem_usage
         if not replacements:
             import devtools.ya.core.sec as sec
 
@@ -29,7 +34,32 @@ class TokenFilterFormatter(logging.Formatter):
         return s
 
     def format(self, record):
+        record.memUsage = self._mem_usage()
         return self._filter(super(TokenFilterFormatter, self).format(record))
+
+    def _mem_usage(self):
+        if not self._add_mem_usage:
+            return ""
+        rss_bytes = psutil.Process().memory_info().rss
+        max_rss_kb = self._vmhwm() or resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return "{:.3f}/{:.3f} GB ".format(rss_bytes / (1024.0**3), max_rss_kb / (1024.0**2))
+
+    def _vmhwm(self):
+        if not sys.platform.startswith("linux"):
+            return
+        line = None
+        status_file = "/proc/self/status"
+        with open(status_file) as f:
+            for s in f:
+                if s.startswith("VmHWM:"):
+                    line = s
+                    break
+        if not line:
+            return
+        # JFI: 'kB' suffix is hardcoded in the Linux kernel source file fs/proc/task_mmu.c
+        m = re.match(r"VmHWM:\s*(\d+)\s*kB", line)
+        if m:
+            return int(m.group(1))
 
 
 class LogChunks(object):
@@ -140,6 +170,8 @@ def _file_logger(log_file, loglevel=logging.DEBUG, replacements=None):
 
     file_handler.setLevel(loglevel)
 
-    file_handler.setFormatter(TokenFilterFormatter(FILE_LOG_FMT, replacements or []))
+    file_handler.setFormatter(
+        TokenFilterFormatter(FILE_LOG_FMT, replacements or [], add_mem_usage=bool(os.getenv("YA_LOG_MEM_USAGE")))
+    )
 
     return file_handler
