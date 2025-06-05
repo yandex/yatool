@@ -157,13 +157,14 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
     def _fetch(self):
         resource = self._get_matched_resource()
-        return self._download_fn(
+        res = self._download_fn(
             None,
             self._root,
             self._get_resource_uri(resource),
             force_refetch=self._force_refetch,
             **self._binname_kwargs
         )
+        return res.where
 
     def _details(self):
         raise NotImplementedError()
@@ -219,7 +220,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
         strip_prefix = resource_desc.get('strip_prefix')
         parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, parsed_uri.resource_type)
-        where = self._download_fn(
+        res = self._download_fn(
             fetcher,
             self._root,
             self._get_resource_uri(resource_desc),
@@ -228,7 +229,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
             strip_prefix=strip_prefix,
             **self._binname_kwargs
         )
-        return where
+        return res.where
 
 
 class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):

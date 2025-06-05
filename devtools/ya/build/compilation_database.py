@@ -143,15 +143,15 @@ def create_patterns(params, graph, app_ctx):
             strip_prefix = resource_desc.get("strip_prefix")
             resource_type, _ = resource_uri.split(':', 1)
             if resource_type == 'base64':
-                where = resource_fetcher.fetch_base64_resource(build_root, resource_uri)
+                res = resource_fetcher.fetch_base64_resource(build_root, resource_uri)
             else:
-                where = resource_fetcher.fetch_resource_if_need(
+                res = resource_fetcher.fetch_resource_if_need(
                     app_ctx.legacy_sandbox_fetcher,
                     tool_root,
                     resource_uri,
                     strip_prefix=strip_prefix,
                 )
-            patterns[resource['pattern']] = where
+            patterns[resource['pattern']] = res.where
     finally:
         shutil.rmtree(temp_dir)
 

@@ -53,22 +53,23 @@ def installed(resource_path):
 def install_resource(resource_path, installer, force_refetch=False):
     toolscache.notify_tool_cache(resource_path)
 
+    install_stat = None
     if not force_refetch and installed(resource_path):
         logger.debug('Resource seems to be installed in %s', resource_path)
-        return resource_path
+        return install_stat, resource_path
 
     with safe_resource_lock(resource_path):
         if force_refetch and resource_path not in _refetched_paths:
             logger.debug('Force refetch resource in path: %s', resource_path)
         elif installed(resource_path):
             logger.debug('Resource is already installed in %s', resource_path)
-            return resource_path
+            return install_stat, resource_path
         clean_dir(resource_path)
-        installer()
+        install_stat = installer()
         fs.write_file(os.path.join(resource_path, _GUARD_FILE_NAME), str(_VERSION))
     if force_refetch:
         _refetched_paths.add(resource_path)
-    return resource_path
+    return install_stat, resource_path
 
 
 def install_symlink(resource_path, link_path):

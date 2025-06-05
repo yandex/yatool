@@ -96,17 +96,16 @@ class PreparePattern(object):
                 self._progress_info.set_total(total_size)
                 self._progress_info.update_downloaded(downloaded)
 
-            return os.path.abspath(
-                self._fetch_resource_if_need(
-                    self._legacy_sandbox_fetcher,
-                    self._res_dir,
-                    resource,
-                    progress_callback,
-                    self._ctx.state,
-                    strip_prefix=strip_prefix,
-                    force_universal_fetcher=self._shloud_use_universal_fetcher,
-                )
+            res = self._fetch_resource_if_need(
+                self._legacy_sandbox_fetcher,
+                self._res_dir,
+                resource,
+                progress_callback,
+                self._ctx.state,
+                strip_prefix=strip_prefix,
+                force_universal_fetcher=self._shloud_use_universal_fetcher,
             )
+            return os.path.abspath(res.where)
         elif resource_type == 'file':
             return os.path.abspath(resource_id)
         elif resource_type == 'base64':

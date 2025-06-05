@@ -153,23 +153,22 @@ class PrepareResource(object):
                 if self._cache.try_restore(self.uid, result_path):
                     return result_path
 
-            result = os.path.abspath(
-                self._fetch_resource_if_need(
-                    self._legacy_sandbox_fetcher,
-                    resource_type_root,
-                    self._uri_description['uri'],
-                    progress_callback,
-                    self._ctx.state,
-                    install_params=(fetcher_common.FIXED_NAME, False),
-                    keep_directory_packed=True,
-                    force_universal_fetcher=self._shloud_use_universal_fetcher,
-                )
+            res = self._fetch_resource_if_need(
+                self._legacy_sandbox_fetcher,
+                resource_type_root,
+                self._uri_description['uri'],
+                progress_callback,
+                self._ctx.state,
+                install_params=(fetcher_common.FIXED_NAME, False),
+                keep_directory_packed=True,
+                force_universal_fetcher=self._shloud_use_universal_fetcher,
             )
+            where = os.path.abspath(res.where)
 
-            files = list([os.path.join(result, file_name) for file_name in os.listdir(result)])
-            self._cache.put(self.uid, result, files)
+            files = list([os.path.join(where, file_name) for file_name in os.listdir(where)])
+            self._cache.put(self.uid, where, files)
 
-            return result
+            return where
 
         elif resource_type == 'ext':
             sb_resource_id = _ExternalResource.get_sb_id(self._ctx.opts.arc_root, self._uri_description['uri'])
