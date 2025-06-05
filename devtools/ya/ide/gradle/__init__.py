@@ -431,6 +431,7 @@ class _JavaSemGraph(SemGraph):
     _KAPT_SEM = 'kapt-classpaths'
     _JAR_SEM = 'jar'
     _JAR_PROTO_SEM = 'jar_proto'
+    _PROTO_GRPC_SEM = 'proto_grpc'
     _SOURCE_SET_SEM = 'jar_source_set'
     _RESOURCE_SET_SEM = 'jar_resource_set'
 
@@ -441,6 +442,9 @@ class _JavaSemGraph(SemGraph):
 
     _PROTO_MAIN2GENERATED = {
         f"{_GENERATED}_java": "generated/source/proto/main/java",
+    }
+
+    _PROTO_GRPC2GENERATED = {
         f"{_GENERATED}_grpc": "generated/source/proto/main/grpc",
     }
 
@@ -517,7 +521,7 @@ class _JavaSemGraph(SemGraph):
             is_contrib = False
             is_proto = False
             for semantic in node.semantics:
-                if semantic.sems[0] == 'jar_proto':
+                if semantic.sems[0] == self._JAR_PROTO_SEM:
                     is_proto = True
                 elif semantic.sems == ['consumer-type', 'contrib']:
                     is_contrib = True
@@ -808,7 +812,12 @@ class _JavaSemGraph(SemGraph):
             if not self.config.in_rel_targets(rel_node_path):
                 continue
             if node.semantics[0].sems[0] == self._JAR_PROTO_SEM:
-                self._on_proto_module(rel_node_path)
+                with_grpc = False
+                for semantic in node.semantics:
+                    if self._PROTO_GRPC_SEM in semantic.sems:
+                        with_grpc = True
+                        break
+                self._on_proto_module(rel_node_path, with_grpc)
                 continue
             is_main_module = node.semantics[0].sems[0] == self._JAR_SEM
             export_node_path = str(self.config.export_root / rel_node_path)
@@ -878,9 +887,12 @@ class _JavaSemGraph(SemGraph):
         mains.sort(key=lambda i: i[0], reverse=True)  # Long paths firstly
         return mains
 
-    def _on_proto_module(self, rel_node_path: Path) -> None:
+    def _on_proto_module(self, rel_node_path: Path, with_grpc: bool) -> None:
         """For proto modules make symlinks, but patch graph don't required"""
-        for [main_tail, generated_tail] in self._PROTO_MAIN2GENERATED.items():
+        for [main_tail, generated_tail] in {
+            **self._PROTO_MAIN2GENERATED,
+            **(self._PROTO_GRPC2GENERATED if with_grpc else {}),
+        }.items():
             rel_arcadia_dir = rel_node_path / main_tail
             self.generated_symlinks[
                 self.config.export_root / self.GRADLE_BUILD_DIR / rel_node_path / generated_tail
