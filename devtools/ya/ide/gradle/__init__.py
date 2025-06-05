@@ -519,7 +519,7 @@ class _JavaSemGraph(SemGraph):
             for semantic in node.semantics:
                 if semantic.sems[0] == 'jar_proto':
                     is_proto = True
-                if semantic.sems == ['consumer-type', 'contrib']:
+                elif semantic.sems == ['consumer-type', 'contrib']:
                     is_contrib = True
                     break
             rel_targets.append((rel_target, is_contrib, is_proto))
@@ -1100,15 +1100,20 @@ class _Builder:
             proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, is_contrib, is_proto in rel_targets:
-                if self.config.in_rel_targets(rel_target):
-                    # Skip target, already in input targets
-                    continue
-                elif self.config.params.collect_contribs or not is_contrib:
-                    # Build all non-input or not contrib targets
-                    if is_proto:
-                        proto_rel_targets.append(rel_target)
-                    else:
-                        build_rel_targets.append(rel_target)
+                if self.config.params.collect_contribs and is_contrib:
+                    # Fast way - build contribs always, if enabled
+                    pass
+                elif self.config.in_rel_targets(rel_target):
+                    if not is_contrib:
+                        # Skip target in exporting targets, except contribs
+                        continue
+                    # Always build contribs in exporting targets
+                if is_proto:
+                    # Collect all proto for build to another list
+                    proto_rel_targets.append(rel_target)
+                else:
+                    # Collect contribs or libraries
+                    build_rel_targets.append(rel_target)
         except Exception as e:
             raise YaIdeGradleException(
                 f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
