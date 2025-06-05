@@ -62,12 +62,13 @@ def parse_args():
 
 
 def run_tests(opts):
-    cmd = get_test_cmd(opts)
-
-    logger.debug("cmd: %s", json.dumps(cmd, indent=4))
-
     jest_stdout = os.path.join(opts.output_dir, "jest.out")
     jest_stderr = os.path.join(opts.output_dir, "jest.err")
+    jest_results_file = os.path.join(opts.output_dir, "jest_results.json")
+
+    cmd = get_test_cmd(opts, jest_results_file)
+
+    logger.debug("cmd: %s", json.dumps(cmd, indent=4))
 
     def shutdown(proc):
         if hasattr(signal, "SIGQUIT"):
@@ -115,15 +116,14 @@ def run_tests(opts):
     except process.SignalInterruptionError:
         exit_code = const.TestRunExitCode.TimeOut
 
-    stdout = open(jest_stdout, "r")
-    suite = parse_jest_stdout(opts, stdout)
-
-    shared.dump_trace_file(suite, opts.tracefile)
+    with open(jest_results_file, "r") as results_stream:
+        suite = parse_jest_stdout(opts, results_stream)
+        shared.dump_trace_file(suite, opts.tracefile)
 
     return exit_code
 
 
-def get_test_cmd(opts):
+def get_test_cmd(opts, jest_results_file):
     cmd = [
         os.path.join(opts.nodejs, "node"),
         os.path.join(opts.node_path, "jest", "bin", "jest"),
@@ -131,6 +131,8 @@ def get_test_cmd(opts):
         os.path.join(opts.test_for_path, opts.config),
         "--reporters=default",
         "--json",
+        "--outputFile",
+        jest_results_file,
         "--ci",
         "--color",
     ]
@@ -149,8 +151,8 @@ def get_test_cmd(opts):
     return cmd
 
 
-def parse_jest_stdout(opts, stdout):
-    results = json.load(stdout)
+def parse_jest_stdout(opts, results_stream):
+    results = json.load(results_stream)
     suite = PerformedTestSuite(None, opts.project_path)
     suite.set_work_dir(opts.test_work_dir)
     suite.register_chunk()
