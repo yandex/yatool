@@ -200,7 +200,11 @@ class JUnitReportGeneratorV2(object):
 
         # XXX don't mention suites without useful info
         if suite.get_comment():
-            add_test(facility.TestCase(suite.get_type(), suite.get_status(), suite.get_comment(), logs=suite.logs))
+            add_test(
+                facility.TestCase(
+                    "{0}::{0}".format(suite.get_type()), suite.get_status(), suite.get_comment(), logs=suite.logs
+                )
+            )
         for chunk in suite.chunks:
             # Don't register chunks without tests - meaningless entries for runs with filters
             if chunk.tests or chunk.get_comment():
