@@ -38,9 +38,11 @@ class RetryPolicy:
         self.disabled = False
         self._lock = threading.Lock()
         self._on_error_callback = on_error_callback
+        # XXX: DEVTOOLSSUPPORT-63336
+        retry_exceptions = [Exception] if retry_time_limit is not None else get_yt_retriable_errors()
         retry_conf = (
             RetryConf()
-            .on(*get_yt_retriable_errors())
+            .on(*retry_exceptions)
             .waiting(delay=self.MIN_SLEEP, backoff=1.3, jitter=0.2, limit=self.MAX_SLEEP)
         )
         if retry_time_limit:
