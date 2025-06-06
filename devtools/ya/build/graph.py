@@ -102,7 +102,7 @@ ALLOWED_EXTRA_RESOURCES = {
 }
 
 GRAPH_STAT_VERSION = 1
-EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value
+EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value + YmakeEvents.TOOLS.value
 
 
 logger = logging.getLogger(__name__)
