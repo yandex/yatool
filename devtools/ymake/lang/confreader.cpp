@@ -260,7 +260,7 @@ namespace {
                     keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
                     break;
                 case EArgType::NamedArray:
-                    keywords.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
+                    keywords.AddArrayKeyword(arg.Name, arg.DeepReplace);
                     break;
                 default:
                     break;

@@ -62,6 +62,9 @@ public:
 
 
         void AddKeyword(const TString& word, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
+        void AddArrayKeyword(const TString& word, const TString& deepReplaceTo) {
+            AddKeyword(word, 0, ::Max<ssize_t>(), deepReplaceTo);
+        }
 
         bool Empty() const noexcept {
             return Collected_.empty();
