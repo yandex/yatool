@@ -175,6 +175,7 @@ def main(args):
         const=logging.DEBUG,
         default=logging.DEBUG if os.environ.get('YA_VERBOSE') else logging.INFO,
     )
+    p.add_argument('--mcp', action='store_const', const=True, default=False)
     if not opensource:
         p.add_argument('--diag', action='store_const', const=True, default=False)
 
@@ -225,6 +226,14 @@ def main(args):
                 sys.stderr.write("{}: {}\n".format(str(ts - start)[:10], sec.cleanup(msg, replacements)))
 
         logging.root.addHandler(Handler())
+
+    if a.mcp:
+        gsid = os.environ.get("GSID", "")
+        if gsid:
+            gsid += " "
+
+        gsid += "YA_MCP:1"
+        os.environ["GSID"] = gsid
 
     def format_help():
         s = p.format_help().replace('[--diag]', '[--diag] [--help] <SUBCOMMAND> [OPTION]...').strip()
