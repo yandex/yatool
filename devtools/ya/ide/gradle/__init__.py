@@ -429,9 +429,8 @@ class _JavaSemGraph(SemGraph):
     _OLD_AP_SEM = 'annotation_processors'
     _NEW_AP_SEM = 'use_annotation_processor'
     _KAPT_SEM = 'kapt-classpaths'
-    _JAR_SEM = 'jar'
-    _JAR_PROTO_SEM = 'jar_proto'
-    _PROTO_GRPC_SEM = 'proto_grpc'
+    JAR_SEM = 'jar'
+    JAR_PROTO_SEM = 'jar_proto'
     _SOURCE_SET_SEM = 'jar_source_set'
     _RESOURCE_SET_SEM = 'jar_resource_set'
 
@@ -439,6 +438,9 @@ class _JavaSemGraph(SemGraph):
     _SRC = "src"
     _SRC_MAIN = "src/main"
     _SRC_TEST = "src/test"
+
+    CONTRIB = 'contrib'
+    LIBRARY = 'library'
 
     def __init__(self, config: _JavaSemConfig):
         super().__init__(config, skip_invalid=True)
@@ -497,7 +499,7 @@ class _JavaSemGraph(SemGraph):
             with tracer.scope('sem-graph>patch'):
                 self._patch_graph()
 
-    def get_rel_targets(self) -> list[(Path, bool, bool)]:
+    def get_rel_targets(self) -> list[(Path, str, str)]:
         """Get list of rel_targets from sem-graph with is_contrib flag for each"""
         rel_targets = []
         for node in self.read():
@@ -510,15 +512,15 @@ class _JavaSemGraph(SemGraph):
                 # Search only *.jar nodes with semantics
                 continue
             rel_target = Path(node.name.replace(self._BUILD_ROOT, '')).parent  # Relative target - directory of *.jar
-            is_contrib = False
-            is_proto = False
+            consumer_type = ""
             for semantic in node.semantics:
-                if semantic.sems[0] == self._JAR_PROTO_SEM:
-                    is_proto = True
-                elif semantic.sems == ['consumer-type', 'contrib']:
-                    is_contrib = True
+                if (len(semantic.sems) == 2) and (semantic.sems[0] == 'consumer-type'):
+                    consumer_type = semantic.sems[1]
                     break
-            rel_targets.append((rel_target, is_contrib, is_proto))
+            module_type = (
+                node.semantics[0].sems[0] if node.semantics[0].sems[0] in [self.JAR_SEM, self.JAR_PROTO_SEM] else ""
+            )
+            rel_targets.append((rel_target, consumer_type, module_type))
         return rel_targets
 
     def get_run_java_program_rel_targets(self) -> list[Path]:
@@ -803,10 +805,10 @@ class _JavaSemGraph(SemGraph):
             rel_node_path = Path(node.name.replace(self._BUILD_ROOT, '')).parent
             if not self.config.in_rel_targets(rel_node_path):
                 continue
-            if node.semantics[0].sems[0] == self._JAR_PROTO_SEM:
+            if node.semantics[0].sems[0] == self.JAR_PROTO_SEM:
                 self._on_proto_module(rel_node_path)
                 continue
-            is_main_module = node.semantics[0].sems[0] == self._JAR_SEM
+            is_main_module = node.semantics[0].sems[0] == self.JAR_SEM
             export_node_path = str(self.config.export_root / rel_node_path)
             src_path = None
             for semantic in node.semantics:
@@ -868,7 +870,7 @@ class _JavaSemGraph(SemGraph):
         for node in self._graph_data:
             if not isinstance(node, SemNode) or not node.has_semantics():
                 continue
-            if node.semantics[0].sems[0] != self._JAR_SEM:  # non-main target module
+            if node.semantics[0].sems[0] != self.JAR_SEM:  # non-main target module
                 continue
             mains.append((str(Path(node.name.replace(self._BUILD_ROOT, '')).parent), node))
         mains.sort(key=lambda i: i[0], reverse=True)  # Long paths firstly
@@ -1094,20 +1096,22 @@ class _Builder:
             build_rel_targets: list[Path] = list(set(self.sem_graph.get_run_java_program_rel_targets()))
             proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
-            for rel_target, is_contrib, is_proto in rel_targets:
-                if self.config.params.collect_contribs and is_contrib:
-                    # Fast way - build contribs always, if enabled
+            for rel_target, consumer_type, module_type in rel_targets:
+                if (consumer_type not in [_JavaSemGraph.LIBRARY, _JavaSemGraph.CONTRIB]) or (
+                    consumer_type == _JavaSemGraph.CONTRIB and self.config.params.collect_contribs
+                ):
+                    # Fast way - build specials always and contribs, if enabled
                     pass
                 elif self.config.in_rel_targets(rel_target):
-                    if not is_contrib:
-                        # Skip target in exporting targets, except contribs
+                    if consumer_type == _JavaSemGraph.LIBRARY:
+                        # Skip libraries in exporting targets
                         continue
                     # Always build contribs in exporting targets
-                if is_proto:
+                if module_type == _JavaSemGraph.JAR_PROTO_SEM:
                     # Collect all proto for build to another list
                     proto_rel_targets.append(rel_target)
                 else:
-                    # Collect contribs or libraries
+                    # Collect other targets
                     build_rel_targets.append(rel_target)
         except Exception as e:
             raise YaIdeGradleException(
