@@ -371,7 +371,7 @@ extern "C" char *gets (char *__s);
 #endif
 //
 // <execution> has a dependency to Intel's thread building blocks:
-// unless these are installed seperately, including <execution> leads
+// unless these are installed separately, including <execution> leads
 // to inscrutable errors inside libstdc++'s own headers.
 //
 #if (BOOST_LIBSTDCXX_VERSION < 100100)
