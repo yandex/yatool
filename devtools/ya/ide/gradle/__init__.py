@@ -1097,13 +1097,13 @@ class _Builder:
             proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, consumer_type, module_type in rel_targets:
-                if (consumer_type not in [_JavaSemGraph.LIBRARY, _JavaSemGraph.CONTRIB]) or (
+                if (consumer_type not in ["", _JavaSemGraph.LIBRARY, _JavaSemGraph.CONTRIB]) or (
                     consumer_type == _JavaSemGraph.CONTRIB and self.config.params.collect_contribs
                 ):
-                    # Fast way - build specials always and contribs, if enabled
+                    # Fast way - always build specials and contribs, if enabled
                     pass
                 elif self.config.in_rel_targets(rel_target):
-                    if consumer_type == _JavaSemGraph.LIBRARY:
+                    if consumer_type in ["", _JavaSemGraph.LIBRARY]:
                         # Skip libraries in exporting targets
                         continue
                     # Always build contribs in exporting targets
@@ -1144,6 +1144,7 @@ class _Builder:
                 opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
                 opts.dump_sources = True
                 if proto_rel_targets:
+                    proto_rel_targets = list(set(proto_rel_targets))
                     opts.add_result.append(".jar")  # require make symlinks to all .jar files
                     # For build PROTO_SCHEMA to jar, require build it as PEERDIR
                     # Make one temporary ya.make with JAVA_PROGRAM and PEERDIR to all proto targets
@@ -1170,6 +1171,7 @@ class _Builder:
 
             opts.rel_targets = []
             opts.abs_targets = []
+            build_rel_targets = list(set(build_rel_targets))
             for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
                 opts.rel_targets.append(str(build_rel_target))
                 opts.abs_targets.append(str(self.config.arcadia_root / build_rel_target))
