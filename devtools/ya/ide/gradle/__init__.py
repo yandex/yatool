@@ -302,6 +302,8 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
 class _RemoveSymlinkCollector(_SymlinkCollector):
     """Collect for remove symlinks"""
 
+    _MAX_SYMLINKS_DEEP: int = 3
+
     def __init__(self, exists_symlinks: _ExistsSymlinkCollector):
         super().__init__(exists_symlinks.config)
         self.logger = logging.getLogger(type(self).__name__)
@@ -326,20 +328,32 @@ class _RemoveSymlinkCollector(_SymlinkCollector):
         del self.symlinks[arcadia_file]
 
     def remove_invalid_symlinks(self):
-        _RemoveSymlinkCollector._remove_invalid_symlinks(self.config.settings_root, True, self.config.export_root)
+        _RemoveSymlinkCollector._remove_invalid_symlinks(
+            self.config.settings_root, self.config.export_root, -1
+        )  # Check only top level for settings
         for rel_target in self.config.params.rel_targets:
             _RemoveSymlinkCollector._remove_invalid_symlinks(
-                self.config.arcadia_root / rel_target, False, self.config.export_root
+                self.config.arcadia_root / rel_target, self.config.export_root, self._MAX_SYMLINKS_DEEP
             )
 
     @staticmethod
-    def _remove_invalid_symlinks(dirtree: Path, top_only: bool = False, export_root: Path = None) -> None:
+    def _remove_invalid_symlinks(dirtree: Path, export_root: Path, symlinks_deep: int) -> None:
         """Remove all invalid symlinks"""
         for walk_root, dirs, files in dirtree.walk():
+            has_symlinks = False
             for item in dirs + files:
-                _SymlinkCollector.resolve(walk_root / item, dirtree, export_root)
-            if top_only:
-                dirs.clear()
+                path = walk_root / item
+                res, resolved_path = _SymlinkCollector.resolve(path, dirtree, export_root)
+                if not res or path != resolved_path:
+                    has_symlinks = True
+            if symlinks_deep >= 0:
+                for dir in dirs:  # Manual walk into dir
+                    _RemoveSymlinkCollector._remove_invalid_symlinks(
+                        walk_root / dir,
+                        export_root,
+                        _RemoveSymlinkCollector._MAX_SYMLINKS_DEEP if has_symlinks else symlinks_deep - 1,
+                    )
+            dirs.clear()  # Stop auto walking into walk_root by dirtree
 
 
 class _NewSymlinkCollector(_SymlinkCollector):
@@ -355,13 +369,13 @@ class _NewSymlinkCollector(_SymlinkCollector):
 
     def collect(self, generated_symlinks: dict[Path, Path] = None) -> None:
         """Collect new symlinks for creating, skip already exists symlinks"""
-        for export_file, arcadia_file in self.collect_symlinks():
-            self._collect_symlink(export_file, arcadia_file)
         if generated_symlinks:
             for build_dir, arcadia_dir in generated_symlinks.items():
                 if not build_dir.exists():
                     self.mkdir(build_dir)
                 self._collect_symlink(build_dir, arcadia_dir)
+        for export_file, arcadia_file in self.collect_symlinks():
+            self._collect_symlink(export_file, arcadia_file)
 
     def _collect_symlink(self, export_file: Path, arcadia_file: Path) -> None:
         if arcadia_file in self.remove_symlinks.symlinks:
@@ -1217,10 +1231,12 @@ class _Remover:
 
 def _collect_symlinks(config: _JavaSemConfig) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
     """Collect exists and invalid symlinks, remove invalid symlinks"""
-    exists_symlinks = _ExistsSymlinkCollector(config)
-    exists_symlinks.collect()
-    remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
-    remove_symlinks.remove_invalid_symlinks()
+    with tracer.scope('collect symlinks>exists'):
+        exists_symlinks = _ExistsSymlinkCollector(config)
+        exists_symlinks.collect()
+    with tracer.scope('collect symlinks>find and remove invalid'):
+        remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
+        remove_symlinks.remove_invalid_symlinks()
     return exists_symlinks, remove_symlinks
 
 
@@ -1228,8 +1244,8 @@ def _print_stat() -> None:
     logging.info("--- Stage durations")
     stat = stage_tracer.get_stat("gradle")
     stages = []
-    predeep = 0
-    deep_i_min = {0: 0}
+    predeep = 1000
+    deep_i_min = {0: -1}
     for stage in stat.keys():
         deep = stage.count('>')
         if predeep > deep:
@@ -1288,14 +1304,14 @@ def do_gradle(params):
                 new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
                 new_symlinks.collect(sem_graph.generated_symlinks)
 
+                remove_symlinks.remove()
+                new_symlinks.create()
+                exists_symlinks.save()
+
                 if new_symlinks.has_errors:
                     raise YaIdeGradleException(
                         'Some errors during creating symlinks, read the logs for more information'
                     )
-
-                remove_symlinks.remove()
-                new_symlinks.create()
-                exists_symlinks.save()
 
             with tracer.scope('build'):
                 builder = _Builder(config, sem_graph)
