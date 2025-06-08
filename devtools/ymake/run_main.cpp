@@ -60,15 +60,42 @@ static TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** ar
 
 using namespace NLastGetopt;
 
-void InitGlobalOpts(int argc, char** argv) {
+const char* GetOption(int& argc, char** argv, std::string_view option) noexcept {
+    const char* result = nullptr;
+    int out = 1;
+
+    for (int in = 1; in < argc; ) {
+        if (!result && argv[in] == option && in + 1 < argc && argv[in + 1][0] != '-') {
+            result = argv[in + 1];
+            in += 2;
+        } else {
+            argv[out++] = argv[in++];
+        }
+    }
+
+    argc = out;
+    return result;
+}
+
+void InitGlobalOpts(int& argc, char** argv, int& threads) {
     try {
         TVector<TString> events;
-        for (int i = 1; i < argc; ++i) {
-            TString value = argv[i];
-            if (value == "--events" || value == "-E") {
-                events.emplace_back(argv[++i]);
+        for (const auto& name : { "--events", "-E" }) {
+            while (true) {
+                const char* value = GetOption(argc, argv, name);
+                if (value == nullptr)
+                    break;
+                events.push_back(std::move(value));
             }
         }
+
+        for (const auto& name : { "--threads", "-t" }) {
+            const char* threadsStr = GetOption(argc, argv, name);
+            if (threadsStr != nullptr) {
+                threads = std::stoul(threadsStr);
+            }
+        }
+
         if (!events.empty()) {
             if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) {return event == events.front();})) {
                 YWarn() << "All trace events must be the same" << Endl;
@@ -137,12 +164,15 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_MSC_VER
 
     SetAsyncSignalHandler(SIGINT, SigInt);
-    asio::thread_pool configure_workers(2);
-
-    InitGlobalOpts(argc, argv);
+    int threads = 0;
+    InitGlobalOpts(argc, argv, threads);
 
     auto configs = SplitMulticonfigCmdline(argc, argv);
     TVector<std::future<int>> ret_codes(configs.size());
+    if (threads <= 0) {
+        threads = configs.size() + 1;
+    }
+    asio::thread_pool configure_workers(threads);
     for (size_t i = 0; i < configs.size(); ++i) {
         auto ctx = std::make_shared<TExecContext>(
             std::make_shared<NCommonDisplay::TLockedStream>(),

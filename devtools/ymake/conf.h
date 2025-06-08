@@ -43,7 +43,6 @@ struct IMemoryPool;
 // build configuration operates local-formatted paths
 class TBuildConfiguration: public TStartUpOptions, public TYmakeConfig, public TDebugOptions, public TCommandLineOptions {
 public:
-    TString Events;
     TString CustomData;
     TVector<TFsPath> PluginsRoots;
     TVector<TString> WarnFlags;

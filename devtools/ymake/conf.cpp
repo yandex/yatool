@@ -105,7 +105,6 @@ void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("foreign-on-nosem", "on NoSem error make foreign request instead configure error").SetFlag(&ForeignOnNoSem).NoArgument();
     opts.AddLongOption('w', "warn-level", "level of human-readable messages to be shown (0 or more: none, error, warning, info, debug)").StoreResult(&WarnLevel);
     opts.AddLongOption('W', "warn", "warnings & messages to display").AppendTo(&WarnFlags);
-    opts.AddLongOption('E', "events", "enable/set trace events").StoreResult(&Events);
     opts.AddLongOption('y', "plugins-root", "set plugins root").SplitHandler(&PluginsRoots, ',');
     opts.AddLongOption('Q', "dump-custom-data", "<type0>:<output file0>;<type1>:<output file1>...<typen>:<output filen> - generate custom data").StoreResult(&CustomData);
 }
