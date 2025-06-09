@@ -123,6 +123,7 @@ class SandboxParams:
     api_url: str = "https://sandbox.yandex-team.ru/api/v1.0/resource/"
     oauth_token: str = ""
     allow_no_auth: bool = False
+    should_tar_output: bool = True
     transports_order: collections.abc.Sequence[SandboxTransportType] = (
         SandboxTransportType.EXTERNAL_PROGRAM_FETCHER,
         SandboxTransportType.HTTP,
