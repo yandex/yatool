@@ -13,6 +13,7 @@ from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.runner.tasks.enums import WorkerPoolType
 import yalibrary.worker_threads as worker_threads
+import exts.deepget as deepget
 
 import yalibrary.fetcher.progress_info as progress_info_lib
 
@@ -45,6 +46,8 @@ class PreparePattern(object):
         self._execution_log = execution_log
         self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
 
+        self._download_transport = "uknown"
+
     @property
     def exit_code(self):
         return self._exit_code
@@ -58,6 +61,7 @@ class PreparePattern(object):
                 'timing': (start_time, finish_time),
                 'prepare': '',
                 'type': 'tools',
+                'transport': self._download_transport,
             }
         except Cancelled:
             logging.debug("Fetching of the %s resource was cancelled", self._pattern)
@@ -105,6 +109,11 @@ class PreparePattern(object):
                 strip_prefix=strip_prefix,
                 force_universal_fetcher=self._shloud_use_universal_fetcher,
             )
+
+            transport_history = deepget.deepget(res.install_stat, ("last_attempt", "result", "transport_history"))
+            if transport_history:
+                self._download_transport = transport_history[-1]["transport"]
+
             return os.path.abspath(res.where)
         elif resource_type == 'file':
             return os.path.abspath(resource_id)

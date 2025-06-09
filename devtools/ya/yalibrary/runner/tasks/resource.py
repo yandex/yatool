@@ -13,6 +13,7 @@ from yalibrary.runner.tasks.enums import WorkerPoolType
 
 import exts.yjson as json
 import exts.fs as fs
+import exts.deepget as deepget
 
 import yalibrary.fetcher.progress_info as progress_info_lib
 
@@ -54,6 +55,8 @@ class PrepareResource(object):
         self._parsed_uri = None
         self._resource_display = None
         self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
+
+        self._download_transport = "uknown"
 
     @property
     def parsed_uri(self):
@@ -111,6 +114,7 @@ class PrepareResource(object):
                 'timing': (start_time, finish_time),
                 'prepare': '',
                 'type': 'resources',
+                'transport': self._download_transport,
             }
         except Cancelled:
             logging.debug("Fetching of the %s resource was cancelled", self._uri_description)
@@ -167,6 +171,10 @@ class PrepareResource(object):
 
             files = list([os.path.join(where, file_name) for file_name in os.listdir(where)])
             self._cache.put(self.uid, where, files)
+
+            transport_history = deepget.deepget(res.install_stat, ("last_attempt", "result", "transport_history"))
+            if transport_history:
+                self._download_transport = transport_history[-1]["transport"]
 
             return where
 

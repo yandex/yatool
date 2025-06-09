@@ -617,6 +617,16 @@ def print_distbuild_download_statistics(graph, filename, display):
         return stats
 
 
+def add_external_program_fetcher_metrics(graph):
+    total_time = 0
+    for task in graph.prepare_tasks.values():
+        if getattr(task, 'transport', None) is None or task.transport != "external_program_fetcher":
+            continue
+        total_time += task.get_time_elapsed() or 0
+
+    YaMonEvent.send('EYaStats::ExternalProgramFetcherTotalTime', total_time)
+
+
 def print_disk_usage(task_stats, filename, display):
     if not task_stats:
         return
@@ -877,6 +887,9 @@ def print_graph_statistics(
         stats.setdefault('gg_stages', {})[name] = stat.duration
 
     stats['graph_lang_usage'], stats['graph_lang'] = _get_lang_statistics(graph)
+
+    add_external_program_fetcher_metrics(graph)
+
     return stats
 
 

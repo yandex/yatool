@@ -194,6 +194,7 @@ class PrepareTask(BaseTask):
         'count',
         'download_time_ms',
         'size',
+        'transport',
     )
 
     def __init__(self, prepare_type: _PrepareType, host: _Hostname) -> None:
@@ -206,6 +207,7 @@ class PrepareTask(BaseTask):
         self.count: int | None = None
         self.download_time_ms: float | None = None
         self.size: int | None = None
+        self.transport: str | None = None
 
     def as_json(self):
         return {
@@ -697,6 +699,9 @@ def create_graph_with_local_log(
 
             if info.get('size'):
                 task.size = info['size']
+
+            if info.get('transport'):
+                task.transport = info['transport']
 
     dependency_count = 0
     for run_task in graph.run_tasks.values():
