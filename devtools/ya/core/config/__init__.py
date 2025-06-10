@@ -275,16 +275,6 @@ def has_mapping():
 
 
 @func.lazy
-def custom_sandbox_api_url():  # can be removed after code sync with Nebius ends (NDT-277)
-    try:
-        import app_config
-
-        return os.getenv('YA_SANDBOX_API_URL') or app_config.custom_sandbox_api_url
-    except (ImportError, AttributeError):
-        return os.getenv('YA_SANDBOX_API_URL')
-
-
-@func.lazy
 def merge_mappings(mappings):
     assert isinstance(mappings, list)
     assert len(mappings) > 0
