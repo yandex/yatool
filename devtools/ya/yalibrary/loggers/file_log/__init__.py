@@ -3,13 +3,16 @@ import logging
 import os
 import psutil
 import re
-import resource
 import six
 import sys
 
 from exts import fs
 from exts import func
+from exts import windows
 from exts.compress import UCompressor
+
+if not windows.on_win():
+    import resource
 
 
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
@@ -41,6 +44,10 @@ class TokenFilterFormatter(logging.Formatter):
         if not self._add_mem_usage:
             return ""
         rss_bytes = psutil.Process().memory_info().rss
+
+        if windows.on_win():
+            return "{:.3f} GB ".format(rss_bytes / (1024.0**3))
+
         max_rss_kb = self._vmhwm() or resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         return "{:.3f}/{:.3f} GB ".format(rss_bytes / (1024.0**3), max_rss_kb / (1024.0**2))
 
