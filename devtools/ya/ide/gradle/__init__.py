@@ -1229,12 +1229,14 @@ class _Remover:
             self.logger.info("Export root %s already not found", self.config.export_root)
 
 
-def _collect_symlinks(config: _JavaSemConfig) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
+def _collect_symlinks(
+    config: _JavaSemConfig, parent_scope: str = 'collect symlinks'
+) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
     """Collect exists and invalid symlinks, remove invalid symlinks"""
-    with tracer.scope('collect symlinks>exists'):
+    with tracer.scope(parent_scope + '>exists'):
         exists_symlinks = _ExistsSymlinkCollector(config)
         exists_symlinks.collect()
-    with tracer.scope('collect symlinks>find and remove invalid'):
+    with tracer.scope(parent_scope + '>find and remove invalid'):
         remove_symlinks = _RemoveSymlinkCollector(exists_symlinks)
         remove_symlinks.remove_invalid_symlinks()
     return exists_symlinks, remove_symlinks
@@ -1287,7 +1289,7 @@ def do_gradle(params):
                 if not config.params.reexport:
                     return
                 with tracer.scope('recollect symlinks'):
-                    exists_symlinks, remove_symlinks = _collect_symlinks(config)
+                    exists_symlinks, remove_symlinks = _collect_symlinks(config, 'recollect symlinks')
 
             with tracer.scope('sem-graph'):
                 sem_graph = _JavaSemGraph(config)
