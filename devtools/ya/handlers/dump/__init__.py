@@ -77,6 +77,8 @@ from devtools.ya.core.common_opts import (
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 
+from devtools.ya.build.ya_make import YmakeEvlogSubscriber, PrintMessageSubscriber
+
 import devtools.ya.app
 import app_config
 
@@ -394,6 +396,24 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
         if hasattr(params, name):
             debug_options.extend(getattr(params, name))
     logger.debug('abs_targets: %s', params.abs_targets)
+
+    try:
+        import app_ctx
+
+        subscribers = [
+            PrintMessageSubscriber(),
+        ]
+
+        if hasattr(app_ctx, 'evlog'):
+            subscribers.append(
+                YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
+            )
+
+        if hasattr(app_ctx, 'event_queue'):
+            app_ctx.event_queue.subscribe(*subscribers)
+    except ImportError:
+        pass
+
     with temp_dir() as tmp:
         res = gen_func(
             build_root=build_root or tmp,
