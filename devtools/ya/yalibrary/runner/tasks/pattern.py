@@ -46,7 +46,7 @@ class PreparePattern(object):
         self._execution_log = execution_log
         self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
 
-        self._download_transport = "uknown"
+        self._download_transport = "unknown"
 
     @property
     def exit_code(self):
