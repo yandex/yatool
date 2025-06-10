@@ -67,7 +67,13 @@ from devtools.ya.build.build_opts import (
     ContinueOnFailOptions,
 )
 from devtools.ya.build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
-from devtools.ya.core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
+from devtools.ya.core.common_opts import (
+    CrossCompilationOptions,
+    YaBin3Options,
+    OutputStyleOptions,
+    LogFileOptions,
+    EventLogFileOptions,
+)
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 
@@ -78,7 +84,11 @@ logger = logging.getLogger(__name__)
 
 
 class DumpYaHandler(CompositeHandler):
-    common_opts = [ShowHelpOptions()]
+    common_opts = [
+        ShowHelpOptions(),
+        LogFileOptions(),
+        EventLogFileOptions(),
+    ]
 
     @staticmethod
     def common_build_facade_opts(with_free_targets=True):
