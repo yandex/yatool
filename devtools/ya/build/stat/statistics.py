@@ -624,7 +624,8 @@ def add_external_program_fetcher_metrics(graph):
             continue
         total_time += task.get_time_elapsed() or 0
 
-    YaMonEvent.send('EYaStats::ExternalProgramFetcherTotalTime', total_time)
+    if total_time > 0:
+        YaMonEvent.send('EYaStats::ExternalProgramFetcherTotalTime', total_time)
 
 
 def print_disk_usage(task_stats, filename, display):
