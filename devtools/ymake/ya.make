@@ -5,7 +5,6 @@ USE_PYTHON3()
 PEERDIR(
     contrib/libs/asio
     contrib/libs/yaml-cpp
-    contrib/python/PyYAML
     contrib/libs/fmt
     contrib/libs/re2
     devtools/draft
