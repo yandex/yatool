@@ -2,11 +2,11 @@ import os
 import stat
 import logging
 import typing as tp
+import functools
 
 
 import devtools.libs.universal_fetcher.py as universal_fetcher
 import devtools.ya.core.report
-import exts.func
 import exts.archive
 import exts.deepget as deepget
 import exts.windows as windows
@@ -57,7 +57,7 @@ def _get_docker_config() -> str:
         return ""
 
 
-@exts.func.memoize(thread_safe=False)
+@functools.cache
 def _get_external_program_fetcher_cmd() -> list[str]:
     try:
         import app_ctx
@@ -101,8 +101,8 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
     return order
 
 
-@exts.func.memoize(thread_safe=False)
-def get_ufetcher() -> universal_fetcher.UniversalFetcher:
+@functools.cache
+def get_ufetcher(should_tar_output: bool = True) -> universal_fetcher.UniversalFetcher:
     # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
         max_retry_count=9,
@@ -135,7 +135,10 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
     if app_config.in_house:
         transports_order = _get_transports_order()
         sandbox_params = universal_fetcher.SandboxParams(
-            oauth_token=_get_sandbox_token(), transports_order=transports_order, allow_no_auth=True
+            oauth_token=_get_sandbox_token(),
+            transports_order=transports_order,
+            allow_no_auth=True,
+            should_tar_output=should_tar_output,
         )
         kwargs = {
             "sandbox_params": sandbox_params,
