@@ -24,10 +24,4 @@ PEERDIR(
     library/python/svn_version
 )
 
-IF (PYTHON2)
-    PEERDIR(
-        contrib/deprecated/python/faulthandler
-    )
-ENDIF()
-
 END()
