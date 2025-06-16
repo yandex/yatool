@@ -131,6 +131,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('multiconfig', default_value=False),
         yarg.Param('order', default_value=None),
         yarg.Param('dont_check_transitive_requirements', default_value=None),
+        yarg.Param('parallel_rendering', default_value=False),
     ]
 
 
@@ -416,6 +417,11 @@ def _cons_ymake_args(**kwargs):
     if classpaths:
         for target in classpaths:
             ret += ['--managed-deps', target]
+
+    # JSON RENDERING PARAMS
+    parallel_rendering = kwargs.pop('parallel_rendering', False)
+    if parallel_rendering:
+        ret += ['--parallel-rendering']
 
     # TODO: remove these unused options
     kwargs.pop('flags', None)

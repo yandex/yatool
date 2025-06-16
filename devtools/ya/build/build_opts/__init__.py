@@ -1537,6 +1537,7 @@ class YMakeModeOptions(Options):
         self.ymake_tool_servermode = False
         self.ymake_pic_servermode = False
         self.ymake_multiconfig = False
+        self.ymake_parallel_rendering = False
 
     @staticmethod
     def consumer():
@@ -1598,6 +1599,7 @@ class YMakeModeOptions(Options):
                 hook=SetValueHook('ymake_multiconfig', return_true_if_enabled),
             ),
             ConfigConsumer('ymake_multiconfig'),
+            ConfigConsumer('ymake_parallel_rendering'),
         ]
 
 
