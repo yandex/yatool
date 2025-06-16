@@ -108,7 +108,7 @@ public:
 
 public:
     ui32 EngineTag() const {
-        return 0;
+        return 1;
     }
 
     const NPolexpr::TExpression* Get(ECmdId id) const {

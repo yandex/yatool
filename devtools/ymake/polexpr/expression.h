@@ -93,6 +93,8 @@ namespace NPolexpr {
                     ui32 Idx : 29;
                 };
             } Attrs;
+            static_assert(29 == TConstId::STORAGE_BITS + TConstId::IDX_BITS);
+            static_assert(29 == TFuncId::ARITY_BITS + TFuncId::IDX_BITS);
 
             constexpr TNode(EType EType, bool store, ui32 idx) noexcept {
                 Attrs.Type = static_cast<ui32>(EType);
