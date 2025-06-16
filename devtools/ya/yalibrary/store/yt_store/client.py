@@ -48,7 +48,9 @@ class YtStoreClient(object):
         'GSID',
     }
 
-    def __init__(self, proxy, data_table, metadata_table, stat_table, token=None, retry_policy=None):
+    def __init__(
+        self, proxy, data_table, metadata_table, stat_table, token=None, retry_policy=None, sync_transaction=None
+    ):
         self._proxy = proxy
         self._data_table = data_table
         self._metadata_table = metadata_table
@@ -56,6 +58,7 @@ class YtStoreClient(object):
         self._token = token
         self._tls = threading.local()
         self._enable_proxy_cache()
+        self._durability = 'sync' if sync_transaction else 'async'
 
         self.retry_policy = retry_policy or retries.RetryPolicy()
 
@@ -234,7 +237,7 @@ class YtStoreClient(object):
                             row['create_time'] = cur_timestamp_ms
                         rows.append(row)
                         chunks_count += 1
-                    self._client.insert_rows(self._data_table, rows, atomicity='none', durability='async')
+                    self._client.insert_rows(self._data_table, rows, atomicity='none', durability=self._durability)
         else:
             data_size = forced_node_size or 0
 
@@ -255,12 +258,12 @@ class YtStoreClient(object):
         if self.is_table_format_v3:
             meta['self_uid'] = self_uid
 
-        self._client.insert_rows(self._metadata_table, [meta], atomicity='none', durability='async')
+        self._client.insert_rows(self._metadata_table, [meta], atomicity='none', durability=self._durability)
 
         cuid = kwargs.get('cuid')
         if self.is_table_format_v3 and cuid and cuid != uid:
             meta['uid'] = cuid
-            self._client.insert_rows(self._metadata_table, [meta], atomicity='none', durability='async')
+            self._client.insert_rows(self._metadata_table, [meta], atomicity='none', durability=self._durability)
 
         return meta
 
@@ -406,7 +409,9 @@ class YtStoreClient(object):
 
             rows = [make_row(r) for r in meta_rows]
             for batch in batched(rows, INSERT_ROWS_LIMIT):
-                self._client.insert_rows(self._metadata_table, batch, update=True, atomicity='none', durability='async')
+                self._client.insert_rows(
+                    self._metadata_table, batch, update=True, atomicity='none', durability=self._durability
+                )
             logger.debug("Update access_time in %d metadata rows", len(rows))
 
     def get_hashes_to_delete(self, hashes_to_check):
@@ -433,14 +438,14 @@ class YtStoreClient(object):
         else:
             meta_keys = [{'uid': m['uid']} for m in meta_to_delete]
 
-        self._client.delete_rows(self._metadata_table, meta_keys, atomicity='none', durability='async')
+        self._client.delete_rows(self._metadata_table, meta_keys, atomicity='none', durability=self._durability)
 
         for content_hash in self.get_hashes_to_delete(hashes_to_check):
             rows = [{'hash': content_hash, 'chunk_i': i} for i in xrange(chunks[content_hash])]
             data_keys += rows
 
         data_row_count = len(data_keys)
-        self._client.delete_rows(self._data_table, data_keys, atomicity='none', durability='async')
+        self._client.delete_rows(self._data_table, data_keys, atomicity='none', durability=self._durability)
         return data_row_count
 
     def start_forced_compaction(self):
