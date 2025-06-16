@@ -34,4 +34,4 @@ struct TRunYmakeParams {
 
 using TRunYmakeMulticonfigResultPtr = TAtomicSharedPtr<THashMap<int, TRunYMakeResultPtr>>;
 
-TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& params);
+TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& params, size_t threads);

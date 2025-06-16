@@ -157,7 +157,7 @@ TRunYMakeResultPtr RunYMake(
     return MakeAtomicShared<TRunYMakeResult>(exitCode, std::move(output.Str()), std::move(errStream.Str()));
 }
 
-TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& params) {
+TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& params, size_t threads) {
     THashMap<int, TRunYMakeResultPtr> results;
     TString Binary;
     TList<TString> Args;
@@ -165,6 +165,11 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
     THashMap<int, TStringStream> outStreams, errStreams;
     TList<TThread> pollThreads;
     THashMap<int, TPipe> stdinr, stdinw, stdoutr, stdoutw, stderrr, stderrw;
+
+    if (threads > 0) {
+        Args.push_back("--threads");
+        Args.push_back(ToString(threads));
+    }
 
     for (const auto& [i, param]: Enumerate(params)) {
         // TODO: check binary is the same for all params

@@ -755,11 +755,17 @@ def _run_ymake(**kwargs):
     return YMakeResult(exit_code, stdout, stderr, meta_data), events
 
 
-def run_ymake_scheduled(count):
+def run_ymake_scheduled(count, threads):
     # it's crucial to call run_ymake.run_scheduled in a separate thread
     # to ensure that main thread is not blocked in "hard" way
     # and signal handlers continue to work
-    thread = threading.Thread(target=run_ymake.run_scheduled, args=(count,))
+    thread = threading.Thread(
+        target=run_ymake.run_scheduled,
+        args=(
+            count,
+            threads,
+        ),
+    )
     thread.start()
     thread.join()
 

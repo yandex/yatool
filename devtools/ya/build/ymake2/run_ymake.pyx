@@ -46,7 +46,8 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
     ctypedef TAtomicSharedPtr[THashMap[int, TRunYMakeResultPtr]] TRunYmakeMulticonfigResultPtr
 
     TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(
-        const TList[TRunYmakeParams]& params
+        const TList[TRunYmakeParams]& params,
+        size_t threads
     ) nogil except +
 
 arg_collection = dict()
@@ -102,7 +103,7 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
     return res.Get().ExitCode, output, six.ensure_str(res.Get().Stderr)
 
 
-def run_scheduled(count):
+def run_scheduled(count, threads):
     cdef TList[TRunYmakeParams] params
     cdef TRunYmakeParams param
     cdef TRunYmakeMulticonfigResultPtr results_c
@@ -121,8 +122,9 @@ def run_scheduled(count):
         param.StderrLineReader = <PyObject*>v['stderr_line_reader']
         param.StdinLineProvider = <PyObject*>v['stdin_line_provider']
         params.push_back(param)
+    cdef size_t threads_c = threads
     with nogil:
-        results_c = RunYMakeMulticonfig(params)
+        results_c = RunYMakeMulticonfig(params, threads_c)
     for k in arg_collection:
         results[k] = results_c.Get().at(k)
     result_ready_event.set()

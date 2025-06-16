@@ -1351,9 +1351,12 @@ class _GraphMaker:
         cl_generator,
     ):
         self._opts = opts
-        self._platform_threadpool = ThreadPoolExecutor(
-            max_workers=getattr(opts, 'ya_threads')
-        )  # must be unbound when ymake is multithreaded
+        # In multiconfig mode, each task simply adds its options to a common list
+        # and then waits for one multiconfig ymake to process all configurations at once.
+        # For the large ymake to run at all, we first need to collect options from all configurations,
+        # so we should not limit threads here.
+        max_workers = None if opts.ymake_multiconfig else getattr(opts, 'ya_threads')
+        self._platform_threadpool = ThreadPoolExecutor(max_workers=max_workers)
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
         self._src_dir = src_dir
@@ -2951,7 +2954,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             **kwargs,
         )
         if opts.ymake_multiconfig:
-            ymake2.run_ymake_scheduled(graph_maker.ymakes_scheduled)
+            ymake2.run_ymake_scheduled(graph_maker.ymakes_scheduled, opts.ya_threads)
         graph_tools = tg.pic().graph
 
     graph_tools.add_host_mark(strtobool(host_tc['flags'].get('SANDBOXING', "no")))
