@@ -155,18 +155,18 @@ def do_dump_debug(params):
     # Store all tools_cache logs
 
     tools_cache_root = item.debug_bundle_data.get('tools_cache_root', None)
-    if tools_cache_root:
+    if tools_cache_root and os.path.exists(tools_cache_root):
         additional_paths.extend(_discovery_folder(tools_cache_root, "fallback.log", "tools_cache_log"))
 
     # Store all build_cache logs
 
     build_cache_root = item.debug_bundle_data.get('build_cache_root', None)
-    if build_cache_root:
+    if build_cache_root and os.path.exists(build_cache_root):
         additional_paths.extend(_discovery_folder(build_cache_root, "fallback.log", "build_cache_log"))
         additional_paths.extend(_discovery_folder(build_cache_root, "blobs.log", "build_cache_blobs_log"))
 
     changelist_store = item.debug_bundle_data.get('changelist_store', None)
-    if changelist_store:
+    if changelist_store and Path(changelist_store).exists():
         additional_paths.append(("changelist_store", Path(changelist_store)))
 
     try:
