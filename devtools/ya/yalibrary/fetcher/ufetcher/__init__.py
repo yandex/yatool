@@ -199,7 +199,7 @@ class UFetcherDownloader:
     def __call__(self, download_to: str) -> dict:
         res_info = self._download(download_to)
         self._send_result_to_telemetry_if_needed(res_info)
-        self._handle_error(res_info)
+        self.handle_error(res_info)
         self._post_process(res_info, download_to)
         return res_info
 
@@ -241,7 +241,7 @@ class UFetcherDownloader:
         self._update_permissions(download_to, is_executable)
 
     @staticmethod
-    def _handle_error(res_info: dict) -> None:
+    def handle_error(res_info: dict) -> None:
         try:
             status = res_info['last_attempt']['result']['status']
             if status != universal_fetcher.OK:
