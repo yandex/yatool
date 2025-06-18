@@ -565,6 +565,16 @@ namespace {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
+    class TDirAllowed: public TInputOutputFlagger {
+    public:
+        TDirAllowed(): TInputOutputFlagger({.Id = EMacroFunction::DirAllowed, .Name = "dirallowed", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        }
+    protected:
+        void Do(TCompiledCommand::TInput& input) const override {
+            input.DirAllowed = true;
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
     class TAddToIncl: public TInputOutputFlagger {
     public:
         TAddToIncl(): TInputOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {

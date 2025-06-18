@@ -91,8 +91,19 @@ void TModuleBuilder::RecursiveAddInputs() {
         TCommandInfo::ECmdInfoState state = cmdInfo->CheckInputs(*this, Node, lastTryMode);
         if (state == TCommandInfo::SKIPPED) {
             TStringBuf cmd, cmdName;
-            ui64 id;
-            ParseLegacyCommandOrSubst(Get1(&cmdInfo->Cmd), id, cmdName, cmd);
+            auto tryParse = [&](const TYVar& var, TStringBuf& cmdName, TStringBuf* cmdArgs) {
+                if (var.size() != 1 || var[0].StructCmd)
+                    return false;
+                ui64 id;
+                TStringBuf cmd;
+                ParseLegacyCommandOrSubst(Get1(&var), id, cmdName, cmd);
+                if (cmdArgs)
+                    *cmdArgs = cmd;
+                return true;
+            };
+            if (!tryParse(cmdInfo->Cmd, cmdName, &cmd))
+                if (!cmdInfo->Cmd.BaseVal || !tryParse(*cmdInfo->Cmd.BaseVal, cmdName, nullptr))
+                    cmdName = "[unspecified macro]";
             YConfErr(BadInput) << Module.GetDir() << ": skip processing macro " << cmdName << cmd << " due to unallowed input." << Endl;
             continue;
         }

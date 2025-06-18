@@ -80,6 +80,7 @@ enum class EMacroFunction: ui32 {
     CutAllExt,
     NoTransformRelativeBuildDir,
     AddToModOutputs,
+    DirAllowed,
     //
     Count
 };

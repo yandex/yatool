@@ -135,10 +135,19 @@ namespace {
 
     bool CheckForDirectory(const TVarStrEx& var, const TYVar& cmdVar, TStringBuf msg) {
         if (Y_UNLIKELY(var.IsDir)) {
-            TStringBuf cmd, cmdName;
-            ui64 id;
-            ParseCommandLikeVariable(Get1(&cmdVar), id, cmdName, cmd);
-            YConfErr(BadInput) << msg << " in " << cmdName << " " << var.Name << " is a directory! Won't be processed!" << Endl;
+            TStringBuf cmdName;
+            auto tryParse = [&](const TYVar& var) {
+                if (var.size() != 1 || var[0].StructCmd)
+                    return false;
+                TStringBuf cmd;
+                ui64 id;
+                ParseCommandLikeVariable(Get1(&var), id, cmdName, cmd);
+                return true;
+            };
+            if (!tryParse(cmdVar))
+                if (!cmdVar.BaseVal || !tryParse(*cmdVar.BaseVal))
+                    cmdName = "[unspecified macro]";
+            YConfErr(BadInput) << msg << " in " << cmdName << " " << var.Name << " is a directory! Won't be processed! Pathetic interloper! Grah!" << Endl;
             return false;
         }
         return true;
@@ -521,7 +530,8 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 ) {
 
     AddCmdNode(Cmd, cmdElemId);
-    Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), true);
+    Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), false);
+    Cmd[0].StructCmd = true;
 
     for (const auto& input : compiled.Inputs.Take()) {
         TVarStrEx in(input.Name);
@@ -539,6 +549,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         in.IsMacro = input.IsLegacyGlob;
         in.ResolveToBinDir = input.ResolveToBinDir;
         in.NoTransformRelativeBuildDir = input.NoTransformRelativeBuildDir;
+        in.DirAllowed = input.DirAllowed;
         GetInputInternal().Push(in);
     }
 
