@@ -563,5 +563,10 @@ def gen_vscode_workspace(params):
     # noinspection PyUnresolvedReferences
     import app_ctx  # pyright: ignore[reportMissingImports]
 
+    if '.' in params.rel_targets and 'WHOLE_ARCADIA_BUILD' not in params.flags:
+        raise vscode.YaIDEError(
+            "You have attempted to generate workspace for whole arcadia. Use -DWHOLE_ARCADIA_BUILD if this is your desire."
+        )
+
     project = VSCodeProject(app_ctx, params)
     project.gen_workspace()
