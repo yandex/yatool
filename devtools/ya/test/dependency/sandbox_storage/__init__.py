@@ -77,7 +77,7 @@ class SandboxStorage(object):
         :param resource_id: resource id
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
         """
-        if not self._sandbox_client and app_config.have_sandbox_fetcher:
+        if not self._sandbox_client and app_config.in_house:
             import devtools.ya.yalibrary.yandex.sandbox as sandbox
 
             logger.debug("Initializing sandbox client")

@@ -51,10 +51,10 @@ from yalibrary import find_root
 from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
 from package.utils import timeit
 
-if app_config.in_house or app_config.have_sandbox_fetcher:
+if app_config.in_house:
     import package.sandbox_source
     import package.sandbox_postprocessor
-if app_config.in_house:
+
     from yalibrary.upload import uploader, mds_uploader
     from devtools.ya.yalibrary.yandex.sandbox.misc.fix_logging import fix_logging
 
@@ -83,7 +83,7 @@ REQUIRED_META_FIELDS = [
     "version",
 ]
 
-if app_config.in_house or app_config.have_sandbox_fetcher:
+if app_config.in_house:
     SOURCE_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_source.SandboxSource
     POSTPROCESS_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_postprocessor.SandboxPostprocessor
 

@@ -7,7 +7,6 @@ cdef extern from "devtools/ya/app_config/lib/config.h" namespace "NYa::NConfig" 
     cdef TString Description
     cdef bool HasMapping
     cdef bool InHouse
-    cdef bool HaveSandboxFetcher
     cdef bool HaveOAuthSupport
     cdef TString JunkRoot
     cdef TString ExtraConfRoot
@@ -18,7 +17,6 @@ support_url = SupportUrl.decode()
 description = Description.decode()
 has_mapping = HasMapping
 in_house = InHouse
-have_sandbox_fetcher = HaveSandboxFetcher
 have_oauth_support = HaveOAuthSupport
 junk_root = JunkRoot.decode()
 extra_conf_root = ExtraConfRoot.decode()

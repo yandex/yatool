@@ -790,7 +790,7 @@ def create_test_node(
             if nparts > devtools.ya.test.const.MAX_CORPUS_RESOURCES_ALLOWED * 2:
                 suite.corpus_parts_limit_exceeded = nparts
 
-            if app_config.have_sandbox_fetcher:
+            if app_config.in_house:
                 for field in corpus_data.keys():
                     for n, resource_id in enumerate(corpus_data[field]):
                         target_path = "{}/{}".format(field, n)
