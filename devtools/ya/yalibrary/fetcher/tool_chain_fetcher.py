@@ -470,15 +470,12 @@ def _get_fetcher(name, resource_type):
     try:
         import app_ctx
 
-        if (
-            getattr(app_ctx, 'state')
-            and getattr(app_ctx, 'display')
-            and getattr(app_ctx, 'use_universal_fetcher_everywhere') is not None
-        ):
+        if getattr(app_ctx, 'state') and getattr(app_ctx, 'display'):
+            progress_info = progress_info_lib.ProgressInfo()
+
             use_universal_fetcher_everywhere = (
                 hasattr(app_ctx, 'use_universal_fetcher_everywhere') and app_ctx.use_universal_fetcher_everywhere
             )
-            progress_info = progress_info_lib.ProgressInfo()
 
             def display_progress(downloaded, total):
                 if not use_universal_fetcher_everywhere:
@@ -506,9 +503,13 @@ def _get_fetcher(name, resource_type):
         progress_printer = ProgressPrinter(
             progress_callback=default_progress_callback, finish_callback=default_finish_callback
         )
+
+    try:
         from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
         return fetcher.SandboxFetcher(), progress_printer
+    except ImportError:
+        return None, progress_printer
 
 
 def _list_all_resources(**kwargs):
