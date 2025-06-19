@@ -168,8 +168,7 @@ class VSCodeProject:
                 ("clang", tool_fetcher("cc")["executable"]),
             ]
             for item in compilation_database:
-                if item["command"].startswith("clang"):
-                    item["command"] = item["command"].replace(" -I", " -isystem")
+                item["command"] = item["command"].replace(" -I", " -isystem")
                 item["command"] = vscode.common.replace_prefix(item["command"], tools_replacements)
                 if is_windows:
                     item["command"] = item["command"].replace("\\", "/")
