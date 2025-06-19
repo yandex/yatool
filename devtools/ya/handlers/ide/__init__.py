@@ -374,9 +374,10 @@ class GradleOptions(yarg.Options):
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
-    OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
+    OPT_EXCLUDE = '--exclude'
 
     # Advanced options
+    ADVOPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
     ADVOPT_NO_BUILD_FOREIGN = '--no-build-foreign'
     ADVOPT_REEXPORT = '--reexport'
 
@@ -388,20 +389,21 @@ class GradleOptions(yarg.Options):
     AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24')
 
     def __init__(self):
-        self.gradle_name = None
-        self.settings_root = None
-        self.disable_errorprone = False
-        self.disable_lombok_plugin = False
-        self.force_jdk_version = None
-        self.remove = None
+        self.gradle_name: str = None
+        self.settings_root: str = None
+        self.disable_errorprone: bool = False
+        self.disable_lombok_plugin: bool = False
+        self.force_jdk_version: str = None
+        self.remove: bool = False
+        self.exclude_targets: list[str] = []
 
-        self.collect_contribs = True
-        self.build_foreign = True
-        self.reexport = None
+        self.collect_contribs: bool = True
+        self.build_foreign: bool = True
+        self.reexport: bool = False
 
-        self.yexport_bin = None
-        self.dump_ymake_stderr = None
-        self.yexport_debug_mode = None
+        self.yexport_bin: str = None
+        self.dump_ymake_stderr: str = None
+        self.yexport_debug_mode: str = None
 
     @staticmethod
     def consumer():
@@ -443,7 +445,13 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
-                [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
+                [GradleOptions.OPT_EXCLUDE],
+                help='Exclude module and submodules from gradle project',
+                hook=yarg.SetAppendHook('exclude_targets'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.ADVOPT_NO_COLLECT_CONTRIBS],
                 help='Export without collect contribs from Arcadia to jar files',
                 hook=yarg.SetConstValueHook('collect_contribs', False),
                 group=GradleOptions.YGRADLE_OPT_GROUP,

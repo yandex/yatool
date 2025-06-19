@@ -46,6 +46,8 @@ class _JavaSemConfig(SemConfig):
         self.settings_root: Path = self._get_settings_root()
         if not self.params.remove:
             self._check_gradle_props()
+        self.rel_exclude_targets: list[str] = []
+        self._check_exclude_targets()
 
     def _check_gradle_props(self) -> None:
         """Check exists all required gradle properties"""
@@ -76,6 +78,38 @@ class _JavaSemConfig(SemConfig):
             self.logger.warning(
                 "You have selected the mode without collecting contribs to jar files, to build successfully in Gradle, check bucket repository settings and access rights"
             )
+
+    def _check_exclude_targets(self) -> None:
+        if not self.params.exclude_targets:
+            return
+        cwd = Path().cwd().resolve()
+        for exclude_target in self.params.exclude_targets:
+            exclude_target = Path(exclude_target)
+            if not exclude_target.is_absolute():
+                exclude_target = cwd / exclude_target
+            if not exclude_target.exists():
+                raise SemException(f"Not found exclude target {exclude_target}")
+            if not exclude_target.is_relative_to(self.arcadia_root):
+                raise SemException(f"Not exclude target {exclude_target} not in {self.arcadia_root}")
+            rel_exclude_target = exclude_target.relative_to(self.arcadia_root)
+            if not self.in_rel_targets(rel_exclude_target):
+                raise SemException(f"Exclude target {rel_exclude_target} not in any export targets")
+            if str(rel_exclude_target) in self.params.rel_targets:
+                raise SemException(f"Exclude target {rel_exclude_target} can't be same as any export targets")
+            self.rel_exclude_targets.append(str(rel_exclude_target))
+        self.logger.info("Exclude targets: %s", self.rel_exclude_targets)
+
+    def is_exclude_target(self, rel_target: Path | str) -> bool:
+        if not self.rel_exclude_targets:
+            return False
+        rel_target = str(rel_target)
+        if rel_target in self.rel_exclude_targets:
+            return True
+        rel_target_len = len(rel_target)
+        for rel_exclude_target in self.rel_exclude_targets:
+            if rel_target_len > len(rel_exclude_target) and rel_target.startswith(rel_exclude_target + "/"):
+                return True
+        return False
 
     def _get_export_root(self) -> Path:
         """Create export_root path by hash of targets"""
@@ -449,6 +483,9 @@ class _JavaSemGraph(SemGraph):
     _OLD_RESOURCE_SET_SEM = 'jar_resource_set'
     _SOURCE_SET_DIR_SEM = 'source_sets-dir'
     _RESOURCE_SET_DIR_SEM = 'resource_sets-dir'
+    _CONSUMER_TYPE_SEM = 'consumer-type'
+    _CONSUMER_PREBUILT_SEM = 'consumer-prebuilt'
+    _IGNORED_SEM = 'IGNORED'
 
     _GENERATED = "generated"
     _SRC = "src"
@@ -530,7 +567,7 @@ class _JavaSemGraph(SemGraph):
             rel_target = Path(node.name.replace(self._BUILD_ROOT, '')).parent  # Relative target - directory of *.jar
             consumer_type = ""
             for semantic in node.semantics:
-                if (len(semantic.sems) == 2) and (semantic.sems[0] == 'consumer-type'):
+                if (len(semantic.sems) == 2) and (semantic.sems[0] == self._CONSUMER_TYPE_SEM):
                     consumer_type = semantic.sems[1]
                     break
             module_type = (
@@ -570,6 +607,7 @@ class _JavaSemGraph(SemGraph):
         self._patch_annotation_processors()
         self._patch_jdk()
         self._patch_generated_path()
+        self._patch_exclude_targets()
         if self._graph_patched:
             self._update_graph()
 
@@ -944,6 +982,31 @@ class _JavaSemGraph(SemGraph):
                 src_path = self._SRC + "/"
         return src_path
 
+    def _patch_exclude_targets(self) -> None:
+        """Patch excluded targets in graph"""
+        if not self.config.rel_exclude_targets:
+            return
+        for node in self._graph_data:
+            if not isinstance(node, SemNode) or not node.has_semantics():
+                continue
+            rel_target = Path(node.name.replace(self._BUILD_ROOT, '')).parent
+            if not self.config.is_exclude_target(rel_target):
+                continue
+            has_ignored = False
+            has_consumer_type = False
+            for s in node.semantics:
+                sem0 = s.sems[0]
+                if sem0 == self._CONSUMER_TYPE_SEM:
+                    has_consumer_type = True
+                elif sem0 == self._IGNORED_SEM:
+                    has_ignored = True
+            if has_consumer_type:
+                node.semantics.append(Semantic({Semantic.SEM: [self._CONSUMER_PREBUILT_SEM]}))
+                self._graph_patched = True
+            if not has_ignored:
+                node.semantics.append(Semantic({Semantic.SEM: [self._IGNORED_SEM]}))
+                self._graph_patched = True
+
 
 class _Exporter:
     """Generating files to export root"""
@@ -1050,10 +1113,10 @@ class _Exporter:
                         f'skip_path_prefixes = [ "{'", "'.join(self.config.params.rel_targets)}" ]',
                         '',
                         '[[target_replacements.addition]]',
-                        'name = "consumer-prebuilt"',
+                        f'name = "{_JavaSemGraph._CONSUMER_PREBUILT_SEM}"',
                         'args = []',
                         '[[target_replacements.addition]]',
-                        'name = "IGNORED"',
+                        f'name = "{_JavaSemGraph._IGNORED_SEM}"',
                         'args = []',
                     ]
                 )
@@ -1122,7 +1185,10 @@ class _Builder:
             proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, consumer_type, module_type in rel_targets:
-                if (consumer_type not in ["", _JavaSemGraph.LIBRARY, _JavaSemGraph.CONTRIB]) or (
+                if self.config.is_exclude_target(rel_target):
+                    # Always build exclude targets
+                    pass
+                elif (consumer_type not in ["", _JavaSemGraph.LIBRARY, _JavaSemGraph.CONTRIB]) or (
                     consumer_type == _JavaSemGraph.CONTRIB and self.config.params.collect_contribs
                 ):
                     # Fast way - always build specials and contribs, if enabled
