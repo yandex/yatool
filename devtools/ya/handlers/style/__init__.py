@@ -108,6 +108,8 @@ class FilterOptions(devtools.ya.core.yarg.Options):
     @staticmethod
     def consumer():
         checks = list(StylerKind)
+        # temporary until stylua support for all platform is added
+        checks_without_lua = [kind for kind in checks if kind != StylerKind.LUA]
 
         return [
             devtools.ya.core.yarg.ArgConsumer(
@@ -120,8 +122,8 @@ class FilterOptions(devtools.ya.core.yarg.Options):
         ] + [
             devtools.ya.core.yarg.ArgConsumer(
                 ['--all'],
-                help='Run all checks: {}'.format(', '.join(checks)),
-                hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks),
+                help='Run all checks: {}'.format(', '.join(checks_without_lua)),
+                hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks_without_lua),
                 group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             ),
         ]

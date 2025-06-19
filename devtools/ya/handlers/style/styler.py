@@ -37,6 +37,7 @@ class StylerKind(StrEnum):
     YAMAKE = auto()
     GO = auto()
     YQL = auto()
+    LUA = auto()
 
     @property
     def default_enabled(self) -> bool:
@@ -416,6 +417,41 @@ class Yql:
 
         if err:
             raise StylingError('error while running sql_formatter on file "{}": {}'.format(path, err.strip()))
+
+        return out
+
+    def format(self, path: PurePath, content: str) -> StylerOutput:
+        return StylerOutput(self._run_format(path, content))
+
+
+@_register
+class StyLua:
+    kind: tp.ClassVar = StylerKind.LUA
+    name: tp.ClassVar = 'stylua'
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".lua",)
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("stylua")  # type: ignore
+
+    def _run_format(self, path: PurePath, content: str) -> str:
+        args = [self._tool, path]
+
+        p = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            text=True,
+        )
+        out, err = p.communicate(input=content)
+
+        # Abort styling on signal
+        if p.returncode < 0:
+            state_helper.stop()
+
+        if err:
+            raise StylingError('error while running stylua on file "{}": {}'.format(path, err.strip()))
 
         return out
 
