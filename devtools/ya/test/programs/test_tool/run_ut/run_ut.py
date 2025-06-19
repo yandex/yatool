@@ -513,7 +513,7 @@ def shorten_wine_paths(wine_path, cmd):
 
         stdin = open(bat_script_file.path)
         cmd = [wine_path, "cmd"]
-        cwd = "/"
+        cwd = wineprefix
 
     else:
         cwd = None
