@@ -95,7 +95,7 @@ namespace NUniversalFetcher {
                 }
 
                 // TODO(trofimenkov): Where Skopeo will store temporary files with layers?
-                // Setup env for it like in https://a.yandex-team.ru/arcadia/devtools/experimental/podman_recipe/run.sh
+                // Setup env for it like in https://a.yandex-team.ru/arcadia/library/recipes/podman_recipe/run.sh
 
                 if (res.ExitStatus == 0) {
                     return {
