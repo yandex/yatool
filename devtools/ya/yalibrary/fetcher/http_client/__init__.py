@@ -12,6 +12,8 @@ try:
 except ImportError:
     universal_fetcher = None
 
+logger = logging.getLogger(__name__)
+
 FetchResponse = collections.namedtuple(
     "FetchResponse",
     (
@@ -26,8 +28,6 @@ FetchResponse = collections.namedtuple(
 def _get_ufetcher():
     if universal_fetcher is None:
         return None
-
-    logger = logging.getLogger(__name__)
 
     retry_policy = universal_fetcher.RetryPolicy(
         max_retry_count=7,
@@ -86,6 +86,7 @@ def download_file(
         last_attempt = result.get("last_attempt", {})
         size = last_attempt.get("result", {}).get("resource_info", {}).get("size", 0)
         download_time_ms = last_attempt.get("duration_us", 0) / 1000
+        logger.debug("Downloaded file %s to %s in %d ms", url, path, download_time_ms)
         return FetchResponse(result, download_time_ms, size)
 
     download_time_ms, size = exts.http_client.download_file(url, path, additional_file_perms, expected_md5, headers)
