@@ -58,7 +58,7 @@ def gen_debug_configurations(run_modules, params, codegen_cpp_dir, tool_fetcher,
             )
         else:
             try:
-                gdb_path = tool_fetcher("gdbnew")["executable"]
+                gdb_path = tool_fetcher("gdb")["executable"]
                 cpp_debug_params = OrderedDict(
                     (
                         ("type", "cppdbg"),

@@ -123,7 +123,7 @@ class VSCodeProject:
             if self.params.compile_commands_fix:
                 tools_list.extend(["cc", "c++"])
             if self.params.debug_enabled and not pm.my_platform().startswith("darwin"):
-                tools_list.append("gdbnew")
+                tools_list.append("gdb")
             if self.params.clang_format_enabled:
                 tools_list.append("clang-format-18")
             if self.params.use_tool_clangd:

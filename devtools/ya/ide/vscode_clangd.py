@@ -206,7 +206,7 @@ def gen_run_configurations(params, modules, args, YA_PATH):
     is_mac = pm.my_platform().startswith('darwin')
     if not is_mac:
         try:
-            gdb_path = yalibrary.tools.tool('gdbnew')
+            gdb_path = yalibrary.tools.tool('gdb')
         except Exception as e:
             ide_common.emit_message(
                 "[[warn]]Unable to get 'gdb' tool: %s.\nSkipping debug configurations.[[rst]]" % repr(e)
