@@ -832,6 +832,8 @@ def launch_tests(
 
         if is_darwin():
             logger.debug("Skip symbolizer processing - it does not work properly on mac")
+        elif wine_path:
+            logger.debug("Skip symbolizer processing - wine dumps backtrace on its own")
         else:
             run_symbolizer(performed_suite, binary)
     if res.rc == VALGRIND_ERROR_RC:
