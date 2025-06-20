@@ -121,5 +121,5 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         return devtools.ya.test.const.SuiteClassType.STYLE
 
     def global_tidy_library(self):
-        library_path = self.meta.global_library_path.replace("$B", "$(BUILD_ROOT)")
-        return library_path if library_path.endswith(".tidyjson") else ""
+        library_path = self.meta.global_library_path
+        return library_path.replace("$B", "$(BUILD_ROOT)") if library_path.endswith(".tidyjson") else ""
