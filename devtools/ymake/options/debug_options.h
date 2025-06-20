@@ -46,6 +46,7 @@ struct TDebugOptions {
     bool DumpPeers = false;
     bool DumpDependentDirs = false;
     bool DumpData = false;  // This is for DumpFiles and DumpSrcDeps
+    bool DumpDepends = false; // Dump depends as direct edges from modules
     bool DumpRenderedCmds = false; // byte
     bool DumpExpressions = false;
     bool DumpBuildables = false;

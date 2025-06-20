@@ -1534,7 +1534,7 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
     IterateAll(Graph, StartTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
     FORCE_TRACE(U, NEvent::TStageFinished("Apply Dependency Management"));
 
-    ComputeDependsToModulesClosure();
+    GetDependsToModulesClosure();
 
     SaveDependencyManagementCache(Conf.YmakeDMCache, &DMCacheTempFile);
 

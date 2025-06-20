@@ -70,6 +70,7 @@ public:
     bool HasNonDirTargets = false;
 
     TDependsToModulesClosure DependsToModulesClosure;
+    bool DependsToModulesClosureCollected{false};
 
     NYndex::TYndex Yndex;
 
@@ -116,6 +117,7 @@ public:
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void ComputeDependsToModulesClosure();
+    void GetDependsToModulesClosure();
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
     void SortAllEdges();

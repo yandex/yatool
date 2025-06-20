@@ -523,24 +523,29 @@ private:
 };
 
 void TYMake::ComputeDependsToModulesClosure() {
+    if (DependsToModulesClosureCollected) {
+        return;
+    }
+    // This records extra outputs for UNIONs listed in DEPENDS
+    // It is currently impossible to record these as actual module outputs,
+    // so we just associate it with a StartTarget and use to fill results
     NYMake::TTraceStage scopeTracer{"Compute DEPENDS to modules closure"};
-
-    if (Conf.DependsLikeRecurse) {
-        // This records extra outputs for UNIONs listed in DEPENDS
-        // It is currently impossible to record these as actual module outputs,
-        // so we just associate it with a StartTarget and use to fill results
-        TDependsToModulesCollector collector(GetRestoreContext(), DependsToModulesClosure);
-        for (const auto& t : StartTargets) {
-            if (t.IsModuleTarget) {
-                continue;
-            }
-            if (t.IsDependsTarget) {
-                IterateAll(Graph, t, collector);
-                collector.Reset();
-            }
+    TDependsToModulesCollector collector(GetRestoreContext(), DependsToModulesClosure);
+    for (const auto& t : StartTargets) {
+        if (t.IsModuleTarget || !t.IsDependsTarget) {
+            continue;
         }
-        // Remove empty closures
-        EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
+        IterateAll(Graph, t, collector);
+        collector.Reset();
+    }
+    // Remove empty closures
+    EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
+    DependsToModulesClosureCollected = true;
+}
+
+void TYMake::GetDependsToModulesClosure() {
+    if (Conf.DependsLikeRecurse) {
+        ComputeDependsToModulesClosure();
     }
 }
 
