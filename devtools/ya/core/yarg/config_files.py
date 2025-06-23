@@ -129,11 +129,12 @@ def get_config_files(cmd_name=None, user_config=True, global_config=True):
 
         if user_config and 'sandbox' not in user and 'teamcity' not in user:
             files = [
-                'ya.conf',
-                'ya.%s.conf' % system,
+                "ya.conf",
+                f"ya.{system}.conf",
             ]
             if cmd_name:
-                files.append('ya.%s.conf' % cmd_name)
+                files.append(f"ya.{cmd_name}.conf")
+                files.append(f"ya.{cmd_name}.{system}.conf")
 
             dirs = []
             # Don't try load user's config from junk using opensource ya
