@@ -626,7 +626,11 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 if (propParent != state.end()) {
                     for (const auto topEdge: topNode.Edges()) {
                         if (IsDirToModuleDep(topEdge)) {
-                            Formatter().EmitDep(propParent->Node()->ElemId, propParent->Node()->NodeType, topEdge.To()->ElemId, topEdge.To()->NodeType, EDT_Include, fresh, ELDT_Depend);
+                            const auto modRef = topEdge.To();
+                            const TModule* mod = RestoreContext.Modules.Get(modRef->ElemId);
+                            if (mod && !mod->IsFakeModule() && (!mod->IsFromMultimodule() || mod->IsFinalTarget())) {
+                                Formatter().EmitDep(propParent->Node()->ElemId, propParent->Node()->NodeType, modRef->ElemId, modRef->NodeType, EDT_Include, fresh, ELDT_Depend);
+                            }
                         }
                     }
                 }
