@@ -434,7 +434,7 @@ class StyLua:
         self._tool: str = yalibrary.tools.tool("stylua")  # type: ignore
 
     def _run_format(self, path: PurePath, content: str) -> str:
-        args = [self._tool, path]
+        args = [self._tool, '--stdin-filepath', str(path), '-']
 
         p = subprocess.Popen(
             args,
