@@ -86,6 +86,10 @@ DCH_COMMAND = "dch"
 # NOTE: hook must be a single line & must not include '='
 DEBSIGS_HOOK_FMT = "debsigs -v --sign origin {key} ../*.deb"
 
+# https://github.com/rgeissert/devscripts/blob/master/scripts/debchange.pl#L754C27-L754C36
+# https://www.debian.org/doc/debian-policy/ch-controlfields.html#source
+VALID_PACKAGE_NAME_PATTERN = r"^[a-z0-9][a-z0-9+\-\.]+$"
+
 
 def create_debian_package(
     result_dir,
@@ -369,6 +373,11 @@ def create_changelog_file(
     changelog_message,
     force_bad_version=False,
 ):
+    # In case of illegal package name dch prints a warning message and opens an editor to allow
+    # the user to correct the package name and waits indefinitely. We want to fail fast here.
+    if not re.fullmatch(VALID_PACKAGE_NAME_PATTERN, package_name):
+        raise ValueError(f"Illegal package name used with --package: {package_name}")
+
     changelog_file_path = os.path.join(debian_dir, 'changelog')
 
     if not os.path.exists(changelog_file_path):
