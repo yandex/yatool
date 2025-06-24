@@ -170,7 +170,7 @@ def gen_extra_dict_by_opts(
         getattr(opts, 'arc_root', None),
         priority or getattr(opts, 'dist_priority', 0),
         getattr(opts, 'distbuild_patch', None),
-        cluster or getattr(opts, 'distbuild_cluster', None),
+        cluster,
         coordinators_filter or getattr(opts, 'coordinators_filter', None),
         getattr(opts, 'force_coordinators_filter', False),
         getattr(opts, 'cache_namespace', None),

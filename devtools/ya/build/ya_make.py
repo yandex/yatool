@@ -1184,10 +1184,6 @@ class Context:
                 graph_conf['pool'] = self.opts.distbuild_pool
             if self.opts.dist_priority:
                 graph_conf['priority'] = self.opts.dist_priority
-            if self.opts.distbuild_cluster:
-                graph_conf['cluster'] = self.opts.distbuild_cluster
-            if self.opts.distbuild_cluster:
-                graph_conf['cluster'] = self.opts.distbuild_cluster
             elif self.opts.coordinators_filter:
                 graph_conf['coordinator'] = self.opts.coordinators_filter
             if self.opts.cache_namespace:
