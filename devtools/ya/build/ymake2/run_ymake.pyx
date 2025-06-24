@@ -34,7 +34,7 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
         const THashMap[TString, TString]& env,
         object stderrLineReader,
         object stdinLineProvider
-    ) nogil except +
+    ) except+ nogil
 
     cdef cppclass TRunYmakeParams:
         TString Binary
@@ -48,7 +48,7 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
     TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(
         const TList[TRunYmakeParams]& params,
         size_t threads
-    ) nogil except +
+    ) except+ nogil
 
 arg_collection = dict()
 result_ready_event = threading.Event()
