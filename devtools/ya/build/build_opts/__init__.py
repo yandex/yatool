@@ -1602,6 +1602,11 @@ class YMakeModeOptions(Options):
             ConfigConsumer('ymake_parallel_rendering'),
         ]
 
+    def postprocess2(self, params):
+        if self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
+            self.ymake_multiconfig = False
+            logger.debug('Ymake multiconfig is disabled for more than one target platform')
+
 
 class YMakeBinOptions(Options):
     def __init__(self):
