@@ -189,8 +189,6 @@ namespace {
             auto result = TMacroValues::TInputs();
             for (auto& name : names)
                 result.Coords.push_back(ProcessCoord(ctx, name, context, isGlob, isLegacyGlob));
-            std::sort(result.Coords.begin(), result.Coords.end());
-            result.Coords.erase(std::unique(result.Coords.begin(), result.Coords.end()), result.Coords.end());
             return result;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);

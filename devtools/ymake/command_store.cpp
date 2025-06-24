@@ -1146,13 +1146,13 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             return NCommands::TTermValue(InputToStringArray(input, ctx));
         },
         [&](const TMacroValues::TInputs& inputs) {
-            auto result = TUniqVector<TString>();
+            auto result = TVector<TString>();
             for (auto& coord : inputs.Coords) {
                 auto inputResult = InputToStringArray(TMacroValues::TInput {.Coord = coord}, ctx);
                 for (auto& input : inputResult)
-                    result.Push(input);
+                    result.push_back(input);
             }
-            return NCommands::TTermValue(result.Take());
+            return NCommands::TTermValue(std::move(result));
         },
         [&](TMacroValues::TOutput val) {
             auto& var = ctx.Vars.at("OUTPUT");
