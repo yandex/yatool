@@ -372,6 +372,7 @@ class GradleOptions(yarg.Options):
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
+    OPT_DISABLE_GENERATED_SYMLINKS = '--disable-generated-symlinks'
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
     OPT_EXCLUDE = '--exclude'
@@ -393,6 +394,7 @@ class GradleOptions(yarg.Options):
         self.settings_root: str = None
         self.disable_errorprone: bool = False
         self.disable_lombok_plugin: bool = False
+        self.disable_generated_symlinks: bool = False
         self.force_jdk_version: str = None
         self.remove: bool = False
         self.exclude_targets: list[str] = []
@@ -430,6 +432,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_DISABLE_LOMBOK_PLUGIN],
                 help='Disable lombok plugin in Gradle project',
                 hook=yarg.SetConstValueHook('disable_lombok_plugin', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_DISABLE_GENERATED_SYMLINKS],
+                help='Disable make symlinks to generated sources',
+                hook=yarg.SetConstValueHook('disable_generated_symlinks', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(

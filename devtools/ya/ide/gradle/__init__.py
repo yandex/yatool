@@ -606,7 +606,8 @@ class _JavaSemGraph(SemGraph):
         self._get_graph_data()
         self._patch_annotation_processors()
         self._patch_jdk()
-        self._patch_generated_path()
+        if not self.config.params.disable_generated_symlinks:
+            self._patch_generated_path()
         self._patch_exclude_targets()
         if self._graph_patched:
             self._update_graph()
@@ -874,22 +875,15 @@ class _JavaSemGraph(SemGraph):
                     parts = semantic.sems[isem].split(':', 2)
                     glob = ':' + parts[1] if len(parts) == 2 else ''
                     generated_tail = parts[0].replace(export_node_path, "")
-                    generated_suf = ""
-                    if (generated_tail == "/" + self._GENERATED) or (
-                        generated_tail.startswith("/" + self._GENERATED + "/")
-                    ):
-                        # Fix /generated/generated/ situation
-                        generated_tail = generated_tail[len(self._GENERATED) + 1 :]
-                        generated_suf = self._GENERATED
                     if is_main_module:
                         if src_path is None:
                             src_path = self._get_main_src_path(node)
                         rel_generated = src_path + self._GENERATED
                         semantic.sems[isem] = rel_generated + generated_tail + glob  # Symlinked relative path in module
                         rel_arcadia_dir = rel_node_path / rel_generated
-                        self.generated_symlinks[
-                            self.config.export_root / self.GRADLE_BUILD_DIR / rel_node_path / generated_suf
-                        ] = (self.config.arcadia_root / rel_arcadia_dir)
+                        self.generated_symlinks[self.config.export_root / self.GRADLE_BUILD_DIR / rel_node_path] = (
+                            self.config.arcadia_root / rel_arcadia_dir
+                        )
                     else:
                         str_rel_node_path = str(rel_node_path)
                         rel_module_path = rel_node_path
@@ -917,9 +911,9 @@ class _JavaSemGraph(SemGraph):
                             + glob
                         )  # Symlinked relative path in module
                         rel_arcadia_dir = rel_module_path / rel_generated
-                        self.generated_symlinks[
-                            self.config.export_root / self.GRADLE_BUILD_DIR / rel_module_path / generated_suf
-                        ] = (self.config.arcadia_root / rel_arcadia_dir)
+                        self.generated_symlinks[self.config.export_root / self.GRADLE_BUILD_DIR / rel_module_path] = (
+                            self.config.arcadia_root / rel_arcadia_dir
+                        )
 
     def _get_mains(self) -> list[tuple[str, SemNode]]:
         """Collect all relative paths of main modules and they nodes"""
