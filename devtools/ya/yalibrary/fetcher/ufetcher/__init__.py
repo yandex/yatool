@@ -238,7 +238,7 @@ class UFetcherDownloader:
             except Exception as err:
                 logger.debug("Couldn't extract from tar: %s" % err)
 
-        self._update_permissions(download_to, is_executable)
+        self.update_permissions(download_to, is_executable, self._resource_type)
 
     @staticmethod
     def handle_error(res_info: dict) -> None:
@@ -252,7 +252,8 @@ class UFetcherDownloader:
         except KeyError as err:
             raise UnableToFetchError(f'No attempt was made: {err}')
 
-    def _update_permissions(self, dst: str, executable: bool) -> None:
+    @classmethod
+    def update_permissions(cls, dst: str, executable: bool, resource_type: str) -> None:
         """
         Update permissions on downloaded result
         - Remove write permissions for files on non-Windows
@@ -260,7 +261,7 @@ class UFetcherDownloader:
         - Set write permissions for directories
         - If resource is executable, set executable premissions if result is file
         """
-        if self._resource_type.startswith("sbr"):
+        if resource_type.startswith("sbr"):
             os.chmod(dst, os.stat(dst).st_mode | stat.S_IWUSR)
 
             if os.path.isdir(dst):
@@ -270,7 +271,7 @@ class UFetcherDownloader:
                 for root, dirs, files in os.walk(dst):
                     for file_name in files:
                         extracted_path = os.path.join(root, file_name)
-                        perms = self._get_sandbox_file_permissions(extracted_path, not dirs and executable)
+                        perms = cls._get_sandbox_file_permissions(extracted_path, not dirs and executable)
                         os.chmod(extracted_path, perms)
 
                     for dir_name in dirs:
@@ -278,9 +279,9 @@ class UFetcherDownloader:
                         os.chmod(extracted_dir, os.stat(extracted_dir).st_mode | stat.S_IWUSR)
 
             else:
-                perms = self._get_sandbox_file_permissions(dst, executable)
+                perms = cls._get_sandbox_file_permissions(dst, executable)
                 os.chmod(dst, perms)
-        elif self._resource_type.startswith("http"):
+        elif resource_type.startswith("http"):
             os.chmod(dst, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
     @staticmethod
