@@ -945,7 +945,6 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.allure_report = None
         self.junit_path = None
-        self.use_junit_report_v2 = False
 
     def consumer(self):
         return [
@@ -965,14 +964,6 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.BASIC,
             ),
             devtools.ya.core.yarg.ConfigConsumer('junit_path'),
-            TestArgConsumer(
-                ['--use-junit-report-v2'],
-                help='Use junit report v2',
-                hook=devtools.ya.core.yarg.SetConstValueHook('use_junit_report_v2', True),
-                subgroup=FILE_REPORTS_SUBGROUP,
-                visible=help_level.HelpLevel.BASIC,
-            ),
-            devtools.ya.core.yarg.ConfigConsumer('use_junit_report_v2'),
         ]
 
     def postprocess(self):

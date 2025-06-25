@@ -9,7 +9,7 @@ __all__ = [
     'AllureReportNotFoundError',
 ]
 
-from .junit import JUnitReportGenerator, JUnitReportGeneratorV2
+from .junit import JUnitReportGenerator
 from .console import ConsoleReporter
 from .dry import DryReporter
 from .stderr_reporter import StdErrReporter

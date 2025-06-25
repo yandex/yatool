@@ -58,10 +58,7 @@ def generate_results_report(builder):
     if builder.opts.junit_path:
         # don't generate junit for broken build if --keep-going isn't specified
         if builder.opts.continue_on_fail or builder.exit_code in [0, devtools.ya.core.error.ExitCodes.TEST_FAILED]:
-            if builder.opts.use_junit_report_v2:
-                instance = devtools.ya.test.reports.JUnitReportGeneratorV2()
-            else:
-                instance = devtools.ya.test.reports.JUnitReportGenerator()
+            instance = devtools.ya.test.reports.JUnitReportGenerator()
 
             instance.create(
                 builder.opts.junit_path,
