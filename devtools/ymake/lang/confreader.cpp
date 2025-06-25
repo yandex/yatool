@@ -1224,7 +1224,6 @@ namespace {
             auto& blockData = (name == block.Name()) ? block.BlockData() : Conf.BlockData[name];
             const TString& fullCommand = MakeFullCommand(args, command);
             SetCommandInternal(blockData, name, fullCommand, isUserMacro);
-            Commands[name] = std::make_pair(fullCommand, args);
         }
 
         void PostprocessForeachStatements() {
@@ -1275,7 +1274,6 @@ namespace {
         TConditionStack ConditionStack;
         TVector<TVector<TString>> ConditionVarsStack;
         bool AllowConditionVars;
-        THashMap<TString, std::pair<TString, TString>> Commands;
         THashMap<TString, TArgs> Macros;
         TSet<TString> Generics;
         TVector<TSelectAlts> SelectStack;
