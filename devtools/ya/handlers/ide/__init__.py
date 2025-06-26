@@ -10,8 +10,6 @@ import devtools.ya.build.compilation_database as bcd
 import devtools.ya.ide.ide_common
 import devtools.ya.ide.clion2016
 import devtools.ya.ide.idea
-import devtools.ya.ide.qt
-import devtools.ya.ide.remote_ide_qt
 import devtools.ya.ide.goland
 import devtools.ya.ide.pycharm
 import devtools.ya.ide.venv
@@ -640,11 +638,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.CreateSymlinksOptions(),
             ],
         )
-        self['qt'] = yarg.OptsHandler(
-            action=devtools.ya.app.execute(self._choose_qt_handler),
-            description='[[imp]]ya ide qt[[rst]] is deprecated, please use clangd-based tooling instead',
-            opts=devtools.ya.ide.qt.QT_OPTS + [devtools.ya.core.common_opts.YaBin3Options()],
-        )
         self['goland'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.goland.do_goland),
             description='Generate stub for Goland',
@@ -775,12 +768,3 @@ class IdeYaHandler(yarg.CompositeHandler):
                     devtools.ya.core.common_opts.YaBin3Options(),
                 ],
             )
-
-    @staticmethod
-    def _choose_qt_handler(params):
-        if params.run:
-            devtools.ya.ide.qt.run_qtcreator(params)
-        elif params.remote_host:
-            devtools.ya.ide.remote_ide_qt.generate_remote_project(params)
-        else:
-            devtools.ya.ide.qt.gen_qt_project(params)

@@ -6,8 +6,6 @@ import os
 import re
 import shutil
 import sys
-import subprocess
-import traceback
 import io
 
 import devtools.ya.app
@@ -90,18 +88,6 @@ class SSHProxy:
     @staticmethod
     def _remote_ya_path(arc_path):
         return os.path.join(arc_path, 'ya')
-
-    def checkout(self, arc_path, rel_targets):
-        ya_opts = ['make', '-j0', '--checkout']
-        exts.process.run_process(
-            self.SSH,
-            self.ssh_args
-            + [self.host, self._remote_ya_path(arc_path)]
-            + ya_opts
-            + [os.path.join(arc_path, p) for p in rel_targets],
-            check=True,
-            pipe_stdout=False,
-        )
 
     def get_real_path(self, path):
         return exts.process.run_process(self.SSH, self.ssh_args + [self.host, 'readlink', '-n', '-f', path], check=True)
@@ -331,99 +317,6 @@ class IdeYaMakeOptions(yarg.Options):
     def postprocess(self):
         if self.use_distbuild:
             self.download_artifacts = True
-
-
-class RemoteOptions(yarg.Options):
-    def __init__(self, require_remote=False):
-        self.require_remote = require_remote
-        self.remote_host = None
-        self.remote_cache_path = DEFAULT_REMOTE_CACHE_DIR
-
-    @staticmethod
-    def consumer():
-        return yarg.ArgConsumer(
-            ['-H', '--host'],
-            help='Host machine address',
-            hook=yarg.SetValueHook('remote_host'),
-            group=yarg.BULLET_PROOF_OPT_GROUP,
-        ) + yarg.ArgConsumer(
-            ['--remote-cache'],
-            help='Path to the service directory on the remote machine',
-            hook=yarg.SetValueHook('remote_cache_path'),
-            group=yarg.ADVANCED_OPT_GROUP,
-        )
-
-    def postprocess(self):
-        if self.require_remote and not self.remote_host:
-            raise yarg.ArgsValidatingException('Remote host must be specified with \'--host\' option')
-
-
-class IdeRemoteOptions(yarg.Options):
-    def __init__(self, require_remote=False):
-        self.require_remote = require_remote
-        self.remote_clean_output = True
-        self.rsync_upload_args = '-avz --copy-unsafe-links'
-        self.rsync_down_args = '-rpthvz --copy-unsafe-links'
-        self.in_build_get_source = True
-        self.forward_key = False
-        self.remote_ya_path = None
-        self.remote_prepare_env = True
-        self.run = False
-
-    @staticmethod
-    def consumer():
-        return (
-            yarg.ArgConsumer(
-                ['--remote-keep-output'],
-                help='Don\'t clean remote output dir after build',
-                hook=yarg.SetConstValueHook('remote_clean_output', False),
-                group=yarg.ADVANCED_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--rsync_up_args'],
-                help='Rsync arguments for uploading sources',
-                hook=yarg.SetValueHook('rsync_upload_args'),
-                group=yarg.DEVELOPERS_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--rsync_down_args'],
-                help='Rsync arguments for downloading build results',
-                hook=yarg.SetValueHook('rsync_down_args'),
-                group=yarg.DEVELOPERS_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--remote-ya'],
-                help='Path to \'ya\' on the remote machine',
-                hook=yarg.SetValueHook('remote_ya_path'),
-                group=yarg.BULLET_PROOF_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--remote-env-ready'],
-                help='Skip preparing remote environment',
-                hook=yarg.SetConstValueHook('remote_prepare_env', False),
-                group=yarg.DEVELOPERS_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--forward-key'],
-                help='Literally, run ssh with -A argument when initiate remote dirs',
-                hook=yarg.SetConstValueHook('forward_key', True),
-                group=yarg.ADVANCED_OPT_GROUP,
-            )
-            + yarg.ArgConsumer(
-                ['--no-get-sources-build'],
-                help='Don\'t download generated source files in build-only targets',
-                hook=yarg.SetConstValueHook('in_build_get_source', False),
-                group=yarg.ADVANCED_OPT_GROUP,
-            )
-        )
-
-    def postprocess(self):
-        if self.require_remote:
-            if not self.remote_ya_path and self.remote_prepare_env:
-                raise yarg.ArgsValidatingException(
-                    'To prepare remote environment you must specify path to remote \'ya\' tool '
-                    '(or use \'--remote-env-ready\')'
-                )
 
 
 class IdeProjectInfo:
@@ -1030,35 +923,6 @@ endif()
 
 class RemoteIdeError(Exception):
     mute = True
-
-
-def set_up_remote(params, app_ctx):
-    sshp = SSHProxy(params.remote_host, ssh_args=['-A'] if params.forward_key else None)
-
-    if not sshp.is_host_up():
-        raise RemoteIdeError('Host is not reachable.')
-
-    if params.remote_prepare_env:
-        emit_message('Preparing remote environment')
-        if not params.remote_ya_path:
-            raise RemoteIdeError('Path to remote Ya tool isn\'t specified.')
-        if not sshp.is_exec(params.remote_ya_path):
-            raise RemoteIdeError('Can\'t find remote ya binary')
-        source_dir = os.path.join(params.remote_cache_path, REMOTE_SOURCE_SUBDIR)
-        sshp.mkdir_p(params.remote_cache_path)
-        if not sshp.is_dir(source_dir):
-            try:
-                sshp.ya_clone(params.remote_ya_path, source_dir)
-                if 'darwin' == yalibrary.platform_matcher.my_platform():
-                    sshp.checkout(source_dir, [DUMMY_CPP_PROJECT_ARCADIA_PATH])
-            except subprocess.CalledProcessError:
-                if 'SvnRuntimeError' in traceback.format_exc():
-                    emit_message(
-                        '[[warn]]Can\'t use svn to clone Arcadia on remote host. '
-                        'Could it be that you forgot [[imp]]--forward-key[[warn]] option?[[rst]]'
-                    )
-                raise
-        emit_message('Remote environment set')
 
 
 class RemoteDevEnvOptions(yarg.Options):

@@ -34,8 +34,6 @@ PY_SRCS(
     ide_common.py
     idea.py
     pycharm.py
-    qt.py
-    remote_ide_qt.py
     venv/__init__.py
     venv/project.py
     vscode/__init__.py
