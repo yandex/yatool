@@ -493,6 +493,7 @@ void TJSONVisitor::Leave(TState& state) {
 
     if (CurrData->WasFresh && !CurrData->Fake && CurrData->HasBuildCmd) {
         SortedNodesForRendering.push_back(state.TopNode().Id());
+        TopoGenerations[CurrData->Generation].push_back(state.TopNode().Id());
         if (IsModuleType(state.TopNode()->NodeType)) {
             ++NumModuleNodesForRendering;
         }
@@ -543,6 +544,8 @@ void TJSONVisitor::Left(TState& state) {
     if (currData.WasFresh && currData.IsGlobalVarsCollectorStarted && IsDirectPeerdirDep(currState.CurDep())) {
         GlobalVarsCollector.Collect(currState, currState.CurDep().To());
     }
+
+    currData.Generation = std::max(currData.Generation, chldData->Generation + 1);
 }
 
 THashMap<TString, TMd5Sig> TJSONVisitor::GetInputs(const TDepGraph& graph) const {

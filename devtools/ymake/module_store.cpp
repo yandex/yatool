@@ -301,15 +301,15 @@ const TGlobalVars& TModules::GetGlobalVars(ui32 moduleId) const {
 }
 
 void TModules::ClearModuleLateOuts(ui32 moduleId) {
-    ModuleLateOutsById[moduleId].clear();
+    ModuleLateOutsById.Insert(moduleId, TVector<TString>());
 }
 
 TVector<TString>& TModules::GetModuleLateOuts(ui32 moduleId) {
-    return ModuleLateOutsById[moduleId];
+    return ModuleLateOutsById.InsertIfAbsent(moduleId, TVector<TString>());
 }
 
 const TVector<TString>& TModules::GetModuleLateOuts(ui32 moduleId) const {
-    return ModuleLateOutsById.at(moduleId);
+    return ModuleLateOutsById.GetBucketForKey(moduleId).GetUnsafe(moduleId);
 }
 
 void TModules::ResetTransitiveInfo() {

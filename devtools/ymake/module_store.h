@@ -5,6 +5,7 @@
 
 #include <devtools/ymake/diag/stats.h>
 
+#include <library/cpp/containers/concurrent_hash/concurrent_hash.h>
 #include <util/generic/hash.h>
 
 class TFileConf;
@@ -33,7 +34,7 @@ private:
     THashMap<ui32, TTransitiveModuleInfo, TIdentity> ModuleIncludesById;
     THashMap<ui32, TDependencyManagementModuleInfo> ModuleDMInfoById;
 
-    THashMap<ui32, TVector<TString>> ModuleLateOutsById;
+    TConcurrentHashMap<ui32, TVector<TString>> ModuleLateOutsById;
 
     mutable NStats::TModulesStats Stats = NStats::TModulesStats("TModules stats");
 
@@ -133,11 +134,11 @@ public:
     TVector<TString>& GetModuleLateOuts(ui32 moduleId);
     const TVector<TString>& GetModuleLateOuts(ui32 moduleId) const;
 
-    THashMap<ui32, TVector<TString>> TakeModulesLateOuts() {
+    TConcurrentHashMap<ui32, TVector<TString>> TakeModulesLateOuts() {
         return std::move(ModuleLateOutsById);
     }
 
-    void SetModulesLateOuts(THashMap<ui32, TVector<TString>>&& lateOutsMap) {
+    void SetModulesLateOuts(TConcurrentHashMap<ui32, TVector<TString>>&& lateOutsMap) {
         ModuleLateOutsById = std::move(lateOutsMap);
     }
 

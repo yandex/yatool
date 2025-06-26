@@ -368,7 +368,7 @@ namespace {
         THashSet<TNodeId> StartDirs;
         const THashSet<TTarget>& ModStartTargets;
         TToolMiner ToolMiner;
-        TMakeModuleStates ModulesStatesCache;
+        TMakeModuleSequentialStates ModulesStatesCache;
     };
 
 }

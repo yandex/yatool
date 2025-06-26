@@ -10,6 +10,7 @@
 
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
 
+#include <mutex>
 #include <util/ysaveload.h>
 #include <util/generic/algorithm.h>
 #include <util/generic/fwd.h>
@@ -470,6 +471,7 @@ TMakePlanCache::TMakePlanCache(const TBuildConfiguration& conf)
         : Conf(conf)
         , LoadFromCache(Conf.ReadJsonCache)
         , SaveToCache(Conf.WriteJsonCache)
+        , LockCache(Conf.ParallelRendering)
         , CachePath(Conf.YmakeJsonCache)
         , ConversionContext_(MakeHolder<NCache::TConversionContext>(Names, Conf.StoreInputsInJsonCache))
 {}
@@ -560,8 +562,18 @@ void TMakePlanCache::AddRenderedNode(const TMakeNode& newNode, TStringBuf name, 
     Stats.Inc(NStats::EJsonCacheStats::AddedItems);
     NCache::TConversionContext context(Names, Conf.StoreInputsInJsonCache);
     if (SaveToCache) {
+        // there actually may be two separate locks for AddedNodes and context,
+        // but keep one for simplicity
+        auto lock = LockContextIfNeeded();
         AddedNodes.emplace_back(newNode, name, cacheUid, renderId, Conf, context);
     }
+}
+
+std::unique_lock<TAdaptiveLock> TMakePlanCache::LockContextIfNeeded() {
+    if (LockCache) {
+        return std::unique_lock(ContextLock);
+    }
+    return {};
 }
 
 void TMakePlanCache::LoadFromContext(const TString& context) {

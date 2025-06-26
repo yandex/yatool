@@ -27,6 +27,7 @@ struct TStartUpOptions: public TRootsOptions {
     bool DescendIntoForeignPlatform = true;
     bool ReportPicNoPic = false;
     bool CheckTransitiveRequirements = true;
+    bool ParallelRendering = false;
 
     PIPEHANDLE InputPipeFd = -1;
     PIPEHANDLE OutputPipeFd = -1;

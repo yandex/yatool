@@ -40,6 +40,9 @@
 #include <util/stream/output.h>
 #include <util/system/types.h>
 
+#include <asio/co_spawn.hpp>
+#include <asio/use_future.hpp>
+
 using EDebugUidType = NDebugEvents::NExportJson::EUidType;
 
 namespace {
@@ -327,14 +330,17 @@ namespace {
         }
 
         const auto cacheUid = renderer.CalculateCacheUid();
-        const auto* cachedNode = cache.GetCachedNodeByCacheUid(cacheUid);
-        BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(cachedNode));
-        if (cachedNode) {
-            cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
-            auto& context = cache.GetConversionContext(&node);
-            renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
-            jsonWriter.WriteArrayValue(plan.NodesArr,*cachedNode, &context);
-            return;
+        {
+            auto lock = cache.LockContextIfNeeded();
+            const auto* cachedNode = cache.GetCachedNodeByCacheUid(cacheUid);
+            BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(cachedNode));
+            if (cachedNode) {
+                cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
+                auto& context = cache.GetConversionContext(&node);
+                renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
+                jsonWriter.WriteArrayValue(plan.NodesArr,*cachedNode, &context);
+                return;
+            }
         }
 
         // If we didn't find exactly the same node, try to find the same, but with different UID.
@@ -412,7 +418,7 @@ namespace {
         ComputeFullUID(graph, cmdbuilder, nodeId);
     }
 
-    void RenderJSONGraph(TYMake& yMake, TMakePlan& plan) {
+    void RenderJSONGraph(TYMake& yMake, TMakePlan& plan, asio::any_io_executor exec) {
         auto& graph = yMake.Graph;
         const auto& conf = yMake.Conf;
         const auto& startTargets = yMake.StartTargets;
@@ -484,18 +490,71 @@ namespace {
             {
                 YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
-                TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
                 TMakePlanCache cache(yMake.Conf);
                 yMake.JSONCacheLoaded(cache.LoadFromFile());
                 plan.WriteConf();
 
-                for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
-                    UpdateUids(yMake.Graph, cmdbuilder, nodeId);
+                if (yMake.Conf.ParallelRendering) {
+                    TMakeModuleParallelStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
+                    for (const auto& [_, nodes]: cmdbuilder.GetTopoGenerations()) {
+                        size_t chunkSize = 10;
+                        // group nodes by module preserving order
+                        std::map<TNodeId, TVector<TNodeId>> nodesByModuleId;
+                        for (const auto& nodeId : nodes) {
+                            nodesByModuleId[cmdbuilder.GetModuleByNode(nodeId)].push_back(nodeId);
+                        }
 
-                    const auto& node = cmdbuilder.Nodes.at(nodeId);
-                    RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer, modulesStatesCache);
-                    if (IsModuleType(graph[nodeId]->NodeType)) {
-                        TProgressManager::Instance()->IncRenderModulesDone();
+                        TVector<std::future<TString>> futs;
+                        auto moduleIt = nodesByModuleId.begin();
+                        while (moduleIt != nodesByModuleId.end()) {
+                            auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
+                            const auto chunk = std::ranges::subrange(moduleIt, chunkEnd);
+                            // collect transitive peer info sequentially to avoid concurrent writes to module table
+                            for (const auto& [modId, nodeIds] : chunk) {
+                                if (nodeIds.size() > 0) {
+                                    TModuleRestorer restorer({conf, graph, yMake.Modules}, graph[modId]);
+                                    restorer.RestoreModule();
+                                    restorer.MinePeers();
+                                    restorer.MineGlobalVars();
+                                    restorer.MineGlobVars();
+                                }
+                            }
+                            futs.push_back(asio::co_spawn(exec, [&cmdbuilder, &plan, &cache, &modulesStatesCache, &graph, &yMake, chunk]() -> asio::awaitable<TString> {
+                                TStringStream ss;
+                                NYMake::TJsonWriter writer(ss);
+                                for (const auto& [modId, nodeIds] : chunk) {
+                                    for (const auto& nodeId : nodeIds) {
+                                        UpdateUids(yMake.Graph, cmdbuilder, nodeId);
+
+                                        const auto& node = cmdbuilder.Nodes.at(nodeId);
+                                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, writer, modulesStatesCache);
+                                        if (IsModuleType(graph[nodeId]->NodeType)) {
+                                            // remove state from cache to free the memory
+                                            modulesStatesCache.GetState(nodeId).Reset();
+                                            TProgressManager::Instance()->IncRenderModulesDone();
+                                        }
+                                    }
+                                }
+                                writer.Flush();
+                                co_return ss.Str();
+                            }, asio::use_future));
+                            moduleIt = chunkEnd;
+                        }
+                        for (auto& f: futs) {
+                            auto s = f.get();
+                            plan.Writer.WriteJsonValue(s);
+                        }
+                    }
+                } else {
+                    TMakeModuleSequentialStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
+                    for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
+                        UpdateUids(yMake.Graph, cmdbuilder, nodeId);
+
+                        const auto& node = cmdbuilder.Nodes.at(nodeId);
+                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer, modulesStatesCache);
+                        if (IsModuleType(graph[nodeId]->NodeType)) {
+                            TProgressManager::Instance()->IncRenderModulesDone();
+                        }
                     }
                 }
 
@@ -554,7 +613,7 @@ namespace {
 
 }
 
-void ExportJSON(TYMake& yMake) {
+void ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
     auto& conf = yMake.Conf;
@@ -564,7 +623,9 @@ void ExportJSON(TYMake& yMake) {
     conf.BuildRoot = "$(BUILD_ROOT)";
     const bool sysNormalize = conf.NormalizeRealPath;
     conf.NormalizeRealPath = true;
-    conf.EnableRealPathCache(&yMake.Names.FileConf);
+    if (!conf.ParallelRendering) {
+        conf.EnableRealPathCache(&yMake.Names.FileConf);
+    }
 
     {
         NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
@@ -572,7 +633,7 @@ void ExportJSON(TYMake& yMake) {
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
         NYMake::TJsonWriter jsonWriter(*output.Get());
         TMakePlan plan(jsonWriter);
-        RenderJSONGraph(yMake, plan);
+        RenderJSONGraph(yMake, plan, exec);
     }
 
     conf.EnableRealPathCache(nullptr);

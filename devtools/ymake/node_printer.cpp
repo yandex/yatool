@@ -730,7 +730,7 @@ static void DumpGraphInternal(TYMake& yMake) {
         NodesByDepth.emplace_back(i.second.Depth, i.first);
     }
     std::sort(NodesByDepth.begin(), NodesByDepth.end());
-    TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
+    TMakeModuleSequentialStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
     for (auto&& i : NodesByDepth) {
         if (renderCmd) {
             TSubst2Shell cmdImage;

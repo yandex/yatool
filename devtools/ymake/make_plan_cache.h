@@ -7,6 +7,7 @@
 #include <devtools/ymake/make_plan/make_plan.h>
 #include <devtools/ymake/symbols/name_store.h>
 
+#include <mutex>
 #include <util/ysaveload.h>
 #include <util/folder/path.h>
 #include <util/generic/deque.h>
@@ -81,6 +82,7 @@ private:
 
     const bool LoadFromCache;
     const bool SaveToCache;
+    const bool LockCache;
     TFsPath CachePath;
 
     TNameStore Names;
@@ -93,6 +95,9 @@ private:
     TRestoredNodesMap PartialMatchMap;
 
     THolder<NCache::TConversionContext> ConversionContext_;
+
+    TAdaptiveLock ContextLock;
+
 public:
     explicit TMakePlanCache(const TBuildConfiguration& conf);
     ~TMakePlanCache();
@@ -117,6 +122,8 @@ public:
     TFsPath GetCachePath() const {
         return CachePath;
     }
+
+    std::unique_lock<TAdaptiveLock> LockContextIfNeeded();
 
     NStats::TJsonCacheStats Stats{"JSON cache stats"};
 

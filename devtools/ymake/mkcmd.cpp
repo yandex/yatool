@@ -66,7 +66,7 @@ TMakeModuleState::TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& g
     GlobalSrcs = &restorer.GetGlobalSrcsIds();
 }
 
-TMakeModuleStatePtr TMakeModuleStates::GetState(TNodeId moduleId) {
+TMakeModuleStatePtr TMakeModuleSequentialStates::GetState(TNodeId moduleId) {
     GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnvCalls);
     if (LastStateId_ != moduleId) {
         LastStateId_ = moduleId;
@@ -85,6 +85,12 @@ inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
 TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake)
     : TMakeCommand(modulesStatesCache, yMake, nullptr)
 {
+}
+
+TMakeModuleStatePtr TMakeModuleParallelStates::GetState(TNodeId moduleId) {
+    return States_.InsertIfAbsentWithInit(moduleId, [&]() {
+        return new TMakeModuleState{Conf_, Graph_, Modules_, moduleId};
+    });
 }
 
 TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake, const TVars* base0)

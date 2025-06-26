@@ -70,6 +70,7 @@ private:
 
     ui64 NumModuleNodesForRendering = 0;
     TVector<TNodeId> SortedNodesForRendering;
+    TMap<size_t, TVector<TNodeId>> TopoGenerations;
 
     TVector<TLoopCnt> LoopsHash;
 
@@ -110,6 +111,15 @@ public:
     const THashMap<TString, TString>& GetResources() const;
     TNodeId GetModuleByNode(TNodeId nodeId);
     const TVector<TNodeId>& GetOrderedNodes() const { return SortedNodesForRendering; }
+    const TMap<size_t, TVector<TNodeId>>& GetTopoGenerations() const {
+        TStringStream ss;
+        ss << "GetTopoGenerations: ";
+        for (const auto& [_, nodes] : TopoGenerations) {
+            ss << "  " << nodes.size();
+        }
+        YDebug() << ss.Str() << Endl;
+        return TopoGenerations;
+    }
     ui64 GetModuleNodesNum() const { return NumModuleNodesForRendering; }
 
     void ReportCacheStats();

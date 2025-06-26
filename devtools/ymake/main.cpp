@@ -773,7 +773,7 @@ asio::awaitable<void> SaveCaches(TBuildConfiguration& conf, THolder<TYMake>& yMa
     co_return;
 }
 
-asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
+asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THolder<TYMake>& yMake, asio::any_io_executor exec) {
     if (conf.RenderSemantics) {
         const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_SOURCE_ROOT);
         const auto* buildRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_BUILD_ROOT);
@@ -800,7 +800,7 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
     }
 
     if (!conf.WriteJSON.empty()) {
-        ExportJSON(*yMake);
+        ExportJSON(*yMake, exec);
     }
 
     co_return TMaybe<EBuildResult>();
@@ -874,7 +874,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         co_return BR_CONFIGURE_FAILED;
     }
 
-    result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake), asio::use_awaitable);
+    result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
     if (result.Defined()) {
         co_return result.GetRef();
     }

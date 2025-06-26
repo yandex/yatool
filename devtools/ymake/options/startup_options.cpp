@@ -50,6 +50,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("fd-out", "output pipe fd").StoreResult(&OutputPipeFd);
     opts.AddLongOption("fd-err", "error pipe fd").StoreResult(&ErrorPipeFd);
     opts.AddLongOption("dont-check-transitive-requirements", "").StoreFalse(&CheckTransitiveRequirements);
+    opts.AddLongOption("parallel-rendering", "").StoreTrue(&ParallelRendering);
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
