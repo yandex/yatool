@@ -1005,7 +1005,8 @@ class _JavaSemGraph(SemGraph):
 class _Exporter:
     """Generating files to export root"""
 
-    _YEXPORT_STAT_PREFIX = '[info] Stat:'
+    _GRADLE_DAEMON_JVMARGS = 'org.gradle.jvmargs'
+    _KOTLIN_DAEMON_JVMARGS = 'kotlin.daemon.jvmargs'
 
     def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
@@ -1042,6 +1043,14 @@ class _Exporter:
         if const_gradle_properties_file.exists():
             with const_gradle_properties_file.open('r') as f:
                 project_gradle_properties += f.read().split("\n")
+        if self.config.params.gradle_daemon_jvmargs:
+            project_gradle_properties = self._apply_gradle_property(
+                project_gradle_properties, self._GRADLE_DAEMON_JVMARGS, self.config.params.gradle_daemon_jvmargs
+            )
+        if self.config.params.kotlin_daemon_jvmargs:
+            project_gradle_properties = self._apply_gradle_property(
+                project_gradle_properties, self._KOTLIN_DAEMON_JVMARGS, self.config.params.kotlin_daemon_jvmargs
+            )
         gradle_jdk_path = self.sem_graph.get_jdk_path(self.sem_graph.gradle_jdk_version)
         if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
             self.attrs_for_all_templates += [
@@ -1061,6 +1070,22 @@ class _Exporter:
         project_gradle_properties_file = self.config.export_root / _JavaSemConfig.GRADLE_PROPS
         with project_gradle_properties_file.open('w') as f:
             f.write('\n'.join(project_gradle_properties))
+
+    @staticmethod
+    def _apply_gradle_property(gradle_properties: list[str], property: str, value: str) -> list[str]:
+        value = value.strip()
+        property_line = property + '=' + value
+        property_applied = False
+        patched_gradle_properties: list[str] = []
+        for gradle_property in gradle_properties:
+            if gradle_property.startswith(property + '='):
+                patched_gradle_properties.append(property_line)
+                property_applied = True
+            else:
+                patched_gradle_properties.append(gradle_property)
+        if not property_applied:
+            patched_gradle_properties.append(property_line)
+        return patched_gradle_properties
 
     def _apply_force_jdk_version(self) -> None:
         """Apply force JDK version from options, if exists"""

@@ -374,6 +374,8 @@ class GradleOptions(yarg.Options):
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
     OPT_REMOVE = '--remove'
     OPT_EXCLUDE = '--exclude'
+    OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
+    OPT_KOTLIN_DAEMON_JVMARGS = '--kotlin-daemon-jvmargs'
 
     # Advanced options
     ADVOPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
@@ -396,6 +398,8 @@ class GradleOptions(yarg.Options):
         self.force_jdk_version: str = None
         self.remove: bool = False
         self.exclude_targets: list[str] = []
+        self.gradle_daemon_jvmargs: str = None
+        self.kotlin_daemon_jvmargs: str = None
 
         self.collect_contribs: bool = True
         self.build_foreign: bool = True
@@ -454,6 +458,18 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_EXCLUDE],
                 help='Exclude module and submodules from gradle project',
                 hook=yarg.SetAppendHook('exclude_targets'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_GRADLE_DAEMON_JVMARGS],
+                help='Set org.gradle.jvmargs value for gradle.properties',
+                hook=yarg.SetValueHook('gradle_daemon_jvmargs'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_KOTLIN_DAEMON_JVMARGS],
+                help='Set kotlin.daemon.jvmargs value for gradle.properties',
+                hook=yarg.SetValueHook('kotlin_daemon_jvmargs'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
