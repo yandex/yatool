@@ -1,3 +1,4 @@
+import os
 import logging
 import shutil
 from pathlib import Path
@@ -80,7 +81,7 @@ class _Builder:
                     opts.add_result.append(".jar")  # require make symlinks to all .jar files
                     # For build PROTO_SCHEMA to jar, require build it as PEERDIR
                     # Make one temporary ya.make with JAVA_PROGRAM and PEERDIR to all proto targets
-                    junk_ya_make = self.config.arcadia_root / "junk" / "ya_ide_gradle" / "ya.make"
+                    junk_ya_make = self.config.arcadia_root / "junk" / "ya_ide_gradle" / str(os.getpid()) / "ya.make"
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
                     with junk_ya_make.open('w') as f:
                         f.write(
@@ -119,6 +120,5 @@ class _Builder:
         except Exception as e:
             raise YaIdeGradleException(f'Failed in build process: {e}') from e
         finally:
-            if junk_ya_make:
-                if junk_ya_make.parent.exists():
-                    shutil.rmtree(junk_ya_make.parent)
+            if junk_ya_make and junk_ya_make.parent.exists():
+                shutil.rmtree(junk_ya_make.parent)
