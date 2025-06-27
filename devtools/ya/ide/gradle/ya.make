@@ -2,6 +2,15 @@ PY3_LIBRARY()
 
 PY_SRCS(
     __init__.py
+    build.py
+    common.py
+    config.py
+    export.py
+    graph.py
+    remove.py
+    stat.py
+    symlinks.py
+    ya_settings.py
 )
 
 PEERDIR(
