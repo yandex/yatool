@@ -714,7 +714,7 @@ void FsmCodeGen::finishRagelDef()
 	else
 		redFsm->chooseSingle();
 
-	/* If any errors have occured in the input file then don't write anything. */
+	/* If any errors have occurred in the input file then don't write anything. */
 	if ( gblErrorCount > 0 )
 		return;
 	
