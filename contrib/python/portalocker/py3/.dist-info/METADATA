@@ -1,9 +1,9 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: portalocker
-Version: 3.1.1
+Version: 3.2.0
 Summary: Wraps the portalocker recipe for easy usage
 Author-email: Rick van Hattem <wolph@wol.ph>
-License: BSD-3-Clause
+License-Expression: BSD-3-Clause
 Project-URL: bugs, https://github.com/wolph/portalocker/issues
 Project-URL: documentation, https://portalocker.readthedocs.io/en/latest/
 Project-URL: repository, https://github.com/wolph/portalocker/
@@ -12,7 +12,6 @@ Platform: any
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Development Status :: 6 - Mature
 Classifier: Intended Audience :: Developers
-Classifier: License :: OSI Approved :: BSD License
 Classifier: Natural Language :: English
 Classifier: Operating System :: MacOS :: MacOS X
 Classifier: Operating System :: MacOS
@@ -49,18 +48,21 @@ Description-Content-Type: text/x-rst
 License-File: LICENSE
 Requires-Dist: pywin32>=226; platform_system == "Windows"
 Provides-Extra: docs
-Requires-Dist: sphinx>=1.7.1; extra == "docs"
+Requires-Dist: portalocker[tests]; extra == "docs"
 Provides-Extra: tests
-Requires-Dist: pytest>=5.4.1; extra == "tests"
+Requires-Dist: coverage-conditional-plugin>=0.9.0; extra == "tests"
+Requires-Dist: portalocker[redis]; extra == "tests"
 Requires-Dist: pytest-cov>=2.8.1; extra == "tests"
-Requires-Dist: pytest-timeout>=2.1.0; extra == "tests"
-Requires-Dist: sphinx>=6.0.0; extra == "tests"
 Requires-Dist: pytest-mypy>=0.8.0; extra == "tests"
-Requires-Dist: types-redis; extra == "tests"
-Requires-Dist: redis; extra == "tests"
 Requires-Dist: pytest-rerunfailures>=15.0; extra == "tests"
+Requires-Dist: pytest-timeout>=2.1.0; extra == "tests"
+Requires-Dist: pytest>=5.4.1; extra == "tests"
+Requires-Dist: sphinx>=6.0.0; extra == "tests"
+Requires-Dist: types-pywin32>=310.0.0.20250429; extra == "tests"
+Requires-Dist: types-redis; extra == "tests"
 Provides-Extra: redis
 Requires-Dist: redis; extra == "redis"
+Dynamic: license-file
 
 ############################################
 portalocker - Cross-platform locking library
