@@ -112,3 +112,7 @@ RECURSE(
     ydb
     yql
 )
+
+RECURSE_FOR_TESTS(
+    tests
+)
