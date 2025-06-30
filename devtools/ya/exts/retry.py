@@ -51,7 +51,7 @@ def _conf(
         retriable=lambda e: not raise_exception(e) and ignore_exception(e),
         get_delay=lambda n, raised_after, last: retry_sleep(n, raised_after),
         max_time=max_time,
-        max_times=max_times if max_times else None,
+        max_times=max_times - 1 if max_times else None,  # tries -> retries
         handle_error=log_error,
         logger=None,
         sleep=sleep_func or lpr.DEFAULT_SLEEP_FUNC,
