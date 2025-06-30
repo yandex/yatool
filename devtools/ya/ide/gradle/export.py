@@ -2,6 +2,7 @@ import os
 import logging
 import subprocess
 import time
+from configparser import ConfigParser
 from pathlib import Path
 
 from devtools.ya.yalibrary import sjson
@@ -16,6 +17,7 @@ class _Exporter:
 
     _GRADLE_DAEMON_JVMARGS = 'org.gradle.jvmargs'
     _KOTLIN_DAEMON_JVMARGS = 'kotlin.daemon.jvmargs'
+    _YA_GRADLE_CONFIG = 'ya.gradle.config'
 
     def __init__(self, java_sem_config: _JavaSemConfig, java_sem_graph: _JavaSemGraph):
         self.logger = logging.getLogger(type(self).__name__)
@@ -52,6 +54,16 @@ class _Exporter:
         if const_gradle_properties_file.exists():
             with const_gradle_properties_file.open('r') as f:
                 project_gradle_properties += f.read().split("\n")
+        ya_gradle_config = self.config.settings_root / self._YA_GRADLE_CONFIG
+        if ya_gradle_config.exists():
+            try:
+                ya_gradle = ConfigParser()
+                ya_gradle.read(str(ya_gradle_config), 'UTF-8')
+            except Exception as e:
+                raise YaIdeGradleException(f"Can't read config file {ya_gradle_config}: {e}") from e
+            if _JavaSemConfig.GRADLE_PROPS in ya_gradle.sections():
+                for [prop, value] in ya_gradle[_JavaSemConfig.GRADLE_PROPS].items():
+                    project_gradle_properties = self._apply_gradle_property(project_gradle_properties, prop, value)
         if self.config.params.gradle_daemon_jvmargs:
             project_gradle_properties = self._apply_gradle_property(
                 project_gradle_properties, self._GRADLE_DAEMON_JVMARGS, self.config.params.gradle_daemon_jvmargs
