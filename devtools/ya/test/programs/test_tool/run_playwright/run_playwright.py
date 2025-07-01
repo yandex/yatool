@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 import os
 import signal
@@ -19,6 +18,8 @@ from build.plugins.lib.nots.package_manager.base.constants import (
     PACKAGE_JSON_FILENAME,
 )
 from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME
+
+from .process_json_report import process_json_report
 
 
 logger = logging.getLogger("run_playwright")
@@ -116,8 +117,8 @@ def run_tests(opts):
             wait=True,
         )
 
-        with open(report_file, "r") as report:
-            suite = create_suite_from_json_report(opts, report)
+        with open(report_file, "r", encoding="utf-8") as report:
+            suite = create_suite_from_json_report(opts, report.read())
             shared.dump_trace_file(suite, opts.tracefile)
 
     except process.SignalInterruptionError:
@@ -144,46 +145,28 @@ def create_suite_from_json_report(opts, json_report: str):
     suite.set_work_dir(opts.test_work_dir)
     suite.register_chunk()
 
-    results = json.load(json_report)
-    project_dirs = {p["id"]: os.path.relpath(p["testDir"], opts.test_for_path) for p in results["config"]["projects"]}
+    tests, project_dirs = process_json_report(json_report)
+    project_dirs = {id: os.path.relpath(dir, opts.test_for_path) for id, dir in project_dirs.items()}
 
-    for suite_result in results.get("suites", []):
-        fill_suite(suite, suite_result, "", project_dirs)
+    for test in tests:
+        logger.debug(f"{test=}")
+        test_status = TEST_STATUS[test.status]
+        test_file = os.path.join(project_dirs[test.project_id], test.file)
+        title = " / ".join(test.suites + [test.name])
+
+        full_test_name = f"{test_file}[{test.project_name}]::{title}"
+
+        test_case = facility.TestCase(
+            name=full_test_name,
+            status=test_status,
+            comment=test.comment or "",
+            elapsed=test.duration / 1000,
+            metrics={"tries": test.tries},
+        )
+        logger.debug(f"{test_case=}")
+        suite.chunk.tests.append(test_case)
 
     return suite
-
-
-def fill_suite(suite: PerformedTestSuite, pw_suite: dict, suite_title: str, project_dirs: dict[str, str]):
-    for spec in pw_suite.get("specs", []):
-        spec_name = spec["title"]
-        spec_file = spec["file"]
-
-        for test in spec.get("tests", []):
-            test_project = test["projectName"]
-            test_project_id = test["projectId"]
-            test_file = os.path.join(project_dirs[test_project_id], spec_file)
-            test_status = TEST_STATUS[test["status"]]
-            result = test.get("results", [])[0]
-            test_duration_ms = result.get("duration", 0)
-            comment = ""
-
-            if "error" in result:
-                comment += shared.clean_ansi_escape_sequences(result["error"]["message"])
-                comment += "\n"
-                comment += shared.clean_ansi_escape_sequences(result["error"]["snippet"])
-
-            full_test_name = f"{test_file}[{test_project}]::{suite_title}{spec_name}"
-            test_case = facility.TestCase(
-                name=full_test_name,
-                status=test_status,
-                comment=comment,
-                elapsed=test_duration_ms / 1000,
-            )
-            suite.chunk.tests.append(test_case)
-
-    for nested_suite in pw_suite.get("suites", []):
-        nested_suite_title = suite_title + nested_suite["title"] + " / "
-        fill_suite(suite, nested_suite, nested_suite_title, project_dirs)
 
 
 def on_timeout(_signum, _frame):
