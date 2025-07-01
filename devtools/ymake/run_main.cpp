@@ -34,11 +34,13 @@
 #include <sys/mman.h>
 #endif
 
-static void SigInt(int) {
+namespace {
+
+void SigInt(int) {
     _Exit(BR_INTERRUPTED);
 }
 
-static TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** argv) {
+TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** argv) {
     TVector<TVector<const char*>> configs;
 
     using namespace std::views;
@@ -127,6 +129,10 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
     return TMaybe<EBuildResult>();
 }
 
+// Attempt to call MLock after logger is ready leads to mlock failure thus it's called before
+// logger initialization and it's failure is reported later. This var keeps mlock call result.
+bool MLOCK_FAILED = false;
+
 asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithContext<TExecContext> exec) {
     TBuildConfiguration conf;
     auto result = InitConf(value, conf);
@@ -134,9 +140,7 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithConte
         co_return result.GetRef();
     }
 
-    try {
-        LockAllMemory(LockCurrentMemory);
-    } catch (const yexception&) {
+    if (MLOCK_FAILED) {
         YDebug() << "mlockall failed" << Endl;
     }
 
@@ -150,6 +154,8 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithConte
         ret_code = BR_FATAL_ERROR;
     }
     co_return ret_code;
+}
+
 }
 
 int YMakeMain(int argc, char** argv) {
@@ -172,6 +178,13 @@ int YMakeMain(int argc, char** argv) {
     if (threads <= 0) {
         threads = configs.size() + 1;
     }
+
+    try {
+        LockAllMemory(LockCurrentMemory);
+    } catch (const yexception&) {
+        MLOCK_FAILED = true;
+    }
+
     asio::thread_pool configure_workers(threads);
     for (size_t i = 0; i < configs.size(); ++i) {
         auto ctx = std::make_shared<TExecContext>(
