@@ -3557,8 +3557,6 @@ def build_graph_cache_config_opts():
                 self.build_graph_use_ymake_cache_params = None
                 self.build_graph_use_ymake_cache_params_str = None
 
-                self.build_graph_use_public_api = False
-
         return [BuildGraphCacheConfigOptions()]
 
     else:
