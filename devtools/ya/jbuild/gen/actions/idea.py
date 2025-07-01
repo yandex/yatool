@@ -685,20 +685,36 @@ def get_vcs(arc_root):
     return vcs_type[0]
 
 
-def has_content_root(module_path, by_path):
-    parts = module_path.split(op.sep)
-    while parts:
-        parts = parts[:-1]
-        parent_path = op.sep.join(parts)
-        if parent_path in by_path:
-            return True
-    return False
+def has_parent_module(module, all_roots):
+    for cr in module.contents:
+        if any(r.generated for r in cr.roots):
+            return False
+        parts = cr.path.split(op.sep)
+        ok = False
+        while parts:
+            parts = parts[:-1]
+            parent_path = op.sep.join(parts)
+            if parent_path in all_roots:
+                ok = True
+                break
+        if not ok:
+            return False
+    return True
 
 
 def get_modules_and_libs(by_path, project_root, ctx):
     modules, libs = {}, set()
 
-    for p, item in sorted(by_path.items()):
+    all_roots = {
+        cr.path
+        for v in by_path.values()
+        # Ignore content-root modules to preserve current grouping behavior: content roots are always
+        # separate modules in the project root that duplicate all sources in the tree.
+        if isinstance(v, Module) and not v.is_content_root
+        for cr in v.contents
+    }
+
+    for _, item in sorted(by_path.items()):
         if isinstance(item, Module):
             if not ctx.opts.iml_in_project_root:
                 modulesroot = ctx.opts.arc_root
@@ -714,10 +730,46 @@ def get_modules_and_libs(by_path, project_root, ctx):
 
             if ctx.opts.group_modules:
                 parts = [x for x in item.path.split(op.sep) if x]
-                parts = parts[:-1]
                 sep = '/' if ctx.opts.group_modules == 'tree' else '.'
-                group_name = sep.join(parts)
-                if group_name and not has_content_root(item.path, by_path):
+
+                group_name = None
+                if item.is_content_root:
+                    # Content roots should always be in root.
+                    pass
+                elif has_parent_module(item, all_roots):
+                    # Do not generate a group if the module is fully contained in other modules.
+                    pass
+                elif len(item.contents) > 1:
+                    # Always generate a separate group for the module if it contains more than one content root.
+                    #
+                    # This is needed because if a module has multiple content roots it will have an additional
+                    # node in the source tree that is named after the module.
+                    #
+                    # Example source tree for module direct/api5 without this group may look like this:
+                    # - direct:         <-- project root
+                    #   - direct-api5:  <-- additional tree node that contains both content roots
+                    #     - api5        <-- first content root that corresponds to source path "direct/api5"
+                    #     - generated   <-- second content root for generated sources
+                    #
+                    # Here the additional node is named "direct-api5" (this is the name of the IDEA module), which can
+                    # be very long for deeply nested modules and does not correspond to module path in source tree.
+                    #
+                    # With a separate group the same tree looks like this:
+                    # - direct:           <-- project root
+                    #   - api5:           <-- (!) new separate group
+                    #     - direct-api5   <-- additional tree node that contains both content roots
+                    #       - api5        <-- first content root that corresponds to source path "direct/api5"
+                    #       - generated   <-- second content root for generated sources
+                    #
+                    # This tree is more deeply nested, but now items in project root will have reasonable names
+                    # ("api5" instead of "direct-api5") and will be sorted in the right order.
+                    group_name = sep.join(parts)
+                else:
+                    # Generate a parent group for the module if there is no parent module.
+                    parts = parts[:-1]
+                    group_name = sep.join(parts)
+
+                if group_name:
                     attrib['group'] = group_name
 
             modules[iml_p] = attrib
