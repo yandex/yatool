@@ -42,6 +42,7 @@ import package.postprocessor
 import package.process
 import package.rpm
 import package.source
+import package.squashfs
 import package.tarball
 import package.vcs
 import package.wheel
@@ -773,6 +774,12 @@ def create_package(package_context, output_root, builds):
                     package_context,
                     compress=params.compress_archive,
                     publish_to_list=params.publish_to,
+                )
+            elif package_format == const.PackageFormat.SQUASHFS:
+                package_path = package.squashfs.create_squashfs_package(
+                    result_dir,
+                    content_dir,
+                    package_context,
                 )
             elif package_format == const.PackageFormat.DEBIAN:
                 if params.build_debian_scripts:

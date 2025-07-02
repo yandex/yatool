@@ -15,6 +15,7 @@ PY_SRCS(
     process.py
     rpm.py
     source.py
+    squashfs.py
     tarball.py
     vcs.py
     wheel.py

@@ -17,6 +17,7 @@ AAR_SUBGROUP = devtools.ya.core.yarg.Group('Aar', 5)
 RPM_SUBGROUP = devtools.ya.core.yarg.Group('Rpm', 6)
 NPM_SUBGROUP = devtools.ya.core.yarg.Group('Npm', 7)
 PYTHON_WHEEL_SUBGROUP = devtools.ya.core.yarg.Group('Python wheel', 8)
+SQUASHFS_SUBGROUP = devtools.ya.core.yarg.Group('Squashfs', 9)
 
 
 class PackageOperationalOptions(devtools.ya.core.yarg.Options):
@@ -502,6 +503,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('format', const.PackageFormat.NPM),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=NPM_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--squashfs'],
+                help='Build squashfs package',
+                hook=devtools.ya.core.yarg.SetConstValueHook('format', const.PackageFormat.SQUASHFS),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=SQUASHFS_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--wheel'],

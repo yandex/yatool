@@ -6,6 +6,7 @@ class PackageFormat(object):
     WHEEL = "wheel"
     AAR = "aar"
     NPM = "npm"
+    SQUASHFS = "squashfs"
 
 
 NANNY_RELEASE_URL = "https://nanny.yandex-team.ru/api/tickets/CreateRelease/"
