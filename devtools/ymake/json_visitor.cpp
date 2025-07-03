@@ -738,7 +738,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         }
 
 
-        if (!prntDone && IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep)) {
+        if (!prntDone && (IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep))) {
             PrntData->NodeToolDeps.Add(CurrData->NodeToolDeps);
         }
 
