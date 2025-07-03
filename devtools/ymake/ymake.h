@@ -96,6 +96,7 @@ private:
     bool HasGraphStructuralChanges_{false};
     TStringBuf ExportLang_{"?"};
     int FillModule2Nodes_{-1};
+    int CheckKVP_{-1};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
@@ -207,5 +208,12 @@ public:
             FillModule2Nodes_ = NYMake::IsTrue(Conf.CommandConf.EvalValue("FILL_MODULE2NODES")) ? 1 : 0;
         }
         return FillModule2Nodes_ > 0;
+    }
+
+    bool GetCheckKVP() {
+        if (CheckKVP_ < 0) {
+            CheckKVP_ = NYMake::IsTrue(Conf.CommandConf.EvalValue("CHECK_KVP")) ? 1 : 0;
+        }
+        return CheckKVP_ > 0;
     }
 };
