@@ -17,4 +17,5 @@ END()
 
 RECURSE_FOR_TESTS(
     bin
+    tests
 )
