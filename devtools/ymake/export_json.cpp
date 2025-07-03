@@ -101,7 +101,8 @@ namespace {
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
                 , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
-                , Subst2Json(cmdBuilder, DumpInfo, resultNode), MakeCommand(modulesStatesCache, ymake)
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode)
+                , MakeCommand(modulesStatesCache, ymake)
         {
             PrepareDeps();
 

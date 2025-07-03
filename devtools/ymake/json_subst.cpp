@@ -237,39 +237,38 @@ TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeN
     : DumpInfo(dumpInfo)
     , JSONVisitor(vis)
     , MakeNode(makeNode)
-{
-}
+{}
 
 void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, const TModule* mod, bool isGlobalNode) {
-    const auto nodeType = node->NodeType;
+    auto to_lower_string = [](const TStringBuf& tag) {
+        TString s(tag);
+        s.to_lower();
+        return s;
+    };
+    auto isModule = IsModuleType(node->NodeType);
+    Y_ASSERT(mod != nullptr);
 
-    if (IsModuleType(nodeType) || isGlobalNode) {
-        Y_ASSERT(mod != nullptr);
-        TStringBuf lang = mod->GetLang();
+    if (isModule || isGlobalNode) {
+        const TStringBuf lang = mod->GetLang();
         if (!lang.empty()) {
-            TargetProperties["module_lang"] = to_lower(TString{lang});
+            TargetProperties["module_lang"] = to_lower_string(lang);
         }
-
         TargetProperties["module_dir"] = TString(mod->GetDir().CutType());
-    }
-
-    if (IsModuleType(nodeType)) {
-        Y_ASSERT(mod != nullptr);
-        auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
-        TargetProperties["module_type"] = ToString(renderModuleType);
-
-        TStringBuf tag = mod->GetTag();
-        if (mod->IsFromMultimodule() && !tag.empty()) {
-            TargetProperties["module_tag"] = to_lower(TString{tag});
-        }
-    } else if (isGlobalNode) {
-        Y_ASSERT(mod != nullptr);
-        TargetProperties["module_type"] = ToString(ERenderModuleType::Library);
-        if (mod->IsFromMultimodule() && !mod->GetTag().empty()) {
-            TargetProperties["module_tag"] = to_lower(TString{mod->GetTag()}) + "_global";
-        }
-        else {
-            TargetProperties["module_tag"] = "global";
+        const TStringBuf tag = mod->GetTag();
+        if (isGlobalNode && !isModule) {
+            TargetProperties["module_type"] = ToString(ERenderModuleType::Library);
+            if (mod->IsFromMultimodule() && !tag.empty()) {
+                TargetProperties["module_tag"] = to_lower_string(tag) + "_global";
+            }
+            else {
+                TargetProperties["module_tag"] = "global";
+            }
+        } else if (isModule) {
+            const auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
+            TargetProperties["module_type"] = ToString(renderModuleType);
+            if (mod->IsFromMultimodule() && !tag.empty()) {
+                TargetProperties["module_tag"] = to_lower_string(tag);
+            }
         }
     }
 }
