@@ -95,6 +95,7 @@ private:
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
     TStringBuf ExportLang_{"?"};
+    int FillModule2Nodes_{-1};
 
     TVector<ui32> PreserveStartTargets() const;
     void FixStartTargets(const TVector<ui32>& elemIds);
@@ -199,5 +200,12 @@ public:
             ExportLang_ = Conf.CommandConf.EvalValue("EXPORT_LANG");
         }
         return ExportLang_;
+    }
+
+    bool GetFillModule2Nodes() {
+        if (FillModule2Nodes_ < 0) {
+            FillModule2Nodes_ = NYMake::IsTrue(Conf.CommandConf.EvalValue("FILL_MODULE2NODES")) ? 1 : 0;
+        }
+        return FillModule2Nodes_ > 0;
     }
 };
