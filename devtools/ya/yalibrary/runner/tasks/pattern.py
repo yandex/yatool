@@ -5,8 +5,6 @@ import base64
 import tempfile
 import time
 
-import six
-
 import devtools.ya.core.error
 
 from devtools.ya.yalibrary.active_state import Cancelled
@@ -120,8 +118,8 @@ class PreparePattern(object):
         elif resource_type == 'base64':
             dir_name = tempfile.mkdtemp(prefix="base64_resource-", dir=self._build_root)
             base_name, contents = resource_id.split(':', 1)
-            with open(os.path.join(dir_name, base_name), 'w') as c:
-                c.write(six.ensure_str(base64.b64decode(contents)))
+            with open(os.path.join(dir_name, base_name), 'wb') as c:
+                c.write(base64.b64decode(contents))
             return dir_name
         else:
             raise RuntimeError(f"Unexpected resource type: {resource_type}")
