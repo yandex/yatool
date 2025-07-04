@@ -7,6 +7,7 @@ import json
 import logging
 import argparse
 import subprocess
+import uuid
 
 from devtools.ya.test.util import shared
 from devtools.ya.test import const
@@ -50,21 +51,24 @@ def gen_suite(project_path):
     return suite
 
 
-def setup_env():
+def setup_env(reliability_token):
     os.environ["YA_COVERAGE_DUMP_PROFILE_AND_EXIT"] = "1"
     os.environ["YA_COVERAGE_DUMP_PROFILE_EXIT_CODE"] = str(SUCCESSFULLY_DUMPED_RC)
+    # C++ programs write the token to stdout when coverage profile is successfully dumped.
+    os.environ["YA_COVERAGE_DUMP_PROFILE_RELIABILITY_TOKEN"] = reliability_token
 
 
 def main():
     args = parse_args()
     testname = "coverage_extractor::test"
+    reliability_token = str(uuid.uuid4())
 
     if args.list:
         print(testname)
         return 0
 
     setup_logging(args.verbose)
-    setup_env()
+    setup_env(reliability_token)
     logger.debug("Environment variables: %s", json.dumps(dict(os.environ), sort_keys=True, indent=4))
 
     open(args.tracefile, "w").close()
@@ -75,6 +79,9 @@ def main():
     rc = proc.wait()
     if rc == SUCCESSFULLY_DUMPED_RC:
         suite.chunk.tests.append(facility.TestCase(testname, const.Status.GOOD))
+    elif rc < 0 and reliability_token.encode() in err:
+        suite.chunk.tests.append(facility.TestCase(testname, const.Status.GOOD))
+        logger.warning("Binary %s has dumped a coverage profile but failed to exit", args.binary)
     else:
         suite.chunk.add_error("[[bad]]Binary failed with {} return code: {}".format(rc, err), const.Status.FAIL)
     shared.dump_trace_file(suite, args.tracefile)
