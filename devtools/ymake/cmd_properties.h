@@ -65,6 +65,12 @@ public:
         void AddArrayKeyword(const TString& word, const TString& deepReplaceTo) {
             AddKeyword(word, 0, ::Max<ssize_t>(), deepReplaceTo);
         }
+        void AddScalarKeyword(const TString& word, const TStringBuf& defaultVal, const TString& deepReplaceTo) {
+            AddKeyword(word, 1, 1, deepReplaceTo, nullptr, defaultVal);
+        }
+        void AddFlagKeyword(const TString& word, const TStringBuf& setVal, const TStringBuf& unsetVal) {
+            AddKeyword(word, 0, 0, {}, setVal, unsetVal);
+        }
 
         bool Empty() const noexcept {
             return Collected_.empty();

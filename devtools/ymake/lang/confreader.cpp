@@ -251,13 +251,13 @@ namespace {
                     if (!arg.InitFalse.empty()) {
                         kwMissing = arg.InitFalse;
                     }
-                    keywords.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
+                    keywords.AddFlagKeyword(arg.Name, kwPresent, kwMissing);
                     break;
                 case EArgType::NamedScalar:
                     if (!arg.InitFalse.empty()) {
                         kwMissing = arg.InitFalse;
                     }
-                    keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
+                    keywords.AddScalarKeyword(arg.Name, kwMissing, arg.DeepReplace);
                     break;
                 case EArgType::NamedArray:
                     keywords.AddArrayKeyword(arg.Name, arg.DeepReplace);
