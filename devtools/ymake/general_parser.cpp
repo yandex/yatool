@@ -437,7 +437,38 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
         SBDIAG << "Result dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
         Graph.Names().CommandConf.GetById(TVersionedCmdId(node.ElemId).CmdId()).KeepTargetPlatform = true;
+        YDebug() << "TGeneralParser::AddCommandNodeDeps: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << tool << Endl;
     }
+
+    // a dirty copy-paste from ProcessBuildCommand
+    // TODO: move this one level upper since it's common code for all implementations
+    bool depsChanged = false;
+    if (node.UpdNode != TNodeId::Invalid) {
+        TDeps oldDeps;
+        node.GetOldDeps(oldDeps, 0, false);
+        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);
+        if (oldDeps.Size() != node.Deps.Size() + delayedDeps.size()) {
+            depsChanged = true;
+        } else {
+            for (size_t n = 0; n < node.Deps.Size(); n++) {
+                if (oldDeps[n].ElemId != node.Deps[n].ElemId) {
+                    depsChanged = true;
+                    break;
+                }
+            }
+            if (!depsChanged) {
+                size_t n = 0;
+                for (const auto& dirId : delayedDeps) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
+                        depsChanged = true;
+                        break;
+                    }
+                    n++;
+                }
+            }
+        }
+    }
+    node.UpdCmdStampForNewCmdNode(Graph.Names().CommandConf, YMake.TimeStamps, depsChanged);
 }
 
 void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) {
@@ -558,6 +589,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
                 node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
                 if (cmd.Result) {
                     Graph.Names().CommandConf.GetById(node.ElemId).KeepTargetPlatform = true;
+                    YDebug() << "TGeneralParser::ProcessBuildCommand: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << dir << Endl;
                 }
             }
         }

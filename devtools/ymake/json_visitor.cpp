@@ -653,6 +653,10 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     PrntData->NodeToolDeps.Add(tool);
                 }
                 prntDestSet.Add(tool);  // Note: this ensures tools in regular deps
+            } else {
+                if (!bundle && (!PrntData->NodeToolDeps || !PrntData->NodeToolDeps->has(tool))) {
+                    YDebug() << "JSON: PrepareLeaving: cannot add tool dep " << Graph.ToTargetStringBuf(tool) << " for completed parent " << PrntState->Print() << Endl;
+                }
             }
         } else {
             if (!prntDone) {
@@ -740,6 +744,31 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
 
         if (!prntDone && (IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep))) {
             PrntData->NodeToolDeps.Add(CurrData->NodeToolDeps);
+        }
+
+        if (prntDone && (IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep))) {
+            if (CurrData->NodeToolDeps && CurrData->NodeToolDeps->size() > 0) {
+                bool enough_deps = true;
+                if (!PrntData->NodeToolDeps) {
+                    enough_deps = false;
+                }
+                if (enough_deps) {
+                    if (PrntData->NodeToolDeps->size() < CurrData->NodeToolDeps->size()) {
+                        enough_deps = false;
+                    }
+                }
+                if (enough_deps) {
+                    for (auto toolDep : *CurrData->NodeToolDeps) {
+                        if (!PrntData->NodeToolDeps->has(toolDep)) {
+                            enough_deps = false;
+                            break;
+                        }
+                    }
+                }
+                if (!enough_deps) {
+                    YDebug() << "JSON: PrepareLeaving: cannot add tool deps for completed parent " << PrntState->Print() << Endl;
+                }
+            }
         }
 
         if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {

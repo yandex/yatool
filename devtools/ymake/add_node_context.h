@@ -134,6 +134,7 @@ public:
     inline TAddDepAdaptor& AddOutput(ui64 fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
 
     void UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
+    void UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
 
     TNodeId Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool lastTry = false);
     void LeaveModule();

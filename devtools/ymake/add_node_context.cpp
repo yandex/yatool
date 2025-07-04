@@ -539,6 +539,13 @@ void TNodeAddCtx::UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTim
     }
 }
 
+void TNodeAddCtx::UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed) {
+    auto& data = conf.GetById(TVersionedCmdId(ElemId).CmdId());
+    if (UpdNode == TNodeId::Invalid || changed) {
+        data.CmdModStamp = stamps.CurStamp();
+    }
+}
+
 bool TMaybeNodeUpdater::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
     if (Deps.Push({depType, elemNodeType, elemId})) {
         SavedRequests.push_back(ERequestType::SingleDep);

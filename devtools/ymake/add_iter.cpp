@@ -1821,6 +1821,7 @@ inline void TUpdIter::Left(TState& state) {
                 }
             } else if (LastType == EMNT_BuildCommand && Graph.Names().CommandConf.GetById(LastElem).KeepTargetPlatform) { // IsInnerCommandDep
                 Graph.Names().CommandConf.GetById(node->ElemId).KeepTargetPlatform = true;
+                YDebug() << "TUpdIter::left: KeepTargetPlatform is set in for " << node->GetEntry().DumpDebugNode() << Endl;
             }
         }
     }
