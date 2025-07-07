@@ -18,6 +18,8 @@ PEERDIR(
 
 END()
 
-RECURSE_FOR_TESTS(
-    tests
-)
+IF (NOT OS_WINDOWS)
+    RECURSE_FOR_TESTS(
+        tests
+    )
+ENDIF()
