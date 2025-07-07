@@ -26,7 +26,6 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/__trace__
         devtools/ya/handlers/addremove
         devtools/ya/handlers/clang_tidy
-        devtools/ya/handlers/clone
         devtools/ya/handlers/completion
         devtools/ya/handlers/dctl
         devtools/ya/handlers/download
@@ -64,7 +63,6 @@ RECURSE(
     autocheck
     buf
     clang_tidy
-    clone
     completion
     curl
     dctl

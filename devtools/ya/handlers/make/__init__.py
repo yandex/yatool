@@ -19,9 +19,6 @@ class MakeYaHandler(devtools.ya.core.yarg.OptsHandler):
                 devtools.ya.core.yarg.UsageExample(
                     '{prefix} -t -j16 library', 'Build and test library with 16 threads'
                 ),
-                devtools.ya.core.yarg.UsageExample(
-                    '{prefix} --checkout -j0', 'Checkout absent directories without build'
-                ),
             ],
             stderr_help=self.stderr_help,
             description=self.description,
