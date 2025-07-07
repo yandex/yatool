@@ -344,7 +344,7 @@ class VSCodeProject:
         venv_opts = venv.VenvOptions()
         venv_opts.venv_add_tests = self.params.tests_enabled
         venv_opts.venv_root = os.path.join(self.project_root, 'venv')
-        venv_opts.venv_with_pip = False
+        venv_opts.venv_with_pip = True
         fs.remove_tree_safe(venv_opts.venv_root)
         venv_opts.venv_tmp_project = self.venv_tmp_project()
         venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
@@ -453,6 +453,7 @@ class VSCodeProject:
             venv_args = self.params.ya_make_extra + [
                 '--venv-root=%s' % os.path.join(self.project_root, 'venv'),
                 '--venv-tmp-project=%s' % self.venv_tmp_project(),
+                '--venv-with-pip',
             ]
             if self.params.tests_enabled:
                 venv_args.append('--venv-add-tests')
