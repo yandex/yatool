@@ -460,7 +460,7 @@ class _JavaSemGraph(SemGraph):
                         in_module_path = ""  # by default no main module
                         module_node = None
                         tlen = len(str_rel_node_path)
-                        for [main_path, main_node] in mains:
+                        for main_path, main_node in mains:
                             if len(main_path) < tlen and str_rel_node_path.startswith(main_path + "/"):
                                 # Test in main module
                                 rel_module_path = Path(main_path)

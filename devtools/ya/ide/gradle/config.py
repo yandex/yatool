@@ -1,5 +1,8 @@
+import os
 import logging
+import re
 from pathlib import Path
+from configparser import ConfigParser
 
 from devtools.ya.core import config as core_config
 from devtools.ya.build.sem_graph import SemLang, SemConfig, SemException
@@ -24,14 +27,21 @@ class _JavaSemConfig(SemConfig):
 
     EXPORT_ROOT_BASE: Path = Path(core_config.misc_root()) / 'gradle'  # Base folder of all export roots
 
+    _YA_GRADLE_CONFIG = 'ya.gradle.config'
+    _YA_IDE_GRADLE = 'ya.ide.gradle'
+
     def __init__(self, params):
         if platform_matcher.is_windows():
             raise YaIdeGradleException("Windows is not supported in ya ide gradle")
         super().__init__(SemLang.JAVA(), params)
+        self.start_cwd: Path = Path().cwd()
         self.logger = logging.getLogger(type(self).__name__)
         self.settings_root: Path = self._get_settings_root()
         if not self.params.remove:
             self._check_gradle_props()
+        self.ya_gradle_config_file: Path = self.settings_root / self._YA_GRADLE_CONFIG
+        self.ya_gradle_config: ConfigParser = None
+        self._update_params()
         self.rel_exclude_targets: list[str] = []
         self._check_exclude_targets()
 
@@ -66,10 +76,10 @@ class _JavaSemConfig(SemConfig):
             )
 
     def _check_exclude_targets(self) -> None:
-        if not self.params.exclude_targets:
+        if not self.params.exclude:
             return
         cwd = Path().cwd().resolve()
-        for exclude_target in self.params.exclude_targets:
+        for exclude_target in self.params.exclude:
             exclude_target = Path(exclude_target)
             if not exclude_target.is_absolute():
                 exclude_target = cwd / exclude_target
@@ -107,7 +117,7 @@ class _JavaSemConfig(SemConfig):
     def _get_settings_root(self) -> Path:
         """Create settings_root path by options and targets"""
         settings_root = Path(self.params.abs_targets[0])
-        cwd = Path.cwd()
+        cwd = self.start_cwd
         if self.params.settings_root:
             cwd_settings_root = cwd / self.params.settings_root
             if cwd.is_relative_to(self.arcadia_root) and cwd_settings_root.exists():
@@ -127,3 +137,49 @@ class _JavaSemConfig(SemConfig):
             if rel_target.is_relative_to(Path(conf_rel_target)):
                 return True
         return False
+
+    def get_project_gradle_props(self) -> dict[str, str]:
+        return self._get_section(self.GRADLE_PROPS)
+
+    def _update_params(self) -> None:
+        props = self._get_section(self._YA_IDE_GRADLE).items()
+        if not props:
+            return
+        os.chdir(self.settings_root)  # in options has relative paths, it relative to settings root
+        self.logger.info("Set params from %s:", self.ya_gradle_config_file.relative_to(self.arcadia_root))
+        default_true_params = ['collect_contribs', 'build_foreign']
+        for prop, value in props:
+            param = self._prop2param(prop)
+            if not hasattr(self.params, param):
+                raise YaIdeGradleException(f"Unknown ya ide gradle param {param}")
+            if (getattr(self.params, param) and (param not in default_true_params)) or (
+                not getattr(self.params, param) and (param in default_true_params)
+            ):  # already overwrote by command line opts
+                continue  # skip config value
+            if isinstance(getattr(self.params, param), list):  # this param must be list
+                value = re.split(r'[\s\t\n,]+', value)
+            elif value is None:  # prop without value, some flag, for example, disable-lombok-plugin
+                value = True
+            setattr(self.params, param, value)
+            self.logger.info("    %s = %s", param, getattr(self.params, param))
+
+    @staticmethod
+    def _prop2param(prop: str) -> str:
+        return prop.replace('-', '_')
+
+    def _get_section(self, section: str) -> dict[str, str]:
+        self._load_ya_gradle_config()
+        if section not in self.ya_gradle_config.sections():
+            return {}
+        return self.ya_gradle_config[section]
+
+    def _load_ya_gradle_config(self) -> None:
+        if self.ya_gradle_config is not None:
+            return
+        self.ya_gradle_config = ConfigParser(allow_no_value=True)
+        if not self.ya_gradle_config_file.exists():
+            return
+        try:
+            self.ya_gradle_config.read(str(self.ya_gradle_config_file), 'UTF-8')
+        except Exception as e:
+            raise YaIdeGradleException(f"Can't read config file {self.ya_gradle_config_file}: {e}") from e

@@ -17,18 +17,16 @@ class _YaSettings:
     def save(self) -> None:
         self._write_xml(self._make_xml(), self.config.export_root / self.YA_SETTINGS_XML)
 
-    @classmethod
-    def _make_xml(cls) -> eTree.Element:
+    def _make_xml(self) -> eTree.Element:
         xml_root = eTree.Element('root')
         cmd = eTree.SubElement(xml_root, 'cmd')
         for arg in sys.argv:
             eTree.SubElement(cmd, 'part').text = arg
-        eTree.SubElement(xml_root, 'cwd').text = str(Path.cwd())
+        eTree.SubElement(xml_root, 'cwd').text = str(self.config.start_cwd)
         return xml_root
 
-    @classmethod
-    def _write_xml(cls, xml_root: eTree.Element, path: Path) -> None:
-        cls._elem_indent(xml_root)
+    def _write_xml(self, xml_root: eTree.Element, path: Path) -> None:
+        self._elem_indent(xml_root)
         with path.open('wb') as f:
             eTree.ElementTree(xml_root).write(f, encoding="utf-8")
 

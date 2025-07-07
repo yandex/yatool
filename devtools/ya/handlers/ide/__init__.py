@@ -397,7 +397,7 @@ class GradleOptions(yarg.Options):
         self.disable_generated_symlinks: bool = False
         self.force_jdk_version: str = None
         self.remove: bool = False
-        self.exclude_targets: list[str] = []
+        self.exclude: list[str] = []
         self.gradle_daemon_jvmargs: str = None
         self.kotlin_daemon_jvmargs: str = None
 
@@ -457,7 +457,7 @@ class GradleOptions(yarg.Options):
             yarg.ArgConsumer(
                 [GradleOptions.OPT_EXCLUDE],
                 help='Exclude module and submodules from gradle project',
-                hook=yarg.SetAppendHook('exclude_targets'),
+                hook=yarg.SetAppendHook('exclude'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
