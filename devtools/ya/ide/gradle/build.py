@@ -107,6 +107,7 @@ class _Builder:
             opts.bld_dir = self.config.params.bld_dir
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
+            opts.ignore_recurses = True
 
             opts.rel_targets = []
             opts.abs_targets = []
