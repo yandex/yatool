@@ -248,6 +248,10 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
         throw yexception() << "Cannot start process: " << errStream.Str();
     }
 
+    if (exitCode != 0) {
+        Cerr << errStream.Str() << Endl;
+    }
+
     for (const auto& [i, param]: Enumerate(params)) {
         results[i] = MakeAtomicShared<TRunYMakeResult>(exitCode, std::move(outStreams[i].Str()), std::move(errStreams[i].Str()));
     }
