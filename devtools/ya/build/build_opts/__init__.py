@@ -1537,6 +1537,7 @@ class YMakeModeOptions(Options):
         self.ymake_tool_servermode = False
         self.ymake_pic_servermode = False
         self.ymake_multiconfig = False
+        self.force_ymake_multiconfig = False
         self.ymake_parallel_rendering = False
 
     @staticmethod
@@ -1594,16 +1595,30 @@ class YMakeModeOptions(Options):
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
+            ArgConsumer(
+                ['--force-ymake-multiconfig'],
+                help='Run one ymake for each configuration',
+                hook=SetConstValueHook('force_ymake_multiconfig', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             EnvConsumer(
                 'YA_YMAKE_MULTICONFIG',
                 hook=SetValueHook('ymake_multiconfig', return_true_if_enabled),
             ),
+            EnvConsumer(
+                'YA_FORCE_YMAKE_MULTICONFIG',
+                hook=SetValueHook('force_ymake_multiconfig', return_true_if_enabled),
+            ),
             ConfigConsumer('ymake_multiconfig'),
+            ConfigConsumer('force_ymake_multiconfig'),
             ConfigConsumer('ymake_parallel_rendering'),
         ]
 
     def postprocess2(self, params):
-        if self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
+        if self.force_ymake_multiconfig:
+            self.ymake_multiconfig = True
+        elif self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
             self.ymake_multiconfig = False
             logger.debug('Ymake multiconfig is disabled for more than one target platform')
 
