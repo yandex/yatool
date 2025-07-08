@@ -1597,8 +1597,8 @@ class YMakeModeOptions(Options):
             ),
             ArgConsumer(
                 ['--force-ymake-multiconfig'],
-                help='Run one ymake for each configuration',
-                hook=SetConstValueHook('force_ymake_multiconfig', False),
+                help='Run one ymake for all configurations regardless of the number of target platforms',
+                hook=SetConstValueHook('force_ymake_multiconfig', True),
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
@@ -1618,6 +1618,7 @@ class YMakeModeOptions(Options):
     def postprocess2(self, params):
         if self.force_ymake_multiconfig:
             self.ymake_multiconfig = True
+            logger.debug('Ymake multiconfig is forced for more than one target platform')
         elif self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
             self.ymake_multiconfig = False
             logger.debug('Ymake multiconfig is disabled for more than one target platform')
