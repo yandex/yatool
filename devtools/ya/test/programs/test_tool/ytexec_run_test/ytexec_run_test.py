@@ -643,7 +643,8 @@ def process_test_results(args, ytexec_config, exit_code, start_time):
 
     print_file(stderr_path)
     yt_metrics = {
-        "ytexec_upload_files_count": len(ytexec_config.fs_fields.upload_tar) + len(ytexec_config.fs_fields.upload_file)
+        "ytexec_upload_files_count": len(ytexec_config.fs_fields.upload_tar) + len(ytexec_config.fs_fields.upload_file),
+        "ytexec_upload_size_mb": get_upload_size(ytexec_config) / 2**20,
     }
 
     if os.path.exists(result_path):
@@ -683,7 +684,6 @@ def process_test_results(args, ytexec_config, exit_code, start_time):
                 yt_metrics["ytexec_operation_creation_delay_s"] = timediff
             else:
                 msg += "operation was not created\n"
-            yt_metrics["ytexec_upload_size_mb"] = get_upload_size(ytexec_config) / 2**20
             msg += "test metrics:\n{}".format(yt_metrics)
             suite = dump_test_info(args, metrics=yt_metrics, error=msg, status=const.Status.TIMEOUT)
         else:
