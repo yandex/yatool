@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import random
-import six
 import sys
 import time
 import traceback
-
+from functools import wraps
 
 # sys.maxint / 2, since Python 3.2 doesn't have a sys.maxint...
 MAX_WAIT = 1073741823
@@ -40,7 +39,7 @@ def retry(*dargs, **dkw):
     if len(dargs) == 1 and callable(dargs[0]):
 
         def wrap_simple(f):
-            @six.wraps(f)
+            @wraps(f)
             def wrapped_f(*args, **kw):
                 return Retrying().call(f, *args, **kw)
 
@@ -51,7 +50,7 @@ def retry(*dargs, **dkw):
     else:
 
         def wrap(f):
-            @six.wraps(f)
+            @wraps(f)
             def wrapped_f(*args, **kw):
                 return Retrying(*dargs, **dkw).call(f, *args, **kw)
 
@@ -83,6 +82,7 @@ class Retrying(object):
         wait_jitter_max=None,
         before_attempts=None,
         after_attempts=None,
+        logger=None,
     ):
 
         self._stop_max_attempt_number = (
@@ -110,6 +110,14 @@ class Retrying(object):
         self._wait_jitter_max = 0 if wait_jitter_max is None else wait_jitter_max
         self._before_attempts = before_attempts
         self._after_attempts = after_attempts
+        
+        if logger in (True, None):
+            self._logger = logging.getLogger(__name__)
+            if logger is None:
+                self._logger.addHandler(logging.NullHandler()) 
+                self._logger.propagate = False
+        elif logger:
+           self._logger = logger
 
         # TODO add chaining of stop behaviors
         # stop behavior
@@ -167,7 +175,7 @@ class Retrying(object):
             # this allows for providing a tuple of exception types that
             # should be allowed to retry on, and avoids having to create
             # a callback that does the same thing
-            if isinstance(retry_on_exception, (tuple)):
+            if isinstance(retry_on_exception, (tuple, Exception)):
                 retry_on_exception = _retry_if_exception_of_type(retry_on_exception)
             self._retry_on_exception = retry_on_exception
 
@@ -249,13 +257,14 @@ class Retrying(object):
 
             try:
                 attempt = Attempt(fn(*args, **kwargs), attempt_number, False)
-            except:
+            except Exception:
                 tb = sys.exc_info()
                 attempt = Attempt(tb, attempt_number, True)
 
             if not self.should_reject(attempt):
                 return attempt.get(self._wrap_exception)
 
+            self._logger.warn(attempt)
             if self._after_attempts:
                 self._after_attempts(attempt_number)
 
@@ -271,6 +280,7 @@ class Retrying(object):
                 if self._wait_jitter_max:
                     jitter = random.random() * self._wait_jitter_max
                     sleep = sleep + max(0, jitter)
+                self._logger.info("Retrying in {0:.2f} seconds.".format(sleep / 1000.0))
                 time.sleep(sleep / 1000.0)
 
             attempt_number += 1
@@ -298,7 +308,8 @@ class Attempt(object):
             if wrap_exception:
                 raise RetryError(self)
             else:
-                six.reraise(self.value[0], self.value[1], self.value[2])
+                exc_type, exc, tb = self.value
+                raise exc.with_traceback(tb)
         else:
             return self.value
 
