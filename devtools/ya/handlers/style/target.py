@@ -25,6 +25,27 @@ class MineOptions(tp.NamedTuple):
     tty: bool = os.isatty(sys.stdin.fileno())
 
 
+def _mine_filepath_targets(paths: tuple[Path]) -> Generator[Target]:
+    for path in paths:
+        if path.is_symlink():
+            continue
+        if path.is_file():
+            yield path.resolve(), path.read_text
+        elif path.is_dir():
+            path = path.resolve()
+            for dirpath, _, filenames in path.walk():
+                if dirpath.is_symlink():
+                    continue
+
+                for filename in filenames:
+                    filepath = dirpath / filename
+                    if filepath.is_symlink():
+                        continue
+                    yield filepath, filepath.read_text
+        else:
+            logger.warning('skip %s (no such file or directory)', path)
+
+
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
@@ -32,24 +53,11 @@ def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
 
     # read cwd if target is not specified
     if not mine_opts.targets and mine_opts.tty:
-        targets = (Path.cwd(),)
+        paths = (Path.cwd(),)
     else:
-        targets = mine_opts.targets
+        paths = mine_opts.targets
 
-    for target in targets:
-        if target.is_symlink():
-            continue
-        if target.is_file():
-            yield target.absolute(), target.read_text
-        elif target.is_dir():
-            for dirpath, _, filenames in target.walk():
-                for filename in filenames:
-                    file = dirpath / filename
-                    if file.is_symlink():
-                        continue
-                    yield file.absolute(), file.read_text
-        else:
-            logger.warning('skip %s (no such file or directory)', target)
+    yield from _mine_filepath_targets(paths)
 
 
 def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[styler.Styler]]]]:
