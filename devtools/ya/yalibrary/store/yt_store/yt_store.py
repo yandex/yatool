@@ -115,6 +115,7 @@ class YtStore(DistStore):
                     proxy,
                     data_dir,
                     token,
+                    retry_time_limit,
                 )
                 logger.debug('Will use new YT store client')
                 self._xx_prepare_data = bool(kwargs.get('cpp_prepare_data'))

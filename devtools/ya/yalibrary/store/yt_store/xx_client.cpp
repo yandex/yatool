@@ -59,17 +59,37 @@ static void InitializeYt() {
     }
 }
 
-YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token) {
+namespace {
+    class TRetryConfigProvider: public IRetryConfigProvider {
+    public:
+        TRetryConfigProvider(TDuration retryTimeLimit) {
+            RetryConfig_ = TRetryConfig{.RetriesTimeLimit = retryTimeLimit};
+        }
+
+        TRetryConfig CreateRetryConfig() {
+            return RetryConfig_;
+        }
+
+    private:
+        TRetryConfig RetryConfig_;
+    };
+}
+
+YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token, TDuration retry_time_limit) {
+    constexpr auto RETRY_INTERVAL = TDuration::MilliSeconds(500);
     InitializeYt();
-    if (yt_token && strlen(yt_token)) {
-        this->Client = NYT::CreateClient(yt_proxy, NYT::TCreateClientOptions().Token(yt_token));
-    } else {
-        this->Client = NYT::CreateClient(yt_proxy);
+    auto config = NYT::TConfig::Get();
+    config->ConnectTimeout = TDuration::Seconds(5);
+    config->SocketTimeout = TDuration::Seconds(5);
+    config->RetryInterval = RETRY_INTERVAL;
+    config->RetryCount = 5;
+    NYT::TCreateClientOptions clientOpts = NYT::TCreateClientOptions().Token(yt_token);
+    if (retry_time_limit) {
+        config->RetryCount = retry_time_limit / RETRY_INTERVAL + 1;
+        // Limit total retry time because each attempt consumes non-zero time
+        clientOpts.RetryConfigProvider(MakeIntrusive<TRetryConfigProvider>(retry_time_limit));
     }
-    NYT::TConfig::Get()->ConnectTimeout = TDuration::Seconds(5);
-    NYT::TConfig::Get()->SocketTimeout = TDuration::Seconds(5);
-    NYT::TConfig::Get()->RetryInterval = TDuration::MilliSeconds(500);
-    NYT::TConfig::Get()->RetryCount = 5;
+    this->Client = NYT::CreateClient(yt_proxy, clientOpts);
     this->YtDir = yt_dir;
 }
 

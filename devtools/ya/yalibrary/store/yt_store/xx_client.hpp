@@ -31,7 +31,7 @@ struct YtStorePrepareDataResponse {
 };
 
 struct YtStore {
-    YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token);
+    YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token, TDuration retry_time_limit = {});
     ~YtStore();
     void DoTryRestore(const YtStoreClientRequest& req, YtStoreClientResponse& rsp);
     void PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDataResponse& rsp);

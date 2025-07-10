@@ -4,6 +4,7 @@ cdef extern from "Python.h":
 from libcpp cimport bool
 from cpython.version cimport PY_VERSION_HEX
 from util.generic.vector cimport TVector
+from util.datetime.base cimport TDuration
 
 import logging
 import os
@@ -37,7 +38,7 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         size_t RawSize;
         char ErrorMsg[4096];
     cdef cppclass YtStore:
-        YtStore(const char *yt_proxy, const char *yt_dir, const char *yt_token) except +
+        YtStore(const char *yt_proxy, const char *yt_dir, const char *yt_token, TDuration retry_time_limit) except +
         void DoTryRestore(const YtStoreClientRequest &req, YtStoreClientResponse &rsp) nogil
         void PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDataResponse& rsp) nogil
 
@@ -47,11 +48,12 @@ class NetworkException(Exception):
 cdef class YtStoreWrapper:
     cdef YtStore *c_ytstore
 
-    def __init__(self, yt_proxy, yt_dir, yt_token):
+    def __init__(self, yt_proxy, yt_dir, yt_token, retry_time_limit):
         self.c_ytstore = new YtStore(
             PyUnicode_AsUTF8(yt_proxy),
             PyUnicode_AsUTF8(yt_dir),
             PyUnicode_AsUTF8(yt_token or ""),
+            TDuration.MicroSeconds(int((retry_time_limit or 0) * 1_000_000))
         )
 
     def do_try_restore(self, shash, into_dir, codec, chunks_count, data_size):
