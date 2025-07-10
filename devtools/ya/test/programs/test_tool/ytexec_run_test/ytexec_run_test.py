@@ -647,7 +647,8 @@ def process_test_results(args, ytexec_config, exit_code, start_time):
         "ytexec_upload_size_mb": get_upload_size(ytexec_config) / 2**20,
     }
 
-    if gpu_limit := getattr(ytexec_config.operation_fields.task_patch, 'gpu_limit', None):
+    task_patch = getattr(ytexec_config.operation_fields, 'task_patch', None) or {}
+    if gpu_limit := task_patch.get('gpu_limit', None):
         yt_metrics["ytexec_gpu_limit"] = gpu_limit
 
     if os.path.exists(result_path):
