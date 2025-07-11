@@ -63,9 +63,10 @@ class TSubst2Json: public TJsonCmdAcceptor {
 
     bool IsFake = false;
     TMakeNode* MakeNode = nullptr;
+    bool FillModule2Nodes;
 
 public:
-    TSubst2Json(const TJSONVisitor&, TDumpInfoUID&, TMakeNode* makeNode);
+    TSubst2Json(const TJSONVisitor&, TDumpInfoUID&, TMakeNode* makeNode, bool fillModule2Nodes = false);
 
     void GenerateJsonTargetProperties(const TConstDepNodeRef&, const TModule* mod, bool isGlobalNode);
 

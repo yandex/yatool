@@ -1025,6 +1025,14 @@ void TJSONVisitor::FinishCurrent(TState& state) {
         if (IsFileType(CurrNode->NodeType)) {
             TStringBuf nodeName = Graph.ToTargetStringBuf(CurrNode);
             UpdateCurrent(state, nodeName, "Include node name to current structure hash");
+
+            // include module_tag to non-module nodes and if module if from multimodule
+            if (!IsModuleType(CurrNode->NodeType)) {
+                const auto moduleIt = FindModule(state);
+                if (moduleIt != state.end() && moduleIt->Module->IsFromMultimodule()) {
+                    UpdateCurrent(state, moduleIt->Module->GetTag(), "Include module tag to current structure hash");
+                }
+            }
         }
     }
 

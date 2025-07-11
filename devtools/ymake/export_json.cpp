@@ -101,7 +101,7 @@ namespace {
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
                 , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
-                , Subst2Json(cmdBuilder, DumpInfo, resultNode)
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode, ymake.GetFillModule2Nodes())
                 , MakeCommand(modulesStatesCache, ymake)
         {
             PrepareDeps();
@@ -339,7 +339,7 @@ namespace {
                 cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
                 auto& context = cache.GetConversionContext(&node);
                 renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
-                jsonWriter.WriteArrayValue(plan.NodesArr,*cachedNode, &context);
+                jsonWriter.WriteArrayValue(plan.NodesArr, *cachedNode, &context);
                 return;
             }
         }
