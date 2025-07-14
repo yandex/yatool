@@ -69,19 +69,19 @@ def _flush_to_terminal(content: str, formatted_content: str, full_output: bool) 
         display.emit_message(diff)
 
 
-def _style(style_opts: StyleOptions, styler: stlr.Styler, target_: trgt.Target) -> StyleOutput:
+def _style(style_opts: StyleOptions, styler: stlr.Styler, target: trgt.Target) -> StyleOutput:
     """
     Execute `format` and store or display the result.
     Return 0 if no formatting happened, 1 otherwise
     """
-    target_path, loader = target_
-    content = loader()
+    content = target.reader()
+    target_path = target.path
 
-    if target_path.name.startswith(trgt.STDIN_FILENAME_STAMP):
+    if target.stdin:
         print(styler.format(target_path, content).content)
         return StyleOutput(rc=0, styler=styler)
 
-    target_path = tp.cast(Path, target_path)
+    target_path = tp.cast(Path, target_path)  # could be PurePath only when from stdin
     if style_opts.force or not (reason := rules.get_skip_reason(str(target_path), content)):
         styler_output = styler.format(target_path, content)
         if styler_output.content == content:
@@ -126,7 +126,7 @@ def run_style(args) -> int:
     style_targets: dict[type[stlr.Styler], list[trgt.Target]] = {}
     disamb_errors: list[str] = []
     for target, styler_classes in trgt.discover_style_targets(mine_opts):
-        res = disambiguate.disambiguate_targets(target[0], styler_classes, disambiguation_opts)
+        res = disambiguate.disambiguate_targets(target.path, styler_classes, disambiguation_opts)
         if isinstance(res, str):
             disamb_errors.append(res)
         else:

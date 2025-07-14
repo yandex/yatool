@@ -11,11 +11,8 @@ from . import styler
 
 
 STDIN_FILENAME = 'source.cpp'
-STDIN_FILENAME_STAMP = 'STDIN_FILENAME_STAMP'
 
 logger = logging.getLogger(__name__)
-
-type Target = tuple[Path | PurePath, Callable[..., str]]
 
 
 class MineOptions(tp.NamedTuple):
@@ -25,12 +22,18 @@ class MineOptions(tp.NamedTuple):
     tty: bool = os.isatty(sys.stdin.fileno())
 
 
+class Target(tp.NamedTuple):
+    path: Path | PurePath
+    reader: Callable[..., str]
+    stdin: bool = False
+
+
 def _mine_filepath_targets(paths: tuple[Path]) -> Generator[Target]:
     for path in paths:
         if path.is_symlink():
             continue
         if path.is_file():
-            yield path.resolve(), path.read_text
+            yield Target(path.resolve(), path.read_text)
         elif path.is_dir():
             path = path.resolve()
             for dirpath, _, filenames in path.walk():
@@ -41,7 +44,7 @@ def _mine_filepath_targets(paths: tuple[Path]) -> Generator[Target]:
                     filepath = dirpath / filename
                     if filepath.is_symlink():
                         continue
-                    yield filepath, filepath.read_text
+                    yield Target(filepath, filepath.read_text)
         else:
             logger.warning('skip %s (no such file or directory)', path)
 
@@ -49,7 +52,7 @@ def _mine_filepath_targets(paths: tuple[Path]) -> Generator[Target]:
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
-        yield PurePath(STDIN_FILENAME_STAMP + mine_opts.stdin_filename), sys.stdin.read
+        yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.read, stdin=True)
 
     # read cwd if target is not specified
     if not mine_opts.targets and mine_opts.tty:
@@ -64,5 +67,5 @@ def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, se
     for target in _mine_targets(mine_opts):
         state_helper.check_cancel_state()
 
-        if styler_classes := styler.select_suitable_stylers(target=target[0], file_types=mine_opts.file_types):
+        if styler_classes := styler.select_suitable_stylers(target=target.path, file_types=mine_opts.file_types):
             yield target, styler_classes
