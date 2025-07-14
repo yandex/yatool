@@ -20,7 +20,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
     if (args.empty() && argNames.empty()) {
         return {};
     }
-    const bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
+    const bool hasVarArg = argNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
     const bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
     if (argNames.size() != args.size() && (argNames.empty() || (argNames.size() > args.size() && !lastMayBeEmpty))) {
         return std::unexpected(TMapMacroVarsErr{
@@ -102,7 +102,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
             vars[name].back().IsMacro = true;
         }
         isEmptyArray = false;
-        //SBDIAG << "PMV : " << name << "=" << val << Endl;
+        //SBDIAG << "PMV : " << name << "=" << arg << Endl;
         if (!insideArray) {
             argNamesIndex++;
         }
@@ -110,7 +110,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
 
     //allowed for now
     if (argNamesIndex == argNames.size() - 1 && lastMayBeEmpty) {
-        TStringBuf name = argNames[argNames.size() - 1];
+        TStringBuf name = argNames.back();
         //SBDIAG << "Last argument is empty but it as an array argument, so " << name << " may be empty" << Endl;
         name.Chop(3); //was checked before (in lastMayBeEmpty initialization)
         vars[name];
