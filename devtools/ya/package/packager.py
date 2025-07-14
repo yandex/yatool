@@ -849,6 +849,7 @@ def create_package(package_context, output_root, builds):
                         debug_install_file.write('.debug/.content/* /\n')
 
                 package_path = package.debian.create_debian_package(
+                    result_dir,
                     temp_work_dir,
                     package_context,
                     params.arch_all,
