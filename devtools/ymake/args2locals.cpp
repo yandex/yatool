@@ -20,8 +20,8 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
     if (args.empty() && argNames.empty()) {
         return {};
     }
-    bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
-    bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
+    const bool hasVarArg = argNames[argNames.size() - 1].EndsWith(NStaticConf::ARRAY_SUFFIX); // FIXME: this incorrectly reports "true" for "macro M(X[]){...}" and suchlike
+    const bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
     if (argNames.size() != args.size() && (argNames.empty() || (argNames.size() > args.size() && !lastMayBeEmpty))) {
         return std::unexpected(TMapMacroVarsErr{
             .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
@@ -43,7 +43,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
 
         isLastArg = argNamesIndex >= argNames.size() - 1;
         TStringBuf name = argNames[isLastArg ? argNames.size() - 1 : argNamesIndex];
-        bool isArrayArg = name.EndsWith(NStaticConf::ARRAY_SUFFIX);
+        const bool isArrayArg = name.EndsWith(NStaticConf::ARRAY_SUFFIX);
 
         if (!isLastArg && insideArray && !isArrayArg) {
             return std::unexpected(TMapMacroVarsErr{
@@ -56,15 +56,14 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
             name.Chop(3);
         }
 
-        TStringBuf val = arg;
-        if (val == "SKIPPED") {
+        if (arg == "SKIPPED") {
             //SBDIAG << "PMV: Skip: " << name << Endl;
             vars[name]; //leave empty value
             argNamesIndex++;
             continue;
         }
 
-        if (val.StartsWith(NStaticConf::ARRAY_START)) {
+        if (arg.StartsWith(NStaticConf::ARRAY_START)) {
             if (insideArray) {
                 return std::unexpected(TMapMacroVarsErr{
                     .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
@@ -73,13 +72,13 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
             }
             insideArray = true;
             isEmptyArray = true;
-            val.Skip(1);
-            if (val.empty()) {
+            arg.Skip(1);
+            if (arg.empty()) {
                 continue;
             }
         }
 
-        if (val.EndsWith(NStaticConf::ARRAY_END)) {
+        if (arg.EndsWith(NStaticConf::ARRAY_END)) {
             if (!insideArray) {
                 return std::unexpected(TMapMacroVarsErr{
                     .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
@@ -87,8 +86,8 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
                 );
             }
             insideArray = false;
-            val.Chop(1);
-            if (val.empty()) {
+            arg.Chop(1);
+            if (arg.empty()) {
                 if (isEmptyArray) {
                     vars[name];
                 }
@@ -98,7 +97,7 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
         }
 
         //if (name == "MnInfo") YDIAG(VV) << vars << "*************\n";
-        vars[name].push_back(TVarStr(val, false, false));
+        vars[name].push_back(TVarStr(arg, false, false));
         if (IsPropertyVarName(vars[name].back().Name)) {
             vars[name].back().IsMacro = true;
         }
