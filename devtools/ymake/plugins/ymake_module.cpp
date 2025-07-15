@@ -12,12 +12,24 @@
 
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
+#include <util/string/strip.h>
+
+#include <contrib/libs/pugixml/pugixml.hpp>
 
 #include <Python.h>
 
 using namespace NYMake::NPlugins;
 
 namespace {
+    TStringBuf CutLastExtension(const TStringBuf path) {
+        TStringBuf left;
+        TStringBuf right;
+        if (path.TryRSplit('.', left, right) && !left.empty() && right.find_first_of("\\/") == right.npos) {
+            return left;
+        }
+        return path;
+    }
+
     typedef struct {
         PyObject_HEAD
         TPluginUnit* Unit;
@@ -31,13 +43,13 @@ namespace {
     }
 
     static PyTypeObject ContextType = {
-        .ob_base=PyVarObject_HEAD_INIT(nullptr, 0)
-        .tp_name="ymake.Context",
-        .tp_basicsize=sizeof(Context),
-        .tp_getattr=ContextTypeGetAttrFunc,
-        .tp_flags=Py_TPFLAGS_DEFAULT,
-        .tp_doc="Context objects",
-        .tp_new=PyType_GenericNew,
+        .ob_base = PyVarObject_HEAD_INIT(nullptr, 0)
+        .tp_name = "ymake.Context",
+        .tp_basicsize = sizeof(Context),
+        .tp_getattr = ContextTypeGetAttrFunc,
+        .tp_flags = Py_TPFLAGS_DEFAULT,
+        .tp_doc = "Context objects",
+        .tp_new = PyType_GenericNew,
     };
 
     typedef struct {
@@ -141,14 +153,14 @@ namespace {
     }
 
     static PyTypeObject CmdContextType = {
-        .ob_base=PyVarObject_HEAD_INIT(nullptr, 0)
-        .tp_name="ymake.CmdContext",
-        .tp_basicsize=sizeof(CmdContext),
-        .tp_call=CmdContextCall,
-        .tp_flags=Py_TPFLAGS_DEFAULT,
-        .tp_doc="CmdContext objects",
-        .tp_init=reinterpret_cast<initproc>(CmdContextInit),
-        .tp_new=PyType_GenericNew,
+        .ob_base = PyVarObject_HEAD_INIT(nullptr, 0)
+        .tp_name = "ymake.CmdContext",
+        .tp_basicsize = sizeof(CmdContext),
+        .tp_call = CmdContextCall,
+        .tp_flags = Py_TPFLAGS_DEFAULT,
+        .tp_doc = "CmdContext objects",
+        .tp_init = reinterpret_cast<initproc>(CmdContextInit),
+        .tp_new = PyType_GenericNew,
     };
 
     PyObject* MethodAddParser(PyObject* /*self*/, PyObject* args, PyObject* kwargs) {
@@ -262,6 +274,141 @@ namespace {
         return list.Release();
     }
 
+    PyObject* MethodGetArtifactIdFromPomXml(PyObject* /*self*/, PyObject* const* args, Py_ssize_t nargs) {
+        if (nargs != 1) {
+            PyErr_Format(PyExc_TypeError, "ymake.get_artifact_id_from_pom_xml takes 1 positional arguments but %z were given", nargs);
+            return nullptr;
+        }
+
+        const char* data = nullptr;
+        Py_ssize_t size = 0;
+        PyObject* xmlDocObject{args[0]};
+        TScopedPyObjectPtr asUnicode{};
+        if (PyUnicode_Check(xmlDocObject)) {
+            data = PyUnicode_AsUTF8AndSize(xmlDocObject, &size);
+            if (data == nullptr) {
+                return nullptr;
+            }
+        } else if (PyBytes_Check(xmlDocObject) || PyByteArray_Check(xmlDocObject)) {
+            asUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", NULL));
+            if (asUnicode == nullptr) {
+                return nullptr;
+            }
+            data = PyUnicode_AsUTF8AndSize(asUnicode, &size);
+            if (data == nullptr) {
+                return nullptr;
+            }
+        } else {
+            PyErr_SetString(PyExc_TypeError, "Expected string or UTF-8 encoded bytes or bytearray");
+            return nullptr;
+        }
+
+        pugi::xml_document doc;
+        if (doc.load_buffer(data, size)) {
+            pugi::xml_node root = doc.root();
+            for (auto path : {"/project/{http://maven.apache.org/POM/4.0.0}artifactId", "/project/artifactId"}) {
+                pugi::xml_node node = root.first_element_by_path(path);
+                if (node) {
+                    return Py_BuildValue("s", node.text().get());
+                }
+            }
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load XML document");
+            return nullptr;
+        }
+
+        Py_RETURN_NONE;
+    }
+
+    PyObject* MethodParseSsqlsFromString(PyObject* /*self*/, PyObject* const* args, Py_ssize_t nargs) {
+        if (nargs != 1) {
+            PyErr_Format(PyExc_TypeError, "ymake.select_attribute_values takes 1 positional arguments but %z were given", nargs);
+            return nullptr;
+        }
+
+        const char* data = nullptr;
+        Py_ssize_t dataSize = 0;
+        PyObject* xmlDocObject{args[0]};
+        TScopedPyObjectPtr dataAsUnicode{};
+        if (PyUnicode_Check(xmlDocObject)) {
+            data = PyUnicode_AsUTF8AndSize(xmlDocObject, &dataSize);
+            if (data == nullptr) {
+                return nullptr;
+            }
+        } else if (PyBytes_Check(xmlDocObject) || PyByteArray_Check(xmlDocObject)) {
+            dataAsUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", NULL));
+            if (dataAsUnicode == nullptr) {
+                return nullptr;
+            }
+            data = PyUnicode_AsUTF8AndSize(dataAsUnicode, &dataSize);
+            if (data == nullptr) {
+                return nullptr;
+            }
+        } else {
+            PyErr_SetString(PyExc_TypeError, "Expected string or UTF-8 encoded bytes or bytearray");
+            return nullptr;
+        }
+
+        pugi::xml_document doc;
+        if (doc.load_buffer(data, dataSize)) {
+            pugi::xml_node root = doc.root();
+            const pugi::xpath_node_set& includes = root.select_nodes("//include");
+            const pugi::xpath_node_set& ancestors = root.select_nodes("//ancestors/ancestor[@path]");
+            TVector<TString> headers;
+            TVector<TString> xmls;
+            for (const auto& node : includes) {
+                TStringBuf include{StripString(TStringBuf{node.node().text().get()}, [](const char* pch) { return EqualToOneOf(*pch, '<', '>', '"'); })};
+                if (!include.empty()) {
+                    headers.push_back(TString{include});
+                }
+
+                TStringBuf xml{node.node().attribute("path").value()};
+                if (!xml.empty()) {
+                    xmls.push_back(TString{xml});
+                }
+            }
+
+            for (const auto& node : ancestors) {
+                TStringBuf xml{node.node().attribute("path").value()};
+                if (!xml.empty()) {
+                    xmls.push_back(TString{xml});
+                    headers.push_back(TString::Join(CutLastExtension(xml), ".h"));
+                }
+            }
+
+            Py_ssize_t index{0};
+            TScopedPyObjectPtr xmlsList = PyList_New(xmls.size());
+            for (const auto& xml : xmls) {
+                if (PyList_SetItem(xmlsList, index++, Py_BuildValue("s", xml.c_str()))) {
+                    return nullptr;
+                }
+            }
+
+            index = 0;
+            TScopedPyObjectPtr headersList = PyList_New(headers.size());
+            for (const auto& header : headers) {
+                if (PyList_SetItem(headersList, index++, Py_BuildValue("s", header.c_str()))) {
+                    return nullptr;
+                }
+            }
+
+            TScopedPyObjectPtr result = PyTuple_New(2);
+            if (PyTuple_SetItem(result, 0, xmlsList.Release())) {
+                return nullptr;
+            }
+            if (PyTuple_SetItem(result, 1, headersList.Release())) {
+                return nullptr;
+            }
+
+            return result.Release();
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to load XML document");
+            return nullptr;
+        }
+
+        Py_RETURN_NONE;
+    }
+
     int YMakeExec(PyObject* mod) {
         if (PyType_Ready(&ContextType) < 0) {
             return -1;
@@ -281,17 +428,17 @@ namespace {
     }
 
     PyMethodDef YMakeMethods[] = {
-        {"add_parser", (PyCFunction)MethodAddParser, METH_VARARGS|METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
-        {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS|METH_KEYWORDS, PyDoc_STR("Report configure error")},
+        {"add_parser", (PyCFunction)MethodAddParser, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
+        {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
-        {NULL, NULL, 0, NULL}
-    };
+        {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},
+        {"parse_ssqls_from_string", (PyCFunction)MethodParseSsqlsFromString, METH_FASTCALL, PyDoc_STR("Parse SSQLS")},
+        {NULL, NULL, 0, NULL}};
 
     PyModuleDef_Slot YMakeSlots[] = {
         {Py_mod_exec, (void*)YMakeExec},
         {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
-        {0, NULL}
-    };
+        {0, NULL}};
 
     struct PyModuleDef ymakemodule = {
         PyModuleDef_HEAD_INIT,           // m_base
@@ -333,4 +480,4 @@ namespace NYMake::NPlugins {
         }
         return obj;
     }
-}
+} // namespace NYMake::NPlugins

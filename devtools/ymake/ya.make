@@ -6,6 +6,7 @@ PEERDIR(
     contrib/libs/asio
     contrib/libs/yaml-cpp
     contrib/libs/fmt
+    contrib/libs/pugixml
     contrib/libs/re2
     devtools/draft
     devtools/common/blacklist
