@@ -137,17 +137,9 @@ std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> a
 }
 
 void TMapMacroVarsErr::Report(TStringBuf argsStr) const {
-    switch (ErrorClass) {
-        case EMapMacroVarsErrClass::UserSyntaxError: {
-            const auto what = TString::Join(Message, "\n\tArgs: ", argsStr);
-            TRACE(S, NEvent::TMakeSyntaxError(what, Diag()->Where.back().second));
-            YConfErr(Syntax) << what << Endl;
-            break;
-        }
-        case EMapMacroVarsErrClass::ArgsSequenceError:
-            YErr() << Message << "\n\tArgs: " << argsStr << Endl;
-        break;
-    }
+    const auto what = TString::Join(Message, "\n\tArgs: ", argsStr);
+    TRACE(S, NEvent::TMakeSyntaxError(what, Diag()->Where.back().second));
+    YConfErr(Syntax) << what << Endl;
 }
 
 std::expected<void, TMapMacroVarsErr> AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals, IMemoryPool& memPool) {
