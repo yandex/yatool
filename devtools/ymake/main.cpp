@@ -46,7 +46,6 @@
 #include <util/generic/hash_set.h>
 #include <util/generic/maybe.h>
 #include <util/generic/ptr.h>
-#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/file.h>
@@ -701,9 +700,6 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
     // This should be called after cache loading because all errors including top level errors restore from cache
     ConfMsgManager()->EnableDelay();
 
-    Y_DEFER {
-        NStats::StackDepthStats.Report();
-    };
     return TMaybe<EBuildResult>();
 }
 

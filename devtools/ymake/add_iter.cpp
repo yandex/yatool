@@ -1117,7 +1117,6 @@ inline bool TUpdIter::Enter(TState& state) {
     TDGIterAddable& st = state.back();
     TDGIterAddable* prev = GetStateByDepth(1);
     BINARY_LOG(Iter, NIter::TEnterEvent, Graph, st.Node, prev ? prev->Dep.DepType : EDT_Last, EIterType::MainIter);
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::UpdIterMaxStackDepth, state.size());
 
     if (st.Node.NodeType == EMNT_Deleted)
         return false;
@@ -2000,7 +1999,6 @@ inline TUpdReiter::TUpdReiter(TUpdIter& parentIter)
 inline bool TUpdReiter::Enter(TState& state) {
     TUpdReIterSt& st = state.back();
     BINARY_LOG(Iter, NIter::TEnterEvent, Graph, st.Node, state.size() < 2 ? EDT_Last : (state.end() - 2)->Dep.DepType, EIterType::ReIter);
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::UpdReIterMaxStackDepth, state.size());
     if (st.Node.NodeType == EMNT_Deleted)
         return false;
 

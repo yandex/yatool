@@ -404,8 +404,6 @@ bool TJSONVisitor::AcceptDep(TState& state) {
 // 2. Do not re-subscan built file nodes.
 // 3. Always re-subscan all other nodes, unless they have no built nodes up ahead.
 bool TJSONVisitor::Enter(TState& state) {
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::JsonVisitorMaxStackDepth, state.Size());
-
     bool fresh = TBaseVisitor::Enter(state);
 
     UpdateReferences(state);
