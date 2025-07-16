@@ -2,7 +2,7 @@
 
 #include "md5.h"
 
-size_t TNodeValueDebug::GlobalIndex_ = 1;
+std::atomic<size_t> TNodeValueDebug::GlobalIndex_ = 1;
 
 const TNodeValueDebug TNodeValueDebug::None{};
 
