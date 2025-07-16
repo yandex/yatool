@@ -47,11 +47,26 @@
 
 #include <stdlib.h>
 
-#define SBDIAG YDIAG(SUBST) << MsgPad
+#define SBDIAG YDIAG(SUBST) << TStringBuf("                    ", Min<size_t>(20, MsgDepth))
 
 namespace {
 
-    TStringBuf MsgPad; // debug only
+#if defined(YMAKE_DEBUG)
+    struct TPadDiag {
+        TPadDiag(ui8& depth) : Depth_(depth) {
+            ++Depth_;
+        }
+        ~TPadDiag() {
+            --Depth_;
+        }
+
+        ui8& Depth_;
+    };
+#else
+    struct TPadDiag {
+        TPadDiag(ui8&) {}
+    };
+#endif
 
     TVarStrEx* FindMainElemOrDefault(std::span<TVarStrEx> elems, ui32 defaultElemPos) {
         if (elems.empty()) {
@@ -1363,7 +1378,7 @@ void TCommandInfo::FillCoords(
     bool setAddCtxFilled
 ) {
     TVector<TMacroData> lmacros;
-    TDbgPadHelper MsgPad(MsgDepth, ::MsgPad);
+    TPadDiag msgPad(MsgDepth);
     SBDIAG << "FM " << Get1(&Cmd) << "\n";
     // fill more inputs
     for (auto& macroData : macros) {
@@ -1878,7 +1893,7 @@ bool TCommandInfo::SubstData(
     ECmdFormat formatFor,
     const TSubstObserver& substObserver
 ) {
-    TDbgPadHelper MsgPad(MsgDepth, ::MsgPad);
+    TPadDiag msgPad(MsgDepth);
     if (EqualToOneOf(cmdFormat, ECF_ExpandVars, ECF_ExpandFoldableVars) && macro.RawString) {
         return false;
     }
@@ -2102,7 +2117,7 @@ void TCommandInfo::SubstData(
 }
 
 TString TCommandInfo::SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor) {
-    TDbgPadHelper MsgPad(MsgDepth, ::MsgPad);
+    TPadDiag msgPad(MsgDepth);
     if (MsgDepth > 30) {
         ythrow yexception() << "Macro call stack exceeded the limit" << Endl;
     }
