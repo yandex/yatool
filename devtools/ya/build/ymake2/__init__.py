@@ -125,6 +125,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('stdin_line_provider', default_value=None),
         yarg.Param('targets_from_evlog', default_value=False),
         yarg.Param('transition_source', default_value=None),
+        yarg.Param('platform_id', default_value=None),
         yarg.Param('report_pic_nopic', default_value=None),
         yarg.Param('descend_into_foreign', default_value=None),
         yarg.Param('drop_foreign_start_modules', default_value=None),
@@ -300,6 +301,10 @@ def _cons_ymake_args(**kwargs):
     transition_source = kwargs.pop('transition_source', None)
     if transition_source:
         ret += ['--transition-source', transition_source]
+
+    platform_id = kwargs.pop('platform_id', None)
+    if platform_id:
+        ret += ['--platform-id', platform_id]
 
     report_pic_nopic = kwargs.pop('report_pic_nopic', None)
     if report_pic_nopic is not None:

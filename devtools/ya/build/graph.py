@@ -1146,12 +1146,19 @@ class _ToolEventsQueueServerMode(_ToolTargetsQueue):
         return res
 
 
+def should_use_internal_servermode(opts):
+    return opts.ymake_internal_servermode
+
+
 def should_use_servermode_for_tools(opts):
     return opts.ymake_tool_servermode
 
 
 def create_tool_event_queue(opts):
-    if should_use_servermode_for_tools(opts):
+    if should_use_internal_servermode(opts):
+        # it's enough for disabling external queues and listeners
+        return None
+    elif should_use_servermode_for_tools(opts):
         return _ToolEventsQueueServerMode()
     else:
         return _ToolTargetsQueue()
@@ -1443,24 +1450,26 @@ class _GraphMaker:
                 no_pic_func, no_pic_tool_queue_putter = tool_targets_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
-            ymake_opts_nopic = ymake_opts
-            if to_build_pic and should_use_servermode_for_pic(self._opts):
+
+            ymake_opts_nopic = dict(
+                ymake_opts or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
+
+            nopic_servermode_opts = dict(
+                transition_source='nopic',
+                report_pic_nopic=True,
+            )
+            if should_use_internal_servermode(self._opts):
+                ymake_opts_nopic.update(platform_id=debug_id, **nopic_servermode_opts)
+            elif to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode()
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
 
-                ymake_opts_nopic = dict(
-                    ymake_opts or {},
-                    transition_source='nopic',
-                    report_pic_nopic=True,
-                )
-
-            ymake_opts_nopic = dict(
-                ymake_opts_nopic or {},
-                order=self.ymakes_scheduled,
-            )
-            self.ymakes_scheduled += 1
+                ymake_opts_nopic.update(**nopic_servermode_opts)
 
             def gen_no_pic():
                 return no_pic_func(
@@ -1492,9 +1501,27 @@ class _GraphMaker:
                     pic_func, self._make_debug_id(debug_id, 'pic')
                 )
 
-            ymake_opts_pic = ymake_opts
+            ymake_opts_pic = dict(
+                ymake_opts or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
+
+            pic_servermode_opts = dict(
+                targets_from_evlog=True,
+                source_root=self._opts.arc_root,
+                transition_source='pic',
+                dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
+            )
+
             abs_targets_pic = abs_targets
-            if pic_queue is not None:
+            if should_use_internal_servermode(self._opts):
+                ymake_opts_pic['platform_id'] = debug_id
+                # tool options are different and set in _get_tools()
+                if graph_kind == _GraphKind.TARGET:
+                    ymake_opts_pic.update(**pic_servermode_opts)
+                abs_targets_pic = []
+            elif pic_queue is not None:
 
                 def stdin_line_provider():
                     # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.
@@ -1505,21 +1532,8 @@ class _GraphMaker:
                         return ''
                     return json.dumps(pic_queue.get()) + '\n'
 
-                ymake_opts_pic = dict(
-                    ymake_opts or {},
-                    targets_from_evlog=True,
-                    source_root=self._opts.arc_root,
-                    stdin_line_provider=stdin_line_provider,
-                    transition_source='pic',
-                    dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
-                )
+                ymake_opts_pic.update(stdin_line_provider=stdin_line_provider, **pic_servermode_opts)
                 abs_targets_pic = []
-
-            ymake_opts_pic = dict(
-                ymake_opts_pic or {},
-                order=self.ymakes_scheduled,
-            )
-            self.ymakes_scheduled += 1
 
             def gen_pic():
                 return pic_func(
@@ -2910,7 +2924,16 @@ def _gen_merge_nodes(nodes):
 
 
 def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts, ymake_opts):
-    if should_use_servermode_for_tools(opts):
+    if should_use_internal_servermode(opts):
+        kwargs = {
+            'abs_targets': [],
+            'ymake_opts': {
+                'targets_from_evlog': True,
+                'source_root': arc_root,
+                **ymake_opts,
+            },
+        }
+    elif should_use_servermode_for_tools(opts):
 
         def stdin_line_provider():
             # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.

@@ -1539,6 +1539,7 @@ class YMakeModeOptions(Options):
         self.ymake_multiconfig = False
         self.force_ymake_multiconfig = False
         self.ymake_parallel_rendering = False
+        self.ymake_internal_servermode = False
 
     @staticmethod
     def consumer():
@@ -1613,6 +1614,7 @@ class YMakeModeOptions(Options):
             ConfigConsumer('ymake_multiconfig'),
             ConfigConsumer('force_ymake_multiconfig'),
             ConfigConsumer('ymake_parallel_rendering'),
+            ConfigConsumer('ymake_internal_servermode'),
         ]
 
     def postprocess2(self, params):
@@ -1622,6 +1624,9 @@ class YMakeModeOptions(Options):
         elif self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
             self.ymake_multiconfig = False
             logger.debug('Ymake multiconfig is disabled for more than one target platform')
+        if not self.ymake_multiconfig:
+            self.ymake_internal_servermode = False
+            logger.debug('Ymake internal servermode is available only in multiconfig mode')
 
 
 class YMakeBinOptions(Options):
