@@ -407,8 +407,13 @@ def concatenate_binaries(files, dst):
 @shared.timeit
 def get_output_files(dirs, skip_files, skip_dirs):
     files_map = collections.defaultdict(list)
+    dirs_set = {os.path.normpath(d) for d in dirs}
     for dirname in dirs:
+        top_level = True
         for root, _, files in os.walk(dirname):
+            if not top_level and os.path.normpath(root) in dirs_set:
+                # NOTE:(DEVTOOLSSUPPORT-66303) Skip nested output dirs
+                continue
             if os.path.basename(root) in skip_dirs:
                 logger.debug("Skipped dir: %s", root)
                 continue
@@ -419,6 +424,7 @@ def get_output_files(dirs, skip_files, skip_dirs):
                     continue
                 rel_name = os.path.relpath(abs_name, dirname)
                 files_map[rel_name].append(abs_name)
+            top_level = False
     return files_map
 
 
