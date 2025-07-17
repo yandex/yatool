@@ -42,14 +42,18 @@ namespace {
         return obj;
     }
 
-    static PyTypeObject ContextType = {
-        .ob_base = PyVarObject_HEAD_INIT(nullptr, 0)
-        .tp_name = "ymake.Context",
-        .tp_basicsize = sizeof(Context),
-        .tp_getattr = ContextTypeGetAttrFunc,
-        .tp_flags = Py_TPFLAGS_DEFAULT,
-        .tp_doc = "Context objects",
-        .tp_new = PyType_GenericNew,
+    static PyType_Slot YMakeContextTypeSlots[] = {
+         {Py_tp_doc, (void*)"Context type"},
+         {Py_tp_getattr, (void*)ContextTypeGetAttrFunc},
+         {Py_tp_new, (void*)PyType_GenericNew},
+         {0, 0}
+    };
+
+    static PyType_Spec ContextTypeSpec = {
+        .name = "ymake.Context",
+        .basicsize = sizeof(Context),
+        .flags = Py_TPFLAGS_DEFAULT,
+        .slots = YMakeContextTypeSlots,
     };
 
     typedef struct {
@@ -152,15 +156,19 @@ namespace {
         return 0;
     }
 
-    static PyTypeObject CmdContextType = {
-        .ob_base = PyVarObject_HEAD_INIT(nullptr, 0)
-        .tp_name = "ymake.CmdContext",
-        .tp_basicsize = sizeof(CmdContext),
-        .tp_call = CmdContextCall,
-        .tp_flags = Py_TPFLAGS_DEFAULT,
-        .tp_doc = "CmdContext objects",
-        .tp_init = reinterpret_cast<initproc>(CmdContextInit),
-        .tp_new = PyType_GenericNew,
+    static PyType_Slot YMakeCmdContextTypeSlots[] = {
+        {Py_tp_doc, (void*)"CmdContext type"},
+        {Py_tp_init, (void*)CmdContextInit},
+        {Py_tp_call, (void*)CmdContextCall},
+        {Py_tp_new, (void*)PyType_GenericNew},
+        {0, 0}
+    };
+
+    static PyType_Spec CmdContextTypeSpec = {
+        .name = "ymake.Context",
+        .basicsize = sizeof(CmdContext),
+        .flags = Py_TPFLAGS_DEFAULT,
+        .slots = YMakeCmdContextTypeSlots,
     };
 
     PyObject* MethodAddParser(PyObject* /*self*/, PyObject* args, PyObject* kwargs) {
@@ -409,22 +417,55 @@ namespace {
         Py_RETURN_NONE;
     }
 
+    struct YMakeState {
+        PyTypeObject* ContextType;
+        PyTypeObject* CmdContextType;
+    };
+
+    YMakeState* GetYMakeState(PyObject* mod) {
+        YMakeState* state = (YMakeState*)PyModule_GetState(mod);
+        Y_ASSERT(state != nullptr);
+        return state;
+    }
+
     int YMakeExec(PyObject* mod) {
-        if (PyType_Ready(&ContextType) < 0) {
+        YMakeState* state = GetYMakeState(mod);
+
+        state->ContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &ContextTypeSpec, NULL);
+        if (state->ContextType == NULL) {
             return -1;
         }
-        Py_INCREF(reinterpret_cast<PyObject*>(&ContextType));
-
-        PyModule_AddObject(mod, "Context", reinterpret_cast<PyObject*>(&ContextType));
-
-        if (PyType_Ready(&CmdContextType) < 0) {
+        if (PyModule_AddType(mod, state->ContextType)) {
             return -1;
         }
-        Py_INCREF(reinterpret_cast<PyObject*>(&CmdContextType));
 
-        PyModule_AddObject(mod, "CmdContext", reinterpret_cast<PyObject*>(&CmdContextType));
+        state->CmdContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, NULL);
+        if (state->CmdContextType == NULL) {
+            return -1;
+        }
+        if (PyModule_AddType(mod, state->CmdContextType)) {
+            return -1;
+        }
 
         return 0;
+    }
+
+    int YMakeTraverse(PyObject* mod, visitproc visit, void* arg) {
+        YMakeState* state = GetYMakeState(mod);
+        Py_VISIT(state->ContextType);
+        Py_VISIT(state->CmdContextType);
+        return 0;
+    }
+
+    int YMakeClear(PyObject* mod) {
+        YMakeState* state = GetYMakeState(mod);
+        Py_CLEAR(state->ContextType);
+        Py_CLEAR(state->CmdContextType);
+        return 0;
+    }
+
+    void YMakeFree(void* mod) {
+        YMakeClear((PyObject*)mod);
     }
 
     PyMethodDef YMakeMethods[] = {
@@ -444,12 +485,12 @@ namespace {
         PyModuleDef_HEAD_INIT,           // m_base
         "ymake",                         // m_name
         PyDoc_STR("Interface to YMake"), // m_doc
-        0,                               // m_size
+        sizeof(YMakeState),              // m_size
         YMakeMethods,                    // m_methods
         YMakeSlots,                      // m_slots
-        NULL,                            // m_traverse
-        NULL,                            // m_clear
-        NULL,                            // m_free
+        YMakeTraverse,                   // m_traverse
+        YMakeClear,                      // m_clear
+        YMakeFree,                       // m_free
     };
 } // anonymous namespace
 
@@ -462,7 +503,8 @@ namespace NYMake::NPlugins {
         TScopedPyObjectPtr args = Py_BuildValue("()");
         TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
         CheckForError();
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(&ContextType), args);
+        YMakeState* state = GetYMakeState(ymakeModule);
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType), args);
         if (obj) {
             Context* context = reinterpret_cast<Context*>(obj);
             context->Unit = unit;
@@ -473,7 +515,9 @@ namespace NYMake::NPlugins {
     PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName) {
         TScopedPyObjectPtr args = Py_BuildValue("(s)", attrName);
         TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(&CmdContextType), args);
+        CheckForError();
+        YMakeState* state = GetYMakeState(ymakeModule);
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType), args);
         if (obj) {
             CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj);
             cmdContext->Unit = unit;
