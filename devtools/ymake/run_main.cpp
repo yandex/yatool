@@ -12,6 +12,7 @@
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/stats.h>
 
+#include <devtools/ymake/foreign_platforms/pipeline.h>
 #include <library/cpp/sighandler/async_signals_handler.h>
 #include <library/cpp/getopt/small/last_getopt.h>
 
@@ -110,7 +111,7 @@ void InitGlobalOpts(int& argc, char** argv, int& threads) {
     }
 }
 
-TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf) {
+TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
     try {
         TOpts opts;
         opts.ArgPermutation_ = REQUIRE_ORDER;
@@ -122,6 +123,8 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 
         // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
         conf.PostProcess(res.GetFreeArgs());
+        conf.ForeignTargetReader = pipeline.CreateReader(conf);
+        conf.ForeignTargetWriter = pipeline.CreateWriter(conf);
     } catch (const yexception& error) {
         YErr() << "Conf initialization failed with error: " << error.what() << Endl;
         return BR_FATAL_ERROR;
@@ -133,9 +136,9 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 // logger initialization and it's failure is reported later. This var keeps mlock call result.
 bool MLOCK_FAILED = false;
 
-asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithContext<TExecContext> exec) {
+asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
     TBuildConfiguration conf;
-    auto result = InitConf(value, conf);
+    auto result = InitConf(value, conf, pipeline);
     if (result.Defined()) {
         co_return result.GetRef();
     }
@@ -156,6 +159,24 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithConte
     co_return ret_code;
 }
 
+}
+
+auto CreatePipeline(const TVector<TVector<const char*>>& configs , asio::any_io_executor exec) {
+    THolder<NForeignTargetPipeline::TForeignTargetPipeline> pipeline;
+    const bool hasMulticonfig = configs.size() > 1;
+    size_t marked = 0;
+    if (hasMulticonfig) {
+        pipeline = MakeHolder<NForeignTargetPipeline::TForeignTargetPipelineInternal>(exec);
+        for (const auto& config : configs) {
+            marked += pipeline->RegisterConfig(config);
+        }
+    }
+    constexpr size_t confsCanHaveNoMarks = 1; // tool config can have no mark yet
+    const bool hasAllRequiredMarks = marked >= configs.size() - confsCanHaveNoMarks;
+    if (!hasMulticonfig || !hasAllRequiredMarks) {
+        pipeline = MakeHolder<NForeignTargetPipeline::TForeignTargetPipelineExternal>();
+    }
+    return pipeline;
 }
 
 int YMakeMain(int argc, char** argv) {
@@ -186,6 +207,8 @@ int YMakeMain(int argc, char** argv) {
     }
 
     asio::thread_pool configure_workers(threads);
+    auto pipeline = CreatePipeline(configs, configure_workers.executor());
+
     for (size_t i = 0; i < configs.size(); ++i) {
         auto ctx = std::make_shared<TExecContext>(
             std::make_shared<NCommonDisplay::TLockedStream>(),
@@ -197,7 +220,7 @@ int YMakeMain(int argc, char** argv) {
             asio::require(configure_workers.executor(), asio::execution::blocking.never),
             ctx
         );
-        ret_codes[i] = asio::co_spawn(proxy, RunConfigure(configs[i], proxy), asio::use_future);
+        ret_codes[i] = asio::co_spawn(proxy, RunConfigure(configs[i], proxy, *pipeline), asio::use_future);
     }
 
     int main_ret_code = BR_OK;

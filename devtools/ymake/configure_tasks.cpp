@@ -109,7 +109,7 @@ asio::awaitable<TMaybe<EBuildResult>> RunConfigureAsync(THolder<TYMake>& yMake, 
     co_return buildRes;
 }
 
-asio::awaitable<void> ProcessEvlogAsync(THolder<TYMake>& yMake, TBuildConfiguration& conf, IInputStream& input, TConfigurationExecutor exec) {
+asio::awaitable<void> ProcessEvlogAsync(THolder<TYMake>& yMake, TBuildConfiguration& conf, NForeignTargetPipeline::TLineReader& input, TConfigurationExecutor exec) {
     YDebug() << "Pseudo parallel server mode START" << Endl;
     yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
     NEvlogServer::TServer evlogServer{exec, *yMake, conf};

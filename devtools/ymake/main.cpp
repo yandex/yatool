@@ -602,17 +602,17 @@ void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
     NEvent::TBypassConfigure bypassEvent;
     bypassEvent.SetMaybeEnabled(conf.ShouldUseGrandBypass());
     bypassEvent.SetEnabled(yMake.CanBypassConfigure());
-    FORCE_TRACE(C, bypassEvent);
+    conf.ForeignTargetWriter->WriteBypassLine(NYMake::EventToStr(bypassEvent));
 };
 
 asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBuildConfiguration& conf, TConfigurationExecutor exec) {
     TBuildGraphScope scope(*yMake.Get());
 
     if (conf.ReadStartTargetsFromEvlog) {
-        co_await ProcessEvlogAsync(yMake, conf, *conf.InputStream, exec);
+        co_await ProcessEvlogAsync(yMake, conf, *conf.ForeignTargetReader, exec);
 
         if (conf.StartDirs.empty()) {
-            FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
+            conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
             FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
             co_return BR_OK;
         }

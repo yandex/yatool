@@ -30,14 +30,16 @@ public:
     const bool RenderSemantics;
     const ETransition TransitionSource;
     const bool ReportPicNopic;
+    NForeignTargetPipeline::TLineWriter& Writer;
 
 public:
-    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics, const ETransition& transitionSource, bool reportPicNopic)
+    TForeignPlatformEventsReporter(const TSymbols& names, const TModules& modules, bool renderSemantics, const ETransition& transitionSource, bool reportPicNopic, NForeignTargetPipeline::TLineWriter& writer)
         : Names(names)
         , Modules(modules)
         , RenderSemantics(renderSemantics)
         , TransitionSource(transitionSource)
         , ReportPicNopic(reportPicNopic)
+        , Writer(writer)
     {}
 
     bool Enter(TState& state);

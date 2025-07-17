@@ -44,6 +44,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
     opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
     opts.AddLongOption("transition-source").StoreResult<ETransition>(&TransitionSource).Optional();
+    opts.AddLongOption("platform-id").StoreResult(&TargetPlatformId).Optional();
     opts.AddLongOption("descend-into-foreign", "follow deps leading into foreign platforms").StoreResult(&DescendIntoForeignPlatform);
     opts.AddLongOption("report-pic-nopic", "report pic/no-pic foreign target events").StoreResult(&ReportPicNoPic);
     opts.AddLongOption("fd-in", "input pipe fd").StoreResult(&InputPipeFd);

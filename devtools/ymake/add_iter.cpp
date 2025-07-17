@@ -1350,9 +1350,9 @@ inline bool TUpdIter::Enter(TState& state) {
         if (YMake.Conf.TransitionSource != ETransition::None && module->Transition != ETransition::None && module->Transition != YMake.Conf.TransitionSource) {
             if (YMake.Conf.ReportPicNoPic) {
                 if (module->Transition == ETransition::Pic) {
-                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::PIC));
+                    YMake.Conf.ForeignTargetWriter->WriteLineUniq(module->GetDir(), NYMake::EventToStr(PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::PIC)));
                 } else if (module->Transition == ETransition::NoPic) {
-                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC));
+                    YMake.Conf.ForeignTargetWriter->WriteLineUniq(module->GetDir(), NYMake::EventToStr(PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC)));
                 }
             }
             if (!YMake.Conf.DescendIntoForeignPlatform) {
@@ -1678,7 +1678,7 @@ inline void TUpdIter::Left(TState& state) {
         if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
             const auto dirNode = Graph.GetNodeById(LastType, LastElem);
             const auto toolDir = Graph.GetFileName(dirNode);
-            FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
+            YMake.Conf.ForeignTargetWriter->WriteLineUniq(toolDir, NYMake::EventToStr(PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL)));
         }
     }
 
@@ -1810,7 +1810,7 @@ inline void TUpdIter::Left(TState& state) {
                     node->AddUniqueDep(st.Dep.DepType, libNode.Node.Value().NodeType, libNode.Node.Value().ElemId);
                     if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
                         const auto toolDir = Graph.GetFileName(dirNode);
-                        FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
+                        YMake.Conf.ForeignTargetWriter->WriteLineUniq(toolDir, NYMake::EventToStr(PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL)));
                     }
                 }
                 else if (libNode.Status == EPeerSearchStatus::NoModules) {

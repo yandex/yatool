@@ -95,6 +95,7 @@ SRCS(
     export_json_debug.cpp
     export_json.cpp
     flat_json_graph.cpp
+    foreign_platforms/pipeline.cpp
     general_parser.cpp
     global_vars_collector.cpp
     graph_changes_predictor.cpp
