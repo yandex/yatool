@@ -41,9 +41,9 @@ def filter_files(path, patterns):
     :return: directories, files, links with matching pattern
     """
     common_patterns = [pattern for pattern in patterns if not pattern.startswith(GLOB_PREFIX)]
-    paths_for_cp = list(_walk_path(pathlib.Path(path)))
+    paths_for_cp = list(_walk_path(pathlib.Path(path))) if common_patterns else []
     glob_patterns = [pattern for pattern in patterns if pattern.startswith(GLOB_PREFIX)]
-    paths_for_gp = list(pathlib.Path(path).walk())
+    paths_for_gp = list(pathlib.Path(path).walk()) if glob_patterns else []
     return fiter_paths(path, paths_for_cp, common_patterns) + fiter_paths(path, paths_for_gp, glob_patterns)
 
 
