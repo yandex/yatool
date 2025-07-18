@@ -624,9 +624,7 @@ void ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
     conf.BuildRoot = "$(BUILD_ROOT)";
     const bool sysNormalize = conf.NormalizeRealPath;
     conf.NormalizeRealPath = true;
-    if (!conf.ParallelRendering) {
-        conf.EnableRealPathCache(&yMake.Names.FileConf);
-    }
+    conf.EnableRealPathCache(&yMake.Names.FileConf);
 
     {
         NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
