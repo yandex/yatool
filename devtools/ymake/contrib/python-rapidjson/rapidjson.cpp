@@ -626,6 +626,10 @@ accept_number_mode_arg(PyObject* arg, int allow_nan, unsigned &number_mode)
         else
             number_mode &= ~NM_NAN;
     }
+    if (is_subinterpreter() && number_mode & NM_DECIMAL) {
+        PyErr_SetString(PyExc_ValueError, "NM_DECIMAL for number_mode is not supportted for subinterpreter");
+        return false;
+    }
     return true;
 }
 
@@ -1781,6 +1785,10 @@ load(PyObject* self, PyObject* args, PyObject* kwargs)
                 return NULL;
             }
             numberMode = (unsigned) mode;
+            if (is_subinterpreter() && numberMode & NM_DECIMAL) {
+                PyErr_SetString(PyExc_ValueError, "NM_DECIMAL for number_mode is not supportted for subinterpreter");
+                return NULL;
+            }
             if (numberMode & NM_DECIMAL && numberMode & NM_NATIVE) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Combining NM_NATIVE with NM_DECIMAL is not supported");
@@ -2204,6 +2212,10 @@ decoder_new(PyTypeObject* type, PyObject* args, PyObject* kwargs)
                 return NULL;
             }
             numberMode = (unsigned) mode;
+            if (is_subinterpreter() && numberMode & NM_DECIMAL) {
+                PyErr_SetString(PyExc_ValueError, "NM_DECIMAL for number_mode is not supportted for subinterpreter");
+                return NULL;
+            }
             if (numberMode & NM_DECIMAL && numberMode & NM_NATIVE) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Combining NM_NATIVE with NM_DECIMAL is not supported");
@@ -3882,15 +3894,17 @@ module_exec(PyObject* m)
     if (datetimeModule == NULL)
         return -1;
 
-    decimalModule = PyImport_ImportModule("decimal");
-    if (decimalModule == NULL)
-        return -1;
+    if (!is_subinterpreter()) {
+        decimalModule = PyImport_ImportModule("decimal");
+        if (decimalModule == NULL)
+            return -1;
 
-    state->decimal_type = PyObject_GetAttrString(decimalModule, "Decimal");
-    Py_DECREF(decimalModule);
+        state->decimal_type = PyObject_GetAttrString(decimalModule, "Decimal");
+        Py_DECREF(decimalModule);
 
-    if (state->decimal_type == NULL)
-        return -1;
+        if (state->decimal_type == NULL)
+            return -1;
+    }
 
     state->timezone_type = PyObject_GetAttrString(datetimeModule, "timezone");
     Py_DECREF(datetimeModule);
