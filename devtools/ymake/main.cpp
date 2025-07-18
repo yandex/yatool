@@ -796,7 +796,7 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
     }
 
     if (!conf.WriteJSON.empty()) {
-        ExportJSON(*yMake, exec);
+        co_await ExportJSON(*yMake, exec);
     }
 
     co_return TMaybe<EBuildResult>();

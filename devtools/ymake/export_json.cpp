@@ -12,6 +12,8 @@
 #include "vars.h"
 #include "ymake.h"
 
+#include <asio/detached.hpp>
+#include <asio/experimental/concurrent_channel.hpp>
 #include <devtools/ymake/action.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/common/npath.h>
@@ -419,7 +421,7 @@ namespace {
         ComputeFullUID(graph, cmdbuilder, nodeId);
     }
 
-    void RenderJSONGraph(TYMake& yMake, TMakePlan& plan, asio::any_io_executor exec) {
+    asio::awaitable<void> RenderJSONGraph(TYMake& yMake, TMakePlan& plan, asio::any_io_executor exec) {
         auto& graph = yMake.Graph;
         const auto& conf = yMake.Conf;
         const auto& startTargets = yMake.StartTargets;
@@ -505,7 +507,8 @@ namespace {
                             nodesByModuleId[cmdbuilder.GetModuleByNode(nodeId)].push_back(nodeId);
                         }
 
-                        TVector<std::future<TString>> futs;
+                        using TChannel = asio::experimental::concurrent_channel<void(asio::error_code, TString)>;
+                        TVector<TAtomicSharedPtr<TChannel>> channels;
                         auto moduleIt = nodesByModuleId.begin();
                         while (moduleIt != nodesByModuleId.end()) {
                             auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
@@ -520,7 +523,9 @@ namespace {
                                     restorer.MineGlobVars();
                                 }
                             }
-                            futs.push_back(asio::co_spawn(exec, [&cmdbuilder, &plan, &cache, &modulesStatesCache, &graph, &yMake, chunk]() -> asio::awaitable<TString> {
+                            auto p = MakeAtomicShared<TChannel>(exec, 1u);
+                            channels.push_back(p);
+                            asio::co_spawn(exec, [&cmdbuilder, &plan, &cache, &modulesStatesCache, &graph, &yMake, chunk, p]() -> asio::awaitable<void> {
                                 TStringStream ss;
                                 NYMake::TJsonWriter writer(ss);
                                 for (const auto& [modId, nodeIds] : chunk) {
@@ -537,12 +542,17 @@ namespace {
                                     }
                                 }
                                 writer.Flush();
-                                co_return ss.Str();
-                            }, asio::use_future));
+                                co_await p->async_send(std::error_code{}, ss.Str());
+                            }, [p](std::exception_ptr ptr) {
+                                if (ptr) {
+                                    p->cancel();
+                                    std::rethrow_exception(ptr);
+                                }
+                            });
                             moduleIt = chunkEnd;
                         }
-                        for (auto& f: futs) {
-                            auto s = f.get();
+                        for (auto& p : channels) {
+                            auto s = co_await p->async_receive();
                             plan.Writer.WriteJsonValue(s);
                         }
                     }
@@ -614,7 +624,7 @@ namespace {
 
 }
 
-void ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
+asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
     auto& conf = yMake.Conf;
@@ -632,7 +642,7 @@ void ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
         TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
         NYMake::TJsonWriter jsonWriter(*output.Get());
         TMakePlan plan(jsonWriter);
-        RenderJSONGraph(yMake, plan, exec);
+        co_await RenderJSONGraph(yMake, plan, exec);
     }
 
     conf.EnableRealPathCache(nullptr);
