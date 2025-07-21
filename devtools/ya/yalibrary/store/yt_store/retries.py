@@ -1,6 +1,7 @@
 import logging
 import functools
 import threading
+import time
 from collections.abc import Callable
 
 import yt.wrapper as yt
@@ -9,6 +10,7 @@ from library.python.retry import RetryConf, retry_call
 from yt.wrapper.dynamic_table_commands import (
     get_dynamic_table_retriable_errors as get_yt_retriable_errors,
 )
+from yt.wrapper.errors import YtTabletTransactionLockConflict
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ def get_default_client(proxy: str, token: str) -> yt.YtClient:
 class RetryPolicy:
     MIN_SLEEP = 0.3
     MAX_SLEEP = 10
+    TRANSACTION_CONFLICT_LIMIT = 90
 
     def __init__(
         self, max_retries: int = 5, on_error_callback: Callable | None = None, retry_time_limit: float | None = None
@@ -55,11 +58,19 @@ class RetryPolicy:
     def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            try:
-                return retry_call(func, f_args=args, f_kwargs=kwargs, conf=self._retry_conf)
-            except Exception as err:
-                self.on_error(err)
-                raise
+            end = time.time() + self.TRANSACTION_CONFLICT_LIMIT
+            while True:
+                try:
+                    return retry_call(func, f_args=args, f_kwargs=kwargs, conf=self._retry_conf)
+                except YtTabletTransactionLockConflict as err:
+                    # Repeated transaction conflicts are rare and we should never reach this code at all
+                    if time.time() > end:
+                        # It should never happen, but it's better to prevent an endless loop than to debug it
+                        self.on_error(err)
+                        raise
+                except Exception as err:
+                    self.on_error(err)
+                    raise
 
         return wrapper
 
