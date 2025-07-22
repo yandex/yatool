@@ -400,6 +400,19 @@ class TaskContext(object):
                     )
                     task_uid = getattr(task_info.task, 'uid', getattr(task_info.task, 'short_name', 'UnknownTask'))
                     exit_code_map[task_uid] = rc
+
+                    error_info = {
+                        "uid": task_uid,
+                        "exit_code": rc,
+                        "stderr": stderr if stderr else 'no strderr was provided',
+                        "outputs": getattr(task_info.task, 'outputs', []),
+                    }
+
+                    devtools.ya.core.report.telemetry.report(
+                        devtools.ya.core.report.ReportTypes.BUILD_ERROR,
+                        error_info,
+                    )
+
                 elif stderr:
                     if len(stderr) <= TRUNCATE_STDERR * 2:
                         truncated_stderr = stderr

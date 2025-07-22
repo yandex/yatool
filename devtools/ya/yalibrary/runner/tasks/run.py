@@ -733,6 +733,10 @@ class RunNodeTask(object):
         return self._node.dep_nodes()
 
     @property
+    def outputs(self):
+        return self._node.outputs
+
+    @property
     def build_time(self):
         if self._supports_build_time_cache():
             _, value = self._ctx.build_time_cache.last_usage(self._node.static_uid)

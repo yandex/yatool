@@ -1,3 +1,4 @@
+import collections
 import os
 import sys
 import logging
@@ -41,6 +42,8 @@ class ReportTypes(object):
     YA_METRICS = 'ya_metrics'
     YT_CACHE_METRICS = 'yt_cache_metrics'
     UNIVERSAL_FETCHER = 'universal_fetcher'
+    BUILD_ERROR = 'build_error'
+    FINISH = 'finish'
 
 
 @func.lazy
@@ -102,6 +105,7 @@ class CompositeTelemetry:
     def __init__(self, backends=None):
         self._backends = backends or {}
         self._report_events = set()
+        self._events_store = collections.defaultdict(list)
 
     @property
     def no_backends(self):
@@ -130,6 +134,8 @@ class CompositeTelemetry:
         if ReportTypes.ALL not in self._report_events and key not in self._report_events:
             logger.debug('Report_disabled %s: %s', key, svalue)  # log record for using in tests
             return
+
+        self._events_store[key].append(svalue)
 
         logger.debug('Report%s %s: %s', ' urgent' if urgent else '', key, svalue)
         for telemetry_name, telemetry in self.iter_backends():
@@ -190,6 +196,14 @@ class CompositeTelemetry:
         if telemetry:
             return telemetry.request(tail, data)
         return "{}"
+
+    def compose(self, *event_keys):
+        res = {}
+        for key in event_keys:
+            if key in self._events_store:
+                res[key] = self._events_store[key]
+
+        return res
 
 
 def mine_env_vars():

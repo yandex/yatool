@@ -807,6 +807,15 @@ def configure_report_interceptor(ctx, report_events):
             ),
         )
 
+        telemetry.report(
+            ReportTypes.FINISH,
+            telemetry.compose(
+                ReportTypes.TIMEIT,
+                ReportTypes.BUILD_ERROR,
+                ReportTypes.PROFILE_BY_TYPE,
+            ),
+        )
+
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FINISHED,
             labels={
