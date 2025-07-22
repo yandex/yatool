@@ -182,12 +182,6 @@ namespace {
             if (!state.HasIncomingDep() && IsDirToModuleDep(dep) && !ModStartTargets.contains(TTarget{dep.To().Id()})) {
                 return false;
             }
-            if (TFileConf::IsLink(dep.From()->ElemId)) {
-                const auto toView = RestoreContext.Graph.GetFileName(dep.To());
-                if (toView.GetType() == NPath::ERoot::Build) {
-                    return true;
-                }
-            }
             return !IsIncludeFileDep(dep) && *dep != EDT_OutTogetherBack;
         }
 
@@ -229,9 +223,6 @@ namespace {
                     node.AddProp("Tag", "StartDir");
                 }
                 if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})) {
-                    if (TFileConf::IsLink(topNode->ElemId)) {
-                        return true; // add Link node as empty, else "No pattern for node" error
-                    }
                     bool structCmdDetected = false;
                     for (const auto& dep : topNode.Edges()) {
                         if (*dep == EDT_BuildCommand && dep.To()->NodeType == EMNT_BuildCommand) {
