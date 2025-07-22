@@ -1229,6 +1229,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.build_coverage_report = False
         self.clang_coverage = False
+        self.clang_mcdc_coverage = False
         self.coverage = False
         self.coverage_direct_upload_yt = True
         self.coverage_exclude_regexp = None
@@ -1239,6 +1240,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.coverage_upload_snapshot_name = None
         self.coverage_verbose_resolve = False
         self.coverage_yt_token_path = None
+        self.cython_coverage = False
         self.enable_contrib_coverage = False
         self.enable_java_contrib_coverage = False
         self.fast_clang_coverage_merge = False
@@ -1247,7 +1249,6 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.merge_coverage = False
         self.nlg_coverage = False
         self.python_coverage = False
-        self.cython_coverage = False
         self.sancov_coverage = False
         self.ts_coverage = False
         self.upload_coverage_report = False
@@ -1431,6 +1432,20 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
             ),
+            TestArgConsumer(
+                ['--clang-mcdc-coverage'],
+                help='Enabled MC/DC coverage',
+                hook=devtools.ya.core.yarg.SetConstValueHook('clang_mcdc_coverage', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_CLANG_MCDC_COVERAGE',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'clang_mcdc_coverage', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('clang_mcdc_coverage'),
         ]
 
     def postprocess(self):
@@ -1480,6 +1495,8 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         if params.clang_coverage:
             params.flags['CLANG_COVERAGE'] = 'yes'
             coverage_requested = True
+            if params.clang_mcdc_coverage:
+                params.flags['CLANG_MCDC_COVERAGE'] = 'yes'
 
         if params.java_coverage:
             params.flags['JAVA_COVERAGE'] = 'yes'
