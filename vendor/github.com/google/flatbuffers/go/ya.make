@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v23.5.26+incompatible)
+VERSION(v24.12.23+incompatible)
 
 SRCS(
     builder.go
