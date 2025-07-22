@@ -72,6 +72,10 @@ class MetaInfo(object):
         return self._experimental_fork or ''
 
     @property
+    def parallel_tests_on_yt_within_node(self):
+        return self._parallel_tests_on_yt_within_node or ''
+
+    @property
     def fuzz_dicts(self):
         return self._fuzz_dicts or ()
 
@@ -400,6 +404,7 @@ class DartInfo(MetaInfo):
         self._use_arcadia_python = dart_info.get('USE_ARCADIA_PYTHON')
         self._use_ktlint_old = dart_info.get('USE_KTLINT_OLD')
         self._yt_spec = dart_info.get('YT-SPEC')
+        self._parallel_tests_on_yt_within_node = dart_info.get('PARALLEL-TESTS-WITHIN-NODE-ON-YT')
 
     # test_name is sometimes set in suites' code
     @MetaInfo.test_name.setter

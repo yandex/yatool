@@ -511,6 +511,8 @@ def parse_args(args=None):
     parser.add_argument("--create-root-guidance-file", action='store_true')
     parser.add_argument("--pycache-prefix")
 
+    parser.add_argument("--temp-tracefile-dir", default=None)
+
     args = parser.parse_args(args)
 
     if "--profile-wrapper" in args.command:
@@ -1842,6 +1844,13 @@ def main():
                 shutil.copyfileobj(src, dst)
 
         stages.stage("load_results")
+
+        if options.temp_tracefile_dir and os.path.exists(options.temp_tracefile_dir):
+            for file in os.listdir(options.temp_tracefile_dir):
+                with open(os.path.join(options.temp_tracefile_dir, file), 'r') as temporary_tracefile:
+                    with open(trace_report, 'a') as dst:
+                        dst.write(temporary_tracefile.read())
+
         suite.load_run_results(trace_report)
         if suite.get_status == const.Status.GOOD and not suite.tests:
             logger.debug("Test wrapper didn't execute any test")

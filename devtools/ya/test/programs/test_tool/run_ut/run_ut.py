@@ -6,17 +6,21 @@ import os
 import re
 import six
 import sys
+import copy
 import json
 import time
-import copy
+import uuid
 import errno
 import signal
 import logging
 import argparse
+import tempfile
 import traceback
 import threading
 import subprocess
 import collections
+import multiprocessing
+import concurrent.futures as futures
 
 from six import string_types
 
@@ -43,6 +47,7 @@ VALGRIND_ERROR_RC = 101
 START_MARKER = "###subtest-started:"
 FINISH_MARKER = "###subtest-finished:"
 SHUTDOWN_REQUESTED = False
+LOCK = threading.Lock()
 
 Result = collections.namedtuple(
     'Result', ['rc', 'pid', 'logs', 'last_test_name', 'first_test_started', 'end_time', 'stderr_file', 'stdout_file']
@@ -103,6 +108,19 @@ def parse_args():
     parser.add_argument(
         "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
     )
+
+    parser.add_argument(
+        "--parallel-tests-within-node-workers",
+        default=None,
+        help="Amount of workers to run tests in parallel",
+    )
+    parser.add_argument(
+        '--cpu-requested',
+        help="Amount of CPUs requested by test",
+        default=0,
+        type=int,
+    )
+    parser.add_argument('--temp-tracefile-dir', help="Directory to place temporary trace-files", default=None)
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -772,10 +790,24 @@ def launch_tests(
     wine_path,
     stop_signal,
     test_binary_args,
+    is_parallel,
+    temp_tracefile_dir,
 ):
+
     logger.debug("Single launch for %d tests", len(test_names))
     # Don't collect core dump files if truncation is required
-    cmd = [binary, "--trace-path-append", tracefile]
+    if temp_tracefile_dir:
+        temp_tracefile = os.path.join(temp_tracefile_dir, uuid.uuid4().hex)
+    else:
+        temp_tracefile = tempfile.mktemp(suffix='.trace')
+
+    cmd = [binary]
+
+    if is_parallel:
+        cmd += ["--trace-path-append", temp_tracefile]
+    else:
+        cmd += ["--trace-path-append", tracefile]
+
     for param in test_params:
         cmd += ["--test-param", param]
     cmd += ["+%s" % x for x in test_names]
@@ -784,10 +816,18 @@ def launch_tests(
     res = execute_ut(cmd, logsdir, truncate, gdb_path, gdb_debug, valgrind_path, test_mode, wine_path, stop_signal)
 
     performed_suite = gen_suite(suite.project_path)
-    performed_suite.load_run_results(tracefile)
+
+    current_tracefile = temp_tracefile if is_parallel else tracefile
+
+    performed_suite.load_run_results(current_tracefile)
+
     shared.adjust_test_status(performed_suite, res.rc, res.end_time, add_error_func=suite.add_chunk_error)
-    # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
-    update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
+
+    # This lock prevents multiple threads from writing to the same common tracefile with status updates simultaneously
+    # Otherwise it will lead to races and non-determined test statuses.
+    with LOCK:
+        # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
+        update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
 
     if res.rc < 0 and not exts.windows.on_win():
         if res.last_test_name:
@@ -839,7 +879,8 @@ def launch_tests(
     if res.rc == VALGRIND_ERROR_RC:
         check_valgrind_errors(performed_suite)
     # Dump fully packed snippet with patched logs
-    update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
+    with LOCK:
+        update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
     return res.rc
 
 
@@ -1044,13 +1085,14 @@ def main():
     suite.chunk.logs = {"logsdir": logsdir}
     shared.dump_trace_file(suite, args.trace_path)
 
-    def launch(tests):
-        return launch_tests(
+    def launch(tests, logs_directory=logsdir, is_parallel=False, temp_tracefile_dir=None):
+        logger.debug("Launching tests %s in logsdir %s", tests, logs_directory)
+        res = launch_tests(
             suite,
             args.binary,
             tests,
             args.trace_path,
-            logsdir,
+            logs_directory,
             args.truncate_logs,
             args.collect_cores,
             args.gdb_path,
@@ -1061,7 +1103,11 @@ def main():
             wine_path,
             args.stop_signal,
             args.test_binary_args,
+            is_parallel,
+            temp_tracefile_dir,
         )
+        logger.debug("Finished executing tests: %s", tests)
+        return res
 
     try:
         global SHUTDOWN_REQUESTED
@@ -1072,9 +1118,36 @@ def main():
                     break
         else:
             while test_names:
-                rc = launch(test_names)
-                if SHUTDOWN_REQUESTED or rc in [0, TIMEOUT_RC]:
-                    break
+                if not args.parallel_tests_within_node_workers:
+                    rc = launch(test_names)
+                    if SHUTDOWN_REQUESTED or rc in [0, TIMEOUT_RC]:
+                        break
+                else:
+                    workers_count = multiprocessing.cpu_count()
+                    if args.parallel_tests_within_node_workers != 'all':
+                        workers_count = min(workers_count, int(args.parallel_tests_within_node_workers))
+
+                    if args.cpu_requested != 0:
+                        workers_count = max(workers_count // args.cpu_requested, 1)
+
+                    executor = futures.ThreadPoolExecutor(max_workers=workers_count)
+                    runs = []
+
+                    tests_subchunks = [[test_name] for test_name in test_names]
+
+                    if args.temp_tracefile_dir:
+                        os.makedirs(args.temp_tracefile_dir, exist_ok=True)
+
+                    for index, subchunk in enumerate(tests_subchunks):
+                        logs_directory = os.path.join(logsdir, str(index))
+                        os.makedirs(logs_directory, exist_ok=True)
+
+                        runs.append(executor.submit(launch, subchunk, logs_directory, True, args.temp_tracefile_dir))
+
+                    futures.wait(runs, return_when=futures.ALL_COMPLETED)
+                    if SHUTDOWN_REQUESTED or all(r.result() in [0, TIMEOUT_RC] for r in runs):
+                        break
+
                 # if case of crash there may be missing tests (which were not launched)
                 missing = get_missing_tests(suite, test_names)
                 logger.debug("Missing tests: %s", missing)

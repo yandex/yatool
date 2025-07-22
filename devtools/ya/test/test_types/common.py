@@ -801,6 +801,9 @@ class AbstractTestSuite(facility.Suite):
     def get_split_params(self):
         return self._modulo, self._modulo_index, self._split_file_name
 
+    def parallel_tests_within_node_workers(self):
+        return self.meta.parallel_tests_on_yt_within_node
+
     def get_fork_mode(self):
         return self.meta.fork_mode
 

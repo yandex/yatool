@@ -1,5 +1,6 @@
 import os
 import six
+import logging
 
 import exts.windows
 import devtools.ya.test.common as test_common
@@ -8,6 +9,8 @@ from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 from devtools.ya.test.util import tools, shared
 
+
+logger = logging.getLogger(__name__)
 
 UNITTEST_TYPE = "unittest"
 
@@ -108,6 +111,18 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             for additional_arg in opts.test_binary_args:
                 cmd += ["--test-binary-args={}".format(additional_arg)]
 
+        if self.parallel_tests_within_node_workers():
+            if getattr(opts, 'run_tagged_tests_on_yt', False) and 'ya:yt' in self.tags:
+                cmd += ["--parallel-tests-within-node-workers", str(self.parallel_tests_within_node_workers())]
+                cmd += ["--temp-tracefile-dir", self.temp_tracefile_dir]
+            else:
+                logger.warning(
+                    "Parallel tests execution within one node is available only for tests that have 'ya:yt' tag and are to be launched on YT"
+                )
+
+        if devtools.ya.test.const.TestRequirements.Cpu in self.requirements:
+            cmd += ["--cpu-requested", str(self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 0))]
+
         return cmd
 
     def get_type(self):
@@ -176,3 +191,14 @@ class UnitTestSuite(common_types.AbstractTestSuite):
     @property
     def smooth_shutdown_signals(self):
         return ["SIGUSR2"]
+
+    @property
+    def temp_tracefile_dir(self):
+        test_work_dir = test_common.get_test_suite_work_dir(
+            '$(BUILD_ROOT)',
+            self.project_path,
+            self.name,
+            target_platform_descriptor=self.target_platform_descriptor,
+            multi_target_platform_run=self.multi_target_platform_run,
+        )
+        return os.path.join(test_work_dir, devtools.ya.test.const.TEMPORARY_TRACE_DIR_NAME)
