@@ -42,7 +42,7 @@ class ReportTypes(object):
     YA_METRICS = 'ya_metrics'
     YT_CACHE_METRICS = 'yt_cache_metrics'
     UNIVERSAL_FETCHER = 'universal_fetcher'
-    BUILD_ERROR = 'build_error'
+    BUILD_ERRORS = 'build_errors'
     FINISH = 'finish'
 
 

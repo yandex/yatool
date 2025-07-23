@@ -811,7 +811,7 @@ def configure_report_interceptor(ctx, report_events):
             ReportTypes.FINISH,
             telemetry.compose(
                 ReportTypes.TIMEIT,
-                ReportTypes.BUILD_ERROR,
+                ReportTypes.BUILD_ERRORS,
                 ReportTypes.PROFILE_BY_TYPE,
             ),
         )

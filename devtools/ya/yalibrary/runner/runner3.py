@@ -409,7 +409,7 @@ class TaskContext(object):
                     }
 
                     devtools.ya.core.report.telemetry.report(
-                        devtools.ya.core.report.ReportTypes.BUILD_ERROR,
+                        devtools.ya.core.report.ReportTypes.BUILD_ERRORS,
                         error_info,
                     )
 
