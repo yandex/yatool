@@ -3888,11 +3888,20 @@ module_exec(PyObject* m)
         PyDateTime_IMPORT;
         if (!PyDateTimeAPI)
             return -1;
-    }
 
-    datetimeModule = PyImport_ImportModule("datetime");
-    if (datetimeModule == NULL)
-        return -1;
+        datetimeModule = PyImport_ImportModule("datetime");
+        if (datetimeModule == NULL)
+            return -1;
+
+        state->timezone_type = PyObject_GetAttrString(datetimeModule, "timezone");
+        Py_DECREF(datetimeModule);
+        if (state->timezone_type == NULL)
+            return -1;
+
+        state->timezone_utc = PyObject_GetAttrString(state->timezone_type, "utc");
+        if (state->timezone_utc == NULL)
+            return -1;
+    }
 
     if (!is_subinterpreter()) {
         decimalModule = PyImport_ImportModule("decimal");
@@ -3905,16 +3914,6 @@ module_exec(PyObject* m)
         if (state->decimal_type == NULL)
             return -1;
     }
-
-    state->timezone_type = PyObject_GetAttrString(datetimeModule, "timezone");
-    Py_DECREF(datetimeModule);
-
-    if (state->timezone_type == NULL)
-        return -1;
-
-    state->timezone_utc = PyObject_GetAttrString(state->timezone_type, "utc");
-    if (state->timezone_utc == NULL)
-        return -1;
 
     uuidModule = PyImport_ImportModule("uuid");
     if (uuidModule == NULL)
