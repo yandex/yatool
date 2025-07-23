@@ -182,7 +182,15 @@ namespace {
             if (!state.HasIncomingDep() && IsDirToModuleDep(dep) && !ModStartTargets.contains(TTarget{dep.To().Id()})) {
                 return false;
             }
-            return !IsIncludeFileDep(dep) && *dep != EDT_OutTogetherBack;
+            if (*dep == EDT_OutTogetherBack) {
+                return false;
+            }
+            if (!IsIncludeFileDep(dep)) {
+                return true;
+            }
+            // Check IsLink and resolve it only if ready return false
+            return TFileId::Create(dep.From()->ElemId).IsLink()
+                && NPath::GetType(RestoreContext.Graph.GetFileName(dep.From()->ElemId).GetTargetStr()) == NPath::ERoot::Build;
         }
 
         bool Enter(TState& state) {
@@ -222,7 +230,10 @@ namespace {
                 if (topNode->NodeType == EMNT_Directory && StartDirs.contains(topNode.Id())) {
                     node.AddProp("Tag", "StartDir");
                 }
-                if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})) {
+                if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})
+                    // Some link may has no commands, skip render semantics for it, else "No pattern for node" error
+                    && (!TFileConf::IsLink(topNode->ElemId) || AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_BuildFrom || dep.To()->NodeType == EMNT_BuildCommand;}))
+                ) {
                     bool structCmdDetected = false;
                     for (const auto& dep : topNode.Edges()) {
                         if (*dep == EDT_BuildCommand && dep.To()->NodeType == EMNT_BuildCommand) {

@@ -159,7 +159,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
     Y_ASSERT(UseFileId(node->NodeType)); //
     auto mainFileView = Graph.GetFileName(node);
     MainFileName = mainFileView.GetTargetStr();
-    YDIAG(MkCmd) << "Build: " << MainFileName << Endl;
+    YDIAG(MkCmd) << "Build: " << (mainFileView.IsLink() ? ELinkTypeHelper::LinkToTargetString(mainFileView.GetLinkType(), mainFileView.GetTargetStr()) : MainFileName) << Endl;
     bool isModule = nodeId == modId;
     TVarStrEx mainOut = TVarStrEx(RealPathEx(node), node->ElemId, true);
 
@@ -226,7 +226,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
     ProcessInputsAndOutputs<false>(node, isModule, Modules, addInput, isGlobalSrc, addSpanInput, addOutput, setCmd);
 
     if (!cmdfound) {
-        throw TMakeError() << "No pattern for node " << MainFileName;
+        throw TMakeError() << "No pattern for node " << (mainFileView.IsLink() ? ELinkTypeHelper::LinkToTargetString(mainFileView.GetLinkType(), mainFileView.GetTargetStr()) : MainFileName);
     }
 
     // TODO: INPUT, OUTPUT has to be released as internal variables.
