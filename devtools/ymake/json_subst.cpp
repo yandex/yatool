@@ -173,7 +173,7 @@ void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     // originally `BreakQuotedExec(nextsubst.Name, quoteDelim, false)`;
     // `TCommandInfo::SubstData` does this to env data before adding it to `EnvSetDefs`,
     // which causes backslashes in, e.g., `TOOLCHAIN_ENV`, to be doubled;
-    // later in `TSubst2Json::CmdFinished` those are kicked out via `SubstGlobal(valRepl, "\\\\:", ":")`;
+    // later in `TSubst2Json::OnCmdFinished` those are kicked out via `SubstGlobal(valRepl, "\\\\:", ":")`;
     // TODO: what are these backslashes doing there to begin with?
     BreakQuotedExec(envStr, "\", \"", false);
 
@@ -233,11 +233,13 @@ inline void TJsonCmdAcceptor::FinishToken(TString& res, const char* at, bool nex
     InToken = nextIsMacro || TopQuote;
 }
 
-TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode, bool fillModule2Nodes)
+TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode, bool fillModule2Nodes, bool checkKVP, const TModule* module)
     : DumpInfo(dumpInfo)
     , JSONVisitor(vis)
     , MakeNode(makeNode)
     , FillModule2Nodes(fillModule2Nodes)
+    , CheckKVP_(checkKVP)
+    , Module_(module)
 {}
 
 void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, const TModule* mod, bool isGlobalNode) {
@@ -288,7 +290,7 @@ void TSubst2Json::UpdateInputs() {
     DumpInfo.MoveInputsTo(makeNode.Inputs);
 }
 
-void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
+void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
     TMakeNode& makeNode = *MakeNode;
 
     makeNode.Uid = DumpInfo.UID;
@@ -318,6 +320,7 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
     if (cmdInfo.KV) {
         makeNode.KV.swap(*cmdInfo.KV);
     }
+
     makeNode.Requirements = cmdInfo.TakeRequirements();
     makeNode.LateOuts = std::move(DumpInfo.LateOuts);
     TYVar lateOutsVars;
@@ -389,15 +392,9 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
 
     makeNode.ResourceUris.swap(resources);
     makeNode.TaredOuts.swap(taredOuts);
-}
 
-void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
-    CmdFinished(commands, cmdInfo, vars);
-}
-
-void TSubst2Json::FakeFinish(TCommandInfo& cmdInfo) {
-    TVars vars;
-    IsFake = true;
-    TString emptyString;
-    GetAcceptor()->Finish(emptyString, cmdInfo, vars);
+    if (CheckKVP_ && (!makeNode.KV || !makeNode.KV.contains("p"))) {
+        THolder<TScopedContext> context = Module_ ? MakeHolder<TScopedContext>(Module_->GetName()) : nullptr;
+        YConfErr(Misconfiguration) << "No kv->p in command with output: " << makeNode.Outputs.substr(2 /* [" */, makeNode.Outputs.find('"', 2) - 2) << Endl;
+    }
 }
