@@ -49,8 +49,6 @@ class _JavaSemGraph(SemGraph):
     _KAPT_SEM = 'kapt-classpaths'
     JAR_SEM = 'jar'
     JAR_PROTO_SEM = 'jar_proto'
-    _OLD_SOURCE_SET_SEM = 'jar_source_set'
-    _OLD_RESOURCE_SET_SEM = 'jar_resource_set'
     _SOURCE_SET_DIR_SEM = 'source_sets-dir'
     _RESOURCE_SET_DIR_SEM = 'resource_sets-dir'
     _CONSUMER_TYPE_SEM = 'consumer-type'
@@ -513,8 +511,6 @@ class _JavaSemGraph(SemGraph):
         return (
             sem0
             in [
-                self._OLD_SOURCE_SET_SEM,
-                self._OLD_RESOURCE_SET_SEM,
                 self._SOURCE_SET_DIR_SEM,
                 self._RESOURCE_SET_DIR_SEM,
             ]
