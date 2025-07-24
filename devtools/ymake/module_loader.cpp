@@ -159,9 +159,7 @@ void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> 
     Vars.AssignFilterGlobalVarsFunc([&moduleConf](const TStringBuf &varName) -> bool { return moduleConf.Globals.contains(varName); });
     OrigVars = orig;
     InitModuleSpecConditions();
-    ModuleConf.ParseModuleArgs(&Module, args);
-    ModuleConf.SetModuleBasename(&Module);
-    ProcessModuleMacroCalls(name, args);
+    ProcessModuleCall(name, args);
     InitFromConf();
     //TODO: set this variable only for DLL and derivatives or add common variable to store FileName
     Vars.SetValue(NVariableDefs::VAR_SONAME, Module.GetFileName());

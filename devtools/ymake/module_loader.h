@@ -138,7 +138,12 @@ private:
             return;
         }
 
-        for (const auto& call: *macroCalls) {
+        ProcessBodyMacroCalls(name, *macroCalls, localVars, std::forward<TMacroHandler>(handler), callStack);
+    }
+
+    template <typename TMacroHandler>
+    void ProcessBodyMacroCalls(TStringBuf name, const TMacroCalls& macroCalls, TVars localVars, TMacroHandler&& handler, TVector<TStringBuf>& callStack) {
+        for (const auto& call: macroCalls) {
             TSplitString callArgs;
             TStringBuf macroName = PrepareMacroCall(call, localVars, callArgs, name);
             if (!ProcessBaseMacro(macroName, static_cast<const TVector<TStringBuf>&>(callArgs), name)) {
@@ -179,6 +184,27 @@ public:
 
     void ProcessModuleMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, bool lintersMake = false) {
         ProcessConfigMacroCalls(name, args, [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);}, lintersMake);
+    }
+
+    void ProcessModuleCall(const TStringBuf& name, TArrayRef<const TStringBuf> args) {
+        ModuleConf.ParseModuleArgs(&Module, args);
+        ModuleConf.SetModuleBasename(&Module);
+
+        auto pi = Conf.BlockData.find(name);
+        if (!pi || !pi->second.CmdProps || !pi->second.CmdProps->HasMacroCalls()) {
+            return;
+        }
+
+        TVars localVars(&Vars);
+        localVars.Id = Vars.Id;
+        TVector<TStringBuf> callStack;
+        ProcessBodyMacroCalls(
+            name,
+            pi->second.CmdProps->GetMacroCalls(),
+            localVars,
+            [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);},
+            callStack
+        );
     }
 
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});
