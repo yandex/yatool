@@ -295,7 +295,7 @@ class UFetcherDownloader:
 
         if executable:
             logger.debug("Setting exec premissions for %s", dst)
-            perms |= stat.S_IXUSR | stat.S_IXGRP
+            perms |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
         return perms
 
