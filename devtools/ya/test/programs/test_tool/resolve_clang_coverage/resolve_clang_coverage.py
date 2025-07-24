@@ -33,6 +33,8 @@ def parse_args():
     parser.add_argument('--llvm-cov-tool', required=True)
     parser.add_argument('--coverage-path', required=True)
     parser.add_argument('--source-root')
+    parser.add_argument('--mcdc-coverage', action='store_true')
+    parser.add_argument('--branch-coverage', action='store_true')
     parser.add_argument('--log-path')
     parser.add_argument(
         "--log-level",
@@ -64,7 +66,7 @@ def merge_segments(s1, s2):
 
 
 @shared.timeit
-def saturate_coverage(covtype, covdata, source_root, cache):
+def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False):
     if covtype == 'files':
         filename = covdata['filename']
     elif covtype == 'functions':
@@ -82,10 +84,20 @@ def saturate_coverage(covtype, covdata, source_root, cache):
         cache[relfilename] = {
             'segments': [],
             'functions': {},
+            'summary': {},
         }
     cache_entry = cache[relfilename]
 
     if covtype == 'files':
+        if 'summary' in covdata:
+            cache_entry['summary'] = covdata['summary']
+
+        if mcdc and 'mcdc_records' in covdata:
+            cache_entry['mcdc'] = covdata['mcdc_records']
+
+        if branches and 'branches' in covdata:
+            cache_entry['branches'] = covdata['branches']
+
         if not cache_entry['segments']:
             cache_entry['segments'] = covdata['segments']
         else:
@@ -212,7 +224,12 @@ def main():
         profdata_path,
         '-object',
         args.target_binary,
-    ] + lib_coverage.util.get_default_llvm_export_args()
+    ]
+
+    if args.mcdc_coverage:
+        cmd.append('--show-mcdc-summary')
+
+    cmd += lib_coverage.util.get_default_llvm_export_args()
 
     def process_block(covtype, filename, data):
         # XXX temporary hack till https://st.yandex-team.ru/DEVTOOLS-3757 is done
@@ -221,7 +238,14 @@ def main():
             if is_generated_code(filename, args.source_root):
                 return
 
-        saturate_coverage(covtype, load_block(data), args.source_root, coverage)
+        saturate_coverage(
+            covtype,
+            load_block(data),
+            args.source_root,
+            coverage,
+            mcdc=args.mcdc_coverage,
+            branches=args.branch_coverage,
+        )
 
     lib_coverage.export.export_llvm_coverage(cmd, process_block, cancel_func=is_shutdown_requested)
 
