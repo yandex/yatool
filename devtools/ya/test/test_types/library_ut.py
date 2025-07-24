@@ -117,11 +117,14 @@ class UnitTestSuite(common_types.AbstractTestSuite):
                 cmd += ["--temp-tracefile-dir", self.temp_tracefile_dir]
             else:
                 logger.warning(
-                    "Parallel tests execution within one node is available only for tests that have 'ya:yt' tag and are to be launched on YT"
+                    "Parallel tests execution within one node is available only for tests that have 'ya:yt' tag and are to be launched on YT with --run-tagged-tests-on-yt flag"
                 )
 
         if devtools.ya.test.const.TestRequirements.Cpu in self.requirements:
-            cmd += ["--cpu-requested", str(self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 0))]
+            cmd += [
+                "--cpu-per-test-requested",
+                str(self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 0)),
+            ]
 
         return cmd
 

@@ -1850,6 +1850,7 @@ def main():
                 with open(os.path.join(options.temp_tracefile_dir, file), 'r') as temporary_tracefile:
                     with open(trace_report, 'a') as dst:
                         dst.write(temporary_tracefile.read())
+                        dst.write('\n')
 
         suite.load_run_results(trace_report)
         if suite.get_status == const.Status.GOOD and not suite.tests:

@@ -14,7 +14,6 @@ import errno
 import signal
 import logging
 import argparse
-import tempfile
 import traceback
 import threading
 import subprocess
@@ -115,7 +114,7 @@ def parse_args():
         help="Amount of workers to run tests in parallel",
     )
     parser.add_argument(
-        '--cpu-requested',
+        '--cpu-per-test-requested',
         help="Amount of CPUs requested by test",
         default=0,
         type=int,
@@ -134,6 +133,8 @@ def parse_args():
             parser.error("Failed to determine project path")
         args.project_path = path.rsplit("arcadia")[1]
     args.project_path.strip("/")
+
+    # Don't collect core dump files if truncation is required
     if args.truncate_logs:
         args.collect_cores = False
     return args
@@ -770,8 +771,11 @@ def update_trace_file(tracefile, suite, performed_suite):
     diff_suite.chunk.logs = performed_suite.chunk.logs
     diff_suite.chunk.metrics = performed_suite.chunk.metrics
 
-    shared.dump_trace_file(diff_suite, tracefile)
-    merge_results(suite, diff_suite)
+    # This lock prevents multiple threads from writing to the same common tracefile with status updates simultaneously
+    # Otherwise it will lead to races and non-determined test statuses.
+    with LOCK:
+        shared.dump_trace_file(diff_suite, tracefile)
+        merge_results(suite, diff_suite)
 
 
 def launch_tests(
@@ -795,11 +799,8 @@ def launch_tests(
 ):
 
     logger.debug("Single launch for %d tests", len(test_names))
-    # Don't collect core dump files if truncation is required
-    if temp_tracefile_dir:
+    if is_parallel:
         temp_tracefile = os.path.join(temp_tracefile_dir, uuid.uuid4().hex)
-    else:
-        temp_tracefile = tempfile.mktemp(suffix='.trace')
 
     cmd = [binary]
 
@@ -823,11 +824,8 @@ def launch_tests(
 
     shared.adjust_test_status(performed_suite, res.rc, res.end_time, add_error_func=suite.add_chunk_error)
 
-    # This lock prevents multiple threads from writing to the same common tracefile with status updates simultaneously
-    # Otherwise it will lead to races and non-determined test statuses.
-    with LOCK:
-        # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
-        update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
+    # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
+    update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
 
     if res.rc < 0 and not exts.windows.on_win():
         if res.last_test_name:
@@ -879,8 +877,7 @@ def launch_tests(
     if res.rc == VALGRIND_ERROR_RC:
         check_valgrind_errors(performed_suite)
     # Dump fully packed snippet with patched logs
-    with LOCK:
-        update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
+    update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
     return res.rc
 
 
@@ -1127,9 +1124,10 @@ def main():
                     if args.parallel_tests_within_node_workers != 'all':
                         workers_count = min(workers_count, int(args.parallel_tests_within_node_workers))
 
-                    if args.cpu_requested != 0:
-                        workers_count = max(workers_count // args.cpu_requested, 1)
+                    if args.cpu_per_test_requested != 0:
+                        workers_count = max(workers_count // args.cpu_per_test_requested, 1)
 
+                    logger.debug("Launching tests in parallel with %d workers", workers_count)
                     executor = futures.ThreadPoolExecutor(max_workers=workers_count)
                     runs = []
 
