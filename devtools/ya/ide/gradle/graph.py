@@ -209,13 +209,9 @@ class _JavaSemGraph(SemGraph):
             )
             self._graph_patched = True
 
-    def get_configs_dir(self) -> Path:
-        """Get directory with ya ide gradle configs"""
-        return self.config.arcadia_root / "build" / "yandex_specific" / "gradle"
-
     def _configure_patch_annotation_processors(self) -> None:
         """Read mapping AP class -> path from configure"""
-        annotation_processors_file = self.get_configs_dir() / "annotation_processors.json"
+        annotation_processors_file = self.config.get_configs_dir() / "annotation_processors.json"
         if not annotation_processors_file.exists():
             raise YaIdeGradleException(f"Not found {annotation_processors_file}")
         with annotation_processors_file.open('rb') as f:

@@ -384,6 +384,7 @@ class GradleOptions(yarg.Options):
 
     # Expert options
     EXPOPT_YEXPORT_BIN = '--yexport-bin'
+    EXPOPT_YEXPORT_TOML = '--yexport-toml'
     EXPOPT_DUMP_YMAKE_STDERR = '--dump-ymake-stderr'
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
 
@@ -406,6 +407,7 @@ class GradleOptions(yarg.Options):
         self.reexport: bool = False
 
         self.yexport_bin: str = None
+        self.yexport_toml: list[str] = []
         self.dump_ymake_stderr: str = None
         self.yexport_debug_mode: str = None
 
@@ -497,6 +499,13 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.EXPOPT_YEXPORT_BIN],
                 help='Full path to yexport binary',
                 hook=yarg.SetValueHook('yexport_bin'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_YEXPORT_TOML],
+                help='Global key=value for put to yexport.toml',
+                hook=yarg.SetAppendHook('yexport_toml'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
                 visible=HelpLevel.EXPERT,
             ),

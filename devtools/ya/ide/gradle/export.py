@@ -22,7 +22,10 @@ class _Exporter:
         self.config: _JavaSemConfig = java_sem_config
         self.sem_graph: _JavaSemGraph = java_sem_graph
         self.project_name: str = None
-        self.attrs_for_all_templates: list[str] = ["symlinks_to_generated = true"]
+        self.attrs_for_all_templates: list[str] = [
+            "symlinks_to_generated = " + ("false" if self.config.params.disable_generated_symlinks else "true")
+        ]
+        self.attrs_for_all_templates += self.config.params.yexport_toml
         if self.config.output_root != self.config.arcadia_root:
             self.attrs_for_all_templates += [f"output_root = '{self.config.output_root}'"]
 
@@ -47,11 +50,7 @@ class _Exporter:
 
     def _make_project_gradle_props(self) -> None:
         """Make project specific gradle.properties file"""
-        const_gradle_properties_file = self.sem_graph.get_configs_dir() / ("const." + _JavaSemConfig.GRADLE_PROPS)
         project_gradle_properties = []
-        if const_gradle_properties_file.exists():
-            with const_gradle_properties_file.open('r') as f:
-                project_gradle_properties += f.read().split("\n")
         for prop, value in self.config.get_project_gradle_props().items():
             project_gradle_properties = self._apply_gradle_property(project_gradle_properties, prop, value)
         if self.config.params.gradle_daemon_jvmargs:
@@ -131,10 +130,10 @@ class _Exporter:
                         *self.attrs_for_all_templates,
                         '',
                         '[add_attrs.dir]',
+                        *self.attrs_for_all_templates,
                         f'build_contribs = {'true' if self.config.params.collect_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
                         f'disable_lombok_plugin = {'true' if self.config.params.disable_lombok_plugin else 'false'}',
-                        *self.attrs_for_all_templates,
                         '',
                         '[add_attrs.target]',
                         *self.attrs_for_all_templates,
