@@ -691,7 +691,7 @@ Version 8.36 26-September-2014
     backtracking, instead of returning with PCRE_ERROR_MATCHLIMIT. This
     issue should be resolved now.
 
-5.  Fixed an issue, which occures when nested alternatives are optimized
+5.  Fixed an issue, which occurres when nested alternatives are optimized
     with table jumps.
 
 6.  Inserted two casts and changed some ints to size_t in the light of some
