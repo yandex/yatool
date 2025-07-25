@@ -111,7 +111,7 @@ struct TVarStr {
 
             ui16 OutInclsFromInput: 1;
             ui16 OutputInThisModule: 1;  // Dynamic mark for vars created as outputs in current module
-            ui16 StructCmd: 1;
+            ui16 StructCmdForVars: 1;
             ui16 IsGlob: 1;
             ui16 : 0;              // Start next word
             // ^^^^^^^^^^^^^^^^^^^^

@@ -1206,7 +1206,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
                 }
 
                 for (const auto& varItem : varValue) {
-                    if (varItem.StructCmd) {
+                    if (varItem.StructCmdForVars) {
                         Y_DEBUG_ABORT_UNLESS(!varItem.HasPrefix);
                         auto expr = Commands.Get(varItem.Name, &CmdConf);
                         Y_ASSERT(expr);

@@ -59,7 +59,7 @@ namespace {
         var.push_back(TVarStr(name, true, false));
         var.BaseVal = lvars.Base ? lvars.Base->Lookup(cmdName) : nullptr;
         var.back().NeedSubst = true;
-        var.back().StructCmd = structCmd;
+        var.back().StructCmdForVars = structCmd;
     }
 }
 

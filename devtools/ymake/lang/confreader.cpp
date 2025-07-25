@@ -1007,9 +1007,9 @@ namespace {
                 if (Conf.RenderSemantics)
                     return;
                 if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmd = true;
+                    BlockStack.back().BlockData().StructCmdForBlockData = true;
                 } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmd = false;
+                    BlockStack.back().BlockData().StructCmdForBlockData = false;
                 } else {
                     ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
                 }
@@ -1018,9 +1018,9 @@ namespace {
                 if (!Conf.RenderSemantics)
                     return;
                 if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmd = true;
+                    BlockStack.back().BlockData().StructCmdForBlockData = true;
                 } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmd = false;
+                    BlockStack.back().BlockData().StructCmdForBlockData = false;
                 } else {
                     ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
                 }

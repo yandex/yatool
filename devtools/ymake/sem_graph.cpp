@@ -77,7 +77,7 @@ namespace {
                 auto& var = vars[varname + TString("_RAW")];
                 var.push_back(varval);
                 if (StructCmdDetected)
-                    var.back().StructCmd = true;
+                    var.back().StructCmdForVars = true;
             }
         }
 

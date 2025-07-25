@@ -152,7 +152,7 @@ namespace {
         if (Y_UNLIKELY(var.IsDir)) {
             TStringBuf cmdName;
             auto tryParse = [&](const TYVar& var) {
-                if (var.size() != 1 || var[0].StructCmd)
+                if (var.size() != 1 || var[0].StructCmdForVars)
                     return false;
                 TStringBuf cmd;
                 ui64 id;
@@ -330,7 +330,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     }
 
-    if (blockData && blockData->StructCmd) {
+    if (blockData && blockData->StructCmdForBlockData) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
         TSpecFileList* knownInputs = {};
@@ -546,7 +546,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 
     AddCmdNode(Cmd, cmdElemId);
     Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), false);
-    Cmd[0].StructCmd = true;
+    Cmd[0].StructCmdForVars = true;
 
     for (const auto& input : compiled.Inputs.Take()) {
         TVarStrEx in(input.Name);
@@ -691,7 +691,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
         if (auto it = Conf->BlockData.find(macroName); it != Conf->BlockData.end()) {
             // the `SRC(...)` case (plus `SRC_C_PIC` and other similar variations);
             // causes one round of `MacroCall()` to expand `_SRC____ext`
-            if (it->second.StructCmd)
+            if (it->second.StructCmdForBlockData)
                 structCmd = true;
         }
         else {
@@ -705,14 +705,14 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
                 auto it = Conf->BlockData.find(m.Name);
                 if (it == Conf->BlockData.end())
                     continue;
-                if (!it->second.StructCmd)
+                if (!it->second.StructCmdForBlockData)
                     continue;
                 structCmd = true;
                 break;
             }
         }
         if (structCmd) {
-            // pass the torch to the `if (...StructCmd...)` section in `MacroCall()`
+            // pass the torch to the `if (...StructCmdForBlockData...)` section in `MacroCall()`
             Cmd.SetSingleVal(macroName, GlueCmd(*args), mod.GetId(), mod.Vars.Id);
             Cmd.BaseVal = macroVar;
             // TBD: the `convertNamedArgs` argument policy; by the old macro processing logic,
@@ -1956,7 +1956,7 @@ void TCommandInfo::SubstData(
         result += "\"";
     for (size_t cnt = 0; cnt < num; cnt++) {
         TVarStr nextsubst(macro.RawString ? TVarStr(macro.Name) : (pvar ? (*pvar)[cnt] : macro.OrigFragment));
-        if (nextsubst.StructCmd) {
+        if (nextsubst.StructCmdForVars) {
             Y_DEBUG_ABORT_UNLESS(CommandSource);
             if (Y_LIKELY(CommandSource)) {
                 auto& cmdSrc = *CommandSource;

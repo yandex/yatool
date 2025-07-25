@@ -92,7 +92,7 @@ void TModuleBuilder::RecursiveAddInputs() {
         if (state == TCommandInfo::SKIPPED) {
             TStringBuf cmd, cmdName;
             auto tryParse = [&](const TYVar& var, TStringBuf& cmdName, TStringBuf* cmdArgs) {
-                if (var.size() != 1 || var[0].StructCmd)
+                if (var.size() != 1 || var[0].StructCmdForVars)
                     return false;
                 ui64 id;
                 TStringBuf cmd;
@@ -393,7 +393,7 @@ void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd) {
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
-    if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
+    if (GetModuleConf().StructCmdForModuleConf && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
         auto mainOutputFile = Graph.GetFileName(node.ElemId);
         auto mainOutputName = mainOutputFile.Basename();
         auto compiled = [&]() {

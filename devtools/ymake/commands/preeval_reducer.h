@@ -164,7 +164,7 @@ namespace NCommands {
                 auto result = TString(fmt::format("${{{}}}", name));
                 return Values.GetValue(Values.InsertStr(result));
             }
-            // TODO? support for TVarStr with .StructCmd
+            // TODO? support for TVarStr with .StructCmdForVars
             if (var->size() == 1) {
                 auto& val = var->front();
                 return Evaluate(val);

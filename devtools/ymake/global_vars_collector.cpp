@@ -53,7 +53,7 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
                 }
             } else {
                 var.push_back(TVarStr(objd));
-                var.back().StructCmd = _quasi_parentData_StructCmdDetected;
+                var.back().StructCmdForVars = _quasi_parentData_StructCmdDetected;
             }
         }
     }

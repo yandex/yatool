@@ -50,7 +50,7 @@ TString EvalAll(const TYVar* var) {
 TVector<TString> EvalAll(const TYVar& var, const TVars& vars, const TCommands& commands, const TCmdConf& cmdConf, const TBuildConfiguration& conf) {
     TVector<TString> result;
     for (const auto& part : var) {
-        if (part.StructCmd) {
+        if (part.StructCmdForVars) {
             auto& expr = *commands.Get(part.Name, &cmdConf);
             auto dummyCmdInfo = TCommandInfo(conf, nullptr, nullptr);
             auto scr = TCommands::SimpleCommandSequenceWriter()
