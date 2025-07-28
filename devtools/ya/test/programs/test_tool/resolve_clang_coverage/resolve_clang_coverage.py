@@ -84,18 +84,25 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
         cache[relfilename] = {
             'segments': [],
             'functions': {},
-            'summary': {},
         }
     cache_entry = cache[relfilename]
 
     if covtype == 'files':
         if 'summary' in covdata:
+            if 'summary' in cache_entry:
+                logger.warning(
+                    f"Found summary report duplicate for '{relfilename}': cache_entry={cache_entry}, covdata={covdata}"
+                )
             cache_entry['summary'] = covdata['summary']
 
         if mcdc and 'mcdc_records' in covdata:
+            if 'mcdc' in cache_entry:
+                raise AssertionError("Found MC/DC coverage duplicate")
             cache_entry['mcdc'] = covdata['mcdc_records']
 
         if branches and 'branches' in covdata:
+            if 'branches' in cache_entry:
+                raise AssertionError("Found branch coverage duplicate")
             cache_entry['branches'] = covdata['branches']
 
         if not cache_entry['segments']:
@@ -129,7 +136,7 @@ def extract(filename):
 def merge_covdata(profdata_tool, bin_name, filenames):
     assert filenames
     output = os.path.abspath(bin_name + ".profdata")
-    cmd = [profdata_tool, 'merge', '-sparse', '-o', output] + filenames
+    cmd = [profdata_tool, 'merge', '--sparse', '-o', output] + filenames
     process.execute(cmd, check_sanitizer=False)
     return output
 
@@ -220,9 +227,9 @@ def main():
         'export',
         '-j',
         '4',
-        '-instr-profile',
+        '--instr-profile',
         profdata_path,
-        '-object',
+        '--object',
         args.target_binary,
     ]
 

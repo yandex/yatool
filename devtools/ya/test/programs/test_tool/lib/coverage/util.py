@@ -55,6 +55,8 @@ def get_default_export_skip_pattern():
             r'(\.rl6\.cc?p?p?$)',
             # python generated files
             r'(\.pyx\.cc?p?p?$)',
+            # VCS info generated file
+            r'(/__vcs_version__.\w+$)',
         ]
     )
     return "({})".format(pattern)
@@ -62,7 +64,7 @@ def get_default_export_skip_pattern():
 
 def get_default_llvm_export_args():
     return [
-        '-ignore-filename-regex',
+        '--ignore-filename-regex',
         get_default_export_skip_pattern(),
     ]
 
