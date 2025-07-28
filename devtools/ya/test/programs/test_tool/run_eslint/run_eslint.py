@@ -5,7 +5,6 @@ import os
 import re
 
 import devtools.ya.test.system.process
-from build.plugins.lib.nots.typescript import DEFAULT_TS_CONFIG_FILE
 from build.plugins.lib.nots.package_manager.base.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
@@ -53,7 +52,7 @@ def main():
             NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             PACKAGE_JSON_FILENAME,
             PNPM_LOCKFILE_FILENAME,
-            DEFAULT_TS_CONFIG_FILE,
+            args.ts_config_path,
         ],
     )
 
@@ -61,6 +60,7 @@ def main():
         module_arc_path=args.source_folder_path,
         source_root=args.source_root,
         bin_root=args.build_root,
+        ts_config_path=args.ts_config_path,
     )
 
     cmd = get_cmd(args, args.files)
@@ -95,6 +95,7 @@ def parse_args():
     parser.add_argument("--build-root", dest="build_root", help="Build root", required=True)
     parser.add_argument("--source-folder-path", dest="source_folder_path", required=True)
     parser.add_argument("--nodejs", dest="nodejs", help="Path to the Node.JS resource", required=True)
+    parser.add_argument("--ts-config-path", dest="ts_config_path", help="tsconfig.json path", required=True)
     parser.add_argument("--eslint-config-path", dest="eslint_config_path", help="ESLint config path", required=True)
     parser.add_argument("--tracefile", help="Path to the output trace log")
     parser.add_argument("--log-path", dest="log_path", help="Log file path")

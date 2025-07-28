@@ -5,7 +5,6 @@ import os
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
 import build.plugins.lib.nots.test_utils.ts_utils as nots_ts_utils
-import build.plugins.lib.nots.typescript as nots_typescript
 
 import devtools.ya.test
 import devtools.ya.test.const
@@ -47,7 +46,7 @@ def run(args):
             pm_const.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
             pnpm_const.PNPM_LOCKFILE_FILENAME,
-            nots_typescript.DEFAULT_TS_CONFIG_FILE,
+            args.ts_config_path,
         ],
     )
 
@@ -55,6 +54,7 @@ def run(args):
         module_arc_path=args.source_folder_path,
         source_root=args.source_root,
         bin_root=args.build_root,
+        ts_config_path=args.ts_config_path,
     )
 
     cmd = get_cmd(args)
