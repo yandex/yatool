@@ -1362,7 +1362,8 @@ class _GraphMaker:
         # and then waits for one multiconfig ymake to process all configurations at once.
         # For the large ymake to run at all, we first need to collect options from all configurations,
         # so we should not limit threads here.
-        max_workers = None if opts.ymake_multiconfig else getattr(opts, 'ya_threads')
+        # We're safe to set high limit since threads are spawned lazily and reused if able.
+        max_workers = 1000 if opts.ymake_multiconfig else getattr(opts, 'ya_threads')
         self._platform_threadpool = ThreadPoolExecutor(max_workers=max_workers)
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
