@@ -8,8 +8,8 @@ namespace NCommands {
     // TMacroValues::TValue
     template<> [[maybe_unused]] inline const char *PrintableTypeName<std::monostate                       >() {return "[pre]Unit";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<bool                                 >() {return "[pre]Bool";}
-    template<> [[maybe_unused]] inline const char *PrintableTypeName<std::string_view                     >() {return "[pre]String";}
-    template<> [[maybe_unused]] inline const char *PrintableTypeName<std::vector<std::string_view>        >() {return "[pre]Strings";}
+    template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TXString               >() {return "[pre]String";}
+    template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TXStrings              >() {return "[pre]Strings";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TTool                  >() {return "[pre]Tool";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TTools                 >() {return "[pre]Tools";}
     template<> [[maybe_unused]] inline const char *PrintableTypeName<TMacroValues::TResult                >() {return "[pre]Result";}
@@ -39,7 +39,7 @@ namespace NCommands {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& unwrappedArgs
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             Y_ABORT();
         }

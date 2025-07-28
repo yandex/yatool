@@ -64,8 +64,8 @@ struct TErrorShowerState {
 };
 
 struct TToolsAndResults {
-    TVector<TStringBuf> Tools;
-    TVector<TStringBuf> Results;
+    TVector<std::string> Tools;
+    TVector<std::string> Results;
 };
 
 class TCommands {
@@ -191,6 +191,7 @@ private:
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
+    TString PrintValue(const TMacroValues::TValue& val) const;
 
     const NCommands::TSyntax& Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
 

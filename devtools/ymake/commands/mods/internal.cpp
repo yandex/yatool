@@ -23,7 +23,7 @@ namespace {
 
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             DoTheThing(args);
         }
@@ -68,8 +68,8 @@ namespace {
         }
 
         std::string ExpectString(const TMacroValues::TValue& val) const {
-            if (auto str = std::get_if<std::string_view>(&val))
-                return std::string(*str);
+            if (auto str = std::get_if<TMacroValues::TXString>(&val))
+                return str->Data;
             return std::visit([&](auto& x) -> std::string {throw TBadArgType(Name, x);}, val);
         }
 
@@ -81,13 +81,13 @@ namespace {
 
         std::string ToString(const TMacroValues::TValue& val) const {
             return std::visit(TOverloaded{
-                [&](std::string_view x) -> std::string {
-                    return std::string(x);
+                [&](const TMacroValues::TXString& x) -> std::string {
+                    return x.Data;
                 },
-                [&](const std::vector<std::string_view>& x) -> std::string {
-                    return fmt::format("{}", fmt::join(x, ", "));
+                [&](const TMacroValues::TXStrings& x) -> std::string {
+                    return fmt::format("{}", fmt::join(x.Data, ", "));
                 },
-                [&](auto& x) -> std::string {
+                [&](const auto& x) -> std::string {
                     throw TBadArgType(Name, x);
                 }
             }, val);
@@ -101,7 +101,7 @@ namespace {
                 [&](const TVector<TString>& x) -> std::string {
                     return fmt::format("{}", fmt::join(x, ", "));
                 },
-                [&](auto& x) -> std::string {
+                [&](const auto& x) -> std::string {
                     throw TBadArgType(Name, x);
                 }
             }, val);

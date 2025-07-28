@@ -10,8 +10,6 @@ namespace NCommands {
 
     struct TSyntax {
 
-        // in variants, EVarId goes first to enable default ctors
-
         struct TTransformation;
         struct TCall;
         struct TBuiltinIf;
@@ -36,8 +34,8 @@ namespace NCommands {
 
         using TTerm = std::variant<
             // proper data
+            TMacroValues::TValue,
             NPolexpr::EVarId,
-            NPolexpr::TConstId,
             TTransformation,
             TCall,
             TBuiltinIf,
@@ -76,6 +74,6 @@ namespace NCommands {
     };
 
     TSyntax Parse(const TBuildConfiguration* conf, const TModRegistry& mods, TMacroValues& values, TStringBuf src);
-    NPolexpr::TExpression Compile(const TModRegistry& mods, const TSyntax& src);
+    NPolexpr::TExpression Compile(const TModRegistry& mods, const TSyntax& src, TMacroValues& values);
 
 }

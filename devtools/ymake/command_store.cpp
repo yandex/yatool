@@ -166,7 +166,7 @@ TCommands::TInliner::GetVariableDefinition(NPolexpr::EVarId id) {
             auto late_globs = TMacroValues::TLegacyLateGlobPatterns();
             for (auto& val : *var)
                 late_globs.Data.push_back(val.Name);
-            def.Definition->Script = {{{Commands.Values.InsertValue(late_globs)}}};
+            def.Definition->Script = {{{late_globs}}};
             def.LegacyMode = ELegacyMode::Macro;
         } else if (has_no_nested_macro) {
             // a proper macro argument
@@ -378,8 +378,8 @@ void TCommands::TInliner::InlineModArgTerm(
     Y_DEFER {--Depth;};
     CheckDepth();
     std::visit(TOverloaded{
-        [&](NPolexpr::TConstId id) {
-            writer.push_back(id);
+        [&](TMacroValues::TValue val) {
+            writer.push_back(std::move(val));
         },
         [&](NPolexpr::EVarId id) {
             auto def = GetVariableDefinition(id);
@@ -491,8 +491,8 @@ void TCommands::TInliner::InlineScalarTerm(
     Y_DEFER {--Depth;};
     CheckDepth();
     std::visit(TOverloaded{
-        [&](NPolexpr::TConstId id) {
-            writer.WriteTerm(id);
+        [&](TMacroValues::TValue val) {
+            writer.WriteTerm(std::move(val));
         },
         [&](NPolexpr::EVarId var) {
             auto def = GetVariableDefinition(var);
@@ -669,7 +669,7 @@ void TCommands::TInliner::InlineArguments(
                     InlineArguments(call.Else, writer);
                 return true;
             },
-            [&](auto&&) {
+            [&](const auto&) {
                 return false;
             }
         }, term);
@@ -753,7 +753,7 @@ void TCommands::TInliner::InlineCommands(
                     InlineCommands({call.Else}, writer);
                 return true;
             },
-            [&](auto&&) {
+            [&](const auto&) {
                 return false;
             }
         }, term);
@@ -813,7 +813,7 @@ NCommands::TCompiledCommand TCommands::Compile(
 #endif
         return result;
     } else
-        return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast)};
+        return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast, Values)};
 }
 
 ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
@@ -871,8 +871,8 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
             if (&term != &arg.front())
                 os << " + ";
             std::visit(TOverloaded{
-                [&](NPolexpr::TConstId id) {
-                    os << PrintConst(id);
+                [&](TMacroValues::TValue val) {
+                    os << PrintValue(std::move(val));
                 },
                 [&](NPolexpr::EVarId id) {
                     os << Values.GetVarName(id);
@@ -922,12 +922,16 @@ void TCommands::PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream&
 }
 
 TString TCommands::PrintConst(NPolexpr::TConstId id) const {
+    return PrintValue(Values.GetValue(id));
+}
+
+TString TCommands::PrintValue(const TMacroValues::TValue& val) const {
     // TODO strings here would be better with the {:?s} formatting, but the current fmt is too old for that
     return std::visit(TOverloaded{
         [](std::monostate                           ) { return fmt::format("{{}}"); },
         [](bool                                  val) { return fmt::format("#{}", val ? "t" : "f"); },
-        [](std::string_view                      val) { return fmt::format("'{}'", val); },
-        [](std::vector<std::string_view>         val) { return fmt::format("'{}'", fmt::join(val, "', '")); },
+        [](TMacroValues::TXString                val) { return fmt::format("'{}'", val.Data); },
+        [](TMacroValues::TXStrings               val) { return fmt::format("'{}'", fmt::join(val.Data, "', '")); },
         [](TMacroValues::TTool                   val) { return fmt::format("Tool{{'{}'}}", val.Data); },
         [](TMacroValues::TTools                  val) { return fmt::format("Tools{{{}}}", fmt::join(val.Data, " ")); },
         [](TMacroValues::TResult                 val) { return fmt::format("Result{{'{}'}}", val.Data); },
@@ -937,7 +941,7 @@ TString TCommands::PrintConst(NPolexpr::TConstId id) const {
         [](TMacroValues::TOutputs                val) { return fmt::format("Outputs{{{}}}", fmt::join(val.Coords, " ")); },
         [](TMacroValues::TGlobPattern            val) { return fmt::format("GlobPattern{{{}}}", fmt::join(val.Data, " ")); },
         [](TMacroValues::TLegacyLateGlobPatterns val) { return fmt::format("LegacyLateGlobPattern{{{}}}", fmt::join(val.Data, " ")); },
-    }, Values.GetValue(id));
+    }, val);
 }
 
 void TCommands::StreamCmdRepr(
@@ -974,13 +978,13 @@ void TCommands::StreamCmdRepr(
 NCommands::TCompiledCommand TCommands::Preevaluate(NCommands::TSyntax& expr, const TVars& vars, TCompilationIODesc io) {
     NCommands::TCompiledCommand result;
     if (!io.MainOutput.empty())
-        result.Outputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(io.MainOutput))));
+        result.Outputs.CollectCoord(Values.Internalize(io.MainOutput));
     if (io.KnownInputs)
         for (auto& x : *io.KnownInputs)
-            result.Inputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));
+            result.Inputs.CollectCoord(Values.Internalize(x.Name));
     if (io.KnownOutputs)
         for (auto& x : *io.KnownOutputs)
-            result.Outputs.CollectCoord(std::get<std::string_view>(Values.GetValue(Values.InsertStr(x.Name))));
+            result.Outputs.CollectCoord(Values.Internalize(x.Name));
     auto reducer = NCommands::TRefReducer{Mods, Values, vars, result};
     try {
         reducer.ReduceIf(expr);
@@ -1070,8 +1074,8 @@ TToolsAndResults TCommands::GetCommandToolsEtc(ui32 elemId) const {
         return {};
     }
 
-    TUniqVector<TStringBuf> tools;
-    TUniqVector<TStringBuf> results;
+    TUniqVector<std::string> tools;
+    TUniqVector<std::string> results;
     for (const auto& node : expr->GetNodes()) {
         if (node.GetType() != NPolexpr::TExpression::TNode::EType::Constant)
             continue;
@@ -1112,13 +1116,13 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             // TODO do we want proper render-time booleans?
             return NCommands::TTermValue(val ? True : False);
         },
-        [](std::string_view val) {
-            return NCommands::TTermValue(TString(val));
+        [](TMacroValues::TXString val) {
+            return NCommands::TTermValue(TString(std::move(val.Data))); // TODO can we move it?
         },
-        [](std::vector<std::string_view> val) {
+        [](TMacroValues::TXStrings val) {
             TVector<TString> result;
-            result.reserve(val.size());
-            for (auto& x : val)
+            result.reserve(val.Data.size());
+            for (auto& x : val.Data)
                 result.emplace_back(x);
             return NCommands::TTermValue(result);
         },
@@ -1167,7 +1171,11 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             return NCommands::TTermValue(result);
         },
         [](TMacroValues::TGlobPattern val) {
-            return NCommands::TTermValue(val.Data);
+            // TODO drop the reconstruction
+            TVector<TString> result;
+            for (auto& x : val.Data)
+                result.push_back(TString(std::move(x)));
+            return NCommands::TTermValue(result);
         },
         [](TMacroValues::TLegacyLateGlobPatterns) -> NCommands::TTermValue {
             ythrow TError() << "unexpected glob evaluation";
@@ -1187,8 +1195,8 @@ TString TCommands::PrintRawCmdNode(NPolexpr::TConstId node) const {
     return std::visit(TOverloaded{
         [](std::monostate                           ) { return TString(); },
         [](bool                                  val) { return val ? True : False; },
-        [](std::string_view                      val) { return TString(val); },
-        [](std::vector<std::string_view>         val) { return JoinArgs(std::span(val), std::identity()); },
+        [](TMacroValues::TXString                val) { return TString(val.Data); },
+        [](TMacroValues::TXStrings               val) { return JoinArgs(std::span(val.Data), std::identity()); },
         [](TMacroValues::TTool                   val) { return TString(val.Data); },
         [](TMacroValues::TTools                  val) { return TString(fmt::format("{}", fmt::join(val.Data, " "))); },
         [](TMacroValues::TResult                 val) { return TString(val.Data); },

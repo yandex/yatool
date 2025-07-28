@@ -5,9 +5,9 @@
 #include <util/string/escape.h>
 #include <span>
 
-TVector<TVector<TString>> SplitCommandsAndArgs(TStringBuf cmd);
-TVector<TString> SplitCommands(TStringBuf cmd);
-TVector<TString> SplitArgs(TStringBuf cmd);
+TVector<TVector<std::string>> SplitCommandsAndArgs(TStringBuf cmd);
+TVector<std::string> SplitCommands(TStringBuf cmd);
+TVector<std::string> SplitArgs(TStringBuf cmd);
 
 template<typename T, typename F>
 TString JoinArgs(std::span<T> args, F proj) {

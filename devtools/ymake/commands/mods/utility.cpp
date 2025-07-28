@@ -13,11 +13,11 @@ namespace {
             [](std::monostate) {
                 return true;
             },
-            [&](std::string_view x) {
-                return x.empty();
+            [&](const TMacroValues::TXString& x) {
+                return x.Data.empty();
             },
-            [&](const std::vector<std::string_view>& x) {
-                return x.empty();
+            [&](const TMacroValues::TXStrings& x) {
+                return x.Data.empty();
             },
             [&](auto&& x) -> bool {
                 throw TBadArgType(mod.Name, x);
@@ -64,7 +64,7 @@ namespace {
             [](TTermNothing) {
                 return false;
             },
-            [&](auto&&) {
+            [&](const auto&) {
                 return true;
             }
         }, val);
@@ -102,7 +102,7 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             if (IsEmpty(*this, args[0]))
@@ -131,7 +131,7 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return IsEmpty(*this, args[0]);
@@ -174,7 +174,7 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return !AsBool(*this, args[0]);
@@ -199,19 +199,19 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-                [&](std::string_view arg) -> TMacroValues::TValue {
-                    return NYMake::IsTrue(arg);
+                [&](const TMacroValues::TXString& arg) -> TMacroValues::TValue {
+                    return NYMake::IsTrue(arg.Data);
                 },
-                [&](const std::vector<std::string_view>& arg) -> TMacroValues::TValue {
-                    if (arg.size() != 1)
+                [&](const TMacroValues::TXStrings& arg) -> TMacroValues::TValue {
+                    if (arg.Data.size() != 1)
                         throw TBadArgType(Name, arg);
-                    return NYMake::IsTrue(arg.front());
+                    return NYMake::IsTrue(arg.Data.front());
                 },
-                [&](auto&& x) -> TMacroValues::TValue {
+                [&](const auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
                 },
             }, args[0]);
@@ -231,7 +231,7 @@ namespace {
                         throw TBadArgType(Name, arg);
                     return FromBool(NYMake::IsTrue(arg.front()));
                 },
-                [&](auto&& x) -> TTermValue {
+                [&](const auto& x) -> TTermValue {
                     throw TBadArgType(Name, x);
                 },
             }, args[0]);

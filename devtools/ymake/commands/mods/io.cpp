@@ -20,42 +20,42 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
+                        return ProcessOne(names.front());
                     else
-                        return ProcessMany(ctx, names);
+                        return ProcessMany(names);
                 },
-                [&](const std::vector<std::string_view>& names) -> TMacroValues::TValue {
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
+                [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
+                    if (names.Data.size() == 1)
+                        return ProcessOne(names.Data.front());
                     else
-                        return ProcessMany(ctx, names);
+                        return ProcessMany(names.Data);
                 },
-                [](auto&&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 },
             }, args[0]);
         }
     private:
-        std::string_view ProcessPath(const TPreevalCtx& ctx, std::string_view path) const {
+        std::string ProcessPath(std::string_view path) const {
             // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
             auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
             auto key = NPath::CutType(dir);
-            return std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(key)));
+            return std::string(key);
         }
-        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            return TMacroValues::TTool {.Data = ProcessPath(ctx, name)};
+        TMacroValues::TValue ProcessOne(std::string_view name) const {
+            return TMacroValues::TTool {.Data = ProcessPath(name)};
         };
-        TMacroValues::TValue ProcessMany(const TPreevalCtx& ctx, auto& names) const {
+        TMacroValues::TValue ProcessMany(auto& names) const {
             auto result = TMacroValues::TTools();
             for (auto& name : names)
-                result.Data.push_back(ProcessPath(ctx, name));
+                result.Data.push_back(ProcessPath(name));
             return result;
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
@@ -73,40 +73,40 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
+                        return ProcessOne(names.front());
                     else
-                        return ProcessMany(ctx, names);
+                        return ProcessMany(names);
                 },
-                [&](const std::vector<std::string_view>& names) -> TMacroValues::TValue {
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
+                [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
+                    if (names.Data.size() == 1)
+                        return ProcessOne(names.Data.front());
                     else
-                        return ProcessMany(ctx, names);
+                        return ProcessMany(names.Data);
                 },
-                [](auto&&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 },
             }, args[0]);
         }
     private:
-        std::string_view ProcessPath(const TPreevalCtx& ctx, std::string_view path) const {
+        std::string ProcessPath(std::string_view path) const {
             // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
             auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
             auto key = NPath::CutType(dir);
-            return std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(key)));
+            return std::string(key);
         }
-        TMacroValues::TValue ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            return TMacroValues::TResult {.Data = ProcessPath(ctx, name)};
+        TMacroValues::TValue ProcessOne(std::string_view name) const {
+            return TMacroValues::TResult {.Data = ProcessPath(name)};
         };
-        TMacroValues::TValue ProcessMany(const TPreevalCtx&, auto& names) const {
-            throw TBadArgType(Name, names);
+        TMacroValues::TValue ProcessMany(auto&) const {
+            throw TBadArgType(Name, TMacroValues::TXStrings());
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -120,7 +120,7 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
 
@@ -128,23 +128,23 @@ namespace {
             if (args.size() == 1)
                 _args.Path = args[0];
             else if (args.size() == 2) {
-                auto arg0 = std::get<std::string_view>(args[0]);
-                _args.Context = TFileConf::GetContextType(arg0);
+                auto arg0 = std::get<TMacroValues::TXString>(args[0]);
+                _args.Context = TFileConf::GetContextType(arg0.Data);
                 _args.Path = args[1];
             } else
                 FailArgCount(args.size(), "1-2");
 
             return std::visit(TOverloaded{
-                [&](std::string_view name) {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                [&](const TMacroValues::TXString& name) {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     if (names.size() == 1)
                         return ProcessOne(ctx, names.front(), _args.Context, false, false);
                     return ProcessMany(ctx, names, _args.Context, false, false);
                 },
-                [&](const std::vector<std::string_view>& names) {
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front(), _args.Context, false, false);
-                    return ProcessMany(ctx, names, _args.Context, false, false);
+                [&](const TMacroValues::TXStrings& names) {
+                    if (names.Data.size() == 1)
+                        return ProcessOne(ctx, names.Data.front(), _args.Context, false, false);
+                    return ProcessMany(ctx, names.Data, _args.Context, false, false);
                 },
                 [&](TMacroValues::TGlobPattern glob) {
                     if (glob.Data.size() == 1)
@@ -172,12 +172,12 @@ namespace {
                 if (propName == "LATE_GLOB")
                     isLegacyGlob = true;
             }
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue([&]() {
+            auto pooledName = [&]() {
                 if (context != ELT_Default)
-                    return ctx.Values.InsertStr(TFileConf::ConstructLink(context, NPath::ConstructPath(name))); // lifted from TCommandInfo::ApplyMods
+                    return ctx.Values.Internalize(TFileConf::ConstructLink(context, NPath::ConstructPath(name))); // lifted from TCommandInfo::ApplyMods
                 else
-                    return ctx.Values.InsertStr(name);
-            }()));
+                    return ctx.Values.Internalize(name);
+            }();
             auto coord = ctx.Sink.Inputs.CollectCoord(pooledName);
             ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) { var.IsGlob = isGlob; var.IsLegacyGlob = isLegacyGlob; });
             return coord;
@@ -205,30 +205,30 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             auto& nameArg = args[0];
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     if (names.size() == 1)
                         return ProcessOne(ctx, names.front());
                     return ProcessMany(ctx, names);
                 },
-                [&](const std::vector<std::string_view>& names) -> TMacroValues::TValue {
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
-                    return ProcessMany(ctx, names);
+                [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
+                    if (names.Data.size() == 1)
+                        return ProcessOne(ctx, names.Data.front());
+                    return ProcessMany(ctx, names.Data);
                 },
-                [](auto&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 }
             }, nameArg);
         }
     private:
         ui32 ProcessCoord(const TPreevalCtx& ctx, std::string_view name) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+            auto pooledName = ctx.Values.Internalize(name);
             auto result = ctx.Sink.Outputs.CollectCoord(pooledName);
             if (Y_UNLIKELY(Id == EMacroFunction::Tmp))
                 ctx.Sink.Outputs.UpdateCoord(result, [](auto& x) {x.IsTmp = true;});
@@ -261,33 +261,33 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
-                    auto result = std::vector<std::string_view>();
-                    result.reserve(names.size());
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
+                    auto result = TMacroValues::TXStrings();
+                    result.Data.reserve(names.size());
                     for (auto& name : names)
-                        result.push_back(ProcessOne(ctx, name));
+                        result.Data.push_back(ProcessOne(ctx, name));
                     return result;
                 },
-                [&](std::vector<std::string_view> names) -> TMacroValues::TValue {
-                    for (auto& name : names)
+                [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
+                    for (auto& name : names.Data)
                         name = ProcessOne(ctx, name);
-                    return std::move(names);
+                    return names;
                 },
-                [](auto&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 }
             }, args[0]);
         }
     private:
-        std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+        std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            auto pooledName = ctx.Values.Internalize(name);
             ctx.Sink.OutputIncludes.CollectCoord(pooledName);
-            return pooledName;
+            return std::string(pooledName);
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -298,38 +298,38 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
-                    auto result = std::vector<std::string_view>();
-                    result.reserve(names.size());
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
+                    auto result = TMacroValues::TXStrings();
+                    result.Data.reserve(names.size());
                     for (auto& name : names)
-                        result.push_back(ProcessOne(ctx, name));
+                        result.Data.push_back(ProcessOne(ctx, name));
                     return result;
                 },
-                [&](std::vector<std::string_view> names) -> TMacroValues::TValue {
-                    for (auto& name : names)
+                [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
+                    for (auto& name : names.Data)
                         name = ProcessOne(ctx, name);
-                    return std::move(names);
+                    return names;
                 },
-                [](auto&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 }
             }, args[0]);
         }
     private:
-        std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+        std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            auto pooledName = ctx.Values.Internalize(name);
             auto ix = ctx.Sink.OutputIncludes.Index(pooledName);
             if (ix == NPOS) [[unlikely]]
                 throw TConfigurationError() << "Unknown output-include [[bad]]" << name << "[[rst]], could not mark as from-input";
             ctx.Sink.OutputIncludes.Update(ix, [&](auto& var) {
                 var.OutInclsFromInput = true;
             });
-            return pooledName;
+            return std::string(pooledName);
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -344,35 +344,35 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto exts = std::get<std::string_view>(args[0]);
+            auto exts = std::get<TMacroValues::TXString>(args[0]).Data;
             auto& dst = ctx.Sink.OutputIncludesForType[exts];
             return std::visit(TOverloaded{
-                [&](std::string_view name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(TString(name)); // TODO get rid of this
-                    auto result = std::vector<std::string_view>();
-                    result.reserve(names.size());
+                [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
+                    auto names = SplitArgs(name.Data); // TODO get rid of this
+                    auto result = TMacroValues::TXStrings();
+                    result.Data.reserve(names.size());
                     for (auto& name : names)
-                        result.push_back(ProcessOne(ctx, name, dst));
+                        result.Data.push_back(ProcessOne(ctx, name, dst));
                     return result;
                 },
-                [&](std::vector<std::string_view> names) -> TMacroValues::TValue {
-                    for (auto& name : names)
+                [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
+                    for (auto& name : names.Data)
                         name = ProcessOne(ctx, name, dst);
-                    return std::move(names);
+                    return names;
                 },
-                [](auto&) -> TMacroValues::TValue {
+                [](const auto&) -> TMacroValues::TValue {
                     throw std::bad_variant_access();
                 }
             }, args[1]);
         }
     private:
-        std::string_view ProcessOne(const TPreevalCtx& ctx, std::string_view name, NCommands::TCompiledCommand::TOutputIncludes& dst) const {
-            auto pooledName = std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(name)));
+        std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name, NCommands::TCompiledCommand::TOutputIncludes& dst) const {
+            auto pooledName = ctx.Values.Internalize(name);
             dst.CollectCoord(pooledName);
-            return pooledName;
+            return std::string(pooledName);
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -386,20 +386,20 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             TMacroValues::TGlobPattern result;
             std::visit(TOverloaded{
-                [&](std::string_view glob) {
-                    result.Data.push_back(TString(glob));
+                [&](const TMacroValues::TXString& glob) {
+                    result.Data.push_back(glob.Data);
                 },
-                [&](const std::vector<std::string_view>& globs) {
-                    result.Data.reserve(globs.size());
-                    for (auto& glob : globs)
-                        result.Data.push_back(TString(glob));
+                [&](const TMacroValues::TXStrings& globs) {
+                    result.Data.reserve(globs.Data.size());
+                    for (auto& glob : globs.Data)
+                        result.Data.push_back(glob);
                 },
-                [](auto&) {
+                [](const auto&) {
                     throw std::bad_variant_access();
                 }
             }, args[0]);
@@ -453,11 +453,11 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto arg0 = std::get<std::string_view>(args[0]);
-            auto context = TFileConf::GetContextType(arg0);
+            auto arg0 = std::get<TMacroValues::TXString>(args[0]);
+            auto context = TFileConf::GetContextType(arg0.Data);
             if (auto arg1 = std::get_if<TMacroValues::TInputs>(&args[1])) {
                 for (auto& coord : arg1->Coords)
                     ctx.Sink.Inputs.UpdateCoord(coord, [=](auto& var) {
@@ -485,7 +485,7 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             std::visit(TOverloaded{

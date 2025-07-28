@@ -13,11 +13,11 @@ namespace {
 
     constexpr ui32 InvalidNameId = 0; // see TNameStore::CheckId, TNameStore::Clear
 
-    TString ArrayToString(const std::vector<std::string_view>& data) {
+    std::string ArrayToString(const std::vector<std::string>& data) {
         size_t size_est = 3 * (1 + data.size()); // (two digits + separator) * (count + sizes)
         for (auto& val : data)
             size_est += val.size();
-        TString result;
+        std::string result;
         result.reserve(size_est);
         fmt::format_to(std::back_inserter(result), "{} ", data.size());
         for (auto& val : data)
@@ -27,9 +27,9 @@ namespace {
         return result;
     }
 
-    std::vector<std::string_view> StringToArray(TStringBuf data) {
+    std::vector<std::string> StringToArray(std::string_view data) {
         size_t desc = data.find(' ', 0);
-        if (Y_UNLIKELY(desc == TStringBuf::npos))
+        if (Y_UNLIKELY(desc == std::string_view::npos))
             throw std::runtime_error{"Bad string array"};
         size_t cnt = FromString<ui32>(data.substr(0, desc));
         if (Y_UNLIKELY(cnt > 10000))
@@ -38,16 +38,16 @@ namespace {
         size_t text = desc;
         for (size_t n = 0; n != cnt; ++n) {
             text = data.find(' ', text);
-            if (Y_UNLIKELY(text == TStringBuf::npos))
+            if (Y_UNLIKELY(text == std::string_view::npos))
                 throw std::runtime_error{"Bad string array"};
             ++text;
         }
-        std::vector<std::string_view> result;
+        std::vector<std::string> result;
         result.reserve(cnt);
         for (size_t n = 0; n != cnt; ++n) {
             size_t next = data.find(' ', desc);
             size_t chunk_size = FromString<ui32>(data.substr(desc, next - desc));
-            result.push_back(data.substr(text, chunk_size));
+            result.push_back(std::string(data.substr(text, chunk_size)));
             desc = ++next;
             text += chunk_size;
         }
@@ -68,12 +68,12 @@ NPolexpr::TConstId TMacroValues::InsertValue(const TValue& value) {
         [&](bool val) {
             return NPolexpr::TConstId(ST_BOOL, val);
         },
-        [&](std::string_view val) {
-            return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val));
+        [&](const TXString& val) {
+            return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val.Data));
         },
-        [&](const std::vector<std::string_view>& val) {
+        [&](const TXStrings& val) {
             // TODO a general array storage
-            return NPolexpr::TConstId(ST_STRING_ARRAYS, Strings.Add(ArrayToString(val)));
+            return NPolexpr::TConstId(ST_STRING_ARRAYS, Strings.Add(ArrayToString(val.Data)));
         },
         [&](const TTool& val) {
             return NPolexpr::TConstId(ST_TOOLS, Refs.Add(val.Data));
@@ -122,16 +122,16 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
             auto idx = id.GetIdx();
             if (Y_UNLIKELY(idx == InvalidNameId))
                 return std::monostate();
-            return Strings.GetName<TCmdView>(idx).GetStr();
+            return TXString{std::string(Strings.GetName<TCmdView>(idx).GetStr())};
         }
         case ST_STRING_ARRAYS:
-            return StringToArray(Strings.GetName<TCmdView>(id.GetIdx()).GetStr());
+            return TXStrings{StringToArray(Strings.GetName<TCmdView>(id.GetIdx()).GetStr())};
         case ST_TOOLS:
-            return TTool {.Data = Refs.GetName<TCmdView>(id.GetIdx()).GetStr()};
+            return TTool {.Data = std::string(Refs.GetName<TCmdView>(id.GetIdx()).GetStr())};
         case ST_TOOL_ARRAYS:
             return TTools {.Data = StringToArray(Strings.GetName<TCmdView>(id.GetIdx()).GetStr())};
         case ST_RESULTS:
-            return TResult {.Data = Refs.GetName<TCmdView>(id.GetIdx()).GetStr()};
+            return TResult {.Data = std::string(Refs.GetName<TCmdView>(id.GetIdx()).GetStr())};
         case ST_INPUTS: {
             auto idx = id.GetIdx();
             return TInput {.Coord = idx};
@@ -161,6 +161,10 @@ TMacroValues::TValue TMacroValues::GetValue(NPolexpr::TConstId id) const {
         default:
             throw std::runtime_error{"Unknown storage id"};
     }
+}
+
+TStringBuf TMacroValues::Internalize(TStringBuf s) {
+    return Strings.GetName<TCmdView>(Strings.Add(s)).GetStr();
 }
 
 void TMacroValues::Save(TMultiBlobBuilder& builder) const {

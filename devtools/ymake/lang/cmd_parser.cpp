@@ -90,7 +90,7 @@ namespace {
         }
 
         std::any visitXModValueT(CmdParser::XModValueTContext *ctx) override {
-            GetCurrentXfm().Mods.back().Arguments.back().push_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
+            GetCurrentXfm().Mods.back().Arguments.back().push_back(TMacroValues::TXString{UnescapeRaw(ctx->getText())});
             return visitChildren(ctx);
         }
 
@@ -114,7 +114,7 @@ namespace {
         }
 
         std::any visitXBodyString(CmdParser::XBodyStringContext *ctx) override {
-            GetCurrentXfm().Body = {{Values.InsertStr(UnquoteDouble(ctx->getText()))}};
+            GetCurrentXfm().Body = {{TMacroValues::TXString{UnquoteDouble(ctx->getText())}}};
             return visitChildren(ctx);
         }
 
@@ -135,11 +135,11 @@ namespace {
             if (arg.size() == 0) {
                 hack_the_system = true;
             } else if (arg.size() == 1) {
-                auto val = std::get_if<NPolexpr::TConstId>(&arg[0]);
-                hack_the_system = !(val && val->GetStorage() == TMacroValues::ST_LITERALS);
+                auto val = std::get_if<TMacroValues::TValue>(&arg[0]);
+                hack_the_system = !(val && std::holds_alternative<TMacroValues::TXString>(*val));
             }
             if (hack_the_system)
-                arg.emplace_back(Values.InsertStr(""));
+                arg.emplace_back(TMacroValues::TXString{});
 
             return result;
         }
@@ -147,7 +147,7 @@ namespace {
         std::any doVisitTermR(antlr4::RuleContext *ctx) {
             auto& arg = GetCurrentArgument();
             if (MacroCallDepth == 0)
-                arg.emplace_back(Values.InsertStr(UnescapeRaw(ctx->getText())));
+                arg.emplace_back(TMacroValues::TXString{UnescapeRaw(ctx->getText())});
             else
                 arg.emplace_back(TSyntax::TIdOrString{UnescapeRaw(ctx->getText())});
             return visitChildren(ctx);
@@ -155,7 +155,7 @@ namespace {
 
         std::any doVisitTermQR(antlr4::RuleContext *ctx) {
             auto& arg = GetCurrentArgument();
-            arg.emplace_back(Values.InsertStr(UnescapeQuoted(ctx->getText())));
+            arg.emplace_back(TMacroValues::TXString{UnescapeQuoted(ctx->getText())});
             return visitChildren(ctx);
         }
 
@@ -290,7 +290,7 @@ namespace {
 
                 for (auto& term : *rawArg)
                     if (auto str = std::get_if<TSyntax::TIdOrString>(&term))
-                        term = Values.InsertStr(str->Value);
+                        term = TMacroValues::TXString{str->Value};
 
                 if (kwDesc) {
                     auto namedArg = &args[kwDesc->Pos];
@@ -350,7 +350,7 @@ namespace {
             TSyntax::TArgument arg;
             arg.reserve(src.size());
             for (auto& s : src)
-                arg.emplace_back(Values.InsertStr(s));
+                arg.emplace_back(TMacroValues::TXString{s});
             dst.push_back({std::move(arg)});
         }
 
@@ -368,10 +368,10 @@ namespace {
             return std::get<TSyntax::TTransformation>(GetCurrentCommand().back().back());
         }
 
-        std::string_view Unvariable(std::string_view s) {
+        std::string Unvariable(std::string_view s) {
             if (!(s.size() >= 2 && s.front() == '$'))
                 throw yexception() << "bad variable name " << s;
-            return s.substr(1, s.size() - 1);
+            return std::string(s.substr(1, s.size() - 1));
         }
 
         std::string UnquoteDouble(std::string_view s) {
@@ -468,13 +468,14 @@ TSyntax NCommands::Parse(const TBuildConfiguration* conf, const TModRegistry& mo
 
 namespace {
 
-    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder);
-    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder);
+    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder, TMacroValues& values);
+    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder, TMacroValues& values);
 
     void CompileTransformation(
         const TModRegistry& mods,
         const TSyntax::TTransformation& x,
         NPolexpr::TVariadicCallBuilder& builder,
+        TMacroValues& values,
         size_t pos = 0
     ) {
         if (pos == x.Mods.size()) {
@@ -485,9 +486,9 @@ namespace {
                 // to cut down on `Args(Terms(...))` wrappers;
                 // conceptually, with proper typing support,
                 // this should not be required
-                CompileTerm(mods, x.Body.front().front(), builder);
+                CompileTerm(mods, x.Body.front().front(), builder, values);
             else
-                CompileArgs(mods, x.Body, builder);
+                CompileArgs(mods, x.Body, builder, values);
             return;
         }
 
@@ -503,15 +504,15 @@ namespace {
         auto doTheArgs = [&](auto& builder) {
             for (auto& v : m.Arguments) {
                 if (v.size() == 1)
-                    CompileTerm(mods, v[0], builder);
+                    CompileTerm(mods, v[0], builder, values);
                 else {
                     NPolexpr::TVariadicCallBuilder catBuilder(builder, mods.Func2Id(EMacroFunction::Cat));
                     for (auto& t : v)
-                        CompileTerm(mods, t, catBuilder);
+                        CompileTerm(mods, t, catBuilder, values);
                     catBuilder.Build<EMacroFunction>();
                 }
             }
-            CompileTransformation(mods, x, builder, pos + 1);
+            CompileTransformation(mods, x, builder, values, pos + 1);
         };
         if (arity == 0) {
             NPolexpr::TVariadicCallBuilder modBuilder(builder, mods.Func2Id(func));
@@ -523,16 +524,16 @@ namespace {
         }
     }
 
-    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder) {
+    void CompileTerm(const TModRegistry& mods, const TSyntax::TTerm& term, NPolexpr::TVariadicCallBuilder& termsBuilder, TMacroValues& values) {
         std::visit(TOverloaded{
-            [&](NPolexpr::TConstId s) {
-                termsBuilder.Append(s);
+            [&](const TMacroValues::TValue& s) {
+                termsBuilder.Append(values.InsertValue(s));
             },
             [&](NPolexpr::EVarId v) {
                 termsBuilder.Append(v);
             },
             [&](const TSyntax::TTransformation& x) {
-                CompileTransformation(mods, x, termsBuilder);
+                CompileTransformation(mods, x, termsBuilder, values);
             },
             [&](const TSyntax::TCall&) {
                 Y_ABORT();
@@ -549,12 +550,12 @@ namespace {
         }, term);
     }
 
-    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder) {
+    void CompileArgs(const TModRegistry& mods, const TSyntax::TCommand& cmd, NPolexpr::TVariadicCallBuilder& cmdsBuilder, TMacroValues& values) {
         NPolexpr::TVariadicCallBuilder argsBuilder(cmdsBuilder, mods.Func2Id(EMacroFunction::Args));
         for (auto& arg : cmd) {
             NPolexpr::TVariadicCallBuilder termsBuilder(argsBuilder, mods.Func2Id(EMacroFunction::Terms));
             for (auto& term : arg)
-                CompileTerm(mods, term, termsBuilder);
+                CompileTerm(mods, term, termsBuilder, values);
             termsBuilder.Build<EMacroFunction>();
         }
         argsBuilder.Build<EMacroFunction>();
@@ -562,11 +563,11 @@ namespace {
 
 }
 
-NPolexpr::TExpression NCommands::Compile(const TModRegistry& mods, const TSyntax& s) {
+NPolexpr::TExpression NCommands::Compile(const TModRegistry& mods, const TSyntax& s, TMacroValues& values) {
     NPolexpr::TExpression result;
     NPolexpr::TVariadicCallBuilder cmdsBuilder(result, mods.Func2Id(EMacroFunction::Cmds));
     for (size_t cmd = 0; cmd != s.Script.size(); ++cmd)
-        CompileArgs(mods, s.Script[cmd], cmdsBuilder);
+        CompileArgs(mods, s.Script[cmd], cmdsBuilder, values);
     cmdsBuilder.Build<EMacroFunction>();
     return result;
 }
