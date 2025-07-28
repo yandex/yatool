@@ -1252,6 +1252,8 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.sancov_coverage = False
         self.ts_coverage = False
         self.upload_coverage_report = False
+        self.upload_coverage_yt_path = ""
+        self.upload_coverage_yt_proxy = "hahn"
 
     def consumer(self):
         return [
@@ -1369,6 +1371,20 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 ['--upload-coverage'],
                 help='Upload collected coverage to the YT',
                 hook=devtools.ya.core.yarg.SetConstValueHook('upload_coverage_report', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
+                ['--upload-coverage-path'],
+                help='Specifies YT path to upload coverage',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_yt_path'),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
+                ['--upload-coverage-proxy'],
+                help='Specifies YT proxy to upload coverage',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_yt_proxy'),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
             ),
