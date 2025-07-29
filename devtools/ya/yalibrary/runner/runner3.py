@@ -664,6 +664,7 @@ class TaskContext(object):
                     timeout=self.opts.status_refresh_interval, ready_to_stop=lambda: self.runq.pending == 0
                 )
             except StopIteration:
+                logger.debug("_process_queue: StopIteration")
                 break
             self._ticker.tick(False, self.compact_cache_task.fmt_size())
             if f:
