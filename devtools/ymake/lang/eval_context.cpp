@@ -107,6 +107,10 @@ bool TEvalContext::BinaryExpr(TTokStream& args, bool just_parse) {
     } else if (op == "MATCHES") {
         // search for substring case-insensitevely
         return TCaseInsensitiveStringBuf(left).find(right) != TCaseInsensitiveStringBuf::npos;
+    } else if (op == "STARTS_WITH") {
+        return left.StartsWith(right);
+    } else if (op == "ENDS_WITH") {
+        return left.EndsWith(right);
     }
 
     static constexpr TStringBuf VERSION_OP_PREFIX = "VERSION_";

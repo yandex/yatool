@@ -106,7 +106,7 @@ private:
     // just_parse means value is known and we need just parse the rest of expr
     const TString PrimExpr(TTokStream& args, bool just_parse);
     const TString UnaryExpr(TTokStream& args, bool just_parse); // DEFINED
-    bool BinaryExpr(TTokStream& args, bool just_parse);         // EQUAL STREQUAL MATCHES
+    bool BinaryExpr(TTokStream& args, bool just_parse);         // EQUAL STREQUAL MATCHES STARTS_WITH ENDS_WITH
     bool NotExpr(TTokStream& args, bool just_parse);            // NOT
     bool AndExpr(TTokStream& args, bool just_parse);            // AND
     bool OrExpr(TTokStream& args, bool just_parse);             // OR
