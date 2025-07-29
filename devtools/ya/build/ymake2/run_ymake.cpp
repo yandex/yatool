@@ -162,9 +162,9 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
     TString Binary;
     TList<TString> Args;
     THashMap<TString, TString> Env;
-    THashMap<int, TStringStream> outStreams, errStreams;
+    TVector<TStringStream> outStreams{params.size()}, errStreams{params.size()};
     TList<TThread> pollThreads;
-    THashMap<int, TPipe> stdinr, stdinw, stdoutr, stdoutw, stderrr, stderrw;
+    TVector<TPipe> stdinr{params.size()}, stdinw{params.size()}, stdoutr{params.size()}, stdoutw{params.size()}, stderrr{params.size()}, stderrw{params.size()};
 
     if (threads > 0) {
         Args.push_back("--threads");
@@ -182,31 +182,31 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
             TPipe::Pipe(stdinr[i], stdinw[i]);
             Args.push_back("--fd-in");
             Args.push_back(ToString(stdinr[i].GetHandle()));
-            pollThreads.emplace_back([&stdinw, i, &param]() {
-                TInputStreamFromCallback input(param.StdinLineProvider);
+            pollThreads.emplace_back([&pipe = stdinw[i], &callback = param.StdinLineProvider]() {
+                TInputStreamFromCallback input(callback);
                 TString line;
                 while (input.ReadLine(line)) {
-                    stdinw[i].Write(line.c_str(), line.size());
-                    stdinw[i].Write("\n", 1);
+                    pipe.Write(line.c_str(), line.size());
+                    pipe.Write("\n", 1);
                 }
             });
         }
         TPipe::Pipe(stdoutr[i], stdoutw[i]);
         Args.push_back("--fd-out");
         Args.push_back(ToString(stdoutw[i].GetHandle()));
-        pollThreads.emplace_back([&stdoutr, &outStreams, i]() {
-            char buf[1 << 10];
-            while (size_t len = stdoutr[i].Read(buf, 1024)) {
-                outStreams[i].Write(buf, len);
+        pollThreads.emplace_back([&pipe = stdoutr[i], &stream = outStreams[i]]() {
+            char buf[1024];
+            while (size_t len = pipe.Read(buf, 1024)) {
+                stream.Write(buf, len);
             }
         });
         TPipe::Pipe(stderrr[i], stderrw[i]);
         Args.push_back("--fd-err");
         Args.push_back(ToString(stderrw[i].GetHandle()));
-        pollThreads.emplace_back([&stderrr, &errStreams, i, &param]() {
-            while (TString line = ReadLine(stderrr[i])) {
-                CallReader(param.StderrLineReader, line);
-                errStreams[i] << line;
+        pollThreads.emplace_back([&pipe= stderrr[i], &stream = errStreams[i], &callback = param.StderrLineReader]() {
+            while (TString line = ReadLine(pipe)) {
+                CallReader(callback, line);
+                stream << line;
             }
         });
         Args.insert(Args.end(), param.Args.begin(), param.Args.end());
@@ -236,7 +236,7 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
     shCmd.Run();
 
     for (auto& s: Concatenate(stdoutw, stderrw, stdinw, stdinr)) {
-        s.second.Close();
+        s.Close();
     }
 
     if (!shCmd.GetExitCode().Defined()) {
