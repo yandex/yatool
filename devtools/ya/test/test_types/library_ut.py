@@ -115,16 +115,13 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             if getattr(opts, 'run_tagged_tests_on_yt', False) and 'ya:yt' in self.tags:
                 cmd += ["--parallel-tests-within-node-workers", str(self.parallel_tests_within_node_workers())]
                 cmd += ["--temp-tracefile-dir", self.temp_tracefile_dir]
+                cpu_count = self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu)
+                if isinstance(cpu_count, int):
+                    cmd += ["--cpu-per-test-requested", str(cpu_count)]
             else:
                 logger.warning(
                     "Parallel tests execution within one node is available only for tests that have 'ya:yt' tag and are to be launched on YT with --run-tagged-tests-on-yt flag"
                 )
-
-        if devtools.ya.test.const.TestRequirements.Cpu in self.requirements:
-            cmd += [
-                "--cpu-per-test-requested",
-                str(self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 0)),
-            ]
 
         return cmd
 
