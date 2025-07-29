@@ -123,7 +123,7 @@ public:
 
     virtual void EmitName(const TStringBuf& /*parentName*/, const TStringBuf& /*name*/) {}
 
-    virtual void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& /*parentName*/, const TStringBuf& /*name*/) {}
+    virtual void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& /*parentName*/, const TStringBuf& /*name*/, const TStringBuf& /*flags*/) {}
 
     virtual void EmitPad(const TStringBuf& /*pad*/) {}
 
@@ -183,7 +183,7 @@ public:
         Writer.WriteString(name);
     }
 
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name) override {
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf&) override {
         Writer.WriteKey("node-type");
         Writer.WriteString(TStringBuilder() << type);
         EmitId(id);
@@ -219,6 +219,11 @@ private:
     void EmitId(int id) {
         *Stream_ << "Id: " << id << ", ";
     }
+
+    void EmitFlags(const TStringBuf& flags) {
+        if (!flags.empty())
+            *Stream_ << "Flags: [" << flags << "], ";
+    }
 public:
     static const bool NeedParentName = false;
     static const bool PrintChildren = true; // for sorted output only
@@ -247,9 +252,10 @@ public:
         }
     }
 
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name) override {
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf& flags) override {
         EmitNodeType(type);
         EmitId(id);
+        EmitFlags(flags);
         EmitName(parentName, name);
         BeginChildren();
     }
@@ -292,7 +298,7 @@ public:
             *Stream_ << "\"" << EscapeC(parentName) << "\" -> \"" << EscapeC(name) << "\";";
     }
 
-    void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& parentName, const TStringBuf& name) override {
+    void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf&) override {
         EmitName(parentName, name);
         BeginChildren();
     }
@@ -315,7 +321,7 @@ public:
         AddLink(fromId, fromType, toId, toType, depType, NFlatJsonGraph::EIDFormat::Complex, logicalDepType);
     }
 
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& /*parentName*/, const TStringBuf& name) override {
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& /*parentName*/, const TStringBuf& name, const TStringBuf&) override {
         AddNode(type, id, name, NFlatJsonGraph::EIDFormat::Complex);
     }
 };
@@ -518,7 +524,13 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
         auto isStructCommand = incDep.IsValid() && (*incDep == EDT_Include || *incDep == EDT_BuildCommand) && nodeType == EMNT_BuildCommand;
         auto isStructVariable = incDep.IsValid() && *incDep == EDT_BuildCommand && nodeType == EMNT_BuildVariable;
         if (isStructCommand || isStructVariable) {
-            Formatter().EmitNode(nodeType, Names.CmdNameById(elemId).GetCmdId(), parentName, FormatBuildCommandName(top.GetCmdName(), Commands, Names.CommandConf, true));
+            Formatter().EmitNode(
+                nodeType,
+                Names.CmdNameById(elemId).GetCmdId(),
+                parentName,
+                FormatBuildCommandName(top.GetCmdName(), Commands, Names.CommandConf, true),
+                DumpNodeFlags(elemId, nodeType, Names)
+            );
             return true;
         }
         return false;
@@ -611,7 +623,13 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             }
             if (fresh && (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(nodeType))) {
                 if (!maybeEmitStructCmd()) {
-                    Formatter().EmitNode(nodeType, elemId, parentName, (nodeType == EMNT_BuildCommand ? SkipId(name) : name));
+                    Formatter().EmitNode(
+                        nodeType,
+                        elemId,
+                        parentName,
+                        (nodeType == EMNT_BuildCommand ? SkipId(name) : name),
+                        DumpNodeFlags(elemId, nodeType, Names)
+                    );
                 }
             }
             if (Mode == DM_DGraphFlatJson && IsOutputType(nodeType)) {
@@ -646,7 +664,13 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             Formatter().EmitDep(parentId, parentType, elemId, nodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             {
                 if (!maybeEmitStructCmd()) {
-                    Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(topNode).GetTargetId() : elemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
+                    Formatter().EmitNode(
+                        nodeType,
+                        UseFileId(nodeType) ? TDepGraph::GetFileName(topNode).GetTargetId() : elemId,
+                        parentName,
+                        (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)),
+                        DumpNodeFlags(elemId, nodeType, Names)
+                    );
                 }
             }
             break;
@@ -2371,4 +2395,14 @@ void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, 
         json.EndList();
         out << Endl;
     }
+}
+
+TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names) {
+    TString result;
+    if (!UseFileId(nodeType)) {
+        auto& data = names.CommandConf.GetById(TVersionedCmdId(elemId).CmdId());
+        if (data.KeepTargetPlatform)
+            result = "KTP";
+    }
+    return result;
 }

@@ -212,3 +212,4 @@ public:
 };
 
 void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TString& filter);
+TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names);
