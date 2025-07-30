@@ -9,6 +9,7 @@ from devtools.ya.test.util import shared, tools
 from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test import facility
 from build.plugins.lib.nots.test_utils import ts_utils
+from build.plugins.lib.nots.typescript import DEFAULT_TS_CONFIG_FILE
 from build.plugins.lib.nots.package_manager.base.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
@@ -53,7 +54,6 @@ def parse_args():
     parser.add_argument("--tracefile")
     parser.add_argument("--config", help="Relative path to playwright config, from testing module root")
     parser.add_argument("--nodejs")
-    parser.add_argument("--ts-config-path", dest="ts_config_path", help="tsconfig.json path", required=True)
 
     args = parser.parse_args()
 
@@ -79,7 +79,7 @@ def run_tests(opts):
             NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             PACKAGE_JSON_FILENAME,
             PNPM_LOCKFILE_FILENAME,
-            opts.ts_config_path,
+            DEFAULT_TS_CONFIG_FILE,
         ],
     )
 
@@ -87,7 +87,6 @@ def run_tests(opts):
         module_arc_path=test_for_project_path,
         source_root=opts.source_root,
         bin_root=opts.build_root,
-        ts_config_path=opts.ts_config_path,
     )
 
     exit_code = 0

@@ -149,15 +149,6 @@ class JestTestSuite(BaseFrontendRegularSuite):
         # TODO: Implement (https://st.yandex-team.ru/FEI-25459)
         return False
 
-    def get_tsconfig_path(self):
-        """
-        Convert paths from test's ya.make (related to this ya.make) to path, related to $source_dir
-        This behaviour is much more expected by user
-        """
-        resolved_path = os.path.normpath(os.path.join(self.meta.source_folder_path, self.meta.ts_config_path))
-
-        return os.path.relpath(resolved_path, self.meta.ts_test_for_path)
-
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
         generic_cmd = test_tools.get_test_tool_cmd(
@@ -174,8 +165,6 @@ class JestTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
-                "--ts-config-path",
-                self.get_tsconfig_path(),
                 "--timeout",
                 str(self.timeout),
                 "--verbose",
@@ -332,8 +321,6 @@ class PlaywrightTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
-                "--ts-config-path",
-                self.meta.ts_config_path,
             ]
         )
 
@@ -491,8 +478,6 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             get_nodejs_res(self.meta),
             "--eslint-config-path",
             self._eslint_config_path,
-            "--ts-config-path",
-            self.meta.ts_config_path,
             "--tracefile",
             os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
         ]
