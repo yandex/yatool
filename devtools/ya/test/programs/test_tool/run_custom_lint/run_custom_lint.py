@@ -114,6 +114,7 @@ def main():
             if report is None:
                 raise Exception("Wrong lint report: 'report' key doesn't exist")
 
+            rel_project_path = os.path.relpath(args.project_path, args.source_root)
             for file_name, test_name in test_cases:
                 file_report = report.get(file_name, {})
                 status = file_report.get("status", "GOOD")
@@ -124,13 +125,14 @@ def main():
                     raise ValueError(
                         "Unknown status: '{}'. Expected one of: {}".format(status, ",".join(STATUSES.keys()))
                     )
+
                 suite.chunk.tests.append(
                     facility.TestCase(
                         test_name,
                         test_status,
                         message,
                         logs={"logsdir": output_path},
-                        path=os.path.relpath(file_name, args.source_root),
+                        path=rel_project_path,
                         elapsed=elapsed,
                     )
                 )
