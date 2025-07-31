@@ -321,14 +321,14 @@ namespace {
         }
     };
 
-    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, TMakePlan& plan, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter, TMakeModuleStates& modulesStatesCache) {
+    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, NYMake::TJsonWriter::TOpenedArray& nodesArr, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter, TMakeModuleStates& modulesStatesCache) {
         TMakeNode node;
         TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node, modulesStatesCache);
 
         if (!yMake.Conf.ReadJsonCache && !yMake.Conf.WriteJsonCache) {
             renderer.RenderNodeDelayed();
             renderer.CompleteRendering();
-            jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
+            jsonWriter.WriteArrayValue(nodesArr, node, nullptr);
             return;
         }
 
@@ -341,7 +341,7 @@ namespace {
                 cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
                 auto& context = cache.GetConversionContext(&node);
                 renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
-                jsonWriter.WriteArrayValue(plan.NodesArr, *cachedNode, &context);
+                jsonWriter.WriteArrayValue(nodesArr, *cachedNode, &context);
                 return;
             }
         }
@@ -355,7 +355,7 @@ namespace {
         const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
         cache.AddRenderedNode(node, nodeName, cacheUid, TString{});
         cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
-        jsonWriter.WriteArrayValue(plan.NodesArr, node, nullptr);
+        jsonWriter.WriteArrayValue(nodesArr, node, nullptr);
     }
 
     void ComputeFullUID(const TDepGraph& graph, TJSONVisitor& cmdBuilder, TNodeId nodeId) {
@@ -525,15 +525,16 @@ namespace {
                             }
                             auto p = MakeAtomicShared<TChannel>(exec, 1u);
                             channels.push_back(p);
-                            asio::co_spawn(exec, [&cmdbuilder, &plan, &cache, &modulesStatesCache, &graph, &yMake, chunk, p]() -> asio::awaitable<void> {
+                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, p]() -> asio::awaitable<void> {
                                 TStringStream ss;
                                 NYMake::TJsonWriter writer(ss);
+                                NYMake::TJsonWriter::TOpenedArray nodesArr;
                                 for (const auto& [modId, nodeIds] : chunk) {
                                     for (const auto& nodeId : nodeIds) {
                                         UpdateUids(yMake.Graph, cmdbuilder, nodeId);
 
                                         const auto& node = cmdbuilder.Nodes.at(nodeId);
-                                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, writer, modulesStatesCache);
+                                        RenderOrRestoreJSONNode(yMake, cmdbuilder, nodesArr, cache, nodeId, node, writer, modulesStatesCache);
                                         if (IsModuleType(graph[nodeId]->NodeType)) {
                                             // remove state from cache to free the memory
                                             modulesStatesCache.GetState(nodeId).Reset();
@@ -553,7 +554,7 @@ namespace {
                         }
                         for (auto& p : channels) {
                             auto s = co_await p->async_receive();
-                            plan.Writer.WriteJsonValue(s);
+                            plan.Writer.WriteArrayJsonValue(plan.NodesArr, s);
                         }
                     }
                 } else {
@@ -562,7 +563,7 @@ namespace {
                         UpdateUids(yMake.Graph, cmdbuilder, nodeId);
 
                         const auto& node = cmdbuilder.Nodes.at(nodeId);
-                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan, cache, nodeId, node, plan.Writer, modulesStatesCache);
+                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan.NodesArr, cache, nodeId, node, plan.Writer, modulesStatesCache);
                         if (IsModuleType(graph[nodeId]->NodeType)) {
                             TProgressManager::Instance()->IncRenderModulesDone();
                         }
