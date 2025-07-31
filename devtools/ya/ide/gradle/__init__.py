@@ -1,4 +1,7 @@
+import os
 import logging
+
+import yalibrary.tools as tools
 
 from devtools.ya.build.sem_graph import SemException
 
@@ -63,3 +66,9 @@ def do_gradle(params):
             logging.error("%s", str(e))
 
     _print_stat()
+
+    logging.info(
+        'Codestyle config: %s. You can import this file with "File -> Manage IDE Settings -> Import settings..." command. '
+        'After this choose "yandex-arcadia" in code style settings (Preferences -> Editor -> Code Style).',
+        os.path.join(tools.tool('idea_style_config'), 'intellij-codestyle.jar'),
+    )

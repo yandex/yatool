@@ -22,6 +22,8 @@ PEERDIR(
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/yalibrary/platform_matcher
+    devtools/ya/yalibrary/sjson
+    devtools/ya/yalibrary/tools
 )
 
 END()
