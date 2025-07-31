@@ -61,6 +61,9 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
         "--tables",
     ] + tables
 
+    # Least surprise behaviour - don't cache create table node if tests are not cached
+    cacheable = opts.cache_tests
+
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "broadcast": False,
@@ -72,7 +75,7 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
         },
         "secrets": ['YA_COVERAGE_YT_TOKEN'],
         "priority": 0,
-        "cache": True,
+        "cache": cacheable,
         "target_properties": {},
         "outputs": [node_log_path],
         "deps": [],
