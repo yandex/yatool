@@ -16,7 +16,7 @@ std::string FormatWrongNumberOfArgumentsErr(size_t numberOfFormals, size_t numbe
     return fmt::format("Wrong number of arguments: {} != {}", ToString(numberOfFormals), ToString(numberOfActuals));
 }
 
-std::expected<void, TMapMacroVarsErr> MapMacroVars(TArrayRef<const TStringBuf> args, const TVector<TStringBuf>& argNames, TVars& vars) {
+TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector<TStringBuf>& argNames, TVars& vars) {
     if (args.empty() && argNames.empty()) {
         return {};
     }
@@ -142,14 +142,14 @@ void TMapMacroVarsErr::Report(TStringBuf argsStr) const {
     YConfErr(Syntax) << what << Endl;
 }
 
-std::expected<void, TMapMacroVarsErr> AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals, IMemoryPool& memPool) {
+TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals, IMemoryPool& memPool) {
     if (prop && prop->IsNonPositional()) {
         ConvertArgsToPositionalArrays(*prop, args, memPool);
     }
     return MapMacroVars(args, argNames, locals);
 }
 
-void AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStringBuf> args, TVars& locals, IMemoryPool& memPool) {
+TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStringBuf> args, TVars& locals, IMemoryPool& memPool) {
     // Patch incoming args to handle named macro arguments
     auto pArgs = args;
     TVector<TStringBuf> tempArgs;
@@ -162,9 +162,7 @@ void AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStrin
     // Map arguments to local call vars using macro signature
     if (macroProps.ArgNames().size()) {
         const TVector<TStringBuf> argNames{macroProps.ArgNames().begin(), macroProps.ArgNames().end()};
-        MapMacroVars(pArgs, argNames, locals).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
-            err.Report(JoinStrings(args.begin(), args.end(), ", "));
-            return {};
-        }).value();
+        return MapMacroVars(pArgs, argNames, locals);
     }
+    return {};
 }
