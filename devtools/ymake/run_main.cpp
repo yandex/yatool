@@ -179,6 +179,42 @@ auto CreatePipeline(const TVector<TVector<const char*>>& configs , asio::any_io_
     return pipeline;
 }
 
+using TChannel = asio::experimental::concurrent_channel<void(asio::error_code, int)>;
+
+void SubmitNextConfigIfAny(TAdaptiveLock& confQueueLock, TQueue<TVector<const char*>>& confQueue, asio::thread_pool::executor_type exec, THolder<NForeignTargetPipeline::TForeignTargetPipeline>& pipeline, TDeque<TAtomicSharedPtr<TChannel>>& channels) {
+    TVector<const char*> config;
+    with_lock(confQueueLock) {
+        if (confQueue.empty()) {
+            return;
+        }
+        config = confQueue.front();
+        confQueue.pop();
+    }
+    auto ctx = std::make_shared<TExecContext>(
+        std::make_shared<NCommonDisplay::TLockedStream>(),
+        std::make_shared<TConfMsgManager>(),
+        std::make_shared<TProgressManager>(),
+        std::make_shared<TDiagCtrl>()
+    );
+    auto proxy = TExecutorWithContext<TExecContext>(
+        asio::require(exec, asio::execution::blocking.never),
+        ctx
+    );
+    auto p = MakeAtomicShared<TChannel>(exec, 1u);
+    with_lock(confQueueLock) {
+        channels.push_back(p); // TODO: mb other lock
+    }
+    asio::co_spawn(proxy, RunConfigure(config, proxy, *pipeline), [p, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {
+        if (ptr) {
+            p->cancel();
+            std::rethrow_exception(ptr);
+        } else {
+            SubmitNextConfigIfAny(confQueueLock, confQueue, exec, pipeline, channels);
+            p->async_send({}, rc, asio::detached);
+        }
+    });
+}
+
 int YMakeMain(int argc, char** argv) {
     TraceYmakeStart(argc, argv);
 
@@ -209,23 +245,20 @@ int YMakeMain(int argc, char** argv) {
     asio::thread_pool configure_workers(threads);
     auto pipeline = CreatePipeline(configs, configure_workers.executor());
 
-    for (size_t i = 0; i < configs.size(); ++i) {
-        auto ctx = std::make_shared<TExecContext>(
-            std::make_shared<NCommonDisplay::TLockedStream>(),
-            std::make_shared<TConfMsgManager>(),
-            std::make_shared<TProgressManager>(),
-            std::make_shared<TDiagCtrl>()
-        );
-        auto proxy = TExecutorWithContext<TExecContext>(
-            asio::require(configure_workers.executor(), asio::execution::blocking.never),
-            ctx
-        );
-        ret_codes[i] = asio::co_spawn(proxy, RunConfigure(configs[i], proxy, *pipeline), asio::use_future);
+    TDeque<TAtomicSharedPtr<TChannel>> channels;
+    TAdaptiveLock confQueueLock;
+    TQueue<TVector<const char*>> confQueue;
+    for (const auto& config : configs) {
+        confQueue.push(config);
+    }
+
+    for (int i = 0; i < threads; ++i) {
+        SubmitNextConfigIfAny(confQueueLock, confQueue, configure_workers.executor(), pipeline, channels);
     }
 
     int main_ret_code = BR_OK;
-    for (auto& ret_code : ret_codes) {
-        main_ret_code |= ret_code.get();
+    for (size_t i = 0; i < channels.size(); ++i) {
+        main_ret_code |= channels[i]->async_receive(asio::use_future).get();
     }
     configure_workers.wait();
 
