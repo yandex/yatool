@@ -84,7 +84,7 @@ const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& na
     }
     const auto& props = *pi->second.CmdProps;
     AddMacroArgsToLocals(props, args, locals, *MakeFileMap.Pool).or_else([&](const TMapMacroVarsErr& err) -> TMapMacroVarsResult {
-        err.Report(JoinStrings(args.begin(), args.end(), ", "));
+        err.Report(name, JoinStrings(args.begin(), args.end(), ", "));
         return {};
     }).value();
     return &props.GetMacroCalls();

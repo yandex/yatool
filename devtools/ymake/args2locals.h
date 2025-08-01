@@ -15,7 +15,7 @@ struct TMapMacroVarsErr {
     EMapMacroVarsErrClass ErrorClass;
     std::string Message;
 
-    void Report(TStringBuf argsStr) const;
+    void Report(TStringBuf macroName, TStringBuf argsStr) const;
 };
 
 using TMapMacroVarsResult = std::expected<void, TMapMacroVarsErr>;

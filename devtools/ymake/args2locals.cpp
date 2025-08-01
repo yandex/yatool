@@ -136,8 +136,8 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
 
 }
 
-void TMapMacroVarsErr::Report(TStringBuf argsStr) const {
-    const auto what = TString::Join(Message, "\n\tArgs: ", argsStr);
+void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
+    const auto what = TString::Join("macro '", macroName, "': ", Message, "\n\tArgs: ", argsStr);
     TRACE(S, NEvent::TMakeSyntaxError(what, Diag()->Where.back().second));
     YConfErr(Syntax) << what << Endl;
 }
