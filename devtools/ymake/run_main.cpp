@@ -104,7 +104,6 @@ void InitGlobalOpts(int& argc, char** argv, int& threads) {
                 YWarn() << "All trace events must be the same" << Endl;
             }
             NYMake::InitTraceSubsystem(events.front());
-            YDebug() << "Trace events enabled: " << events.front() << Endl;
         }
     } catch (const yexception& error) {
         YErr() << "Global opts initialization failed with error: " << error.what() << Endl;
