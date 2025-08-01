@@ -100,6 +100,56 @@ namespace {
     //
     //
 
+    class TNoBuildRoot: public TBasicModImpl {
+    public:
+        TNoBuildRoot(): TBasicModImpl({.Id = EMacroFunction::NoBuildRoot, .Name = "nobuildroot", .Arity = 1, .CanEvaluate = true}) {
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            TStringBuf buildRoot = ctx.BuildConf.BuildRoot.c_str();
+            auto apply = [buildRoot](TStringBuf name) {
+                // lifted from EMF_Namespace/ApplyNamespaceModifier processing:
+                Y_ASSERT(name.StartsWith(buildRoot));
+                size_t slash = name.find(buildRoot);
+                if (slash != TString::npos) {
+                    name = name.substr(slash + buildRoot.size() + 1);
+                }
+                return name;
+            };
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                },
+                [&](TString s) -> TTermValue {
+                    return TString(apply(s));
+                },
+                [&](TVector<TString> v) -> TTermValue {
+                    for (auto& s : v)
+                        s = apply(s);
+                    return v;
+                },
+                [&](const TTaggedStrings& v) -> TTermValue {
+                    TVector<TString> vv(v.size());
+                    std::transform(v.begin(), v.end(), vv.begin(), [&](auto& s) {
+                        return apply(s.Data);
+                    });
+                    return vv;
+                }
+            }, args[0]);
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    //
+    //
+    //
+
     class TCutPath: public TBasicModImpl {
     public:
         TCutPath(): TBasicModImpl({.Id = EMacroFunction::CutPath, .Name = "nopath", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
@@ -170,7 +220,7 @@ namespace {
                 result.Data.push_back(std::string(Cut(path)));
             return result;
         }
-} Y_GENERATE_UNIQUE_ID(Mod);
+    } Y_GENERATE_UNIQUE_ID(Mod);
 
     //
     //
@@ -361,7 +411,7 @@ namespace {
                     throw TBadArgType(Name, x);
                 },
                 [&](TString s) -> TTermValue {
-                    return s.EndsWith(ext) ? args[1] : TTermNothing();
+                    return !s.EndsWith(ext) ? TTermNothing() : args[1];
                 },
                 [&](TVector<TString> v) -> TTermValue {
                     v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return !s.EndsWith(ext); }), v.end());
@@ -369,6 +419,39 @@ namespace {
                 },
                 [&](TTaggedStrings v) -> TTermValue {
                     v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return !s.Data.EndsWith(ext); }), v.end());
+                    return std::move(v);
+                }
+            }, args[1]);
+        }
+    } Y_GENERATE_UNIQUE_ID(Mod);
+
+    class TSkipByExtFilter: public TBasicModImpl {
+    public:
+        TSkipByExtFilter(): TBasicModImpl({.Id = EMacroFunction::SkipByExtFilter, .Name = "skip_by_ext", .Arity = 2, .CanEvaluate = true}) {
+        }
+        TTermValue Evaluate(
+            [[maybe_unused]] std::span<const TTermValue> args,
+            [[maybe_unused]] const TEvalCtx& ctx,
+            [[maybe_unused]] ICommandSequenceWriter* writer
+        ) const override {
+            CheckArgCount(args);
+            auto ext = std::get<TString>(args[0]);
+            return std::visit(TOverloaded{
+                [](TTermError) -> TTermValue {
+                    Y_ABORT();
+                },
+                [&](TTermNothing x) -> TTermValue {
+                    throw TBadArgType(Name, x);
+                },
+                [&](TString s) -> TTermValue {
+                    return s.EndsWith(ext) ? TTermNothing() : args[1];
+                },
+                [&](TVector<TString> v) -> TTermValue {
+                    v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return s.EndsWith(ext); }), v.end());
+                    return std::move(v);
+                },
+                [&](TTaggedStrings v) -> TTermValue {
+                    v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return s.Data.EndsWith(ext); }), v.end());
                     return std::move(v);
                 }
             }, args[1]);

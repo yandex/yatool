@@ -81,6 +81,8 @@ enum class EMacroFunction: ui32 {
     NoTransformRelativeBuildDir,
     AddToModOutputs,
     DirAllowed,
+    SkipByExtFilter,
+    NoBuildRoot,
     //
     Count
 };
