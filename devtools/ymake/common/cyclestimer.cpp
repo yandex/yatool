@@ -3,6 +3,10 @@
 #include <util/system/datetime.h>
 #include <util/system/hp_timer.h>
 
+namespace {
+    static ui64 CyclesPerSecond = NHPTimer::GetCyclesPerSecond();
+};
+
 TCyclesTimer::TCyclesTimer()
     : Start_(::GetCycleCount())
 {}
@@ -16,7 +20,7 @@ size_t TCyclesTimer::GetUs() const {
 }
 
 double TCyclesTimer::GetSeconds() const {
-    return double(::GetCycleCount() - Start_) / NHPTimer::GetCyclesPerSecond();
+    return double(::GetCycleCount() - Start_) / CyclesPerSecond;
 }
 
 TCyclesTimerRestarter::TCyclesTimerRestarter(TCyclesTimer& cyclesTimer)
