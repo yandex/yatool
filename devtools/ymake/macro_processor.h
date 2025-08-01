@@ -54,10 +54,11 @@ struct TCommandInfo {
     explicit TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
     void SetCommandSink(TCommands* commands);
     void SetCommandSource(const TCommands* commands);
-    bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod);
+    bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod, TVars* extraVars = nullptr);
 
 public:
     TYVar Cmd; // dep for the main output
+    THolder<TVars> ExtraVars;
     THolder<TVars> LocalVars;
     THolder<TVars> GlobalVars; // TODO remove this when TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes is out
     THolder<THashMap<TString, TString>> KV;

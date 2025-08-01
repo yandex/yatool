@@ -791,15 +791,14 @@ void TCommands::TInliner::CheckDepth() {
 }
 
 NCommands::TCompiledCommand TCommands::Compile(
-    TStringBuf cmd,
+    const NCommands::TSyntax& cmd,
     const TBuildConfiguration& conf,
     const TVars& vars,
     bool preevaluate,
     TCompilationIODesc io
 ) {
     auto inliner = TInliner(conf, *this, vars);
-    auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
-    auto [ast, sideChannels] = inliner.Inline(cachedAst);
+    auto [ast, sideChannels] = inliner.Inline(cmd);
     // TODO? VarRecursionDepth.clear(); // or clean up individual items as we go?
     if (preevaluate) {
 #if 0
@@ -814,6 +813,37 @@ NCommands::TCompiledCommand TCommands::Compile(
         return result;
     } else
         return NCommands::TCompiledCommand{.Expression = NCommands::Compile(Mods, ast, Values)};
+}
+
+NCommands::TCompiledCommand TCommands::Compile(
+    const TYVar& cmd,
+    const TBuildConfiguration& conf,
+    const TVars& vars,
+    bool preevaluate,
+    TCompilationIODesc io
+) {
+    if (cmd.DontParse) {
+        NCommands::TSyntax data;
+        data.Script.emplace_back();
+        for (auto& val : cmd) {
+            data.Script.back().push_back({TMacroValues::TXString{val.Name}});
+        }
+        return Compile(data, conf, vars, preevaluate, io);
+    } else {
+        auto& cachedAst = Parse(conf, Mods, Values, EvalAll(&cmd));
+        return Compile(cachedAst, conf, vars, preevaluate, io);
+    }
+}
+
+NCommands::TCompiledCommand TCommands::Compile(
+    TStringBuf cmd,
+    const TBuildConfiguration& conf,
+    const TVars& vars,
+    bool preevaluate,
+    TCompilationIODesc io
+) {
+    auto& cachedAst = Parse(conf, Mods, Values, TString(cmd));
+    return Compile(cachedAst, conf, vars, preevaluate, io);
 }
 
 ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {

@@ -1024,6 +1024,30 @@ void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args)
     ProcessStatement(name, args);
 }
 
+void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args, TVars extraVars) {
+    // this is basically the original `CallMacro`
+    // (1) without the `ProcessConfigMacroCalls` part,
+    // (2) with the shortcut through `ProcessStatement` -> `GenStatement` -> `if(IsUserMacro)` taken,
+    // (3) with `extraVars` directly supplied to the invoker
+    auto i = Conf.BlockData.find(name);
+    if (!(i && i->second.IsUserMacro))
+        return;
+
+    if (HasNamedArgs(&i->second)) {
+        ConvertArgsToPositionalArrays(*i->second.CmdProps, const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+    }
+    TVarStrEx cmd(name);
+    cmd.IsMacro = true;
+
+    // copied from the relevant section of `AddSource(/*for outputs*/ "SRCS", cmd, &args)`:
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
+    cmdInfo->SetCommandSink(&Commands);
+    if (!cmdInfo->Init("SRCS", cmd, &args, *this, &extraVars))
+        return;
+    CmdAddQueue.push_back(std::move(cmdInfo));
+
+}
+
 bool TModuleBuilder::SkipStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     auto i = Conf.BlockData.find(name);
     if (i && i->second.CmdProps && i->second.CmdProps->HasMacroCalls()) {

@@ -43,6 +43,9 @@ public:
 class TPluginUnit: private TNonCopyable {
 public:
     virtual void CallMacro(TStringBuf name, const TVector<TStringBuf>& args) = 0;
+    virtual void CallMacro(TStringBuf name, const TVector<TStringBuf>& args, [[maybe_unused]] TVars extraVars) {
+        CallMacro(name, args);
+    }
 
     virtual TStringBuf Get(TStringBuf name) const = 0;
 

@@ -60,6 +60,7 @@ public:
 
     // Implementation of TPluginUnit
     void CallMacro(TStringBuf name, const TVector<TStringBuf>& args) override;
+    void CallMacro(TStringBuf name, const TVector<TStringBuf>& args, TVars extraVars) override;
 
     void SetProperty(TStringBuf propName, TStringBuf value) override;
 

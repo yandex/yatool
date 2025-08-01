@@ -293,6 +293,9 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     for (auto& var : ownVars)
         var.second.NoInline = true;
+    if (ExtraVars)
+        for (auto& v : *ExtraVars)
+            ownVars[v.first] = std::move(v.second);
 
     if (blockData && blockData->CmdProps) {
 
@@ -518,12 +521,11 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
             continue;
         auto& subBinding = it->second;
 
-        auto val = EvalAll(var);
         auto compiled = NCommands::TCompiledCommand();
         try {
-            compiled = commands.Compile(val, *Conf, varDefinitionSources, false, {});
+            compiled = commands.Compile(*var, *Conf, varDefinitionSources, false, {});
         } catch (const std::exception& e) {
-            compiled = compilationFallback(e, exprVarName, val);
+            compiled = compilationFallback(e, exprVarName, EvalAll(var));
         }
         const ui32 subExpr = commands.Add(*Graph, std::move(compiled.Expression));
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
@@ -647,7 +649,7 @@ void TCommandInfo::InitFromModule(const TModule& mod) {
     BuildDirStr = BuildDir.GetTargetStr(); // InitDirs() may rewrite these
 }
 
-bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& modBuilder) {
+bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& modBuilder, TVars* extraVars) {
     TModule& mod = modBuilder.GetModule();
     InitFromModule(mod);
     TStringBuf macroName = src.Name;
@@ -712,6 +714,8 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
             }
         }
         if (structCmd) {
+            if (extraVars)
+                GetOrInit(ExtraVars) = std::move(*extraVars);
             // pass the torch to the `if (...StructCmdForBlockData...)` section in `MacroCall()`
             Cmd.SetSingleVal(macroName, GlueCmd(*args), mod.GetId(), mod.Vars.Id);
             Cmd.BaseVal = macroVar;

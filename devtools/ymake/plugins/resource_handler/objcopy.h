@@ -47,21 +47,30 @@ namespace NYMake::NResourcePacker {
                    "--objcopy"sv, Unit_.Get("OBJCOPY_TOOL"),
                    "--compressor"sv, Unit_.Get("_TOOL_RESCOMPRESSOR"),
                    "--rescompiler"sv, Unit_.Get("_TOOL_RESCOMPILER"),
-                   "--output_obj"sv, outputObj,
+                   "--output_obj"sv, "${output:__OUT}"sv,
                    "--target"sv, targetPlatform);
-            append_if(Objects_.paths.size() > 0, cmdArgs, "--inputs"sv, Objects_.paths, "--keys"sv, Objects_.keys);
+            append_if(Objects_.paths.size() > 0, cmdArgs, "--inputs"sv, "${input:__PATHS}"sv, "--keys"sv, "$__KEYS"sv);
             append_if(Objects_.kvs.size() > 0, cmdArgs, "--kvs"sv, Objects_.kvs);
-            append_if(Objects_.paths.size() > 0, cmdArgs, "IN"sv, Objects_.paths);
             append(cmdArgs,
                    "TOOL"sv, Unit_.Get("_TOOL_RESCOMPRESSOR"), Unit_.Get("_TOOL_RESCOMPILER"),
-                   "OUT_GLOBAL"sv, outputObj);
+                   "OUT_GLOBAL"sv, "$__OUT"sv);
 
             if (UseTextContext_) {
                 auto inputsMap = PrepareInputs(Objects_.paths);
-                ReplaceInputs(cmdArgs, inputsMap);
+                ReplaceInputs(Objects_.paths, inputsMap);
             }
 
-            RunMacro("RUN_PYTHON3"sv, cmdArgs);
+            TVars extras;
+            // TODO ~~ring them bells~~ move them strings
+            extras["__OUT"].push_back(outputObj);
+            extras["__OUT"].NoInline = true;
+            extras["__PATHS"].Assign(Objects_.paths);
+            extras["__PATHS"].NoInline = true;
+            extras["__KEYS"].Assign(Objects_.keys);
+            extras["__KEYS"].NoInline = true;
+            extras["__KEYS"].DontParse = true;
+
+            RunMacro("RUN_PYTHON3"sv, cmdArgs, extras);
 
             EstimatedCmdLen_ = 0;
             Objects_.paths.clear();

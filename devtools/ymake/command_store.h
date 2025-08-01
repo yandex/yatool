@@ -137,6 +137,20 @@ public:
         return &Commands[static_cast<ui32>(fres->second)];
     }
     NCommands::TCompiledCommand Compile(
+        const NCommands::TSyntax& cmd,
+        const TBuildConfiguration& conf,
+        const TVars& vars,
+        bool preevaluate,
+        TCompilationIODesc io
+    );
+    NCommands::TCompiledCommand Compile(
+        const TYVar& cmd,
+        const TBuildConfiguration& conf,
+        const TVars& vars,
+        bool preevaluate,
+        TCompilationIODesc io
+    );
+    NCommands::TCompiledCommand Compile(
         TStringBuf cmd,
         const TBuildConfiguration& conf,
         const TVars& vars,

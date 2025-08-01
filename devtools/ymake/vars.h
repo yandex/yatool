@@ -190,6 +190,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 NoInline : 1;
             ui32 ModuleScopeOnly : 1;
             ui32 FakeDeepReplacement : 1;
+            ui32 DontParse : 1;
         };
     };
     ui32 Id; // tmp hack! only used to return id from Lookup commands
