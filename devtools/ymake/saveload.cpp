@@ -718,6 +718,9 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         } else {
             return false;
         }
+    } else {
+        // related: TInternalCacheSaver::CompactSymbols games
+        Names.CommandConf.Clear();
     }
 
     TimeStamps.InitSession(Graph.GetFileNodeData());
