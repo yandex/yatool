@@ -55,10 +55,10 @@ static Namer::Config PythonDefaultConfig() {
            /*fields=*/Case::kLowerCamel,
            /*variable=*/Case::kLowerCamel,
            /*variants=*/Case::kKeep,
-           /*enum_variant_seperator=*/".",
+           /*enum_variant_separator=*/".",
            /*escape_keywords=*/Namer::Config::Escape::BeforeConvertingCase,
            /*namespaces=*/Case::kKeep,  // Packages in python.
-           /*namespace_seperator=*/".",
+           /*namespace_separator=*/".",
            /*object_prefix=*/"",
            /*object_suffix=*/"T",
            /*keyword_prefix=*/"",
