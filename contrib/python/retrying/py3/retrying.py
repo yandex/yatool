@@ -58,6 +58,26 @@ def retry(*dargs, **dkw):
 
         return wrap
 
+_default_logger = None
+_configured_null_logger = False
+
+def _pick_logger(logger=None):
+    # Factor this logic out into a smaller function so that `global` only needs to be here,
+    # not the large __init__ function.
+    global _default_logger, _configured_null_logger
+
+    if logger in (True, None):
+        if _default_logger is None:
+            _default_logger = logging.getLogger(__name__)
+        # Only add the null handler once, not every time we get the logger
+        if logger is None and not _configured_null_logger:
+            _configured_null_logger = True
+            _default_logger.addHandler(logging.NullHandler())
+            _default_logger.propagate = False
+        return _default_logger
+    else:  # Not None (and not True) -> must have supplied a logger. Just use that.
+        return logger
+
 
 class Retrying(object):
     def __init__(
@@ -110,14 +130,8 @@ class Retrying(object):
         self._wait_jitter_max = 0 if wait_jitter_max is None else wait_jitter_max
         self._before_attempts = before_attempts
         self._after_attempts = after_attempts
-        
-        if logger in (True, None):
-            self._logger = logging.getLogger(__name__)
-            if logger is None:
-                self._logger.addHandler(logging.NullHandler()) 
-                self._logger.propagate = False
-        elif logger:
-           self._logger = logger
+
+        self._logger = _pick_logger(logger)
 
         # TODO add chaining of stop behaviors
         # stop behavior
@@ -264,7 +278,7 @@ class Retrying(object):
             if not self.should_reject(attempt):
                 return attempt.get(self._wrap_exception)
 
-            self._logger.warn(attempt)
+            self._logger.warning(attempt)
             if self._after_attempts:
                 self._after_attempts(attempt_number)
 
@@ -280,7 +294,7 @@ class Retrying(object):
                 if self._wait_jitter_max:
                     jitter = random.random() * self._wait_jitter_max
                     sleep = sleep + max(0, jitter)
-                self._logger.info("Retrying in {0:.2f} seconds.".format(sleep / 1000.0))
+                self._logger.info(f"Retrying in {sleep / 1000.0:.2f} seconds.")
                 time.sleep(sleep / 1000.0)
 
             attempt_number += 1
@@ -315,11 +329,9 @@ class Attempt(object):
 
     def __repr__(self):
         if self.has_exception:
-            return "Attempts: {0}, Error:\n{1}".format(
-                self.attempt_number, "".join(traceback.format_tb(self.value[2]))
-            )
+            return f"Attempts: {self.attempt_number}, Error:\n{''.join(traceback.format_tb(self.value[2]))}"
         else:
-            return "Attempts: {0}, Value: {1}".format(self.attempt_number, self.value)
+            return f"Attempts: {self.attempt_number}, Value: {self.value}"
 
 
 class RetryError(Exception):
@@ -331,4 +343,4 @@ class RetryError(Exception):
         self.last_attempt = last_attempt
 
     def __str__(self):
-        return "RetryError[{0}]".format(self.last_attempt)
+        return f"RetryError[{self.last_attempt}]"

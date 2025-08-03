@@ -38,3 +38,4 @@ Contributors
 - Jonathan Herriott
 - Job Evers
 - Cyrus Durgin
+- Hugo Klepsch
