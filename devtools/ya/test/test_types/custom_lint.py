@@ -102,7 +102,7 @@ class CustomLintTestSuite(LintTestSuite):
     # TODO YMAKE-427
     def get_arcadia_test_data(self):
         data = super(CustomLintTestSuite, self).get_arcadia_test_data()
-        return data + self._configs
+        return data + list(self._configs)
 
     def get_test_dependencies(self):
         return list(set([x for x in self.meta.custom_dependencies.split(' ') if x]))
