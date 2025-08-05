@@ -1719,7 +1719,7 @@ public:
                                 }
                             }
                             if (!inPeerdirs) {
-                                guess += TString("\n[[unimp]][ Guess][[rst]]: [[alt1]]PEERDIR[[rst]] is probably missing: ")
+                                guess += TString("\n[[unimp]][ Guess][[rst]]: [[alt1]]PEERDIR[[rst]] is either missing or forbidden by peerdir policy: ")
                                       + graph.GetFileName(graph.Get(*prev)).GetTargetStr()
                                       + " -> "
                                       + graph.GetFileName(graph.Get(*cur)).GetTargetStr();
