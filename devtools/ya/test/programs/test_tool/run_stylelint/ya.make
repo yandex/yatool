@@ -14,6 +14,6 @@ PEERDIR(
 
 END()
 
-RECURSE_FOR_TESTS(
+RECURSE(
     tests
 )
