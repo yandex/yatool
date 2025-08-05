@@ -264,6 +264,7 @@ class YtStoreClient(object):
 
         if self.is_table_format_v3:
             meta['self_uid'] = self_uid
+            meta['create_time'] = cur_timestamp_ms
 
         self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
 
