@@ -1437,6 +1437,7 @@ class _GraphMaker:
 
         assert to_build_pic or to_build_no_pic
 
+        platform_id = self._make_debug_id(debug_id, None)
         pic = None
         no_pic = None
         pic_queue = None
@@ -1463,7 +1464,7 @@ class _GraphMaker:
                 report_pic_nopic=True,
             )
             if should_use_internal_servermode(self._opts):
-                ymake_opts_nopic.update(platform_id=debug_id, **nopic_servermode_opts)
+                ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
             elif to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode()
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
@@ -1517,11 +1518,13 @@ class _GraphMaker:
 
             abs_targets_pic = abs_targets
             if should_use_internal_servermode(self._opts):
-                ymake_opts_pic['platform_id'] = debug_id
+                ymake_opts_pic['platform_id'] = platform_id
                 # tool options are different and set in _get_tools()
                 if graph_kind == _GraphKind.TARGET:
-                    ymake_opts_pic.update(**pic_servermode_opts)
-                abs_targets_pic = []
+                    ymake_opts_pic['transition_source'] = 'pic'
+                    if to_build_no_pic:
+                        ymake_opts_pic.update(**pic_servermode_opts)
+                        abs_targets_pic = []
             elif pic_queue is not None:
 
                 def stdin_line_provider():
