@@ -213,12 +213,14 @@ bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& 
     PipesByTargetPlatformId_[conf.TargetPlatformId][conf.TransitionSource] = queue;
     switch (conf.TransitionSource) {
         case ETransition::NoPic:
-            Subscribers_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)].push_back(ETransition::Pic);
-            Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Pic)]++;
             Subscribers_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)].push_back(ETransition::Tool);
             Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)]++;
             break;
         case ETransition::Pic:
+            if (PipesByTargetPlatformId_[conf.TargetPlatformId].contains(ETransition::NoPic)) {
+                Subscribers_[std::make_pair(conf.TargetPlatformId, ETransition::NoPic)].push_back(conf.TransitionSource);
+                Subscriptions_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)]++;
+            }
             Subscribers_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)].push_back(ETransition::Tool);
             Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)]++;
             break;
