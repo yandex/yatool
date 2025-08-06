@@ -11,6 +11,7 @@
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/compute_reachability.h>
 #include <devtools/ymake/propagate_change_flags.h>
+#include <devtools/ymake/python_runtime.h>
 
 #include <asio/co_spawn.hpp>
 #include <asio/use_awaitable.hpp>
@@ -169,6 +170,7 @@ void TYMake::ReportMakeCommandStats() {
 
 asio::awaitable<void> TYMake::AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag, bool followRecurses) {
     return asio::co_spawn(exec, [dir, tag, followRecurses, this] () -> asio::awaitable<void> {
+        NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
         TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
         auto elemId = Names.AddName(EMNT_Directory, dirPath);
         TNodeId nodeId = TNodeId::Invalid;
@@ -186,6 +188,7 @@ asio::awaitable<void> TYMake::AddStartTarget(TConfigurationExecutor exec, const 
 
 asio::awaitable<void> TYMake::AddTarget(TConfigurationExecutor exec, const TString& dir) {
     return asio::co_spawn(exec, [dir, this] () -> asio::awaitable<void> {
+        NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
         TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
         auto elemId = Names.AddName(EMNT_Directory, dirPath);
         UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());

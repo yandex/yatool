@@ -67,6 +67,8 @@ public:
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
 
+    void* SubState = nullptr;
+
 public:
     TBuildConfiguration();
     ~TBuildConfiguration() = default;
@@ -82,6 +84,10 @@ public:
     }
     void RegisterPluginParser(const TString& ext, TSimpleSharedPtr<TParser> parser) {
         MacroFacade.RegisterParser(*this, ext, parser);
+    }
+    void ClearPlugins() {
+        ParserPlugins.clear();
+        MacroFacade.Clear();
     }
 
     void AddOptions(NLastGetopt::TOpts& opts);

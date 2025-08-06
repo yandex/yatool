@@ -12,27 +12,29 @@ namespace {
 
     class TPluginAddParserImpl : public TParser {
     private:
-        PyObject *Obj;
+        PyObject *Obj = nullptr;
         std::map<TString, TString> IndDepsRule;
-        bool PassInducedIncludes;
+        bool PassInducedIncludes = false;
+        bool NeedPyThreadLock_ = true;
 
     public:
-        TPluginAddParserImpl(PyObject *obj, const std::map<TString, TString> &indDepsRule, bool passInducedIncludes)
+        TPluginAddParserImpl(PyObject *obj, const std::map<TString, TString> &indDepsRule, bool passInducedIncludes, bool needLock)
             : Obj(obj)
             , IndDepsRule(indDepsRule)
             , PassInducedIncludes(passInducedIncludes)
+            , NeedPyThreadLock_(needLock)
         {
             Py_XINCREF(Obj);
         }
 
         ~TPluginAddParserImpl() override {
-            TPyThreadLock pylk;
+            TPyThreadLock pylk{NeedPyThreadLock_};
             Py_XDECREF(Obj);
         }
 
         void Execute(const TString &path, TPluginUnit &unit, TVector<TString> &includes,
                      TPyDictReflection &inducedDeps) override {
-            TPyThreadLock pylk;
+            TPyThreadLock pylk{NeedPyThreadLock_};
             PyObject *context = CreateContextObject(&unit);
             CheckForError();
 
@@ -76,5 +78,5 @@ namespace {
 }
 
 void AddParser(TBuildConfiguration* conf, const TString& ext, PyObject* callable, std::map<TString, TString> inducedDeps, bool passInducedIncludes) {
-    conf->RegisterPluginParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes));
+    conf->RegisterPluginParser(ext, new TPluginAddParserImpl(callable, inducedDeps, passInducedIncludes, !conf->UseSubinterpreters));
 }

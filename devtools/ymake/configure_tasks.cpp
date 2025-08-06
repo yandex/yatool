@@ -1,6 +1,8 @@
 #include "configure_tasks.h"
 #include "evlog_server.h"
 
+#include <devtools/ymake/python_runtime.h>
+
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
 #include <asio/strand.hpp>
@@ -55,6 +57,7 @@ asio::awaitable<void> TYMake::BuildDepGraph(TConfigurationExecutor exec) {
             for (const auto& [to, dep] : *deps) {
                 if (IsTestRecurseDep(node.NodeType, dep, to.NodeType)) {
                     co_await asio::co_spawn(exec, [&]() -> asio::awaitable<void> {
+                        NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
                         UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
                         co_return;
                     }, asio::use_awaitable);
@@ -77,6 +80,7 @@ asio::awaitable<void> TYMake::BuildDepGraph(TConfigurationExecutor exec) {
         for (const auto& [to, dep] : *deps) {
             if (IsDependsDep(node.NodeType, dep, to.NodeType)) {
                 co_await asio::co_spawn(exec, [&]() -> asio::awaitable<void> {
+                    NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
                     UpdIter->RecursiveAddStartTarget(to.NodeType, to.ElemId, &rootModule);
                     co_return;
                 }, asio::use_awaitable);

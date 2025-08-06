@@ -4,19 +4,22 @@
 #include "conf.h"
 #include "main.h"
 #include "trace_start.h"
-#include "ymake.h"
 #include "context_executor.h"
 
 #include <asio/use_future.hpp>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/stats.h>
-
 #include <devtools/ymake/foreign_platforms/pipeline.h>
-#include <library/cpp/sighandler/async_signals_handler.h>
-#include <library/cpp/getopt/small/last_getopt.h>
+#include <devtools/ymake/python_runtime.h>
 
-#include <util/generic/fwd.h>
+#include <library/cpp/getopt/small/last_getopt.h>
+#include <library/cpp/iterator/enumerate.h>
+#include <library/cpp/sighandler/async_signals_handler.h>
+
+#include <util/generic/algorithm.h>
+#include <util/generic/queue.h>
+#include <util/generic/scope.h>
 #include <util/generic/yexception.h>
 #include <util/system/env.h>
 #include <util/system/mlock.h>
@@ -40,6 +43,11 @@ namespace {
 void SigInt(int) {
     _Exit(BR_INTERRUPTED);
 }
+
+struct TConfigDesc {
+    size_t Id;
+    TVector<const char*> CmdLine;
+};
 
 TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** argv) {
     TVector<TVector<const char*>> configs;
@@ -80,7 +88,7 @@ const char* GetOption(int& argc, char** argv, std::string_view option) noexcept 
     return result;
 }
 
-void InitGlobalOpts(int& argc, char** argv, int& threads) {
+void InitGlobalOpts(int& argc, char** argv, int& threads, bool& useSubinterpreters) {
     try {
         TVector<TString> events;
         for (const auto& name : { "--events", "-E" }) {
@@ -98,6 +106,8 @@ void InitGlobalOpts(int& argc, char** argv, int& threads) {
                 threads = std::stoul(threadsStr);
             }
         }
+
+        useSubinterpreters = FindPtr(argv, argv + argc, TStringBuf{"--use-subinterpreters"});
 
         if (!events.empty()) {
             if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) {return event == events.front();})) {
@@ -135,12 +145,23 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 // logger initialization and it's failure is reported later. This var keeps mlock call result.
 bool MLOCK_FAILED = false;
 
-asio::awaitable<int> RunConfigure(TVector<const char*> value, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+asio::awaitable<int> RunConfigure(TVector<const char*> value, PyInterpreterState* interp, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
     TBuildConfiguration conf;
-    auto result = InitConf(value, conf, pipeline);
+    TMaybe<EBuildResult> result{};
+    {
+        NYMake::TPythonThreadStateScope initState{interp};
+        result = InitConf(value, conf, pipeline);
+    }
+
+    Y_DEFER {
+        NYMake::TPythonThreadStateScope finiState{interp};
+        conf.ClearPlugins();
+    };
+
     if (result.Defined()) {
         co_return result.GetRef();
     }
+    conf.SubState = interp;
 
     if (MLOCK_FAILED) {
         YDebug() << "mlockall failed" << Endl;
@@ -180,8 +201,8 @@ auto CreatePipeline(const TVector<TVector<const char*>>& configs , asio::any_io_
 
 using TChannel = asio::experimental::concurrent_channel<void(asio::error_code, int)>;
 
-void SubmitNextConfigIfAny(TAdaptiveLock& confQueueLock, TQueue<TVector<const char*>>& confQueue, asio::thread_pool::executor_type exec, THolder<NForeignTargetPipeline::TForeignTargetPipeline>& pipeline, TDeque<TAtomicSharedPtr<TChannel>>& channels) {
-    TVector<const char*> config;
+void SubmitNextConfigIfAny(NYMake::TPythonRuntimeScope& pythonRuntime, TAdaptiveLock& confQueueLock, TQueue<TConfigDesc>& confQueue, asio::thread_pool::executor_type exec, THolder<NForeignTargetPipeline::TForeignTargetPipeline>& pipeline, TDeque<TAtomicSharedPtr<TChannel>>& channels) {
+    TConfigDesc config;
     with_lock(confQueueLock) {
         if (confQueue.empty()) {
             return;
@@ -203,12 +224,12 @@ void SubmitNextConfigIfAny(TAdaptiveLock& confQueueLock, TQueue<TVector<const ch
     with_lock(confQueueLock) {
         channels.push_back(p); // TODO: mb other lock
     }
-    asio::co_spawn(proxy, RunConfigure(config, proxy, *pipeline), [p, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {
+    asio::co_spawn(proxy, RunConfigure(config.CmdLine, pythonRuntime.GetSubinterpreterState(config.Id), proxy, *pipeline), [p, &pythonRuntime, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {
         if (ptr) {
             p->cancel();
             std::rethrow_exception(ptr);
         } else {
-            SubmitNextConfigIfAny(confQueueLock, confQueue, exec, pipeline, channels);
+            SubmitNextConfigIfAny(pythonRuntime, confQueueLock, confQueue, exec, pipeline, channels);
             p->async_send({}, rc, asio::detached);
         }
     });
@@ -227,7 +248,8 @@ int YMakeMain(int argc, char** argv) {
 
     SetAsyncSignalHandler(SIGINT, SigInt);
     int threads = 0;
-    InitGlobalOpts(argc, argv, threads);
+    bool useSubinterpreters = false;
+    InitGlobalOpts(argc, argv, threads, useSubinterpreters);
 
     auto configs = SplitMulticonfigCmdline(argc, argv);
     TVector<std::future<int>> ret_codes(configs.size());
@@ -241,18 +263,20 @@ int YMakeMain(int argc, char** argv) {
         MLOCK_FAILED = true;
     }
 
+    NYMake::TPythonRuntimeScope pythonRuntime(useSubinterpreters, configs.size());
+
     asio::thread_pool configure_workers(threads);
     auto pipeline = CreatePipeline(configs, configure_workers.executor());
 
     TDeque<TAtomicSharedPtr<TChannel>> channels;
     TAdaptiveLock confQueueLock;
-    TQueue<TVector<const char*>> confQueue;
-    for (const auto& config : configs) {
-        confQueue.push(config);
+    TQueue<TConfigDesc> confQueue;
+    for (const auto& [i, config] : Enumerate(configs)) {
+        confQueue.emplace(i, config);
     }
 
     for (int i = 0; i < threads; ++i) {
-        SubmitNextConfigIfAny(confQueueLock, confQueue, configure_workers.executor(), pipeline, channels);
+        SubmitNextConfigIfAny(pythonRuntime, confQueueLock, confQueue, configure_workers.executor(), pipeline, channels);
     }
 
     int main_ret_code = BR_OK;

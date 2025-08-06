@@ -168,6 +168,7 @@ SRCS(
     plugins/scoped_py_object_ptr.cpp
     plugins/ymake_module_adapter.cpp
     propagate_change_flags.cpp
+    python_runtime.cpp
     recurse_graph.cpp
     run_main.cpp
     saveload.cpp

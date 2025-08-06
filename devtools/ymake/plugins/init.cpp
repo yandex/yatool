@@ -4,9 +4,11 @@
 #include "ymake_module.h"
 
 #include <util/folder/path.h>
+#include <util/generic/algorithm.h>
+#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
-#include <util/generic/algorithm.h>
+
 
 #include <Python.h>
 
@@ -112,16 +114,23 @@ namespace {
     thread_local int py_lock_depth = 0;
 }
 
-TPyThreadLock::TPyThreadLock() noexcept {
-    if (py_lock_depth == 0) {
-        py_gstate = PyGILState_Ensure();
+TPyThreadLock::TPyThreadLock(bool needLock) noexcept
+    : NeedPyThreadLock_{needLock}
+{
+    if (NeedPyThreadLock_) {
+        if (py_lock_depth == 0) {
+            py_gstate = PyGILState_Ensure();
+        }
+        py_lock_depth++;
     }
-    py_lock_depth++;
 }
+
 TPyThreadLock::~TPyThreadLock() noexcept {
-    --py_lock_depth;
-    if (py_lock_depth == 0) {
-        PyGILState_Release(py_gstate);
+    if (NeedPyThreadLock_) {
+        --py_lock_depth;
+        if (py_lock_depth == 0) {
+            PyGILState_Release(py_gstate);
+        }
     }
 }
 
@@ -162,14 +171,20 @@ void InitPyRuntime() {
     Singleton<TPyRuntime>();
 }
 
-void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, bool UseSubinterpreters, TBuildConfiguration *conf) {
     if (pluginsRoots.empty()) {
         return;
     }
 
-    InitPyRuntime();
+    if (UseSubinterpreters) {
+        PyInit_ymake();
 
-    TPyThreadLock lk;
+        PyRun_SimpleString("import sys; sys.dont_write_bytecode = True");
+    } else {
+        InitPyRuntime();
+    }
+
+    TPyThreadLock lk{!UseSubinterpreters};
 
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {

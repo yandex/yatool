@@ -114,11 +114,13 @@ public:
 
     void RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action);
     void RegisterParser(TBuildConfiguration& conf, const TString& ext, TSimpleSharedPtr<TParser> parser);
+
+    void Clear();
 };
 
 // functions below implemented outside
 
-void LoadPlugins(const TVector<TFsPath> &sourceRoot, TBuildConfiguration *conf);
+void LoadPlugins(const TVector<TFsPath> &sourceRoot, bool UseSubinterpreters, TBuildConfiguration *conf);
 
 void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 
@@ -127,9 +129,12 @@ void OnPluginLoadFail(const char* fileName, const char* msg);
 void OnConfigureError(const char* msg);
 void OnBadDirError(const char* msg, const char* dir);
 
-struct TPyThreadLock {
-    TPyThreadLock() noexcept;
+class TPyThreadLock {
+public:
+    TPyThreadLock(bool needLock = true) noexcept;
     ~TPyThreadLock() noexcept;
+private:
+    bool NeedPyThreadLock_ = true;
 };
 
 struct TPyRuntime {

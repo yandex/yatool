@@ -42,6 +42,10 @@ void TMacroFacade::RegisterMacro(TBuildConfiguration& conf, const TString& name,
         NYndex::EDefinitionType::Macro);
 }
 
+void TMacroFacade::Clear() {
+    Name2Macro_.clear();
+}
+
 class TParserAdapter: public TParserBase {
 private:
     TSimpleSharedPtr<TParser> Parser_;
