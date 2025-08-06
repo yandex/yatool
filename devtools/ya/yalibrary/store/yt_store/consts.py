@@ -4,7 +4,7 @@ YT_CACHE_RAM_PER_THREAD_LIMIT = 64 * 2**20
 YT_CACHE_SELECT_METADATA_LIMIT = 10000
 YT_CACHE_SELECT_INPUT_ROW_LIMIT = 4000000000  # Treat the value as 'unlimited'
 YT_CACHE_SELECT_OUTPUT_ROW_LIMIT = 4000000000  # Treat the value as 'unlimited'
-YT_CACHE_EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL'])
+YT_CACHE_EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL', 'TS_DEP'])
 # Used in dynamic tables readiness check only
 YT_CACHE_REQUEST_TIMEOUT_MS = 5000
 YT_CACHE_REQUEST_RETRIES = 2
