@@ -133,6 +133,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('order', default_value=None),
         yarg.Param('dont_check_transitive_requirements', default_value=None),
         yarg.Param('parallel_rendering', default_value=False),
+        yarg.Param('use_subinterpreters', default_value=False),
     ]
 
 
@@ -427,6 +428,10 @@ def _cons_ymake_args(**kwargs):
     parallel_rendering = kwargs.pop('parallel_rendering', False)
     if parallel_rendering:
         ret += ['--parallel-rendering']
+
+    use_subinterpraters = kwargs.pop('use_subinterpreters', False)
+    if use_subinterpraters:
+        ret += ['--use-subinterpreters']
 
     # TODO: remove these unused options
     kwargs.pop('flags', None)

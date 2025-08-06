@@ -1931,6 +1931,7 @@ class _GraphMaker:
             no_ymake_retry=no_ymake_retry,
             disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
             parallel_rendering=self._opts.ymake_parallel_rendering,
+            use_subinterpreters=self._opts.ymake_use_subinterpreters,
         )
 
         if test_dart:

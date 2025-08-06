@@ -1540,6 +1540,7 @@ class YMakeModeOptions(Options):
         self.force_ymake_multiconfig = False
         self.ymake_parallel_rendering = False
         self.ymake_internal_servermode = False
+        self.ymake_use_subinterpreters = False
 
     @staticmethod
     def consumer():
@@ -1603,6 +1604,20 @@ class YMakeModeOptions(Options):
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
+            ArgConsumer(
+                ['--ymake-use-subinterpreters'],
+                help='Use Python subinterpreters',
+                hook=SetConstValueHook('ymake_use_subinterpreters', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--no-ymake-use-subinterpreters'],
+                help='Do not use Python subinterpreters',
+                hook=SetConstValueHook('ymake_use_subinterpreters', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             EnvConsumer(
                 'YA_YMAKE_MULTICONFIG',
                 hook=SetValueHook('ymake_multiconfig', return_true_if_enabled),
@@ -1611,10 +1626,15 @@ class YMakeModeOptions(Options):
                 'YA_FORCE_YMAKE_MULTICONFIG',
                 hook=SetValueHook('force_ymake_multiconfig', return_true_if_enabled),
             ),
+            EnvConsumer(
+                'YA_YMAKE_USE_SUBINTERPRETERS',
+                hook=SetValueHook('ymake_use_subinterpreters', return_true_if_enabled),
+            ),
             ConfigConsumer('ymake_multiconfig'),
             ConfigConsumer('force_ymake_multiconfig'),
             ConfigConsumer('ymake_parallel_rendering'),
             ConfigConsumer('ymake_internal_servermode'),
+            ConfigConsumer('ymake_use_subinterpreters'),
         ]
 
     def postprocess2(self, params):
