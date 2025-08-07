@@ -158,7 +158,7 @@ def parse_jest_stdout(opts, results_stream):
     suite.register_chunk()
 
     for suite_result in results.get("testResults", []):
-        rel_test_path = os.path.relpath(suite_result["name"], opts.build_root)
+        rel_test_path = os.path.relpath(suite_result["name"], opts.test_for_path)
         for test_result in suite_result["assertionResults"]:
             full_test_name = six.ensure_str(
                 "{}: {}::{}".format(
