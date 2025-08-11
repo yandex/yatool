@@ -510,7 +510,7 @@ class TaskContext(object):
             download=self._threads + net_threads,
             upload=net_threads,
         )
-        worker_pools = {WorkerPoolType.BASE: self._threads, WorkerPoolType.SERVICE: net_threads + 1}
+        worker_pools = {WorkerPoolType.BASE: self._threads + 1, WorkerPoolType.SERVICE: net_threads}
         strategy = schedule_strategy.Strategies.pick(self.opts.schedule_strategy, build_time_cache_availability)
 
         self._workers = worker_threads.WorkerThreads(

@@ -483,7 +483,10 @@ class CacheFactory:
         return fits_filter
 
     def _get_connection_pool_size(self):
-        return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0)
+        # NOTE: pool size must be equal to a number of runner's worker threads
+        # to avoid "Connection pool is full" message
+        # devtools/ya/yalibrary/runner/runner3.py
+        return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0) + 1
 
 
 def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
