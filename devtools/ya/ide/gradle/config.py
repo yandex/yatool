@@ -33,10 +33,9 @@ class _JavaSemConfig(SemConfig):
     def __init__(self, params):
         if platform_matcher.is_windows():
             raise YaIdeGradleException("Windows is not supported in ya ide gradle")
-        super().__init__(SemLang.JAVA(), params)
         self.start_cwd: Path = Path().cwd()
+        super().__init__(SemLang.JAVA(), params)
         self.logger = logging.getLogger(type(self).__name__)
-        self.settings_root: Path = self._get_settings_root()
         if not self.params.remove:
             self._check_gradle_props()
         self.ya_gradle_config_files: list[str] = []
@@ -47,6 +46,11 @@ class _JavaSemConfig(SemConfig):
         self._check_exclude_targets()
         if not self.yexport_toml_checked:
             self._check_yexport_toml()
+
+    def _prepare_targets(self) -> None:
+        super()._prepare_targets()
+        # For use settings_root as hash base for export root must fill it after prepare targets
+        self.settings_root: Path = self._get_settings_root()
 
     def _check_gradle_props(self) -> None:
         """Check exists all required gradle properties"""
@@ -124,7 +128,14 @@ class _JavaSemConfig(SemConfig):
 
     def _get_export_root(self) -> Path:
         """Create export_root path by hash of targets"""
-        targets_hash = hashing.fast_hash(':'.join(sorted(self.params.abs_targets)))
+        if self.params.settings_root_as_hash_base:
+            targets_hash = hashing.fast_hash(str(self.settings_root))
+        else:
+            all_abs_targets = ':'.join(sorted(self.params.abs_targets))
+            targets_hash = hashing.fast_hash(all_abs_targets)
+            if not (_JavaSemConfig.EXPORT_ROOT_BASE / targets_hash).exists():
+                # First time export, add settings root to hash - new improved hashing logic
+                targets_hash = hashing.fast_hash(str(self.settings_root) + ':' + all_abs_targets)
         export_root = _JavaSemConfig.EXPORT_ROOT_BASE / targets_hash
         self.logger.info("Export root: %s", export_root)
         return export_root
