@@ -326,7 +326,7 @@ class TaskContext(object):
         try:
             task = self.task_cache(node)
             self.runq.dispatch(task, *args, **kwargs)
-        except KeyError:
+        except AssertionError:
             pass
 
     def dispatch_all(self, *args, **kwargs) -> None:
