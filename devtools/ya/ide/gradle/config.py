@@ -81,6 +81,10 @@ class _JavaSemConfig(SemConfig):
             self.logger.warning(
                 "You have selected the mode without collecting contribs to jar files, to build successfully in Gradle, check bucket repository settings and access rights"
             )
+        if self.params.strip_symlinks:
+            raise YaIdeGradleException(
+                "You must remove strip_symlinks = true from ya.conf, else 'ya ide gradle' can't work properly"
+            )
 
     def _check_exclude_targets(self) -> None:
         if not self.params.exclude:
