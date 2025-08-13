@@ -15,10 +15,6 @@ from collections.abc import Callable
 import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.report
-import exts.archive
-import exts.os2
-import exts.process
-import exts.shlex2
 import exts.timer
 import exts.windows
 import devtools.ya.test.const
@@ -34,6 +30,7 @@ from yalibrary.runner import runqueue
 from yalibrary.runner import statcalc
 from yalibrary.runner import worker_threads
 from yalibrary.runner import task_cache
+from yalibrary.runner.topo import BaseTopoError
 from yalibrary.runner.command_file.python import command_file as cf
 from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.status_view.helpers import format_paths
@@ -326,7 +323,7 @@ class TaskContext(object):
         try:
             task = self.task_cache(node)
             self.runq.dispatch(task, *args, **kwargs)
-        except AssertionError:
+        except (task_cache.TaskCachFnNotFoundError, BaseTopoError):
             pass
 
     def dispatch_all(self, *args, **kwargs) -> None:

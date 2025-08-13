@@ -1,6 +1,32 @@
 import collections
 import threading
 
+DEFAULT_ERR_MSG_PATTERN = "Node {node} not found in {lookup_in}"
+
+
+class BaseTopoError(Exception):
+    pass
+
+
+class NodeNotFoundInTopoError(BaseTopoError):
+    pass
+
+
+class NodeFoundInTopoError(BaseTopoError):
+    pass
+
+
+def _assert_node_in(node, lookup_in, msg_pattern=DEFAULT_ERR_MSG_PATTERN):
+    if node not in lookup_in:
+        msg = msg_pattern.format(node, lookup_in)
+        raise NodeNotFoundInTopoError(msg)
+
+
+def _assert_node_not_in(node, lookup_in, msg_pattern=DEFAULT_ERR_MSG_PATTERN):
+    if node in lookup_in:
+        msg = msg_pattern.format(node, lookup_in)
+        raise NodeFoundInTopoError(msg)
+
 
 class DisjointSet(object):
     def __init__(self):
@@ -94,9 +120,9 @@ class Topo(object):
     def add_deps(self, from_node, *to_nodes):
         with self._lock:
             for to_node in to_nodes:
-                assert to_node in self._dsu, "Node {} is not in DSU".format(to_node)  # check existence
-                assert from_node in self._dsu, "Node {} is not in DSU".format(from_node)  # check existence
-                assert from_node not in self._scheduled, "Node {} has been already scheduled".format(from_node)
+                _assert_node_in(to_node, self._dsu, "Node {} is not in DSU")  # check existence
+                _assert_node_in(from_node, self._dsu, "Node {} is not in DSU")  # check existence
+                _assert_node_not_in(from_node, self._scheduled, "Node {} has been already scheduled")
 
                 self._deps[from_node].append(to_node)
 
@@ -106,14 +132,14 @@ class Topo(object):
 
     def merge_nodes(self, node1, node2):
         with self._lock:
-            assert node1 not in self._completed
-            assert node2 not in self._completed
+            _assert_node_not_in(node1, self._completed, "Node {} has been already completed")
+            _assert_node_not_in(node2, self._completed, "Node {} has been already completed")
             self._dsu.merge(node1, node2, lambda x, y: x + y)
 
     def schedule_node(self, node, when_ready=None, inplace_execution=False):
         with self._lock:
-            assert node in self._dsu
-            assert node not in self._scheduled
+            _assert_node_in(node, self._dsu, "Node {} is not in DSU")  # check existence
+            _assert_node_not_in(node, self._scheduled, "Node {} has been already scheduled")
 
             if when_ready:
                 self._when_ready[node] = when_ready

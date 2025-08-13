@@ -89,11 +89,12 @@ class RunQueue:
             yield [TaskInfo(task, deps, self._timing.get(task)) for task, deps in group]
 
     def dispatch(self, task, *args, **kwargs):
-        inplace_execution = kwargs.pop('inplace_execution', False)
-        if hasattr(task, 'on_dispatch'):
-            task.on_dispatch(*args, **kwargs)
-        self._topo.schedule_node(task, when_ready=self._when_ready, inplace_execution=inplace_execution)
-        self._not_dispatched.remove(task)
+        with self._lock:
+            inplace_execution = kwargs.pop('inplace_execution', False)
+            if hasattr(task, 'on_dispatch'):
+                task.on_dispatch(*args, **kwargs)
+            self._topo.schedule_node(task, when_ready=self._when_ready, inplace_execution=inplace_execution)
+            self._not_dispatched.remove(task)
 
     def dispatch_all(self, *args, **kwargs):
         for task in frozenset(self._not_dispatched):
@@ -101,7 +102,8 @@ class RunQueue:
 
     @property
     def pending(self):
-        return len(self._not_dispatched)
+        with self._lock:
+            return len(self._not_dispatched)
 
     def add(self, task, dispatch=True, joint=None, deps=None, inplace_execution=False):
         if deps is None:
