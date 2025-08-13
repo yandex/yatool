@@ -498,6 +498,10 @@ namespace {
                 plan.WriteConf();
 
                 if (yMake.Conf.ParallelRendering) {
+                    // Uids must be updated in depth-first order
+                    for (const auto& nodeId: cmdbuilder.GetOrderedNodes()) {
+                        UpdateUids(yMake.Graph, cmdbuilder, nodeId);
+                    }
                     TMakeModuleParallelStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
                     for (const auto& [_, nodes]: cmdbuilder.GetTopoGenerations()) {
                         size_t chunkSize = 10;
@@ -531,8 +535,6 @@ namespace {
                                 NYMake::TJsonWriter::TOpenedArray nodesArr;
                                 for (const auto& [modId, nodeIds] : chunk) {
                                     for (const auto& nodeId : nodeIds) {
-                                        UpdateUids(yMake.Graph, cmdbuilder, nodeId);
-
                                         const auto& node = cmdbuilder.Nodes.at(nodeId);
                                         RenderOrRestoreJSONNode(yMake, cmdbuilder, nodesArr, cache, nodeId, node, writer, modulesStatesCache);
                                         if (IsModuleType(graph[nodeId]->NodeType)) {
