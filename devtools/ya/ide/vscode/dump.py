@@ -160,7 +160,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
     def is_protobuf(node):
         if isinstance(node, yalibrary.makelists.macro_definitions.Macro) and node.name == 'PROTO_LIBRARY':
             return True
-        return any(is_flatbuf(child) for child in node.children)
+        return any(is_protobuf(child) for child in node.children)
 
     def is_top_level(node):
         if isinstance(node, yalibrary.makelists.macro_definitions.SrcValue) and node.name == "TOP_LEVEL":
@@ -214,7 +214,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
             if is_top_level(makelist) or is_flatbuf(makelist):
                 namespace = "."
             elif is_protobuf(makelist):
-                namespace = module_dir.replace('/', '.')
+                namespace = module_dir.replace('/', '.').replace('-', '_')
             elif has_srcs(makelist):
                 namespace = "."
             else:
