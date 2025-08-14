@@ -54,7 +54,8 @@ class RunQueue:
     def __init__(self, out, listener=None):
         self._out = out
         self._listener = listener or status_view.DummyListener()
-        self._lock = threading.Lock()
+        # XXX: reentrancy is essential for eager execution
+        self._lock = threading.RLock()
         self._not_dispatched = set()
 
         self._topo = topo.Topo()
