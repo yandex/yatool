@@ -66,6 +66,18 @@ struct TGlobStat {
     }
 };
 
+struct TGlobRestrictions {
+    size_t MaxMatches{10000}; // Maximum matched files for globs in module, 0 - unlimit
+    size_t MaxWatchDirs{5000}; // Maximum watched dirs for globs in module, 0 - unlimit
+
+    void Extend() {
+        MaxMatches *= 10;
+        MaxWatchDirs *= 10;
+    }
+
+    bool Check(const TStringBuf& name, const TGlobStat& globStat) const;
+};
+
 // Short-live object with 2 scenarios of usage:
 // 1. TGlob (pattern) -> Apply -> dump to property (GetWatchDirs + GetMatchesHash)
 // 2. WatchDirsUpdated -> TGlob (property) -> NeedUpdate

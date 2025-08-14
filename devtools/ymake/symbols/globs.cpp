@@ -62,6 +62,35 @@ namespace {
     }
 }
 
+bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat) const {
+    size_t tooManyMatches = 0;
+    if (globStat.MatchedFilesCount >= MaxMatches) {
+        tooManyMatches = globStat.MatchedFilesCount;
+    }
+    // TODO(dimdim11) Make check skipped
+    size_t tooManyWatchDirs = 0;
+    if (globStat.WatchedDirsCount >= MaxWatchDirs) {
+        tooManyWatchDirs = globStat.WatchedDirsCount;
+    }
+    if (!tooManyMatches && !tooManyWatchDirs) {
+        return true;
+    }
+    TStringBuilder s;
+    s << "Glob restrictions violated in [[alt1]]" << name << "[[rst]]: ";
+    if (tooManyMatches) {
+        s << "too many matched files - " << ToString(tooManyMatches);
+        if (tooManyWatchDirs) {
+            s << ", ";
+        }
+    }
+    if (tooManyWatchDirs) {
+        s << "too many watched dirs - " << ToString(tooManyWatchDirs);
+    }
+    s << Endl;
+    YConfErr(Misconfiguration) << s;
+    return false;
+}
+
 TGlob::TGlob(TFileConf& fileConf, TStringBuf glob, TFileView rootDir)
     : FileConf(fileConf)
     , RootDir(rootDir)
