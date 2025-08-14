@@ -71,7 +71,8 @@ namespace {
 
         try {
             TGlob glob{st.Graph.Names().FileConf, pattern, dirName};
-            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher);
+            TGlobStat patternStat;
+            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &patternStat);
             if (glob.GetMatchesHash() == globInfo.GlobHash && glob.GetWatchDirs().Data() == globInfo.WatchDirs.Data()) {
                 return;
             }
@@ -102,7 +103,8 @@ namespace {
         bool result;
         try {
             TGlob glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
-            result = glob.NeedUpdate(globInfo.ExcludesMatcher);
+            TGlobStat patternStat;
+            result = glob.NeedUpdate(globInfo.ExcludesMatcher, &patternStat);
         } catch (const yexception&) {
             result = false;
         }

@@ -140,20 +140,21 @@ bool TGlob::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watch
     });
 }
 
-bool TGlob::NeedUpdate(const TExcludeMatcher& excludeMatcher) {
+bool TGlob::NeedUpdate(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat) {
     TUniqVector<ui32> oldWatchDirs = std::move(WatchDirs);
     TString oldMatchesHash = std::move(MatchesHash);
-    Apply(excludeMatcher);
+    Apply(excludeMatcher, globStat);
     bool equal = (oldMatchesHash == MatchesHash) && (oldWatchDirs == WatchDirs);
     return !equal;
 }
 
-TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
+TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat) {
     using namespace NPath;
     WatchDirs.clear();
     TVector<TFileView> matches;
     TVector<TFileView> dirs;
     dirs.emplace_back(RootDir);
+    size_t skippedFilesCount = 0;
 
     for (auto it = Parts.begin(); it != Parts.end(); it++) {
         const auto& part = *it;
@@ -180,7 +181,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                         path = Reconstruct(path);
                     }
                     auto id = FileConf.Add(path);
-                    bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher);
+                    bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher, skippedFilesCount);
                     if (isLastPart || !found) {
                         WatchDirs.Push(FileConf.Add(NPath::Parent(path)));
                     }
@@ -189,7 +190,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                 case TGlobPart::EGlobType::Pattern:
                 case TGlobPart::EGlobType::Anything: {
                     WatchDirs.Push(dir.GetElemId());
-                    ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher);
+                    ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher, skippedFilesCount);
                     if (!isLastPart) {
                         for (const auto& newDir : newDirs) {
                             WatchDirs.Push(newDir.GetElemId());
@@ -224,10 +225,16 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
     md5.Final(sign.RawData);
     MatchesHash = Md5SignatureAsBase64(sign);
 
+    if (globStat) {
+        globStat->MatchedFilesCount = matches.size();
+        globStat->SkippedFilesCount = skippedFilesCount;
+        globStat->WatchedDirsCount = WatchDirs.size();
+    }
+
     return matches;
 }
 
-void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const {
+void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     FileConf.ListDir(dirId, true);
     const auto& children = FileConf.GetCachedDirContent(dirId);
     for (const auto& childId : children) {
@@ -239,6 +246,7 @@ void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& ma
 
         TFileView nameView = file->GetName();
         if (!matcher(nameView.Basename())) {
+            if (!data.IsDir) ++skippedFilesCount;
             continue;
         }
 
@@ -246,11 +254,13 @@ void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& ma
             newDirs.push_back(nameView);
         } else if (!excludeMatcher.IsExcluded(nameView)) {
             matches.push_back(nameView);
+        } else {
+            ++skippedFilesCount;
         }
     }
 }
 
-bool TGlob::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const {
+bool TGlob::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     auto file = FileConf.GetFileById(id);
     const auto& fileData = file->GetFileData();
     if (fileData.NotFound) {
@@ -263,6 +273,8 @@ bool TGlob::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matc
         newDirs.push_back(storedName);
     } else if (isLastPart && !excludeMatcher.IsExcluded(storedName)) {
         matches.push_back(storedName);
+    } else {
+        ++skippedFilesCount;
     }
     return true;
 }

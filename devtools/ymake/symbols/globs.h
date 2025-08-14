@@ -33,6 +33,39 @@ struct TGlobPart {
     TString Data;
 };
 
+struct TGlobStat {
+    size_t MatchedFilesCount{0};
+    size_t SkippedFilesCount{0};
+    size_t WatchedDirsCount{0};
+    size_t PatternsCount{0};
+
+    void operator+=(const TGlobStat& patternStat) {
+        if (!WatchedDirsCount) {
+            *this = patternStat;
+        } else {
+            Y_ASSERT(WatchedDirsCount == patternStat.WatchedDirsCount);
+            auto watchFilesCount = patternStat.MatchedFilesCount + patternStat.SkippedFilesCount;
+            MatchedFilesCount += patternStat.MatchedFilesCount; // sum matched in all patterns
+            if (MatchedFilesCount >= watchFilesCount) {
+                // Patterns overlap, as fact disable skipped checking
+                SkippedFilesCount = 0;
+            } else {
+                // All patterns in glob same files, count of watched files in all patters is equal
+                // Calc skipped as watched count - sum of matched in all patterns
+                SkippedFilesCount = watchFilesCount - MatchedFilesCount;
+            }
+        }
+        ++PatternsCount;
+    }
+
+    bool operator==(const TGlobStat& other) const {
+        return MatchedFilesCount == other.MatchedFilesCount
+            && SkippedFilesCount == other.SkippedFilesCount
+            && WatchedDirsCount == other.WatchedDirsCount
+            && PatternsCount == other.PatternsCount;
+    }
+};
+
 // Short-live object with 2 scenarios of usage:
 // 1. TGlob (pattern) -> Apply -> dump to property (GetWatchDirs + GetMatchesHash)
 // 2. WatchDirsUpdated -> TGlob (property) -> NeedUpdate
@@ -56,10 +89,10 @@ public:
     static bool WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs);
 
     // Is hash(matches) or WatchDirs list changed
-    bool NeedUpdate(const TExcludeMatcher& excludeMatcher);
+    bool NeedUpdate(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat = nullptr);
 
     // Returns list of files, matched by the glob pattern
-    TVector<TFileView> Apply(const TExcludeMatcher& excludeMatcher);
+    TVector<TFileView> Apply(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat = nullptr);
 
     const TUniqVector<ui32>& GetWatchDirs() const {
         return WatchDirs;
@@ -72,9 +105,9 @@ public:
 private:
     void ParseGlobPattern();
 
-    bool ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const;
+    bool ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
     void ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 dirId) const;
-    void ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const;
+    void ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
 };
 
 // Transforms ANT-like glob pattern to a regular expression. Usable in case of matching set of paths against

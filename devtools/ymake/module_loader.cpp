@@ -262,14 +262,17 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
+    TGlobStat globStat;
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
             TGlob glob(Names.FileConf, globStr, Module.GetDir());
-            for (const auto& result : glob.Apply(excludeMatcher)) {
+            TGlobStat patternStat;
+            for (const auto& result : glob.Apply(excludeMatcher, &patternStat)) {
                 values.Push(result);
             }
+            globStat += patternStat;
 
             const auto globCmd = FormatCmd(Module.GetName().GetElemId(), globPropName, globStr);
             const auto globId = Names.AddName(EMNT_BuildCommand, globCmd);

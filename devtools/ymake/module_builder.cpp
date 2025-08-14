@@ -979,22 +979,30 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         // not setting .HasPrefix even though there is one, because we want to pass it through to input processing as is
         lateExpansionVar->back().IsMacro = true;
     };
+
+    TGlobStat globStat;
+    ui32 varElemId = 0;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
             TGlob glob(Graph.Names().FileConf, globStr, Module.GetDir());
-            for (const auto& result : glob.Apply(excludeMatcher)) {
+            TGlobStat patternStat;
+            for (const auto& result : glob.Apply(excludeMatcher, &patternStat)) {
                 matches.Push(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
             }
+            globStat += patternStat;
 
             const TString globCmd = FormatCmd(Module.GetName().GetElemId(), NProps::LATE_GLOB, globStr);
+            if (!varElemId) {
+                varElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            }
             TModuleGlobInfo globInfo = {
                 Graph.Names().AddName(EMNT_BuildCommand, globCmd),
                 Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
                 glob.GetWatchDirs().Data(),
                 matches.Take(),
                 excludeIds.Data(),
-                Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName))
+                varElemId
             };
             CreateGlobNode(globInfo, globCmd);
         } catch (const yexception& error){
