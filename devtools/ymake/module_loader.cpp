@@ -249,7 +249,10 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     }
 
     TStringBuf varName = args.front();
-    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::EXCLUDE);
+    const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
+    auto globRestrictions = ParseGlobRestrictions(restrictions, NMacro::_GLOB);
+    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{globsWithExcludes}, NArgs::EXCLUDE);
+    Y_UNUSED(globRestrictions);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
@@ -294,6 +297,44 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     return true;
 }
 
-TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() {
+TGlobRestrictions TModuleDef::ParseGlobRestrictions(const TArrayRef<const TStringBuf>& restrictions, const TStringBuf& macro) {
+    const auto rend = restrictions.cend();
+    auto parseVal = [&macro, &rend](TArrayRef<const TStringBuf>::iterator& rit, const TStringBuf& name) {
+        if (*rit != name) {
+            return -1;
+        }
+        if ((rit + 1) == rend) {
+            YConfErr(Syntax) << "No value for " << name << " in " << macro;
+            return -2;
+        }
+        rit++;
+        auto v = std::stoi(std::string(*rit).c_str());
+        if (v <= 0 || v > 1000000) {
+            YConfErr(Syntax) << "Invalid value " << *rit << " for " << name << " in " << macro;
+            return -3;
+        }
+        return v;
+    };
+
+    TGlobRestrictions globRestrictions;
+    auto rit = restrictions.cbegin();
+    while (rit != rend) {
+        auto maxMatches = parseVal(rit, NArgs::MAX_MATCHES);
+        if (maxMatches > 0) {
+            globRestrictions.MaxMatches = maxMatches;
+        }
+        auto maxWatchDirs = parseVal(rit, NArgs::MAX_MATCHES);
+        if (maxWatchDirs > 0) {
+            globRestrictions.MaxWatchDirs = maxWatchDirs;
+        }
+        if (maxMatches == -1 && maxWatchDirs == -1) {
+            YConfErr(Syntax) << "Unknown restriction name " << *rit << " in " << macro;
+        }
+        rit++;
+    }
+    return globRestrictions;
+}
+
+const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
     return ModuleGlobs;
 }

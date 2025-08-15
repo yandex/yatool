@@ -35,5 +35,8 @@ constexpr TStringBuf PARTITIONED_RECURSE_FOR_TESTS = "PARTITIONED_RECURSE_FOR_TE
 namespace NArgs {
 
 constexpr TStringBuf EXCLUDE = "EXCLUDE";
+constexpr TStringBuf RESTRICTIONS = "RESTRICTIONS";
+constexpr TStringBuf MAX_MATCHES = "MAX_MATCHES";
+constexpr TStringBuf MAX_WATCH_DIRS = "MAX_WATCH_DIRS";
 
 }

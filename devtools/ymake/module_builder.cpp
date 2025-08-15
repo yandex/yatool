@@ -949,7 +949,10 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     TStringBuf varName = args.front();
-    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::EXCLUDE);
+    const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
+    auto globRestrictions = TModuleDef::ParseGlobRestrictions(restrictions, NMacro::_LATE_GLOB);
+    const auto [globs, excludes] = SplitBy(globsWithExcludes, NArgs::EXCLUDE);
+    Y_UNUSED(globRestrictions);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
