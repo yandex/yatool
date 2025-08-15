@@ -950,7 +950,13 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
 
     TStringBuf varName = args.front();
     const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
-    auto globRestrictions = TModuleDef::ParseGlobRestrictions(restrictions, NMacro::_LATE_GLOB);
+    TGlobRestrictions globRestrictions;
+    if (!restrictions.empty()) {
+        globRestrictions = TModuleDef::ParseGlobRestrictions(restrictions.subspan(1), NMacro::_LATE_GLOB);
+    }
+    if (ModuleDef && ModuleDef->IsExtendGlobRestriction()) {
+        globRestrictions.Extend();
+    }
     const auto [globs, excludes] = SplitBy(globsWithExcludes, NArgs::EXCLUDE);
     Y_UNUSED(globRestrictions);
 

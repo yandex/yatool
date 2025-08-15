@@ -66,6 +66,7 @@ public:
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
+    THashSet<TStringBuf> GlobRestrictionExtends{};
 
     void* SubState = nullptr;
 

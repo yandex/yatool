@@ -210,6 +210,7 @@ public:
     static TGlobRestrictions ParseGlobRestrictions(const TArrayRef<const TStringBuf>& restrictions, const TStringBuf& macro);
 
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});
+    bool IsExtendGlobRestriction() const;
 
     TFileView GetName() const {
         return Module.GetName();

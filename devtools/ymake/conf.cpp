@@ -90,6 +90,17 @@ namespace {
             }
         }
     }
+
+    void ReadModulesWithExtendedGlobs(TBuildConfiguration& conf) {
+        TVector<TStringBuf> extends;
+        Split(conf.CommandConf.EvalValue(NVariableDefs::VAR_MODULES_WITH_EXTENDED_GLOB_RESTRICTIONS), " ", extends);
+        for (const auto& extend: extends) {
+            if (extend.empty()) {
+                continue;
+            }
+            conf.GlobRestrictionExtends.insert(extend);
+        }
+    }
 }
 
 TBuildConfiguration::TBuildConfiguration() {
@@ -258,6 +269,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     CompileAndRecalcAllConditions();
     FoldGlobalCommands(*this);
     FillModuleScopeOnlyFlag(*this);
+    ReadModulesWithExtendedGlobs(*this);
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
 

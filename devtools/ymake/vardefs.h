@@ -65,6 +65,7 @@ VARIABLE(MODULE_TAG, "Defines TAG of the module. Module tags compatibility is ch
     "proper submodule in multimodule")
 VARIABLE(MODULE_TYPE, "")
 VARIABLE(MODULE_SEM_IGNORE, "Skip traverse into module during render sem-graph, add IGNORED to semantics")
+VARIABLE(MODULES_WITH_EXTENDED_GLOB_RESTRICTIONS, "Few modules with many files to extend glob restrictions")
 VARIABLE(NON_NAMAGEABLE_PEERS, "")
 VARIABLE(OUTPUT, "")
 VARIABLE(PASS_PEERS, "@usage: PASS_PEERS=yes/no\n\n"

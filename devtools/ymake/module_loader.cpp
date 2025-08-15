@@ -250,7 +250,13 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
 
     TStringBuf varName = args.front();
     const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
-    auto globRestrictions = ParseGlobRestrictions(restrictions, NMacro::_GLOB);
+    TGlobRestrictions globRestrictions;
+    if (!restrictions.empty()) {
+        globRestrictions = ParseGlobRestrictions(restrictions.subspan(1), NMacro::_GLOB);
+    }
+    if (IsExtendGlobRestriction()) {
+        globRestrictions.Extend();
+    }
     const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{globsWithExcludes}, NArgs::EXCLUDE);
     Y_UNUSED(globRestrictions);
 
@@ -304,13 +310,17 @@ TGlobRestrictions TModuleDef::ParseGlobRestrictions(const TArrayRef<const TStrin
             return -1;
         }
         if ((rit + 1) == rend) {
-            YConfErr(Syntax) << "No value for " << name << " in " << macro;
+            YConfErr(Syntax) << "No value for " << name << " in " << macro << Endl;
             return -2;
         }
         rit++;
-        auto v = std::stoi(std::string(*rit).c_str());
+        int v = 0;
+        try {
+            v = std::stoi(std::string(*rit).c_str());
+        } catch (const std::exception) {
+        }
         if (v <= 0 || v > 1000000) {
-            YConfErr(Syntax) << "Invalid value " << *rit << " for " << name << " in " << macro;
+            YConfErr(Syntax) << "Invalid value " << *rit << " for " << name << " in " << macro << Endl;
             return -3;
         }
         return v;
@@ -323,16 +333,20 @@ TGlobRestrictions TModuleDef::ParseGlobRestrictions(const TArrayRef<const TStrin
         if (maxMatches > 0) {
             globRestrictions.MaxMatches = maxMatches;
         }
-        auto maxWatchDirs = parseVal(rit, NArgs::MAX_MATCHES);
+        auto maxWatchDirs = parseVal(rit, NArgs::MAX_WATCH_DIRS);
         if (maxWatchDirs > 0) {
             globRestrictions.MaxWatchDirs = maxWatchDirs;
         }
         if (maxMatches == -1 && maxWatchDirs == -1) {
-            YConfErr(Syntax) << "Unknown restriction name " << *rit << " in " << macro;
+            YConfErr(Syntax) << "Unknown restriction name " << *rit << " in " << macro << Endl;
         }
         rit++;
     }
     return globRestrictions;
+}
+
+bool TModuleDef::IsExtendGlobRestriction() const {
+    return !Conf.GlobRestrictionExtends.empty() && Conf.GlobRestrictionExtends.contains(Module.GetDir().CutType());
 }
 
 const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
