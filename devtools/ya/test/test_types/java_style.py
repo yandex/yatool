@@ -210,6 +210,18 @@ class KtlintTestSuite(LintTestSuite):
             return os.path.join(SOURCE_ROOT, self.project_path, self.meta.ktlint_baseline_file)
         return None
 
+    def _ktlint_ruleset(self):
+        ruleset = self.meta.ktlint_ruleset
+        if ruleset is None:
+            return None
+        deps = self.meta.custom_dependencies
+        if not deps:
+            return None
+        for dep in deps.split(" "):
+            if dep.startswith(ruleset):
+                return dep
+        return None
+
     def get_resource_tools(self):
         return (self._ktlint_folder_name(),)
 
@@ -235,6 +247,8 @@ class KtlintTestSuite(LintTestSuite):
             os.path.join(work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
             "--source-root",
             SOURCE_ROOT,
+            "--build-root",
+            BUILD_ROOT,
             "--project-path",
             self.project_path,
             "--output-dir",
@@ -246,6 +260,10 @@ class KtlintTestSuite(LintTestSuite):
         baseline = self._ktlint_baseline_path()
         if baseline:
             cmd += ["--baseline", baseline]
+
+        ruleset = self._ktlint_ruleset()
+        if ruleset:
+            cmd += ["--ruleset", ruleset]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:

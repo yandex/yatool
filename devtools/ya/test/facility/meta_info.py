@@ -126,6 +126,10 @@ class MetaInfo(object):
         return self._ktlint_baseline_file
 
     @property
+    def ktlint_ruleset(self):
+        return self._ktlint_ruleset
+
+    @property
     def ktlint_binary(self):
         if self._ktlint_binary is None:
             raise ValueError('ktlint_binary cannot be None')
@@ -357,6 +361,7 @@ class DartInfo(MetaInfo):
         self._jdk_latest_version = dart_info.get('JDK_LATEST_VERSION')
         self._jdk_resource_prefix = dart_info.get('JDK_RESOURCE')
         self._ktlint_baseline_file = dart_info.get('KTLINT_BASELINE_FILE')
+        self._ktlint_ruleset = dart_info.get('KTLINT_RULESET')
         self._ktlint_binary = dart_info.get("KTLINT_BINARY")
         self._lint_configs = dart_info.get("LINT-CONFIGS")
         self._linter = dart_info.get("LINTER")
