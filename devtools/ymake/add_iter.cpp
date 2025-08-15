@@ -1843,7 +1843,7 @@ inline void TUpdIter::Left(TState& state) {
 }
 
 void TUpdIter::NukeModuleDir(TState& state) {
-    TStringBuf modName = state.back().Add ? state.back().Add->Module->GetFileName() : Graph.GetFileName(state.back().Node).GetTargetStr();
+    TString modName = state.back().Add ? state.back().Add->Module->GetFileName() : TString{Graph.GetFileName(state.back().Node).GetTargetStr()};
     while (!state.empty()) { // there may be Dir -> Test Module -> Main module case
         if (!IsModuleType(state.back().Node.NodeType))
             break;
