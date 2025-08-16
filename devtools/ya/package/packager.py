@@ -780,6 +780,7 @@ def create_package(package_context, output_root, builds):
                     result_dir,
                     content_dir,
                     package_context,
+                    compression_filter=params.squashfs_compression_filter,
                 )
             elif package_format == const.PackageFormat.DEBIAN:
                 if params.build_debian_scripts:

@@ -385,7 +385,9 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.force_dupload = False
         self.format = None
         self.full_strip = False
+        self.include_traversal_variant = None
         self.overwrite_read_only_files = False
+        self.package_filename = None
         self.raw_package = False
         self.resource_attrs = {}
         self.resource_type = "YA_PACKAGE"
@@ -394,12 +396,11 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.sloppy_deb = False
         self.store_debian = True
         self.strip = False
+        self.squashfs_compression_filter = None
         self.hardlink_package_outputs = False
         self.wheel_platform = ""
         self.wheel_limited_api = ""
         self.wheel_python3 = False
-        self.package_filename = None
-        self.include_traversal_variant = None
 
     @staticmethod
     def consumer():
@@ -468,6 +469,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook('compression_filter'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=TAR_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--squashfs-compression-filter"],
+                help="Specifies compression filter for SquashFS (gzip/zstd/xz/lzo/lz4/lzma)",
+                hook=devtools.ya.core.yarg.SetValueHook('squashfs_compression_filter'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=SQUASHFS_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--compression-level"],
@@ -801,6 +809,10 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         if self.compression_filter not in (None, 'gzip', 'zstd'):
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using unsupported compression filter: {}".format(self.compression_filter)
+            )
+        if self.squashfs_compression_filter not in (None, 'gzip', 'xz', 'zstd', 'lzo', 'lz4', 'lzma'):
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "Using unsupported squashfs compression filter: {}".format(self.compression_filter)
             )
         if self.include_traversal_variant not in (None, 'postorder', 'preorder'):
             raise devtools.ya.core.yarg.ArgsValidatingException(
