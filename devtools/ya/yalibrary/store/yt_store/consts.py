@@ -37,7 +37,7 @@ YT_CACHE_METADATA_SCHEMA = [
 YT_CACHE_METADATA_V3_SCHEMA = [
     {
         'name': 'tablet_hash',
-        'expression': 'farm_hash(uid) % {}'.format(YT_CACHE_HASH_SPACE),
+        'expression': 'farm_hash(self_uid) % {}'.format(YT_CACHE_HASH_SPACE),
         'type': 'uint64',
         'sort_order': 'ascending',
     },
