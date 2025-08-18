@@ -14,8 +14,8 @@ HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
 PLAYWRIGHT_LARGE_TEST_TYPE = "playwright_large"
 
-TS_MODULE_TAGS = ("ts", "ts_proto")
-TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
+TS_MODULE_TAGS = ("ts", "ts_proto", "ts_proto_from_schema", "ts_proto_auto")
+TS_TRANSIENT_MODULE_TAGS = TS_MODULE_TAGS + ("ts_prepare_deps",)
 
 
 def get_nodejs_res(meta):
