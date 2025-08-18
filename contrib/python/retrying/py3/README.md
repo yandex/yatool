@@ -1,34 +1,3 @@
-Metadata-Version: 2.4
-Name: retrying
-Version: 1.4.2
-Summary: Retrying
-Author: Alex Kuang, Anthony McClosky, Cyrus Durgin, Daniel Nephin, Dougal Matthews, Greg Roodt, Haïkel Guémar, Hugo Klepsch, J Derek Wilson, James Page, Jason Dunkelberger, Job Evers, Jonathan Herriott, Josh Marshall, Joshua Harlow, Justin Turner Arthur, Maxym Shalenyi, Monty Taylor, Pierre-Yves Chibon, Ray Holder, Rees Dooley, Saul Shanabrook, Simon Dollé, Simeon Visser, Thomas Goirand
-License-Expression: Apache-2.0
-Project-URL: Homepage, https://github.com/groodt/retrying
-Project-URL: Repository, https://github.com/groodt/retrying
-Keywords: decorator,decorators,retry,retrying,exception,exponential,backoff
-Classifier: Intended Audience :: Developers
-Classifier: Natural Language :: English
-Classifier: Programming Language :: Python
-Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3 :: Only
-Classifier: Programming Language :: Python :: 3.6
-Classifier: Programming Language :: Python :: 3.7
-Classifier: Programming Language :: Python :: 3.8
-Classifier: Programming Language :: Python :: 3.9
-Classifier: Programming Language :: Python :: 3.10
-Classifier: Programming Language :: Python :: 3.11
-Classifier: Programming Language :: Python :: 3.12
-Classifier: Programming Language :: Python :: 3.13
-Classifier: Programming Language :: Python :: Implementation :: CPython
-Classifier: Topic :: Internet
-Classifier: Topic :: Utilities
-Requires-Python: >=3.6
-Description-Content-Type: text/markdown
-License-File: LICENSE.txt
-License-File: NOTICE.txt
-Dynamic: license-file
-
 # Retrying
 
 Retrying is an Apache 2.0 licensed general-purpose retrying library, written in
