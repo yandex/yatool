@@ -101,6 +101,12 @@ namespace {
             conf.GlobRestrictionExtends.insert(extend);
         }
     }
+
+    void ReadFeatureFlags(TBuildConfiguration& conf) {
+        conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
+        conf.CheckKVP = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_KVP"));
+        conf.CheckGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_GLOB_RESTRICTIONS"));
+    }
 }
 
 TBuildConfiguration::TBuildConfiguration() {
@@ -270,6 +276,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     FoldGlobalCommands(*this);
     FillModuleScopeOnlyFlag(*this);
     ReadModulesWithExtendedGlobs(*this);
+    ReadFeatureFlags(*this);
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
 

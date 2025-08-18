@@ -103,7 +103,7 @@ namespace {
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
                 , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
-                , Subst2Json(cmdBuilder, DumpInfo, resultNode, ymake.GetFillModule2Nodes(), ymake.GetCheckKVP(), Modules.Get(Graph[ModuleId]->ElemId))
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode, ymake.Conf.FillModule2Nodes, ymake.Conf.CheckKVP, Modules.Get(Graph[ModuleId]->ElemId))
                 , MakeCommand(modulesStatesCache, ymake)
         {
             PrepareDeps();

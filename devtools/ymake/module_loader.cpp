@@ -293,6 +293,10 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
+    if (Conf.CheckGlobRestrictions) {
+        globRestrictions.Check(name, globStat);
+    }
+
     auto&& range = MakeMappedRange(values, [](auto x) {
         Y_ASSERT(x.IsType(NPath::Source));
         return TString::Join("${ARCADIA_ROOT}/", x.CutType());

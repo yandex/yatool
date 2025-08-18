@@ -1019,6 +1019,10 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         }
     }
 
+    if (Conf.CheckGlobRestrictions) {
+        globRestrictions.Check(name, globStat);
+    }
+
     if (globs.empty()) {
         // Add fake glob property in order to be able to reference variable created with _LATE_GLOB
         // without patterns from command subgraph

@@ -67,6 +67,9 @@ public:
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
+    bool FillModule2Nodes{false};
+    bool CheckKVP{false};
+    bool CheckGlobRestrictions{false};
 
     void* SubState = nullptr;
 
