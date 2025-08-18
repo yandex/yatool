@@ -43,17 +43,8 @@ struct TGlobStat {
         if (!WatchedDirsCount) {
             *this = patternStat;
         } else {
-            Y_ASSERT(WatchedDirsCount == patternStat.WatchedDirsCount);
-            auto watchFilesCount = patternStat.MatchedFilesCount + patternStat.SkippedFilesCount;
             MatchedFilesCount += patternStat.MatchedFilesCount; // sum matched in all patterns
-            if (MatchedFilesCount >= watchFilesCount) {
-                // Patterns overlap, as fact disable skipped checking
-                SkippedFilesCount = 0;
-            } else {
-                // All patterns in glob same files, count of watched files in all patters is equal
-                // Calc skipped as watched count - sum of matched in all patterns
-                SkippedFilesCount = watchFilesCount - MatchedFilesCount;
-            }
+            WatchedDirsCount = std::max(WatchedDirsCount, patternStat.WatchedDirsCount);
         }
         ++PatternsCount;
     }
