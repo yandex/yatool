@@ -31,6 +31,7 @@ def parse_args():
     parser.add_argument("--tests-filters", required=False, action="append")
     parser.add_argument("--lint-name", help="Lint name")
     parser.add_argument("--linter", required=True, help="Path to linter binary (optional")
+    parser.add_argument("--wrapper-script", required=False, help="Path to wrapper script")
     parser.add_argument("--depends", required=False, action="append", help="Depends. The option can be repeated")
     parser.add_argument(
         "--global-resource",
@@ -80,7 +81,6 @@ def main():
         test_cases.append((file_name, test_name))
 
     if test_cases:
-        linter_path = os.path.join(args.build_root, args.linter)
         linter_params_file = os.path.join(output_path, "linter_params.json")
         linter_report_file = os.path.join(output_path, "linter_report.json")
         global_resources = _parse_kv_arg(args.global_resources, "::")
@@ -101,7 +101,18 @@ def main():
         with open(linter_params_file, "w") as f:
             json.dump(linter_params, f)
 
-        res = process.execute([linter_path, "--params", linter_params_file], check_exit_code=False)
+        if args.wrapper_script:
+            test_tool = sys.executable
+            wrapper_script = os.path.join(args.source_root, args.wrapper_script)
+            env = os.environ.copy()
+            env['Y_PYTHON_ENTRY_POINT'] = ':main'
+            res = process.execute(
+                [test_tool, wrapper_script, "--params", linter_params_file], check_exit_code=False, env=env
+            )
+        else:
+            linter_path = os.path.join(args.build_root, args.linter)
+            res = process.execute([linter_path, "--params", linter_params_file], check_exit_code=False)
+
         if res.exit_code:
             logger.error("Linter return exit code={}".format(res.exit_code))
             return 1
