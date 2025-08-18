@@ -1,10 +1,6 @@
 import threading
 
 
-class TaskCachFnNotFoundError(KeyError):
-    pass
-
-
 class TaskCache(object):
     def __init__(self, runq, default_func=None):
         self._cache = {}
@@ -16,10 +12,10 @@ class TaskCache(object):
         with self._lock:
             try:
                 return self._cache[item]
-            except KeyError as err:
+            except KeyError:
                 func = func or self._default_func
                 if not func:
-                    raise TaskCachFnNotFoundError(str(err)) from err
+                    raise
                 task = func(item)
                 self._cache[item] = task
                 self._runq.add(task, dispatch=dispatch, deps=deps)
