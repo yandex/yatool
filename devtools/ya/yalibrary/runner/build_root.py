@@ -18,7 +18,6 @@ from exts import archive
 from exts import uniq_id
 from exts import filelock
 from exts import fs
-from exts import hashing
 
 from yalibrary import formatter
 from yalibrary.runner import fs as runner_fs
@@ -28,7 +27,7 @@ from devtools.libs.limits.python import limits
 import devtools.libs.acdigest.python as acdigest
 
 STAMP_FILE = 'STAMP'
-CONTENT_HASH_FILE_NAME = '.content_hash.md5'
+CONTENT_HASH_FILE_NAME = '.content_hash.md5'  # deprecated
 OUTPUT_DIGESTS_FILE_NAME = '.output_digests.json'
 EMPTY_DIR_OUTPUTS_META = '.empty_dir_outputs.json'
 
@@ -287,15 +286,11 @@ class BuildRoot(object):
                 dir_outputs_archive_map[dir_out] = None
         return dir_outputs_archive_map
 
-    def _hash_file(self):
-        return os.path.join(self.path, CONTENT_HASH_FILE_NAME)
-
     def _output_digests_file(self):
         return os.path.join(self.path, OUTPUT_DIGESTS_FILE_NAME)
 
     def read_output_digests(self, force_recalc=False, write_if_absent=False):
         digests_file = self._output_digests_file()
-        content_hash_file = self._hash_file()
         if not force_recalc and os.path.exists(digests_file):
             try:
                 with open(digests_file) as f:
@@ -303,11 +298,6 @@ class BuildRoot(object):
                 return OutputDigests.from_json(self.path, data)
             except (KeyError, json.JSONDecodeError):
                 logger.exception("Cannot load digest file %s", digests_file)
-
-        # Use only legacy hash file if possible
-        if not write_if_absent and not force_recalc and os.path.exists(content_hash_file):
-            outputs_uid = runner_fs.read_from_file(content_hash_file)
-            return OutputDigests.from_outputs_uid(outputs_uid)
 
         if not self._compute_hash:
             return OutputDigests.from_outputs_uid("rndhash-{}".format(time.time()))
@@ -321,7 +311,7 @@ class BuildRoot(object):
                 hashes.append(d.content_digest)
             else:
                 return None
-        outputs_uid = hashing.sum_hashes(hashes)
+        outputs_uid = acdigest.combine_hashes(hashes)
 
         output_digests = OutputDigests(self.path, acdigest.digest_current_version, digests, outputs_uid)
 
@@ -329,10 +319,6 @@ class BuildRoot(object):
             self.add_output("$(BUILD_ROOT)/" + OUTPUT_DIGESTS_FILE_NAME)
             with open(digests_file, "w") as f:
                 json.dump(output_digests.to_json(), f)
-
-            if not os.path.exists(content_hash_file):
-                self.add_output('$(BUILD_ROOT)/' + CONTENT_HASH_FILE_NAME)
-                runner_fs.write_into_file(content_hash_file, outputs_uid)
 
         return output_digests
 

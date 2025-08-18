@@ -46,4 +46,5 @@ namespace NACDigest {
 
     TStreamDigest GetStreamDigest(IInputStream& in, size_t limit = 0);
     TFileDigest GetFileDigest(const TFsPath& fileName, TString contentDigest = {});
+    TString GetBufferDigest(const char* ptr, size_t size);
 }

@@ -1,6 +1,13 @@
 from libcpp.utility cimport move as std_move
 
-from devtools.libs.acdigest.acdigest cimport TFileDigest, GetFileDigest, DIGEST_GIT_LIKE_VERSION, DIGEST_XXHASH_VERSION, DIGEST_CURRENT_VERSION
+from devtools.libs.acdigest.acdigest cimport (
+    TFileDigest,
+    GetFileDigest,
+    GetBufferDigest,
+    DIGEST_GIT_LIKE_VERSION,
+    DIGEST_XXHASH_VERSION,
+    DIGEST_CURRENT_VERSION
+)
 from util.folder.path cimport TFsPath
 from util.generic.string cimport TString
 
@@ -30,6 +37,20 @@ def get_file_digest(file_name: str, content_digest: str = "") -> FileDigest:
         digest = GetFileDigest(TFsPath(file_name_cpp), std_move(content_digest_cpp))
 
     return FileDigest(six.ensure_str(digest.ContentDigest), six.ensure_str(digest.Uid), digest.Size)
+
+
+def combine_hashes(hashes: list[str]):
+    """
+        Combine hashes into a single hash.
+
+        Note: this function differ from devtools/ya/exts/hashing.py::sum_hashes() in the following aspects:
+         - ignores hashes order (sorts before combining)
+         - uses the xxh3_128 hash algorithm instead of the md5 one
+         - doesn't add trailing '#'
+    """
+    s = b'#'.join(sorted(six.ensure_binary(s) for s in hashes))
+    cdef TString v = GetBufferDigest(s, len(s))
+    return six.ensure_str(v)
 
 
 digest_git_like_version = DIGEST_GIT_LIKE_VERSION

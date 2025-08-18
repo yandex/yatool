@@ -12,6 +12,7 @@ import exts.shlex2
 import exts.windows
 import six
 
+import devtools.libs.acdigest.python as acdigest
 import devtools.ya.test.const as const
 import six.moves.queue as Queue
 import yalibrary.runner
@@ -19,7 +20,6 @@ import yalibrary.worker_threads as worker_threads
 
 from devtools.libs.parse_number.python import parse_number
 from exts import strings
-from exts import hashing
 from exts.fs import create_dirs, ensure_removed, hardlink_tree, remove_tree_with_perm_update
 from yalibrary import formatter
 from yalibrary.runner.build_root import BuildRootError
@@ -605,7 +605,7 @@ class RunNodeTask(object):
                         break
 
                 if all_deps_have_outputs_uid:
-                    self._node.content_uid = hashing.sum_hashes(uids_hashes)
+                    self._node.content_uid = acdigest.combine_hashes(uids_hashes)
                     start_time = time.time()
                     if self._cache.try_restore(self._node.content_uid, self._build_root.path):
                         cached_by_content_uid = True
