@@ -18,13 +18,20 @@ PEERDIR(
     contrib/python/humanfriendly
     contrib/python/retrying
     contrib/python/six
+
     devtools/ya/core/gsid
     devtools/ya/core/report
     devtools/ya/core/monitoring
     devtools/ya/yalibrary/store
+
+    library/cpp/regex/pcre
+    library/cpp/retry
+    library/cpp/threading/cancellation
     library/cpp/ucompress
     library/python/retry
+
     yt/cpp/mapreduce/client
+    yt/cpp/mapreduce/util
     yt/python/client_lite
     yt/python/yt/yson
     yt/yt/python/yt_yson_bindings

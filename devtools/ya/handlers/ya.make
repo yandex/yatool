@@ -4,6 +4,7 @@ SRCDIR(devtools/ya)
 
 PEERDIR(
     devtools/ya/handlers/buf
+    devtools/ya/handlers/cache
     devtools/ya/handlers/dump
     devtools/ya/handlers/gc
     devtools/ya/handlers/gen_config
@@ -62,6 +63,7 @@ RECURSE(
     analyze_make
     autocheck
     buf
+    cache
     clang_tidy
     completion
     curl

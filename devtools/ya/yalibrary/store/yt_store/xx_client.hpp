@@ -39,4 +39,39 @@ struct YtStore {
     std::string YtDir;
 };
 
-// vim:ts=4:sw=4:et:
+namespace NYa {
+    struct TNameReTtl {
+        TString NameRe;
+        TDuration Ttl;
+    };
+
+    using TMaxCacheSize = std::variant<size_t, double>;
+    struct TYtStore2Options {
+        TYtStore2Options() = default;
+
+        TString Token;
+        bool ReadOnly{true};
+        void* OnDisable{};
+        TMaxCacheSize MaxCacheSize{0u};
+        TDuration Ttl{};
+        TVector<TNameReTtl> NameReTtls{};
+        TString OperationPool{};
+        TDuration RetryTimeLimit{};
+        bool SyncDurability{};
+    };
+
+    class TYtStore2 {
+    public:
+        TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options);
+        ~TYtStore2();
+
+        void WaitInitialized();
+        bool Disabled() const;
+        void Strip();
+
+        static void ValidateRegexp(const TString& re);
+    private:
+        class TImpl;
+        std::unique_ptr<TImpl> Impl_;
+    };
+}

@@ -3,6 +3,9 @@ import logging
 import os
 import time
 
+from collections.abc import Callable
+import typing as tp
+
 from contextlib2 import ExitStack
 from devtools.ya.core import config as core_config
 from devtools.ya.core import monitoring as core_monitoring
@@ -12,6 +15,8 @@ from exts.timer import AccumulateTime
 from library.python import compress
 from yalibrary.store.dist_store import DistStore
 from yalibrary.store.yt_store import client, consts, retries, utils
+from . import xx_client
+from .xx_client import YtStoreError  # noqa
 
 logger = logging.getLogger(__name__)
 # Suppress spam
@@ -660,3 +665,112 @@ class YndexerYtStore(YtStore):
         return self._client.put(
             self_uid, uid, None, name=name, codec=codec, forced_node_size=forced_node_size, cuid=cuid
         )
+
+
+class YtStore2(DistStore):
+    def __init__(
+        self,
+        proxy: str,
+        data_dir: str,
+        token: str | None = None,
+        readonly=True,
+        max_cache_size: str | int | None = None,
+        ttl: int | None = None,
+        name_re_ttls: dict[str, int] | None = None,
+        max_file_size: int = 0,
+        fits_filter: Callable[[tp.Any], bool] = None,
+        heater_mode=False,
+        probe_before_put=False,
+        probe_before_put_min_size=0,
+        retry_time_limit=None,
+        sync_durability=None,
+        operation_pool=None,
+        **kwargs
+    ):
+        super().__init__(
+            name='yt-store',
+            stats_name='yt_store_stats',
+            tag='YT',
+            readonly=readonly,
+            max_file_size=max_file_size,
+            fits_filter=fits_filter,
+            heater_mode=heater_mode,
+        )
+        self._proxy = proxy
+        self._ttl = ttl
+        self._probe_before_put = probe_before_put
+        self._probe_before_put_min_size = probe_before_put_min_size
+        self._data_dir = data_dir
+        self._time_to_first_recv_meta = None
+        self._time_to_first_call_has = None
+        self._yt_store_exclusive = kwargs.get('yt_store_exclusive', False)
+
+        self._client = xx_client.YtStoreWrapper2(
+            proxy,
+            data_dir,
+            token=token,
+            on_disable=self._on_disable_callback,
+            readonly=readonly,
+            max_cache_size=max_cache_size,
+            ttl_hours=ttl if ttl else None,
+            name_re_ttls=name_re_ttls,
+            operation_pool=operation_pool,
+            retry_time_limit=retry_time_limit,
+            sync_durability=sync_durability,
+        )
+
+        if self._heater_mode:
+            self._client.wait_initialized()
+
+        self._stager = kwargs.get("stager", utils.DummyStager())
+
+    @property
+    def is_disabled(self):
+        return self._client.disabled()
+
+    def _on_disable_callback(self, err_type, msg):
+        if self._yt_store_exclusive or self._heater_mode or len(msg) <= 100:
+            logger.warning("Disabling dist cache. Last caught error: %s", msg)
+        else:
+            logger.warning(
+                "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
+                msg[:100],
+            )
+            logger.debug("Disabling dist cache. Last caught error: %s", msg)
+
+        labels = {
+            "error_type": err_type,
+            "yt_proxy": self._proxy,
+            "yt_dir": self._data_dir,
+            "is_heater": self._heater_mode,
+        }
+
+        try:
+            import app_ctx
+
+            if hasattr(app_ctx, 'metrics_reporter'):
+                app_ctx.metrics_reporter.report_metric(
+                    core_monitoring.MetricNames.YT_CACHE_ERROR,
+                    labels=labels,
+                    urgent=True,
+                    report_type=report.ReportTypes.YT_CACHE_METRICS,
+                )
+        except Exception:
+            logger.debug('Failed to report yt cache error metric to snowden', exc_info=True)
+            pass
+
+        labels['error'] = msg
+        labels['user'] = core_config.get_user()
+
+        report.telemetry.report(
+            report.ReportTypes.YT_CACHE_ERROR,
+            labels,
+        )
+
+    def strip(self):
+        self._client.strip()
+
+    @staticmethod
+    def validate_regexp(re_str: str) -> None:
+        """Check C++ regexp syntax (it may differ from the python one)"""
+        xx_client.YtStoreWrapper2.validate_regexp(re_str)

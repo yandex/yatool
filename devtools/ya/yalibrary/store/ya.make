@@ -19,6 +19,8 @@ PEERDIR(
     devtools/ya/yalibrary/store/hash_map
     library/python/cityhash
     library/python/compress
+    library/cpp/logger
+    library/cpp/logger/global
 )
 
 END()

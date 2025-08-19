@@ -1,0 +1,200 @@
+import logging
+import os
+
+import devtools.ya.app
+import devtools.ya.core.yarg as yarg
+from devtools.ya.core.common_opts import LogFileOptions
+from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
+from exts.asyncthread import asyncthread
+from yalibrary.store.yt_store.yt_store import YtStore2
+
+
+logger = logging.getLogger(__name__)
+
+
+class YtClusterOptions(yarg.Options):
+    def __init__(self):
+        self.yt_proxy = None
+        self.yt_dir = None
+        self.yt_token = None
+        self.yt_token_path = "~/.yt/token"
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--yt-proxy"],
+                help="YT cache proxy",
+                hook=yarg.SetValueHook("yt_proxy"),
+            ),
+            yarg.ArgConsumer(["--yt-dir"], help="YT cache cypress directory path", hook=yarg.SetValueHook("yt_dir")),
+            yarg.ArgConsumer(
+                ["--yt-token-path"],
+                help="YT token path",
+                hook=yarg.SetValueHook("yt_token_path"),
+            ),
+            yarg.EnvConsumer(
+                "YA_YT_PROXY",
+                help="YT storage proxy",
+                hook=yarg.SetValueHook("yt_proxy"),
+            ),
+            yarg.EnvConsumer(
+                "YA_YT_DIR",
+                help="YT storage cypress directory pass",
+                hook=yarg.SetValueHook("yt_dir"),
+            ),
+            yarg.EnvConsumer(
+                "YA_YT_TOKEN",
+                help="YT token",
+                hook=yarg.SetValueHook("yt_token"),
+            ),
+            yarg.EnvConsumer(
+                "YA_YT_TOKEN_PATH",
+                help="YT token path",
+                hook=yarg.SetValueHook("yt_token_path"),
+            ),
+        ]
+
+    def postprocess(self):
+        super().postprocess()
+        if self.yt_token_path:
+            self.yt_token_path = os.path.expanduser(self.yt_token_path)
+            self._read_token_file()
+
+    def _read_token_file(self):
+        try:
+            with open(self.yt_token_path, "r") as f:
+                self.yt_token = f.read().strip()
+                logger.debug("Load yt token from %s", self.yt_token_path)
+        except Exception as e:
+            logger.warning("Cannot load token from {}: {}".format(self.yt_token_path, str(e)))
+            self.yt_token_path = None
+
+
+class DryRunOption(yarg.Options):
+    def __init__(self):
+        self.dry_run = False
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--dry-run"],
+                help="Dry run",
+                hook=yarg.SetConstValueHook("dry_run", True),
+            ),
+        ]
+
+
+class StripOptions(yarg.Options):
+    def __init__(self):
+        self.yt_max_cache_size = None
+        self.yt_store_ttl = None
+        self.yt_name_re_ttls = {}
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--max-cache-size"],
+                help="YT storage max size",
+                hook=yarg.SetValueHook("yt_max_cache_size"),
+            ),
+            yarg.ArgConsumer(
+                ["--ttl"],
+                help="YT store ttl in hours",
+                hook=yarg.SetValueHook("yt_store_ttl", transform=int),
+            ),
+            yarg.ArgConsumer(
+                ["--name-re-ttl"],
+                help="Individual ttl (in hours) for an artefact name regexp. Format: 'regexp:ttl'",
+                hook=StripOptions.NameReTtlHook("yt_name_re_ttls"),
+            ),
+        ]
+
+    class NameReTtlHook(yarg.BaseHook):
+        def __init__(self, name):
+            super().__init__()
+            self.name = name
+
+        def __call__(self, to, value):
+            if not hasattr(to, self.name):
+                raise Exception("{0} doesn't have {1} attr".format(to, self.name))
+            dct = getattr(to, self.name)
+            items = value.rsplit(":", 1)
+            if len(items) != 2:
+                raise yarg.ArgsValidatingException(f"Value '{value}' has wrong format")
+            regexp, ttl = items
+            try:
+                YtStore2.validate_regexp(regexp)
+            except ValueError as e:
+                # The exception already contains wrong regexp value so we don't need to add it to the error message
+                raise yarg.ArgsValidatingException(f"Cannot compile regexp: {e}")
+            dct[regexp] = int(ttl)
+            setattr(to, self.name, dct)
+
+        @staticmethod
+        def need_value():
+            return True
+
+    def postprocess(self):
+        super().postprocess()
+        try:
+            self.yt_max_cache_size = parse_yt_max_cache_size(self.yt_max_cache_size)
+        except ValueError as e:
+            raise yarg.ArgsValidatingException(f"Wrong yt_max_cache_size value {self.yt_max_cache_size}: {e!s}")
+
+
+class PoolOption(yarg.Options):
+    def __init__(self):
+        self.yt_pool = None
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--pool"],
+                help="YT pool for operations",
+                hook=yarg.SetValueHook("yt_pool"),
+            ),
+        ]
+
+
+class CacheYtHandler(yarg.CompositeHandler):
+    description = "Yt cache maintenance"
+
+    def __init__(self):
+        yarg.CompositeHandler.__init__(self, description=self.description)
+        self["strip"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(strip, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Apply LRU rules",
+            opts=get_common_opts()
+            + [
+                StripOptions(),
+                PoolOption(),
+                DryRunOption(),
+            ],
+        )
+
+
+def get_common_opts():
+    return [
+        yarg.ShowHelpOptions(),
+        LogFileOptions(),
+        YtClusterOptions(),
+    ]
+
+
+def strip(params):
+    yt_store = YtStore2(
+        params.yt_proxy,
+        params.yt_dir,
+        token=params.yt_token,
+        readonly=params.dry_run,
+        max_cache_size=params.yt_max_cache_size,
+        ttl=params.yt_store_ttl,
+        name_re_ttls=params.yt_name_re_ttls,
+        operation_pool=params.yt_pool,
+    )
+    # Run strip in the separate thread to allow INT signal processing in the main thread
+    asyncthread(yt_store.strip)()
