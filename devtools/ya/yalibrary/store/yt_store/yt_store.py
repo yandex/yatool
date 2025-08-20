@@ -240,9 +240,8 @@ class YtStore(DistStore):
 
             try:
                 with AccumulateTime(lambda x: self._inc_time(x, 'get-meta')):
-                    refresh_access_time = not self.readonly() and refresh_on_read
                     self._meta = self._client.get_metadata(
-                        self_uids, uids, refresh_access_time=refresh_access_time, content_uids=content_uids
+                        self_uids, uids, refresh_access_time=refresh_on_read, content_uids=content_uids
                     )
                     if self._time_to_first_recv_meta is None:
                         self._time_to_first_recv_meta = time.time()
