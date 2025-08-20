@@ -258,7 +258,6 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         globRestrictions.Extend();
     }
     const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{globsWithExcludes}, NArgs::EXCLUDE);
-    Y_UNUSED(globRestrictions);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
@@ -273,6 +272,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
 
     TGlobStat globStat;
     TUniqVector<TFileView> values;
+    ui32 varElemId = 0;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
@@ -286,13 +286,18 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             const auto globCmd = FormatCmd(Module.GetName().GetElemId(), globPropName, globStr);
             const auto globId = Names.AddName(EMNT_BuildCommand, globCmd);
             const auto globHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
-            const auto refferer = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
-            ModuleGlobs.push_back(TModuleGlobInfo{globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), refferer});
+            if (!varElemId) {
+                varElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            }
+            ModuleGlobs.push_back(TModuleGlobInfo{globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), varElemId});
         } catch (const yexception& error){
             YConfErrPrecise(Syntax, location.first, location.second) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
     }
 
+    if (varElemId) {
+        TModuleDef::SetGlobRestrictionsVars(Vars, globRestrictions, varElemId);
+    }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
     }
@@ -355,4 +360,13 @@ bool TModuleDef::IsExtendGlobRestriction() const {
 
 const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
     return ModuleGlobs;
+}
+
+void TModuleDef::SetGlobRestrictionsVars(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 varElemId) {
+    // variable name ElemId may be not unique in graph, but must be unique in module (else globs can't work properly)
+    // that is why we can use variable ElemId as ID for glob in module
+    auto strVarElemId = ToString(varElemId);
+    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strVarElemId);
+    vars.SetValue(TStringBuilder() << NArgs::MAX_MATCHES << "-" << strVarElemId, ToString(globRestrictions.MaxMatches));
+    vars.SetValue(TStringBuilder() << NArgs::MAX_WATCH_DIRS << "-" << strVarElemId, ToString(globRestrictions.MaxWatchDirs));
 }

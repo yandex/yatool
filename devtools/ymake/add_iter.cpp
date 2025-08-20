@@ -38,7 +38,6 @@ namespace {
         TUniqVector<ui32> Refferers;
         TUniqVector<ui32> Excludes;
         TExcludeMatcher ExcludesMatcher;
-        TGlobRestrictions GlobRestrictions;
     };
 
     GlobNodeInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName) {
@@ -61,7 +60,6 @@ namespace {
                 res.WatchDirs.Push(edge.To()->ElemId);
             }
         }
-        //TODO(dimdim11) Extract GlobRestrictions from graph
         return res;
     }
 

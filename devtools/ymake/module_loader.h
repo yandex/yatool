@@ -263,4 +263,6 @@ public:
     }
 
     TDepsCacheId Commit();
+
+    static void SetGlobRestrictionsVars(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 varElemId);
 };

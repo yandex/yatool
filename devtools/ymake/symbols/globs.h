@@ -40,21 +40,18 @@ struct TGlobStat {
     size_t PatternsCount{0};
 
     void operator+=(const TGlobStat& patternStat) {
-        if (!WatchedDirsCount) {
+        if (!PatternsCount) {
             *this = patternStat;
+            PatternsCount = 1;
         } else {
             MatchedFilesCount += patternStat.MatchedFilesCount; // sum matched in all patterns
+            SkippedFilesCount = std::min(SkippedFilesCount, patternStat.SkippedFilesCount); // lite restriction
             WatchedDirsCount = std::max(WatchedDirsCount, patternStat.WatchedDirsCount);
+            ++PatternsCount;
         }
-        ++PatternsCount;
     }
 
-    bool operator==(const TGlobStat& other) const {
-        return MatchedFilesCount == other.MatchedFilesCount
-            && SkippedFilesCount == other.SkippedFilesCount
-            && WatchedDirsCount == other.WatchedDirsCount
-            && PatternsCount == other.PatternsCount;
-    }
+    bool operator==(const TGlobStat&) const = default;
 };
 
 struct TGlobRestrictions {

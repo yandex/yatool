@@ -229,6 +229,18 @@ void TModule::Save(TModuleSavedState& saved) const {
             saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
         }
     }
+    if (Vars.Contains(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS)) {
+        for (const auto& globVarName: Vars.find(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS)->second) {
+            static TVector<TString> globRestrictionFields = {TString{NArgs::MAX_MATCHES}, TString{NArgs::MAX_WATCH_DIRS}};
+            for (const auto& globRestrictionField: globRestrictionFields) {
+                auto globFieldVarName = globRestrictionField + "-" + globVarName.Name;
+                TStringBuf value = Get(globFieldVarName);
+                if (!value.empty()) {
+                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globFieldVarName, value)));
+                }
+            }
+        }
+    }
 
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {

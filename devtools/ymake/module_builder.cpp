@@ -958,7 +958,6 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         globRestrictions.Extend();
     }
     const auto [globs, excludes] = SplitBy(globsWithExcludes, NArgs::EXCLUDE);
-    Y_UNUSED(globRestrictions);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
@@ -1019,6 +1018,9 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         }
     }
 
+    if (varElemId) {
+        TModuleDef::SetGlobRestrictionsVars(Vars, globRestrictions, varElemId);
+    }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
     }
