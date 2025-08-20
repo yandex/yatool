@@ -275,6 +275,18 @@ class YtStore(DistStore):
     def _upload_data(self, stack, files, codec, root_dir, self_uid, uid, name, cuid):
         if codec == consts.YT_CACHE_NO_DATA_CODEC:
             raise Exception("Codec {} is not supported here".format(consts.YT_CACHE_NO_DATA_CODEC))
+        if self._client.is_table_format_v3 and cuid and cuid in self._meta:
+            meta = self._meta[cuid]
+            self._client.refresh_access_time([meta])
+            return self._client.put(
+                self_uid,
+                uid,
+                None,
+                name=name,
+                codec=meta["codec"],
+                forced_node_size=meta["data_size"],
+                forced_hash=meta["hash"],
+            )
         data_path = self._prepare_data(stack, files, codec, root_dir)
         return self._client.put(self_uid, uid, data_path, name=name, codec=codec, cuid=cuid)
 

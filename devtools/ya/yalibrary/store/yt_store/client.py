@@ -220,13 +220,13 @@ class YtStoreClient(object):
     def get_data_replication_factor(self):
         return self._client.get('{}/@replication_factor'.format(self._data_table))
 
-    def put(self, self_uid, uid, path, codec=None, forced_node_size=None, **kwargs):
+    def put(self, self_uid, uid, path, codec=None, forced_node_size=None, forced_hash='', cuid=None, name=None):
         chunks_count = 0
         data_size = 0
-        _hash = hashing.fast_filehash(path) if path else ''  # TODO: streaming hash
+        _hash = hashing.fast_filehash(path) if path else forced_hash  # TODO: streaming hash
         cur_timestamp_ms = utils.time_to_microseconds(time.time())
 
-        if codec != consts.YT_CACHE_NO_DATA_CODEC:
+        if codec != consts.YT_CACHE_NO_DATA_CODEC and path is not None:
             with open(path, "rb") as f:
                 while True:
                     data = f.read(consts.YT_CACHE_RAM_PER_THREAD_LIMIT // 2)
@@ -252,7 +252,7 @@ class YtStoreClient(object):
             'uid': uid,
             'chunks_count': chunks_count,
             'hash': _hash,
-            'name': kwargs.get('name'),
+            'name': name,
             'hostname': platform.node(),
             'GSID': devtools.ya.core.gsid.flat_session_id(),
             'codec': codec,
@@ -268,7 +268,6 @@ class YtStoreClient(object):
 
         self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
 
-        cuid = kwargs.get('cuid')
         if self.is_table_format_v3 and cuid and cuid != uid:
             meta['uid'] = cuid
             self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
