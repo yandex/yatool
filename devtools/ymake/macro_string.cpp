@@ -93,10 +93,19 @@ TString FormatProperty(const TStringBuf& propName, const TStringBuf& value) {
     return TString::Join(propName, CmdNameDelimS, value);
 }
 
+TString FormatProperty(ui64 id, const TStringBuf& propName, const TStringBuf& value) {
+    return TString::Join(ToString<ui64>(id), CmdDelimS, propName, CmdNameDelimS, value);
+}
+
 TStringBuf GetPropertyName(const TStringBuf& prop) {
+    size_t afterId = prop.find(CmdDelimC);
     size_t afterCmdName = prop.find(CmdNameDelimC);
     AssertEx(afterCmdName != TStringBuf::npos, TString::Join("ParseProperty: PropertyNameDelim \"", CmdNameDelimS, "\" not found in ", prop));
-    return prop.SubStr(0, afterCmdName);
+    if (afterId == TStringBuf::npos || afterId > afterCmdName/* CmdDelimC may be in prop value */) {
+        return prop.SubStr(0, afterCmdName);
+    } else {
+        return prop.SubStr(afterId + 1, afterCmdName - afterId - 1);
+    }
 }
 
 TStringBuf GetPropertyValue(const TStringBuf& prop) {

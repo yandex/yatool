@@ -241,8 +241,6 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         return false;
     }
 
-    TStringBuf globPropName = NProps::GLOB;
-
     if (args.empty()) {
         YConfErrPrecise(Syntax, location.first, location.second) << "empty argument in [[alt1]]" << name << "[[rst]]" << Endl;
         return true;
@@ -270,9 +268,10 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
+    const auto moduleElemId = Module.GetName().GetElemId();
+    ui32 varElemId = 0;
     TGlobStat globStat;
     TUniqVector<TFileView> values;
-    ui32 varElemId = 0;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
@@ -283,14 +282,21 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             }
             globStat += patternStat;
 
-            const auto globCmd = FormatCmd(Module.GetName().GetElemId(), globPropName, globStr);
-            const auto globId = Names.AddName(EMNT_BuildCommand, globCmd);
-            const auto globHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
             if (!varElemId) {
                 varElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
             }
-            ModuleGlobs.push_back(TModuleGlobInfo{globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), varElemId});
-        } catch (const yexception& error){
+            const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
+            ModuleGlobs.push_back(
+                TModuleGlobInfo {
+                    .GlobId = Names.AddName(EMNT_BuildCommand, globCmd),
+                    .GlobHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
+                    .WatchedDirs = glob.GetWatchDirs().Data(),
+                    .MatchedFiles = matches.Take(),
+                    .Excludes = excludeIds.Data(),
+                    .ReferencedByVar = varElemId,
+                }
+            );
+        } catch (const yexception& error) {
             YConfErrPrecise(Syntax, location.first, location.second) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
     }
