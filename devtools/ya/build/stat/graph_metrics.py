@@ -94,6 +94,7 @@ def make_targets_metrics(
         if 'size' in task_metrics:
             size = task_metrics['size']
         else:
+            # Constructing a key that matches string representation of a dist download task: devtools/ya/yalibrary/runner/tasks/distbuild/__init__.py
             key = f'DistDownload({uid})'
             size = execution_log[key]['size'] if key in execution_log else -1
 
