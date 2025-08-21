@@ -157,7 +157,7 @@ class ResultsComparer(object):
 
         expected_checksum = external_expected.checksum
         if not expected_checksum:
-            expected_checksum = exts.hashing.md5_path(expected_file_path)
+            expected_checksum = exts.hashing.md5_path(expected_file_path, include_dir_layout=True)
 
         return expected_file_path, expected_checksum
 
@@ -184,8 +184,9 @@ class ResultsComparer(object):
                         else:
                             diffs.append(
                                 self._get_diff_message(
-                                    "Canonization content is same wtih canonized before but checksum differs.\n"
-                                    "make sure that you didn't change checksum in {}/{} manually".format(
+                                    "Canonization content is same with canonized before but checksum differs.\n"
+                                    "Make sure that you didn't change checksum in {}/{} manually.\n"
+                                    "It may also be due to switching to directory canonization".format(
                                         const.CANON_DATA_DIR_NAME, const.CANON_RESULT_FILE_NAME
                                     ),
                                     crumbs,
