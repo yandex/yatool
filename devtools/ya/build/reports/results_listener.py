@@ -29,7 +29,7 @@ class BuildResultsListener:
 
     def __init__(self, graph, report_generator, build_root, opts):
         self._lock = threading.Lock()
-        self._build_metrics = st.make_targets_metrics(graph['graph'], {})
+        self._build_metrics = st.make_targets_metrics(graph['graph'], {}, {})
         self._report_generator = report_generator
         self._build_root = build_root
         self._notified = set()

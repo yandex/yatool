@@ -1657,7 +1657,8 @@ class YaMake:
                         node_status_map,
                         exit_code_map,
                         result_analyzer,
-                    ) = ({}, {}, {}, {}, 0, {}, {}, None)
+                        execution_log,
+                    ) = ({}, {}, {}, {}, 0, {}, {}, None, {})
                 else:
                     (
                         res,
@@ -1668,6 +1669,7 @@ class YaMake:
                         node_status_map,
                         exit_code_map,
                         result_analyzer,
+                        execution_log,
                     ) = self._dispatch_build(self._build_results_listener)
                 (
                     errors,
@@ -1676,7 +1678,7 @@ class YaMake:
                     node_build_errors,
                     node_build_errors_links,
                 ) = br.make_build_errors_by_project(self.ctx.graph['graph'], err, err_links or {})
-                build_metrics = st.make_targets_metrics(self.ctx.graph['graph'], tasks_metrics)
+                build_metrics = st.make_targets_metrics(self.ctx.graph['graph'], tasks_metrics, execution_log)
                 self.build_result = br.BuildResult(
                     errors,
                     failed_deps,
@@ -1950,6 +1952,7 @@ class YaMake:
             status_map,
             exit_code_map,
             result_analyzer,
+            local_execution_log,
         )
 
     def _build_local(self, callback):
@@ -1984,7 +1987,7 @@ class YaMake:
             if not os.path.exists(latest_path):
                 exts.fs.symlink(self.opts.bld_root, latest_path)
 
-        return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer
+        return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer, execution_log
 
     @property
     def targets(self):
