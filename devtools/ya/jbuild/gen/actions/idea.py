@@ -1465,7 +1465,11 @@ def collapse_content_roots(by_path):
     def collapse_roots(module, roots):
         assert all(root.path == roots[0].path for root in roots)
         assert all(root.generated == roots[0].generated for root in roots)
-        assert all(root.is_resource == roots[0].is_resource for root in roots)
+        # Explicit mark collapsed root as source if not all roots has some type
+        if not all(root.is_resource == roots[0].is_resource for root in roots):
+            collapsed_root_is_resource = False
+        else:
+            collapsed_root_is_resource = roots[0].is_resource
 
         if not all(root.prefix == roots[0].prefix for root in roots):
             warns.append(
@@ -1476,14 +1480,13 @@ def collapse_content_roots(by_path):
                     )
                 )
             )
-
         return Root(
             roots[0].path,
             roots[0].prefix,
             all(root.is_test for root in roots),
             all(root.ignored for root in roots),
             roots[0].generated,
-            roots[0].is_resource,
+            collapsed_root_is_resource,
         )
 
     for m in modules:
