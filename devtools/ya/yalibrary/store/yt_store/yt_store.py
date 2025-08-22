@@ -781,6 +781,9 @@ class YtStore2(DistStore):
     def strip(self):
         self._client.strip()
 
+    def data_gc(self):
+        self._client.data_gc()
+
     @staticmethod
     def validate_regexp(re_str: str) -> None:
         """Check C++ regexp syntax (it may differ from the python one)"""

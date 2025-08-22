@@ -68,6 +68,7 @@ namespace NYa {
         void WaitInitialized();
         bool Disabled() const;
         void Strip();
+        void DataGc();
 
         static void ValidateRegexp(const TString& re);
     private:

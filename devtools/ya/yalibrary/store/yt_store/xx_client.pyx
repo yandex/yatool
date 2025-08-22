@@ -7,6 +7,7 @@ from util.datetime.base cimport TDuration
 
 import logging
 import os
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,7 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         void WaitInitialized() except +raise_yt_store_error
         bool Disabled()
         void Strip() except +raise_yt_store_error
+        void DataGc() except +raise_yt_store_error
         @staticmethod
         void ValidateRegexp(const TString& re) except +ValueError
 
@@ -174,6 +176,7 @@ cdef class YtStoreWrapper:
 
 cdef class YtStoreWrapper2:
     cdef TYtStore2* store_ptr
+    _on_disable: Callable
 
     def __init__(
         self,
@@ -196,6 +199,7 @@ cdef class YtStoreWrapper2:
             options.Token = token.encode()
         options.ReadOnly = readonly
         if on_disable:
+            self._on_disable = on_disable
             options.OnDisable = <void*> on_disable
         if max_cache_size:
             if isinstance(max_cache_size, int):
@@ -229,6 +233,10 @@ cdef class YtStoreWrapper2:
     def strip(self):
         with nogil:
             self.store_ptr.Strip()
+
+    def data_gc(self):
+        with nogil:
+            self.store_ptr.DataGc()
 
     def __dealloc__(self):
         # nogil is required to allow YtStore internal threads write log messages during termination

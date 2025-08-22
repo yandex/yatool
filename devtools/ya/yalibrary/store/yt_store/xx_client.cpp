@@ -21,6 +21,7 @@
 #include <util/folder/path.h>
 #include <util/generic/guid.h>
 #include <util/generic/scope.h>
+#include <util/generic/size_literals.h>
 #include <util/string/join.h>
 #include <util/stream/format.h>
 #include <util/stream/printf.h>
@@ -432,6 +433,7 @@ namespace NYa {
 
     namespace {
         using TYtTimestamp = ui64;
+        using TKnownHashesSet = THashSet<TString>;
 
         TYtTimestamp ToYtTimestamp(TInstant time) {
             return time.MicroSeconds();
@@ -643,6 +645,49 @@ namespace NYa {
             }
             return JoinSeq(" ", result);
         }
+
+        class TFirstRowReducer final : public NYT::IReducer<NYT::TTableReader<NYT::TNode>, NYT::TTableWriter<NYT::TNode>> {
+        public:
+            TFirstRowReducer() = default;
+
+            void Do(TReader* reader, TWriter* writer) override {
+                writer->AddRow(reader->GetRow());
+            }
+        };
+        REGISTER_REDUCER(TFirstRowReducer)
+
+        class TOrphanHashesExtractReducer : public NYT::IReducer<NYT::TTableReader<NYT::TNode>, NYT::TTableWriter<NYT::TNode>> {
+        static constexpr ui32 KNOWN_HASHES_TABLE_INDEX = 1;
+        public:
+            TOrphanHashesExtractReducer() = default;
+
+            TOrphanHashesExtractReducer(TYtTimestamp timeThreshold)
+                : TimeThreshold_{timeThreshold}
+            {
+            }
+
+            void Do(NYT::TTableReader<NYT::TNode>* reader, NYT::TTableWriter<NYT::TNode>* writer) override {
+                NYT::TNode::TListType outRows;
+                for (auto& cursor : *reader) {
+                    if (cursor.GetTableIndex() == KNOWN_HASHES_TABLE_INDEX) {
+                        return;  // Not an orphan row
+                    }
+                    const NYT::TNode& row = cursor.GetRow();
+                    // Data row is too young to be deleted
+                    if (row.ChildAs<TYtTimestamp>("create_time") > TimeThreshold_) {
+                        return;
+                    }
+                    outRows.push_back(NYT::TNode()("hash", row["hash"])("chunk_i", row["chunk_i"]));
+                }
+                writer->AddRowBatch(outRows);
+            }
+
+            Y_SAVELOAD_JOB(TimeThreshold_);
+
+        private:
+            TYtTimestamp TimeThreshold_;
+        };
+        REGISTER_REDUCER(TOrphanHashesExtractReducer);
     }
 
     class TYtStore2::TImpl {
@@ -717,29 +762,7 @@ namespace NYa {
                 INFO_LOG << "Strip runs in readonly mode (dry run)";
             }
 
-            // Note: for operations we use separate client with default retry policy
-            IClientPtr opClient{};
-            TYPath opDataDir{};
-            if (MainCluster_.Replicated) {
-                TDuration minLag = TDuration::Max();
-                const TReplica* bestReplica{};
-                for (const TReplica& r : Replicas_) {
-                    if (r.Sync) {
-                        bestReplica = &r;
-                        break;
-                    }
-                    if (r.Lag < minLag) {
-                        minLag = r.Lag;
-                        bestReplica = &r;
-                    }
-                }
-                opClient = NYT::CreateClient(bestReplica->Proxy);
-                opDataDir = bestReplica->DataDir;
-                DEBUG_LOG << "Operation replica: " << bestReplica->Proxy << ":" << bestReplica->DataDir;
-            } else {
-                opClient = NYT::CreateClient(MainCluster_.Proxy);
-                opDataDir = MainCluster_.DataDir;
-            }
+            auto [opClient, opDataDir] = GetOpCluster();
             Y_ENSURE(opClient && opDataDir);
 
             size_t maxCacheSize = GetMaxCacheSize(opClient, opDataDir);
@@ -792,9 +815,7 @@ namespace NYa {
             if (stripByDataSize) {
                 mrSpec.AddOutput<NYT::TNode>(remainingRowsTable);
             }
-            if (OperationPool_) {
-                mrSpec.Pool(OperationPool_);
-            }
+            AddPool(mrSpec);
             TInstant now = TInstant::Now();
             auto mapper = MakeIntrusive<TStripMapper>(now, Ttl_, NameReTtls_, mappedColumns);
             auto reducer = MakeIntrusive<TStripReducer>(metaKeyColumns, stripByDataSize);
@@ -844,9 +865,7 @@ namespace NYa {
                     .AddInput(remainingRowsTable)
                     .Output(remainingRowsTable)
                     .SortBy("access_time");
-                if (OperationPool_) {
-                    sortSpec.Pool(OperationPool_);
-                }
+                AddPool(sortSpec);
                 tx->Sort(sortSpec);
 
                 DEBUG_LOG << "Start deleting rows by data size" << (ReadOnly_ ? " (dry run)" : "");
@@ -922,6 +941,123 @@ namespace NYa {
             tx->Abort();
         }
 
+        void DataGc() {
+            WaitInitialized();
+            if (ReadOnly_) {
+                INFO_LOG << "Data GC runs in readonly mode (dry run)";
+            }
+
+            auto [opClient, opDataDir] = GetOpCluster();
+            Y_ENSURE(opClient && opDataDir);
+
+            const NYT::TYPath dataTable = NYT::JoinYPaths(opDataDir, DATA_TABLE);
+            const auto dataAttrsGetOpts = NYT::TGetOptions()
+                .ReadFrom(NYT::EMasterReadKind::Cache)
+                .AttributeFilter(TAttributeFilter().Attributes({"pivot_keys", "schema", "uncompressed_data_size"}));
+            const NYT::TNode dataAttrs = opClient->Get(NYT::JoinYPaths(dataTable, "@"), dataAttrsGetOpts);
+            const auto tx = opClient->StartTransaction();
+
+            // Prepare table with known hashes
+            const NYT::TNode& dataSchema = dataAttrs["schema"];
+            Y_ENSURE(dataSchema.Size() > 2);
+            const NYT::TTableSchema knownHashesSchema = NYT::TTableSchema::FromNode(NYT::TNode::CreateList({dataSchema[0], dataSchema[1]})).UniqueKeys(true);
+            const NYT::TTableSchema unsortedKnownHashesSchema = NYT::TTableSchema(knownHashesSchema).UniqueKeys(false).SortBy({});
+            const NYT::TYPath knownHashesTable = NYT::JoinYPaths(TMP_DIR, CreateGuidAsString());
+
+            auto mrSpec = NYT::TMapReduceOperationSpec()
+                .AddInput<NYT::TNode>(NYT::TRichYPath(NYT::JoinYPaths(opDataDir, METADATA_TABLE)).Columns({"hash"}))
+                .AddOutput<NYT::TNode>(NYT::TRichYPath(knownHashesTable).Schema(unsortedKnownHashesSchema))
+                .ReduceBy("hash");
+            AddPool(mrSpec);
+            DEBUG_LOG << "Start MapReduce over metadata table";
+            tx->MapReduce(mrSpec, nullptr, MakeIntrusive<TFirstRowReducer>());
+
+            // To do join-reduce operation between the the knownHashesSchema and data tables they must be sorted by the same columns
+            DEBUG_LOG << "Start sort of known hashes table";
+            auto sortSpec = NYT::TSortOperationSpec()
+            .AddInput(knownHashesTable)
+            .Output(NYT::TRichYPath(knownHashesTable).Schema(knownHashesSchema))
+            .SortBy({"tablet_hash", "hash"});
+            AddPool(sortSpec);
+            tx->Sort(sortSpec);
+
+            // The data table is too large to scan it in a single operation.
+            // Split it by key ranges into reasonable parts.
+            TVector<TKeyRange> keyRanges;
+            const NYT::TNode::TListType& pivotKeys = dataAttrs["pivot_keys"].AsList();
+            ui64 begin = 0;
+            if (pivotKeys.size() > 1) {
+                ui64 lastPivotBegin = pivotKeys.back()[0].AsUint64();
+                ui64 maxKeyValue = lastPivotBegin + lastPivotBegin / (pivotKeys.size() - 1);
+                auto dataSize = dataAttrs.ChildAsInt64("uncompressed_data_size");
+                auto rangeCount = Max<i64>(dataSize / DATA_GC_DATA_SIZE_PER_KEY_RANGE, 1);
+                ui64 step = maxKeyValue / rangeCount;
+                ui64 rem = maxKeyValue % rangeCount;
+                for (int i = 1; i < rangeCount; i++) {
+                    ui64 end = step * i + rem * i / rangeCount;
+                    keyRanges.push_back({begin, end});
+                    begin = end;
+                }
+            }
+            keyRanges.push_back({begin, Max<ui64>()});
+            INFO_LOG << "Data table scanning split into " << keyRanges.size() << " operations";
+
+            const TYtTimestamp timeThreshold = ToYtTimestamp(TInstant::Now() - DATA_GC_MIN_AGE);
+            DEBUG_LOG << "Time threshold=" <<  timeThreshold;
+
+            size_t deletedRowCount = 0;
+            // It's ok to reuse the same table for all operations
+            NYT::TYPath orphanRowsTable = NYT::JoinYPaths(TMP_DIR, CreateGuidAsString());
+            for (const auto& keyRange : keyRanges) {
+                INFO_LOG << "Range " << keyRange << ": start";
+                NYT::TRichYPath richDataPath = NYT::TRichYPath(dataTable)
+                    .Columns({"tablet_hash", "hash", "chunk_i", "create_time"})
+                    .AddRange(keyRange.AsReadRange());
+                NYT::TRichYPath richKnownHashesPath = NYT::TRichYPath(knownHashesTable)
+                    .Foreign(true);
+                auto reduceSpec = NYT::TReduceOperationSpec()
+                    .AddInput<NYT::TNode>(richDataPath)
+                    .AddInput<NYT::TNode>(richKnownHashesPath)
+                    .AddOutput<NYT::TNode>(orphanRowsTable)
+                    .JoinBy({"tablet_hash", "hash"})
+                    .EnableKeyGuarantee(false)
+                    // YT overestimate required job count because of large 'data' column size
+                    .DataSizePerJob(DATA_GC_DATA_SIZE_PER_JOB);
+                AddPool(reduceSpec);
+
+                auto reducer = MakeIntrusive<TOrphanHashesExtractReducer>(timeThreshold);
+                tx->Reduce(reduceSpec, reducer);
+
+                size_t foundRowCount = 0;
+                for (auto reader = tx->CreateTableReader<NYT::TNode>(orphanRowsTable); reader->IsValid(); ) {
+                    NYT::TNode::TListType keys;
+                    for (; reader->IsValid() && keys.size() < REMOVE_BATCH_SIZE; reader->Next()) {
+                        keys.push_back(std::move(reader->MoveRow()));
+                    }
+                    if (keys.empty())
+                        break;
+                    foundRowCount += keys.size();
+                    if (!ReadOnly_) {
+                        DeleteRows({}, keys);
+                    }
+                }
+                INFO_LOG << "Range " << keyRange << ": " << foundRowCount << " orphan rows found";
+                deletedRowCount += foundRowCount;
+            }
+
+            if (deletedRowCount) {
+                if (ReadOnly_) {
+                    INFO_LOG << "Total: " << deletedRowCount << " orphan rows found";
+                } else {
+                    INFO_LOG << "Total: " << deletedRowCount << " orphan rows deleted";
+                }
+            } else {
+                DEBUG_LOG << "No orphan rows found";
+            }
+            // Yes, it's the default behaviour and is optional but added to demonstrate intent
+            tx->Abort();
+        }
+
         static inline void ValidateRegexp(const TString& re) {
             TRegExMatch x{re};
         }
@@ -937,6 +1073,9 @@ namespace NYa {
         static constexpr double RETRY_SCALE_FACTOR = 1.3;
         static constexpr TDuration RETRY_MAX_DELAY = TDuration::Seconds(10);
         static constexpr size_t RETRY_MAX_COUNT = 5;
+        static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
+        static constexpr ui64 DATA_GC_DATA_SIZE_PER_JOB = 3_GB;
+        static constexpr i64 DATA_GC_DATA_SIZE_PER_KEY_RANGE = 1_TB;
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
@@ -955,6 +1094,19 @@ namespace NYa {
             NYT::IClientPtr Client;
             bool Sync;
             TDuration Lag;
+        };
+
+        struct TKeyRange {
+            ui64 Begin;
+            ui64 End;
+
+            friend IOutputStream& operator<<(IOutputStream& stream, const TKeyRange& self) {
+                return stream << self.Begin << "-" << self.End;
+            }
+
+            NYT::TReadRange AsReadRange() const {
+                return NYT::TReadRange::FromKeys(NYT::TNode(Begin), NYT::TNode(End));
+            }
         };
 
     private:
@@ -993,6 +1145,13 @@ namespace NYa {
         requires (std::is_base_of_v<TTabletTransactionOptions<TOpts>, TOpts>)
         TOpts MakeTransactionOpts() {
             return TOpts().Atomicity(Atomicity_).Durability(Durability_).RequireSyncReplica(RequireSyncReplica_);
+        }
+
+        template <class TSpec>
+        void AddPool(TSpec& spec) {
+            if (OperationPool_) {
+                spec.Pool(OperationPool_);
+            }
         }
 
         void Disable(const yexception& err) {
@@ -1072,6 +1231,29 @@ namespace NYa {
             }
         }
 
+        std::pair<IClientPtr, TYPath> GetOpCluster() {
+            if (MainCluster_.Replicated) {
+                TDuration minLag = TDuration::Max();
+                const TReplica* bestReplica{};
+                for (const TReplica& r : Replicas_) {
+                    if (r.Sync) {
+                        bestReplica = &r;
+                        break;
+                    }
+                    if (r.Lag < minLag) {
+                        minLag = r.Lag;
+                        bestReplica = &r;
+                    }
+                }
+                DEBUG_LOG << "Operation replica: " << bestReplica->Proxy << ":" << bestReplica->DataDir;
+                // Note: for operations we use separate client with default retry policy
+                return std::make_pair(NYT::CreateClient(bestReplica->Proxy), bestReplica->DataDir);
+            } else {
+                // Note: for operations we use separate client with default retry policy
+                return std::make_pair(NYT::CreateClient(MainCluster_.Proxy), MainCluster_.DataDir);
+            }
+        }
+
         size_t GetQuotaSize(IClientPtr client, const TYPath& dataDir) {
             NYT::TNode tableAttrs = RetryUntilDisabled([&]{
                 auto getOpts = NYT::TGetOptions()
@@ -1120,7 +1302,7 @@ namespace NYa {
             }
         }
 
-        void DeleteRows(NYT::TNode::TListType& deleteMetaKeys, NYT::TNode::TListType& deleteDataKeys) {
+        void DeleteRows(const NYT::TNode::TListType& deleteMetaKeys, const NYT::TNode::TListType& deleteDataKeys) {
             Y_ENSURE(!ReadOnly_);
             auto opts = MakeTransactionOpts<TDeleteRowsOptions>();
             if (!deleteMetaKeys.empty()) {
@@ -1183,6 +1365,10 @@ namespace NYa {
 
     void TYtStore2::Strip() {
         Impl_->Strip();
+    }
+
+    void TYtStore2::DataGc() {
+        Impl_->DataGc();
     }
 
     void TYtStore2::ValidateRegexp(const TString& re) {

@@ -5,7 +5,7 @@ import devtools.ya.app
 import devtools.ya.core.yarg as yarg
 from devtools.ya.core.common_opts import LogFileOptions
 from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
-from exts.asyncthread import asyncthread
+from exts.asyncthread import future
 from yalibrary.store.yt_store.yt_store import YtStore2
 
 
@@ -175,6 +175,15 @@ class CacheYtHandler(yarg.CompositeHandler):
                 DryRunOption(),
             ],
         )
+        self["data-gc"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(data_gc, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Remove orphan (not referred from the metadata table) rows from the data table",
+            opts=get_common_opts()
+            + [
+                PoolOption(),
+                DryRunOption(),
+            ],
+        )
 
 
 def get_common_opts():
@@ -196,5 +205,17 @@ def strip(params):
         name_re_ttls=params.yt_name_re_ttls,
         operation_pool=params.yt_pool,
     )
-    # Run strip in the separate thread to allow INT signal processing in the main thread
-    asyncthread(yt_store.strip)()
+    # Run in the separate thread to allow INT signal processing in the main thread
+    future(yt_store.strip)()
+
+
+def data_gc(params):
+    yt_store = YtStore2(
+        params.yt_proxy,
+        params.yt_dir,
+        token=params.yt_token,
+        readonly=params.dry_run,
+        operation_pool=params.yt_pool,
+    )
+    # Run in the separate thread to allow INT signal processing in the main thread
+    future(yt_store.data_gc)()
