@@ -1135,10 +1135,14 @@ namespace NYa {
             return WithRetry(std::function(func), [this, cToken](const yexception&) {if (cToken.IsCancellationRequested()) throw;});
         }
 
-        NYT::IClientPtr ConnectToCluster(TString proxy) {
-            NYT::TConfigPtr cfg = MakeIntrusive<NYT::TConfig>();
-            cfg->RetryCount = 1;
-            return CreateClient(proxy, TCreateClientOptions().Token(Token_).Config(cfg));
+        NYT::IClientPtr ConnectToCluster(TString proxy, bool defaultRetryPolicy = false) {
+            auto options = TCreateClientOptions().Token(Token_);
+            if (!defaultRetryPolicy) {
+                NYT::TConfigPtr cfg = MakeIntrusive<NYT::TConfig>();
+                cfg->RetryCount = 1;
+                options.Config(cfg);
+            }
+            return CreateClient(proxy, options);
         }
 
         template <class TOpts>
@@ -1247,10 +1251,10 @@ namespace NYa {
                 }
                 DEBUG_LOG << "Operation replica: " << bestReplica->Proxy << ":" << bestReplica->DataDir;
                 // Note: for operations we use separate client with default retry policy
-                return std::make_pair(NYT::CreateClient(bestReplica->Proxy), bestReplica->DataDir);
+                return std::make_pair(ConnectToCluster(bestReplica->Proxy, true), bestReplica->DataDir);
             } else {
                 // Note: for operations we use separate client with default retry policy
-                return std::make_pair(NYT::CreateClient(MainCluster_.Proxy), MainCluster_.DataDir);
+                return std::make_pair(ConnectToCluster(MainCluster_.Proxy, true), MainCluster_.DataDir);
             }
         }
 
