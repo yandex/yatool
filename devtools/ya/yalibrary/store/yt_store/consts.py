@@ -68,7 +68,14 @@ YT_CACHE_DATA_SCHEMA = [
 ]
 
 YT_CACHE_STAT_SCHEMA = [
-    {'name': 'timestamp', 'type_v3': 'timestamp'},
-    {'name': 'key', 'type_v3': 'string'},
+    {
+        'name': 'tablet_hash',
+        'expression': 'farm_hash(timestamp, salt) % {}'.format(YT_CACHE_HASH_SPACE),
+        'type': 'uint64',
+        'sort_order': 'ascending',
+    },
+    {'name': 'timestamp', 'type_v3': 'timestamp', 'sort_order': 'ascending'},
+    {'name': 'salt', 'type_v3': 'uint64', 'sort_order': 'ascending'},
+    {'name': 'key', 'type_v3': 'string', 'sort_order': 'ascending'},
     {'name': 'value', 'type_v3': {'type_name': 'optional', 'item': 'yson'}},
 ]

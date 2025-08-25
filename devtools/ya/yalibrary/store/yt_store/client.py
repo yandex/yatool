@@ -1,5 +1,6 @@
 import logging
 import platform
+import random
 import threading
 import time
 from functools import wraps
@@ -10,7 +11,7 @@ from yt.wrapper import YtClient, TablePath
 from yt.wrapper.common import update as yt_config_update
 from yt.wrapper.default_config import retries_config, retry_backoff_config, get_config_from_env
 from yt.wrapper.format import YsonFormat
-from yt.yson import YsonList, get_bytes
+from yt.yson import get_bytes
 
 import devtools.ya.core.gsid  # XXX
 import yalibrary.store.yt_store.consts as consts
@@ -179,11 +180,6 @@ class YtStoreClient(object):
         else:
             self._client.create('table', table, attributes=attrs)
 
-    def _create_stat_table(self):
-        schema = YsonList(consts.YT_CACHE_STAT_SCHEMA)
-        schema.attributes = {'strict': True}
-        self._create_table(self._stat_table, {'schema': schema})
-
     def merge_stat_table(self):
         logger.debug("Merge table %s", self._stat_table)
         self._client.run_merge(TablePath(self._stat_table), TablePath(self._stat_table), spec={'combine_chunks': True})
@@ -208,8 +204,10 @@ class YtStoreClient(object):
         metadata_schema = consts.YT_CACHE_METADATA_V3_SCHEMA if with_self_uid else consts.YT_CACHE_METADATA_SCHEMA
 
         self.create_dynamic_table(self._metadata_table, utils.make_table_attrs(metadata_schema, 2**4, **attrs))
-
-        self._create_stat_table()
+        stat_attrs = attrs | {"enable_dynamic_store_read": True}
+        self.create_dynamic_table(
+            self._stat_table, utils.make_table_attrs(consts.YT_CACHE_STAT_SCHEMA, 1, **stat_attrs)
+        )
 
     def get_tables_size(self):
         size = 0
@@ -466,9 +464,14 @@ class YtStoreClient(object):
                 self._stat_table,
             )
             return
-        rows = ({'timestamp': timestamp, 'key': key, 'value': value},)
-        table_path = TablePath(self._stat_table, append=True)
-        self._client.write_table(table_path, rows, format=YsonFormat(format='text', require_yson_bindings=False))
+        dynamic = self._client.get(self._stat_table + "/@dynamic")
+        row = {'timestamp': timestamp, 'key': key, 'value': value}
+        if dynamic:
+            row['salt'] = random.randrange(1 << 64)
+            self._client.insert_rows(self._stat_table, [row], **self._integrity)
+        else:
+            table_path = TablePath(self._stat_table, append=True)
+            self._client.write_table(table_path, [row], format=YsonFormat(format='text', require_yson_bindings=False))
 
     @staticmethod
     def _cache_proxy(func):

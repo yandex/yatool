@@ -1324,12 +1324,22 @@ namespace NYa {
 
         void PutStat(const TString& key, const NYT::TNode& value) {
             Y_ENSURE(!ReadOnly_);
-            NYT::TRichYPath statTable = NYT::TRichYPath(NYT::JoinYPaths(MainCluster_.DataDir, STAT_TABLE)).Append(true);
-            RetryUntilDisabled([&] {
-                auto writer = MainCluster_.Client->CreateTableWriter<NYT::TNode>(statTable);
-                writer->AddRow(NYT::TNode()("timestamp", ToYtTimestamp(TInstant::Now()))("key", key)("value", value));
-                writer->Finish();
-            });
+            NYT::TYPath statTable = NYT::JoinYPaths(MainCluster_.DataDir, STAT_TABLE);
+            bool dynamic = MainCluster_.Client->Get(JoinYPaths(statTable, "@dynamic")).AsBool();
+            auto row = NYT::TNode()("timestamp", ToYtTimestamp(TInstant::Now()))("key", key)("value", value);
+            if (dynamic) {
+                row["salt"] = RandomNumber<ui64>();
+                RetryUntilDisabled([&] {
+                    MainCluster_.Client->InsertRows(statTable, {row}, MakeTransactionOpts<TInsertRowsOptions>());
+                });
+            } else {
+                NYT::TRichYPath richPath = NYT::TRichYPath(statTable).Append(true);
+                RetryUntilDisabled([&] {
+                    auto writer = MainCluster_.Client->CreateTableWriter<NYT::TNode>(richPath);
+                    writer->AddRow(row);
+                    writer->Finish();
+                });
+            }
         }
 
     private:
