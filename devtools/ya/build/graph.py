@@ -57,6 +57,7 @@ from devtools.ya.build.ymake2.consts import YmakeEvents
 import devtools.ya.build.genconf as bg
 from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
+from devtools.ya.test.test_types.common import SemanticLinterSuite
 
 if tp.TYPE_CHECKING:
     from devtools.ya.test.test_types.common import AbstractTestSuite
@@ -1279,16 +1280,16 @@ def build_graph_and_tests(opts, check, event_queue=None, display=None):
             raise GraphBuildError("{} from {} exception".format(ex_val, ex_type)).with_traceback(ex_bt)
 
 
-def _clang_tidy_strip_deps(plan, suites):
+def _static_analysis_strip_deps(plan, suites):
     def get_diff(lhs, rhs):
         return list(sorted(set(lhs) - set(rhs)))
 
     seen_uids = {}
-    for suite in suites:
-        if type(suite).__name__ != "ClangTidySuite":
-            continue
 
-        for out in suite.clang_tidy_inputs:
+    for suite in suites:
+        if not isinstance(suite, SemanticLinterSuite):
+            continue
+        for out in suite.semantic_linter_inputs:
             uid = plan.get_uids_by_outputs(out)
             if not uid:
                 continue
@@ -3257,8 +3258,8 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
     tests = test_framer.prepare_suites(tests)
 
-    logger.debug("Stripping clang-tidy irrelevant deps")
-    _clang_tidy_strip_deps(plan, tests)
+    logger.debug("Stripping static analysis irrelevant deps")
+    _static_analysis_strip_deps(plan, tests)
 
     # split after filtering
     requested, stripped = _split_stripped_tests(tests, test_opts)

@@ -12,6 +12,7 @@ PY_SRCS(
     fuzz_test.py
     go_test.py
     gtest.py
+    iwyu.py
     java_style.py
     junit.py
     library_ut.py

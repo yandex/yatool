@@ -1027,6 +1027,20 @@ class PythonTestSuite(AbstractTestSuite):
         return True
 
 
+class SemanticLinterSuite(AbstractTestSuite):
+    """
+    Base class for static analysis test suites (clang-tidy, iwyu, etc.)
+    """
+
+    @property
+    def semantic_linter_inputs(self):
+        """
+        Property that returns tuple/list of semantic linter input files.
+        Should be implemented by concrete static analyzer suites.
+        """
+        raise NotImplementedError("Subclasses must implement semantic_linter_inputs property")
+
+
 class StyleTestSuite(PythonTestSuite):
     def get_test_related_paths(self, arc_root, opts):
         return []

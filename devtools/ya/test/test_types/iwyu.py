@@ -6,22 +6,22 @@ from devtools.ya.test import common as test_common
 from devtools.ya.test.test_types import common as common_types
 
 
-CLANG_TIDY_TEST_TYPE = "clang_tidy"
+IWYU_TEST_TYPE = "iwyu"
 
 
-class ClangTidySuite(common_types.SemanticLinterSuite):
+class IwyuSuite(common_types.SemanticLinterSuite):
     def __init__(self, *args, **kwargs):
-        super(ClangTidySuite, self).__init__(*args, **kwargs)
-        self.clang_tidy_inputs = []
+        super(IwyuSuite, self).__init__(*args, **kwargs)
+        self.iwyu_inputs = []
         self.library_path = None
         self.global_library_path = None
 
     @property
     def semantic_linter_inputs(self):
         """
-        Property that returns tuple of semantic linter input files for ClangTidySuite.
+        Property that returns tuple of semantic linter input files for IwyuSuite.
         """
-        return tuple(self.clang_tidy_inputs)
+        return tuple(self.iwyu_inputs)
 
     def support_splitting(self, opts=None):
         """
@@ -34,7 +34,7 @@ class ClangTidySuite(common_types.SemanticLinterSuite):
 
     @property
     def requires_test_data(self):
-        # clang-tidy test node doesn't require any test environment.
+        # iwyu test node doesn't require any test environment.
         # All work is done within compile nodes, while test node only process results.
         # Disabling test data allows to avoid extracting heavy test's dependencies like DATA(sbr:X), etc
         return False
@@ -46,12 +46,12 @@ class ClangTidySuite(common_types.SemanticLinterSuite):
         lib_path = os.path.join("$(BUILD_ROOT)", self.binary_path(''))
         if graph.get_uids_by_outputs(lib_path):
             self.library_path = lib_path
-            self.clang_tidy_inputs.append(lib_path)
-        glob_lib_path = self.global_tidy_library()
+            self.iwyu_inputs.append(lib_path)
+        glob_lib_path = self.global_iwyu_library()
         if graph.get_uids_by_outputs(glob_lib_path):
             self.global_library_path = glob_lib_path
-            self.clang_tidy_inputs.append(glob_lib_path)
-        return super(ClangTidySuite, self).fill_test_build_deps(graph)
+            self.iwyu_inputs.append(glob_lib_path)
+        return super(IwyuSuite, self).fill_test_build_deps(graph)
 
     def get_test_dependencies(self):
         # We need only LIBRARY\PROGRAM artifacts in deps
@@ -89,10 +89,10 @@ class ClangTidySuite(common_types.SemanticLinterSuite):
         # return True
 
     def binary_path(self, root):
-        return os.path.splitext(self.meta.binary_path)[0] + ".tidyjson"
+        return os.path.splitext(self.meta.binary_path)[0] + ".iwyujson"
 
     def get_run_cmd_inputs(self, opts):
-        return self.clang_tidy_inputs
+        return self.iwyu_inputs
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
@@ -105,7 +105,7 @@ class ClangTidySuite(common_types.SemanticLinterSuite):
             remove_tos=opts.remove_tos,
         )
         cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
-            opts, 'run_clang_tidy', self.global_resources, wrapper=True, run_on_target_platform=True
+            opts, 'run_iwyu', self.global_resources, wrapper=True, run_on_target_platform=True
         ) + [
             '--tracefile',
             os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
@@ -114,19 +114,19 @@ class ClangTidySuite(common_types.SemanticLinterSuite):
             '--project-path',
             self.project_path,
         ]
-        for test_node_input in self.clang_tidy_inputs:
+        for test_node_input in self.iwyu_inputs:
             cmd += ["--archive", test_node_input]
         for f in opts.tests_filters + self._additional_filters:
             cmd += ["--tests-filters", f]
         return cmd
 
     def get_type(self):
-        return CLANG_TIDY_TEST_TYPE
+        return IWYU_TEST_TYPE
 
     @property
     def class_type(self):
         return devtools.ya.test.const.SuiteClassType.STYLE
 
-    def global_tidy_library(self):
+    def global_iwyu_library(self):
         library_path = self.meta.global_library_path
-        return library_path.replace("$B", "$(BUILD_ROOT)") if library_path.endswith(".tidyjson") else ""
+        return library_path.replace("$B", "$(BUILD_ROOT)") if library_path.endswith(".iwyujson") else ""

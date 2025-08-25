@@ -15,6 +15,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
         devtools/ya/test/programs/test_tool/resolve_sancov_coverage
         devtools/ya/test/programs/test_tool/run_clang_tidy
+        devtools/ya/test/programs/test_tool/run_iwyu
         devtools/ya/test/programs/test_tool/run_detekt_report_check
         devtools/ya/test/programs/test_tool/run_diff_test
         devtools/ya/test/programs/test_tool/sandbox_run_test
