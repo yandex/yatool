@@ -926,7 +926,7 @@ namespace NYa {
             // Put cleaner stat
             auto makeStatNode = [](TDuration ttl, size_t dataSize, size_t fileCount) {
                 return NYT::TNode()
-                ("age", i64(ttl.Seconds()))
+                ("max_age", i64(ttl.Seconds()))
                 ("data_size", i64(dataSize))
                 ("file_count", i64(fileCount));
             };
