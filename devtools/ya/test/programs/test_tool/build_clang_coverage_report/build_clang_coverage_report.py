@@ -44,11 +44,25 @@ def parse_args():
     parser.add_argument("--exclude-regexp")
     parser.add_argument("--test-mode", action="store_true")
 
+    parser.add_argument("--mcdc-coverage", action="store_true")
+
+    parser.add_argument("--branch-coverage", action="store_true")
+    parser.add_argument("--branch-coverage-type", default="count", choices=("percent", "count"))
+
     args = parser.parse_args()
     return args
 
 
-def get_file_stats(llvm_cov_bin, indexed_profile, binaries, source_root, prefix_filter=None, exclude_regexp=None):
+def get_file_stats(
+    llvm_cov_bin,
+    indexed_profile,
+    binaries,
+    source_root,
+    prefix_filter=None,
+    exclude_regexp=None,
+    mcdc=False,
+    branches=False,
+):
     cmd = [
         llvm_cov_bin,
         "export",
@@ -61,6 +75,12 @@ def get_file_stats(llvm_cov_bin, indexed_profile, binaries, source_root, prefix_
 
     for binary in binaries:
         cmd += ["-object", binary]
+
+    if mcdc:
+        cmd += ["--show-mcdc-summary"]
+
+    if branches:
+        cmd += ["--show-branch-summary"]
 
     cov_files = {}
     cov_total = {
@@ -159,6 +179,8 @@ def main():
         args.source_root,
         args.prefix_filter,
         args.exclude_regexp,
+        args.mcdc_coverage,
+        args.branch_coverage,
     )
 
     cmd = [
@@ -172,6 +194,12 @@ def main():
 
     for binary in binaries:
         cmd += ["-object", binary]
+
+    if args.mcdc_coverage:
+        cmd += ["--show-mcdc", "--show-mcdc-summary"]
+
+    if args.branch_coverage:
+        cmd += [f"--show-branches={args.branch_coverage_type}", "--show-branch-summary"]
 
     file_filter = coverage_utils_library.make_filter(args.prefix_filter, args.exclude_regexp)
 
@@ -279,6 +307,9 @@ def generate_table_report(cov_data, do_links=True):
                 <th>
                     Regions, %
                 </th>
+                <th>
+                    MC/DC, %
+                </th>
             </tr>
         """
     for filename in sorted(cov_data.keys()):
@@ -288,7 +319,7 @@ def generate_table_report(cov_data, do_links=True):
         else:
             res += '<td><div>{0}</div></td>'.format(filename)
 
-        for item in ["lines", "branches", "functions", "instantiations", "regions"]:
+        for item in ["lines", "branches", "functions", "instantiations", "regions", "mcdc"]:
             res += generate_table_cell(cov_data, filename, item)
         res += "</tr>"
     return res + "</table>"
