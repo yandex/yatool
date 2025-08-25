@@ -76,14 +76,7 @@ def validate(
             yield styler, rules_config, errors
 
 
-@tp.runtime_checkable
-class SupportsConfigLookup(tp.Protocol):
-    def lookup_config(self, path: PurePath) -> Config: ...
-
-    def lookup_default_config(self) -> MaybeConfig: ...
-
-
-class ConfigMixin:
+class ConfigFinder:
     def __init__(self, config_loaders: tuple[ConfigLoader, ...]):
         self._config_loaders = config_loaders
 

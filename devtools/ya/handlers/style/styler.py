@@ -107,22 +107,23 @@ class Styler(tp.Protocol):
         ...
 
 
-class ConfigurableStyler(Styler, cfg.SupportsConfigLookup, tp.Protocol): ...
+class ConfigurableStyler(Styler, tp.Protocol):
+    _config_finder: cfg.ConfigFinder
 
 
 def is_configurable(styler: Styler) -> tp.TypeGuard[ConfigurableStyler]:
-    return isinstance(styler, cfg.SupportsConfigLookup)
+    return hasattr(styler, '_config_finder')
 
 
 @_register
-class Black(cfg.ConfigMixin):
+class Black:
     kind: tp.ClassVar = StylerKind.PY
     name: tp.ClassVar = const.PythonLinterName.Black
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("black" if not styler_opts.py2 else "black_py2")  # type: ignore
-        super().__init__(
+        self._config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -136,7 +137,7 @@ class Black(cfg.ConfigMixin):
         )
 
     def _run_black(self, content: str, path: PurePath) -> StylerOutput:
-        config = self.lookup_config(path)
+        config = self._config_finder.lookup_config(path)
         black_args = [self._tool, "-q", "-", "--config", config.path]
 
         p = subprocess.Popen(
@@ -163,14 +164,14 @@ class Black(cfg.ConfigMixin):
 
 
 @_register
-class Ruff(cfg.ConfigMixin):
+class Ruff:
     kind: tp.ClassVar = StylerKind.PY
     name: tp.ClassVar = const.PythonLinterName.Ruff
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
-        super().__init__(
+        self._config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -217,7 +218,7 @@ class Ruff(cfg.ConfigMixin):
         return out
 
     def format(self, path: PurePath, content: str) -> StylerOutput:
-        ruff_config = self.lookup_config(path)
+        ruff_config = self._config_finder.lookup_config(path)
 
         stdin_filename = ["--stdin-filename", str(path)]
 
@@ -232,14 +233,14 @@ class Ruff(cfg.ConfigMixin):
 
 
 @_register
-class ClangFormat(cfg.ConfigMixin):
+class ClangFormat:
     kind: tp.ClassVar = StylerKind.CPP
     name: tp.ClassVar = const.CppLinterName.ClangFormat
     suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
-        super().__init__(
+        self._config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -256,7 +257,7 @@ class ClangFormat(cfg.ConfigMixin):
         if path.suffix == ".h":
             content = self.fix_header(content)
 
-        config = self.lookup_config(path)
+        config = self._config_finder.lookup_config(path)
         p = subprocess.Popen(
             [self._tool, f"-assume-filename={path.name}", f"-style=file:{config.path}"],
             stdin=subprocess.PIPE,
@@ -303,8 +304,7 @@ class ClangFormatYT(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ads-clang-format")  # type: ignore
-        cfg.ConfigMixin.__init__(
-            self,
+        self._config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -319,8 +319,7 @@ class ClangFormat15(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format-15")  # type: ignore
-        cfg.ConfigMixin.__init__(
-            self,
+        self._config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -335,8 +334,7 @@ class ClangFormat18Vanilla(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format-18-vanilla")  # type: ignore
-        cfg.ConfigMixin.__init__(
-            self,
+        self._config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
