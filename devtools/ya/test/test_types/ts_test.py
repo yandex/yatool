@@ -165,6 +165,8 @@ class JestTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
+                "--ts-config-path",
+                self.meta.ts_config_path,
                 "--timeout",
                 str(self.timeout),
                 "--verbose",
@@ -321,6 +323,8 @@ class PlaywrightTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
+                "--ts-config-path",
+                self.meta.ts_config_path,
             ]
         )
 
@@ -478,6 +482,8 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             get_nodejs_res(self.meta),
             "--eslint-config-path",
             self._eslint_config_path,
+            "--ts-config-path",
+            self.meta.ts_config_path,
             "--tracefile",
             os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
         ]

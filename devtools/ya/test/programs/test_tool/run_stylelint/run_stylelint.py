@@ -5,13 +5,11 @@ import os
 
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
-import build.plugins.lib.nots.typescript as nots_typescript
-
-import devtools.ya.test
-import devtools.ya.test.const
-import devtools.ya.test.system.process
-import devtools.ya.test.test_types.common
-import devtools.ya.test.util
+import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
+from devtools.ya.test.const import Status
+from devtools.ya.test.facility import TestCase
+from devtools.ya.test.system.process import execute
+from devtools.ya.test.test_types.common import PerformedTestSuite
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +74,7 @@ def format_error(records: list[dict]):
 
 
 def fill_suite(build_dir, report_json, trace):
-    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = PerformedTestSuite(None, None, None)
     suite.set_work_dir(build_dir)
     suite.register_chunk()
 
@@ -86,9 +84,9 @@ def fill_suite(build_dir, report_json, trace):
         warnings_ = case['warnings']
         errors = [w for w in warnings_ if w['severity'] == 'error']
         has_errors = len(errors) > 0
-        status = devtools.ya.test.const.Status.FAIL if has_errors else devtools.ya.test.const.Status.GOOD
+        status = Status.FAIL if has_errors else Status.GOOD
 
-        test_case = devtools.ya.test.facility.TestCase(
+        test_case = TestCase(
             f"{file}::ts_stylelint",
             status,
             format_error(warnings_),
@@ -100,14 +98,12 @@ def fill_suite(build_dir, report_json, trace):
 
 
 def main():
-    # devtools.ya.test.util.shared.setup_logging("DEBUG", "")
-
     args = parse_args()
 
     src_dir = os.path.join(args.source_root, args.project_path)
     build_dir = os.path.join(args.build_root, args.project_path)
 
-    devtools.ya.test.util.tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_dir,
         build_dir,
         ignore_list=[
@@ -118,11 +114,10 @@ def main():
             pm_const.OUTPUT_TAR_UUID_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
             pnpm_const.PNPM_LOCKFILE_FILENAME,
-            nots_typescript.DEFAULT_TS_CONFIG_FILE,
         ],
     )
 
-    exec_result = devtools.ya.test.system.process.execute(get_stylelint_cmd(args), cwd=build_dir, check_exit_code=False)
+    exec_result = execute(get_stylelint_cmd(args), cwd=build_dir, check_exit_code=False)
     if exec_result.exit_code < 0:
         logger.error("stylelint was terminated by signal: %s", exec_result.exit_code)
         return 1

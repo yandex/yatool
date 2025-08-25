@@ -6,7 +6,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    library/python/color
     build/plugins/lib/nots/package_manager
     build/plugins/lib/nots/test_utils
     build/plugins/lib/nots/typescript
@@ -15,6 +14,7 @@ PEERDIR(
     devtools/ya/test/system
     devtools/ya/test/test_types
     devtools/ya/test/util
+    library/python/color
 )
 
 END()
