@@ -16,3 +16,11 @@ PEERDIR(
 )
 
 END()
+
+RECURSE(
+    bin
+)
+
+RECURSE_FOR_TESTS(
+    tests
+)
