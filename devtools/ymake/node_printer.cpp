@@ -427,6 +427,10 @@ template <class TFormatter>
 bool TNodePrinter<TFormatter>::AcceptDep(TState& state) {
     TBase::AcceptDep(state);
     const auto& dep = state.NextDep();
+    if (IsProp2BuildCommandDep(dep)) {
+        // Skip backward edges REFERENCE_BY(Property) -> GLOB(BuildCommand)
+        return false;
+    }
     bool isStartModuleDep = !state.HasIncomingDep() && IsDirToModuleDep(dep);
     if (isStartModuleDep && !StartTargets.contains(dep.To().Id())) {
         return false;

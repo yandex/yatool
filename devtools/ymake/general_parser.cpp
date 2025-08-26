@@ -30,16 +30,23 @@ namespace {
 
     void ProcessMakefileGlobs(TNodeAddCtx& node, const TVector<TModuleDef*>& modules) {
         for (const auto module : modules) {
+            THashMap<ui32, TVector<ui32>> globVarElemId2PatternElemIds;
             for (const auto& globInfo : module->GetModuleGlobs()) {
                 // EMNT_Makefile -> GlobCmd -> WatchDirs
-                node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, globInfo.GlobId);
-                auto& [id, entryStats] = *node.UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &node.YMake, node.Module);
+                const auto globPatternElemId = globInfo.GlobPatternId;
+                globVarElemId2PatternElemIds[globInfo.ReferencedByVar].push_back(globPatternElemId);
+                const auto emnt = EMNT_BuildCommand;
+                node.AddUniqueDep(EDT_Property, emnt, globPatternElemId);
+                auto& [id, entryStats] = *node.UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globPatternElemId), &node.YMake, node.Module);
                 auto& globNode = entryStats.GetAddCtx(node.Module, node.YMake);
-                globNode.NodeType = EMNT_BuildCommand;
-                globNode.ElemId = globInfo.GlobId;
+                globNode.NodeType = emnt;
+                globNode.ElemId = globPatternElemId;
                 entryStats.SetOnceEntered(false);
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
+            }
+            for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
+                CreateGlobVar2PatternDeps(globVarElemId, globPatternElemIds, node.YMake, node.UpdIter, node.Module);
             }
         }
     }
@@ -670,7 +677,7 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
 }
 
 void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
-    node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobHash);
+    node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobPatternHash);
     for (ui32 fileId: globInfo.MatchedFiles) {
         node.AddUniqueDep(EDT_Property, EMNT_File, fileId);
     }
@@ -684,5 +691,16 @@ void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
     deps.clear();
     for (const auto& dir : globInfo.WatchedDirs) {
         deps.Push(dir);
+    }
+}
+
+void CreateGlobVar2PatternDeps(ui32 globVarElemId, const TVector<ui32>& globPatternElemIds, TYMake& YMake, TUpdIter& UpdIter, TModule* Module) {
+    const auto emnt = EMNT_Property;
+    auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globVarElemId), &YMake, Module);
+    auto& globVarNode = entryStats.GetAddCtx(Module, YMake);
+    globVarNode.NodeType = emnt;
+    globVarNode.ElemId = globVarElemId;
+    for (auto globPatternElemId: globPatternElemIds) {
+        globVarNode.AddUniqueDep(EDT_Property, EMNT_Property, globPatternElemId);
     }
 }

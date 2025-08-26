@@ -21,8 +21,8 @@ class TYMake;
 class TModules;
 
 struct TModuleGlobInfo {
-    ui32 GlobId;
-    ui32 GlobHash;
+    ui32 GlobPatternId;
+    ui32 GlobPatternHash;
     TVector<ui32> WatchedDirs;
     TVector<ui32> MatchedFiles;
     TVector<ui32> Excludes;
@@ -264,5 +264,8 @@ public:
 
     TDepsCacheId Commit();
 
-    static void SetGlobRestrictionsVars(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 varElemId);
+    static void SaveGlobRestrictions(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 globVarElemId);
+    static TGlobRestrictions LoadGlobRestrictions(const TVars& vars, const ui32 globVarElemId);
+    static void SaveGlobPatternStat(TVars& vars, const TGlobStat& globPatternStat, const ui32 globPatternElemId);
+    static TGlobStat LoadGlobPatternStat(const TVars& vars, const ui32 globPatternElemId);
 };

@@ -39,4 +39,7 @@ constexpr TStringBuf RESTRICTIONS = "RESTRICTIONS";
 constexpr TStringBuf MAX_MATCHES = "MAX_MATCHES";
 constexpr TStringBuf MAX_WATCH_DIRS = "MAX_WATCH_DIRS";
 
+constexpr TStringBuf MATCHED = "MATCHED";
+constexpr TStringBuf SKIPPED = "SKIPPED";
+constexpr TStringBuf DIRS = "DIRS";
 }

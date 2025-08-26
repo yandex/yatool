@@ -1288,11 +1288,13 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
 
     auto CreateGlobNode = [&node, this](const TModuleGlobInfo& globInfo) {
-        node.AddUniqueDep(EDT_BuildFrom, EMNT_BuildCommand, globInfo.GlobId);
-        auto& [id, entryStats] = *UpdIter->Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &(UpdIter->YMake), Module);
+        const auto globPatternId = globInfo.GlobPatternId;
+        const auto emnt = EMNT_BuildCommand;
+        node.AddUniqueDep(EDT_BuildFrom, emnt, globPatternId);
+        auto& [id, entryStats] = *UpdIter->Nodes.Insert(MakeDepsCacheId(emnt, globPatternId), &(UpdIter->YMake), Module);
         auto& globNode = entryStats.GetAddCtx(Module, UpdIter->YMake);
-        globNode.NodeType = EMNT_BuildCommand;
-        globNode.ElemId = globInfo.GlobId;
+        globNode.NodeType = emnt;
+        globNode.ElemId = globPatternId;
         entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
@@ -1301,18 +1303,18 @@ void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
     try {
         TExcludeMatcher excludeMatcher;
         TUniqVector<ui32> matches;
-        TGlob glob(Graph->Names().FileConf, globStr, Module->GetDir());
+        TGlobPattern glob(Graph->Names().FileConf, globStr, Module->GetDir());
         for (const auto& result : glob.Apply(excludeMatcher)) {
             matches.Push(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
         }
         const TString globCmd = FormatCmd(Module->GetName().GetElemId(), NProps::LATE_GLOB, globStr);
         TModuleGlobInfo globInfo = {
-            Graph->Names().AddName(EMNT_BuildCommand, globCmd),
-            Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
-            glob.GetWatchDirs().Data(),
-            matches.Take(),
-            {},
-            0
+            .GlobPatternId = Graph->Names().AddName(EMNT_BuildCommand, globCmd),
+            .GlobPatternHash = Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
+            .WatchedDirs = glob.GetWatchDirs().Data(),
+            .MatchedFiles = matches.Take(),
+            .Excludes = {},
+            .ReferencedByVar = 0,
         };
         CreateGlobNode(globInfo);
     } catch (const yexception& error){

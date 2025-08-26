@@ -57,3 +57,4 @@ private:
 TFileView MakefileNodeNameForDir(TFileConf& fileConf, TFileView dir);
 TFileView MakefileNodeNameForModule(const TFileConf& fileConf, const TModule& module);
 void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo);
+void CreateGlobVar2PatternDeps(ui32 globVarElemId, const TVector<ui32>& globPatternElemIds, TYMake& YMake, TUpdIter& UpdIter, TModule* Module);

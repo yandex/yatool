@@ -32,16 +32,16 @@ namespace {
         return node.IsValid() ? node->ElemId : 0;
     }
 
-    struct GlobNodeInfo {
+    struct TGlobPatternInfo {
         TStringBuf GlobHash;
         TUniqVector<ui32> WatchDirs;
-        TUniqVector<ui32> Refferers;
+        THashMap<ui32, TVector<ui32>> Var2OtherPatterns;
         TUniqVector<ui32> Excludes;
         TExcludeMatcher ExcludesMatcher;
     };
 
-    GlobNodeInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName) {
-        GlobNodeInfo res;
+    TGlobPatternInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName) {
+        TGlobPatternInfo res;
         const auto node = st.Graph.Get(st.NodeStart);
         for (const auto& edge : node.Edges()) {
             if (edge.Value() == EDT_Property && edge.To()->NodeType == EMNT_Property) {
@@ -50,7 +50,14 @@ namespace {
                 if (propName == NProps::GLOB_HASH) {
                     res.GlobHash = GetPropertyValue(prop);
                 } else if (propName == NProps::REFERENCED_BY) {
-                    res.Refferers.Push(edge.To()->ElemId);
+                    const auto globElemId = edge.From()->ElemId;
+                    auto& otherGlobPatternElemIds = res.Var2OtherPatterns[edge.To()->ElemId];
+                    for (const auto& globVarDep: edge.To().Edges()) {
+                        const auto otherGlobElemId = globVarDep.To()->ElemId;
+                        if (otherGlobElemId != globElemId) {
+                            otherGlobPatternElemIds.push_back(otherGlobElemId);
+                        }
+                    }
                 } else if (propName == NProps::GLOB_EXCLUDE) {
                     if (res.Excludes.Push(edge.To()->ElemId)) {
                         res.ExcludesMatcher.AddExcludePattern(dirName, GetPropertyValue(prop));
@@ -63,16 +70,31 @@ namespace {
         return res;
     }
 
-    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName) {
+    void OnChangeGlobPatternStat(TVars& moduleVars, const ui32 globPatternElemId, const TGlobStat& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name) {
+        TModuleDef::SaveGlobPatternStat(moduleVars, globPatternStat, globPatternElemId);
+        for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
+            auto globRestrictions = TModuleDef::LoadGlobRestrictions(moduleVars, globVarElemId);
+            TGlobStat globStat;
+            globStat += globPatternStat;
+            for (const auto otherGlobPatternElemId: otherGlobPatternElemIds) {
+                globStat += TModuleDef::LoadGlobPatternStat(moduleVars, otherGlobPatternElemId);
+            }
+            globRestrictions.Check(name, globStat);
+        }
+    }
+
+    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
-        if (!TGlob::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
+        if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return;
         }
 
         try {
-            TGlob glob{st.Graph.Names().FileConf, pattern, dirName};
-            TGlobStat patternStat;
-            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &patternStat);
+            TGlobPattern glob{st.Graph.Names().FileConf, pattern, dirName};
+            const auto globPatternElemId = st.Node.ElemId;
+            TGlobStat prevGlobPatternStat = TModuleDef::LoadGlobPatternStat(module->Vars, globPatternElemId);
+            TGlobStat globPatternStat;
+            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &globPatternStat);
             if (glob.GetMatchesHash() == globInfo.GlobHash && glob.GetWatchDirs().Data() == globInfo.WatchDirs.Data()) {
                 return;
             }
@@ -84,27 +106,42 @@ namespace {
                 matchIds.Push(st.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, match).GetElemId());
             }
             const auto globHash = st.Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
-            TModuleGlobInfo globModuleInfo{static_cast<ui32>(st.Add->ElemId), globHash, glob.GetWatchDirs().Data(), matchIds.Take(), globInfo.Excludes.Data(), 0};
+            TModuleGlobInfo globModuleInfo{
+                .GlobPatternId = static_cast<ui32>(st.Add->ElemId),
+                .GlobPatternHash = globHash,
+                .WatchedDirs = glob.GetWatchDirs().Data(),
+                .MatchedFiles = matchIds.Take(),
+                .Excludes = globInfo.Excludes.Data(),
+                .ReferencedByVar = 0,
+            };
             PopulateGlobNode(*st.Add, globModuleInfo);
-            for (ui32 reffererId: globInfo.Refferers.Data()) {
-                st.Add->AddDep(EDT_Property, EMNT_Property, reffererId);
+            for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
+                st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
+            }
+            if (prevGlobPatternStat != globPatternStat) {
+                OnChangeGlobPatternStat(module->Vars, globPatternElemId, globPatternStat, globInfo, pattern);
             }
         } catch (const yexception&) {
             // Invalid pattern error was reported earlier
         }
     }
 
-    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName) {
+    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
-        if (!TGlob::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
+        if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return false;
         }
 
         bool result;
         try {
-            TGlob glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
-            TGlobStat patternStat;
-            result = glob.NeedUpdate(globInfo.ExcludesMatcher, &patternStat);
+            TGlobPattern glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
+            const auto globPatternElemId = st.Node.ElemId;
+            const auto prevGlobPatternStat = TModuleDef::LoadGlobPatternStat(module->Vars, globPatternElemId);
+            TGlobStat globPatternStat;
+            result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);
+            if (result && globPatternStat != prevGlobPatternStat) {
+                OnChangeGlobPatternStat(module->Vars, globPatternElemId, globPatternStat, globInfo, pattern);
+            }
         } catch (const yexception&) {
             result = false;
         }
@@ -1305,7 +1342,7 @@ inline bool TUpdIter::Enter(TState& state) {
                     if (name == NProps::LATE_GLOB && !val.empty()) {
                         auto* module = YMake.Modules.Get(prev->Node.ElemId);
                         Y_ASSERT(module);
-                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()));
+                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()), module);
                     }
                 }
             }
@@ -1414,7 +1451,9 @@ inline void TUpdIter::Leave(TState& state) {
                     prev.Entry().DepsToInducedProps(propType, deps, sourceDebug);
 
                 } else if (propName == NProps::GLOB) {
-                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node))) {
+                    auto* module = YMake.Modules.Get(propId);
+                    Y_ASSERT(module);
+                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node), module)) {
                         prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                         st.Entry().SetOnceEntered(false);
                         st.ForceReassemble();

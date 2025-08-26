@@ -974,11 +974,13 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     lateExpansionVar->IsReservedName = true;
 
     auto CreateGlobNode = [this, &lateExpansionVar](const TModuleGlobInfo& globInfo, const TString& globCmd) {
-        Node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, globInfo.GlobId);
-        auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &UpdIter.YMake, &Module);
+        const auto globId = globInfo.GlobPatternId;
+        const auto emnt = EMNT_BuildCommand;
+        Node.AddUniqueDep(EDT_Property, emnt, globId);
+        auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globId), &UpdIter.YMake, &Module);
         auto& globNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
-        globNode.NodeType = EMNT_BuildCommand;
-        globNode.ElemId = globInfo.GlobId;
+        globNode.NodeType = emnt;
+        globNode.ElemId = globId;
         entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
@@ -989,29 +991,33 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     };
 
     const auto moduleElemId = Module.GetName().GetElemId();
-    ui32 varElemId = 0;
+    ui32 globVarElemId = 0;
+    TVector<ui32> globPatternElemIds;
     TGlobStat globStat;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
-            TGlob glob(Graph.Names().FileConf, globStr, Module.GetDir());
-            TGlobStat patternStat;
-            for (const auto& result : glob.Apply(excludeMatcher, &patternStat)) {
+            TGlobPattern globPattern(Graph.Names().FileConf, globStr, Module.GetDir());
+            TGlobStat globPatternStat;
+            for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
                 matches.Push(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
             }
-            globStat += patternStat;
+            globStat += globPatternStat;
 
-            if (!varElemId) {
-                varElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            if (!globVarElemId) {
+                globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
             }
             const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, globStr);
+            const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+            globPatternElemIds.push_back(globPatternElemId);
+            TModuleDef::SaveGlobPatternStat(Vars, globStat, globPatternElemId);
             TModuleGlobInfo globInfo = {
-                .GlobId = Graph.Names().AddName(EMNT_BuildCommand, globCmd),
-                .GlobHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
-                .WatchedDirs = glob.GetWatchDirs().Data(),
+                .GlobPatternId = globPatternElemId,
+                .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                .WatchedDirs = globPattern.GetWatchDirs().Data(),
                 .MatchedFiles = matches.Take(),
                 .Excludes = excludeIds.Data(),
-                .ReferencedByVar = varElemId,
+                .ReferencedByVar = globVarElemId,
             };
             CreateGlobNode(globInfo, globCmd);
         } catch (const yexception& error) {
@@ -1019,8 +1025,8 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         }
     }
 
-    if (varElemId) {
-        TModuleDef::SetGlobRestrictionsVars(Vars, globRestrictions, varElemId);
+    if (globVarElemId) {
+        TModuleDef::SaveGlobRestrictions(Vars, globRestrictions, globVarElemId);
     }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
@@ -1029,19 +1035,25 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     if (globs.empty()) {
         // Add fake glob property in order to be able to reference variable created with _LATE_GLOB
         // without patterns from command subgraph
-        if (!varElemId) {
-            varElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+        if (!globVarElemId) {
+            globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
         }
         const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, "");
+        const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+        globPatternElemIds.push_back(globPatternElemId);
         TModuleGlobInfo globInfo = {
-            .GlobId = Graph.Names().AddName(EMNT_BuildCommand, globCmd),
-            .GlobHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, "")),
+            .GlobPatternId = globPatternElemId,
+            .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, "")),
             .WatchedDirs = {},
             .MatchedFiles = {},
             .Excludes = excludeIds.Data(),
-            .ReferencedByVar = varElemId,
+            .ReferencedByVar = globVarElemId,
         };
         CreateGlobNode(globInfo, globCmd);
+    }
+
+    if (globVarElemId) {
+        CreateGlobVar2PatternDeps(globVarElemId, globPatternElemIds, UpdIter.YMake, UpdIter, &Module);
     }
     return true;
 }

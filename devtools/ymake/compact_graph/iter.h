@@ -552,6 +552,10 @@ public:
     ///        BuildFrom dependency
     bool AcceptDep(TState& state) {
         const auto& dep = state.NextDep();
+        if (IsProp2BuildCommandDep(dep)) {
+            // Skip backward edges REFERENCE_BY(Property) -> GLOB(BuildCommand)
+            return false;
+        }
         if (*dep == EDT_BuildFrom) {
             CurEnt->HasBuildFrom = true;
         } else if (*dep == EDT_BuildCommand && IsFileType(dep.From()->NodeType)) {

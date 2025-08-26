@@ -229,8 +229,9 @@ void TModule::Save(TModuleSavedState& saved) const {
             saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
         }
     }
-    if (Vars.Contains(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS)) {
-        for (const auto& globVarName: Vars.find(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS)->second) {
+    const auto itGlobVarElemIds = Vars.find(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS);
+    if (itGlobVarElemIds != Vars.end()) {
+        for (const auto& globVarName: itGlobVarElemIds->second) {
             static TVector<TString> globRestrictionFields = {TString{NArgs::MAX_MATCHES}, TString{NArgs::MAX_WATCH_DIRS}};
             for (const auto& globRestrictionField: globRestrictionFields) {
                 auto globFieldVarName = globRestrictionField + "-" + globVarName.Name;
@@ -241,6 +242,20 @@ void TModule::Save(TModuleSavedState& saved) const {
             }
         }
     }
+    const auto itGlobPatternElemIds = Vars.find(NVariableDefs::VAR_GLOB_PATTERN_ELEM_IDS);
+    if (itGlobPatternElemIds != Vars.end()) {
+        for (const auto& globPatternName: itGlobPatternElemIds->second) {
+            static TVector<TString> globStatFields = {TString{NArgs::MATCHED}, TString{NArgs::SKIPPED}, TString{NArgs::DIRS}};
+            for (const auto& globStatField: globStatFields) {
+                auto globFieldVarName = globStatField + "-" + globPatternName.Name;
+                TStringBuf value = Get(globFieldVarName);
+                if (!value.empty()) {
+                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globFieldVarName, value)));
+                }
+            }
+        }
+    }
+
 
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {

@@ -12,6 +12,8 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/trace.h>
 
+#include <util/string/cast.h>
+
 #include <library/cpp/iterator/mapped.h>
 
 
@@ -269,31 +271,33 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     }
 
     const auto moduleElemId = Module.GetName().GetElemId();
-    ui32 varElemId = 0;
+    ui32 globVarElemId = 0;
     TGlobStat globStat;
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
-            TGlob glob(Names.FileConf, globStr, Module.GetDir());
-            TGlobStat patternStat;
-            for (const auto& result : glob.Apply(excludeMatcher, &patternStat)) {
+            TGlobPattern globPattern(Names.FileConf, globStr, Module.GetDir());
+            TGlobStat globPatternStat;
+            for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
                 values.Push(result);
             }
-            globStat += patternStat;
+            globStat += globPatternStat;
 
-            if (!varElemId) {
-                varElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            if (!globVarElemId) {
+                globVarElemId = Names.AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
+            const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
+            TModuleDef::SaveGlobPatternStat(Vars, globPatternStat, globPatternId);
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
-                    .GlobId = Names.AddName(EMNT_BuildCommand, globCmd),
-                    .GlobHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
-                    .WatchedDirs = glob.GetWatchDirs().Data(),
+                    .GlobPatternId = globPatternId,
+                    .GlobPatternHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                    .WatchedDirs = globPattern.GetWatchDirs().Data(),
                     .MatchedFiles = matches.Take(),
                     .Excludes = excludeIds.Data(),
-                    .ReferencedByVar = varElemId,
+                    .ReferencedByVar = globVarElemId,
                 }
             );
         } catch (const yexception& error) {
@@ -301,8 +305,8 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    if (varElemId) {
-        TModuleDef::SetGlobRestrictionsVars(Vars, globRestrictions, varElemId);
+    if (globVarElemId) {
+        TModuleDef::SaveGlobRestrictions(Vars, globRestrictions, globVarElemId);
     }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
@@ -329,13 +333,12 @@ TGlobRestrictions TModuleDef::ParseGlobRestrictions(const TArrayRef<const TStrin
             return -2;
         }
         rit++;
-        int v = 0;
-        try {
-            v = std::stoi(std::string(*rit).c_str());
-        } catch (const std::exception) {
+        int v;
+        if (!TryFromString(*rit, v)) {
+            v = 0;
         }
         if (v <= 0 || v > 1000000) {
-            YConfErr(Syntax) << "Invalid value " << *rit << " for " << name << " in " << macro << Endl;
+            YConfErr(Syntax) << "Invalid value '" << *rit << "' for " << name << " in " << macro << Endl;
             return -3;
         }
         return v;
@@ -368,11 +371,83 @@ const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
     return ModuleGlobs;
 }
 
-void TModuleDef::SetGlobRestrictionsVars(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 varElemId) {
-    // variable name ElemId may be not unique in graph, but must be unique in module (else globs can't work properly)
-    // that is why we can use variable ElemId as ID for glob in module
-    auto strVarElemId = ToString(varElemId);
-    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strVarElemId);
-    vars.SetValue(TStringBuilder() << NArgs::MAX_MATCHES << "-" << strVarElemId, ToString(globRestrictions.MaxMatches));
-    vars.SetValue(TStringBuilder() << NArgs::MAX_WATCH_DIRS << "-" << strVarElemId, ToString(globRestrictions.MaxWatchDirs));
+static TString MaxMatchesVar(const TString& strGlobVarElemId) {
+    return TStringBuilder() << NArgs::MAX_MATCHES << "-" << strGlobVarElemId;
+}
+
+static TString MaxWatchDirsVar(const TString& strGlobVarElemId) {
+    return TStringBuilder() << NArgs::MAX_WATCH_DIRS << "-" << strGlobVarElemId;
+}
+
+static void GetVal(const TString& var, const TStringBuf& val, size_t&value) {
+    size_t v;
+    if (!TryFromString(val, v)) {
+        YConfWarn(Syntax) << "Invalid value '" << val << "' in " << var << Endl;
+    } else {
+        value = v;
+    }
+}
+
+void TModuleDef::SaveGlobRestrictions(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 globVarElemId) {
+    auto strGlobVarElemId = ToString(globVarElemId);
+    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strGlobVarElemId);
+    vars.SetValue(MaxMatchesVar(strGlobVarElemId), ToString(globRestrictions.MaxMatches));
+    vars.SetValue(MaxWatchDirsVar(strGlobVarElemId), ToString(globRestrictions.MaxWatchDirs));
+}
+
+TGlobRestrictions TModuleDef::LoadGlobRestrictions(const TVars& vars, const ui32 globVarElemId) {
+    TGlobRestrictions globRestrictions;
+    auto strGlobVarElemId = ToString(globVarElemId);
+    const auto maxMatchesVar = MaxMatchesVar(strGlobVarElemId);
+    const auto maxMatchesVal = vars.Get1(maxMatchesVar);
+    if (!maxMatchesVal.empty()) {
+        GetVal(maxMatchesVar, maxMatchesVal, globRestrictions.MaxMatches);
+    }
+    const auto maxWatchDirsVar = MaxWatchDirsVar(strGlobVarElemId);
+    const auto maxWatchDirsVal = vars.Get1(maxWatchDirsVar);
+    if (!maxWatchDirsVal.empty()) {
+        GetVal(maxWatchDirsVar, maxWatchDirsVal, globRestrictions.MaxWatchDirs);
+    }
+    return globRestrictions;
+}
+
+static TString MatchedVar(const TString& strGlobPatternElemId) {
+    return TStringBuilder() << NArgs::MATCHED << "-" << strGlobPatternElemId;
+}
+
+static TString SkippedVar(const TString& strGlobPatternElemId) {
+    return TStringBuilder() << NArgs::SKIPPED << "-" << strGlobPatternElemId;
+}
+
+static TString DirsVar(const TString& strGlobPatternElemId) {
+    return TStringBuilder() << NArgs::DIRS << "-" << strGlobPatternElemId;
+}
+
+void TModuleDef::SaveGlobPatternStat(TVars& vars, const TGlobStat& globPatternStat, const ui32 globPatternElemId) {
+    auto strGlobPatternElemId = ToString(globPatternElemId);
+    vars.SetAppend(NVariableDefs::VAR_GLOB_PATTERN_ELEM_IDS, strGlobPatternElemId);
+    vars.SetValue(MatchedVar(strGlobPatternElemId), ToString(globPatternStat.MatchedFilesCount));
+    vars.SetValue(SkippedVar(strGlobPatternElemId), ToString(globPatternStat.SkippedFilesCount));
+    vars.SetValue(DirsVar(strGlobPatternElemId), ToString(globPatternStat.WatchedDirsCount));
+}
+
+TGlobStat TModuleDef::LoadGlobPatternStat(const TVars& vars, const ui32 globPatternElemId) {
+    auto strGlobPatternElemId = ToString(globPatternElemId);
+    TGlobStat globPatternStat;
+    const auto matchedVar = MatchedVar(strGlobPatternElemId);
+    const auto matchedVal = vars.Get1(matchedVar);
+    if (!matchedVal.empty()) {
+        GetVal(matchedVar, matchedVal, globPatternStat.MatchedFilesCount);
+    }
+    const auto skipperVar = SkippedVar(strGlobPatternElemId);
+    const auto skippedVal = vars.Get1(skipperVar);
+    if (!skippedVal.empty()) {
+        GetVal(skipperVar, skippedVal, globPatternStat.SkippedFilesCount);
+    }
+    const auto dirsVar = DirsVar(strGlobPatternElemId);
+    const auto dirsVal = vars.Get1(dirsVar);
+    if (!dirsVal.empty()) {
+        GetVal(dirsVar, dirsVal, globPatternStat.WatchedDirsCount);
+    }
+    return globPatternStat;
 }

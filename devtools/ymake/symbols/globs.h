@@ -44,9 +44,9 @@ struct TGlobStat {
             *this = patternStat;
             PatternsCount = 1;
         } else {
-            MatchedFilesCount += patternStat.MatchedFilesCount; // sum matched in all patterns
-            SkippedFilesCount = std::min(SkippedFilesCount, patternStat.SkippedFilesCount); // lite restriction
-            WatchedDirsCount = std::max(WatchedDirsCount, patternStat.WatchedDirsCount);
+            MatchedFilesCount += patternStat.MatchedFilesCount; // sum matched in all patterns (assume each pattern unique)
+            SkippedFilesCount = std::min(SkippedFilesCount, patternStat.SkippedFilesCount); // very lite restriction - minimal of skipped in all patterns
+            WatchedDirsCount = std::max(WatchedDirsCount, patternStat.WatchedDirsCount); // dirs count in maximum pattern
             ++PatternsCount;
         }
     }
@@ -67,9 +67,9 @@ struct TGlobRestrictions {
 };
 
 // Short-live object with 2 scenarios of usage:
-// 1. TGlob (pattern) -> Apply -> dump to property (GetWatchDirs + GetMatchesHash)
-// 2. WatchDirsUpdated -> TGlob (property) -> NeedUpdate
-class TGlob {
+// 1. TGlobPattern (pattern) -> Apply -> dump to property (GetWatchDirs + GetMatchesHash)
+// 2. WatchDirsUpdated -> TGlobPattern (property) -> NeedUpdate
+class TGlobPattern {
 private:
     TFileConf& FileConf;
 
@@ -81,9 +81,9 @@ private:
     TString MatchesHash;
 
 public:
-    TGlob(TFileConf& fileConf, TStringBuf glob, TFileView rootDir);
+    TGlobPattern(TFileConf& fileConf, TStringBuf glob, TFileView rootDir);
 
-    TGlob(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs);
+    TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs);
 
     // Watch-dir timestamp changed -> apply glob
     static bool WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs);
