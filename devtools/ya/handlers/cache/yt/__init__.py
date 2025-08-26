@@ -1,5 +1,6 @@
 import logging
 import os
+from humanfriendly import parse_size, format_size
 
 import devtools.ya.app
 import devtools.ya.core.yarg as yarg
@@ -160,6 +161,43 @@ class PoolOption(yarg.Options):
         ]
 
 
+class DataGcOptions(yarg.Options):
+    def __init__(self):
+        self.data_size_per_job = 90 * (1 << 30)
+        self.data_size_per_key_range = 1536 * (1 << 30)
+
+    @staticmethod
+    def parse_size_arg(v: str) -> int:
+        return parse_size(v, binary=True)
+
+    @staticmethod
+    def format_size_arg(v: int) -> str:
+        return format_size(v, binary=True)
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--data-size-per-job"],
+                help="Data size per reduce job. Change if the average duration of the jobs is out of the range of 2..5 minutes",
+                hook=yarg.SetValueHook(
+                    "data_size_per_job",
+                    transform=DataGcOptions.parse_size_arg,
+                    default_value=DataGcOptions.format_size_arg,
+                ),
+            ),
+            yarg.ArgConsumer(
+                ["--data-size-per-key-range"],
+                help="Data size per one reduce operation (one key range processing). Change if the average duration of the operation is out of the range 5-20 minutes",
+                hook=yarg.SetValueHook(
+                    "data_size_per_key_range",
+                    transform=DataGcOptions.parse_size_arg,
+                    default_value=DataGcOptions.format_size_arg,
+                ),
+            ),
+        ]
+
+
 class CacheYtHandler(yarg.CompositeHandler):
     description = "Yt cache maintenance"
 
@@ -180,6 +218,7 @@ class CacheYtHandler(yarg.CompositeHandler):
             description="Remove orphan (not referred from the metadata table) rows from the data table",
             opts=get_common_opts()
             + [
+                DataGcOptions(),
                 PoolOption(),
                 DryRunOption(),
             ],
@@ -217,5 +256,11 @@ def data_gc(params):
         readonly=params.dry_run,
         operation_pool=params.yt_pool,
     )
+
+    def do_data_gc():
+        yt_store.data_gc(
+            data_size_per_job=params.data_size_per_job, data_size_per_key_range=params.data_size_per_key_range
+        )
+
     # Run in the separate thread to allow INT signal processing in the main thread
-    future(yt_store.data_gc)()
+    future(do_data_gc)()

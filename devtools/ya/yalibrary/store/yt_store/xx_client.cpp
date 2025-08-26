@@ -625,27 +625,6 @@ namespace NYa {
         };
         REGISTER_REDUCER(TStripReducer)
 
-        TString PrettyPrint(TDuration val) {
-            TVector<TString> result{};
-            auto seconds = val.Seconds();
-            if (seconds >= 86400) {
-                result.push_back(ToString(seconds / 86400) + "d");
-                seconds %= 86400;
-            }
-            if (seconds > 0) {
-                result.push_back(ToString(seconds / 3600) + "h");
-                seconds %= 3600;
-            }
-            if (seconds > 0) {
-                result.push_back(ToString(seconds / 60) + "m");
-                seconds %= 60;
-            }
-            if (seconds > 0 || result.empty()) {
-                result.push_back(ToString(seconds) + "s");
-            }
-            return JoinSeq(" ", result);
-        }
-
         class TFirstRowReducer final : public NYT::IReducer<NYT::TTableReader<NYT::TNode>, NYT::TTableWriter<NYT::TNode>> {
         public:
             TFirstRowReducer() = default;
@@ -767,11 +746,11 @@ namespace NYa {
 
             size_t maxCacheSize = GetMaxCacheSize(opClient, opDataDir);
 
-            INFO_LOG << "Desired max age: " << (Ttl_ ? PrettyPrint(Ttl_) : "-");
+            INFO_LOG << "Desired max age: " << (Ttl_ ? ToString(HumanReadable(Ttl_)) : "-");
             for (const auto& item : NameReTtls_) {
-                INFO_LOG << "Desired max age: " << PrettyPrint(item.Ttl) << " for " << item.NameRe;
+                INFO_LOG << "Desired max age: " << HumanReadable(item.Ttl) << " for " << item.NameRe;
             }
-            INFO_LOG << "Desired data size: " << (maxCacheSize ? ToString(HumanReadableSize(maxCacheSize, ESizeFormat::SF_BYTES)).c_str() : "-");
+            INFO_LOG << "Desired data size: " << (maxCacheSize ? ToString(HumanReadableSize(maxCacheSize, ESizeFormat::SF_BYTES)) : "-");
 
             bool stripByDataSize = false;
             if (maxCacheSize) {
@@ -830,7 +809,7 @@ namespace NYa {
             TDuration currentAge = now - Min(now, FromYtTimestamp(rawStat.InitialMinAccessTime));
 
             INFO_LOG << "Current net data size: " << HumanReadableSize(rawStat.InitialDataSize * REPLICATION_FACTOR, ESizeFormat::SF_BYTES);
-            INFO_LOG << "Current max age: " << PrettyPrint(currentAge);
+            INFO_LOG << "Current max age: " << HumanReadable(currentAge);
 
             DEBUG_LOG << "Start deleting rows by access time" << (ReadOnly_ ? " (dry run)" : "");
 
@@ -918,7 +897,7 @@ namespace NYa {
 
             TDuration remainingAge = now - Min(now, FromYtTimestamp(rawStat.RemainingMinAccessTime));
             INFO_LOG << "Data size after clean: " << HumanReadableSize(rawStat.RemainingDataSize * REPLICATION_FACTOR, ESizeFormat::SF_BYTES);
-            INFO_LOG << "Max age after clean: " << PrettyPrint(remainingAge);
+            INFO_LOG << "Max age after clean: " << HumanReadable(remainingAge);
             INFO_LOG << "Removed row count from metadata: " << removedMetadataRowCount;
             INFO_LOG << "Removed hash count from data: " << (rawStat.InitialFileCount - rawStat.RemainingFileCount);
             INFO_LOG << "Removed net data size: " << HumanReadableSize((rawStat.InitialDataSize - rawStat.RemainingDataSize) * REPLICATION_FACTOR, ESizeFormat::SF_BYTES);
@@ -926,26 +905,24 @@ namespace NYa {
             // Put cleaner stat
             auto makeStatNode = [](TDuration ttl, size_t dataSize, size_t fileCount) {
                 return NYT::TNode()
-                ("max_age", i64(ttl.Seconds()))
-                ("data_size", i64(dataSize))
-                ("file_count", i64(fileCount));
+                ("max_age", static_cast<i64>(ttl.Seconds()))
+                ("data_size", static_cast<i64>(dataSize))
+                ("file_count", static_cast<i64>(fileCount));
             };
             NYT::TNode statNode = NYT::TNode()
                 ("before_clean", makeStatNode(currentAge, rawStat.InitialDataSize, rawStat.InitialFileCount))
                 ("after_clean", makeStatNode(remainingAge, rawStat.RemainingDataSize, rawStat.RemainingFileCount));
-            DEBUG_LOG << "Put to stat table:" << (ReadOnly_ ? " (dry run)" : "") << "\n" << NYT::NodeToYsonString(statNode, ::NYson::EYsonFormat::Pretty);
-            if (!ReadOnly_) {
-                PutStat("cleaner", statNode);
-            }
+            PutStat("cleaner", statNode);
             // Yes, it's the default behaviour and is optional but added to demonstrate intent
             tx->Abort();
         }
 
-        void DataGc() {
+        void DataGc(const TDataGcOptions& options) {
             WaitInitialized();
             if (ReadOnly_) {
                 INFO_LOG << "Data GC runs in readonly mode (dry run)";
             }
+            auto dataGcStartTime = TInstant::Now();
 
             auto [opClient, opDataDir] = GetOpCluster();
             Y_ENSURE(opClient && opDataDir);
@@ -986,11 +963,11 @@ namespace NYa {
             TVector<TKeyRange> keyRanges;
             const NYT::TNode::TListType& pivotKeys = dataAttrs["pivot_keys"].AsList();
             ui64 begin = 0;
-            if (pivotKeys.size() > 1) {
+            if (pivotKeys.size() > 1 && options.DataSizePerKeyRange > 0) {
                 ui64 lastPivotBegin = pivotKeys.back()[0].AsUint64();
                 ui64 maxKeyValue = lastPivotBegin + lastPivotBegin / (pivotKeys.size() - 1);
                 auto dataSize = dataAttrs.ChildAsInt64("uncompressed_data_size");
-                auto rangeCount = Max<i64>(dataSize / DATA_GC_DATA_SIZE_PER_KEY_RANGE, 1);
+                auto rangeCount = Max<i64>(dataSize / options.DataSizePerKeyRange, 1);
                 ui64 step = maxKeyValue / rangeCount;
                 ui64 rem = maxKeyValue % rangeCount;
                 for (int i = 1; i < rangeCount; i++) {
@@ -1008,8 +985,10 @@ namespace NYa {
             size_t deletedRowCount = 0;
             // It's ok to reuse the same table for all operations
             NYT::TYPath orphanRowsTable = NYT::JoinYPaths(TMP_DIR, CreateGuidAsString());
-            for (const auto& keyRange : keyRanges) {
-                INFO_LOG << "Range " << keyRange << ": start";
+            for (size_t range_i = 0; range_i < keyRanges.size(); ++range_i) {
+                auto startTime = TInstant::Now();
+                const TKeyRange& keyRange = keyRanges[range_i];
+                INFO_LOG << "Range " << keyRange << ": start " << (range_i + 1) << "/" << keyRanges.size();
                 NYT::TRichYPath richDataPath = NYT::TRichYPath(dataTable)
                     .Columns({"tablet_hash", "hash", "chunk_i", "create_time"})
                     .AddRange(keyRange.AsReadRange());
@@ -1020,9 +999,10 @@ namespace NYa {
                     .AddInput<NYT::TNode>(richKnownHashesPath)
                     .AddOutput<NYT::TNode>(orphanRowsTable)
                     .JoinBy({"tablet_hash", "hash"})
-                    .EnableKeyGuarantee(false)
-                    // YT overestimate required job count because of large 'data' column size
-                    .DataSizePerJob(DATA_GC_DATA_SIZE_PER_JOB);
+                    .EnableKeyGuarantee(false);
+                if (options.DataSizePerJob > 0) {
+                    reduceSpec.DataSizePerJob(options.DataSizePerJob);
+                }
                 AddPool(reduceSpec);
 
                 auto reducer = MakeIntrusive<TOrphanHashesExtractReducer>(timeThreshold);
@@ -1041,7 +1021,7 @@ namespace NYa {
                         DeleteRows({}, keys);
                     }
                 }
-                INFO_LOG << "Range " << keyRange << ": " << foundRowCount << " orphan rows found";
+                INFO_LOG << "Range " << keyRange << ": " << foundRowCount << " orphan rows found in " << HumanReadable(TInstant::Now() - startTime);
                 deletedRowCount += foundRowCount;
             }
 
@@ -1054,6 +1034,12 @@ namespace NYa {
             } else {
                 DEBUG_LOG << "No orphan rows found";
             }
+
+            // Put data-gc stat
+            auto statNode = NYT::TNode()
+                ("deleted_row_count", static_cast<i64>(deletedRowCount))
+                ("duration", static_cast<i64>((TInstant::Now() - dataGcStartTime).Seconds()));
+            PutStat("data_gc", statNode);
             // Yes, it's the default behaviour and is optional but added to demonstrate intent
             tx->Abort();
         }
@@ -1074,8 +1060,6 @@ namespace NYa {
         static constexpr TDuration RETRY_MAX_DELAY = TDuration::Seconds(10);
         static constexpr size_t RETRY_MAX_COUNT = 5;
         static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
-        static constexpr ui64 DATA_GC_DATA_SIZE_PER_JOB = 3_GB;
-        static constexpr i64 DATA_GC_DATA_SIZE_PER_KEY_RANGE = 1_TB;
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
@@ -1323,7 +1307,10 @@ namespace NYa {
         }
 
         void PutStat(const TString& key, const NYT::TNode& value) {
-            Y_ENSURE(!ReadOnly_);
+            DEBUG_LOG << "Put to stat table:" << (ReadOnly_ ? " (dry run)" : "") << "\n" << NYT::NodeToYsonString(value, ::NYson::EYsonFormat::Pretty);
+            if (ReadOnly_) {
+                return;
+            }
             NYT::TYPath statTable = NYT::JoinYPaths(MainCluster_.DataDir, STAT_TABLE);
             bool dynamic = MainCluster_.Client->Get(JoinYPaths(statTable, "@dynamic")).AsBool();
             auto row = NYT::TNode()("timestamp", ToYtTimestamp(TInstant::Now()))("key", key)("value", value);
@@ -1381,8 +1368,8 @@ namespace NYa {
         Impl_->Strip();
     }
 
-    void TYtStore2::DataGc() {
-        Impl_->DataGc();
+    void TYtStore2::DataGc(const TDataGcOptions& options) {
+        Impl_->DataGc(options);
     }
 
     void TYtStore2::ValidateRegexp(const TString& re) {

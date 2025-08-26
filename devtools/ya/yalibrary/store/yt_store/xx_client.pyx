@@ -4,6 +4,7 @@ from cpython.unicode cimport PyUnicode_AsUTF8
 from util.generic.vector cimport TVector
 from util.generic.string cimport TString
 from util.datetime.base cimport TDuration
+from util.system.types cimport i64, ui64
 
 import logging
 import os
@@ -113,12 +114,16 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         TDuration RetryTimeLimit
         bool SyncDurability
 
+    cdef cppclass TDataGcOptions "NYa::TDataGcOptions":
+        i64 DataSizePerJob
+        ui64 DataSizePerKeyRange
+
     cdef cppclass TYtStore2 "NYa::TYtStore2" nogil:
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options) except +raise_yt_store_error
         void WaitInitialized() except +raise_yt_store_error
         bool Disabled()
         void Strip() except +raise_yt_store_error
-        void DataGc() except +raise_yt_store_error
+        void DataGc(const TDataGcOptions& options) except +raise_yt_store_error
         @staticmethod
         void ValidateRegexp(const TString& re) except +ValueError
 
@@ -234,9 +239,18 @@ cdef class YtStoreWrapper2:
         with nogil:
             self.store_ptr.Strip()
 
-    def data_gc(self):
+    def data_gc(
+        self,
+        data_size_per_job: int | None = None,
+        data_size_per_key_range: int | None = None,
+    ) -> None:
+        cdef TDataGcOptions options
+        if data_size_per_job:
+            options.DataSizePerJob = data_size_per_job
+        if data_size_per_key_range:
+            options.DataSizePerKeyRange = data_size_per_key_range
         with nogil:
-            self.store_ptr.DataGc()
+            self.store_ptr.DataGc(options)
 
     def __dealloc__(self):
         # nogil is required to allow YtStore internal threads write log messages during termination

@@ -60,6 +60,11 @@ namespace NYa {
         bool SyncDurability{};
     };
 
+    struct TDataGcOptions {
+        i64 DataSizePerJob{};
+        ui64 DataSizePerKeyRange{};
+    };
+
     class TYtStore2 {
     public:
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options);
@@ -68,7 +73,7 @@ namespace NYa {
         void WaitInitialized();
         bool Disabled() const;
         void Strip();
-        void DataGc();
+        void DataGc(const TDataGcOptions& options);
 
         static void ValidateRegexp(const TString& re);
     private:

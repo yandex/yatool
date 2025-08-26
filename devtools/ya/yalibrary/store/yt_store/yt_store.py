@@ -781,8 +781,12 @@ class YtStore2(DistStore):
     def strip(self):
         self._client.strip()
 
-    def data_gc(self):
-        self._client.data_gc()
+    def data_gc(
+        self,
+        data_size_per_job: int | None = None,
+        data_size_per_key_range: int | None = None,
+    ) -> None:
+        self._client.data_gc(data_size_per_job, data_size_per_key_range)
 
     @staticmethod
     def validate_regexp(re_str: str) -> None:
