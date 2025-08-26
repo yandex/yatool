@@ -1647,6 +1647,10 @@ class YMakeModeOptions(Options):
         if not self.ymake_multiconfig:
             self.ymake_internal_servermode = False
             logger.debug('Ymake internal servermode is available only in multiconfig mode')
+            self.ymake_parallel_rendering = False
+            logger.debug('Ymake parallel rendering is available only in multiconfig mode')
+            self.ymake_use_subinterpreters = False
+            logger.debug('Ymake subinterpreters is available only in multiconfig mode')
 
 
 class YMakeBinOptions(Options):
