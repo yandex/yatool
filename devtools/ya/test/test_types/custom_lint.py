@@ -16,7 +16,6 @@ class CustomLintTestSuite(LintTestSuite):
         self._files = self.get_suite_files()
         self._configs = self.meta.lint_configs
         self._lint_name = self.meta.lint_name
-        self._linter = self.meta.linter
         self._lint_wrapper_script = self.meta.lint_wrapper_script
         self._file_processing_time = float(self.meta.lint_file_processing_time or "0.0")
         self._extra_params = self.meta.lint_extra_params
@@ -75,11 +74,9 @@ class CustomLintTestSuite(LintTestSuite):
             os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
             "--lint-name",
             self._lint_name,
-            "--linter",
-            self._linter,
+            "--wrapper-script",
+            self._lint_wrapper_script,
         ]
-        if self._lint_wrapper_script:
-            cmd += ["--wrapper-script", self._lint_wrapper_script]
         for dep in sorted(self._custom_dependencies):
             cmd += ["--depends", dep]
         for f in opts.tests_filters + self._additional_filters:
@@ -106,8 +103,7 @@ class CustomLintTestSuite(LintTestSuite):
     def get_arcadia_test_data(self):
         data = super(CustomLintTestSuite, self).get_arcadia_test_data()
         data.extend(self._configs)
-        if self._lint_wrapper_script:
-            data.append(self._lint_wrapper_script)
+        data.append(self._lint_wrapper_script)
         return data
 
     def get_test_dependencies(self):

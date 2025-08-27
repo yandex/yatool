@@ -140,14 +140,10 @@ class MetaInfo(object):
         return self._lint_configs or ()
 
     @property
-    def linter(self):
-        if self._linter is None:
-            raise ValueError('linter cannot be None')
-        return self._linter
-
-    @property
     def lint_wrapper_script(self):
-        return self._lint_wrapper_script or ''
+        if self._lint_wrapper_script is None:
+            raise ValueError('lint_wrapper_script cannot be None')
+        return self._lint_wrapper_script
 
     @property
     def lint_extra_params(self):
@@ -368,7 +364,6 @@ class DartInfo(MetaInfo):
         self._ktlint_ruleset = dart_info.get('KTLINT_RULESET')
         self._ktlint_binary = dart_info.get("KTLINT_BINARY")
         self._lint_configs = dart_info.get("LINT-CONFIGS")
-        self._linter = dart_info.get("LINTER")
         self._lint_wrapper_script = dart_info.get("LINT-WRAPPER-SCRIPT")
         self._lint_extra_params = dart_info.get("LINT-EXTRA-PARAMS")
         self._lint_file_processing_time = dart_info.get("LINT-FILE-PROCESSING-TIME")

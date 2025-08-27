@@ -8,6 +8,7 @@ PEERDIR(
     devtools/ya/yalibrary/graph
     # These are needed to run wrapper scripts
     build/plugins/lib/test_const
+    devtools/ya/test/programs/test_tool/lib/migrations_config
     library/python/testing/custom_linter_util
     library/python/testing/style
 )
