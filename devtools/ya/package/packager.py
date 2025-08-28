@@ -1592,12 +1592,12 @@ def do_dump_input(params, arcadia_root, output):
 
         package_build = package_context.parsed_package.get("build", {})
         if "targets" in package_build:
-            for build_info in _do_dump_input_build(package_build):
+            for build_info in _do_dump_input_build(package_build, params):
                 build_section[safe_format(build_info[0], formatters)].add(safe_format(build_info[1], formatters))
         else:
             for build_key in package_build:
                 if "targets" in package_build[build_key]:
-                    for build_info in _do_dump_input_build(package_build[build_key]):
+                    for build_info in _do_dump_input_build(package_build[build_key], params):
                         build_section[safe_format(build_info[0], formatters)].add(
                             safe_format(build_info[1], formatters)
                         )
@@ -1638,13 +1638,14 @@ def do_dump_input(params, arcadia_root, output):
         out.write(json.dumps(result, sort_keys=True, indent=2))
 
 
-def _do_dump_input_build(build_info):
+def _do_dump_input_build(build_info, params):
     targets = build_info.get("targets")
     if not targets:
         return
+    build_type = build_info.get("build_type", params.build_type)
     flags = {item["name"]: item.get("value") for item in build_info.get("flags", [])}
     for platform in build_info.get("target-platforms", []) or ["DEFAULT-LINUX-X86_64"]:
-        platform_key = json.dumps({platform: flags}, sort_keys=True)
+        platform_key = json.dumps({f"{platform},{build_type}": flags}, sort_keys=True)
         for t in targets:
             yield platform_key, t
 
